@@ -79,10 +79,12 @@ export function canonicalizeJson(value: unknown): string {
 
 export function syncPackageSigningText(input: SyncPackage): string {
   const parsed = syncPackageSchema.parse(input);
-  const { signature: _signature, ...proofWithoutSignature } = parsed.proof;
   return canonicalizeJson({
     ...parsed,
-    proof: proofWithoutSignature,
+    proof: {
+      algorithm: parsed.proof.algorithm,
+      key_id: parsed.proof.key_id,
+    },
   });
 }
 
