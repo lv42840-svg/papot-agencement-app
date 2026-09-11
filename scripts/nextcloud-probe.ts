@@ -12,10 +12,9 @@ function requiredEnv(name: string): string {
 }
 
 function joinUrl(base: string, ...parts: string[]): string {
-  return [
-    base.replace(/\/+$/, ""),
-    ...parts.map((part) => part.replace(/^\/+|\/+$/g, "")),
-  ].join("/");
+  return [base.replace(/\/+$/, ""), ...parts.map((part) => part.replace(/^\/+|\/+$/g, ""))].join(
+    "/",
+  );
 }
 
 function basicAuth(login: string, appPassword: string): string {
@@ -80,10 +79,7 @@ async function discoverUserId(baseUrl: string, authorization: string): Promise<s
 }
 
 async function main() {
-  const baseUrl = (process.env.NEXTCLOUD_BASE_URL?.trim() || DEFAULT_BASE_URL).replace(
-    /\/+$/,
-    "",
-  );
+  const baseUrl = (process.env.NEXTCLOUD_BASE_URL?.trim() || DEFAULT_BASE_URL).replace(/\/+$/, "");
   const login = requiredEnv("NEXTCLOUD_LOGIN");
   const appPassword = requiredEnv("NEXTCLOUD_APP_PASSWORD");
   const syncRoot = process.env.NEXTCLOUD_SYNC_ROOT?.trim() || DEFAULT_SYNC_ROOT;
