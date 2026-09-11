@@ -1,6 +1,6 @@
 "use client";
 
-export default function ErrorPage({ reset }: { error: Error & { digest?: string }; reset: () => void }) {
+export default function ErrorPage({ reset }: { reset: () => void }) {
   return (
     <main className="errorPage">
       <section className="panel errorPanel">
