@@ -54,7 +54,7 @@ async function davRequest(
 }
 
 async function discoverUserId(baseUrl: string, authorization: string): Promise<string> {
-  const response = await fetch(`${baseUrl}/ocs/v2.php/cloud/user?format=json`, {
+  const response = await fetch(`${baseUrl}/ocs/v1.php/cloud/user?format=json`, {
     headers: {
       Authorization: authorization,
       "OCS-APIRequest": "true",
@@ -98,7 +98,7 @@ async function main() {
   const fixedPayload = `papot-nextcloud-probe:${probeId}\n`;
   let probeDirectoryCreated = false;
 
-  console.log(`[info] Testing WebDAV path: ${new URL(filesRoot).pathname}/`);
+  console.log("[info] Testing the discovered Nextcloud WebDAV files endpoint");
 
   try {
     await davRequest("PROPFIND", `${filesRoot}/`, authorization, {
