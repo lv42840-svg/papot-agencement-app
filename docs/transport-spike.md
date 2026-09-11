@@ -1,6 +1,6 @@
 # Spike transport Nextcloud
 
-Status: **NEXTCLOUD WEBDAV REEL VALIDE**. Le transport WebDAV direct depuis une PWA Safari iPhone est **ECARTE** a cause du CORS constate en conditions reelles. Le spike global reste **NON VALIDE** tant que l'installation PWA est constatee, le prototype hybride/native, Android, le worker PostgreSQL, l'ACK et les essais de reprise/destruction ne sont pas termines.
+Status: **NEXTCLOUD WEBDAV REEL VALIDE**. L'installation PWA sur iPhone reel est **VALIDEE**, mais le transport WebDAV direct depuis la PWA Safari iPhone est **ECARTE** a cause du CORS constate en conditions reelles. Le spike global reste **NON VALIDE** tant que le prototype hybride/native, Android, le worker PostgreSQL, l'ACK et les essais de reprise/destruction ne sont pas termines.
 
 ## Porte d'architecture
 
@@ -65,21 +65,27 @@ Ce resultat valide le socle WebDAV reel de Nextcloud IDEO pour le transport asyn
 
 ## Essai reel iPhone / PWA
 
-Essai effectue le 11 septembre 2026 sur iPhone en 5G depuis la page HTTPS GitHub Pages du spike.
+Essai effectue le 11 septembre 2026 sur iPhone en reseau cellulaire depuis la page HTTPS GitHub Pages du spike.
 
-Constats visibles dans Safari:
+Premier passage dans Safari:
 
 - HTTPS: OK;
 - contexte securise: OK;
 - Service Worker: PRET;
-- mode installe: NON lors de cette capture, donc la page etait encore ouverte dans Safari et non depuis l'icone d'ecran d'accueil;
+- mode installe: NON, ce qui est normal dans Safari;
 - `GET https://cloud.ideo-solutions.com/status.php`: HTTP 200 lisible par Safari;
 - `PROPFIND` cross-origin vers WebDAV Nextcloud: bloque avant lecture de la reponse.
 
-Conclusion de ce test: le navigateur atteint bien Nextcloud, mais le WebDAV direct cross-origin requis par la PWA est bloque par CORS sur l'iPhone reel. Conformement a la decision d'architecture du cahier des charges, la voie PWA directe vers WebDAV est donc ecartee. Le prochain prototype de transport mobile doit passer par une enveloppe hybride/native legere tout en conservant les types et regles TypeScript existants et sans exposer PAPOT sur Internet.
+Deuxieme passage depuis l'icone ajoutee a l'ecran d'accueil, en 4G:
 
-L'installation depuis l'ecran d'accueil doit encore etre constatee une fois pour clore proprement le sous-test PWA, meme si elle ne peut plus lever le blocage CORS du transport direct.
+- HTTPS: OK;
+- contexte securise: OK;
+- Service Worker: PRET;
+- mode installe: OUI;
+- le meme diagnostic CORS WebDAV reste affiche: `GET status.php` HTTP 200, puis `PROPFIND` WebDAV bloque avant lecture de la reponse.
+
+Conclusion: l'installation PWA et le Service Worker fonctionnent reellement sur iPhone, mais le transport WebDAV direct cross-origin requis par une PWA est bloque par CORS. Conformement a la decision d'architecture du cahier des charges, la voie PWA directe vers WebDAV est ecartee. Le prochain prototype de transport mobile doit passer par une enveloppe hybride/native legere tout en conservant les types et regles TypeScript existants et sans exposer PAPOT sur Internet.
 
 ## Ce que ce probe ne prouve pas
 
-Le succes WebDAV serveur et le constat CORS iPhone ne valident pas encore Android, le transport hybride/native authentifie, le worker PostgreSQL, l'ACK ni la reprise apres coupure. Ces points restent obligatoires avant le GO du spike complet.
+Le succes WebDAV serveur et le constat PWA/CORS iPhone ne valident pas encore Android, le transport hybride/native authentifie, le worker PostgreSQL, l'ACK ni la reprise apres coupure. Ces points restent obligatoires avant le GO du spike complet.
