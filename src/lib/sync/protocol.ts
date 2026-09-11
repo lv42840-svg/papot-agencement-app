@@ -1,5 +1,5 @@
 import { z } from "zod";
-import { captureCreateSchema } from "@/lib/capture/schema";
+import { captureCreateSchema } from "../capture/schema";
 
 export const SYNC_SCHEMA_VERSION = 1 as const;
 
@@ -83,5 +83,16 @@ export function syncPackageSigningText(input: SyncPackage): string {
   return canonicalizeJson({
     ...parsed,
     proof: proofWithoutSignature,
+  });
+}
+
+export function syncBusinessRequestText(input: SyncPackage): string {
+  const parsed = syncPackageSchema.parse(input);
+  return canonicalizeJson({
+    operation: parsed.operation,
+    papot_user_id: parsed.papot_user_id,
+    client_request_id: parsed.client_request_id,
+    payload: parsed.payload,
+    attachments: parsed.attachments,
   });
 }
