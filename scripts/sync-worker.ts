@@ -108,12 +108,27 @@ async function verifyAttachmentBytes(
   }
 }
 
+async function verifyArchivedAttachment(
+  dav: NextcloudDavClient,
+  url: string,
+  attachment: SyncAttachment,
+): Promise<void> {
+  try {
+    await verifyAttachmentBytes(dav, url, attachment);
+  } catch (error) {
+    if (error instanceof PermanentSyncError) {
+      throw new Error(`DOCUMENT_${error.code}`);
+    }
+    throw error;
+  }
+}
+
 async function verifyIncomingAttachments(
   dav: NextcloudDavClient,
   incomingUrl: string,
   packet: SyncPackage,
-): Promise<string | null> {
-  if (!packet.attachments.length) return null;
+): Promise<void> {
+  if (!packet.attachments.length) return;
 
   const attachmentDir = dav.childUrl(incomingUrl, `${packet.package_id}.attachments`);
   if (!(await dav.exists(`${attachmentDir}/`))) {
@@ -127,15 +142,13 @@ async function verifyIncomingAttachments(
     }
     await verifyAttachmentBytes(dav, sourceUrl, attachment);
   }
-
-  return attachmentDir;
 }
 
 async function assertDeviceAndPermission(
   client: PoolClient,
   packet: SyncPackage,
   nextcloudUserId: string,
-): Promise<DeviceRow> {
+): Promise<void> {
   const deviceResult = await client.query<DeviceRow & { app_user_active: boolean; is_active: boolean }>(
     `SELECT d.id, d.user_id, d.nextcloud_user_id, d.key_id, d.public_key_pem,
             d.is_active, u.is_active AS app_user_active
@@ -165,8 +178,6 @@ async function assertDeviceAndPermission(
   if (permission.rows[0]?.access_level !== "WRITE") {
     throw new PermanentSyncError("NO_CAPTURE_WRITE_PERMISSION");
   }
-
-  return device;
 }
 
 async function findAppliedPackage(client: PoolClient, packet: SyncPackage): Promise<AppliedRow | null> {
@@ -180,6 +191,20 @@ async function findAppliedPackage(client: PoolClient, packet: SyncPackage): Prom
     [packet.package_id, packet.operation, packet.client_request_id],
   );
   return result.rows[0] ?? null;
+}
+
+async function recoverAppliedResult(pool: Pool, packet: SyncPackage): Promise<AppliedResult | null> {
+  const client = await pool.connect();
+  try {
+    const existing = await findAppliedPackage(client, packet);
+    if (!existing) return null;
+    if (existing.request_sha256 !== syncBusinessRequestHash(packet)) {
+      throw new PermanentSyncError("IDEMPOTENCE_CONFLICT");
+    }
+    return { captureId: captureIdFromResult(existing.result_json), duplicate: true };
+  } finally {
+    client.release();
+  }
 }
 
 async function applyPackageToDatabase(
@@ -280,7 +305,7 @@ async function archiveAttachments(
     const targetUrl = dav.childUrl(targetDir, attachment.object_name);
 
     if (await dav.exists(targetUrl)) {
-      await verifyAttachmentBytes(dav, targetUrl, attachment);
+      await verifyArchivedAttachment(dav, targetUrl, attachment);
       continue;
     }
     if (!(await dav.exists(sourceUrl))) {
@@ -288,7 +313,7 @@ async function archiveAttachments(
     }
 
     await dav.move(sourceUrl, targetUrl, false);
-    await verifyAttachmentBytes(dav, targetUrl, attachment);
+    await verifyArchivedAttachment(dav, targetUrl, attachment);
   }
 
   await dav.delete(sourceDir, true);
@@ -368,8 +393,12 @@ async function processPacketFile(
       throw new PermanentSyncError("INVALID_DEVICE_SIGNATURE");
     }
 
-    await verifyIncomingAttachments(dav, zones.incoming, packet);
-    const result = await applyPackageToDatabase(pool, packet, nextcloudUserId);
+    let result = await recoverAppliedResult(pool, packet);
+    if (!result) {
+      await verifyIncomingAttachments(dav, zones.incoming, packet);
+      result = await applyPackageToDatabase(pool, packet, nextcloudUserId);
+    }
+
     await archiveAttachments(dav, syncRootUrl, zones.incoming, packet, result.captureId);
     await writeAck(dav, zones.ack, packet, result);
     await dav.delete(packetUrl, true);
