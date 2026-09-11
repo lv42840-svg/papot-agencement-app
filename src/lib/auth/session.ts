@@ -24,10 +24,11 @@ export async function createSession(userId: string) {
   const token = randomBytes(32).toString("base64url");
   const expiresAt = new Date(Date.now() + ttlHours * 60 * 60 * 1000);
 
-  await db.query(
-    "INSERT INTO app_session(token_hash, user_id, expires_at) VALUES ($1, $2, $3)",
-    [tokenHash(token), userId, expiresAt],
-  );
+  await db.query("INSERT INTO app_session(token_hash, user_id, expires_at) VALUES ($1, $2, $3)", [
+    tokenHash(token),
+    userId,
+    expiresAt,
+  ]);
 
   const store = await cookies();
   store.set(cookieName, token, {

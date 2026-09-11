@@ -20,7 +20,10 @@ export function AccentPicker({ initialAccent }: { initialAccent: string }) {
     if (response.ok) {
       setAccent(next);
       document.documentElement.style.setProperty("--accent", accentPalette[next].value);
-      document.documentElement.style.setProperty("--accent-foreground", accentPalette[next].foreground);
+      document.documentElement.style.setProperty(
+        "--accent-foreground",
+        accentPalette[next].foreground,
+      );
     }
     setBusy(false);
   }

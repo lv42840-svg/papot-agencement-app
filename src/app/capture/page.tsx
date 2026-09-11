@@ -12,9 +12,16 @@ export default async function CapturePage() {
   return (
     <AppShell user={user}>
       {canWrite ? (
-        <CaptureForm currentUserId={user.id} users={users} tags={tags.map((tag) => ({ id: tag.id, label: tag.label }))} />
+        <CaptureForm
+          currentUserId={user.id}
+          users={users}
+          tags={tags.map((tag) => ({ id: tag.id, label: tag.label }))}
+        />
       ) : (
-        <section className="panel"><h1>Capture</h1><p>Vous n’avez pas le droit de créer une capture.</p></section>
+        <section className="panel">
+          <h1>Capture</h1>
+          <p>Vous n’avez pas le droit de créer une capture.</p>
+        </section>
       )}
     </AppShell>
   );

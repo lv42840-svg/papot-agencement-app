@@ -30,10 +30,22 @@ export function LoginForm() {
 
   return (
     <form className="loginForm" onSubmit={submit}>
-      <label>Adresse e-mail<input name="email" type="email" autoComplete="username" required /></label>
-      <label>Mot de passe<input name="password" type="password" autoComplete="current-password" required /></label>
-      {error && <p className="formError" role="alert">{error}</p>}
-      <button className="primaryButton" type="submit" disabled={busy}>{busy ? "Connexion…" : "Se connecter"}</button>
+      <label>
+        Adresse e-mail
+        <input name="email" type="email" autoComplete="username" required />
+      </label>
+      <label>
+        Mot de passe
+        <input name="password" type="password" autoComplete="current-password" required />
+      </label>
+      {error && (
+        <p className="formError" role="alert">
+          {error}
+        </p>
+      )}
+      <button className="primaryButton" type="submit" disabled={busy}>
+        {busy ? "Connexion…" : "Se connecter"}
+      </button>
     </form>
   );
 }

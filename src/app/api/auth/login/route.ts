@@ -18,14 +18,16 @@ export async function POST(request: Request) {
   const result = await db.query<{
     id: string;
     password_hash: string;
-  }>(
-    "SELECT id, password_hash FROM app_user WHERE lower(email) = lower($1) AND is_active = true",
-    [parsed.data.email],
-  );
+  }>("SELECT id, password_hash FROM app_user WHERE lower(email) = lower($1) AND is_active = true", [
+    parsed.data.email,
+  ]);
   const user = result.rows[0];
 
   if (!user || !(await verifyPassword(parsed.data.password, user.password_hash))) {
-    return NextResponse.json({ error: "Adresse e-mail ou mot de passe incorrect." }, { status: 401 });
+    return NextResponse.json(
+      { error: "Adresse e-mail ou mot de passe incorrect." },
+      { status: 401 },
+    );
   }
 
   await createSession(user.id);

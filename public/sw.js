@@ -2,7 +2,12 @@ const CACHE = "papot-shell-v1";
 const SHELL = ["/", "/capture", "/tasks", "/manifest.webmanifest"];
 
 self.addEventListener("install", (event) => {
-  event.waitUntil(caches.open(CACHE).then((cache) => cache.addAll(SHELL)).catch(() => undefined));
+  event.waitUntil(
+    caches
+      .open(CACHE)
+      .then((cache) => cache.addAll(SHELL))
+      .catch(() => undefined),
+  );
   self.skipWaiting();
 });
 

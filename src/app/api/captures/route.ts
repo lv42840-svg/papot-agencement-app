@@ -22,7 +22,10 @@ export async function POST(request: Request) {
   } catch (error) {
     const code = error instanceof Error ? error.message : "UNKNOWN";
     if (code === "INVALID_RESPONSIBLE" || code === "INVALID_TAG") {
-      return NextResponse.json({ error: "Une valeur sélectionnée n’est plus disponible." }, { status: 409 });
+      return NextResponse.json(
+        { error: "Une valeur sélectionnée n’est plus disponible." },
+        { status: 409 },
+      );
     }
     console.error("capture_create_failed", error);
     return NextResponse.json({ error: "Impossible d’enregistrer la capture." }, { status: 500 });
