@@ -6,7 +6,10 @@ import {
   syncPackageSigningText,
   type SyncPackage,
 } from "../src/lib/sync/protocol";
-import { verifySyncPackageSignature } from "../src/lib/sync/signature";
+import {
+  syncBusinessRequestHash,
+  verifySyncPackageSignature,
+} from "../src/lib/sync/signature";
 
 const packageId = "11111111-1111-4111-8111-111111111111";
 const userId = "22222222-2222-4222-8222-222222222222";
@@ -82,6 +85,17 @@ describe("sync package protocol", () => {
     expect(canonicalizeJson({ z: 1, a: { d: 2, c: 3 } })).toBe(
       '{"a":{"c":3,"d":2},"z":1}',
     );
+  });
+
+  it("keeps the business idempotence hash across a repackaged retry", () => {
+    const first = syncPackageSchema.parse(unsignedPackage());
+    const retry = syncPackageSchema.parse({
+      ...unsignedPackage(),
+      package_id: "77777777-7777-4777-8777-777777777777",
+      created_at: "2026-09-11T20:05:00+02:00",
+    });
+
+    expect(syncBusinessRequestHash(retry)).toBe(syncBusinessRequestHash(first));
   });
 
   it("verifies an Ed25519 device proof and rejects a tampered payload", () => {
