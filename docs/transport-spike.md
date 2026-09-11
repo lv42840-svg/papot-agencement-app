@@ -86,6 +86,40 @@ Deuxieme passage depuis l'icone ajoutee a l'ecran d'accueil, en 4G:
 
 Conclusion: l'installation PWA et le Service Worker fonctionnent reellement sur iPhone, mais le transport WebDAV direct cross-origin requis par une PWA est bloque par CORS. Conformement a la decision d'architecture du cahier des charges, la voie PWA directe vers WebDAV est ecartee. Le prochain prototype de transport mobile doit passer par une enveloppe hybride/native legere tout en conservant les types et regles TypeScript existants et sans exposer PAPOT sur Internet.
 
-## Ce que ce probe ne prouve pas
+## Android
 
-Le succes WebDAV serveur et le constat PWA/CORS iPhone ne valident pas encore Android, le transport hybride/native authentifie, le worker PostgreSQL, l'ACK ni la reprise apres coupure. Ces points restent obligatoires avant le GO du spike complet.
+Aucun terminal Android n'est disponible pour le moment. L'essai Android reel est donc **DIFFERE**, pas valide ni abandonne. Il reste obligatoire avant le GO final du spike, mais il ne bloque pas l'implementation des composants serveur et protocole independants de la plateforme mobile.
+
+## Protocole et worker, etat d'implementation
+
+Le socle suivant est implemente sur la branche du spike mais n'est pas encore valide par un aller-retour reel telephone -> Nextcloud -> worker PAPOT -> PostgreSQL -> ACK -> telephone:
+
+- paquet `capture.create` versionne avec `package_id`, `client_request_id`, version d'application, identite utilisateur/appareil, horodatage, payload metier et metadonnees de pieces jointes;
+- preuve cryptographique Ed25519 rattachee a un appareil autorise;
+- empreintes SHA-256 des pieces jointes et controle taille/empreinte avant ecriture metier;
+- idempotence sur `package_id` et `client_request_id`, avec detection d'un meme identifiant de requete reutilise pour un contenu metier different;
+- migration SQL pour les appareils autorises, les paquets recus et les metadonnees de pieces jointes;
+- zones Nextcloud isolees `incoming`, `ack`, `error`, `outgoing` et `snapshot` par utilisateur et appareil;
+- worker local qui ne traite que les fichiers `.json` finalises, donc ignore les fichiers de staging;
+- staging compatible Nextcloud avec suffixe `.staging-<UUID>`, puis `MOVE` vers le fichier final;
+- validation de l'appareil, de l'identite, de la permission Capture WRITE et de la signature avant ecriture metier;
+- transaction PostgreSQL reutilisant la logique Capture existante;
+- archivage des pieces jointes sous `PAPOT_SYNC/documents/captures/<capture_id>/...`;
+- ACK ecrit seulement apres validation et ecriture metier completes;
+- reprise idempotente prevue si le paquet a ete applique en base mais que l'ACK n'a pas encore pu etre depose;
+- erreurs permanentes explicites et erreurs transitoires conservees pour nouvelle tentative;
+- journaux techniques sans secret ni payload metier complet.
+
+Commandes prevues une fois la base locale configuree:
+
+```bash
+npm run db:migrate
+npm run sync:once
+npm run sync:worker
+```
+
+Ne pas considerer cette section comme une preuve de fonctionnement reel: le worker et les migrations doivent encore etre executes sur l'infrastructure PAPOT cible, puis soumis aux essais de panne et d'idempotence prevus par le cahier des charges.
+
+## Ce que ce spike ne prouve pas encore
+
+Le succes WebDAV serveur et le constat PWA/CORS iPhone ne valident pas encore Android, le transport hybride/native authentifie, l'execution reelle du worker PostgreSQL, l'ACK de bout en bout ni la reprise apres coupure. Ces points restent obligatoires avant le GO du spike complet.
