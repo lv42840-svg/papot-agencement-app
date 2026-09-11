@@ -16,7 +16,9 @@
     "test": "vitest run",
     "db:migrate": "tsx scripts/migrate.ts",
     "db:bootstrap": "tsx scripts/bootstrap-admin.ts",
-    "nextcloud:probe": "tsx scripts/nextcloud-probe.ts"
+    "nextcloud:probe": "tsx scripts/nextcloud-probe.ts",
+    "sync:once": "tsx scripts/sync-worker.ts",
+    "sync:worker": "tsx scripts/sync-worker.ts --watch"
   },
   "dependencies": {
     "lucide-react": "0.468.0",
