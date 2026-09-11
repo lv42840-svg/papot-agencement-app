@@ -15,7 +15,8 @@
     "typecheck": "tsc --noEmit",
     "test": "vitest run",
     "db:migrate": "tsx scripts/migrate.ts",
-    "db:bootstrap": "tsx scripts/bootstrap-admin.ts"
+    "db:bootstrap": "tsx scripts/bootstrap-admin.ts",
+    "nextcloud:probe": "tsx scripts/nextcloud-probe.ts"
   },
   "dependencies": {
     "lucide-react": "0.468.0",
