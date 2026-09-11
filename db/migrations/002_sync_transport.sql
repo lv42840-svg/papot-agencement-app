@@ -35,4 +35,17 @@ CREATE UNIQUE INDEX IF NOT EXISTS sync_received_client_request_uidx
 CREATE INDEX IF NOT EXISTS sync_received_device_applied_idx
   ON sync_received_package(device_id, applied_at DESC);
 
+CREATE TABLE IF NOT EXISTS capture_attachment (
+  id uuid PRIMARY KEY,
+  capture_entry_id uuid NOT NULL REFERENCES capture_entry(id) ON DELETE CASCADE,
+  file_name text NOT NULL,
+  content_type text NOT NULL,
+  size_bytes bigint NOT NULL CHECK (size_bytes >= 0),
+  sha256 text NOT NULL CHECK (sha256 ~ '^[a-f0-9]{64}$'),
+  nextcloud_path text NOT NULL,
+  created_at timestamptz NOT NULL DEFAULT now()
+);
+CREATE INDEX IF NOT EXISTS capture_attachment_capture_idx
+  ON capture_attachment(capture_entry_id, created_at);
+
 COMMIT;
