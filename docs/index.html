@@ -1,0 +1,226 @@
+<!doctype html>
+<html lang="fr">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+    <meta name="theme-color" content="#111827" />
+    <meta name="apple-mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-title" content="PAPOT Probe" />
+    <title>PAPOT PWA Probe</title>
+    <link rel="manifest" href="./manifest.webmanifest" />
+    <style>
+      :root {
+        color-scheme: light dark;
+        font-family:
+          Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+      }
+
+      body {
+        margin: 0;
+        min-height: 100vh;
+        background: Canvas;
+        color: CanvasText;
+      }
+
+      main {
+        width: min(720px, calc(100% - 32px));
+        margin: 0 auto;
+        padding: calc(24px + env(safe-area-inset-top)) 0 calc(40px + env(safe-area-inset-bottom));
+      }
+
+      h1 {
+        margin-bottom: 8px;
+        font-size: 1.6rem;
+      }
+
+      p {
+        line-height: 1.5;
+      }
+
+      .card {
+        margin-top: 18px;
+        padding: 16px;
+        border: 1px solid color-mix(in srgb, CanvasText 18%, transparent);
+        border-radius: 14px;
+      }
+
+      .status {
+        display: grid;
+        gap: 8px;
+      }
+
+      .status-row {
+        display: flex;
+        justify-content: space-between;
+        gap: 16px;
+      }
+
+      .status-value {
+        font-weight: 700;
+      }
+
+      button {
+        width: 100%;
+        margin-top: 14px;
+        padding: 13px 16px;
+        border: 0;
+        border-radius: 10px;
+        background: #111827;
+        color: #ffffff;
+        font: inherit;
+        font-weight: 700;
+        cursor: pointer;
+      }
+
+      pre {
+        min-height: 96px;
+        margin: 12px 0 0;
+        padding: 12px;
+        overflow-x: auto;
+        border-radius: 10px;
+        background: color-mix(in srgb, CanvasText 7%, Canvas);
+        white-space: pre-wrap;
+        word-break: break-word;
+      }
+    </style>
+  </head>
+  <body>
+    <main>
+      <h1>PAPOT PWA Probe</h1>
+      <p>
+        Test technique temporaire. Aucun identifiant, mot de passe, jeton ou donnée métier n'est
+        demandé par cette page.
+      </p>
+
+      <section class="card">
+        <h2>État PWA</h2>
+        <div class="status">
+          <div class="status-row">
+            <span>HTTPS</span>
+            <span class="status-value" id="https-status">En attente…</span>
+          </div>
+          <div class="status-row">
+            <span>Contexte sécurisé</span>
+            <span class="status-value" id="secure-status">En attente…</span>
+          </div>
+          <div class="status-row">
+            <span>Service Worker</span>
+            <span class="status-value" id="sw-status">En attente…</span>
+          </div>
+          <div class="status-row">
+            <span>Mode installé</span>
+            <span class="status-value" id="standalone-status">En attente…</span>
+          </div>
+        </div>
+      </section>
+
+      <section class="card">
+        <h2>Pré-test CORS Nextcloud</h2>
+        <p>
+          Ce test envoie uniquement des requêtes non authentifiées vers Nextcloud IDEO. Il vérifie
+          si Safari peut au moins atteindre le serveur et tenter une méthode WebDAV cross-origin.
+        </p>
+        <button id="run-test" type="button">Tester le CORS WebDAV</button>
+        <button id="copy-result" type="button">Copier le résultat</button>
+        <pre id="result" aria-live="polite">Prêt.</pre>
+      </section>
+    </main>
+
+    <script>
+      const NEXTCLOUD_BASE_URL = "https://cloud.ideo-solutions.com";
+      const resultElement = document.querySelector("#result");
+      const runButton = document.querySelector("#run-test");
+      const copyButton = document.querySelector("#copy-result");
+
+      function setStatus(id, text) {
+        const element = document.querySelector(id);
+        if (element) {
+          element.textContent = text;
+        }
+      }
+
+      function writeResult(lines) {
+        resultElement.textContent = lines.join("\n");
+      }
+
+      async function registerServiceWorker() {
+        setStatus("#https-status", location.protocol === "https:" ? "OK" : "NON");
+        setStatus("#secure-status", window.isSecureContext ? "OK" : "NON");
+
+        const isStandalone =
+          window.matchMedia("(display-mode: standalone)").matches ||
+          window.navigator.standalone === true;
+        setStatus("#standalone-status", isStandalone ? "OUI" : "NON");
+
+        if (!("serviceWorker" in navigator)) {
+          setStatus("#sw-status", "NON SUPPORTÉ");
+          return;
+        }
+
+        try {
+          await navigator.serviceWorker.register("./sw.js", { scope: "./" });
+          await navigator.serviceWorker.ready;
+          setStatus("#sw-status", "PRÊT");
+        } catch {
+          setStatus("#sw-status", "ÉCHEC");
+        }
+      }
+
+      async function runCorsTest() {
+        const lines = [];
+        runButton.disabled = true;
+        writeResult(["[info] Test en cours…"]);
+
+        try {
+          try {
+            const statusResponse = await fetch(`${NEXTCLOUD_BASE_URL}/status.php`, {
+              method: "GET",
+              cache: "no-store",
+              mode: "cors",
+            });
+            lines.push(`[ok] GET status.php visible par Safari: HTTP ${statusResponse.status}`);
+          } catch {
+            lines.push("[fail] GET status.php bloqué avant lecture de la réponse.");
+            lines.push("[diagnostic] CORS ou accès réseau navigateur bloqué.");
+            writeResult(lines);
+            return;
+          }
+
+          try {
+            const davResponse = await fetch(`${NEXTCLOUD_BASE_URL}/remote.php/dav/`, {
+              method: "PROPFIND",
+              headers: { Depth: "0" },
+              cache: "no-store",
+              mode: "cors",
+            });
+            lines.push(`[ok] PROPFIND WebDAV visible par Safari: HTTP ${davResponse.status}`);
+            lines.push("[pass] Pré-test CORS WebDAV réussi sans authentification.");
+            lines.push("[info] Il reste à tester l'authentification et le WebDAV authentifié.");
+          } catch {
+            lines.push("[fail] PROPFIND WebDAV bloqué avant lecture de la réponse.");
+            lines.push("[diagnostic] CORS WebDAV navigateur probablement bloqué.");
+          }
+
+          writeResult(lines);
+        } finally {
+          runButton.disabled = false;
+        }
+      }
+
+      runButton.addEventListener("click", runCorsTest);
+      copyButton.addEventListener("click", async () => {
+        try {
+          await navigator.clipboard.writeText(resultElement.textContent || "");
+          copyButton.textContent = "Résultat copié";
+          setTimeout(() => {
+            copyButton.textContent = "Copier le résultat";
+          }, 1200);
+        } catch {
+          copyButton.textContent = "Copie impossible";
+        }
+      });
+
+      registerServiceWorker();
+    </script>
+  </body>
+</html>
