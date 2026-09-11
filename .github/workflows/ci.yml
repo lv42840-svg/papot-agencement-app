@@ -14,10 +14,10 @@ jobs:
         with:
           node-version: 22
       - run: npm install
-      - run: npm run format:check
       - run: npm run lint
       - run: npm run typecheck
       - run: npm test
       - run: npm run build
         env:
           DATABASE_URL: postgresql://user:pass@127.0.0.1:5432/db
+      - run: npm run format:check
