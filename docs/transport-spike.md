@@ -32,7 +32,7 @@ Le probe decouvre d'abord l'identifiant Nextcloud canonique via l'API OCS. Il ne
 1. `PROPFIND` de la racine fichiers;
 2. `PROPFIND` ou `MKCOL` de `PAPOT_SYNC`;
 3. `MKCOL` d'un repertoire de test unique;
-4. `PUT` d'un fichier temporaire `.part`;
+4. `PUT` d'un fichier temporaire de staging sans extension reservee;
 5. `GET` et verification de son contenu;
 6. `MOVE` vers le nom final `.json`;
 7. `PROPFIND` et `GET` du fichier final;
@@ -40,6 +40,12 @@ Le probe decouvre d'abord l'identifiant Nextcloud canonique via l'API OCS. Il ne
 9. nettoyage du repertoire de test.
 
 Le contenu de test est fixe et non metier. Le script n'affiche ni login, ni mot de passe d'application, ni entete Authorization, ni corps des reponses Nextcloud.
+
+### Constat reel du 11 septembre 2026
+
+Le premier essai reel sur Nextcloud IDEO a valide la decouverte de l'utilisateur, `PROPFIND`, la creation de `PAPOT_SYNC` et la creation d'un repertoire de test. Le `PUT` d'un fichier dont le nom se terminait par `.part` a ete refuse en HTTP 400. Le repertoire de test a ensuite ete nettoye correctement en HTTP 204.
+
+La documentation Nextcloud actuelle reserve l'extension `.part` a son fonctionnement interne. Le probe de capacites utilise donc desormais un nom temporaire sans cette extension pour verifier que `PUT`, `GET`, `MOVE` et `DELETE` fonctionnent reellement. Cette adaptation du probe ne modifie pas silencieusement le protocole de production: la regle de nommage temporaire du protocole devra etre alignee explicitement avec cette contrainte Nextcloud avant son implementation definitive.
 
 ## Ce que ce probe ne prouve pas
 
