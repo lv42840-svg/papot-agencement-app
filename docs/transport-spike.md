@@ -1,6 +1,6 @@
 # Spike transport Nextcloud
 
-Status: **NON VALIDE** tant que les essais reels ci-dessous ne sont pas executes sur l'infrastructure cible et sur de vrais telephones.
+Status: **NEXTCLOUD WEBDAV REEL VALIDE**. Le spike global reste **NON VALIDE** tant que les essais PWA sur vrais telephones, le worker PostgreSQL, l'ACK et les essais de reprise/destruction ne sont pas termines.
 
 ## Porte d'architecture
 
@@ -41,12 +41,28 @@ Le probe decouvre d'abord l'identifiant Nextcloud canonique via l'API OCS. Il ne
 
 Le contenu de test est fixe et non metier. Le script n'affiche ni login, ni mot de passe d'application, ni entete Authorization, ni corps des reponses Nextcloud.
 
-### Constat reel du 11 septembre 2026
+### Constats reels du 11 septembre 2026
 
-Le premier essai reel sur Nextcloud IDEO a valide la decouverte de l'utilisateur, `PROPFIND`, la creation de `PAPOT_SYNC` et la creation d'un repertoire de test. Le `PUT` d'un fichier dont le nom se terminait par `.part` a ete refuse en HTTP 400. Le repertoire de test a ensuite ete nettoye correctement en HTTP 204.
+Premier essai: la decouverte de l'utilisateur, `PROPFIND`, la creation de `PAPOT_SYNC` et la creation d'un repertoire de test ont reussi. Le `PUT` d'un fichier dont le nom se terminait par `.part` a ete refuse en HTTP 400. Le repertoire de test a ensuite ete nettoye correctement en HTTP 204.
 
-La documentation Nextcloud actuelle reserve l'extension `.part` a son fonctionnement interne. Le probe de capacites utilise donc desormais un nom temporaire sans cette extension pour verifier que `PUT`, `GET`, `MOVE` et `DELETE` fonctionnent reellement. Cette adaptation du probe ne modifie pas silencieusement le protocole de production: la regle de nommage temporaire du protocole devra etre alignee explicitement avec cette contrainte Nextcloud avant son implementation definitive.
+La documentation Nextcloud actuelle reserve l'extension `.part` a son fonctionnement interne. Le probe de capacites utilise donc un nom temporaire de staging sans cette extension. Cette adaptation ne modifie pas silencieusement le protocole de production: la regle de nommage temporaire devra etre alignee explicitement avec cette contrainte Nextcloud avant implementation definitive.
+
+Deuxieme essai reel, apres adaptation du nom temporaire: **SUCCES COMPLET**.
+
+- decouverte de l'identifiant utilisateur: OK;
+- `PROPFIND` racine fichiers: HTTP 207;
+- `PROPFIND PAPOT_SYNC`: HTTP 207;
+- `MKCOL` repertoire de test: HTTP 201;
+- `PUT` staging: HTTP 201;
+- `GET` staging: HTTP 200 et contenu identique;
+- `MOVE` staging vers `.json`: HTTP 201;
+- `PROPFIND` fichier final: HTTP 207;
+- `GET` fichier final: HTTP 200 et contenu identique;
+- `DELETE` fichier final: HTTP 204;
+- nettoyage repertoire de test: HTTP 204.
+
+Ce resultat valide le socle WebDAV reel de Nextcloud IDEO pour le transport asynchrone PAPOT, sous reserve de remplacer le suffixe temporaire `.part` prevu initialement par un nom de staging compatible Nextcloud.
 
 ## Ce que ce probe ne prouve pas
 
-Un succes de ce script ne valide pas encore le CORS d'une PWA, un iPhone en 4G/5G, Android, le worker PostgreSQL, l'ACK ni la reprise apres coupure. Ces points restent obligatoires avant le GO du spike complet.
+Ce succes ne valide pas encore le CORS d'une PWA, un iPhone en conditions reelles, Android, le worker PostgreSQL, l'ACK ni la reprise apres coupure. Ces points restent obligatoires avant le GO du spike complet.
