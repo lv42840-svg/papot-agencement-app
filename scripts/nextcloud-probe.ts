@@ -89,7 +89,10 @@ async function main() {
   const syncRootUrl = joinUrl(filesRoot, encodeURIComponent(syncRoot));
   const probeId = randomUUID();
   const probeDirUrl = joinUrl(syncRootUrl, `.papot-probe-${probeId}`);
-  const partUrl = joinUrl(probeDirUrl, `${probeId}.part`);
+  // Nextcloud reserves the .part extension internally. The capability probe therefore
+  // uses an extensionless staging name, then atomically MOVE-s it to the final .json name.
+  // The production transport naming rule remains a separate architecture decision.
+  const stagingUrl = joinUrl(probeDirUrl, `uploading-${probeId}`);
   const finalUrl = joinUrl(probeDirUrl, `${probeId}.json`);
   const fixedPayload = `papot-nextcloud-probe:${probeId}\n`;
   let probeDirectoryCreated = false;
@@ -129,29 +132,29 @@ async function main() {
     });
     probeDirectoryCreated = true;
 
-    await davRequest("PUT", partUrl, authorization, {
+    await davRequest("PUT", stagingUrl, authorization, {
       body: fixedPayload,
       expected: [201, 204],
       headers: { "Content-Type": "application/octet-stream" },
-      label: "PUT temporary .part file",
+      label: "PUT temporary staging file",
     });
 
-    const partResponse = await davRequest("GET", partUrl, authorization, {
+    const stagingResponse = await davRequest("GET", stagingUrl, authorization, {
       expected: [200],
-      label: "GET temporary .part file",
+      label: "GET temporary staging file",
     });
-    if ((await partResponse.text()) !== fixedPayload) {
-      throw new Error("GET temporary .part file returned different content");
+    if ((await stagingResponse.text()) !== fixedPayload) {
+      throw new Error("GET temporary staging file returned different content");
     }
     console.log("[ok] Temporary file content integrity verified");
 
-    await davRequest("MOVE", partUrl, authorization, {
+    await davRequest("MOVE", stagingUrl, authorization, {
       expected: [201, 204],
       headers: {
         Destination: finalUrl,
         Overwrite: "F",
       },
-      label: "MOVE .part to finalized .json",
+      label: "MOVE staging file to finalized .json",
     });
 
     await davRequest("PROPFIND", finalUrl, authorization, {
