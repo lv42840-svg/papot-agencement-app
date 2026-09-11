@@ -1,9 +1,19 @@
 import { createHash, createPublicKey, verify } from "node:crypto";
-import { syncPackageSchema, syncPackageSigningText, type SyncPackage } from "@/lib/sync/protocol";
+import {
+  syncBusinessRequestText,
+  syncPackageSchema,
+  syncPackageSigningText,
+  type SyncPackage,
+} from "./protocol";
 
 export function syncPackagePayloadHash(input: SyncPackage): string {
   const parsed = syncPackageSchema.parse(input);
   return createHash("sha256").update(syncPackageSigningText(parsed), "utf8").digest("hex");
+}
+
+export function syncBusinessRequestHash(input: SyncPackage): string {
+  const parsed = syncPackageSchema.parse(input);
+  return createHash("sha256").update(syncBusinessRequestText(parsed), "utf8").digest("hex");
 }
 
 export function verifySyncPackageSignature(input: SyncPackage, publicKeyPem: string): boolean {
