@@ -268,10 +268,9 @@ h2 {
 .tableHead,
 .listRow {
   display: grid;
-  grid-template-columns: minmax(240px, 2fr) minmax(120px, 0.9fr) minmax(120px, 0.9fr) minmax(
-      140px,
-      0.9fr
-    ) 90px;
+  grid-template-columns:
+    minmax(240px, 2fr) minmax(120px, 0.9fr) minmax(120px, 0.9fr) minmax(140px, 0.9fr)
+    90px;
   gap: 16px;
   align-items: center;
 }
