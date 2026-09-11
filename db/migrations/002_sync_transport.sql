@@ -23,6 +23,7 @@ CREATE TABLE IF NOT EXISTS sync_received_package (
   papot_user_id uuid NOT NULL REFERENCES app_user(id),
   device_id uuid NOT NULL REFERENCES sync_device(id),
   payload_sha256 text NOT NULL CHECK (payload_sha256 ~ '^[a-f0-9]{64}$'),
+  request_sha256 text NOT NULL CHECK (request_sha256 ~ '^[a-f0-9]{64}$'),
   package_created_at timestamptz NOT NULL,
   applied_at timestamptz NOT NULL DEFAULT now(),
   result_json jsonb NOT NULL DEFAULT '{}'::jsonb
