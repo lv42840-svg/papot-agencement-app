@@ -87,13 +87,18 @@ export class NextcloudDavClient {
     return joinUrl(parentUrl, encodeURIComponent(childName));
   }
 
-  async ensureCollection(url: string): Promise<void> {
-    const probe = await fetch(`${url.replace(/\/+$/, "")}/`, {
+  async exists(url: string): Promise<boolean> {
+    const response = await fetch(url, {
       method: "PROPFIND",
       headers: this.headers({ Depth: "0" }),
     });
-    if (probe.status === 207) return;
-    if (probe.status !== 404) throw new Error(`WEBDAV_PROPFIND_HTTP_${probe.status}`);
+    if (response.status === 207) return true;
+    if (response.status === 404) return false;
+    throw new Error(`WEBDAV_PROPFIND_HTTP_${response.status}`);
+  }
+
+  async ensureCollection(url: string): Promise<void> {
+    if (await this.exists(`${url.replace(/\/+$/, "")}/`)) return;
     await this.request("MKCOL", url, [201]);
   }
 
