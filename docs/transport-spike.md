@@ -84,7 +84,21 @@ Deuxieme passage depuis l'icone ajoutee a l'ecran d'accueil, en 4G:
 - mode installe: OUI;
 - le meme diagnostic CORS WebDAV reste affiche: `GET status.php` HTTP 200, puis `PROPFIND` WebDAV bloque avant lecture de la reponse.
 
-Conclusion: l'installation PWA et le Service Worker fonctionnent reellement sur iPhone, mais le transport WebDAV direct cross-origin requis par une PWA est bloque par CORS. Conformement a la decision d'architecture du cahier des charges, la voie PWA directe vers WebDAV est ecartee. Le prochain prototype de transport mobile doit passer par une enveloppe hybride/native legere tout en conservant les types et regles TypeScript existants et sans exposer PAPOT sur Internet.
+Conclusion: l'installation PWA et le Service Worker fonctionnent reellement sur iPhone, mais le transport WebDAV direct cross-origin requis par une PWA est bloque par CORS. Conformement a la decision d'architecture du cahier des charges, la voie PWA directe vers WebDAV est ecartee.
+
+## Verification des alternatives navigateur Nextcloud
+
+La recherche documentaire a ete poursuivie avant de retenir une enveloppe mobile native.
+
+- Les operations de contenu fichier supportees officiellement par Nextcloud restent exposees via WebDAV (`remote.php/dav` pour un compte authentifie et `public.php/dav` pour un partage public).
+- Un partage public en mode File Drop permet l'envoi, mais il est volontairement upload-only et ne permet donc pas au telephone de relire automatiquement les ACK.
+- Un partage public avec lecture/ecriture retombe sur WebDAV et ne supprime pas la contrainte CORS du navigateur.
+- Les API OCS servent notamment a la gestion des comptes et des partages. L'acces depuis un site web externe n'est autorise que pour les routes qui declarent explicitement CORS; cela ne fournit pas un canal generique de lecture/ecriture des fichiers PAPOT depuis la PWA actuelle.
+- Passer par l'application Nextcloud ou le selecteur de fichiers iOS imposerait une action manuelle pour chaque transfert et ne permettrait pas la boucle automatique envoi -> ACK -> reprise attendue par PAPOT.
+
+Conclusion de cette recherche: **il n'existe pas de contournement navigateur-only propre et documente permettant a la PWA PAPOT actuelle de lire et deposer automatiquement les paquets dans Nextcloud sans support CORS cote Nextcloud**. Ajouter un relais Internet serait contraire a l'architecture retenue et n'est pas propose.
+
+L'absence de Mac local ne ferme cependant pas la piste d'un runtime mobile natif leger: un probe peut etre execute sur iPhone via un environnement de developpement mobile charge depuis Windows, et une compilation iOS de production peut ensuite etre realisee sur une infrastructure de build macOS distante. Cette piste reste un candidat de spike, pas encore une decision de production.
 
 ## Android
 
@@ -122,4 +136,4 @@ Ne pas considerer cette section comme une preuve de fonctionnement reel: le work
 
 ## Ce que ce spike ne prouve pas encore
 
-Le succes WebDAV serveur et le constat PWA/CORS iPhone ne valident pas encore Android, le transport hybride/native authentifie, l'execution reelle du worker PostgreSQL, l'ACK de bout en bout ni la reprise apres coupure. Ces points restent obligatoires avant le GO du spike complet.
+Le succes WebDAV serveur et le constat PWA/CORS iPhone ne valident pas encore Android, le transport mobile natif authentifie, l'execution reelle du worker PostgreSQL, l'ACK de bout en bout ni la reprise apres coupure. Ces points restent obligatoires avant le GO du spike complet.
