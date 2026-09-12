@@ -14,8 +14,10 @@ const {
   normalizeSetupInput,
   saveDesktopSetup,
 } = require("./setup-store.cjs");
+const { openLocalDatabase } = require("./local-database.cjs");
 
 const appUrl = normalizeLocalAppUrl(process.env.PAPOT_APP_URL || DEFAULT_DESKTOP_APP_URL);
+let localDatabase;
 
 function desktopUrl(pathname) {
   return new URL(pathname, `${new URL(appUrl).origin}/`).toString();
@@ -194,6 +196,7 @@ function createMainWindow() {
 }
 
 app.whenReady().then(() => {
+  localDatabase = openLocalDatabase(app.getPath("userData"));
   registerDesktopSetupHandler();
 
   session.defaultSession.setPermissionCheckHandler(() => false);
@@ -210,4 +213,11 @@ app.whenReady().then(() => {
 
 app.on("window-all-closed", () => {
   if (process.platform !== "darwin") app.quit();
+});
+
+app.on("before-quit", () => {
+  if (localDatabase) {
+    localDatabase.close();
+    localDatabase = undefined;
+  }
 });
