@@ -2,10 +2,9 @@
 
 const { spawn, spawnSync } = require("node:child_process");
 const net = require("node:net");
+const path = require("node:path");
 
-const nextBin = require.resolve("next/dist/bin/next");
-const electronExecutable = require("electron");
-const appUrl = process.env.PAPOT_APP_URL || "http://127.0.0.1:3217";
+const appUrl = process.env.PAPOT_APP_URL || "http://127.0.0.1:3217/desktop-setup";
 const parsed = new URL(appUrl);
 const host = parsed.hostname;
 const port = Number(parsed.port || 80);
@@ -36,14 +35,19 @@ function waitForPort(timeoutMs = 30000) {
 }
 
 async function main() {
-  const next = spawn(
-    process.execPath,
-    [nextBin, "dev", "-H", host, "-p", String(port)],
-    {
-      stdio: "inherit",
-      env: process.env,
-    },
+  const nextBin = path.join(process.cwd(), "node_modules", "next", "dist", "bin", "next");
+  const electronBin = path.join(
+    process.cwd(),
+    "node_modules",
+    "electron",
+    "dist",
+    process.platform === "win32" ? "electron.exe" : "electron",
   );
+
+  const next = spawn(process.execPath, [nextBin, "dev", "-H", host, "-p", String(port)], {
+    stdio: "inherit",
+    env: process.env,
+  });
 
   let electron;
   let nextStopped = false;
@@ -66,15 +70,12 @@ async function main() {
   try {
     await waitForPort();
 
-    electron = spawn(electronExecutable, ["desktop/main.cjs"], {
+    electron = spawn(electronBin, ["desktop/main.cjs"], {
       stdio: "inherit",
       env: { ...process.env, PAPOT_APP_URL: appUrl },
     });
 
-    const exitCode = await new Promise((resolve, reject) => {
-      electron.once("error", reject);
-      electron.once("exit", resolve);
-    });
+    const exitCode = await new Promise((resolve) => electron.once("exit", resolve));
     process.exitCode = typeof exitCode === "number" ? exitCode : 0;
   } finally {
     if (electron && !electron.killed) electron.kill();
