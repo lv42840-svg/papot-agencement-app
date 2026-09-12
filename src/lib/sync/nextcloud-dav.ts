@@ -26,6 +26,14 @@ export type NextcloudDavConfig = {
   userAgent?: string;
 };
 
+export type ConditionalWriteResult = "written" | "precondition-failed";
+export type ConditionalDeleteResult = "deleted" | "missing" | "precondition-failed";
+
+export type TextWithEtag = {
+  text: string;
+  etag: string;
+};
+
 export class NextcloudDavClient {
   readonly baseUrl: string;
   private readonly authorization: string;
@@ -148,6 +156,24 @@ export class NextcloudDavClient {
     return (await this.request("GET", url, [200])).text();
   }
 
+  async getTextWithEtag(url: string): Promise<TextWithEtag | null> {
+    const response = await fetch(url, {
+      method: "GET",
+      headers: this.headers(),
+    });
+
+    if (response.status === 404) return null;
+    if (response.status !== 200) throw new Error(`WEBDAV_GET_HTTP_${response.status}`);
+
+    const etag = response.headers.get("ETag")?.trim();
+    if (!etag) throw new Error("WEBDAV_GET_ETAG_MISSING");
+
+    return {
+      text: await response.text(),
+      etag,
+    };
+  }
+
   async getBytes(url: string): Promise<Buffer> {
     const response = await this.request("GET", url, [200]);
     return Buffer.from(await response.arrayBuffer());
@@ -158,6 +184,36 @@ export class NextcloudDavClient {
       body,
       headers: { "Content-Type": "application/json; charset=utf-8" },
     });
+  }
+
+  async putTextIfAbsent(url: string, body: string): Promise<ConditionalWriteResult> {
+    const response = await fetch(url, {
+      method: "PUT",
+      headers: this.headers({
+        "Content-Type": "application/json; charset=utf-8",
+        "If-None-Match": "*",
+      }),
+      body,
+    });
+
+    if (response.status === 201 || response.status === 204) return "written";
+    if (response.status === 412) return "precondition-failed";
+    throw new Error(`WEBDAV_PUT_HTTP_${response.status}`);
+  }
+
+  async putTextIfMatch(url: string, body: string, etag: string): Promise<ConditionalWriteResult> {
+    const response = await fetch(url, {
+      method: "PUT",
+      headers: this.headers({
+        "Content-Type": "application/json; charset=utf-8",
+        "If-Match": etag,
+      }),
+      body,
+    });
+
+    if (response.status === 201 || response.status === 204) return "written";
+    if (response.status === 412) return "precondition-failed";
+    throw new Error(`WEBDAV_PUT_HTTP_${response.status}`);
   }
 
   async move(sourceUrl: string, destinationUrl: string, overwrite: boolean): Promise<void> {
@@ -171,6 +227,18 @@ export class NextcloudDavClient {
 
   async delete(url: string, allowMissing = false): Promise<void> {
     await this.request("DELETE", url, allowMissing ? [204, 404] : [204]);
+  }
+
+  async deleteIfMatch(url: string, etag: string): Promise<ConditionalDeleteResult> {
+    const response = await fetch(url, {
+      method: "DELETE",
+      headers: this.headers({ "If-Match": etag }),
+    });
+
+    if (response.status === 204) return "deleted";
+    if (response.status === 404) return "missing";
+    if (response.status === 412) return "precondition-failed";
+    throw new Error(`WEBDAV_DELETE_HTTP_${response.status}`);
   }
 
   async putFinalizedJson(finalUrl: string, body: string, overwrite = true): Promise<void> {
