@@ -37,6 +37,10 @@ class FakeDav {
     return [rootUrl, ...segments.map(encodeURIComponent)].join("/");
   }
 
+  async getTextIfExists(url: string): Promise<string | null> {
+    return this.files.get(url)?.text ?? null;
+  }
+
   async getTextWithEtag(url: string): Promise<TextWithEtag | null> {
     return this.files.get(url) ?? null;
   }
