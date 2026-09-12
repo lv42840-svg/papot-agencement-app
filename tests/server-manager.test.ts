@@ -55,5 +55,8 @@ describe("packaged desktop server", () => {
     expect(process.env.HOSTNAME).toBe("127.0.0.1");
     expect(process.env.PORT).toBe(String(address.port));
     expect(process.env.NODE_ENV).toBe("production");
+    expect(process.env.NODE_PATH).toBe(
+      "C:\\Program Files\\PAPOT\\resources/server/vendor_node_modules",
+    );
   });
 });

@@ -1,6 +1,7 @@
 "use strict";
 
 const net = require("node:net");
+const Module = require("node:module");
 const path = require("node:path");
 
 function waitForLocalServer({ host, port, timeoutMs = 30000 }) {
@@ -31,7 +32,9 @@ async function startPackagedServer({ resourcesPath, host, port, loadServer = req
   const serverPath = path.join(resourcesPath, "server", "server.js");
   process.env.HOSTNAME = host;
   process.env.NODE_ENV = "production";
+  process.env.NODE_PATH = path.join(resourcesPath, "server", "vendor_node_modules");
   process.env.PORT = String(port);
+  Module._initPaths();
   loadServer(serverPath);
   await waitForLocalServer({ host, port });
 }
