@@ -1,4 +1,5 @@
 import { PlanningWeekEditor } from "@/components/planning-week-editor";
+import { DesktopAppShell } from "@/components/desktop-app-shell";
 
 export default async function PlanningWeekPage({
   params,
@@ -7,7 +8,7 @@ export default async function PlanningWeekPage({
 }) {
   const { weekId } = await params;
   return (
-    <main className="content" style={{ marginLeft: 0 }}>
+    <DesktopAppShell>
       <div className="pageHeader">
         <div>
           <p className="eyebrow">Planning partagé</p>
@@ -15,6 +16,6 @@ export default async function PlanningWeekPage({
         </div>
       </div>
       <PlanningWeekEditor weekId={weekId} />
-    </main>
+    </DesktopAppShell>
   );
 }

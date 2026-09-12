@@ -1,4 +1,5 @@
 import { ChantierEditor } from "@/components/chantier-editor";
+import { DesktopAppShell } from "@/components/desktop-app-shell";
 
 export default async function ChantierPage({
   params,
@@ -7,7 +8,7 @@ export default async function ChantierPage({
 }) {
   const { chantierId } = await params;
   return (
-    <main className="content" style={{ marginLeft: 0 }}>
+    <DesktopAppShell>
       <div className="pageHeader">
         <div>
           <p className="eyebrow">Chantier partagé</p>
@@ -15,6 +16,6 @@ export default async function ChantierPage({
         </div>
       </div>
       <ChantierEditor chantierId={chantierId} />
-    </main>
+    </DesktopAppShell>
   );
 }
