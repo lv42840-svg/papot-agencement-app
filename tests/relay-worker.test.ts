@@ -150,3 +150,118 @@ describe("PAPOT relay worker", () => {
     expect(fetchMock).toHaveBeenCalledTimes(1);
   });
 });
+
+describe("PAPOT relay ACK read", () => {
+  const papotUserId = "22222222-2222-4222-8222-222222222222";
+  const deviceId = "33333333-3333-4333-8333-333333333333";
+  const packageId = "11111111-1111-4111-8111-111111111111";
+
+  function ackRequest(
+    path = `/v1/sync/acks/${papotUserId}/${deviceId}/${packageId}`,
+    headers: Record<string, string> = {},
+  ): Request {
+    return new Request(`https://relay.example.test${path}`, {
+      method: "GET",
+      headers: {
+        Authorization: "Bearer test-token",
+        Origin: "https://mobile.example.test",
+        ...headers,
+      },
+    });
+  }
+
+  it("returns a valid ACK from the correct device ACK zone", async () => {
+    const ack = {
+      schema_version: 1,
+      package_id: packageId,
+      status: "RECEIVED_BY_PAPOT",
+      duplicate: false,
+      capture_id: "55555555-5555-4555-8555-555555555555",
+    };
+
+    const fetchMock = vi.fn().mockResolvedValueOnce(
+      new Response(JSON.stringify(ack), {
+        status: 200,
+        headers: { "Content-Type": "application/json" },
+      }),
+    );
+
+    vi.stubGlobal("fetch", fetchMock);
+
+    const response = await worker.fetch(ackRequest(), env);
+
+    expect(response.status).toBe(200);
+    await expect(response.json()).resolves.toEqual(ack);
+
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+
+    const requestedUrl = String(fetchMock.mock.calls[0][0]);
+
+    expect(requestedUrl).toContain(
+      `/PAPOT_SYNC/users/${papotUserId}/devices/${deviceId}/ack/${packageId}.json`,
+    );
+  });
+
+  it("returns ACK_NOT_READY when the ACK does not exist yet", async () => {
+    const fetchMock = vi.fn().mockResolvedValueOnce(new Response(null, { status: 404 }));
+
+    vi.stubGlobal("fetch", fetchMock);
+
+    const response = await worker.fetch(ackRequest(), env);
+
+    expect(response.status).toBe(404);
+    await expect(response.json()).resolves.toEqual({
+      status: "ACK_NOT_READY",
+      package_id: packageId,
+    });
+  });
+
+  it("rejects an ACK whose package_id does not match the requested package", async () => {
+    const fetchMock = vi.fn().mockResolvedValueOnce(
+      new Response(
+        JSON.stringify({
+          package_id: "66666666-6666-4666-8666-666666666666",
+          status: "RECEIVED_BY_PAPOT",
+        }),
+        { status: 200 },
+      ),
+    );
+
+    vi.stubGlobal("fetch", fetchMock);
+
+    const response = await worker.fetch(ackRequest(), env);
+
+    expect(response.status).toBe(502);
+    await expect(response.json()).resolves.toEqual({
+      error: "UPSTREAM_ACK_INVALID",
+    });
+  });
+
+  it("rejects an invalid ACK path without contacting Nextcloud", async () => {
+    const fetchMock = vi.fn();
+    vi.stubGlobal("fetch", fetchMock);
+
+    const response = await worker.fetch(
+      ackRequest("/v1/sync/acks/not-a-uuid/not-a-device/not-a-package"),
+      env,
+    );
+
+    expect(response.status).toBe(400);
+    expect(fetchMock).not.toHaveBeenCalled();
+  });
+
+  it("rejects an unauthorized ACK read without contacting Nextcloud", async () => {
+    const fetchMock = vi.fn();
+    vi.stubGlobal("fetch", fetchMock);
+
+    const response = await worker.fetch(
+      ackRequest(undefined, {
+        Authorization: "Bearer wrong-token",
+      }),
+      env,
+    );
+
+    expect(response.status).toBe(401);
+    expect(fetchMock).not.toHaveBeenCalled();
+  });
+});
