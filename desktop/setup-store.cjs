@@ -76,8 +76,26 @@ function readDesktopSetupConfig(userDataPath) {
   }
 }
 
-function hasDesktopSetup(userDataPath) {
-  return Boolean(readDesktopSetupConfig(userDataPath)) && fs.existsSync(secretPath(userDataPath));
+function readDesktopSetup({ userDataPath, safeStorage }) {
+  const config = readDesktopSetupConfig(userDataPath);
+  if (!config || !fs.existsSync(secretPath(userDataPath))) return null;
+  if (!safeStorage || typeof safeStorage.isEncryptionAvailable !== "function") return null;
+  if (!safeStorage.isEncryptionAvailable() || typeof safeStorage.decryptString !== "function") {
+    return null;
+  }
+
+  try {
+    const encrypted = fs.readFileSync(secretPath(userDataPath));
+    const nextcloudAppPassword = safeStorage.decryptString(encrypted);
+    if (typeof nextcloudAppPassword !== "string" || !nextcloudAppPassword) return null;
+    return { config, nextcloudAppPassword };
+  } catch {
+    return null;
+  }
+}
+
+function hasDesktopSetup({ userDataPath, safeStorage }) {
+  return Boolean(readDesktopSetup({ userDataPath, safeStorage }));
 }
 
 function saveDesktopSetup({ userDataPath, input, nextcloudUserId, safeStorage }) {
@@ -136,6 +154,7 @@ module.exports = {
   SECRET_FILE_NAME,
   hasDesktopSetup,
   normalizeSetupInput,
+  readDesktopSetup,
   readDesktopSetupConfig,
   saveDesktopSetup,
 };

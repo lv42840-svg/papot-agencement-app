@@ -10,11 +10,16 @@ const {
 } = require("./security.cjs");
 const {
   DEFAULT_SYNC_ROOT,
+  hasDesktopSetup,
   normalizeSetupInput,
   saveDesktopSetup,
 } = require("./setup-store.cjs");
 
 const appUrl = normalizeLocalAppUrl(process.env.PAPOT_APP_URL || DEFAULT_DESKTOP_APP_URL);
+
+function desktopUrl(pathname) {
+  return new URL(pathname, `${new URL(appUrl).origin}/`).toString();
+}
 
 function authorization(login, password) {
   return `Basic ${Buffer.from(`${login}:${password}`, "utf8").toString("base64")}`;
@@ -143,6 +148,14 @@ function registerDesktopSetupHandler() {
       return { ok: false, error: publicSetupError(error) };
     }
   });
+
+  ipcMain.handle("papot:desktop-setup:finish", (event) => {
+    if (!hasDesktopSetup({ userDataPath: app.getPath("userData"), safeStorage })) {
+      return { ok: false };
+    }
+    event.sender.loadURL(desktopUrl("/desktop-ready"));
+    return { ok: true };
+  });
 }
 
 function createMainWindow() {
@@ -174,7 +187,8 @@ function createMainWindow() {
   window.webContents.on("will-attach-webview", (event) => event.preventDefault());
 
   window.once("ready-to-show", () => window.show());
-  window.loadURL(appUrl);
+  const setupComplete = hasDesktopSetup({ userDataPath: app.getPath("userData"), safeStorage });
+  window.loadURL(setupComplete ? desktopUrl("/desktop-ready") : desktopUrl("/desktop-setup"));
 
   return window;
 }

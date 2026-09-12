@@ -71,6 +71,7 @@ export function DesktopSetupForm() {
         kind: "success",
         message: `Poste « ${result.config.deviceLabel} » configuré. Nextcloud et le dossier partagé sont accessibles, et le mot de passe est chiffré dans le coffre Windows.`,
       });
+      await bridge.finishSetup();
     } catch {
       setState({ kind: "error", message: errorMessages.DESKTOP_SETUP_FAILED });
     }

@@ -23,6 +23,7 @@ declare global {
           }
         | { ok: false; error: string }
       >;
+      finishSetup: () => Promise<{ ok: boolean }>;
     };
   }
 }

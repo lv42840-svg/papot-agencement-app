@@ -10,6 +10,20 @@ const setupStore = require("../desktop/setup-store.cjs") as {
   SECRET_FILE_NAME: string;
   normalizeSetupInput: (input: Record<string, unknown>) => Record<string, string>;
   readDesktopSetupConfig: (userDataPath: string) => Record<string, unknown> | null;
+  readDesktopSetup: (params: {
+    userDataPath: string;
+    safeStorage: {
+      isEncryptionAvailable: () => boolean;
+      decryptString: (value: Buffer) => string;
+    };
+  }) => { config: Record<string, unknown>; nextcloudAppPassword: string } | null;
+  hasDesktopSetup: (params: {
+    userDataPath: string;
+    safeStorage: {
+      isEncryptionAvailable: () => boolean;
+      decryptString: (value: Buffer) => string;
+    };
+  }) => boolean;
   saveDesktopSetup: (params: {
     userDataPath: string;
     input: Record<string, unknown>;
@@ -43,6 +57,11 @@ function validInput() {
 const fakeSafeStorage = {
   isEncryptionAvailable: () => true,
   encryptString: (value: string) => Buffer.from(`encrypted:${value}`, "utf8"),
+};
+
+const fakeSafeStorageReader = {
+  isEncryptionAvailable: () => true,
+  decryptString: (value: Buffer) => value.toString("utf8").replace(/^encrypted:/, ""),
 };
 
 afterEach(() => {
@@ -81,6 +100,46 @@ describe("desktop setup encrypted storage", () => {
 
     const encrypted = fs.readFileSync(path.join(userDataPath, setupStore.SECRET_FILE_NAME), "utf8");
     expect(encrypted).toBe("encrypted:secret-app-password");
+  });
+
+  it("reopens a complete setup and decrypts the reusable secret", () => {
+    const userDataPath = makeTempDirectory();
+    setupStore.saveDesktopSetup({
+      userDataPath,
+      input: validInput(),
+      nextcloudUserId: "Papot_Appli",
+      safeStorage: fakeSafeStorage,
+    });
+
+    const reopened = setupStore.readDesktopSetup({
+      userDataPath,
+      safeStorage: fakeSafeStorageReader,
+    });
+    expect(reopened?.nextcloudAppPassword).toBe("secret-app-password");
+    expect(reopened?.config.device_label).toBe("PC Lucien");
+    expect(setupStore.hasDesktopSetup({ userDataPath, safeStorage: fakeSafeStorageReader })).toBe(
+      true,
+    );
+  });
+
+  it("does not accept an unreadable encrypted secret as a completed setup", () => {
+    const userDataPath = makeTempDirectory();
+    setupStore.saveDesktopSetup({
+      userDataPath,
+      input: validInput(),
+      nextcloudUserId: "Papot_Appli",
+      safeStorage: fakeSafeStorage,
+    });
+
+    const unavailableReader = {
+      isEncryptionAvailable: () => true,
+      decryptString: () => {
+        throw new Error("cannot decrypt");
+      },
+    };
+    expect(setupStore.hasDesktopSetup({ userDataPath, safeStorage: unavailableReader })).toBe(
+      false,
+    );
   });
 
   it("preserves stable device and PAPOT user identifiers when setup is saved again", () => {
