@@ -7,6 +7,7 @@ export const sharedResourceTypeSchema = z.enum([
   "CHANTIER",
   "PLANNING_WEEK",
   "TREASURY_MONTH",
+  "ENTRIES",
 ]);
 
 export const sharedResourceRefSchema = z.object({
