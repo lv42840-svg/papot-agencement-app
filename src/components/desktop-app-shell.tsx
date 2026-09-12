@@ -4,11 +4,18 @@ import { DesktopTopbar } from "./desktop-topbar";
 type DesktopIdentity = {
   displayName: string;
   deviceLabel: string;
+  configured: boolean;
 };
 
 function readDesktopIdentity(): DesktopIdentity {
   const rawConfig = process.env.PAPOT_DESKTOP_CONFIG_JSON;
-  if (!rawConfig) return { displayName: "Utilisateur PAPOT", deviceLabel: "Poste PAPOT" };
+  if (!rawConfig) {
+    return {
+      displayName: "Utilisateur PAPOT",
+      deviceLabel: "Poste PAPOT",
+      configured: false,
+    };
+  }
   try {
     const config = JSON.parse(rawConfig) as {
       papot_user_display_name?: unknown;
@@ -21,9 +28,14 @@ function readDesktopIdentity(): DesktopIdentity {
           : "Utilisateur PAPOT",
       deviceLabel:
         typeof config.device_label === "string" ? config.device_label : "Poste PAPOT",
+      configured: true,
     };
   } catch {
-    return { displayName: "Utilisateur PAPOT", deviceLabel: "Poste PAPOT" };
+    return {
+      displayName: "Utilisateur PAPOT",
+      deviceLabel: "Poste PAPOT",
+      configured: false,
+    };
   }
 }
 
@@ -45,6 +57,7 @@ export function DesktopAppShell({ children }: { children: React.ReactNode }) {
           displayName={identity.displayName}
           deviceLabel={identity.deviceLabel}
           initials={initials}
+          configured={identity.configured}
         />
         <main className="desktopMain">{children}</main>
       </div>
