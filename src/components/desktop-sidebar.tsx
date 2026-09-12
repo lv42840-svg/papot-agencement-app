@@ -37,13 +37,29 @@ const navigation = [
 ];
 
 const STORAGE_KEY = "papot.desktop.sidebar.collapsed";
+const COMPACT_BREAKPOINT = 1180;
 
 export function DesktopSidebar() {
   const pathname = usePathname();
   const [collapsed, setCollapsed] = useState(false);
 
   useEffect(() => {
-    setCollapsed(window.localStorage.getItem(STORAGE_KEY) === "1");
+    const applyPreference = () => {
+      const saved = window.localStorage.getItem(STORAGE_KEY);
+      if (saved === "1") {
+        setCollapsed(true);
+        return;
+      }
+      if (saved === "0") {
+        setCollapsed(false);
+        return;
+      }
+      setCollapsed(window.innerWidth < COMPACT_BREAKPOINT);
+    };
+
+    applyPreference();
+    window.addEventListener("resize", applyPreference);
+    return () => window.removeEventListener("resize", applyPreference);
   }, []);
 
   function toggleSidebar() {
@@ -218,6 +234,49 @@ export function DesktopSidebar() {
           display: inline;
           font-size: 8px;
         }
+
+        @media (max-height: 760px) {
+          .desktopBrandV2 {
+            min-height: 96px;
+            padding: 12px 18px;
+          }
+          .desktopBrandLogoV2 {
+            width: 72px;
+            height: 72px;
+          }
+          .desktopSidebarToggle {
+            top: 82px;
+          }
+          .desktopNavV2 {
+            gap: 1px;
+            padding-top: 10px;
+            padding-bottom: 10px;
+          }
+          .desktopNavV2 > a,
+          .desktopNavV2 > span {
+            min-height: 34px;
+          }
+          .desktopSidebarFooter {
+            padding-top: 10px;
+            padding-bottom: 10px;
+          }
+          .desktopSidebarV2.isCollapsed .desktopBrandV2 {
+            min-height: 76px;
+            padding: 10px 8px;
+          }
+          .desktopSidebarV2.isCollapsed .desktopBrandLogoV2 {
+            width: 42px;
+            height: 42px;
+          }
+          .desktopSidebarV2.isCollapsed .desktopSidebarToggle {
+            top: 62px;
+          }
+          .desktopSidebarV2.isCollapsed .desktopNavV2 > a,
+          .desktopSidebarV2.isCollapsed .desktopNavV2 > span {
+            min-height: 35px;
+          }
+        }
+
         @media (prefers-reduced-motion: reduce) {
           .desktopAppShellV2,
           .desktopBrandV2,
