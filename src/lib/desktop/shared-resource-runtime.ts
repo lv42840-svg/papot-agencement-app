@@ -15,10 +15,36 @@ type DesktopRuntimeConfig = {
   papot_user_display_name: string;
 };
 
-export function createDesktopSharedResourceRuntime() {
+type DesktopSharedResourceRuntime = {
+  coordinator: SharedResourceEditCoordinator;
+  locks: NextcloudResourceLockStore;
+  owner: {
+    userId: string;
+    deviceId: string;
+    displayName: string;
+  };
+};
+
+let cachedRuntime:
+  | {
+      rawConfig: string;
+      appPassword: string;
+      value: DesktopSharedResourceRuntime;
+    }
+  | undefined;
+
+export function createDesktopSharedResourceRuntime(): DesktopSharedResourceRuntime {
   const rawConfig = process.env.PAPOT_DESKTOP_CONFIG_JSON;
   const appPassword = process.env.PAPOT_NEXTCLOUD_APP_PASSWORD;
   if (!rawConfig || !appPassword) throw new Error("DESKTOP_RUNTIME_NOT_CONFIGURED");
+
+  if (
+    cachedRuntime &&
+    cachedRuntime.rawConfig === rawConfig &&
+    cachedRuntime.appPassword === appPassword
+  ) {
+    return cachedRuntime.value;
+  }
 
   let config: DesktopRuntimeConfig;
   try {
@@ -57,7 +83,7 @@ export function createDesktopSharedResourceRuntime() {
     config.nextcloud_sync_root,
   );
 
-  return {
+  const value = {
     coordinator: new SharedResourceEditCoordinator(locks, states),
     locks,
     owner: {
@@ -66,4 +92,7 @@ export function createDesktopSharedResourceRuntime() {
       displayName: config.papot_user_display_name,
     },
   };
+
+  cachedRuntime = { rawConfig, appPassword, value };
+  return value;
 }

@@ -47,6 +47,7 @@ export class NextcloudDavClient {
   readonly baseUrl: string;
   private readonly authorization: string;
   private readonly userAgent: string;
+  private readonly ensuredCollections = new Map<string, Promise<void>>();
 
   constructor(config: NextcloudDavConfig) {
     this.baseUrl = config.baseUrl.replace(/\/+$/, "");
@@ -115,8 +116,22 @@ export class NextcloudDavClient {
   }
 
   async ensureCollection(url: string): Promise<void> {
-    if (await this.exists(`${url.replace(/\/+$/, "")}/`)) return;
-    await this.request("MKCOL", url, [201]);
+    const normalizedUrl = url.replace(/\/+$/, "");
+    const existing = this.ensuredCollections.get(normalizedUrl);
+    if (existing) return existing;
+
+    const verification = (async () => {
+      if (await this.exists(`${normalizedUrl}/`)) return;
+      await this.request("MKCOL", normalizedUrl, [201]);
+    })();
+    this.ensuredCollections.set(normalizedUrl, verification);
+
+    try {
+      await verification;
+    } catch (error) {
+      this.ensuredCollections.delete(normalizedUrl);
+      throw error;
+    }
   }
 
   async ensurePath(rootUrl: string, segments: string[]): Promise<string> {
