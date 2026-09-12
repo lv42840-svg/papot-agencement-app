@@ -1,4 +1,4 @@
-﻿import { afterEach, describe, expect, it, vi } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 import worker from "../relay/worker";
 
 const env = {
@@ -50,6 +50,28 @@ afterEach(() => {
 });
 
 describe("PAPOT relay worker", () => {
+  it("fails closed when required relay configuration is missing", async () => {
+    const fetchMock = vi.fn();
+    vi.stubGlobal("fetch", fetchMock);
+
+    const missingTokenEnv = {
+      ...env,
+      RELAY_ACCESS_TOKEN: undefined as unknown as string,
+    };
+
+    const response = await worker.fetch(
+      relayRequest(packageBody, {
+        Authorization: "Bearer undefined",
+      }),
+      missingTokenEnv,
+    );
+
+    expect(response.status).toBe(503);
+    await expect(response.json()).resolves.toEqual({
+      error: "RELAY_NOT_CONFIGURED",
+    });
+    expect(fetchMock).not.toHaveBeenCalled();
+  });
   it("rejects an unknown route", async () => {
     const response = await worker.fetch(new Request("https://relay.example.test/unknown"), env);
 

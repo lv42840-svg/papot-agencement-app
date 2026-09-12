@@ -72,9 +72,21 @@ function isOriginAllowed(request: Request, env: RelayEnv): boolean {
   return Boolean(allowedOrigin && origin === allowedOrigin);
 }
 
+function hasRequiredConfig(env: RelayEnv): boolean {
+  return [
+    env.NEXTCLOUD_BASE_URL,
+    env.NEXTCLOUD_LOGIN,
+    env.NEXTCLOUD_APP_PASSWORD,
+    env.NEXTCLOUD_USER_ID,
+    env.RELAY_ACCESS_TOKEN,
+  ].every((value) => typeof value === "string" && value.trim().length > 0);
+}
 function isAuthorized(request: Request, env: RelayEnv): boolean {
+  const accessToken = env.RELAY_ACCESS_TOKEN?.trim();
+  if (!accessToken) return false;
+
   const authorization = request.headers.get("Authorization") ?? "";
-  return secureEqual(authorization, `Bearer ${env.RELAY_ACCESS_TOKEN}`);
+  return secureEqual(authorization, `Bearer ${accessToken}`);
 }
 
 function isRecord(value: unknown): value is Record<string, unknown> {
@@ -334,6 +346,10 @@ function handleOptions(request: Request, env: RelayEnv, methods: string): Respon
 
 const worker = {
   async fetch(request: Request, env: RelayEnv): Promise<Response> {
+    if (!hasRequiredConfig(env)) {
+      return jsonResponse(503, { error: "RELAY_NOT_CONFIGURED" });
+    }
+
     const url = new URL(request.url);
 
     if (url.pathname === "/v1/sync/packages") {
