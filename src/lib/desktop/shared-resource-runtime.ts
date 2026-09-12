@@ -18,6 +18,7 @@ type DesktopRuntimeConfig = {
 type DesktopSharedResourceRuntime = {
   coordinator: SharedResourceEditCoordinator;
   locks: NextcloudResourceLockStore;
+  states: NextcloudSharedResourceStore;
   owner: {
     userId: string;
     deviceId: string;
@@ -86,6 +87,7 @@ export function createDesktopSharedResourceRuntime(): DesktopSharedResourceRunti
   const value = {
     coordinator: new SharedResourceEditCoordinator(locks, states),
     locks,
+    states,
     owner: {
       userId: config.papot_user_id,
       deviceId: config.device_id,
