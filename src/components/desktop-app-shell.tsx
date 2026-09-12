@@ -1,5 +1,5 @@
-import { Wifi } from "lucide-react";
 import { DesktopSidebar } from "./desktop-sidebar";
+import { DesktopTopbar } from "./desktop-topbar";
 
 type DesktopIdentity = {
   displayName: string;
@@ -41,19 +41,11 @@ export function DesktopAppShell({ children }: { children: React.ReactNode }) {
       <DesktopSidebar />
 
       <div className="desktopWorkspace">
-        <header className="desktopTopbar">
-          <div className="desktopConnection">
-            <Wifi size={16} aria-hidden="true" />
-            <span>Configuration active</span>
-          </div>
-          <div className="desktopIdentity">
-            <div>
-              <strong>{identity.displayName}</strong>
-              <span>{identity.deviceLabel}</span>
-            </div>
-            <span className="desktopAvatar">{initials}</span>
-          </div>
-        </header>
+        <DesktopTopbar
+          displayName={identity.displayName}
+          deviceLabel={identity.deviceLabel}
+          initials={initials}
+        />
         <main className="desktopMain">{children}</main>
       </div>
     </div>
