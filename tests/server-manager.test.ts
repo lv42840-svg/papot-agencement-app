@@ -9,7 +9,7 @@ const serverManager = require("../desktop/server-manager.cjs") as {
     execPath: string;
     host: string;
     port: number;
-    forkProcess: (...args: unknown[]) => { kill: () => void; killed: boolean };
+    spawnProcess: (...args: unknown[]) => { kill: () => void; killed: boolean };
   }) => Promise<{ kill: () => void; killed: boolean }>;
   stopPackagedServer: (child?: { kill: () => void; killed: boolean }) => void;
   waitForLocalServer: (input: { host: string; port: number; timeoutMs?: number }) => Promise<void>;
@@ -52,7 +52,9 @@ describe("packaged desktop server", () => {
       execPath: "C:\\Program Files\\PAPOT\\PAPOT.exe",
       host: "127.0.0.1",
       port: address.port,
-      forkProcess: (...args: unknown[]) => {
+      spawnProcess: (...args: unknown[]) => {
+        expect(args[0]).toBe("C:\\Program Files\\PAPOT\\PAPOT.exe");
+        expect(args[1]).toEqual(["C:\\Program Files\\PAPOT\\resources/server/server.js"]);
         receivedOptions = args[2] as Record<string, unknown>;
         return child;
       },

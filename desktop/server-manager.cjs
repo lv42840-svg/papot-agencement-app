@@ -1,6 +1,6 @@
 "use strict";
 
-const { fork } = require("node:child_process");
+const { spawn } = require("node:child_process");
 const net = require("node:net");
 const path = require("node:path");
 
@@ -28,9 +28,9 @@ function waitForLocalServer({ host, port, timeoutMs = 30000 }) {
   });
 }
 
-async function startPackagedServer({ resourcesPath, execPath, host, port, forkProcess = fork }) {
+async function startPackagedServer({ resourcesPath, execPath, host, port, spawnProcess = spawn }) {
   const serverPath = path.join(resourcesPath, "server", "server.js");
-  const child = forkProcess(serverPath, [], {
+  const child = spawnProcess(execPath, [serverPath], {
     cwd: path.dirname(serverPath),
     env: {
       ...process.env,
@@ -39,8 +39,8 @@ async function startPackagedServer({ resourcesPath, execPath, host, port, forkPr
       NODE_ENV: "production",
       PORT: String(port),
     },
-    execPath,
     stdio: "ignore",
+    windowsHide: true,
   });
 
   try {
