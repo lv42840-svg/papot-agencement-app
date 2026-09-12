@@ -15,11 +15,10 @@ const {
   saveDesktopSetup,
 } = require("./setup-store.cjs");
 const { openLocalDatabase } = require("./local-database.cjs");
-const { startPackagedServer, stopPackagedServer } = require("./server-manager.cjs");
+const { startPackagedServer } = require("./server-manager.cjs");
 
 const appUrl = normalizeLocalAppUrl(process.env.PAPOT_APP_URL || DEFAULT_DESKTOP_APP_URL);
 let localDatabase;
-let packagedServer;
 
 function desktopUrl(pathname) {
   return new URL(pathname, `${new URL(appUrl).origin}/`).toString();
@@ -199,9 +198,8 @@ function createMainWindow() {
 
 app.whenReady().then(async () => {
   if (app.isPackaged) {
-    packagedServer = await startPackagedServer({
+    await startPackagedServer({
       resourcesPath: process.resourcesPath,
-      execPath: process.execPath,
       host: new URL(appUrl).hostname,
       port: Number(new URL(appUrl).port),
     });
@@ -226,8 +224,6 @@ app.on("window-all-closed", () => {
 });
 
 app.on("before-quit", () => {
-  stopPackagedServer(packagedServer);
-  packagedServer = undefined;
   if (localDatabase) {
     localDatabase.close();
     localDatabase = undefined;

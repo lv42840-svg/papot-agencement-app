@@ -6,12 +6,10 @@ const require = createRequire(import.meta.url);
 const serverManager = require("../desktop/server-manager.cjs") as {
   startPackagedServer: (input: {
     resourcesPath: string;
-    execPath: string;
     host: string;
     port: number;
-    spawnProcess: (...args: unknown[]) => { kill: () => void; killed: boolean };
-  }) => Promise<{ kill: () => void; killed: boolean }>;
-  stopPackagedServer: (child?: { kill: () => void; killed: boolean }) => void;
+    loadServer: (serverPath: string) => void;
+  }) => Promise<void>;
   waitForLocalServer: (input: { host: string; port: number; timeoutMs?: number }) => Promise<void>;
 };
 
@@ -38,38 +36,24 @@ describe("packaged desktop server", () => {
     ).resolves.toBeUndefined();
   });
 
-  it("starts the bundled server with loopback-only production settings", async () => {
+  it("loads the bundled server inside PAPOT with loopback-only production settings", async () => {
     const server = net.createServer();
     servers.push(server);
     await new Promise<void>((resolve) => server.listen(0, "127.0.0.1", resolve));
     const address = server.address();
     if (!address || typeof address === "string") throw new Error("TEST_SERVER_ADDRESS_MISSING");
 
-    let receivedOptions: Record<string, unknown> | undefined;
-    const child = { killed: false, kill: () => undefined };
+    let loadedServerPath = "";
     await serverManager.startPackagedServer({
       resourcesPath: "C:\\Program Files\\PAPOT\\resources",
-      execPath: "C:\\Program Files\\PAPOT\\PAPOT.exe",
       host: "127.0.0.1",
       port: address.port,
-      spawnProcess: (...args: unknown[]) => {
-        expect(args[0]).toBe("C:\\Program Files\\PAPOT\\PAPOT.exe");
-        expect(args[1]).toEqual(["C:\\Program Files\\PAPOT\\resources/server/server.js"]);
-        receivedOptions = args[2] as Record<string, unknown>;
-        return child;
-      },
+      loadServer: (serverPath: string) => void (loadedServerPath = serverPath),
     });
 
-    const env = receivedOptions?.env as Record<string, string>;
-    expect(env.HOSTNAME).toBe("127.0.0.1");
-    expect(env.PORT).toBe(String(address.port));
-    expect(env.NODE_ENV).toBe("production");
-    expect(env.ELECTRON_RUN_AS_NODE).toBe("1");
-  });
-
-  it("stops the bundled server on application shutdown", () => {
-    let stopped = false;
-    serverManager.stopPackagedServer({ killed: false, kill: () => void (stopped = true) });
-    expect(stopped).toBe(true);
+    expect(loadedServerPath).toBe("C:\\Program Files\\PAPOT\\resources/server/server.js");
+    expect(process.env.HOSTNAME).toBe("127.0.0.1");
+    expect(process.env.PORT).toBe(String(address.port));
+    expect(process.env.NODE_ENV).toBe("production");
   });
 });
