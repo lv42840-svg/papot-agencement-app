@@ -1,6 +1,6 @@
 "use strict";
 
-const DEFAULT_DESKTOP_APP_URL = "http://127.0.0.1:3217";
+const DEFAULT_DESKTOP_APP_URL = "http://127.0.0.1:3217/desktop-setup";
 const ALLOWED_DESKTOP_HOSTS = new Set(["127.0.0.1", "localhost"]);
 
 function normalizeLocalAppUrl(value = DEFAULT_DESKTOP_APP_URL) {
