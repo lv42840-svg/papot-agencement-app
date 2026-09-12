@@ -49,28 +49,10 @@ function errorStatus(code: string): number {
 }
 
 export async function GET() {
-  const leaseId = randomUUID();
   try {
     const desktop = createDesktopSharedResourceRuntime();
-    const opened = await desktop.coordinator.open({
-      resource: ENTRIES_RESOURCE,
-      leaseId,
-      owner: desktop.owner,
-    });
-    const payload = parseEntriesPayload(opened.resource?.payload);
-
-    if (opened.status === "editable") {
-      try {
-        await desktop.coordinator.release({
-          resource: ENTRIES_RESOURCE,
-          leaseId,
-          owner: desktop.owner,
-        });
-      } catch {
-        // La lecture reste valable. Le lease expirera si sa libération est momentanément impossible.
-      }
-    }
-
+    const resource = await desktop.states.get(ENTRIES_RESOURCE);
+    const payload = parseEntriesPayload(resource?.payload);
     return noStoreJson(publicSnapshot(payload, desktop.owner));
   } catch (error) {
     const code = error instanceof Error ? error.message : "ENTRIES_LOAD_FAILED";
@@ -86,34 +68,58 @@ export async function POST(request: Request) {
   try {
     const input = entriesMutationSchema.parse(await request.json());
     desktop = createDesktopSharedResourceRuntime();
-    const opened = await desktop.coordinator.open({
+
+    const before = await desktop.states.get(ENTRIES_RESOURCE);
+    const baseVersion = before?.version ?? 0;
+    const lockResult = await desktop.locks.acquire({
       resource: ENTRIES_RESOURCE,
       leaseId,
       owner: desktop.owner,
+      baseVersion,
     });
 
-    if (opened.status === "read-only") {
+    if (lockResult.status === "locked") {
       return noStoreJson(
         {
           status: "error",
           error: "ENTRIES_LOCKED",
-          lockedBy: opened.lock.owner_display_name,
+          lockedBy: lockResult.lock.owner_display_name,
         },
         { status: 423 },
       );
     }
     ownsLock = true;
 
-    const current = parseEntriesPayload(opened.resource?.payload);
     const actor = { userId: desktop.owner.userId, displayName: desktop.owner.displayName };
-    const mutation = applyEntriesMutation(current, input, actor);
-    const saved = await desktop.coordinator.save({
+    let mutation = applyEntriesMutation(parseEntriesPayload(before?.payload), input, actor);
+    let saved = await desktop.states.save({
       resource: ENTRIES_RESOURCE,
-      leaseId,
-      owner: desktop.owner,
-      expectedVersion: opened.baseVersion,
+      expectedVersion: baseVersion,
       payload: mutation.payload,
+      actor: {
+        userId: desktop.owner.userId,
+        deviceId: desktop.owner.deviceId,
+      },
     });
+
+    // If another workstation completed a save just before our lock acquisition,
+    // reapply the same business action once on the winning version while we own the lock.
+    if (saved.status === "conflict" && saved.current) {
+      mutation = applyEntriesMutation(
+        parseEntriesPayload(saved.current.payload),
+        input,
+        actor,
+      );
+      saved = await desktop.states.save({
+        resource: ENTRIES_RESOURCE,
+        expectedVersion: saved.current.version,
+        payload: mutation.payload,
+        actor: {
+          userId: desktop.owner.userId,
+          deviceId: desktop.owner.deviceId,
+        },
+      });
+    }
 
     if (saved.status === "conflict") {
       return noStoreJson(
@@ -146,7 +152,7 @@ export async function POST(request: Request) {
           owner: desktop.owner,
         });
       } catch {
-        // Le lease expirera de lui-même si Nextcloud devient indisponible pendant la libération.
+        // The lease will expire by itself if Nextcloud becomes unavailable during release.
       }
     }
   }
