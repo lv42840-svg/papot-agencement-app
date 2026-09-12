@@ -180,6 +180,16 @@ export class NextcloudDavClient {
     return (await this.request("GET", url, [200])).text();
   }
 
+  async getTextIfExists(url: string): Promise<string | null> {
+    const response = await fetch(url, {
+      method: "GET",
+      headers: this.headers({ "Cache-Control": "no-cache" }),
+    });
+    if (response.status === 404) return null;
+    if (response.status !== 200) throw new Error(`WEBDAV_GET_HTTP_${response.status}`);
+    return response.text();
+  }
+
   private async getDavEtag(url: string): Promise<string | null> {
     const response = await fetch(url, {
       method: "PROPFIND",
@@ -198,7 +208,7 @@ export class NextcloudDavClient {
     return etag;
   }
 
-  private async getTextWithEtagViaPropfind(url: string): Promise<TextWithEtag | null> {
+  async getTextWithEtag(url: string): Promise<TextWithEtag | null> {
     for (let attempt = 0; attempt < 3; attempt += 1) {
       const beforeEtag = await this.getDavEtag(url);
       if (beforeEtag === null) return null;
@@ -220,22 +230,6 @@ export class NextcloudDavClient {
     }
 
     throw new Error("WEBDAV_READ_UNSTABLE");
-  }
-
-  async getTextWithEtag(url: string): Promise<TextWithEtag | null> {
-    const response = await fetch(url, {
-      method: "GET",
-      headers: this.headers({ "Cache-Control": "no-cache" }),
-    });
-
-    if (response.status === 404) return null;
-    if (response.status !== 200) throw new Error(`WEBDAV_GET_HTTP_${response.status}`);
-
-    const text = await response.text();
-    const etag = response.headers.get("etag");
-    if (etag) return { text, etag };
-
-    return this.getTextWithEtagViaPropfind(url);
   }
 
   async getBytes(url: string): Promise<Buffer> {
