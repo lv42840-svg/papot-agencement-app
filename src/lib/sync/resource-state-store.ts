@@ -12,6 +12,7 @@ type ResourceDavClient = Pick<
   | "filesRoot"
   | "childUrl"
   | "ensurePath"
+  | "getTextIfExists"
   | "getTextWithEtag"
   | "putTextIfAbsent"
   | "putTextIfMatch"
@@ -35,19 +36,22 @@ function encodeEnvelope(envelope: SharedResourceEnvelope): string {
   return `${JSON.stringify(envelope, null, 2)}\n`;
 }
 
-function parseEnvelope(record: TextWithEtag): ResourceRecord {
+function parseEnvelopeText(text: string): SharedResourceEnvelope {
   let raw: unknown;
   try {
-    raw = JSON.parse(record.text);
+    raw = JSON.parse(text);
   } catch {
     throw new Error("RESOURCE_FILE_INVALID_JSON");
   }
 
   const parsed = sharedResourceEnvelopeSchema.safeParse(raw);
   if (!parsed.success) throw new Error("RESOURCE_FILE_INVALID");
+  return parsed.data;
+}
 
+function parseEnvelope(record: TextWithEtag): ResourceRecord {
   return {
-    envelope: parsed.data,
+    envelope: parseEnvelopeText(record.text),
     etag: record.etag,
   };
 }
@@ -78,8 +82,8 @@ export class NextcloudSharedResourceStore {
 
   async get(resource: SharedResourceRef): Promise<SharedResourceEnvelope | null> {
     const url = await this.resourceUrl(resource);
-    const record = await this.readRecordAt(url);
-    return record?.envelope ?? null;
+    const text = await this.dav.getTextIfExists(url);
+    return text === null ? null : parseEnvelopeText(text);
   }
 
   async save(params: {
