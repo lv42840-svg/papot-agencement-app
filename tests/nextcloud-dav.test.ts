@@ -60,13 +60,34 @@ describe("NextcloudDavClient collection cache", () => {
     expect(fetchMock).toHaveBeenCalledTimes(2);
   });
 
-  it("reads text and ETag in a single GET when Nextcloud exposes the ETag header", async () => {
-    const fetchMock = vi.fn(async () =>
-      new Response('{"ok":true}', {
-        status: 200,
-        headers: { ETag: '"v42"' },
-      }),
-    );
+  it("uses a single GET for read-only text access", async () => {
+    const fetchMock = vi.fn(async () => new Response('{"ok":true}', { status: 200 }));
+    vi.stubGlobal("fetch", fetchMock);
+    const dav = new NextcloudDavClient({
+      baseUrl: "https://cloud.example.test",
+      login: "technical-account",
+      appPassword: "not-a-real-secret",
+    });
+
+    await expect(
+      dav.getTextIfExists("https://cloud.example.test/remote.php/dav/files/papot/file.json"),
+    ).resolves.toBe('{"ok":true}');
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+  });
+
+  it("uses the DAV getetag value for conditional-write reads", async () => {
+    const propfindBody =
+      '<?xml version="1.0"?><d:multistatus xmlns:d="DAV:"><d:response><d:propstat><d:prop><d:getetag>"dav-v42"</d:getetag></d:prop></d:propstat></d:response></d:multistatus>';
+    const fetchMock = vi
+      .fn()
+      .mockResolvedValueOnce(new Response(propfindBody, { status: 207 }))
+      .mockResolvedValueOnce(
+        new Response('{"ok":true}', {
+          status: 200,
+          headers: { ETag: '"plain-http-etag"' },
+        }),
+      )
+      .mockResolvedValueOnce(new Response(propfindBody, { status: 207 }));
     vi.stubGlobal("fetch", fetchMock);
     const dav = new NextcloudDavClient({
       baseUrl: "https://cloud.example.test",
@@ -76,7 +97,7 @@ describe("NextcloudDavClient collection cache", () => {
 
     await expect(
       dav.getTextWithEtag("https://cloud.example.test/remote.php/dav/files/papot/file.json"),
-    ).resolves.toEqual({ text: '{"ok":true}', etag: '"v42"' });
-    expect(fetchMock).toHaveBeenCalledTimes(1);
+    ).resolves.toEqual({ text: '{"ok":true}', etag: '"dav-v42"' });
+    expect(fetchMock).toHaveBeenCalledTimes(3);
   });
 });
