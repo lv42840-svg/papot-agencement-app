@@ -52,6 +52,13 @@ function parseLock(record: TextWithEtag): LockRecord {
   };
 }
 
+function isSameOwner(
+  lock: SharedResourceLock,
+  owner: Pick<ResourceLockOwner, "userId" | "deviceId">,
+): boolean {
+  return lock.owner_user_id === owner.userId && lock.owner_device_id === owner.deviceId;
+}
+
 export class NextcloudResourceLockStore {
   constructor(
     private readonly dav: LockDavClient,
@@ -92,8 +99,16 @@ export class NextcloudResourceLockStore {
     baseVersion: number;
     now?: Date;
     ttlMs?: number;
+    reclaimOwnAfterMs?: number;
   }): Promise<AcquireResourceLockResult> {
     const now = params.now ?? new Date();
+    if (
+      params.reclaimOwnAfterMs !== undefined &&
+      (!Number.isFinite(params.reclaimOwnAfterMs) || params.reclaimOwnAfterMs < 0)
+    ) {
+      throw new Error("LOCK_RECLAIM_DELAY_INVALID");
+    }
+
     const candidate = createResourceLock({ ...params, now });
     const url = await this.lockUrl(params.resource);
     const body = encodeLock(candidate);
@@ -108,7 +123,19 @@ export class NextcloudResourceLockStore {
       }
 
       if (!isResourceLockExpired(current.lock, now)) {
-        return { status: "locked", lock: current.lock };
+        const ownLockAgeMs = now.getTime() - Date.parse(current.lock.renewed_at);
+        const mayReclaimOwnLock =
+          params.reclaimOwnAfterMs !== undefined &&
+          ownLockAgeMs >= params.reclaimOwnAfterMs &&
+          isSameOwner(current.lock, params.owner);
+
+        if (!mayReclaimOwnLock) {
+          return { status: "locked", lock: current.lock };
+        }
+
+        const result = await this.dav.putTextIfMatch(url, body, current.etag);
+        if (result === "written") return { status: "acquired", lock: candidate };
+        continue;
       }
 
       const result = await this.dav.putTextIfMatch(url, body, current.etag);
