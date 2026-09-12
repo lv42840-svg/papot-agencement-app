@@ -17,6 +17,8 @@ const ENTRIES_RESOURCE = {
   resource_type: "ENTRIES" as const,
   resource_id: "global",
 };
+const ENTRIES_WRITE_LOCK_TTL_MS = 30_000;
+const ENTRIES_OWN_LOCK_RECLAIM_AFTER_MS = 15_000;
 
 function noStoreJson(body: unknown, init?: ResponseInit) {
   const response = NextResponse.json(body, init);
@@ -76,6 +78,8 @@ export async function POST(request: Request) {
       leaseId,
       owner: desktop.owner,
       baseVersion,
+      ttlMs: ENTRIES_WRITE_LOCK_TTL_MS,
+      reclaimOwnAfterMs: ENTRIES_OWN_LOCK_RECLAIM_AFTER_MS,
     });
 
     if (lockResult.status === "locked") {
@@ -146,13 +150,14 @@ export async function POST(request: Request) {
   } finally {
     if (desktop && ownsLock) {
       try {
-        await desktop.coordinator.release({
+        await desktop.locks.release({
           resource: ENTRIES_RESOURCE,
           leaseId,
           owner: desktop.owner,
         });
       } catch {
-        // The lease will expire by itself if Nextcloud becomes unavailable during release.
+        // A failed release no longer blocks this workstation for long:
+        // Entries locks are short-lived and the same device can reclaim a stale lease.
       }
     }
   }
