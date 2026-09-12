@@ -70,8 +70,20 @@ export function DesktopAppShell({ children }: { children: React.ReactNode }) {
     <div className="desktopAppShellV2">
       <aside className="desktopSidebarV2">
         <div className="desktopBrandV2">
-          <span className="desktopBrandScript">Papot</span>
-          <span className="desktopBrandName">AGENCEMENT</span>
+          <img
+            src="/logo%20papot.jpg"
+            alt="PAPOT AGENCEMENT"
+            width={94}
+            height={94}
+            style={{
+              display: "block",
+              width: 94,
+              height: 94,
+              objectFit: "cover",
+              borderRadius: "50%",
+              margin: "0 auto",
+            }}
+          />
         </div>
         <nav className="desktopNavV2" aria-label="Navigation principale">
           {navigation.map(({ label, icon: Icon, href }) =>
