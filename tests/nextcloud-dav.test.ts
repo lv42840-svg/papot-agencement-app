@@ -59,4 +59,24 @@ describe("NextcloudDavClient collection cache", () => {
 
     expect(fetchMock).toHaveBeenCalledTimes(2);
   });
+
+  it("reads text and ETag in a single GET when Nextcloud exposes the ETag header", async () => {
+    const fetchMock = vi.fn(async () =>
+      new Response('{"ok":true}', {
+        status: 200,
+        headers: { ETag: '"v42"' },
+      }),
+    );
+    vi.stubGlobal("fetch", fetchMock);
+    const dav = new NextcloudDavClient({
+      baseUrl: "https://cloud.example.test",
+      login: "technical-account",
+      appPassword: "not-a-real-secret",
+    });
+
+    await expect(
+      dav.getTextWithEtag("https://cloud.example.test/remote.php/dav/files/papot/file.json"),
+    ).resolves.toEqual({ text: '{"ok":true}', etag: '"v42"' });
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+  });
 });
