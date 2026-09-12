@@ -19,6 +19,15 @@ function decodeXmlText(value: string): string {
     .replace(/&#39;/g, "'");
 }
 
+function extractDavEtag(xml: string): string | null {
+  const match = xml.match(
+    /<(?:[A-Za-z][A-Za-z0-9_-]*:)?getetag(?:\s[^>]*)?>([\s\S]*?)<\/(?:[A-Za-z][A-Za-z0-9_-]*:)?getetag>/i,
+  );
+  if (!match) return null;
+  const etag = decodeXmlText(match[1].trim());
+  return etag || null;
+}
+
 export type NextcloudDavConfig = {
   baseUrl: string;
   login: string;
@@ -156,22 +165,46 @@ export class NextcloudDavClient {
     return (await this.request("GET", url, [200])).text();
   }
 
-  async getTextWithEtag(url: string): Promise<TextWithEtag | null> {
+  private async getDavEtag(url: string): Promise<string | null> {
     const response = await fetch(url, {
-      method: "GET",
-      headers: this.headers(),
+      method: "PROPFIND",
+      headers: this.headers({
+        Depth: "0",
+        "Content-Type": "application/xml; charset=utf-8",
+      }),
+      body: '<?xml version="1.0"?><d:propfind xmlns:d="DAV:"><d:prop><d:getetag/></d:prop></d:propfind>',
     });
 
     if (response.status === 404) return null;
-    if (response.status !== 200) throw new Error(`WEBDAV_GET_HTTP_${response.status}`);
+    if (response.status !== 207) throw new Error(`WEBDAV_PROPFIND_HTTP_${response.status}`);
 
-    const etag = response.headers.get("ETag")?.trim();
-    if (!etag) throw new Error("WEBDAV_GET_ETAG_MISSING");
+    const etag = extractDavEtag(await response.text());
+    if (!etag) throw new Error("WEBDAV_PROPFIND_ETAG_MISSING");
+    return etag;
+  }
 
-    return {
-      text: await response.text(),
-      etag,
-    };
+  async getTextWithEtag(url: string): Promise<TextWithEtag | null> {
+    for (let attempt = 0; attempt < 3; attempt += 1) {
+      const beforeEtag = await this.getDavEtag(url);
+      if (beforeEtag === null) return null;
+
+      const response = await fetch(url, {
+        method: "GET",
+        headers: this.headers({ "Cache-Control": "no-cache" }),
+      });
+
+      if (response.status === 404) continue;
+      if (response.status !== 200) throw new Error(`WEBDAV_GET_HTTP_${response.status}`);
+      const text = await response.text();
+
+      const afterEtag = await this.getDavEtag(url);
+      if (afterEtag === null) continue;
+      if (beforeEtag === afterEtag) {
+        return { text, etag: afterEtag };
+      }
+    }
+
+    throw new Error("WEBDAV_READ_UNSTABLE");
   }
 
   async getBytes(url: string): Promise<Buffer> {
