@@ -44,7 +44,8 @@ export function DesktopSetupForm() {
       return;
     }
 
-    const form = new FormData(event.currentTarget);
+    const formElement = event.currentTarget;
+    const form = new FormData(formElement);
     setState({ kind: "saving" });
 
     try {
@@ -65,7 +66,7 @@ export function DesktopSetupForm() {
         return;
       }
 
-      event.currentTarget.reset();
+      formElement.reset();
       setState({
         kind: "success",
         message: `Poste « ${result.config.deviceLabel} » configuré. Nextcloud et le dossier partagé sont accessibles, et le mot de passe est chiffré dans le coffre Windows.`,
@@ -145,7 +146,11 @@ export function DesktopSetupForm() {
         />
       </label>
 
-      <button className="primaryButton" type="submit" disabled={state.kind === "saving" || state.kind === "success"}>
+      <button
+        className="primaryButton"
+        type="submit"
+        disabled={state.kind === "saving" || state.kind === "success"}
+      >
         {state.kind === "saving" ? "Test en cours…" : "Tester et enregistrer"}
       </button>
 
