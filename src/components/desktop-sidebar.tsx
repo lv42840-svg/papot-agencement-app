@@ -22,7 +22,7 @@ import {
 
 const navigation = [
   { label: "Accueil", icon: Home, href: "/desktop-ready" },
-  { label: "Entrées", icon: ClipboardList },
+  { label: "Entrées", icon: ClipboardList, href: "/entrees" },
   { label: "Commercial", icon: BriefcaseBusiness },
   { label: "Chantiers", icon: FolderOpen, href: "/chantiers/chantier-test-verrou" },
   { label: "Grand planning", icon: CalendarDays, href: "/planning/2026-S38" },
@@ -154,7 +154,9 @@ export function DesktopSidebar() {
         .desktopBrandV2 {
           position: relative;
           justify-items: center;
-          transition: min-height 180ms ease, padding 180ms ease;
+          transition:
+            min-height 180ms ease,
+            padding 180ms ease;
         }
         .desktopBrandLogoV2 {
           display: block;
@@ -163,7 +165,9 @@ export function DesktopSidebar() {
           object-fit: cover;
           border-radius: 50%;
           box-shadow: 0 5px 18px rgb(55 39 112 / 0.15);
-          transition: width 180ms ease, height 180ms ease;
+          transition:
+            width 180ms ease,
+            height 180ms ease;
         }
         .desktopSidebarToggle {
           position: absolute;
