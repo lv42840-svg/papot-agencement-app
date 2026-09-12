@@ -4,7 +4,7 @@ const { spawn, spawnSync } = require("node:child_process");
 const net = require("node:net");
 
 const npmCommand = process.platform === "win32" ? "npm.cmd" : "npm";
-const appUrl = process.env.PAPOT_APP_URL || "http://127.0.0.1:3000";
+const appUrl = process.env.PAPOT_APP_URL || "http://127.0.0.1:3217";
 const parsed = new URL(appUrl);
 const host = parsed.hostname;
 const port = Number(parsed.port || 80);
@@ -35,10 +35,14 @@ function waitForPort(timeoutMs = 30000) {
 }
 
 async function main() {
-  const next = spawn(npmCommand, ["run", "dev", "--", "-H", "127.0.0.1"], {
-    stdio: "inherit",
-    env: process.env,
-  });
+  const next = spawn(
+    npmCommand,
+    ["run", "dev", "--", "-H", host, "-p", String(port)],
+    {
+      stdio: "inherit",
+      env: process.env,
+    },
+  );
 
   let electron;
   let nextStopped = false;
