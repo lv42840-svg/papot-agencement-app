@@ -1,0 +1,20 @@
+import { PlanningWeekEditor } from "@/components/planning-week-editor";
+
+export default async function PlanningWeekPage({
+  params,
+}: {
+  params: Promise<{ weekId: string }>;
+}) {
+  const { weekId } = await params;
+  return (
+    <main className="content" style={{ marginLeft: 0 }}>
+      <div className="pageHeader">
+        <div>
+          <p className="eyebrow">Planning partagé</p>
+          <h1>Grand planning hebdomadaire</h1>
+        </div>
+      </div>
+      <PlanningWeekEditor weekId={weekId} />
+    </main>
+  );
+}

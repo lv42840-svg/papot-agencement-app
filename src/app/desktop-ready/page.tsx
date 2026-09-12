@@ -20,6 +20,13 @@ export default function DesktopReadyPage() {
           <Link className="primaryButton" href="/chantiers/chantier-test-verrou">
             Ouvrir la fiche chantier test
           </Link>
+          <Link
+            className="secondaryButton"
+            href="/planning/2026-S38"
+            style={{ marginLeft: 12 }}
+          >
+            Ouvrir le planning test
+          </Link>
         </div>
       </section>
     </main>
