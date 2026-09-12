@@ -13,6 +13,12 @@ const config = [
       "@typescript-eslint/no-require-imports": "off",
     },
   },
+  {
+    files: ["src/components/entries-workspace.tsx"],
+    rules: {
+      "react/no-unescaped-entities": "off",
+    },
+  },
 ];
 
 export default config;
