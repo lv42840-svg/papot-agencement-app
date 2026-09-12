@@ -1,6 +1,6 @@
 "use client";
 
-import { Wifi } from "lucide-react";
+import { Wifi, WifiOff } from "lucide-react";
 import { usePathname } from "next/navigation";
 import { useEffect, useMemo, useState } from "react";
 
@@ -8,6 +8,7 @@ type DesktopTopbarProps = {
   displayName: string;
   deviceLabel: string;
   initials: string;
+  configured: boolean;
 };
 
 const routeTitles: Array<{ prefix: string; title: string }> = [
@@ -30,7 +31,12 @@ function resolveTitle(pathname: string) {
   return routeTitles.find(({ prefix }) => pathname.startsWith(prefix))?.title ?? "PAPOT AGENCEMENT";
 }
 
-export function DesktopTopbar({ displayName, deviceLabel, initials }: DesktopTopbarProps) {
+export function DesktopTopbar({
+  displayName,
+  deviceLabel,
+  initials,
+  configured,
+}: DesktopTopbarProps) {
   const pathname = usePathname();
   const [dateLabel, setDateLabel] = useState("");
   const pageTitle = useMemo(() => resolveTitle(pathname), [pathname]);
@@ -58,9 +64,9 @@ export function DesktopTopbar({ displayName, deviceLabel, initials }: DesktopTop
         </div>
 
         <div className="desktopTopbarRight">
-          <div className="desktopConnection">
-            <Wifi size={16} aria-hidden="true" />
-            <span>Configuration active</span>
+          <div className={`desktopConnection${configured ? "" : " isOffline"}`}>
+            {configured ? <Wifi size={16} aria-hidden="true" /> : <WifiOff size={16} aria-hidden="true" />}
+            <span>{configured ? "Configuration active" : "Configuration absente"}</span>
           </div>
           <div className="desktopIdentity">
             <div>
@@ -96,6 +102,9 @@ export function DesktopTopbar({ displayName, deviceLabel, initials }: DesktopTop
           align-items: center;
           gap: 22px;
           min-width: 0;
+        }
+        .desktopConnection.isOffline {
+          color: #b45309;
         }
 
         @media (max-width: 1280px) {
