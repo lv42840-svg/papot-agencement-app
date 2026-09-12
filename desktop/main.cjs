@@ -16,13 +16,18 @@ const {
   saveDesktopSetup,
 } = require("./setup-store.cjs");
 const { openLocalDatabase } = require("./local-database.cjs");
-const { startPackagedServer } = require("./server-manager.cjs");
+const { startDevelopmentServer, startPackagedServer } = require("./server-manager.cjs");
 
 const appUrl = normalizeLocalAppUrl(process.env.PAPOT_APP_URL || DEFAULT_DESKTOP_APP_URL);
 let localDatabase;
+let developmentServer;
 
 function exposeSetupToLocalServer(setup) {
-  if (!setup) return;
+  if (!setup) {
+    delete process.env.PAPOT_DESKTOP_CONFIG_JSON;
+    delete process.env.PAPOT_NEXTCLOUD_APP_PASSWORD;
+    return;
+  }
   process.env.PAPOT_DESKTOP_CONFIG_JSON = JSON.stringify(setup.config);
   process.env.PAPOT_NEXTCLOUD_APP_PASSWORD = setup.nextcloudAppPassword;
 }
@@ -147,6 +152,9 @@ function registerDesktopSetupHandler() {
       exposeSetupToLocalServer(
         readDesktopSetup({ userDataPath: app.getPath("userData"), safeStorage }),
       );
+      if (developmentServer) {
+        await developmentServer.restart();
+      }
       return {
         ok: true,
         config: {
@@ -210,13 +218,25 @@ app.whenReady().then(async () => {
   exposeSetupToLocalServer(
     readDesktopSetup({ userDataPath: app.getPath("userData"), safeStorage }),
   );
+
+  const parsedAppUrl = new URL(appUrl);
+  const serverConfig = {
+    host: parsedAppUrl.hostname,
+    port: Number(parsedAppUrl.port || 80),
+  };
+
   if (app.isPackaged) {
     await startPackagedServer({
       resourcesPath: process.resourcesPath,
-      host: new URL(appUrl).hostname,
-      port: Number(new URL(appUrl).port),
+      ...serverConfig,
+    });
+  } else if (process.env.PAPOT_MANAGE_DEV_SERVER === "1") {
+    developmentServer = await startDevelopmentServer({
+      projectRoot: path.join(__dirname, ".."),
+      ...serverConfig,
     });
   }
+
   localDatabase = openLocalDatabase(app.getPath("userData"));
   registerDesktopSetupHandler();
 
@@ -237,6 +257,10 @@ app.on("window-all-closed", () => {
 });
 
 app.on("before-quit", () => {
+  if (developmentServer) {
+    developmentServer.stop();
+    developmentServer = undefined;
+  }
   if (localDatabase) {
     localDatabase.close();
     localDatabase = undefined;
