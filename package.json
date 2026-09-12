@@ -2,12 +2,15 @@
   "name": "papot-agencement-app",
   "version": "0.1.0",
   "private": true,
+  "main": "desktop/main.cjs",
   "engines": {
     "node": ">=22"
   },
   "scripts": {
     "dev": "next dev",
     "build": "next build",
+    "desktop:dev": "node scripts/desktop-dev.cjs",
+    "desktop:dist": "npm run build && electron-builder --win nsis",
     "start": "next start",
     "lint": "eslint .",
     "format": "prettier --write .",
@@ -35,6 +38,8 @@
     "@types/pg": "8.11.10",
     "@types/react": "19.0.3",
     "@types/react-dom": "19.0.2",
+    "electron": "44.3.0",
+    "electron-builder": "26.15.3",
     "eslint": "9.17.0",
     "eslint-config-next": "15.5.24",
     "prettier": "3.4.2",
@@ -42,5 +47,43 @@
     "typescript": "5.7.2",
     "vitest": "2.1.8",
     "wrangler": "4.131.1"
+  },
+  "build": {
+    "appId": "fr.papot.agencement",
+    "productName": "PAPOT AGENCEMENT",
+    "asar": true,
+    "directories": {
+      "output": "release"
+    },
+    "files": [
+      "desktop/**/*",
+      "package.json"
+    ],
+    "extraResources": [
+      {
+        "from": ".next/standalone",
+        "to": "server"
+      },
+      {
+        "from": ".next/static",
+        "to": "server/.next/static"
+      },
+      {
+        "from": "public",
+        "to": "server/public"
+      }
+    ],
+    "win": {
+      "target": "nsis",
+      "icon": "build/papot-icon.ico"
+    },
+    "nsis": {
+      "oneClick": false,
+      "perMachine": false,
+      "allowToChangeInstallationDirectory": true,
+      "createDesktopShortcut": true,
+      "createStartMenuShortcut": true,
+      "shortcutName": "PAPOT AGENCEMENT"
+    }
   }
 }

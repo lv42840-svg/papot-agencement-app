@@ -2,6 +2,8 @@ node_modules/
 .next/
 out/
 coverage/
+release/
+build/*.png
 .env
 .env.local
 .env.*.local

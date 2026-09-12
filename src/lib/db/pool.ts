@@ -2,12 +2,6 @@ import "server-only";
 
 import { Pool } from "pg";
 
-const connectionString = process.env.DATABASE_URL;
-
-if (!connectionString) {
-  throw new Error("DATABASE_URL is required");
-}
-
 declare global {
   // eslint-disable-next-line no-var
   var __papotPool: Pool | undefined;
@@ -16,7 +10,7 @@ declare global {
 export const db =
   global.__papotPool ??
   new Pool({
-    connectionString,
+    connectionString: process.env.DATABASE_URL,
     max: 10,
     idleTimeoutMillis: 30_000,
     connectionTimeoutMillis: 5_000,
