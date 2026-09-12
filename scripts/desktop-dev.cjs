@@ -1,6 +1,6 @@
 "use strict";
 
-const { spawn } = require("node:child_process");
+const { spawn, spawnSync } = require("node:child_process");
 const net = require("node:net");
 
 const npmCommand = process.platform === "win32" ? "npm.cmd" : "npm";
@@ -41,9 +41,18 @@ async function main() {
   });
 
   let electron;
+  let nextStopped = false;
 
   const stopNext = () => {
-    if (!next.killed) next.kill();
+    if (nextStopped || !next.pid) return;
+    nextStopped = true;
+
+    if (process.platform === "win32") {
+      spawnSync("taskkill", ["/pid", String(next.pid), "/t", "/f"], { stdio: "ignore" });
+      return;
+    }
+
+    next.kill("SIGTERM");
   };
 
   process.once("SIGINT", stopNext);
