@@ -1,4 +1,4 @@
-﻿import { RelayNextcloudClient } from "./nextcloud-client";
+import { RelayNextcloudClient } from "./nextcloud-client";
 
 type RelayEnv = {
   NEXTCLOUD_BASE_URL: string;
@@ -13,6 +13,7 @@ type RelayEnv = {
 };
 
 const MAX_PACKAGE_BYTES = 256 * 1024;
+const ACK_ROUTE_PREFIX = "/v1/sync/acks/";
 
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 
@@ -80,6 +81,16 @@ function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === "object" && value !== null && !Array.isArray(value);
 }
 
+function nextcloudClient(env: RelayEnv): RelayNextcloudClient {
+  return new RelayNextcloudClient({
+    baseUrl: env.NEXTCLOUD_BASE_URL,
+    login: env.NEXTCLOUD_LOGIN,
+    appPassword: env.NEXTCLOUD_APP_PASSWORD,
+    userId: env.NEXTCLOUD_USER_ID,
+    syncRoot: env.NEXTCLOUD_SYNC_ROOT,
+  });
+}
+
 function parseEnvelope(raw: string): {
   packageId: string;
   papotUserId: string;
@@ -140,6 +151,24 @@ function parseEnvelope(raw: string): {
   };
 }
 
+function parseAckPath(pathname: string): {
+  papotUserId: string;
+  deviceId: string;
+  packageId: string;
+} | null {
+  if (!pathname.startsWith(ACK_ROUTE_PREFIX)) return null;
+
+  const segments = pathname.slice(ACK_ROUTE_PREFIX.length).split("/");
+  if (segments.length !== 3) return null;
+
+  const [papotUserId, deviceId, packageId] = segments;
+  if (!UUID_RE.test(papotUserId) || !UUID_RE.test(deviceId) || !UUID_RE.test(packageId)) {
+    return null;
+  }
+
+  return { papotUserId, deviceId, packageId };
+}
+
 async function acceptedResponse(
   packageId: string,
   duplicate: boolean,
@@ -191,16 +220,9 @@ async function handleUpload(request: Request, env: RelayEnv): Promise<Response> 
     return jsonResponse(400, { error: "INVALID_PACKAGE_ENVELOPE" }, corsHeaders);
   }
 
-  const nextcloud = new RelayNextcloudClient({
-    baseUrl: env.NEXTCLOUD_BASE_URL,
-    login: env.NEXTCLOUD_LOGIN,
-    appPassword: env.NEXTCLOUD_APP_PASSWORD,
-    userId: env.NEXTCLOUD_USER_ID,
-    syncRoot: env.NEXTCLOUD_SYNC_ROOT,
-  });
+  const nextcloud = nextcloudClient(env);
 
   const incomingUrl = nextcloud.deviceZoneUrl(envelope.papotUserId, envelope.deviceId, "incoming");
-
   const packageUrl = nextcloud.childUrl(incomingUrl, `${envelope.packageId}.json`);
 
   const existing = await nextcloud.getText(packageUrl);
@@ -241,7 +263,59 @@ async function handleUpload(request: Request, env: RelayEnv): Promise<Response> 
   return acceptedResponse(envelope.packageId, false, corsHeaders);
 }
 
-function handleOptions(request: Request, env: RelayEnv): Response {
+async function handleAckRead(
+  request: Request,
+  env: RelayEnv,
+  target: { papotUserId: string; deviceId: string; packageId: string },
+): Promise<Response> {
+  const corsHeaders = originHeaders(request, env);
+
+  if (!isOriginAllowed(request, env)) {
+    return jsonResponse(403, { error: "ORIGIN_NOT_ALLOWED" });
+  }
+
+  if (!isAuthorized(request, env)) {
+    return jsonResponse(401, { error: "UNAUTHORIZED" }, corsHeaders);
+  }
+
+  const nextcloud = nextcloudClient(env);
+  const ackUrl = nextcloud.deviceZoneUrl(target.papotUserId, target.deviceId, "ack");
+  const ackFileUrl = nextcloud.childUrl(ackUrl, `${target.packageId}.json`);
+
+  let raw: string | null;
+  try {
+    raw = await nextcloud.getText(ackFileUrl);
+  } catch (error) {
+    const code = error instanceof Error ? error.message : "NEXTCLOUD_READ_FAILED";
+    return jsonResponse(502, { error: "UPSTREAM_READ_FAILED", code }, corsHeaders);
+  }
+
+  if (raw === null) {
+    return jsonResponse(
+      404,
+      {
+        status: "ACK_NOT_READY",
+        package_id: target.packageId,
+      },
+      corsHeaders,
+    );
+  }
+
+  let ack: unknown;
+  try {
+    ack = JSON.parse(raw);
+  } catch {
+    return jsonResponse(502, { error: "UPSTREAM_ACK_INVALID" }, corsHeaders);
+  }
+
+  if (!isRecord(ack) || ack.package_id !== target.packageId) {
+    return jsonResponse(502, { error: "UPSTREAM_ACK_INVALID" }, corsHeaders);
+  }
+
+  return jsonResponse(200, ack, corsHeaders);
+}
+
+function handleOptions(request: Request, env: RelayEnv, methods: string): Response {
   if (!isOriginAllowed(request, env)) {
     return jsonResponse(403, { error: "ORIGIN_NOT_ALLOWED" });
   }
@@ -250,7 +324,7 @@ function handleOptions(request: Request, env: RelayEnv): Response {
     status: 204,
     headers: {
       ...originHeaders(request, env),
-      "Access-Control-Allow-Methods": "POST, OPTIONS",
+      "Access-Control-Allow-Methods": methods,
       "Access-Control-Allow-Headers": "Authorization, Content-Type",
       "Access-Control-Max-Age": "600",
       "Cache-Control": "no-store",
@@ -262,26 +336,50 @@ const worker = {
   async fetch(request: Request, env: RelayEnv): Promise<Response> {
     const url = new URL(request.url);
 
-    if (url.pathname !== "/v1/sync/packages") {
-      return jsonResponse(404, { error: "NOT_FOUND" });
+    if (url.pathname === "/v1/sync/packages") {
+      if (request.method === "OPTIONS") {
+        return handleOptions(request, env, "POST, OPTIONS");
+      }
+
+      if (request.method !== "POST") {
+        return jsonResponse(
+          405,
+          { error: "METHOD_NOT_ALLOWED" },
+          {
+            Allow: "POST, OPTIONS",
+            ...originHeaders(request, env),
+          },
+        );
+      }
+
+      return handleUpload(request, env);
     }
 
-    if (request.method === "OPTIONS") {
-      return handleOptions(request, env);
+    if (url.pathname.startsWith(ACK_ROUTE_PREFIX)) {
+      if (request.method === "OPTIONS") {
+        return handleOptions(request, env, "GET, OPTIONS");
+      }
+
+      if (request.method !== "GET") {
+        return jsonResponse(
+          405,
+          { error: "METHOD_NOT_ALLOWED" },
+          {
+            Allow: "GET, OPTIONS",
+            ...originHeaders(request, env),
+          },
+        );
+      }
+
+      const target = parseAckPath(url.pathname);
+      if (!target) {
+        return jsonResponse(400, { error: "INVALID_ACK_PATH" }, originHeaders(request, env));
+      }
+
+      return handleAckRead(request, env, target);
     }
 
-    if (request.method !== "POST") {
-      return jsonResponse(
-        405,
-        { error: "METHOD_NOT_ALLOWED" },
-        {
-          Allow: "POST, OPTIONS",
-          ...originHeaders(request, env),
-        },
-      );
-    }
-
-    return handleUpload(request, env);
+    return jsonResponse(404, { error: "NOT_FOUND" });
   },
 };
 
