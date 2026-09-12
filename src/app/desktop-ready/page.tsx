@@ -5,20 +5,11 @@ import { DesktopAppShell } from "@/components/desktop-app-shell";
 export const dynamic = "force-dynamic";
 
 export default function DesktopReadyPage() {
-  const today = new Intl.DateTimeFormat("fr-FR", {
-    weekday: "long",
-    day: "numeric",
-    month: "long",
-    year: "numeric",
-  }).format(new Date());
-
   return (
     <DesktopAppShell>
       <div className="dashboardHeading">
         <div>
-          <p className="eyebrow">Accueil</p>
           <h1>Bonjour 👋</h1>
-          <p className="dashboardDate">{today}</p>
         </div>
         <button className="primaryButton" disabled title="Disponible avec le module Entrées">
           <Plus size={18} /> Nouvelle entrée
