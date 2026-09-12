@@ -1,3 +1,5 @@
+import Link from "next/link";
+
 export const dynamic = "force-static";
 
 export default function DesktopReadyPage() {
@@ -15,6 +17,9 @@ export default function DesktopReadyPage() {
             La configuration locale et l’accès Nextcloud sécurisé seront réutilisés aux prochains
             démarrages. Le raccordement aux écrans métier est la prochaine étape.
           </p>
+          <Link className="primaryButton" href="/chantiers/chantier-test-verrou">
+            Ouvrir la fiche chantier test
+          </Link>
         </div>
       </section>
     </main>

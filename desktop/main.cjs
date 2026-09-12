@@ -12,6 +12,7 @@ const {
   DEFAULT_SYNC_ROOT,
   hasDesktopSetup,
   normalizeSetupInput,
+  readDesktopSetup,
   saveDesktopSetup,
 } = require("./setup-store.cjs");
 const { openLocalDatabase } = require("./local-database.cjs");
@@ -19,6 +20,12 @@ const { startPackagedServer } = require("./server-manager.cjs");
 
 const appUrl = normalizeLocalAppUrl(process.env.PAPOT_APP_URL || DEFAULT_DESKTOP_APP_URL);
 let localDatabase;
+
+function exposeSetupToLocalServer(setup) {
+  if (!setup) return;
+  process.env.PAPOT_DESKTOP_CONFIG_JSON = JSON.stringify(setup.config);
+  process.env.PAPOT_NEXTCLOUD_APP_PASSWORD = setup.nextcloudAppPassword;
+}
 
 function desktopUrl(pathname) {
   return new URL(pathname, `${new URL(appUrl).origin}/`).toString();
@@ -137,6 +144,9 @@ function registerDesktopSetupHandler() {
         nextcloudUserId,
         safeStorage,
       });
+      exposeSetupToLocalServer(
+        readDesktopSetup({ userDataPath: app.getPath("userData"), safeStorage }),
+      );
       return {
         ok: true,
         config: {
@@ -197,6 +207,9 @@ function createMainWindow() {
 }
 
 app.whenReady().then(async () => {
+  exposeSetupToLocalServer(
+    readDesktopSetup({ userDataPath: app.getPath("userData"), safeStorage }),
+  );
   if (app.isPackaged) {
     await startPackagedServer({
       resourcesPath: process.resourcesPath,
