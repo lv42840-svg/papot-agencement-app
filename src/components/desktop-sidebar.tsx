@@ -23,6 +23,7 @@ import {
 const navigation = [
   { label: "Accueil", icon: Home, href: "/desktop-ready" },
   { label: "Entrées", icon: ClipboardList, href: "/entrees", moduleKey: "capture" },
+  { label: "Clients", icon: Users, href: "/clients", moduleKey: "clients" },
   { label: "Commercial", icon: BriefcaseBusiness, href: "/commercial", moduleKey: "commercial" },
   { label: "Chantiers", icon: FolderOpen, href: "/chantiers", moduleKey: "chantiers" },
   {

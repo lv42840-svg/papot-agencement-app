@@ -37,6 +37,8 @@ function moduleForResource(resourceType: SharedResourceType): string {
   switch (resourceType) {
     case "ENTRIES":
       return "capture";
+    case "CLIENTS":
+      return "clients";
     case "COMMERCIAL":
       return "commercial";
     case "CHANTIER":
