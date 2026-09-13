@@ -139,7 +139,7 @@ describe("Chantiers V1 foundation", () => {
     expect(item.status).toBe("ACTIVE");
     expect(item.plannedHours).toEqual({ be: 0, workshop: 32, install: 16 });
     expect(item.sourceCommercialCaseId).toBe(commercialCase.id);
-    expect(item.id).not.toBe(commercialCase.id);
+    expect(item.id).toBe(commercialCase.id);
     expect(item.launchDocuments).toEqual({
       quote: "MISSING_DECLARED",
       signedQuote: "MISSING_DECLARED",
