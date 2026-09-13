@@ -19,6 +19,9 @@ type DesktopSharedResourceRuntime = {
   coordinator: SharedResourceEditCoordinator;
   locks: NextcloudResourceLockStore;
   states: NextcloudSharedResourceStore;
+  dav: NextcloudDavClient;
+  nextcloudUserId: string;
+  syncRoot: string;
   owner: {
     userId: string;
     deviceId: string;
@@ -39,11 +42,7 @@ export function createDesktopSharedResourceRuntime(): DesktopSharedResourceRunti
   const appPassword = process.env.PAPOT_NEXTCLOUD_APP_PASSWORD;
   if (!rawConfig || !appPassword) throw new Error("DESKTOP_RUNTIME_NOT_CONFIGURED");
 
-  if (
-    cachedRuntime &&
-    cachedRuntime.rawConfig === rawConfig &&
-    cachedRuntime.appPassword === appPassword
-  ) {
+  if (cachedRuntime && cachedRuntime.rawConfig === rawConfig && cachedRuntime.appPassword === appPassword) {
     return cachedRuntime.value;
   }
 
@@ -73,21 +72,16 @@ export function createDesktopSharedResourceRuntime(): DesktopSharedResourceRunti
     appPassword,
     userAgent: "PAPOT-Desktop/0.1",
   });
-  const locks = new NextcloudResourceLockStore(
-    dav,
-    config.nextcloud_user_id,
-    config.nextcloud_sync_root,
-  );
-  const states = new NextcloudSharedResourceStore(
-    dav,
-    config.nextcloud_user_id,
-    config.nextcloud_sync_root,
-  );
+  const locks = new NextcloudResourceLockStore(dav, config.nextcloud_user_id, config.nextcloud_sync_root);
+  const states = new NextcloudSharedResourceStore(dav, config.nextcloud_user_id, config.nextcloud_sync_root);
 
   const value = {
     coordinator: new SharedResourceEditCoordinator(locks, states),
     locks,
     states,
+    dav,
+    nextcloudUserId: config.nextcloud_user_id,
+    syncRoot: config.nextcloud_sync_root,
     owner: {
       userId: config.papot_user_id,
       deviceId: config.device_id,
