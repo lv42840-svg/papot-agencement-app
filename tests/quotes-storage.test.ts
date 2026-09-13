@@ -167,7 +167,13 @@ describe("shared native quotes", () => {
   it("allocates the next annual number to the next quote", () => {
     const firstDraft = createDraft();
     const sendFirst = quotesMutationSchema.parse({ action: "send", quoteId });
-    const firstSent = applyQuotesMutation(firstDraft, sendFirst, actor, new Date(), sendContext).payload;
+    const firstSent = applyQuotesMutation(
+      firstDraft,
+      sendFirst,
+      actor,
+      new Date(),
+      sendContext,
+    ).payload;
     const secondId = "77777777-7777-4777-8777-777777777777";
     const createSecond = quotesMutationSchema.parse({
       action: "create",
