@@ -74,7 +74,9 @@ function errorStatus(code: string): number {
 
 async function getClient(desktop: Desktop, clientId: string): Promise<ClientRecord> {
   const resource = await desktop.states.get(CLIENTS_RESOURCE);
-  const client = parseClientsPayload(resource?.payload).clients.find((item) => item.id === clientId);
+  const client = parseClientsPayload(resource?.payload).clients.find(
+    (item) => item.id === clientId,
+  );
   if (!client) throw new Error("CLIENT_NOT_FOUND");
   if (client.isArchived) throw new Error("CLIENT_ARCHIVED");
   return client;
