@@ -140,6 +140,7 @@ describe("Chantiers V1 foundation", () => {
     expect(item.plannedHours).toEqual({ be: 0, workshop: 32, install: 16 });
     expect(item.sourceCommercialCaseId).toBe(commercialCase.id);
     expect(item.id).toBe(commercialCase.id);
+    expect(item.operational).toEqual({ beItems: [], workshopItems: [], installItems: [] });
     expect(item.launchDocuments).toEqual({
       quote: "MISSING_DECLARED",
       signedQuote: "MISSING_DECLARED",
@@ -206,6 +207,104 @@ describe("Chantiers V1 foundation", () => {
     expect(result.plannedHours).toEqual({ be: 4, workshop: 40, install: 18 });
     expect(result.history.at(-1)?.summary).toContain("Atelier 32 → 40 h");
     expect(result.history.at(-1)?.summary).toContain("Complément demandé");
+  });
+
+  it("creates Atelier and Pose when a BE item is validated for an in-house installation", () => {
+    let source = launch().payload;
+    const chantierId = source.chantiers[0].id;
+    source = applyChantierMutation(
+      source,
+      {
+        action: "createBeItem",
+        chantierId,
+        name: "Banque accueil",
+        originKind: "QUOTE_LINE",
+        originLabel: "1.2 Banque accueil",
+        installedByUs: true,
+      },
+      actor,
+      new Date("2026-09-14T09:00:00.000Z"),
+    ).payload;
+
+    const beItem = source.chantiers[0].operational.beItems[0];
+    const validated = applyChantierMutation(
+      source,
+      { action: "setBeStatus", chantierId, beItemId: beItem.id, status: "VALIDATED" },
+      actor,
+      new Date("2026-09-14T10:00:00.000Z"),
+    ).payload.chantiers[0];
+
+    expect(validated.operational.workshopItems).toHaveLength(1);
+    expect(validated.operational.workshopItems[0].sourceBeItemId).toBe(beItem.id);
+    expect(validated.operational.installItems).toHaveLength(1);
+    expect(validated.operational.installItems[0].sourceBeItemId).toBe(beItem.id);
+    expect(validated.operational.installItems[0].status).toBe("TODO");
+  });
+
+  it("creates a direct Atelier item and its Pose tracking without forcing a BE item", () => {
+    const source = launch().payload;
+    const chantierId = source.chantiers[0].id;
+    const result = applyChantierMutation(
+      source,
+      {
+        action: "createWorkshopItem",
+        chantierId,
+        name: "Tablette complémentaire",
+        originKind: "TS",
+        originLabel: "Ajout demandé en réunion",
+        installedByUs: true,
+      },
+      actor,
+      new Date("2026-09-14T11:00:00.000Z"),
+    ).payload.chantiers[0];
+
+    expect(result.operational.beItems).toHaveLength(0);
+    expect(result.operational.workshopItems).toHaveLength(1);
+    expect(result.operational.workshopItems[0].sourceBeItemId).toBeNull();
+    expect(result.operational.installItems).toHaveLength(1);
+    expect(result.operational.installItems[0].sourceWorkshopItemId).toBe(result.operational.workshopItems[0].id);
+  });
+
+  it("keeps Atelier and Pose progress independent", () => {
+    let source = launch().payload;
+    const chantierId = source.chantiers[0].id;
+    source = applyChantierMutation(
+      source,
+      {
+        action: "createWorkshopItem",
+        chantierId,
+        name: "Habillage mural",
+        originKind: "QUOTE_LINE",
+        originLabel: "2.4 Habillage mural",
+        installedByUs: true,
+      },
+      actor,
+    ).payload;
+
+    const workshop = source.chantiers[0].operational.workshopItems[0];
+    const installation = source.chantiers[0].operational.installItems[0];
+    const afterWorkshop = applyChantierMutation(
+      source,
+      { action: "setWorkshopStatus", chantierId, workshopItemId: workshop.id, status: "DONE" },
+      actor,
+    ).payload;
+
+    expect(afterWorkshop.chantiers[0].operational.installItems[0].status).toBe("TODO");
+
+    const afterInstall = applyChantierMutation(
+      afterWorkshop,
+      {
+        action: "setInstallStatus",
+        chantierId,
+        installItemId: installation.id,
+        status: "IN_PROGRESS",
+        note: "Première zone posée",
+      },
+      actor,
+    ).payload.chantiers[0];
+    expect(afterInstall.operational.workshopItems[0].status).toBe("DONE");
+    expect(afterInstall.operational.installItems[0].status).toBe("IN_PROGRESS");
+    expect(afterInstall.operational.installItems[0].note).toBe("Première zone posée");
   });
 
   it("supports Active → Terminé → Active without recreating the chantier", () => {
