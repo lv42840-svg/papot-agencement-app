@@ -22,7 +22,7 @@ jobs:
       - name: Install dependencies
         run: npm.cmd ci
       - name: Inspect pending install scripts
-        run: npm.cmd install-scripts ls --all --json
+        run: npm.cmd install-scripts ls --json
       - name: Bootstrap Electron 44 binary through its CLI
         run: node .\node_modules\electron\cli.js --version
       - name: Verify Electron binary
