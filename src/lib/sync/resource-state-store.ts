@@ -28,6 +28,11 @@ export type SharedResourceActor = {
   deviceId: string;
 };
 
+export type SharedResourceUpdateSnapshot = {
+  resource: SharedResourceEnvelope | null;
+  etag: string | null;
+};
+
 export type SaveSharedResourceResult =
   | { status: "saved"; resource: SharedResourceEnvelope }
   | { status: "conflict"; current: SharedResourceEnvelope | null };
@@ -86,6 +91,48 @@ export class NextcloudSharedResourceStore {
     return text === null ? null : parseEnvelopeText(text);
   }
 
+  async openForUpdate(resource: SharedResourceRef): Promise<SharedResourceUpdateSnapshot> {
+    const url = await this.resourceUrl(resource);
+    const record = await this.readRecordAt(url);
+    return record
+      ? { resource: record.envelope, etag: record.etag }
+      : { resource: null, etag: null };
+  }
+
+  async saveOpened(params: {
+    resource: SharedResourceRef;
+    opened: SharedResourceUpdateSnapshot;
+    payload: unknown;
+    actor: SharedResourceActor;
+    now?: Date;
+  }): Promise<SaveSharedResourceResult> {
+    const expectedVersion = params.opened.resource?.version ?? 0;
+    const now = params.now ?? new Date();
+    const candidate = sharedResourceEnvelopeSchema.parse({
+      schema_version: 1,
+      resource: params.resource,
+      version: nextSharedResourceVersion(expectedVersion),
+      updated_at: now.toISOString(),
+      updated_by_user_id: params.actor.userId,
+      updated_by_device_id: params.actor.deviceId,
+      payload: params.payload,
+    });
+
+    const url = await this.resourceUrl(params.resource);
+    const body = encodeEnvelope(candidate);
+    const result =
+      params.opened.etag === null
+        ? await this.dav.putTextIfAbsent(url, body)
+        : await this.dav.putTextIfMatch(url, body, params.opened.etag);
+
+    if (result === "written") {
+      return { status: "saved", resource: candidate };
+    }
+
+    const winner = await this.readRecordAt(url);
+    return { status: "conflict", current: winner?.envelope ?? null };
+  }
+
   async save(params: {
     resource: SharedResourceRef;
     expectedVersion: number;
@@ -97,46 +144,18 @@ export class NextcloudSharedResourceStore {
       throw new Error("EXPECTED_VERSION_INVALID");
     }
 
-    const now = params.now ?? new Date();
-    const nextVersion = nextSharedResourceVersion(params.expectedVersion);
-    const candidate = sharedResourceEnvelopeSchema.parse({
-      schema_version: 1,
+    const opened = await this.openForUpdate(params.resource);
+    const currentVersion = opened.resource?.version ?? 0;
+    if (currentVersion !== params.expectedVersion) {
+      return { status: "conflict", current: opened.resource };
+    }
+
+    return this.saveOpened({
       resource: params.resource,
-      version: nextVersion,
-      updated_at: now.toISOString(),
-      updated_by_user_id: params.actor.userId,
-      updated_by_device_id: params.actor.deviceId,
+      opened,
       payload: params.payload,
+      actor: params.actor,
+      now: params.now,
     });
-
-    const url = await this.resourceUrl(params.resource);
-    const body = encodeEnvelope(candidate);
-    const current = await this.readRecordAt(url);
-
-    if (!current) {
-      if (params.expectedVersion !== 0) {
-        return { status: "conflict", current: null };
-      }
-
-      const result = await this.dav.putTextIfAbsent(url, body);
-      if (result === "written") {
-        return { status: "saved", resource: candidate };
-      }
-
-      const winner = await this.readRecordAt(url);
-      return { status: "conflict", current: winner?.envelope ?? null };
-    }
-
-    if (current.envelope.version !== params.expectedVersion) {
-      return { status: "conflict", current: current.envelope };
-    }
-
-    const result = await this.dav.putTextIfMatch(url, body, current.etag);
-    if (result === "written") {
-      return { status: "saved", resource: candidate };
-    }
-
-    const winner = await this.readRecordAt(url);
-    return { status: "conflict", current: winner?.envelope ?? null };
   }
 }
