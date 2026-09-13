@@ -1,21 +1,23 @@
+import { randomUUID } from "node:crypto";
 import { NextResponse } from "next/server";
 import {
   desktopRequestErrorStatus,
   requireDesktopRequestContext,
 } from "@/lib/desktop/request-context";
 import { cleanupEntryAttachments, uploadEntryAttachments } from "@/lib/entries/attachment-storage";
+import { parseEntriesPayload } from "@/lib/entries/domain";
 import {
   entriesCapabilities,
   listSuggestedAssignees,
+  registerEntryAttachments,
   type EntriesActor,
 } from "@/lib/entries/mutations";
-import {
-  entryExistsInDatabase,
-  registerEntryAttachmentsInDatabase,
-} from "@/lib/entries/postgres-repository";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
+
+const ENTRIES_RESOURCE = { resource_type: "ENTRIES" as const, resource_id: "global" };
+const LOCK_TTL_MS = 30_000;
 
 type RouteContext = { params: Promise<{ entryId: string }> };
 
@@ -29,7 +31,7 @@ function actorFor(context: Awaited<ReturnType<typeof requireDesktopRequestContex
 }
 
 function snapshot(
-  payload: Awaited<ReturnType<typeof registerEntryAttachmentsInDatabase>>["payload"],
+  payload: ReturnType<typeof parseEntriesPayload>,
   actor: EntriesActor,
   focusEntryId?: string,
 ) {
@@ -47,15 +49,13 @@ function statusFor(code: string): number {
   const requestStatus = desktopRequestErrorStatus(code);
   if (requestStatus) return requestStatus;
   if (code === "ENTRY_NOT_FOUND") return 404;
-  if (code.includes("TOO_LARGE")) return 413;
+  if (code === "ENTRIES_LOCKED") return 423;
   if (code.includes("CONFLICT")) return 409;
+  if (code.includes("TOO_LARGE")) return 413;
   return 400;
 }
 
 export async function POST(request: Request, context: RouteContext) {
-  let uploaded = [] as Awaited<ReturnType<typeof uploadEntryAttachments>>;
-  let transport: Parameters<typeof cleanupEntryAttachments>[0] | null = null;
-
   try {
     const { entryId } = await context.params;
     const requestContext = await requireDesktopRequestContext("capture", "WRITE");
@@ -67,26 +67,87 @@ export async function POST(request: Request, context: RouteContext) {
       return NextResponse.json({ error: "ENTRY_ATTACHMENTS_REQUIRED" }, { status: 400 });
     }
 
-    if (!(await entryExistsInDatabase(entryId))) {
-      return NextResponse.json({ error: "ENTRY_NOT_FOUND" }, { status: 404 });
-    }
-
-    transport = {
+    const transport = {
       dav: desktop.dav,
       nextcloudUserId: desktop.nextcloudUserId,
       syncRoot: desktop.syncRoot,
       displayName: owner.displayName,
     };
-    uploaded = await uploadEntryAttachments(transport, entryId, files);
 
-    const mutation = await registerEntryAttachmentsInDatabase(entryId, uploaded, actor);
-    return NextResponse.json(snapshot(mutation.payload, actor, entryId), {
-      headers: { "Cache-Control": "no-store" },
-    });
-  } catch (error) {
-    if (transport && uploaded.length > 0) {
-      await cleanupEntryAttachments(transport, uploaded);
+    const current = await desktop.states.get(ENTRIES_RESOURCE);
+    const currentPayload = parseEntriesPayload(current?.payload);
+    if (!currentPayload.entries.some((entry) => entry.id === entryId)) {
+      return NextResponse.json({ error: "ENTRY_NOT_FOUND" }, { status: 404 });
     }
+
+    let uploaded = [] as Awaited<ReturnType<typeof uploadEntryAttachments>>;
+    const leaseId = randomUUID();
+    let ownsLock = false;
+    try {
+      uploaded = await uploadEntryAttachments(transport, entryId, files);
+
+      const [lock, openedInitial] = await Promise.all([
+        desktop.locks.acquire({
+          resource: ENTRIES_RESOURCE,
+          leaseId,
+          owner,
+          baseVersion: 0,
+          ttlMs: LOCK_TTL_MS,
+          reclaimOwnAfterMs: 0,
+        }),
+        desktop.states.openForUpdate(ENTRIES_RESOURCE),
+      ]);
+      if (lock.status === "locked") throw new Error("ENTRIES_LOCKED");
+      ownsLock = true;
+
+      let opened = openedInitial;
+      let mutation = registerEntryAttachments(
+        parseEntriesPayload(opened.resource?.payload),
+        entryId,
+        uploaded,
+        actor,
+      );
+      let saved = await desktop.states.saveOpened({
+        resource: ENTRIES_RESOURCE,
+        opened,
+        payload: mutation.payload,
+        actor: { userId: owner.userId, deviceId: owner.deviceId },
+      });
+
+      if (saved.status === "conflict") {
+        opened = await desktop.states.openForUpdate(ENTRIES_RESOURCE);
+        mutation = registerEntryAttachments(
+          parseEntriesPayload(opened.resource?.payload),
+          entryId,
+          uploaded,
+          actor,
+        );
+        saved = await desktop.states.saveOpened({
+          resource: ENTRIES_RESOURCE,
+          opened,
+          payload: mutation.payload,
+          actor: { userId: owner.userId, deviceId: owner.deviceId },
+        });
+      }
+      if (saved.status === "conflict") throw new Error("ENTRIES_VERSION_CONFLICT");
+
+      return NextResponse.json(
+        snapshot(parseEntriesPayload(saved.resource.payload), actor, entryId),
+        {
+          headers: { "Cache-Control": "no-store" },
+        },
+      );
+    } catch (error) {
+      if (uploaded.length > 0) await cleanupEntryAttachments(transport, uploaded);
+      throw error;
+    } finally {
+      if (ownsLock) {
+        void desktop.locks
+          .release({ resource: ENTRIES_RESOURCE, leaseId, owner })
+          .catch(() => undefined);
+      }
+    }
+  } catch (error) {
     const code = error instanceof Error ? error.message : "ENTRY_ATTACHMENTS_FAILED";
     return NextResponse.json(
       { error: code },

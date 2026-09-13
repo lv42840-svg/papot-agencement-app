@@ -1,8 +1,8 @@
 import { NextResponse } from "next/server";
 import { z } from "zod";
 import { hashPassword } from "@/lib/auth/password";
-import { createSession, destroyAllSessionsForUser, getCurrentUser } from "@/lib/auth/session";
-import { db } from "@/lib/db/pool";
+import { createSession, getCurrentUser } from "@/lib/auth/session";
+import { mutateAuthPayload } from "@/lib/auth/store";
 
 const schema = z.object({
   password: z.string().min(12).max(512),
@@ -21,13 +21,15 @@ export async function POST(request: Request) {
   }
 
   const passwordHash = await hashPassword(parsed.data.password);
-  await db.query(
-    `UPDATE app_user
-     SET password_hash = $2, must_change_password = false
-     WHERE id = $1 AND is_active = true`,
-    [user.id, passwordHash],
-  );
-  await destroyAllSessionsForUser(user.id);
+  await mutateAuthPayload(user.id, (payload) => {
+    const target = payload.users.find(
+      (candidate) => candidate.id === user.id && candidate.isActive,
+    );
+    if (!target) throw new Error("AUTH_USER_NOT_FOUND");
+    target.passwordHash = passwordHash;
+    target.mustChangePassword = false;
+    payload.sessions = payload.sessions.filter((session) => session.userId !== user.id);
+  });
   await createSession(user.id);
 
   return NextResponse.json({ ok: true });

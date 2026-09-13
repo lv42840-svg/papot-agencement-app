@@ -1,13 +1,17 @@
 import Link from "next/link";
+import { redirect } from "next/navigation";
 import { BriefcaseBusiness, Clock3, FolderOpen, ListTodo, Plus } from "lucide-react";
 import { DashboardChantierStat } from "@/components/dashboard-chantier-stat";
 import { DashboardCommercialStats } from "@/components/dashboard-commercial-stats";
 import { DesktopAppShell } from "@/components/desktop-app-shell";
 import { DashboardTasksPanel } from "@/components/tasks-workspace";
+import { authHasUsers } from "@/lib/auth/store";
 
 export const dynamic = "force-dynamic";
 
-export default function DesktopReadyPage() {
+export default async function DesktopReadyPage() {
+  if (!(await authHasUsers())) redirect("/first-admin");
+
   return (
     <DesktopAppShell>
       <div className="dashboardHeading">

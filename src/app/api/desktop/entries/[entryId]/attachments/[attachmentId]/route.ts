@@ -1,11 +1,12 @@
 import { NextResponse } from "next/server";
 import { requireDesktopRequestContext } from "@/lib/desktop/request-context";
 import { attachmentUrl } from "@/lib/entries/attachment-storage";
-import { getEntryAttachmentFromDatabase } from "@/lib/entries/postgres-repository";
+import { parseEntriesPayload } from "@/lib/entries/domain";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
+const ENTRIES_RESOURCE = { resource_type: "ENTRIES" as const, resource_id: "global" };
 type RouteContext = { params: Promise<{ entryId: string; attachmentId: string }> };
 
 function contentDisposition(fileName: string, download: boolean): string {
@@ -17,7 +18,11 @@ export async function GET(request: Request, context: RouteContext) {
   try {
     const { entryId, attachmentId } = await context.params;
     const { desktop } = await requireDesktopRequestContext("capture", "READ");
-    const attachment = await getEntryAttachmentFromDatabase(entryId, attachmentId);
+    const resource = await desktop.states.get(ENTRIES_RESOURCE);
+    const payload = parseEntriesPayload(resource?.payload);
+    const entry = payload.entries.find((candidate) => candidate.id === entryId);
+    if (!entry) return NextResponse.json({ error: "ENTRY_NOT_FOUND" }, { status: 404 });
+    const attachment = entry.attachments.find((candidate) => candidate.id === attachmentId);
     if (!attachment) {
       return NextResponse.json({ error: "ENTRY_ATTACHMENT_NOT_FOUND" }, { status: 404 });
     }

@@ -1,7 +1,7 @@
 import { randomUUID } from "node:crypto";
 import { z } from "zod";
 
-export const LOCAL_DESKTOP_SETUP_SCHEMA_VERSION = 2 as const;
+export const LOCAL_DESKTOP_SETUP_SCHEMA_VERSION = 3 as const;
 export const DEFAULT_NEXTCLOUD_SYNC_ROOT = "PAPOT_SYNC";
 
 const windowsSharedPathSchema = z
@@ -39,7 +39,6 @@ export const localDesktopSetupConfigSchema = z
     device_id: z.string().uuid(),
     device_label: z.string().trim().min(1).max(120),
     nextcloud_app_password_secret_key: z.string().trim().min(1).max(120),
-    database_url_secret_key: z.string().trim().min(1).max(120),
   })
   .strict();
 
@@ -54,7 +53,6 @@ export type CreateLocalDesktopSetupInput = {
   deviceId?: string;
   nextcloudSyncRoot?: string;
   nextcloudAppPasswordSecretKey?: string;
-  databaseUrlSecretKey?: string;
 };
 
 export function createLocalDesktopSetupConfig(
@@ -71,7 +69,6 @@ export function createLocalDesktopSetupConfig(
     device_label: input.deviceLabel,
     nextcloud_app_password_secret_key:
       input.nextcloudAppPasswordSecretKey ?? "nextcloud-app-password",
-    database_url_secret_key: input.databaseUrlSecretKey ?? "database-url",
   });
 }
 
