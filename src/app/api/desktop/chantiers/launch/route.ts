@@ -7,7 +7,7 @@ import {
   requireDesktopRequestContext,
 } from "@/lib/desktop/request-context";
 import { createDesktopSharedResourceRuntime } from "@/lib/desktop/shared-resource-runtime";
-import { loadCommercialCaseFromDatabase } from "@/lib/commercial/postgres";
+import { parseCommercialPayload } from "@/lib/commercial/domain";
 import { parseChantiersPayload } from "@/lib/chantiers/domain";
 import { chantierCapabilities } from "@/lib/chantiers/mutations";
 import {
@@ -19,6 +19,7 @@ export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
 const CHANTIERS_RESOURCE = { resource_type: "CHANTIER" as const, resource_id: "registry" };
+const COMMERCIAL_RESOURCE = { resource_type: "COMMERCIAL" as const, resource_id: "global" };
 const LOCK_TTL_MS = 30_000;
 
 type Owner = { userId: string; deviceId: string; displayName: string };
@@ -57,8 +58,8 @@ export async function POST(request: Request) {
     const actor = { userId: owner.userId, displayName: owner.displayName };
 
     stage = "read-affair-and-lock-chantiers";
-    const [affair, lock, openedInitial] = await Promise.all([
-      loadCommercialCaseFromDatabase(input.commercialCaseId),
+    const [commercialResource, lock, openedInitial] = await Promise.all([
+      desktop.states.get(COMMERCIAL_RESOURCE),
       desktop.locks.acquire({
         resource: CHANTIERS_RESOURCE,
         leaseId,
@@ -77,6 +78,9 @@ export async function POST(request: Request) {
       );
     }
     ownsLock = true;
+
+    const commercial = parseCommercialPayload(commercialResource?.payload);
+    const affair = commercial.cases.find((item) => item.id === input.commercialCaseId);
     if (!affair) throw new Error("CHANTIER_COMMERCIAL_CASE_NOT_FOUND");
 
     let opened = openedInitial;
