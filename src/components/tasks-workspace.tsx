@@ -204,9 +204,11 @@ export function DashboardTasksPanel() {
   const now = useMemo(() => new Date(snapshot?.serverNow ?? Date.now()), [snapshot?.serverNow]);
   const tasks = useMemo(() => personalTasks(snapshot), [snapshot]);
   const groups = useMemo(() => groupTasks(tasks, now), [tasks, now]);
-  const visibleTasks = groups.flatMap((group) =>
-    group.tasks.map((task) => ({ task, group: group.key, groupLabel: group.label })),
-  ).slice(0, 6);
+  const visibleTasks = groups
+    .flatMap((group) =>
+      group.tasks.map((task) => ({ task, group: group.key, groupLabel: group.label })),
+    )
+    .slice(0, 6);
 
   return (
     <article className="dashboardPanel dashboardTasksPanel">
@@ -229,13 +231,15 @@ export function DashboardTasksPanel() {
         <div className="dashboardTasksError">
           <AlertTriangle size={17} />
           <span>{error}</span>
-          <button type="button" onClick={() => void load()}>Réessayer</button>
+          <button type="button" onClick={() => void load()}>
+            Réessayer
+          </button>
         </div>
       ) : visibleTasks.length === 0 ? (
         <div className="dashboardTasksEmpty">
           <CheckCircle2 size={28} />
           <strong>Rien à faire pour le moment</strong>
-          <span>Aucune tâche active ne t'est affectée.</span>
+          <span>Aucune tâche active ne t&apos;est affectée.</span>
         </div>
       ) : (
         <div className="dashboardTasksList">
@@ -246,7 +250,9 @@ export function DashboardTasksPanel() {
             >
               <Link href={`/tasks?focus=${task.id}`} className="dashboardTaskMain">
                 <div className="dashboardTaskTopline">
-                  <span className={`dashboardTaskGroup dashboardTaskGroup-${group}`}>{groupLabel}</span>
+                  <span className={`dashboardTaskGroup dashboardTaskGroup-${group}`}>
+                    {groupLabel}
+                  </span>
                   {task.priority === "URGENT" ? (
                     <span className="tasksBadge tasksBadgeUrgent">Urgent</span>
                   ) : null}
@@ -276,7 +282,9 @@ export function DashboardTasksPanel() {
           ))}
           {tasks.length > visibleTasks.length ? (
             <Link href="/tasks" className="dashboardTasksMore">
-              + {tasks.length - visibleTasks.length} autre{tasks.length - visibleTasks.length > 1 ? "s" : ""} tâche{tasks.length - visibleTasks.length > 1 ? "s" : ""}
+              + {tasks.length - visibleTasks.length} autre
+              {tasks.length - visibleTasks.length > 1 ? "s" : ""} tâche
+              {tasks.length - visibleTasks.length > 1 ? "s" : ""}
               <ChevronRight size={13} />
             </Link>
           ) : null}
@@ -333,9 +341,14 @@ export function TasksWorkspace() {
       <section className="tasksPageHeading">
         <div>
           <h1>Mes tâches</h1>
-          <p>Toutes les actions actives qui te sont affectées, dans l'ordre des échéances.</p>
+          <p>Toutes les actions actives qui te sont affectées, dans l&apos;ordre des échéances.</p>
         </div>
-        <button type="button" className="tasksRefreshButton" onClick={() => void load()} disabled={busy}>
+        <button
+          type="button"
+          className="tasksRefreshButton"
+          onClick={() => void load()}
+          disabled={busy}
+        >
           <RefreshCw size={15} /> Actualiser
         </button>
       </section>
@@ -344,19 +357,33 @@ export function TasksWorkspace() {
       {notice ? <div className="tasksMessage tasksMessageSuccess">{notice}</div> : null}
 
       <section className="tasksSummary" aria-label="Résumé des tâches">
-        <div><strong>{tasks.length}</strong><span>Actives</span></div>
-        <div className={overdueCount > 0 ? "isAlert" : ""}><strong>{overdueCount}</strong><span>En retard</span></div>
-        <div><strong>{todayCount}</strong><span>Aujourd'hui</span></div>
-        <div className={urgentCount > 0 ? "isUrgent" : ""}><strong>{urgentCount}</strong><span>Urgentes</span></div>
+        <div>
+          <strong>{tasks.length}</strong>
+          <span>Actives</span>
+        </div>
+        <div className={overdueCount > 0 ? "isAlert" : ""}>
+          <strong>{overdueCount}</strong>
+          <span>En retard</span>
+        </div>
+        <div>
+          <strong>{todayCount}</strong>
+          <span>Aujourd&apos;hui</span>
+        </div>
+        <div className={urgentCount > 0 ? "isUrgent" : ""}>
+          <strong>{urgentCount}</strong>
+          <span>Urgentes</span>
+        </div>
       </section>
 
       {loading && !snapshot ? (
-        <div className="tasksLoading"><RefreshCw size={18} className="tasksSpin" /> Chargement des tâches…</div>
+        <div className="tasksLoading">
+          <RefreshCw size={18} className="tasksSpin" /> Chargement des tâches…
+        </div>
       ) : tasks.length === 0 ? (
         <div className="tasksAllDone">
           <CheckCircle2 size={34} />
           <strong>Aucune tâche active</strong>
-          <span>Les tâches terminées restent conservées dans l'historique des Entrées.</span>
+          <span>Les tâches terminées restent conservées dans l&apos;historique des Entrées.</span>
         </div>
       ) : (
         <div className="tasksGroups">
@@ -381,13 +408,18 @@ export function TasksWorkspace() {
                           <span className={`tasksBadge tasksBadgeDate tasksBadgeDate-${group.key}`}>
                             <CalendarClock size={12} /> {formatDateOnly(task.dueDate)}
                           </span>
-                          {task.priority === "URGENT" ? <span className="tasksBadge tasksBadgeUrgent">Urgent</span> : null}
-                          {group.key === "overdue" ? <span className="tasksBadge tasksBadgeLate">En retard</span> : null}
+                          {task.priority === "URGENT" ? (
+                            <span className="tasksBadge tasksBadgeUrgent">Urgent</span>
+                          ) : null}
+                          {group.key === "overdue" ? (
+                            <span className="tasksBadge tasksBadgeLate">En retard</span>
+                          ) : null}
                         </div>
                         <h3>{taskTitle(task)}</h3>
                         {context ? <p>{context}</p> : null}
                         <div className="tasksCardMeta">
-                          {task.structuredDescription && task.structuredDescription !== taskTitle(task) ? (
+                          {task.structuredDescription &&
+                          task.structuredDescription !== taskTitle(task) ? (
                             <span>{task.structuredDescription}</span>
                           ) : null}
                         </div>
@@ -426,7 +458,10 @@ export function TasksWorkspace() {
                       </div>
 
                       {postponeId === task.id ? (
-                        <form className="tasksPostponeForm" onSubmit={(event) => void submitPostpone(event, task)}>
+                        <form
+                          className="tasksPostponeForm"
+                          onSubmit={(event) => void submitPostpone(event, task)}
+                        >
                           <label>
                             <span>Nouvelle échéance</span>
                             <input
@@ -877,7 +912,9 @@ function TasksStyles() {
         animation: tasksSpin 1s linear infinite;
       }
       @keyframes tasksSpin {
-        to { transform: rotate(360deg); }
+        to {
+          transform: rotate(360deg);
+        }
       }
       @media (max-width: 980px) {
         .tasksSummary {
