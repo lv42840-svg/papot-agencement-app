@@ -119,11 +119,27 @@ describe("Chantiers V1 foundation", () => {
   });
 
   it("accepts zero-hour activities and preserves the commercial source link", () => {
-    const result = launch();
+    const commercialCase = confirmedCommercialCase();
+    const result = launchChantierFromCommercial(
+      createInitialChantiersPayload(),
+      commercialCase,
+      {
+        commercialCaseId: commercialCase.id,
+        quoteMissingDeclared: true,
+        signedQuoteMissingDeclared: true,
+        costingMissingDeclared: true,
+        be: 0,
+        workshop: 32,
+        install: 16,
+      },
+      actor,
+      new Date("2026-09-13T10:00:00.000Z"),
+    );
     const item = result.payload.chantiers[0];
     expect(item.status).toBe("ACTIVE");
     expect(item.plannedHours).toEqual({ be: 0, workshop: 32, install: 16 });
-    expect(item.sourceCommercialCaseId).toBe(item.id);
+    expect(item.sourceCommercialCaseId).toBe(commercialCase.id);
+    expect(item.id).not.toBe(commercialCase.id);
     expect(item.launchDocuments).toEqual({
       quote: "MISSING_DECLARED",
       signedQuote: "MISSING_DECLARED",
