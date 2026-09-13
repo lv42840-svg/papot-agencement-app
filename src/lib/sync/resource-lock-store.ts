@@ -113,6 +113,11 @@ export class NextcloudResourceLockStore {
     const url = await this.lockUrl(params.resource);
     const body = encodeLock(candidate);
 
+    // Fast path: locks are normally absent. Creating with If-None-Match is
+    // already atomic, so avoid reading the lock file before every write.
+    const created = await this.dav.putTextIfAbsent(url, body);
+    if (created === "written") return { status: "acquired", lock: candidate };
+
     for (let attempt = 0; attempt < 3; attempt += 1) {
       const current = await this.readRecordAt(url);
 
