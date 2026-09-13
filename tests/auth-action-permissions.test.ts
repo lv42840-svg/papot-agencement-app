@@ -15,6 +15,12 @@ describe("commercial special permissions", () => {
     );
   });
 
+  it("requires the provision permission for capacity provisioning", () => {
+    expect(commercialSpecialPermissionForMutation({ action: "updateProvision" })).toBe(
+      "commercial.provision",
+    );
+  });
+
   it("requires confirmation permission when a case becomes confirmed", () => {
     expect(
       commercialSpecialPermissionForMutation({ action: "setStatus", status: "CONFIRMED" }),
