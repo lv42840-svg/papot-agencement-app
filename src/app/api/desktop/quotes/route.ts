@@ -148,7 +148,9 @@ async function applyApiMutation(params: {
       {
         ...input,
         paymentTerms:
-          input.paymentTerms === undefined && clientChanged ? client.paymentTerms : input.paymentTerms,
+          input.paymentTerms === undefined && clientChanged
+            ? client.paymentTerms
+            : input.paymentTerms,
       },
       actor,
     );
