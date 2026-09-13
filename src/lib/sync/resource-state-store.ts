@@ -61,7 +61,15 @@ function parseEnvelope(record: TextWithEtag): ResourceRecord {
   };
 }
 
+function resourceCacheKey(resource: SharedResourceRef): string {
+  const parsed = sharedResourceRefSchema.parse(resource);
+  return `${parsed.resource_type}:${parsed.resource_id}`;
+}
+
 export class NextcloudSharedResourceStore {
+  private readonly envelopeCache = new Map<string, SharedResourceEnvelope | null>();
+  private readonly inflightGets = new Map<string, Promise<SharedResourceEnvelope | null>>();
+
   constructor(
     private readonly dav: ResourceDavClient,
     private readonly nextcloudUserId: string,
@@ -85,18 +93,37 @@ export class NextcloudSharedResourceStore {
     return record ? parseEnvelope(record) : null;
   }
 
+  getCached(resource: SharedResourceRef): SharedResourceEnvelope | null | undefined {
+    return this.envelopeCache.get(resourceCacheKey(resource));
+  }
+
   async get(resource: SharedResourceRef): Promise<SharedResourceEnvelope | null> {
-    const url = await this.resourceUrl(resource);
-    const text = await this.dav.getTextIfExists(url);
-    return text === null ? null : parseEnvelopeText(text);
+    const key = resourceCacheKey(resource);
+    const inflight = this.inflightGets.get(key);
+    if (inflight) return inflight;
+
+    const request = (async () => {
+      const url = await this.resourceUrl(resource);
+      const text = await this.dav.getTextIfExists(url);
+      const envelope = text === null ? null : parseEnvelopeText(text);
+      this.envelopeCache.set(key, envelope);
+      return envelope;
+    })();
+
+    this.inflightGets.set(key, request);
+    try {
+      return await request;
+    } finally {
+      this.inflightGets.delete(key);
+    }
   }
 
   async openForUpdate(resource: SharedResourceRef): Promise<SharedResourceUpdateSnapshot> {
     const url = await this.resourceUrl(resource);
     const record = await this.readRecordAt(url);
-    return record
-      ? { resource: record.envelope, etag: record.etag }
-      : { resource: null, etag: null };
+    const envelope = record?.envelope ?? null;
+    this.envelopeCache.set(resourceCacheKey(resource), envelope);
+    return record ? { resource: record.envelope, etag: record.etag } : { resource: null, etag: null };
   }
 
   async saveOpened(params: {
@@ -118,6 +145,7 @@ export class NextcloudSharedResourceStore {
       payload: params.payload,
     });
 
+    const key = resourceCacheKey(params.resource);
     const url = await this.resourceUrl(params.resource);
     const body = encodeEnvelope(candidate);
     const result =
@@ -126,10 +154,12 @@ export class NextcloudSharedResourceStore {
         : await this.dav.putTextIfMatch(url, body, params.opened.etag);
 
     if (result === "written") {
+      this.envelopeCache.set(key, candidate);
       return { status: "saved", resource: candidate };
     }
 
     const winner = await this.readRecordAt(url);
+    this.envelopeCache.set(key, winner?.envelope ?? null);
     return { status: "conflict", current: winner?.envelope ?? null };
   }
 
