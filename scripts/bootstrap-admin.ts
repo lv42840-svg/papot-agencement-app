@@ -39,12 +39,12 @@ async function main() {
     );
     const userId = result.rows[0]!.id;
 
-    for (const module of MODULE_PERMISSIONS) {
+    for (const modulePermission of MODULE_PERMISSIONS) {
       await client.query(
         `INSERT INTO user_module_permission(user_id, module_key, access_level)
          VALUES ($1, $2, 'WRITE')
          ON CONFLICT (user_id, module_key) DO UPDATE SET access_level = 'WRITE'`,
-        [userId, module.key],
+        [userId, modulePermission.key],
       );
     }
 
