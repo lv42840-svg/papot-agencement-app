@@ -1,4 +1,4 @@
-import type { ObatImportAnalysis } from "./domain";
+import type { ObatImportAnalysis, ObatQuoteLine } from "./domain";
 
 export type PartialObatData = Partial<
   Omit<ObatImportAnalysis, "hours" | "sources" | "files" | "warnings">
@@ -98,6 +98,7 @@ export function parseObatCostingCsvText(rawText: string): PartialObatData {
   let be: number | null = null;
   let workshop: number | null = null;
   let install: number | null = null;
+  const quoteLines: ObatQuoteLine[] = [];
 
   for (const row of rows) {
     const first = cleanLine(row[0] ?? "");
@@ -109,6 +110,17 @@ export function parseObatCostingCsvText(rawText: string): PartialObatData {
       if (designation === "ETUDES") be = quantity;
       if (designation === "FABRICATION") workshop = quantity;
       if (designation === "POSE") install = quantity;
+    }
+
+    const quotedLine = first.match(/^(\d{1,3}(?:\.\d+)*)\s+(.+)$/);
+    if (quotedLine) {
+      quoteLines.push({
+        ref: quotedLine[1],
+        designation: cleanLine(quotedLine[2]),
+        quantity,
+        unit: unit || null,
+        totalHt: parseFrenchNumber(row[7]),
+      });
     }
 
     quoteNumber ??= afterPrefix(first, /Bordereau de chantier sur devis\s*:\s*(D\d{6,})/i)?.toUpperCase() ?? null;
@@ -134,6 +146,7 @@ export function parseObatCostingCsvText(rawText: string): PartialObatData {
     clientAddress,
     siteAddress,
     description: description ?? projectName,
+    quoteLines,
     hours: { be, workshop, install },
   };
 }
