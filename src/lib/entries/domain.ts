@@ -13,6 +13,17 @@ export const entriesTagSchema = z.object({
   sortOrder: z.number().int().nonnegative(),
 });
 
+export const entryAttachmentSchema = z.object({
+  id: z.string().uuid(),
+  fileName: z.string().trim().min(1).max(255),
+  contentType: z.string().trim().min(1).max(200),
+  sizeBytes: z.number().int().nonnegative(),
+  sha256: z.string().regex(/^[a-f0-9]{64}$/),
+  storagePath: z.string().trim().min(1).max(1000),
+  uploadedAt: isoDateTimeSchema,
+  uploadedByName: z.string().trim().min(1).max(120),
+});
+
 export const entryHistoryEventSchema = z.object({
   id: z.string().uuid(),
   type: z.enum([
@@ -24,6 +35,7 @@ export const entryHistoryEventSchema = z.object({
     "REASSIGNED",
     "COMPLETED",
     "DERIVED_CREATED",
+    "ATTACHMENTS_ADDED",
   ]),
   at: isoDateTimeSchema,
   actorName: z.string().trim().min(1).max(120),
@@ -47,6 +59,7 @@ export const entryRecordSchema = z.object({
   completedAt: isoDateTimeSchema.nullable(),
   parentEntryId: z.string().uuid().nullable(),
   derivedEntryIds: z.array(z.string().uuid()),
+  attachments: z.array(entryAttachmentSchema).default([]),
   history: z.array(entryHistoryEventSchema),
 });
 
@@ -67,6 +80,7 @@ export const entriesPayloadSchema = z.object({
 });
 
 export type EntriesTag = z.infer<typeof entriesTagSchema>;
+export type EntryAttachment = z.infer<typeof entryAttachmentSchema>;
 export type EntryRecord = z.infer<typeof entryRecordSchema>;
 export type EntryNotification = z.infer<typeof entryNotificationSchema>;
 export type EntriesPayload = z.infer<typeof entriesPayloadSchema>;
