@@ -209,27 +209,20 @@ export class NextcloudDavClient {
   }
 
   async getTextWithEtag(url: string): Promise<TextWithEtag | null> {
-    for (let attempt = 0; attempt < 3; attempt += 1) {
-      const beforeEtag = await this.getDavEtag(url);
-      if (beforeEtag === null) return null;
+    // One WebDAV ETag read plus one GET is enough for conditional writes.
+    // If the file changes between them, the later If-Match write fails safely
+    // and the caller retries from the winning version.
+    const etag = await this.getDavEtag(url);
+    if (etag === null) return null;
 
-      const response = await fetch(url, {
-        method: "GET",
-        headers: this.headers({ "Cache-Control": "no-cache" }),
-      });
+    const response = await fetch(url, {
+      method: "GET",
+      headers: this.headers({ "Cache-Control": "no-cache" }),
+    });
 
-      if (response.status === 404) continue;
-      if (response.status !== 200) throw new Error(`WEBDAV_GET_HTTP_${response.status}`);
-      const text = await response.text();
-
-      const afterEtag = await this.getDavEtag(url);
-      if (afterEtag === null) continue;
-      if (beforeEtag === afterEtag) {
-        return { text, etag: afterEtag };
-      }
-    }
-
-    throw new Error("WEBDAV_READ_UNSTABLE");
+    if (response.status === 404) return null;
+    if (response.status !== 200) throw new Error(`WEBDAV_GET_HTTP_${response.status}`);
+    return { text: await response.text(), etag };
   }
 
   async getBytes(url: string): Promise<Buffer> {
