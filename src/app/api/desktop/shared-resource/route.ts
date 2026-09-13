@@ -45,6 +45,8 @@ function moduleForResource(resourceType: SharedResourceType): string {
       return "planning";
     case "TREASURY_MONTH":
       return "treasury";
+    case "AUTH":
+      throw new Error("SHARED_RESOURCE_AUTH_INTERNAL_ONLY");
   }
 }
 
