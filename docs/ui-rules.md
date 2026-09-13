@@ -26,7 +26,8 @@ La page `Utilisateurs et droits` utilise une grille déterministe :
 - modules : 6 colonnes à partir de 1600 px, 4 colonnes entre 1200 et 1599 px, 2 colonnes entre 800 et 1199 px, 1 colonne sous 800 px ;
 - droits spéciaux : 4 colonnes à partir de 1200 px, 2 colonnes entre 800 et 1199 px, 1 colonne sous 800 px ;
 - le bouton de création d’utilisateur et le bouton d’enregistrement du profil gardent une largeur de bouton, ils ne remplissent pas arbitrairement une colonne entière ;
-- le champ de réinitialisation du mot de passe est plafonné à 620 px sur grand écran.
+- le champ de réinitialisation du mot de passe est plafonné à 620 px sur grand écran ;
+- les clés techniques de modules ou permissions (`commercial`, `planning`, `purchases`, etc.) ne doivent jamais être affichées à l’utilisateur.
 
 ## Règle de développement
 
