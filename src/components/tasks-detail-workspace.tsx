@@ -594,8 +594,12 @@ function TaskDetail({
 }
 
 function AttachmentRow({ task, attachment }: { task: EntryRecord; attachment: EntryAttachment }) {
-  const canPreview = attachment.contentType.startsWith("image/") || attachment.contentType === "application/pdf";
-  const Icon = attachment.contentType.startsWith("image/") ? ImageIcon : FileText;
+  const [preview, setPreview] = useState(false);
+  const url = attachmentHref(task, attachment);
+  const isImage = attachment.contentType.startsWith("image/");
+  const isPdf = attachment.contentType === "application/pdf";
+  const canPreview = isImage || isPdf;
+  const Icon = isImage ? ImageIcon : FileText;
   return (
     <div className="taskAttachmentRow">
       <span className="taskAttachmentIcon"><Icon size={17} /></span>
@@ -605,14 +609,20 @@ function AttachmentRow({ task, attachment }: { task: EntryRecord; attachment: En
       </div>
       <div className="taskAttachmentActions">
         {canPreview ? (
-          <a href={attachmentHref(task, attachment)} target="_blank" rel="noreferrer" className="secondaryButton">
-            <Eye size={14} /> Aperçu
-          </a>
+          <button type="button" className="secondaryButton" onClick={() => setPreview((current) => !current)}>
+            <Eye size={14} /> {preview ? "Fermer" : "Aperçu"}
+          </button>
         ) : null}
         <a href={attachmentHref(task, attachment, true)} className="secondaryButton">
           <Download size={14} /> Télécharger
         </a>
       </div>
+      {preview ? (
+        <div className="taskAttachmentPreview">
+          {isImage ? <img src={url} alt={attachment.fileName} /> : null}
+          {isPdf ? <iframe title={attachment.fileName} src={url} /> : null}
+        </div>
+      ) : null}
     </div>
   );
 }
@@ -689,6 +699,9 @@ function TaskDetailStyles() {
       .taskAttachmentInfo small { color: #918c99; font-size: 8px; }
       .taskAttachmentActions { display: flex; gap: 6px; }
       .taskAttachmentActions .secondaryButton { min-height: 30px; padding: 0 8px; display: inline-flex; align-items: center; gap: 5px; font-size: 9px; }
+      .taskAttachmentPreview { grid-column: 1 / -1; min-height: 180px; padding: 8px; overflow: hidden; border: 1px solid #e8e3f0; border-radius: 8px; background: white; }
+      .taskAttachmentPreview img { display: block; width: 100%; max-height: 520px; object-fit: contain; }
+      .taskAttachmentPreview iframe { display: block; width: 100%; height: 520px; border: 0; border-radius: 6px; background: #f8f7fa; }
       .taskUploadBox { padding: 10px; display: grid; gap: 8px; border: 1px dashed #d8d1e7; border-radius: 8px; background: #fbfaff; }
       .taskUploadBox > label { width: max-content; display: inline-flex; align-items: center; gap: 6px; color: #6654bd; font-size: 10px; font-weight: 750; cursor: pointer; }
       .taskUploadBox input { display: none; }
@@ -723,6 +736,8 @@ function TaskDetailStyles() {
         .taskSummary { grid-template-columns: 1fr 1fr; }
         .taskAttachmentRow { grid-template-columns: 34px minmax(0, 1fr); }
         .taskAttachmentActions { grid-column: 1 / -1; }
+        .taskAttachmentPreview { height: auto; }
+        .taskAttachmentPreview iframe { height: 420px; }
       }
     `}</style>
   );
