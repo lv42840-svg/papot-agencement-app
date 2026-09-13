@@ -1,0 +1,33 @@
+name: npm12 Windows Electron check
+
+on:
+  push:
+    branches:
+      - fix/npm12-electron-install
+
+permissions:
+  contents: read
+
+jobs:
+  windows-npm12:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: npm
+      - name: Use npm 12
+        run: npm.cmd install --global npm@12
+      - name: Install dependencies
+        run: npm.cmd ci
+      - name: Verify Electron binary
+        shell: pwsh
+        run: |
+          $electron = Join-Path $PWD 'node_modules\electron\dist\electron.exe'
+          if (-not (Test-Path $electron)) {
+            throw "Electron binary missing: $electron"
+          }
+          & $electron --version
+      - name: Typecheck
+        run: npm.cmd run typecheck
