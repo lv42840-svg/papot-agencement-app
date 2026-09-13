@@ -23,7 +23,7 @@ import {
 const navigation = [
   { label: "Accueil", icon: Home, href: "/desktop-ready" },
   { label: "Entrées", icon: ClipboardList, href: "/entrees" },
-  { label: "Commercial", icon: BriefcaseBusiness },
+  { label: "Commercial", icon: BriefcaseBusiness, href: "/commercial" },
   { label: "Chantiers", icon: FolderOpen, href: "/chantiers/chantier-test-verrou" },
   { label: "Grand planning", icon: CalendarDays, href: "/planning/2026-S38" },
   { label: "Petit planning", icon: CalendarDays },
