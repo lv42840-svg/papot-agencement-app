@@ -1,6 +1,6 @@
 import { randomUUID } from "node:crypto";
 import { z } from "zod";
-import { commercialHasSignedQuote, type CommercialCase } from "@/lib/commercial/domain";
+import { commercialHasSignedQuote, type CommercialCase } from "../commercial/domain";
 import {
   CHANTIER_STATUS_LABELS,
   parseChantiersPayload,
