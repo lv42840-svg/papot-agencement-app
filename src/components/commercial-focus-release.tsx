@@ -13,7 +13,7 @@ export function CommercialFocusRelease() {
     const releaseFocus = () => {
       const url = new URL(window.location.href);
       if (!url.searchParams.has("focus")) return true;
-      if (!document.querySelector(".commercialDetailHeader")) return false;
+      if (!document.querySelector(".commercialV2DetailHeader, .commercialDetailHeader")) return false;
 
       url.searchParams.delete("focus");
       const query = url.searchParams.toString();
