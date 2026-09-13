@@ -21,6 +21,17 @@ jobs:
         run: npm.cmd install --global npm@12
       - name: Install dependencies
         run: npm.cmd ci
+      - name: Inspect pending install scripts
+        shell: pwsh
+        run: |
+          npm.cmd --version
+          npm.cmd install-scripts ls --all --json
+      - name: Let npm write canonical approvals for diagnosis
+        shell: pwsh
+        run: |
+          npm.cmd install-scripts approve --all
+          Get-Content package.json
+          npm.cmd rebuild electron
       - name: Verify Electron binary
         shell: pwsh
         run: |
