@@ -97,9 +97,7 @@ describe("minimal native quote model", () => {
       ...missingParent.items[2],
       parentId: "99999999-9999-4999-8999-999999999999",
     };
-    expect(() => parseQuoteModel(missingParent)).toThrow(
-      "QUOTE_ITEM_PARENT_NOT_FOUND",
-    );
+    expect(() => parseQuoteModel(missingParent)).toThrow("QUOTE_ITEM_PARENT_NOT_FOUND");
 
     const duplicate = minimalQuote();
     duplicate.items.push({ ...duplicate.items[2] });
@@ -107,9 +105,9 @@ describe("minimal native quote model", () => {
   });
 
   it("rejects an invalid calendar date", () => {
-    expect(() =>
-      parseQuoteModel({ ...minimalQuote(), issueDate: "2026-02-31" }),
-    ).toThrow("QUOTE_MODEL_INVALID");
+    expect(() => parseQuoteModel({ ...minimalQuote(), issueDate: "2026-02-31" })).toThrow(
+      "QUOTE_MODEL_INVALID",
+    );
   });
 
   it("requires payment terms and a positive validity duration", () => {
@@ -134,11 +132,7 @@ describe("minimal native quote model", () => {
 
   it("rejects a plain number used as a fake formula memo", () => {
     const quote = minimalQuote();
-    quote.items[2] = {
-      ...quote.items[2],
-      quantity: 21,
-      quantityFormula: "21",
-    };
+    quote.items[2] = { ...quote.items[2], quantity: 21, quantityFormula: "21" };
     expect(() => parseQuoteModel(quote)).toThrow("QUOTE_LINE_FORMULA_INVALID");
   });
 });
