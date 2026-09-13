@@ -24,7 +24,7 @@ const navigation = [
   { label: "Accueil", icon: Home, href: "/desktop-ready" },
   { label: "Entrées", icon: ClipboardList, href: "/entrees" },
   { label: "Commercial", icon: BriefcaseBusiness, href: "/commercial" },
-  { label: "Chantiers", icon: FolderOpen, href: "/chantiers/chantier-test-verrou" },
+  { label: "Chantiers", icon: FolderOpen, href: "/chantiers" },
   { label: "Grand planning", icon: CalendarDays, href: "/planning/2026-S38" },
   { label: "Petit planning", icon: CalendarDays },
   { label: "Heures", icon: Clock3 },
