@@ -104,7 +104,8 @@ const STATUS_LABELS: Record<QuoteRecord["status"], string> = {
 
 const ERROR_MESSAGES: Record<string, string> = {
   MODULE_FORBIDDEN: "Vous n’avez pas accès au module Devis.",
-  QUOTES_LOCKED: "Le fichier devis est modifié sur un autre poste. Réessaie dans quelques secondes.",
+  QUOTES_LOCKED:
+    "Le fichier devis est modifié sur un autre poste. Réessaie dans quelques secondes.",
   QUOTES_VERSION_CONFLICT: "Le fichier devis a changé sur un autre poste. Il a été rechargé.",
   QUOTES_REQUEST_INVALID: "Certaines informations du devis sont invalides.",
   QUOTE_NOT_FOUND: "Ce devis n’existe plus.",
@@ -211,9 +212,9 @@ function parentDiscounts(items: DraftItem[], line: DraftLine): number[] {
   if (!parent || parent.kind === "LINE" || parent.kind === "COMMENT") return [];
   if (parent.kind === "SECTION") return [percent(parent.discountPercent)];
 
-  const section = items.find(
-    (item) => item.kind === "SECTION" && item.id === parent.parentId,
-  ) as DraftSection | undefined;
+  const section = items.find((item) => item.kind === "SECTION" && item.id === parent.parentId) as
+    | DraftSection
+    | undefined;
   return [percent(parent.discountPercent), ...(section ? [percent(section.discountPercent)] : [])];
 }
 
@@ -356,7 +357,11 @@ export function QuotesWorkspace() {
     return (snapshot?.payload.quotes ?? []).filter((quote) => {
       if (!normalized) return true;
       const client = clientById.get(quote.clientId);
-      return [quote.quoteNumber ?? "Brouillon", quote.subject, client ? clientDisplayName(client) : ""]
+      return [
+        quote.quoteNumber ?? "Brouillon",
+        quote.subject,
+        client ? clientDisplayName(client) : "",
+      ]
         .join(" ")
         .toLocaleLowerCase("fr-FR")
         .includes(normalized);
@@ -637,7 +642,9 @@ export function QuotesWorkspace() {
       <div className="dashboardHeading quotesHeading">
         <div>
           <h1>Devis</h1>
-          <p className="muted">Devis natifs PAPOT, liés aux clients et aux affaires commerciales.</p>
+          <p className="muted">
+            Devis natifs PAPOT, liés aux clients et aux affaires commerciales.
+          </p>
         </div>
         <button
           type="button"
@@ -699,7 +706,8 @@ export function QuotesWorkspace() {
                     </span>
                     <span>{quote.subject}</span>
                     <small className="muted">
-                      {client ? clientDisplayName(client) : "Client introuvable"} · {quote.issueDate}
+                      {client ? clientDisplayName(client) : "Client introuvable"} ·{" "}
+                      {quote.issueDate}
                     </small>
                   </button>
                 );
@@ -772,7 +780,11 @@ export function QuotesWorkspace() {
                 />
               </label>
               <div className="quoteCreateActions">
-                <button type="button" className="secondaryButton" onClick={() => setCreating(false)}>
+                <button
+                  type="button"
+                  className="secondaryButton"
+                  onClick={() => setCreating(false)}
+                >
                   Annuler
                 </button>
                 <button type="submit" className="primaryButton" disabled={busy}>
@@ -968,9 +980,10 @@ function QuoteEditor({
             onChange={(event) => onDraftChange("paymentTerms", event.target.value)}
           >
             <option value="">À définir</option>
-            {draft.paymentTerms && !PAYMENT_TERMS.includes(draft.paymentTerms as (typeof PAYMENT_TERMS)[number]) && (
-              <option value={draft.paymentTerms}>{draft.paymentTerms}</option>
-            )}
+            {draft.paymentTerms &&
+              !PAYMENT_TERMS.includes(draft.paymentTerms as (typeof PAYMENT_TERMS)[number]) && (
+                <option value={draft.paymentTerms}>{draft.paymentTerms}</option>
+              )}
             {PAYMENT_TERMS.map((term) => (
               <option key={term} value={term}>
                 {term}
@@ -1549,8 +1562,10 @@ function QuotesStyles() {
         background: #fffdf7;
       }
       .quoteLine {
-        grid-template-columns:
-          minmax(220px, 1.5fr) minmax(150px, 0.8fr) 72px 130px 100px 84px 82px 110px auto;
+        grid-template-columns: minmax(220px, 1.5fr) minmax(
+            150px,
+            0.8fr
+          ) 72px 130px 100px 84px 82px 110px auto;
       }
       .quoteLine.hasError {
         border-color: #d49a9a;
