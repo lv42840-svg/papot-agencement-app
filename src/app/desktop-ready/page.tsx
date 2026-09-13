@@ -129,7 +129,7 @@ export default function DesktopReadyPage() {
             ))}
           </div>
           <p style={{ margin: "12px 0 0", color: "#8d8895", fontSize: 9 }}>
-            Les compteurs restent volontairement neutres tant que le vrai module Achats n'est pas raccordé.
+            Les compteurs restent volontairement neutres tant que le vrai module Achats n&apos;est pas raccordé.
           </p>
         </article>
 
