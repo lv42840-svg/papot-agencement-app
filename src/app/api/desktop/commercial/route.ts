@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { ZodError } from "zod";
+import { commercialSpecialPermissionForMutation } from "@/lib/auth/action-permissions";
 import {
   hasEffectiveSpecialPermission,
   requireSpecialPermission,
@@ -23,6 +24,7 @@ function noStoreJson(body: unknown, init?: ResponseInit) {
 
 function statusFor(code: string): number {
   if (code === "AUTH_REQUIRED") return 401;
+  if (code === "PASSWORD_CHANGE_REQUIRED") return 403;
   if (code === "MODULE_FORBIDDEN" || code === "SPECIAL_PERMISSION_FORBIDDEN") return 403;
   if (code.endsWith("_NOT_FOUND")) return 404;
   if (code.includes("CLOSED") || code.includes("ALREADY_LINKED")) return 409;
@@ -31,7 +33,7 @@ function statusFor(code: string): number {
 
 async function snapshot(
   canWrite: boolean,
-  user: { id: string; canManagePermissions: boolean },
+  user: { id: string },
   actor: { userId: string; displayName: string },
   focusCaseId?: string,
 ) {
@@ -64,9 +66,7 @@ export async function GET() {
   try {
     const context = await requireDesktopRequestContext("commercial", "READ");
     const actor = { userId: context.user.id, displayName: context.user.displayName };
-    return noStoreJson(
-      await snapshot(context.moduleAccess.canWrite, context.user, actor),
-    );
+    return noStoreJson(await snapshot(context.moduleAccess.canWrite, context.user, actor));
   } catch (error) {
     const code = error instanceof Error ? error.message : "COMMERCIAL_LOAD_FAILED";
     return noStoreJson({ error: code }, { status: statusFor(code) });
@@ -78,14 +78,9 @@ export async function POST(request: Request) {
   try {
     const input = commercialPostgresMutationSchema.parse(await request.json());
     const context = await requireDesktopRequestContext("commercial", "WRITE");
-    if (input.action === "create") {
-      await requireSpecialPermission(context.user, "commercial.create");
-    }
-    if (
-      (input.action === "setStatus" && input.status === "CONFIRMED") ||
-      (input.action === "recordFollowUp" && input.nextStatus === "CONFIRMED")
-    ) {
-      await requireSpecialPermission(context.user, "commercial.confirm_launch");
+    const requiredSpecialPermission = commercialSpecialPermissionForMutation(input);
+    if (requiredSpecialPermission) {
+      await requireSpecialPermission(context.user, requiredSpecialPermission);
     }
 
     const actor = { userId: context.user.id, displayName: context.user.displayName };
