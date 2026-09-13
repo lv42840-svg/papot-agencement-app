@@ -1,3 +1,4 @@
+import { ChantierOperationalStandalone } from "@/components/chantier-operational-standalone";
 import { ChantierWorkspace } from "@/components/chantier-workspace";
 import { DesktopAppShell } from "@/components/desktop-app-shell";
 
@@ -12,6 +13,7 @@ export default async function ChantierPage({
   return (
     <DesktopAppShell>
       <ChantierWorkspace chantierId={chantierId} />
+      <ChantierOperationalStandalone chantierId={chantierId} />
     </DesktopAppShell>
   );
 }
