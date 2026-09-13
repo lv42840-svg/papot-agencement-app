@@ -2,7 +2,10 @@ import { randomUUID } from "node:crypto";
 import { NextResponse } from "next/server";
 import { z } from "zod";
 import { createDesktopSharedResourceRuntime } from "@/lib/desktop/shared-resource-runtime";
-import { cleanupEntryAttachments, uploadEntryAttachments } from "@/lib/entries/attachment-storage";
+import {
+  cleanupEntryAttachments,
+  uploadEntryAttachments,
+} from "@/lib/entries/attachment-storage";
 import { parseEntriesPayload } from "@/lib/entries/domain";
 import {
   applyEntriesMutation,
@@ -79,7 +82,7 @@ export async function POST(request: Request) {
   let ownsLock = false;
 
   try {
-    const [lock, openedInitial, uploadResult] = await Promise.all([
+    const [lock, openedInitial] = await Promise.all([
       desktop.locks.acquire({
         resource: ENTRIES_RESOURCE,
         leaseId,
@@ -89,14 +92,14 @@ export async function POST(request: Request) {
         reclaimOwnAfterMs: 0,
       }),
       desktop.states.openForUpdate(ENTRIES_RESOURCE),
-      files.length > 0
-        ? uploadEntryAttachments(transport, entryId, files)
-        : Promise.resolve([]),
     ]);
-    uploaded = uploadResult;
 
     if (lock.status === "locked") throw new Error("ENTRIES_LOCKED");
     ownsLock = true;
+
+    if (files.length > 0) {
+      uploaded = await uploadEntryAttachments(transport, entryId, files);
+    }
 
     let opened = openedInitial;
     let mutation = applyEntriesMutation(
