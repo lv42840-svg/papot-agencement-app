@@ -14,7 +14,7 @@ function mergeValue<T>(current: T | null, incoming: T | null | undefined): T | n
 }
 
 function mergeData(target: ObatImportAnalysis, incoming: PartialObatData, preferIncoming = false): void {
-  const keys: Array<keyof Omit<ObatImportAnalysis, "hours" | "sources" | "files" | "warnings">> = [
+  const keys: Array<keyof Omit<ObatImportAnalysis, "quoteLines" | "hours" | "sources" | "files" | "warnings">> = [
     "quoteNumber",
     "quoteDate",
     "validUntil",
@@ -40,6 +40,10 @@ function mergeData(target: ObatImportAnalysis, incoming: PartialObatData, prefer
     if (preferIncoming || target[key] === null) {
       (target as unknown as Record<string, unknown>)[key] = incomingValue;
     }
+  }
+
+  if (incoming.quoteLines?.length && (preferIncoming || target.quoteLines.length === 0)) {
+    target.quoteLines = incoming.quoteLines;
   }
 
   if (incoming.hours) {
