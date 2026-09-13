@@ -2,12 +2,7 @@ import { z } from "zod";
 
 const isoDateTimeSchema = z.string().datetime({ offset: true });
 
-export const clientTypeSchema = z.enum([
-  "PARTICULIER",
-  "ENTREPRISE",
-  "COLLECTIVITE",
-  "AUTRE",
-]);
+export const clientTypeSchema = z.enum(["PARTICULIER", "ENTREPRISE", "COLLECTIVITE", "AUTRE"]);
 
 export const clientContactSchema = z
   .object({

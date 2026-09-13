@@ -153,7 +153,13 @@ export async function POST(request: Request, context: RouteContext) {
       if (saved.status === "conflict") throw new Error("COMMERCIAL_VERSION_CONFLICT");
 
       return NextResponse.json(
-        await snapshot(parseCommercialPayload(saved.resource.payload), owner, user, desktop, caseId),
+        await snapshot(
+          parseCommercialPayload(saved.resource.payload),
+          owner,
+          user,
+          desktop,
+          caseId,
+        ),
         { headers: { "Cache-Control": "no-store" } },
       );
     } catch (error) {

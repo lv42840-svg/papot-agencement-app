@@ -27,7 +27,10 @@ function normalizeName(value: string): string {
   return value.trim().toLocaleLowerCase("fr-FR");
 }
 
-function activeClient(payload: ReturnType<typeof parseClientsPayload>, clientId: string): ClientRecord {
+function activeClient(
+  payload: ReturnType<typeof parseClientsPayload>,
+  clientId: string,
+): ClientRecord {
   const client = payload.clients.find((candidate) => candidate.id === clientId);
   if (!client || client.isArchived) throw new Error("COMMERCIAL_CLIENT_NOT_FOUND");
   return client;
@@ -38,7 +41,9 @@ export async function readCanonicalClients(desktop: Desktop) {
   return parseClientsPayload(resource?.payload);
 }
 
-export async function listCanonicalCommercialClients(desktop: Desktop): Promise<CommercialClient[]> {
+export async function listCanonicalCommercialClients(
+  desktop: Desktop,
+): Promise<CommercialClient[]> {
   const payload = await readCanonicalClients(desktop);
   return payload.clients
     .filter((client) => !client.isArchived)
@@ -112,7 +117,11 @@ async function createProvisionalClient(
     };
 
     let opened = openedInitial;
-    let mutation = applyClientsMutation(parseClientsPayload(opened.resource?.payload), input, actor);
+    let mutation = applyClientsMutation(
+      parseClientsPayload(opened.resource?.payload),
+      input,
+      actor,
+    );
     let saved = await desktop.states.saveOpened({
       resource: CLIENTS_RESOURCE,
       opened,

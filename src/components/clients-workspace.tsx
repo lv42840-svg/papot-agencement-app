@@ -64,7 +64,8 @@ const typeLabels: Record<ClientType, string> = {
 
 const errorMessages: Record<string, string> = {
   MODULE_FORBIDDEN: "Vous n’avez pas accès au fichier clients.",
-  CLIENTS_LOCKED: "Le fichier clients est modifié sur un autre poste. Réessaie dans quelques secondes.",
+  CLIENTS_LOCKED:
+    "Le fichier clients est modifié sur un autre poste. Réessaie dans quelques secondes.",
   CLIENTS_VERSION_CONFLICT: "Le fichier clients a changé sur un autre poste. Il a été rechargé.",
   CLIENTS_REQUEST_INVALID: "Certaines informations de la fiche sont invalides ou incomplètes.",
   CLIENT_REQUEST_INVALID: "Certaines informations de la fiche sont invalides ou incomplètes.",
@@ -204,7 +205,8 @@ export function ClientsWorkspace() {
         lockedBy?: string;
       };
       if (!response.ok) {
-        const base = errorMessages[result.error ?? ""] ?? "La fiche client n’a pas pu être enregistrée.";
+        const base =
+          errorMessages[result.error ?? ""] ?? "La fiche client n’a pas pu être enregistrée.";
         throw new Error(result.lockedBy ? `${base} Poste en cours : ${result.lockedBy}.` : base);
       }
       setSnapshot(result);
@@ -218,7 +220,9 @@ export function ClientsWorkspace() {
       return result;
     } catch (mutationError) {
       const message =
-        mutationError instanceof Error ? mutationError.message : "La fiche client n’a pas pu être enregistrée.";
+        mutationError instanceof Error
+          ? mutationError.message
+          : "La fiche client n’a pas pu être enregistrée.";
       setError(message);
       if (message.includes("changé sur un autre poste")) await load();
       return null;
@@ -319,10 +323,7 @@ export function ClientsWorkspace() {
 
   async function reactivateSelected() {
     if (!selectedClient) return;
-    await mutate(
-      { action: "reactivate", clientId: selectedClient.id },
-      "Client réactivé.",
-    );
+    await mutate({ action: "reactivate", clientId: selectedClient.id }, "Client réactivé.");
   }
 
   const canWrite = snapshot?.canWrite === true;
@@ -334,7 +335,9 @@ export function ClientsWorkspace() {
       <header className="clientsPageHeader">
         <div>
           <h1>Clients</h1>
-          <p className="muted">Référentiel unique pour les affaires, devis, chantiers et factures.</p>
+          <p className="muted">
+            Référentiel unique pour les affaires, devis, chantiers et factures.
+          </p>
         </div>
         {canWrite ? (
           <button className="primaryButton" type="button" onClick={startNew} disabled={busy}>
@@ -457,7 +460,12 @@ export function ClientsWorkspace() {
                   ) : null}
                   {editable ? (
                     <>
-                      <button className="secondaryButton" type="button" onClick={cancelEdit} disabled={busy}>
+                      <button
+                        className="secondaryButton"
+                        type="button"
+                        onClick={cancelEdit}
+                        disabled={busy}
+                      >
                         <X size={15} aria-hidden="true" />
                         Annuler
                       </button>
@@ -611,7 +619,9 @@ export function ClientsWorkspace() {
                 <div className="clientsSectionHeader">
                   <div>
                     <h3>Contacts</h3>
-                    <p className="muted">Plusieurs interlocuteurs possibles pour une même entreprise.</p>
+                    <p className="muted">
+                      Plusieurs interlocuteurs possibles pour une même entreprise.
+                    </p>
                   </div>
                   {editable ? (
                     <button className="secondaryButton" type="button" onClick={addContact}>
@@ -631,7 +641,9 @@ export function ClientsWorkspace() {
                           Prénom
                           <input
                             value={contact.firstName}
-                            onChange={(event) => updateContact(index, { firstName: event.target.value })}
+                            onChange={(event) =>
+                              updateContact(index, { firstName: event.target.value })
+                            }
                             disabled={!editable}
                           />
                         </label>
@@ -639,7 +651,9 @@ export function ClientsWorkspace() {
                           Nom
                           <input
                             value={contact.lastName}
-                            onChange={(event) => updateContact(index, { lastName: event.target.value })}
+                            onChange={(event) =>
+                              updateContact(index, { lastName: event.target.value })
+                            }
                             disabled={!editable}
                           />
                         </label>
@@ -655,7 +669,9 @@ export function ClientsWorkspace() {
                           Téléphone
                           <input
                             value={contact.phone}
-                            onChange={(event) => updateContact(index, { phone: event.target.value })}
+                            onChange={(event) =>
+                              updateContact(index, { phone: event.target.value })
+                            }
                             disabled={!editable}
                             type="tel"
                           />
@@ -664,7 +680,9 @@ export function ClientsWorkspace() {
                           E-mail
                           <input
                             value={contact.email}
-                            onChange={(event) => updateContact(index, { email: event.target.value })}
+                            onChange={(event) =>
+                              updateContact(index, { email: event.target.value })
+                            }
                             disabled={!editable}
                             type="email"
                           />
@@ -673,7 +691,9 @@ export function ClientsWorkspace() {
                           <input
                             type="checkbox"
                             checked={contact.isPrimary}
-                            onChange={(event) => updateContact(index, { isPrimary: event.target.checked })}
+                            onChange={(event) =>
+                              updateContact(index, { isPrimary: event.target.checked })
+                            }
                             disabled={!editable}
                           />
                           Contact principal

@@ -208,13 +208,7 @@ export async function GET() {
         ? await persistAutomaticTransitions(desktop, owner)
         : transition.payload;
       return noStoreJson(
-        await snapshot(
-          payload,
-          owner,
-          context.moduleAccess.canWrite,
-          context.user,
-          desktop,
-        ),
+        await snapshot(payload, owner, context.moduleAccess.canWrite, context.user, desktop),
       );
     }
 
@@ -319,10 +313,7 @@ export async function POST(request: Request) {
 
     let opened = openedInitial;
     stage = "apply-mutation";
-    let mutation = await buildMutation(
-      parseCommercialPayload(opened.resource?.payload),
-      true,
-    );
+    let mutation = await buildMutation(parseCommercialPayload(opened.resource?.payload), true);
 
     stage = "save-resource";
     let saved = await desktop.states.saveOpened({
@@ -336,10 +327,7 @@ export async function POST(request: Request) {
       stage = "reopen-after-conflict";
       opened = await desktop.states.openForUpdate(COMMERCIAL_RESOURCE);
       stage = "reapply-after-conflict";
-      mutation = await buildMutation(
-        parseCommercialPayload(opened.resource?.payload),
-        false,
-      );
+      mutation = await buildMutation(parseCommercialPayload(opened.resource?.payload), false);
       stage = "save-after-conflict";
       saved = await desktop.states.saveOpened({
         resource: COMMERCIAL_RESOURCE,

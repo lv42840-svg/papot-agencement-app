@@ -55,7 +55,9 @@ export async function GET() {
         const code = error instanceof Error ? error.message : "CLIENTS_REFRESH_FAILED";
         console.error("[PAPOT][Clients] background refresh failed", { code });
       });
-      return noStoreJson(publicSnapshot(parseClientsPayload(cached?.payload), context.moduleAccess.canWrite));
+      return noStoreJson(
+        publicSnapshot(parseClientsPayload(cached?.payload), context.moduleAccess.canWrite),
+      );
     }
 
     const resource = await context.desktop.states.get(CLIENTS_RESOURCE);
@@ -109,11 +111,10 @@ export async function POST(request: Request) {
 
     let opened = initialOpened;
     stage = "apply-mutation";
-    let mutation = applyClientsMutation(
-      parseClientsPayload(opened.resource?.payload),
-      input,
-      { userId: context.user.id, displayName: context.user.displayName },
-    );
+    let mutation = applyClientsMutation(parseClientsPayload(opened.resource?.payload), input, {
+      userId: context.user.id,
+      displayName: context.user.displayName,
+    });
 
     stage = "save-resource";
     let saved = await desktop.states.saveOpened({
@@ -127,11 +128,10 @@ export async function POST(request: Request) {
       stage = "reopen-after-conflict";
       opened = await desktop.states.openForUpdate(CLIENTS_RESOURCE);
       stage = "reapply-after-conflict";
-      mutation = applyClientsMutation(
-        parseClientsPayload(opened.resource?.payload),
-        input,
-        { userId: context.user.id, displayName: context.user.displayName },
-      );
+      mutation = applyClientsMutation(parseClientsPayload(opened.resource?.payload), input, {
+        userId: context.user.id,
+        displayName: context.user.displayName,
+      });
       stage = "save-after-conflict";
       saved = await desktop.states.saveOpened({
         resource: CLIENTS_RESOURCE,
