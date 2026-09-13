@@ -1,11 +1,7 @@
 import { NextResponse } from "next/server";
 import { z } from "zod";
 import { hashPassword } from "@/lib/auth/password";
-import {
-  createSession,
-  destroyAllSessionsForUser,
-  getCurrentUser,
-} from "@/lib/auth/session";
+import { createSession, destroyAllSessionsForUser, getCurrentUser } from "@/lib/auth/session";
 import { db } from "@/lib/db/pool";
 
 const schema = z.object({

@@ -1,9 +1,6 @@
 import { NextResponse } from "next/server";
 import { z } from "zod";
-import {
-  MODULE_PERMISSIONS,
-  SPECIAL_PERMISSIONS,
-} from "@/lib/auth/permission-catalog";
+import { MODULE_PERMISSIONS, SPECIAL_PERMISSIONS } from "@/lib/auth/permission-catalog";
 import {
   createManagedUser,
   listAdminUsers,
@@ -115,7 +112,12 @@ export async function POST(request: Request) {
 
     return noStoreJson(await snapshot(actor.id));
   } catch (error) {
-    const code = error instanceof z.ZodError ? "USER_ADMIN_REQUEST_INVALID" : error instanceof Error ? error.message : "USER_ADMIN_MUTATION_FAILED";
+    const code =
+      error instanceof z.ZodError
+        ? "USER_ADMIN_REQUEST_INVALID"
+        : error instanceof Error
+          ? error.message
+          : "USER_ADMIN_MUTATION_FAILED";
     return noStoreJson({ error: code }, { status: userAdminErrorStatus(code) });
   }
 }

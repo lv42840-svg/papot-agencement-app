@@ -2,10 +2,7 @@ import { randomUUID } from "node:crypto";
 import { NextResponse } from "next/server";
 import { ZodError } from "zod";
 import { chantierSpecialPermissionForMutation } from "@/lib/auth/action-permissions";
-import {
-  hasEffectiveSpecialPermission,
-  requireSpecialPermission,
-} from "@/lib/auth/permissions";
+import { hasEffectiveSpecialPermission, requireSpecialPermission } from "@/lib/auth/permissions";
 import {
   desktopRequestErrorStatus,
   requireDesktopRequestContext,
@@ -135,7 +132,11 @@ export async function POST(request: Request) {
 
     let opened = openedInitial;
     stage = "apply-mutation";
-    let mutation = applyChantierMutation(parseChantiersPayload(opened.resource?.payload), input, actor);
+    let mutation = applyChantierMutation(
+      parseChantiersPayload(opened.resource?.payload),
+      input,
+      actor,
+    );
 
     stage = "save-resource";
     let saved = await desktop.states.saveOpened({
@@ -149,7 +150,11 @@ export async function POST(request: Request) {
       stage = "reopen-after-conflict";
       opened = await desktop.states.openForUpdate(CHANTIERS_RESOURCE);
       stage = "reapply-after-conflict";
-      mutation = applyChantierMutation(parseChantiersPayload(opened.resource?.payload), input, actor);
+      mutation = applyChantierMutation(
+        parseChantiersPayload(opened.resource?.payload),
+        input,
+        actor,
+      );
       stage = "save-after-conflict";
       saved = await desktop.states.saveOpened({
         resource: CHANTIERS_RESOURCE,
@@ -162,7 +167,9 @@ export async function POST(request: Request) {
     if (saved.status === "conflict") throw new Error("CHANTIERS_VERSION_CONFLICT");
     const payload = parseChantiersPayload(saved.resource.payload);
     console.info("[PAPOT][Chantiers] POST saved", { ms: Date.now() - startedAt });
-    return noStoreJson(await snapshot(payload, owner, context.user, true, mutation.focusChantierId));
+    return noStoreJson(
+      await snapshot(payload, owner, context.user, true, mutation.focusChantierId),
+    );
   } catch (error) {
     const code =
       error instanceof ZodError

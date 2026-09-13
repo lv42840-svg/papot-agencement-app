@@ -1,10 +1,7 @@
 import { NextResponse } from "next/server";
 import { ZodError } from "zod";
 import { commercialSpecialPermissionForMutation } from "@/lib/auth/action-permissions";
-import {
-  hasEffectiveSpecialPermission,
-  requireSpecialPermission,
-} from "@/lib/auth/permissions";
+import { hasEffectiveSpecialPermission, requireSpecialPermission } from "@/lib/auth/permissions";
 import { requireDesktopRequestContext } from "@/lib/desktop/request-context";
 import { listCommercialAssignableUsers } from "@/lib/commercial/people";
 import {

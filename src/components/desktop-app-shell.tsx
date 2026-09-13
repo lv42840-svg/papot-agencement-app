@@ -20,8 +20,7 @@ function readDesktopDeviceIdentity(): DesktopDeviceIdentity {
   try {
     const config = JSON.parse(rawConfig) as { device_label?: unknown };
     return {
-      deviceLabel:
-        typeof config.device_label === "string" ? config.device_label : "Poste PAPOT",
+      deviceLabel: typeof config.device_label === "string" ? config.device_label : "Poste PAPOT",
       configured: true,
     };
   } catch {

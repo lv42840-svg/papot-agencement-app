@@ -3,16 +3,11 @@ import {
   chantierSpecialPermissionForMutation,
   commercialSpecialPermissionForMutation,
 } from "../src/lib/auth/action-permissions";
-import {
-  MODULE_PERMISSIONS,
-  SPECIAL_PERMISSIONS,
-} from "../src/lib/auth/permission-catalog";
+import { MODULE_PERMISSIONS, SPECIAL_PERMISSIONS } from "../src/lib/auth/permission-catalog";
 
 describe("commercial special permissions", () => {
   it("requires the create permission for a new commercial case", () => {
-    expect(commercialSpecialPermissionForMutation({ action: "create" })).toBe(
-      "commercial.create",
-    );
+    expect(commercialSpecialPermissionForMutation({ action: "create" })).toBe("commercial.create");
   });
 
   it("requires the provision permission for capacity provisioning", () => {

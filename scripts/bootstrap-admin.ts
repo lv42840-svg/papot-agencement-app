@@ -1,10 +1,7 @@
 import { randomUUID } from "node:crypto";
 import { Pool } from "pg";
 import { hashPassword } from "../src/lib/auth/password";
-import {
-  MODULE_PERMISSIONS,
-  SPECIAL_PERMISSIONS,
-} from "../src/lib/auth/permission-catalog";
+import { MODULE_PERMISSIONS, SPECIAL_PERMISSIONS } from "../src/lib/auth/permission-catalog";
 
 const connectionString = process.env.DATABASE_URL;
 const name = process.env.BOOTSTRAP_ADMIN_NAME;

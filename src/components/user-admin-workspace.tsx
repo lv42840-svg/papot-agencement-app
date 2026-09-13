@@ -54,7 +54,9 @@ export function UserAdminWorkspace() {
   async function load() {
     setError("");
     const response = await fetch("/api/admin/users", { cache: "no-store" });
-    const body = (await response.json().catch(() => null)) as (Snapshot & { error?: string }) | null;
+    const body = (await response.json().catch(() => null)) as
+      | (Snapshot & { error?: string })
+      | null;
     if (!response.ok || !body) {
       setError(errorMessage(body?.error ?? "Chargement impossible."));
       return;
@@ -75,7 +77,9 @@ export function UserAdminWorkspace() {
         headers: { "content-type": "application/json" },
         body: JSON.stringify(input),
       });
-      const body = (await response.json().catch(() => null)) as (Snapshot & { error?: string }) | null;
+      const body = (await response.json().catch(() => null)) as
+        | (Snapshot & { error?: string })
+        | null;
       if (!response.ok || !body) {
         setError(errorMessage(body?.error ?? "Modification impossible."));
         return false;
@@ -425,7 +429,9 @@ function UserAdminCard({
         >
           {user.isActive ? "Désactiver le compte" : "Réactiver le compte"}
         </button>
-        {user.id === actorUserId && <span className="muted">Votre compte ne peut pas être désactivé ici.</span>}
+        {user.id === actorUserId && (
+          <span className="muted">Votre compte ne peut pas être désactivé ici.</span>
+        )}
       </div>
 
       <section className="adminSection">

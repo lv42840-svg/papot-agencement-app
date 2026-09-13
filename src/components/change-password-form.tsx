@@ -40,7 +40,13 @@ export function ChangePasswordForm() {
     <form className="loginForm" onSubmit={submit}>
       <label>
         Nouveau mot de passe
-        <input name="password" type="password" autoComplete="new-password" minLength={12} required />
+        <input
+          name="password"
+          type="password"
+          autoComplete="new-password"
+          minLength={12}
+          required
+        />
       </label>
       <label>
         Confirmer le mot de passe
