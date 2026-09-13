@@ -23,6 +23,7 @@ type EntriesContext = {
 async function requireEntriesContext(required: AccessLevel): Promise<EntriesContext> {
   const user = await getCurrentUser();
   if (!user) throw new Error("AUTH_REQUIRED");
+  if (user.mustChangePassword) throw new Error("PASSWORD_CHANGE_REQUIRED");
 
   const isAdmin = user.canManagePermissions;
   const canWrite = isAdmin || (await hasModuleAccess(user.id, "capture", "WRITE"));
@@ -62,7 +63,13 @@ function publicSnapshot(
 
 function errorStatus(code: string): number {
   if (code === "AUTH_REQUIRED") return 401;
-  if (code === "MODULE_FORBIDDEN" || code.endsWith("_FORBIDDEN")) return 403;
+  if (
+    code === "PASSWORD_CHANGE_REQUIRED" ||
+    code === "MODULE_FORBIDDEN" ||
+    code.endsWith("_FORBIDDEN")
+  ) {
+    return 403;
+  }
   if (code.endsWith("_NOT_FOUND")) return 404;
   if (
     code.includes("AMBIGUOUS") ||
