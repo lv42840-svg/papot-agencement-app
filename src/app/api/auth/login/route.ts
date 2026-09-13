@@ -18,9 +18,13 @@ export async function POST(request: Request) {
   const result = await db.query<{
     id: string;
     password_hash: string;
-  }>("SELECT id, password_hash FROM app_user WHERE lower(email) = lower($1) AND is_active = true", [
-    parsed.data.email,
-  ]);
+    must_change_password: boolean;
+  }>(
+    `SELECT id, password_hash, must_change_password
+     FROM app_user
+     WHERE lower(email) = lower($1) AND is_active = true`,
+    [parsed.data.email],
+  );
   const user = result.rows[0];
 
   if (!user || !(await verifyPassword(parsed.data.password, user.password_hash))) {
@@ -30,6 +34,7 @@ export async function POST(request: Request) {
     );
   }
 
+  await db.query("DELETE FROM app_session WHERE expires_at <= now()");
   await createSession(user.id);
-  return NextResponse.json({ ok: true });
+  return NextResponse.json({ ok: true, mustChangePassword: user.must_change_password });
 }
