@@ -2,13 +2,25 @@ import { randomUUID } from "node:crypto";
 import { z } from "zod";
 import { commercialHasSignedQuote, type CommercialCase } from "../commercial/domain";
 import {
+  BE_STATUS_LABELS,
   CHANTIER_STATUS_LABELS,
+  INSTALL_STATUS_LABELS,
+  WORKSHOP_STATUS_LABELS,
   parseChantiersPayload,
+  type BeItem,
   type ChantierRecord,
   type ChantiersPayload,
+  type InstallItem,
+  type WorkshopItem,
 } from "./domain";
 
 const nullableText = (max: number) => z.string().trim().max(max).optional().default("");
+const technicalOriginInput = z.object({
+  name: z.string().trim().min(1).max(240),
+  originKind: z.enum(["QUOTE_LINE", "TS"]),
+  originLabel: nullableText(500),
+  installedByUs: z.boolean(),
+});
 
 export const launchChantierSchema = z.object({
   commercialCaseId: z.string().uuid(),
@@ -43,6 +55,33 @@ export const chantierMutationSchema = z.discriminatedUnion("action", [
     workshop: z.number().min(0).max(100000),
     install: z.number().min(0).max(100000),
     reason: z.string().trim().min(1).max(2000),
+  }),
+  technicalOriginInput.extend({
+    action: z.literal("createBeItem"),
+    chantierId: z.string().uuid(),
+  }),
+  z.object({
+    action: z.literal("setBeStatus"),
+    chantierId: z.string().uuid(),
+    beItemId: z.string().uuid(),
+    status: z.enum(["TODO", "DRAW", "VALIDATION", "VALIDATED"]),
+  }),
+  technicalOriginInput.extend({
+    action: z.literal("createWorkshopItem"),
+    chantierId: z.string().uuid(),
+  }),
+  z.object({
+    action: z.literal("setWorkshopStatus"),
+    chantierId: z.string().uuid(),
+    workshopItemId: z.string().uuid(),
+    status: z.enum(["PREPARE", "READY", "IN_PROGRESS", "DONE"]),
+  }),
+  z.object({
+    action: z.literal("setInstallStatus"),
+    chantierId: z.string().uuid(),
+    installItemId: z.string().uuid(),
+    status: z.enum(["TODO", "IN_PROGRESS", "DONE"]),
+    note: nullableText(2000),
   }),
   z.object({
     action: z.literal("markDone"),
@@ -111,6 +150,81 @@ function hasDocument(item: CommercialCase, category: "QUOTE" | "COSTING"): boole
   return item.documents.some((document) => document.category === category);
 }
 
+function ensureOperationalEditable(item: ChantierRecord): void {
+  if (item.status === "ARCHIVED") throw new Error("CHANTIER_ARCHIVED_READ_ONLY");
+}
+
+function findBeItem(item: ChantierRecord, id: string): BeItem {
+  const result = item.operational.beItems.find((candidate) => candidate.id === id);
+  if (!result) throw new Error("CHANTIER_BE_ITEM_NOT_FOUND");
+  return result;
+}
+
+function findWorkshopItem(item: ChantierRecord, id: string): WorkshopItem {
+  const result = item.operational.workshopItems.find((candidate) => candidate.id === id);
+  if (!result) throw new Error("CHANTIER_WORKSHOP_ITEM_NOT_FOUND");
+  return result;
+}
+
+function findInstallItem(item: ChantierRecord, id: string): InstallItem {
+  const result = item.operational.installItems.find((candidate) => candidate.id === id);
+  if (!result) throw new Error("CHANTIER_INSTALL_ITEM_NOT_FOUND");
+  return result;
+}
+
+function createWorkshopFromBe(item: ChantierRecord, beItem: BeItem, now: Date): WorkshopItem {
+  const existing = item.operational.workshopItems.find((candidate) => candidate.sourceBeItemId === beItem.id);
+  if (existing) return existing;
+  const timestamp = now.toISOString();
+  const created: WorkshopItem = {
+    id: randomUUID(),
+    sourceBeItemId: beItem.id,
+    name: beItem.name,
+    originKind: beItem.originKind,
+    originLabel: beItem.originLabel,
+    installedByUs: beItem.installedByUs,
+    status: "PREPARE",
+    createdAt: timestamp,
+    updatedAt: timestamp,
+  };
+  item.operational.workshopItems.push(created);
+  return created;
+}
+
+function createInstallFromTechnical(
+  item: ChantierRecord,
+  source: {
+    sourceBeItemId: string | null;
+    sourceWorkshopItemId: string | null;
+    name: string;
+    originKind: "QUOTE_LINE" | "TS";
+    originLabel: string | null;
+  },
+  now: Date,
+): InstallItem {
+  const existing = item.operational.installItems.find(
+    (candidate) =>
+      (source.sourceBeItemId && candidate.sourceBeItemId === source.sourceBeItemId) ||
+      (source.sourceWorkshopItemId && candidate.sourceWorkshopItemId === source.sourceWorkshopItemId),
+  );
+  if (existing) return existing;
+  const timestamp = now.toISOString();
+  const created: InstallItem = {
+    id: randomUUID(),
+    sourceBeItemId: source.sourceBeItemId,
+    sourceWorkshopItemId: source.sourceWorkshopItemId,
+    name: source.name,
+    originKind: source.originKind,
+    originLabel: source.originLabel,
+    status: "TODO",
+    note: null,
+    createdAt: timestamp,
+    updatedAt: timestamp,
+  };
+  item.operational.installItems.push(created);
+  return created;
+}
+
 export function launchChantierFromCommercial(
   rawSource: ChantiersPayload,
   commercialCase: CommercialCase,
@@ -165,6 +279,7 @@ export function launchChantierFromCommercial(
     signedQuoteReminder: quotePresent && !signedQuotePresent,
     plannedHours: { be: input.be, workshop: input.workshop, install: input.install },
     actualHours: { be: 0, workshop: 0, install: 0 },
+    operational: { beItems: [], workshopItems: [], installItems: [] },
     launchedAt: timestamp,
     launchedByName: actor.displayName,
     completedAt: null,
@@ -233,6 +348,138 @@ export function applyChantierMutation(
       actor.displayName,
       "PLANNED_HOURS_UPDATED",
       `Prévision modifiée : BE ${previous.be} → ${next.be} h · Atelier ${previous.workshop} → ${next.workshop} h · Pose ${previous.install} → ${next.install} h. Motif : ${input.reason}`,
+      now,
+    );
+    return { payload, focusChantierId: item.id };
+  }
+
+  if (input.action === "createBeItem") {
+    ensureOperationalEditable(item);
+    const timestamp = now.toISOString();
+    const created: BeItem = {
+      id: randomUUID(),
+      name: input.name,
+      originKind: input.originKind,
+      originLabel: text(input.originLabel),
+      installedByUs: input.installedByUs,
+      status: "TODO",
+      createdAt: timestamp,
+      updatedAt: timestamp,
+    };
+    item.operational.beItems.push(created);
+    touch(item, actor, now);
+    history(
+      item,
+      actor.displayName,
+      "OPERATIONAL_ITEM_CREATED",
+      `BE : ${created.name} créé (${created.originKind === "TS" ? "TS" : "ligne devis"}${created.installedByUs ? " · posé par PAPOT" : ""}).`,
+      now,
+    );
+    return { payload, focusChantierId: item.id };
+  }
+
+  if (input.action === "setBeStatus") {
+    ensureOperationalEditable(item);
+    const beItem = findBeItem(item, input.beItemId);
+    const previous = beItem.status;
+    beItem.status = input.status;
+    beItem.updatedAt = now.toISOString();
+    if (input.status === "VALIDATED") {
+      const workshop = createWorkshopFromBe(item, beItem, now);
+      if (beItem.installedByUs) {
+        createInstallFromTechnical(
+          item,
+          {
+            sourceBeItemId: beItem.id,
+            sourceWorkshopItemId: workshop.id,
+            name: beItem.name,
+            originKind: beItem.originKind,
+            originLabel: beItem.originLabel,
+          },
+          now,
+        );
+      }
+    }
+    touch(item, actor, now);
+    history(
+      item,
+      actor.displayName,
+      "OPERATIONAL_STATUS_UPDATED",
+      `BE · ${beItem.name} : ${BE_STATUS_LABELS[previous]} → ${BE_STATUS_LABELS[input.status]}.`,
+      now,
+    );
+    return { payload, focusChantierId: item.id };
+  }
+
+  if (input.action === "createWorkshopItem") {
+    ensureOperationalEditable(item);
+    const timestamp = now.toISOString();
+    const created: WorkshopItem = {
+      id: randomUUID(),
+      sourceBeItemId: null,
+      name: input.name,
+      originKind: input.originKind,
+      originLabel: text(input.originLabel),
+      installedByUs: input.installedByUs,
+      status: "PREPARE",
+      createdAt: timestamp,
+      updatedAt: timestamp,
+    };
+    item.operational.workshopItems.push(created);
+    if (created.installedByUs) {
+      createInstallFromTechnical(
+        item,
+        {
+          sourceBeItemId: null,
+          sourceWorkshopItemId: created.id,
+          name: created.name,
+          originKind: created.originKind,
+          originLabel: created.originLabel,
+        },
+        now,
+      );
+    }
+    touch(item, actor, now);
+    history(
+      item,
+      actor.displayName,
+      "OPERATIONAL_ITEM_CREATED",
+      `Atelier : ${created.name} créé directement (${created.originKind === "TS" ? "TS" : "ligne devis"}${created.installedByUs ? " · posé par PAPOT" : ""}).`,
+      now,
+    );
+    return { payload, focusChantierId: item.id };
+  }
+
+  if (input.action === "setWorkshopStatus") {
+    ensureOperationalEditable(item);
+    const workshopItem = findWorkshopItem(item, input.workshopItemId);
+    const previous = workshopItem.status;
+    workshopItem.status = input.status;
+    workshopItem.updatedAt = now.toISOString();
+    touch(item, actor, now);
+    history(
+      item,
+      actor.displayName,
+      "OPERATIONAL_STATUS_UPDATED",
+      `Atelier · ${workshopItem.name} : ${WORKSHOP_STATUS_LABELS[previous]} → ${WORKSHOP_STATUS_LABELS[input.status]}.`,
+      now,
+    );
+    return { payload, focusChantierId: item.id };
+  }
+
+  if (input.action === "setInstallStatus") {
+    ensureOperationalEditable(item);
+    const installItem = findInstallItem(item, input.installItemId);
+    const previous = installItem.status;
+    installItem.status = input.status;
+    installItem.note = text(input.note);
+    installItem.updatedAt = now.toISOString();
+    touch(item, actor, now);
+    history(
+      item,
+      actor.displayName,
+      "OPERATIONAL_STATUS_UPDATED",
+      `Pose · ${installItem.name} : ${INSTALL_STATUS_LABELS[previous]} → ${INSTALL_STATUS_LABELS[input.status]}${installItem.note ? ` · ${installItem.note}` : ""}.`,
       now,
     );
     return { payload, focusChantierId: item.id };
