@@ -1,0 +1,148 @@
+import { randomUUID } from "node:crypto";
+import { NextResponse } from "next/server";
+import { createDesktopSharedResourceRuntime } from "@/lib/desktop/shared-resource-runtime";
+import {
+  cleanupCommercialDocuments,
+  uploadCommercialDocuments,
+} from "@/lib/commercial/document-storage";
+import {
+  commercialDocumentCategorySchema,
+  parseCommercialPayload,
+} from "@/lib/commercial/domain";
+import {
+  commercialCapabilities,
+  listCommercialPeople,
+  registerCommercialDocuments,
+} from "@/lib/commercial/mutations";
+
+export const runtime = "nodejs";
+export const dynamic = "force-dynamic";
+
+const COMMERCIAL_RESOURCE = { resource_type: "COMMERCIAL" as const, resource_id: "global" };
+const LOCK_TTL_MS = 30_000;
+type RouteContext = { params: Promise<{ caseId: string }> };
+
+function snapshot(
+  payload: ReturnType<typeof parseCommercialPayload>,
+  owner: { userId: string; displayName: string },
+  focusCaseId?: string,
+) {
+  const actor = { userId: owner.userId, displayName: owner.displayName };
+  return {
+    payload,
+    actor,
+    capabilities: commercialCapabilities(actor),
+    suggestedPeople: listCommercialPeople(payload, actor),
+    focusCaseId,
+    serverNow: new Date().toISOString(),
+  };
+}
+
+function statusFor(code: string): number {
+  if (code === "COMMERCIAL_CASE_NOT_FOUND") return 404;
+  if (code === "COMMERCIAL_LOCKED") return 423;
+  if (code.includes("CONFLICT")) return 409;
+  if (code.includes("TOO_LARGE")) return 413;
+  return 400;
+}
+
+export async function POST(request: Request, context: RouteContext) {
+  const { caseId } = await context.params;
+  const desktop = createDesktopSharedResourceRuntime();
+  const form = await request.formData();
+  const files = form.getAll("files").filter((value): value is File => value instanceof File);
+  const category = commercialDocumentCategorySchema.parse(form.get("category"));
+  const versionLabel = String(form.get("versionLabel") ?? "").trim();
+  const variantLabel = String(form.get("variantLabel") ?? "").trim();
+  const isCurrent = String(form.get("isCurrent") ?? "1") !== "0";
+  const isSignedQuote = String(form.get("isSignedQuote") ?? "0") === "1";
+
+  const current = await desktop.states.get(COMMERCIAL_RESOURCE);
+  const currentPayload = parseCommercialPayload(current?.payload);
+  const item = currentPayload.cases.find((candidate) => candidate.id === caseId);
+  if (!item) return NextResponse.json({ error: "COMMERCIAL_CASE_NOT_FOUND" }, { status: 404 });
+
+  const creationYear = new Date(item.createdAt).getFullYear();
+  const actor = { userId: desktop.owner.userId, displayName: desktop.owner.displayName };
+  const transport = {
+    dav: desktop.dav,
+    nextcloudUserId: desktop.nextcloudUserId,
+    syncRoot: desktop.syncRoot,
+    displayName: desktop.owner.displayName,
+  };
+
+  let uploaded = [] as Awaited<ReturnType<typeof uploadCommercialDocuments>>;
+  const leaseId = randomUUID();
+  let ownsLock = false;
+  try {
+    uploaded = await uploadCommercialDocuments(transport, {
+      caseId,
+      creationYear,
+      files,
+      options: { category, versionLabel, variantLabel, isCurrent, isSignedQuote },
+    });
+
+    const [lock, openedInitial] = await Promise.all([
+      desktop.locks.acquire({
+        resource: COMMERCIAL_RESOURCE,
+        leaseId,
+        owner: desktop.owner,
+        baseVersion: 0,
+        ttlMs: LOCK_TTL_MS,
+        reclaimOwnAfterMs: 0,
+      }),
+      desktop.states.openForUpdate(COMMERCIAL_RESOURCE),
+    ]);
+    if (lock.status === "locked") throw new Error("COMMERCIAL_LOCKED");
+    ownsLock = true;
+
+    let opened = openedInitial;
+    let mutation = registerCommercialDocuments(
+      parseCommercialPayload(opened.resource?.payload),
+      caseId,
+      uploaded,
+      actor,
+    );
+    let saved = await desktop.states.saveOpened({
+      resource: COMMERCIAL_RESOURCE,
+      opened,
+      payload: mutation.payload,
+      actor: { userId: desktop.owner.userId, deviceId: desktop.owner.deviceId },
+    });
+
+    if (saved.status === "conflict") {
+      opened = await desktop.states.openForUpdate(COMMERCIAL_RESOURCE);
+      mutation = registerCommercialDocuments(
+        parseCommercialPayload(opened.resource?.payload),
+        caseId,
+        uploaded,
+        actor,
+      );
+      saved = await desktop.states.saveOpened({
+        resource: COMMERCIAL_RESOURCE,
+        opened,
+        payload: mutation.payload,
+        actor: { userId: desktop.owner.userId, deviceId: desktop.owner.deviceId },
+      });
+    }
+    if (saved.status === "conflict") throw new Error("COMMERCIAL_VERSION_CONFLICT");
+
+    return NextResponse.json(
+      snapshot(parseCommercialPayload(saved.resource.payload), desktop.owner, caseId),
+      { headers: { "Cache-Control": "no-store" } },
+    );
+  } catch (error) {
+    if (uploaded.length > 0) await cleanupCommercialDocuments(transport, uploaded);
+    const code = error instanceof Error ? error.message : "COMMERCIAL_DOCUMENT_UPLOAD_FAILED";
+    return NextResponse.json(
+      { error: code },
+      { status: statusFor(code), headers: { "Cache-Control": "no-store" } },
+    );
+  } finally {
+    if (ownsLock) {
+      void desktop.locks
+        .release({ resource: COMMERCIAL_RESOURCE, leaseId, owner: desktop.owner })
+        .catch(() => undefined);
+    }
+  }
+}
