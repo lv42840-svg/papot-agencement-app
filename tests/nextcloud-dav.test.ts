@@ -75,7 +75,7 @@ describe("NextcloudDavClient collection cache", () => {
     expect(fetchMock).toHaveBeenCalledTimes(1);
   });
 
-  it("uses the DAV getetag value for conditional-write reads", async () => {
+  it("uses one DAV ETag read plus one GET for conditional-write reads", async () => {
     const propfindBody =
       '<?xml version="1.0"?><d:multistatus xmlns:d="DAV:"><d:response><d:propstat><d:prop><d:getetag>"dav-v42"</d:getetag></d:prop></d:propstat></d:response></d:multistatus>';
     const fetchMock = vi
@@ -86,8 +86,7 @@ describe("NextcloudDavClient collection cache", () => {
           status: 200,
           headers: { ETag: '"plain-http-etag"' },
         }),
-      )
-      .mockResolvedValueOnce(new Response(propfindBody, { status: 207 }));
+      );
     vi.stubGlobal("fetch", fetchMock);
     const dav = new NextcloudDavClient({
       baseUrl: "https://cloud.example.test",
@@ -98,6 +97,6 @@ describe("NextcloudDavClient collection cache", () => {
     await expect(
       dav.getTextWithEtag("https://cloud.example.test/remote.php/dav/files/papot/file.json"),
     ).resolves.toEqual({ text: '{"ok":true}', etag: '"dav-v42"' });
-    expect(fetchMock).toHaveBeenCalledTimes(3);
+    expect(fetchMock).toHaveBeenCalledTimes(2);
   });
 });
