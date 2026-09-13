@@ -36,12 +36,7 @@ export const quoteLineSchema = z.object({
   description: z.string().trim().min(1).max(4000),
   unit: z.string().trim().max(40),
   quantity: z.number().finite().positive().max(QUOTE_MAX_QUANTITY),
-  quantityFormula: z
-    .string()
-    .trim()
-    .min(1)
-    .max(QUOTE_MAX_QUANTITY_EXPRESSION_LENGTH)
-    .nullable(),
+  quantityFormula: z.string().trim().min(1).max(QUOTE_MAX_QUANTITY_EXPRESSION_LENGTH).nullable(),
 });
 
 export const quoteCommentSchema = z.object({
