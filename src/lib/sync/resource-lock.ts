@@ -8,6 +8,7 @@ export const sharedResourceTypeSchema = z.enum([
   "PLANNING_WEEK",
   "TREASURY_MONTH",
   "ENTRIES",
+  "COMMERCIAL",
 ]);
 
 export const sharedResourceRefSchema = z.object({
@@ -79,17 +80,10 @@ export type ResourceLockOwner = {
 
 export function resourceLockPathSegments(resource: SharedResourceRef): string[] {
   const parsed = sharedResourceRefSchema.parse(resource);
-  return [
-    "locks",
-    parsed.resource_type.toLowerCase(),
-    `${parsed.resource_id}.json`,
-  ];
+  return ["locks", parsed.resource_type.toLowerCase(), `${parsed.resource_id}.json`];
 }
 
-export function isResourceLockExpired(
-  lock: SharedResourceLock,
-  now: Date = new Date(),
-): boolean {
+export function isResourceLockExpired(lock: SharedResourceLock, now: Date = new Date()): boolean {
   const parsed = sharedResourceLockSchema.parse(lock);
   return Date.parse(parsed.expires_at) <= now.getTime();
 }
@@ -107,10 +101,7 @@ export function isResourceLockOwnedBy(
   );
 }
 
-export function resourceLockBlocksWrite(
-  lock: SharedResourceLock | null,
-  now: Date = new Date(),
-): boolean {
+export function resourceLockBlocksWrite(lock: SharedResourceLock | null, now: Date = new Date()): boolean {
   if (!lock) return false;
   return !isResourceLockExpired(lock, now);
 }
@@ -176,10 +167,7 @@ export function renewResourceLock(params: {
   });
 }
 
-export function hasSharedResourceVersionConflict(
-  openedVersion: number,
-  currentVersion: number,
-): boolean {
+export function hasSharedResourceVersionConflict(openedVersion: number, currentVersion: number): boolean {
   if (!Number.isInteger(openedVersion) || openedVersion < 0) {
     throw new Error("OPENED_VERSION_INVALID");
   }
