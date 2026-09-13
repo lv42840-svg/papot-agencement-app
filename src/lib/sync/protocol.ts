@@ -19,15 +19,17 @@ export const syncAttachmentSchema = z
     attachment_id: uuidSchema,
     file_name: z.string().trim().min(1).max(240),
     content_type: z.string().trim().min(1).max(120),
-    size_bytes: z.number().int().nonnegative().max(50 * 1024 * 1024),
+    size_bytes: z
+      .number()
+      .int()
+      .nonnegative()
+      .max(50 * 1024 * 1024),
     sha256: sha256Schema,
     object_name: safeObjectNameSchema,
   })
   .strict();
 
-const captureTransportPayloadSchema = captureCreateSchema
-  .omit({ clientRequestId: true })
-  .strict();
+const captureTransportPayloadSchema = captureCreateSchema.omit({ clientRequestId: true }).strict();
 
 const deviceProofSchema = z
   .object({

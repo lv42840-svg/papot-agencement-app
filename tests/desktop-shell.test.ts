@@ -32,17 +32,12 @@ describe("desktop shell security policy", () => {
   });
 
   it("allows navigation inside the same local PAPOT origin", () => {
-    expect(
-      isAllowedDesktopNavigation(
-        "http://127.0.0.1:3000/tasks",
-        "http://127.0.0.1:3000",
-      ),
-    ).toBe(true);
+    expect(isAllowedDesktopNavigation("http://127.0.0.1:3000/tasks", "http://127.0.0.1:3000")).toBe(
+      true,
+    );
   });
 
   it("blocks navigation outside the PAPOT origin", () => {
-    expect(
-      isAllowedDesktopNavigation("https://example.com", "http://127.0.0.1:3000"),
-    ).toBe(false);
+    expect(isAllowedDesktopNavigation("https://example.com", "http://127.0.0.1:3000")).toBe(false);
   });
 });

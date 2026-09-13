@@ -675,9 +675,7 @@ select:focus {
   min-height: 100vh;
   display: grid;
   grid-template-columns: 228px minmax(0, 1fr);
-  background:
-    radial-gradient(circle at 88% 3%, rgb(196 181 253 / 0.17), transparent 31%),
-    #f7f6fb;
+  background: radial-gradient(circle at 88% 3%, rgb(196 181 253 / 0.17), transparent 31%), #f7f6fb;
 }
 .desktopSidebarV2 {
   min-height: 100vh;
@@ -870,10 +868,22 @@ select:focus {
   color: var(--muted);
   font-size: 10px;
 }
-.dashboardStatPurple .dashboardStatIcon { color: #7f60eb; background: #eee9ff; }
-.dashboardStatGold .dashboardStatIcon { color: #bd7927; background: #fff2df; }
-.dashboardStatGreen .dashboardStatIcon { color: #2b9b62; background: #e4f8ec; }
-.dashboardStatBlue .dashboardStatIcon { color: #2783d7; background: #e7f3ff; }
+.dashboardStatPurple .dashboardStatIcon {
+  color: #7f60eb;
+  background: #eee9ff;
+}
+.dashboardStatGold .dashboardStatIcon {
+  color: #bd7927;
+  background: #fff2df;
+}
+.dashboardStatGreen .dashboardStatIcon {
+  color: #2b9b62;
+  background: #e4f8ec;
+}
+.dashboardStatBlue .dashboardStatIcon {
+  color: #2783d7;
+  background: #e7f3ff;
+}
 .dashboardGrid {
   display: grid;
   grid-template-columns: minmax(0, 1.4fr) minmax(280px, 0.9fr);
@@ -953,8 +963,12 @@ select:focus {
   border-radius: 5px;
   background: #f0edf6;
 }
-.clipboardEmpty span:nth-child(2) { width: 82%; }
-.clipboardEmpty span:nth-child(3) { width: 64%; }
+.clipboardEmpty span:nth-child(2) {
+  width: 82%;
+}
+.clipboardEmpty span:nth-child(3) {
+  width: 64%;
+}
 .dashboardQuickPanel {
   grid-column: 1 / -1;
   min-height: 0;
@@ -966,6 +980,10 @@ select:focus {
 }
 
 @media (max-width: 1050px) {
-  .desktopAppShellV2 { grid-template-columns: 205px minmax(0, 1fr); }
-  .dashboardStats { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .desktopAppShellV2 {
+    grid-template-columns: 205px minmax(0, 1fr);
+  }
+  .dashboardStats {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
 }

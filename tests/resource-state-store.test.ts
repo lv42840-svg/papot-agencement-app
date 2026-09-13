@@ -1,8 +1,5 @@
 import { describe, expect, it } from "vitest";
-import type {
-  ConditionalWriteResult,
-  TextWithEtag,
-} from "../src/lib/sync/nextcloud-dav";
+import type { ConditionalWriteResult, TextWithEtag } from "../src/lib/sync/nextcloud-dav";
 import { NextcloudSharedResourceStore } from "../src/lib/sync/resource-state-store";
 
 const lucien = {
@@ -51,11 +48,7 @@ class FakeDav {
     return "written";
   }
 
-  async putTextIfMatch(
-    url: string,
-    body: string,
-    etag: string,
-  ): Promise<ConditionalWriteResult> {
+  async putTextIfMatch(url: string, body: string, etag: string): Promise<ConditionalWriteResult> {
     if (this.raceBeforeNextConditionalWrite) {
       this.raceBeforeNextConditionalWrite = false;
       const current = this.files.get(url);

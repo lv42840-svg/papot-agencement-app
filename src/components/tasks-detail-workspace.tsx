@@ -179,37 +179,36 @@ function useTasksData() {
     void load();
   }, [load]);
 
-  const mutate = useCallback(
-    async (body: MutationBody, successMessage: string) => {
-      setBusy(true);
-      setError(null);
-      setNotice(null);
-      try {
-        const response = await fetch("/api/desktop/entries", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify(body),
-        });
-        const result = (await response.json()) as TasksSnapshot & { error?: string };
-        if (!response.ok) {
-          throw new Error(
-            errorMessages[result.error ?? ""] ?? "L'action sur la tâche n'a pas pu être enregistrée.",
-          );
-        }
-        setSnapshot(result);
-        setNotice(successMessage);
-        return true;
-      } catch (mutationError) {
-        setError(
-          mutationError instanceof Error ? mutationError.message : "L'action n'a pas pu être enregistrée.",
+  const mutate = useCallback(async (body: MutationBody, successMessage: string) => {
+    setBusy(true);
+    setError(null);
+    setNotice(null);
+    try {
+      const response = await fetch("/api/desktop/entries", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(body),
+      });
+      const result = (await response.json()) as TasksSnapshot & { error?: string };
+      if (!response.ok) {
+        throw new Error(
+          errorMessages[result.error ?? ""] ?? "L'action sur la tâche n'a pas pu être enregistrée.",
         );
-        return false;
-      } finally {
-        setBusy(false);
       }
-    },
-    [],
-  );
+      setSnapshot(result);
+      setNotice(successMessage);
+      return true;
+    } catch (mutationError) {
+      setError(
+        mutationError instanceof Error
+          ? mutationError.message
+          : "L'action n'a pas pu être enregistrée.",
+      );
+      return false;
+    } finally {
+      setBusy(false);
+    }
+  }, []);
 
   const upload = useCallback(async (entryId: string, files: File[]) => {
     if (files.length === 0) return true;
@@ -230,7 +229,9 @@ function useTasksData() {
         );
       }
       setSnapshot(result);
-      setNotice(`${files.length} pièce${files.length > 1 ? "s" : ""} jointe${files.length > 1 ? "s" : ""} ajoutée${files.length > 1 ? "s" : ""}.`);
+      setNotice(
+        `${files.length} pièce${files.length > 1 ? "s" : ""} jointe${files.length > 1 ? "s" : ""} ajoutée${files.length > 1 ? "s" : ""}.`,
+      );
       return true;
     } catch (uploadError) {
       setError(
@@ -275,9 +276,16 @@ export function TasksDetailWorkspace() {
       <section className="taskDetailHeading">
         <div>
           <h1>Mes tâches</h1>
-          <p>Clique sur une tâche pour consulter ses pièces jointes et modifier ses informations.</p>
+          <p>
+            Clique sur une tâche pour consulter ses pièces jointes et modifier ses informations.
+          </p>
         </div>
-        <button type="button" className="taskRefreshButton" onClick={() => void load()} disabled={busy}>
+        <button
+          type="button"
+          className="taskRefreshButton"
+          onClick={() => void load()}
+          disabled={busy}
+        >
           <RefreshCw size={15} /> Actualiser
         </button>
       </section>
@@ -287,9 +295,17 @@ export function TasksDetailWorkspace() {
 
       <section className="taskSummary" aria-label="Résumé des tâches">
         <SummaryCard value={tasks.length} label="Actives" />
-        <SummaryCard value={overdueCount} label="En retard" tone={overdueCount > 0 ? "alert" : undefined} />
+        <SummaryCard
+          value={overdueCount}
+          label="En retard"
+          tone={overdueCount > 0 ? "alert" : undefined}
+        />
         <SummaryCard value={todayCount} label="Aujourd'hui" />
-        <SummaryCard value={urgentCount} label="Urgentes" tone={urgentCount > 0 ? "urgent" : undefined} />
+        <SummaryCard
+          value={urgentCount}
+          label="Urgentes"
+          tone={urgentCount > 0 ? "urgent" : undefined}
+        />
       </section>
 
       {loading && !snapshot ? (
@@ -322,9 +338,13 @@ export function TasksDetailWorkspace() {
                       <span className={`taskDatePill taskDatePill-${group.key}`}>
                         <CalendarClock size={11} /> {formatDateOnly(task.dueDate)}
                       </span>
-                      {task.priority === "URGENT" ? <span className="taskUrgentPill">Urgent</span> : null}
+                      {task.priority === "URGENT" ? (
+                        <span className="taskUrgentPill">Urgent</span>
+                      ) : null}
                       {task.attachments.length > 0 ? (
-                        <span className="taskAttachmentPill"><Paperclip size={10} /> {task.attachments.length}</span>
+                        <span className="taskAttachmentPill">
+                          <Paperclip size={10} /> {task.attachments.length}
+                        </span>
                       ) : null}
                     </div>
                     <strong>{taskTitle(task)}</strong>
@@ -440,13 +460,19 @@ function TaskDetail({
       <header className="taskDetailHeader">
         <div>
           <div className="taskDetailBadges">
-            <span className="taskDatePill"><CalendarClock size={12} /> {formatDateOnly(task.dueDate)}</span>
+            <span className="taskDatePill">
+              <CalendarClock size={12} /> {formatDateOnly(task.dueDate)}
+            </span>
             {task.priority === "URGENT" ? <span className="taskUrgentPill">Urgent</span> : null}
           </div>
           <h2>{taskTitle(task)}</h2>
-          <p>Responsable : <strong>{task.assigneeName}</strong></p>
+          <p>
+            Responsable : <strong>{task.assigneeName}</strong>
+          </p>
         </div>
-        <Link href="/entrees" className="taskOpenEntries">Ouvrir Entrées</Link>
+        <Link href="/entrees" className="taskOpenEntries">
+          Ouvrir Entrées
+        </Link>
       </header>
 
       <section className="taskOriginBox">
@@ -457,14 +483,24 @@ function TaskDetail({
       <TaskCommercialBridge task={task} description={description} nextAction={nextAction} />
 
       <section className="taskDetailSection">
-        <div className="taskSectionTitle"><Save size={15} /> Modifier la tâche</div>
+        <div className="taskSectionTitle">
+          <Save size={15} /> Modifier la tâche
+        </div>
         <label className="taskField">
           <span>C&apos;est quoi ?</span>
-          <textarea rows={3} value={description} onChange={(event) => setDescription(event.target.value)} />
+          <textarea
+            rows={3}
+            value={description}
+            onChange={(event) => setDescription(event.target.value)}
+          />
         </label>
         <label className="taskField">
           <span>J&apos;en fais quoi ?</span>
-          <textarea rows={3} value={nextAction} onChange={(event) => setNextAction(event.target.value)} />
+          <textarea
+            rows={3}
+            value={nextAction}
+            onChange={(event) => setNextAction(event.target.value)}
+          />
         </label>
 
         <div className="taskEditOptions">
@@ -488,7 +524,8 @@ function TaskDetail({
                 )
               }
             >
-              {tag.label}{!tag.active ? " (désactivé)" : ""}
+              {tag.label}
+              {!tag.active ? " (désactivé)" : ""}
             </button>
           ))}
         </div>
@@ -504,7 +541,9 @@ function TaskDetail({
       </section>
 
       <section className="taskDetailSection">
-        <div className="taskSectionTitle"><Paperclip size={15} /> Pièces jointes ({task.attachments.length})</div>
+        <div className="taskSectionTitle">
+          <Paperclip size={15} /> Pièces jointes ({task.attachments.length})
+        </div>
         {task.attachments.length === 0 ? (
           <p className="taskMuted">Aucune pièce jointe sur cette tâche.</p>
         ) : (
@@ -526,8 +565,15 @@ function TaskDetail({
           </label>
           {files.length > 0 ? (
             <div className="taskSelectedFiles">
-              {files.map((file) => <span key={`${file.name}-${file.size}`}>{file.name}</span>)}
-              <button type="button" className="secondaryButton" disabled={busy} onClick={() => void submitFiles()}>
+              {files.map((file) => (
+                <span key={`${file.name}-${file.size}`}>{file.name}</span>
+              ))}
+              <button
+                type="button"
+                className="secondaryButton"
+                disabled={busy}
+                onClick={() => void submitFiles()}
+              >
                 Envoyer {files.length} pièce{files.length > 1 ? "s" : ""}
               </button>
             </div>
@@ -536,8 +582,12 @@ function TaskDetail({
       </section>
 
       <section className="taskDetailSection">
-        <div className="taskSectionTitle"><Clock3 size={15} /> Échéance</div>
-        <p className="taskCurrentDeadline">Échéance actuelle : <strong>{formatDateOnly(task.dueDate)}</strong></p>
+        <div className="taskSectionTitle">
+          <Clock3 size={15} /> Échéance
+        </div>
+        <p className="taskCurrentDeadline">
+          Échéance actuelle : <strong>{formatDateOnly(task.dueDate)}</strong>
+        </p>
         <form className="taskPostponeForm" onSubmit={(event) => void submitPostpone(event)}>
           <label className="taskField">
             <span>Nouvelle échéance</span>
@@ -558,14 +608,20 @@ function TaskDetail({
               required
             />
           </label>
-          <button type="submit" className="secondaryButton" disabled={busy || !postponeDate || !postponeReason.trim()}>
+          <button
+            type="submit"
+            className="secondaryButton"
+            disabled={busy || !postponeDate || !postponeReason.trim()}
+          >
             Reporter l&apos;échéance
           </button>
         </form>
       </section>
 
       <section className="taskDetailSection taskCompleteSection">
-        <div className="taskSectionTitle"><Check size={15} /> Terminer</div>
+        <div className="taskSectionTitle">
+          <Check size={15} /> Terminer
+        </div>
         <label className="taskField">
           <span>Résultat facultatif</span>
           <textarea rows={2} value={result} onChange={(event) => setResult(event.target.value)} />
@@ -574,7 +630,9 @@ function TaskDetail({
           type="button"
           className="taskCompleteButton"
           disabled={busy}
-          onClick={() => void mutate({ action: "complete", entryId: task.id, result }, "Tâche terminée.")}
+          onClick={() =>
+            void mutate({ action: "complete", entryId: task.id, result }, "Tâche terminée.")
+          }
         >
           <Check size={15} /> Marquer comme terminée
         </button>
@@ -587,7 +645,9 @@ function TaskDetail({
             <span />
             <div>
               <strong>{event.summary}</strong>
-              <small>{event.actorName} · {formatDateTime(event.at)}</small>
+              <small>
+                {event.actorName} · {formatDateTime(event.at)}
+              </small>
             </div>
           </div>
         ))}
@@ -605,14 +665,23 @@ function AttachmentRow({ task, attachment }: { task: EntryRecord; attachment: En
   const Icon = isImage ? ImageIcon : FileText;
   return (
     <div className="taskAttachmentRow">
-      <span className="taskAttachmentIcon"><Icon size={17} /></span>
+      <span className="taskAttachmentIcon">
+        <Icon size={17} />
+      </span>
       <div className="taskAttachmentInfo">
         <strong>{attachment.fileName}</strong>
-        <small>{formatBytes(attachment.sizeBytes)} · {attachment.uploadedByName} · {formatDateTime(attachment.uploadedAt)}</small>
+        <small>
+          {formatBytes(attachment.sizeBytes)} · {attachment.uploadedByName} ·{" "}
+          {formatDateTime(attachment.uploadedAt)}
+        </small>
       </div>
       <div className="taskAttachmentActions">
         {canPreview ? (
-          <button type="button" className="secondaryButton" onClick={() => setPreview((current) => !current)}>
+          <button
+            type="button"
+            className="secondaryButton"
+            onClick={() => setPreview((current) => !current)}
+          >
             <Eye size={14} /> {preview ? "Fermer" : "Aperçu"}
           </button>
         ) : null}
@@ -633,114 +702,578 @@ function AttachmentRow({ task, attachment }: { task: EntryRecord; attachment: En
 function TaskDetailStyles() {
   return (
     <style jsx global>{`
-      .taskDetailWorkspace { display: grid; gap: 16px; }
-      .taskDetailHeading { display: flex; justify-content: space-between; gap: 18px; align-items: flex-start; }
-      .taskDetailHeading h1 { margin: 0 0 4px; font-size: 27px; }
-      .taskDetailHeading p { margin: 0; color: var(--muted); font-size: 11px; }
-      .taskRefreshButton { min-height: 36px; padding: 0 11px; display: inline-flex; align-items: center; gap: 6px; border: 1px solid #ddd9e8; border-radius: 8px; background: white; color: #5c5765; font-size: 11px; }
-      .taskMessage { padding: 10px 12px; border-radius: 9px; font-size: 11px; }
-      .taskMessageError { border: 1px solid #efc4bc; background: #fff5f3; color: #a3493a; }
-      .taskMessageSuccess { border: 1px solid #c4e4cf; background: #f1faf4; color: #347850; }
-      .taskSummary { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 10px; }
-      .taskSummary > div { min-height: 72px; padding: 12px 14px; display: grid; align-content: center; gap: 4px; border: 1px solid #e8e4ef; border-radius: 10px; background: white; }
-      .taskSummary strong { font-size: 21px; line-height: 1; }
-      .taskSummary span { color: #85808e; font-size: 9px; font-weight: 700; }
-      .taskSummary .is-alert strong { color: #b34e3d; }
-      .taskSummary .is-urgent strong { color: #ad671e; }
-      .taskLoading, .taskEmpty { min-height: 360px; display: grid; place-items: center; align-content: center; gap: 8px; border: 1px solid #e8e4ef; border-radius: 12px; background: white; color: #85808e; text-align: center; font-size: 11px; }
-      .taskEmpty svg { color: #4d9b6d; }
-      .taskEmpty strong { color: #5b5664; font-size: 14px; }
-      .taskMasterDetail { min-height: 610px; display: grid; grid-template-columns: minmax(330px, .72fr) minmax(560px, 1.65fr); gap: 14px; align-items: start; }
-      .taskListPanel, .taskDetailPanel { min-width: 0; border: 1px solid #e8e4ef; border-radius: 12px; background: white; overflow: hidden; }
-      .taskListPanel { max-height: calc(100vh - 275px); overflow-y: auto; }
-      .taskListGroup + .taskListGroup { border-top: 1px solid #eeeaf3; }
-      .taskListGroupTitle { min-height: 42px; padding: 0 12px; display: flex; align-items: center; justify-content: space-between; background: #fbfaff; }
-      .taskListGroupTitle strong { font-size: 11px; }
-      .taskListGroupTitle span { min-width: 21px; padding: 3px 6px; border-radius: 999px; background: #eeeaf6; color: #6d6579; text-align: center; font-size: 9px; font-weight: 800; }
-      .taskListGroupTitle-overdue { background: #fff7f5; color: #a94d3e; }
-      .taskListRow { width: 100%; padding: 12px 13px; display: grid; gap: 5px; border: 0; border-bottom: 1px solid #f0edf4; border-left: 3px solid transparent; background: white; text-align: left; color: inherit; }
-      .taskListRow:hover { background: #fbf9ff; }
-      .taskListRow.isSelected { border-left-color: #8065e7; background: #f7f4ff; }
-      .taskListRow.isOverdue:not(.isSelected) { border-left-color: #d36a55; }
-      .taskListRowTop { display: flex; flex-wrap: wrap; gap: 5px; }
-      .taskListRow > strong { font-size: 12px; line-height: 1.35; }
-      .taskListRow > small { overflow: hidden; color: #8b8693; font-size: 9px; text-overflow: ellipsis; white-space: nowrap; }
-      .taskDatePill, .taskUrgentPill, .taskAttachmentPill { width: max-content; padding: 3px 6px; display: inline-flex; align-items: center; gap: 4px; border-radius: 999px; font-size: 8px; font-weight: 800; }
-      .taskDatePill { background: #f0edf7; color: #706a78; }
-      .taskDatePill-overdue { background: #ffe8e3; color: #b44f3d; }
-      .taskDatePill-today { background: #eee9ff; color: #6e55cc; }
-      .taskUrgentPill { background: #fff0dd; color: #a85f18; }
-      .taskAttachmentPill { background: #eef5ff; color: #4572a6; }
-      .taskDetailPanel { max-height: calc(100vh - 275px); overflow-y: auto; }
-      .taskDetailContent { padding: 18px; display: grid; gap: 14px; }
-      .taskDetailHeader { display: flex; justify-content: space-between; gap: 16px; align-items: flex-start; }
-      .taskDetailHeader h2 { margin: 7px 0 4px; font-size: 20px; line-height: 1.3; }
-      .taskDetailHeader p { margin: 0; color: #8a8693; font-size: 10px; }
-      .taskDetailBadges { display: flex; flex-wrap: wrap; gap: 6px; }
-      .taskOpenEntries { color: #735dd3; font-size: 10px; font-weight: 750; white-space: nowrap; }
-      .taskOriginBox { padding: 12px 13px; border: 1px solid #e8e2f2; border-radius: 9px; background: #faf8ff; }
-      .taskOriginBox > span { color: #7c6ab8; font-size: 9px; font-weight: 800; text-transform: uppercase; letter-spacing: .05em; }
-      .taskOriginBox p { margin: 6px 0 0; white-space: pre-wrap; font-size: 11px; }
-      .taskDetailSection { padding: 14px; display: grid; gap: 11px; border: 1px solid #e9e5f0; border-radius: 10px; }
-      .taskSectionTitle { display: flex; align-items: center; gap: 7px; color: #504b59; font-size: 12px; font-weight: 800; }
-      .taskField { display: grid; gap: 5px; color: #5b5763; font-size: 10px; font-weight: 750; }
-      .taskField textarea, .taskField input { width: 100%; padding: 9px 10px; border: 1px solid #dcd8e4; border-radius: 8px; background: white; color: var(--text); outline: none; }
-      .taskField textarea { resize: vertical; min-height: 64px; }
-      .taskField textarea:focus, .taskField input:focus { border-color: var(--accent); box-shadow: 0 0 0 3px color-mix(in srgb, var(--accent) 13%, transparent); }
-      .taskEditOptions { display: flex; flex-wrap: wrap; gap: 6px; }
-      .taskPriorityButton, .taskTagButton { min-height: 30px; padding: 0 9px; border: 1px solid #ddd9e5; border-radius: 7px; background: white; color: #5e5a68; font-size: 10px; }
-      .taskPriorityButton { display: inline-flex; align-items: center; gap: 5px; }
-      .taskPriorityButton.isUrgent { border-color: #e5a66d; background: #fff2df; color: #a55d19; }
-      .taskTagButton.isSelected { border-color: #9d8be7; background: #f1edff; color: #6551c7; font-weight: 750; }
-      .taskSaveButton { width: max-content; }
-      .taskMuted { margin: 0; color: #8b8794; font-size: 10px; }
-      .taskAttachments { display: grid; gap: 7px; }
-      .taskAttachmentRow { padding: 9px 10px; display: grid; grid-template-columns: 34px minmax(0, 1fr) auto; gap: 9px; align-items: center; border: 1px solid #ece8f2; border-radius: 8px; background: #fdfcff; }
-      .taskAttachmentIcon { width: 32px; height: 32px; display: grid; place-items: center; border-radius: 8px; background: #eee9ff; color: #6f5bc7; }
-      .taskAttachmentInfo { min-width: 0; display: grid; gap: 2px; }
-      .taskAttachmentInfo strong { overflow: hidden; font-size: 10px; text-overflow: ellipsis; white-space: nowrap; }
-      .taskAttachmentInfo small { color: #918c99; font-size: 8px; }
-      .taskAttachmentActions { display: flex; gap: 6px; }
-      .taskAttachmentActions .secondaryButton { min-height: 30px; padding: 0 8px; display: inline-flex; align-items: center; gap: 5px; font-size: 9px; }
-      .taskAttachmentPreview { grid-column: 1 / -1; min-height: 180px; padding: 8px; overflow: hidden; border: 1px solid #e8e3f0; border-radius: 8px; background: white; }
-      .taskAttachmentPreview img { display: block; width: 100%; max-height: 520px; object-fit: contain; }
-      .taskAttachmentPreview iframe { display: block; width: 100%; height: 520px; border: 0; border-radius: 6px; background: #f8f7fa; }
-      .taskUploadBox { padding: 10px; display: grid; gap: 8px; border: 1px dashed #d8d1e7; border-radius: 8px; background: #fbfaff; }
-      .taskUploadBox > label { width: max-content; display: inline-flex; align-items: center; gap: 6px; color: #6654bd; font-size: 10px; font-weight: 750; cursor: pointer; }
-      .taskUploadBox input { display: none; }
-      .taskSelectedFiles { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; }
-      .taskSelectedFiles > span { padding: 4px 7px; border-radius: 6px; background: #eee9ff; color: #6654bd; font-size: 9px; }
-      .taskSelectedFiles .secondaryButton { min-height: 30px; font-size: 9px; }
-      .taskCurrentDeadline { margin: 0; color: #6c6674; font-size: 10px; }
-      .taskPostponeForm { display: grid; grid-template-columns: minmax(150px, .5fr) minmax(220px, 1fr) auto; gap: 9px; align-items: end; }
-      .taskPostponeForm .secondaryButton { min-height: 38px; }
-      .taskCompleteSection { background: #f9fcfa; border-color: #dbece1; }
-      .taskCompleteButton { width: max-content; min-height: 36px; padding: 0 11px; display: inline-flex; align-items: center; gap: 6px; border: 1px solid #cce4d5; border-radius: 8px; background: #f2faf5; color: #3a8055; font-size: 10px; font-weight: 750; }
-      .taskHistory { display: grid; gap: 8px; padding-top: 2px; }
-      .taskHistory h3 { margin: 0 0 2px; font-size: 12px; }
-      .taskHistoryRow { display: grid; grid-template-columns: 10px minmax(0, 1fr); gap: 7px; }
-      .taskHistoryRow > span { width: 6px; height: 6px; margin-top: 5px; border-radius: 50%; background: #aa9bdd; }
-      .taskHistoryRow > div { display: grid; gap: 2px; }
-      .taskHistoryRow strong { font-size: 9px; font-weight: 650; }
-      .taskHistoryRow small { color: #96919e; font-size: 8px; }
-      .taskSpin { animation: taskSpin 1s linear infinite; }
-      @keyframes taskSpin { to { transform: rotate(360deg); } }
+      .taskDetailWorkspace {
+        display: grid;
+        gap: 16px;
+      }
+      .taskDetailHeading {
+        display: flex;
+        justify-content: space-between;
+        gap: 18px;
+        align-items: flex-start;
+      }
+      .taskDetailHeading h1 {
+        margin: 0 0 4px;
+        font-size: 27px;
+      }
+      .taskDetailHeading p {
+        margin: 0;
+        color: var(--muted);
+        font-size: 11px;
+      }
+      .taskRefreshButton {
+        min-height: 36px;
+        padding: 0 11px;
+        display: inline-flex;
+        align-items: center;
+        gap: 6px;
+        border: 1px solid #ddd9e8;
+        border-radius: 8px;
+        background: white;
+        color: #5c5765;
+        font-size: 11px;
+      }
+      .taskMessage {
+        padding: 10px 12px;
+        border-radius: 9px;
+        font-size: 11px;
+      }
+      .taskMessageError {
+        border: 1px solid #efc4bc;
+        background: #fff5f3;
+        color: #a3493a;
+      }
+      .taskMessageSuccess {
+        border: 1px solid #c4e4cf;
+        background: #f1faf4;
+        color: #347850;
+      }
+      .taskSummary {
+        display: grid;
+        grid-template-columns: repeat(4, minmax(0, 1fr));
+        gap: 10px;
+      }
+      .taskSummary > div {
+        min-height: 72px;
+        padding: 12px 14px;
+        display: grid;
+        align-content: center;
+        gap: 4px;
+        border: 1px solid #e8e4ef;
+        border-radius: 10px;
+        background: white;
+      }
+      .taskSummary strong {
+        font-size: 21px;
+        line-height: 1;
+      }
+      .taskSummary span {
+        color: #85808e;
+        font-size: 9px;
+        font-weight: 700;
+      }
+      .taskSummary .is-alert strong {
+        color: #b34e3d;
+      }
+      .taskSummary .is-urgent strong {
+        color: #ad671e;
+      }
+      .taskLoading,
+      .taskEmpty {
+        min-height: 360px;
+        display: grid;
+        place-items: center;
+        align-content: center;
+        gap: 8px;
+        border: 1px solid #e8e4ef;
+        border-radius: 12px;
+        background: white;
+        color: #85808e;
+        text-align: center;
+        font-size: 11px;
+      }
+      .taskEmpty svg {
+        color: #4d9b6d;
+      }
+      .taskEmpty strong {
+        color: #5b5664;
+        font-size: 14px;
+      }
+      .taskMasterDetail {
+        min-height: 610px;
+        display: grid;
+        grid-template-columns: minmax(330px, 0.72fr) minmax(560px, 1.65fr);
+        gap: 14px;
+        align-items: start;
+      }
+      .taskListPanel,
+      .taskDetailPanel {
+        min-width: 0;
+        border: 1px solid #e8e4ef;
+        border-radius: 12px;
+        background: white;
+        overflow: hidden;
+      }
+      .taskListPanel {
+        max-height: calc(100vh - 275px);
+        overflow-y: auto;
+      }
+      .taskListGroup + .taskListGroup {
+        border-top: 1px solid #eeeaf3;
+      }
+      .taskListGroupTitle {
+        min-height: 42px;
+        padding: 0 12px;
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        background: #fbfaff;
+      }
+      .taskListGroupTitle strong {
+        font-size: 11px;
+      }
+      .taskListGroupTitle span {
+        min-width: 21px;
+        padding: 3px 6px;
+        border-radius: 999px;
+        background: #eeeaf6;
+        color: #6d6579;
+        text-align: center;
+        font-size: 9px;
+        font-weight: 800;
+      }
+      .taskListGroupTitle-overdue {
+        background: #fff7f5;
+        color: #a94d3e;
+      }
+      .taskListRow {
+        width: 100%;
+        padding: 12px 13px;
+        display: grid;
+        gap: 5px;
+        border: 0;
+        border-bottom: 1px solid #f0edf4;
+        border-left: 3px solid transparent;
+        background: white;
+        text-align: left;
+        color: inherit;
+      }
+      .taskListRow:hover {
+        background: #fbf9ff;
+      }
+      .taskListRow.isSelected {
+        border-left-color: #8065e7;
+        background: #f7f4ff;
+      }
+      .taskListRow.isOverdue:not(.isSelected) {
+        border-left-color: #d36a55;
+      }
+      .taskListRowTop {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 5px;
+      }
+      .taskListRow > strong {
+        font-size: 12px;
+        line-height: 1.35;
+      }
+      .taskListRow > small {
+        overflow: hidden;
+        color: #8b8693;
+        font-size: 9px;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+      }
+      .taskDatePill,
+      .taskUrgentPill,
+      .taskAttachmentPill {
+        width: max-content;
+        padding: 3px 6px;
+        display: inline-flex;
+        align-items: center;
+        gap: 4px;
+        border-radius: 999px;
+        font-size: 8px;
+        font-weight: 800;
+      }
+      .taskDatePill {
+        background: #f0edf7;
+        color: #706a78;
+      }
+      .taskDatePill-overdue {
+        background: #ffe8e3;
+        color: #b44f3d;
+      }
+      .taskDatePill-today {
+        background: #eee9ff;
+        color: #6e55cc;
+      }
+      .taskUrgentPill {
+        background: #fff0dd;
+        color: #a85f18;
+      }
+      .taskAttachmentPill {
+        background: #eef5ff;
+        color: #4572a6;
+      }
+      .taskDetailPanel {
+        max-height: calc(100vh - 275px);
+        overflow-y: auto;
+      }
+      .taskDetailContent {
+        padding: 18px;
+        display: grid;
+        gap: 14px;
+      }
+      .taskDetailHeader {
+        display: flex;
+        justify-content: space-between;
+        gap: 16px;
+        align-items: flex-start;
+      }
+      .taskDetailHeader h2 {
+        margin: 7px 0 4px;
+        font-size: 20px;
+        line-height: 1.3;
+      }
+      .taskDetailHeader p {
+        margin: 0;
+        color: #8a8693;
+        font-size: 10px;
+      }
+      .taskDetailBadges {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 6px;
+      }
+      .taskOpenEntries {
+        color: #735dd3;
+        font-size: 10px;
+        font-weight: 750;
+        white-space: nowrap;
+      }
+      .taskOriginBox {
+        padding: 12px 13px;
+        border: 1px solid #e8e2f2;
+        border-radius: 9px;
+        background: #faf8ff;
+      }
+      .taskOriginBox > span {
+        color: #7c6ab8;
+        font-size: 9px;
+        font-weight: 800;
+        text-transform: uppercase;
+        letter-spacing: 0.05em;
+      }
+      .taskOriginBox p {
+        margin: 6px 0 0;
+        white-space: pre-wrap;
+        font-size: 11px;
+      }
+      .taskDetailSection {
+        padding: 14px;
+        display: grid;
+        gap: 11px;
+        border: 1px solid #e9e5f0;
+        border-radius: 10px;
+      }
+      .taskSectionTitle {
+        display: flex;
+        align-items: center;
+        gap: 7px;
+        color: #504b59;
+        font-size: 12px;
+        font-weight: 800;
+      }
+      .taskField {
+        display: grid;
+        gap: 5px;
+        color: #5b5763;
+        font-size: 10px;
+        font-weight: 750;
+      }
+      .taskField textarea,
+      .taskField input {
+        width: 100%;
+        padding: 9px 10px;
+        border: 1px solid #dcd8e4;
+        border-radius: 8px;
+        background: white;
+        color: var(--text);
+        outline: none;
+      }
+      .taskField textarea {
+        resize: vertical;
+        min-height: 64px;
+      }
+      .taskField textarea:focus,
+      .taskField input:focus {
+        border-color: var(--accent);
+        box-shadow: 0 0 0 3px color-mix(in srgb, var(--accent) 13%, transparent);
+      }
+      .taskEditOptions {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 6px;
+      }
+      .taskPriorityButton,
+      .taskTagButton {
+        min-height: 30px;
+        padding: 0 9px;
+        border: 1px solid #ddd9e5;
+        border-radius: 7px;
+        background: white;
+        color: #5e5a68;
+        font-size: 10px;
+      }
+      .taskPriorityButton {
+        display: inline-flex;
+        align-items: center;
+        gap: 5px;
+      }
+      .taskPriorityButton.isUrgent {
+        border-color: #e5a66d;
+        background: #fff2df;
+        color: #a55d19;
+      }
+      .taskTagButton.isSelected {
+        border-color: #9d8be7;
+        background: #f1edff;
+        color: #6551c7;
+        font-weight: 750;
+      }
+      .taskSaveButton {
+        width: max-content;
+      }
+      .taskMuted {
+        margin: 0;
+        color: #8b8794;
+        font-size: 10px;
+      }
+      .taskAttachments {
+        display: grid;
+        gap: 7px;
+      }
+      .taskAttachmentRow {
+        padding: 9px 10px;
+        display: grid;
+        grid-template-columns: 34px minmax(0, 1fr) auto;
+        gap: 9px;
+        align-items: center;
+        border: 1px solid #ece8f2;
+        border-radius: 8px;
+        background: #fdfcff;
+      }
+      .taskAttachmentIcon {
+        width: 32px;
+        height: 32px;
+        display: grid;
+        place-items: center;
+        border-radius: 8px;
+        background: #eee9ff;
+        color: #6f5bc7;
+      }
+      .taskAttachmentInfo {
+        min-width: 0;
+        display: grid;
+        gap: 2px;
+      }
+      .taskAttachmentInfo strong {
+        overflow: hidden;
+        font-size: 10px;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+      }
+      .taskAttachmentInfo small {
+        color: #918c99;
+        font-size: 8px;
+      }
+      .taskAttachmentActions {
+        display: flex;
+        gap: 6px;
+      }
+      .taskAttachmentActions .secondaryButton {
+        min-height: 30px;
+        padding: 0 8px;
+        display: inline-flex;
+        align-items: center;
+        gap: 5px;
+        font-size: 9px;
+      }
+      .taskAttachmentPreview {
+        grid-column: 1 / -1;
+        min-height: 180px;
+        padding: 8px;
+        overflow: hidden;
+        border: 1px solid #e8e3f0;
+        border-radius: 8px;
+        background: white;
+      }
+      .taskAttachmentPreview img {
+        display: block;
+        width: 100%;
+        max-height: 520px;
+        object-fit: contain;
+      }
+      .taskAttachmentPreview iframe {
+        display: block;
+        width: 100%;
+        height: 520px;
+        border: 0;
+        border-radius: 6px;
+        background: #f8f7fa;
+      }
+      .taskUploadBox {
+        padding: 10px;
+        display: grid;
+        gap: 8px;
+        border: 1px dashed #d8d1e7;
+        border-radius: 8px;
+        background: #fbfaff;
+      }
+      .taskUploadBox > label {
+        width: max-content;
+        display: inline-flex;
+        align-items: center;
+        gap: 6px;
+        color: #6654bd;
+        font-size: 10px;
+        font-weight: 750;
+        cursor: pointer;
+      }
+      .taskUploadBox input {
+        display: none;
+      }
+      .taskSelectedFiles {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 6px;
+        align-items: center;
+      }
+      .taskSelectedFiles > span {
+        padding: 4px 7px;
+        border-radius: 6px;
+        background: #eee9ff;
+        color: #6654bd;
+        font-size: 9px;
+      }
+      .taskSelectedFiles .secondaryButton {
+        min-height: 30px;
+        font-size: 9px;
+      }
+      .taskCurrentDeadline {
+        margin: 0;
+        color: #6c6674;
+        font-size: 10px;
+      }
+      .taskPostponeForm {
+        display: grid;
+        grid-template-columns: minmax(150px, 0.5fr) minmax(220px, 1fr) auto;
+        gap: 9px;
+        align-items: end;
+      }
+      .taskPostponeForm .secondaryButton {
+        min-height: 38px;
+      }
+      .taskCompleteSection {
+        background: #f9fcfa;
+        border-color: #dbece1;
+      }
+      .taskCompleteButton {
+        width: max-content;
+        min-height: 36px;
+        padding: 0 11px;
+        display: inline-flex;
+        align-items: center;
+        gap: 6px;
+        border: 1px solid #cce4d5;
+        border-radius: 8px;
+        background: #f2faf5;
+        color: #3a8055;
+        font-size: 10px;
+        font-weight: 750;
+      }
+      .taskHistory {
+        display: grid;
+        gap: 8px;
+        padding-top: 2px;
+      }
+      .taskHistory h3 {
+        margin: 0 0 2px;
+        font-size: 12px;
+      }
+      .taskHistoryRow {
+        display: grid;
+        grid-template-columns: 10px minmax(0, 1fr);
+        gap: 7px;
+      }
+      .taskHistoryRow > span {
+        width: 6px;
+        height: 6px;
+        margin-top: 5px;
+        border-radius: 50%;
+        background: #aa9bdd;
+      }
+      .taskHistoryRow > div {
+        display: grid;
+        gap: 2px;
+      }
+      .taskHistoryRow strong {
+        font-size: 9px;
+        font-weight: 650;
+      }
+      .taskHistoryRow small {
+        color: #96919e;
+        font-size: 8px;
+      }
+      .taskSpin {
+        animation: taskSpin 1s linear infinite;
+      }
+      @keyframes taskSpin {
+        to {
+          transform: rotate(360deg);
+        }
+      }
       @media (max-width: 1150px) {
-        .taskMasterDetail { grid-template-columns: minmax(290px, .7fr) minmax(450px, 1.3fr); }
-        .taskPostponeForm { grid-template-columns: 1fr; }
+        .taskMasterDetail {
+          grid-template-columns: minmax(290px, 0.7fr) minmax(450px, 1.3fr);
+        }
+        .taskPostponeForm {
+          grid-template-columns: 1fr;
+        }
       }
       @media (max-width: 900px) {
-        .taskSummary { grid-template-columns: repeat(2, minmax(0, 1fr)); }
-        .taskMasterDetail { grid-template-columns: 1fr; }
-        .taskListPanel, .taskDetailPanel { max-height: none; }
+        .taskSummary {
+          grid-template-columns: repeat(2, minmax(0, 1fr));
+        }
+        .taskMasterDetail {
+          grid-template-columns: 1fr;
+        }
+        .taskListPanel,
+        .taskDetailPanel {
+          max-height: none;
+        }
       }
       @media (max-width: 620px) {
-        .taskDetailHeading, .taskDetailHeader { flex-direction: column; }
-        .taskSummary { grid-template-columns: 1fr 1fr; }
-        .taskAttachmentRow { grid-template-columns: 34px minmax(0, 1fr); }
-        .taskAttachmentActions { grid-column: 1 / -1; }
-        .taskAttachmentPreview { height: auto; }
-        .taskAttachmentPreview iframe { height: 420px; }
+        .taskDetailHeading,
+        .taskDetailHeader {
+          flex-direction: column;
+        }
+        .taskSummary {
+          grid-template-columns: 1fr 1fr;
+        }
+        .taskAttachmentRow {
+          grid-template-columns: 34px minmax(0, 1fr);
+        }
+        .taskAttachmentActions {
+          grid-column: 1 / -1;
+        }
+        .taskAttachmentPreview {
+          height: auto;
+        }
+        .taskAttachmentPreview iframe {
+          height: 420px;
+        }
       }
     `}</style>
   );

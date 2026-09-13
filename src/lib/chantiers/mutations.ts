@@ -173,7 +173,9 @@ function findInstallItem(item: ChantierRecord, id: string): InstallItem {
 }
 
 function createWorkshopFromBe(item: ChantierRecord, beItem: BeItem, now: Date): WorkshopItem {
-  const existing = item.operational.workshopItems.find((candidate) => candidate.sourceBeItemId === beItem.id);
+  const existing = item.operational.workshopItems.find(
+    (candidate) => candidate.sourceBeItemId === beItem.id,
+  );
   if (existing) return existing;
   const timestamp = now.toISOString();
   const created: WorkshopItem = {
@@ -205,7 +207,8 @@ function createInstallFromTechnical(
   const existing = item.operational.installItems.find(
     (candidate) =>
       (source.sourceBeItemId && candidate.sourceBeItemId === source.sourceBeItemId) ||
-      (source.sourceWorkshopItemId && candidate.sourceWorkshopItemId === source.sourceWorkshopItemId),
+      (source.sourceWorkshopItemId &&
+        candidate.sourceWorkshopItemId === source.sourceWorkshopItemId),
   );
   if (existing) return existing;
   const timestamp = now.toISOString();
@@ -235,7 +238,8 @@ export function launchChantierFromCommercial(
   const source = parseChantiersPayload(rawSource);
   const payload = structuredClone(source);
 
-  if (commercialCase.id !== input.commercialCaseId) throw new Error("CHANTIER_COMMERCIAL_CASE_MISMATCH");
+  if (commercialCase.id !== input.commercialCaseId)
+    throw new Error("CHANTIER_COMMERCIAL_CASE_MISMATCH");
   if (commercialCase.status !== "CONFIRMED") throw new Error("CHANTIER_COMMERCIAL_NOT_CONFIRMED");
   if (!commercialCase.plannedInstallDate) throw new Error("CHANTIER_INSTALL_DATE_REQUIRED");
   if (payload.chantiers.some((item) => item.sourceCommercialCaseId === commercialCase.id)) {
@@ -246,11 +250,13 @@ export function launchChantierFromCommercial(
   const signedQuotePresent = commercialHasSignedQuote(commercialCase);
   const costingPresent = hasDocument(commercialCase, "COSTING");
 
-  if (!quotePresent && !input.quoteMissingDeclared) throw new Error("CHANTIER_QUOTE_DECLARATION_REQUIRED");
+  if (!quotePresent && !input.quoteMissingDeclared)
+    throw new Error("CHANTIER_QUOTE_DECLARATION_REQUIRED");
   if (!signedQuotePresent && !input.signedQuoteMissingDeclared) {
     throw new Error("CHANTIER_SIGNED_QUOTE_DECLARATION_REQUIRED");
   }
-  if (!costingPresent && !input.costingMissingDeclared) throw new Error("CHANTIER_COSTING_DECLARATION_REQUIRED");
+  if (!costingPresent && !input.costingMissingDeclared)
+    throw new Error("CHANTIER_COSTING_DECLARATION_REQUIRED");
 
   const timestamp = now.toISOString();
   const item: ChantierRecord = {
@@ -330,7 +336,13 @@ export function applyChantierMutation(
     item.description = text(input.description);
     item.nextAction = text(input.nextAction);
     touch(item, actor, now);
-    history(item, actor.displayName, "DETAILS_UPDATED", "Informations du chantier mises à jour.", now);
+    history(
+      item,
+      actor.displayName,
+      "DETAILS_UPDATED",
+      "Informations du chantier mises à jour.",
+      now,
+    );
     return { payload, focusChantierId: item.id };
   }
 
@@ -338,7 +350,11 @@ export function applyChantierMutation(
     if (item.status === "ARCHIVED") throw new Error("CHANTIER_ARCHIVED_READ_ONLY");
     const previous = item.plannedHours;
     const next = { be: input.be, workshop: input.workshop, install: input.install };
-    if (previous.be === next.be && previous.workshop === next.workshop && previous.install === next.install) {
+    if (
+      previous.be === next.be &&
+      previous.workshop === next.workshop &&
+      previous.install === next.install
+    ) {
       throw new Error("CHANTIER_HOURS_UNCHANGED");
     }
     item.plannedHours = next;
@@ -514,7 +530,13 @@ export function applyChantierMutation(
     item.status = "ARCHIVED";
     item.archivedAt = now.toISOString();
     touch(item, actor, now);
-    history(item, actor.displayName, "ARCHIVED", "Chantier archivé après revue des éléments encore ouverts.", now);
+    history(
+      item,
+      actor.displayName,
+      "ARCHIVED",
+      "Chantier archivé après revue des éléments encore ouverts.",
+      now,
+    );
     return { payload, focusChantierId: item.id };
   }
 
@@ -524,7 +546,13 @@ export function applyChantierMutation(
     item.archivedAt = null;
     item.completedAt = null;
     touch(item, actor, now);
-    history(item, actor.displayName, "UNARCHIVED", `Chantier réactivé depuis les archives. Motif : ${input.reason}`, now);
+    history(
+      item,
+      actor.displayName,
+      "UNARCHIVED",
+      `Chantier réactivé depuis les archives. Motif : ${input.reason}`,
+      now,
+    );
     return { payload, focusChantierId: item.id };
   }
 

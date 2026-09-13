@@ -1,8 +1,4 @@
-import {
-  emptyObatImportAnalysis,
-  type ObatAnalyzedFile,
-  type ObatImportAnalysis,
-} from "./domain";
+import { emptyObatImportAnalysis, type ObatAnalyzedFile, type ObatImportAnalysis } from "./domain";
 import { parseObatCostingCsvText, type PartialObatData } from "./csv-parser";
 import { extractPdfText, parseObatQuoteText } from "./pdf-parser";
 
@@ -13,8 +9,14 @@ function mergeValue<T>(current: T | null, incoming: T | null | undefined): T | n
   return current ?? incoming ?? null;
 }
 
-function mergeData(target: ObatImportAnalysis, incoming: PartialObatData, preferIncoming = false): void {
-  const keys: Array<keyof Omit<ObatImportAnalysis, "quoteLines" | "hours" | "sources" | "files" | "warnings">> = [
+function mergeData(
+  target: ObatImportAnalysis,
+  incoming: PartialObatData,
+  preferIncoming = false,
+): void {
+  const keys: Array<
+    keyof Omit<ObatImportAnalysis, "quoteLines" | "hours" | "sources" | "files" | "warnings">
+  > = [
     "quoteNumber",
     "quoteDate",
     "validUntil",
@@ -60,7 +62,8 @@ function extensionOf(file: File): string {
 export async function analyzeObatFiles(files: File[]): Promise<ObatImportAnalysis> {
   if (files.length === 0) throw new Error("OBAT_FILES_REQUIRED");
   if (files.length > MAX_ANALYZED_FILES) throw new Error("OBAT_TOO_MANY_FILES");
-  if (files.some((file) => file.size > MAX_ANALYZED_FILE_SIZE)) throw new Error("OBAT_FILE_TOO_LARGE");
+  if (files.some((file) => file.size > MAX_ANALYZED_FILE_SIZE))
+    throw new Error("OBAT_FILE_TOO_LARGE");
 
   const result = emptyObatImportAnalysis();
   const quoteNumbers = new Set<string>();
@@ -94,7 +97,9 @@ export async function analyzeObatFiles(files: File[]): Promise<ObatImportAnalysi
         result.warnings.push(`${file.name} : aucun bordereau OBAT lisible n'a été reconnu.`);
       }
     } else {
-      result.warnings.push(`${file.name} : format non analysé. Utilise un PDF de devis ou un CSV de bordereau OBAT.`);
+      result.warnings.push(
+        `${file.name} : format non analysé. Utilise un PDF de devis ou un CSV de bordereau OBAT.`,
+      );
     }
 
     result.files.push({ name: file.name, sizeBytes: file.size, kind, quoteNumber });
@@ -102,7 +107,8 @@ export async function analyzeObatFiles(files: File[]): Promise<ObatImportAnalysi
 
   if (quoteNumbers.size > 1) throw new Error("OBAT_DOCUMENT_NUMBER_MISMATCH");
   result.quoteNumber = result.quoteNumber ?? [...quoteNumbers][0] ?? null;
-  if (!result.sources.quotePdf && !result.sources.costingCsv) throw new Error("OBAT_NOT_RECOGNIZED");
+  if (!result.sources.quotePdf && !result.sources.costingCsv)
+    throw new Error("OBAT_NOT_RECOGNIZED");
 
   if (
     result.sources.costingCsv &&

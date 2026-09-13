@@ -1,5 +1,8 @@
 import { describe, expect, it } from "vitest";
-import { createInitialCommercialPayload, parseCommercialPayload } from "../src/lib/commercial/domain";
+import {
+  createInitialCommercialPayload,
+  parseCommercialPayload,
+} from "../src/lib/commercial/domain";
 import { applyCommercialMutation } from "../src/lib/commercial/mutations";
 
 const actor = {

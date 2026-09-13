@@ -27,7 +27,11 @@ import {
   type WorkshopItem,
   type WorkshopItemStatus,
 } from "@/lib/chantiers/domain";
-import type { CommercialCase, CommercialDocument, CommercialPayload } from "@/lib/commercial/domain";
+import type {
+  CommercialCase,
+  CommercialDocument,
+  CommercialPayload,
+} from "@/lib/commercial/domain";
 import { requestObatAnalysis } from "@/lib/obat/client";
 import type { ObatQuoteLine } from "@/lib/obat/domain";
 
@@ -86,7 +90,8 @@ function latestQuoteDocuments(item: CommercialCase): CommercialDocument[] {
   const candidates = item.documents.filter(
     (document) =>
       document.category === "QUOTE" &&
-      (document.contentType === "application/pdf" || document.fileName.toLowerCase().endsWith(".pdf")),
+      (document.contentType === "application/pdf" ||
+        document.fileName.toLowerCase().endsWith(".pdf")),
   );
 
   for (const document of candidates) {
@@ -100,7 +105,10 @@ function latestQuoteDocuments(item: CommercialCase): CommercialDocument[] {
       selected.set(key, document);
       continue;
     }
-    if (current.isSignedQuote === document.isSignedQuote && document.uploadedAt > current.uploadedAt) {
+    if (
+      current.isSignedQuote === document.isSignedQuote &&
+      document.uploadedAt > current.uploadedAt
+    ) {
       selected.set(key, document);
     }
   }
@@ -122,7 +130,9 @@ export function ChantierOperationalWorkspace({ chantier, busy, canModify, mutate
       setQuoteLinesError(null);
       try {
         const commercialResponse = await fetch("/api/desktop/commercial", { cache: "no-store" });
-        const commercial = (await commercialResponse.json()) as CommercialSnapshot & { error?: string };
+        const commercial = (await commercialResponse.json()) as CommercialSnapshot & {
+          error?: string;
+        };
         if (!commercialResponse.ok) throw new Error(commercial.error ?? "COMMERCIAL_LOAD_FAILED");
 
         const item = commercial.payload.cases.find(
@@ -143,7 +153,9 @@ export function ChantierOperationalWorkspace({ chantier, busy, canModify, mutate
         await Promise.all(
           documents.map(async (document) => {
             try {
-              const response = await fetch(quoteDocumentHref(item.id, document.id), { cache: "no-store" });
+              const response = await fetch(quoteDocumentHref(item.id, document.id), {
+                cache: "no-store",
+              });
               if (!response.ok) throw new Error("QUOTE_DOCUMENT_READ_FAILED");
               const blob = await response.blob();
               const file = new File([blob], document.fileName, {
@@ -172,7 +184,9 @@ export function ChantierOperationalWorkspace({ chantier, busy, canModify, mutate
           .sort((left, right) => left.quoteNumber.localeCompare(right.quoteNumber, "fr"));
         setQuoteGroups(groups);
         if (groups.length === 0 && documents.length > 0 && failedDocuments > 0) {
-          setQuoteLinesError("Les devis sont présents, mais PAPOT n'a pas réussi à relire leurs lignes.");
+          setQuoteLinesError(
+            "Les devis sont présents, mais PAPOT n'a pas réussi à relire leurs lignes.",
+          );
         }
       } catch {
         if (!cancelled) {
@@ -270,7 +284,9 @@ function BeSpace({
           <ClipboardList size={18} />
           <span>
             <strong>BE</strong>
-            <small>{items.length} élément{items.length > 1 ? "s" : ""}</small>
+            <small>
+              {items.length} élément{items.length > 1 ? "s" : ""}
+            </small>
           </span>
         </div>
         {canModify ? (
@@ -348,7 +364,9 @@ function BeRow({ chantier, item, busy, canModify, mutate }: Props & { item: BeIt
         }
       >
         {Object.entries(BE_STATUS_LABELS).map(([value, label]) => (
-          <option key={value} value={value}>{label}</option>
+          <option key={value} value={value}>
+            {label}
+          </option>
         ))}
       </select>
       <StatusPill value={BE_STATUS_LABELS[item.status]} done={item.status === "VALIDATED"} />
@@ -375,7 +393,9 @@ function WorkshopSpace({
           <Factory size={18} />
           <span>
             <strong>Atelier</strong>
-            <small>{items.length} élément{items.length > 1 ? "s" : ""}</small>
+            <small>
+              {items.length} élément{items.length > 1 ? "s" : ""}
+            </small>
           </span>
         </div>
         {canModify ? (
@@ -385,8 +405,8 @@ function WorkshopSpace({
         ) : null}
       </div>
       <p className="chantierOpHint">
-        Un élément peut venir du BE validé ou être créé directement ici pour un débit ou un
-        petit ouvrage qui ne passe pas par le BE.
+        Un élément peut venir du BE validé ou être créé directement ici pour un débit ou un petit
+        ouvrage qui ne passe pas par le BE.
       </p>
       {creating ? (
         <TechnicalCreateForm
@@ -431,7 +451,8 @@ function WorkshopRow({ chantier, item, busy, canModify, mutate }: Props & { item
       <div className="chantierOpRowMain">
         <strong>{item.name}</strong>
         <span>
-          {item.sourceBeItemId ? "Issu du BE" : "Créé directement Atelier"} · {originLabel(item.originKind, item.originLabel)}
+          {item.sourceBeItemId ? "Issu du BE" : "Créé directement Atelier"} ·{" "}
+          {originLabel(item.originKind, item.originLabel)}
           {item.installedByUs ? " · Pose PAPOT" : ""}
         </span>
       </div>
@@ -451,7 +472,9 @@ function WorkshopRow({ chantier, item, busy, canModify, mutate }: Props & { item
         }
       >
         {Object.entries(WORKSHOP_STATUS_LABELS).map(([value, label]) => (
-          <option key={value} value={value}>{label}</option>
+          <option key={value} value={value}>
+            {label}
+          </option>
         ))}
       </select>
       <StatusPill value={WORKSHOP_STATUS_LABELS[item.status]} done={item.status === "DONE"} />
@@ -468,7 +491,10 @@ function InstallSpace({ chantier, busy, canModify, mutate }: Props) {
           <Wrench size={18} />
           <span>
             <strong>Pose</strong>
-            <small>{items.length} ouvrage{items.length > 1 ? "s" : ""} / zone{items.length > 1 ? "s" : ""}</small>
+            <small>
+              {items.length} ouvrage{items.length > 1 ? "s" : ""} / zone
+              {items.length > 1 ? "s" : ""}
+            </small>
           </span>
         </div>
       </div>
@@ -515,7 +541,9 @@ function InstallRow({ chantier, item, busy, canModify, mutate }: Props & { item:
         onChange={(event) => setStatus(event.target.value as InstallItemStatus)}
       >
         {Object.entries(INSTALL_STATUS_LABELS).map(([value, label]) => (
-          <option key={value} value={value}>{label}</option>
+          <option key={value} value={value}>
+            {label}
+          </option>
         ))}
       </select>
       <textarea
@@ -597,7 +625,9 @@ function TechnicalCreateForm({
           ...group,
           lines: normalizedSearch
             ? group.lines.filter((line) =>
-                `${line.ref} ${line.designation}`.toLocaleLowerCase("fr").includes(normalizedSearch),
+                `${line.ref} ${line.designation}`
+                  .toLocaleLowerCase("fr")
+                  .includes(normalizedSearch),
               )
             : group.lines,
         }))
@@ -618,7 +648,9 @@ function TechnicalCreateForm({
     <div className="chantierTechnicalCreate">
       <div className="chantierTechnicalCreateTitle">
         <strong>{mode === "be" ? "Nouvel élément BE" : "Nouvel élément direct Atelier"}</strong>
-        <span>Chaque élément reste relié à une vraie ligne de devis, ou est identifié comme TS.</span>
+        <span>
+          Chaque élément reste relié à une vraie ligne de devis, ou est identifié comme TS.
+        </span>
       </div>
 
       <label>
@@ -676,7 +708,10 @@ function TechnicalCreateForm({
                   {group.lines.map((line) => {
                     const value = `${group.quoteNumber} · ${line.ref} · ${line.designation}`;
                     return (
-                      <option key={`${group.quoteNumber}-${line.ref}-${line.designation}`} value={value}>
+                      <option
+                        key={`${group.quoteNumber}-${line.ref}-${line.designation}`}
+                        value={value}
+                      >
                         {line.ref} · {line.designation}
                       </option>
                     );
@@ -687,11 +722,15 @@ function TechnicalCreateForm({
           </label>
           {quoteLinesLoading ? <p>Lecture automatique des lignes des devis OBAT…</p> : null}
           {!quoteLinesLoading && quoteGroups.length > 0 ? (
-            <p>{quoteOptions.length} ligne{quoteOptions.length > 1 ? "s" : ""} trouvée{quoteOptions.length > 1 ? "s" : ""} dans {quoteGroups.length} devis.</p>
+            <p>
+              {quoteOptions.length} ligne{quoteOptions.length > 1 ? "s" : ""} trouvée
+              {quoteOptions.length > 1 ? "s" : ""} dans {quoteGroups.length} devis.
+            </p>
           ) : null}
           {!quoteLinesLoading && quoteGroups.length === 0 ? (
             <p className="isWarning">
-              {quoteLinesError ?? "Aucune ligne lisible trouvée. Importe le PDF du devis OBAT dans l'affaire commerciale."}
+              {quoteLinesError ??
+                "Aucune ligne lisible trouvée. Importe le PDF du devis OBAT dans l'affaire commerciale."}
             </p>
           ) : null}
         </div>
@@ -716,7 +755,9 @@ function TechnicalCreateForm({
       </label>
 
       <div className="chantierTechnicalActions">
-        <button type="button" onClick={onCancel}>Annuler</button>
+        <button type="button" onClick={onCancel}>
+          Annuler
+        </button>
         <button
           type="button"
           className="isPrimary"
@@ -767,7 +808,10 @@ function FutureSpace({ id }: { id: Exclude<SpaceId, "be" | "workshop" | "install
       </span>
       <strong>{title}</strong>
       <p>{spaceDescriptions[id]}</p>
-      <small>Cette rubrique est déjà réservée dans la fiche chantier. Son contenu métier sera raccordé dans une prochaine étape.</small>
+      <small>
+        Cette rubrique est déjà réservée dans la fiche chantier. Son contenu métier sera raccordé
+        dans une prochaine étape.
+      </small>
     </div>
   );
 }
@@ -775,19 +819,374 @@ function FutureSpace({ id }: { id: Exclude<SpaceId, "be" | "workshop" | "install
 function OperationalStyles() {
   return (
     <style jsx global>{`
-      .chantierOperationalWorkspace{padding:16px;display:grid;gap:14px;border:1px solid #e9e5f0;border-radius:11px;background:#fff}
-      .chantierOperationalTabs{padding:6px;display:flex;gap:5px;overflow-x:auto;border:1px solid #e3deed;border-radius:10px;background:#faf8ff}
-      .chantierOperationalTabs button{min-height:42px;padding:0 13px;display:inline-flex;align-items:center;gap:7px;flex:0 0 auto;border:1px solid transparent;border-radius:8px;background:transparent;color:#706978;font-size:13px;font-weight:750}
-      .chantierOperationalTabs button:hover{background:white;color:#5f51a1}.chantierOperationalTabs button.isActive{border-color:#a894ec;background:white;color:#6551c7;box-shadow:0 2px 8px rgb(87 67 150 / .08)}
-      .chantierOperationalTabs small{min-width:22px;padding:2px 6px;border-radius:999px;background:#eeeaf6;color:#766c86;font-size:11px;text-align:center}
-      .chantierOperationalTabBody{min-height:320px}.chantierOpSpace{display:grid;gap:12px}.chantierOpSpaceTitle{display:flex;align-items:center;justify-content:space-between;gap:10px}.chantierOpSpaceTitle>div{display:flex;align-items:center;gap:8px;color:#5c50b3}.chantierOpSpaceTitle>div>span{display:grid;gap:2px}.chantierOpSpaceTitle strong{font-size:16px;color:#4f4956}.chantierOpSpaceTitle small{color:#817b88;font-size:13px}.chantierOpSpaceTitle>button{min-height:37px;padding:0 11px;display:inline-flex;align-items:center;gap:6px;border:1px solid #a998e4;border-radius:7px;background:#f7f3ff;color:#6351bf;font-size:13px;font-weight:750}
-      .chantierOpHint{margin:0;color:#746e7a;font-size:13px;line-height:1.5}.chantierOpRows,.chantierInstallRows{display:grid;gap:8px}.chantierOpRow{padding:11px 12px;display:grid;grid-template-columns:minmax(0,1fr) 180px auto;gap:9px;align-items:center;border:1px solid #ece8f1;border-radius:8px;background:#fdfcff}.chantierOpRowMain{min-width:0;display:grid;gap:3px}.chantierOpRowMain strong{font-size:14px;color:#4e4954}.chantierOpRowMain span{overflow:hidden;color:#746e7a;font-size:13px;text-overflow:ellipsis;white-space:nowrap}
-      .chantierOpRow select,.chantierInstallRow select,.chantierTechnicalCreate select,.chantierTechnicalCreate input,.chantierInstallRow textarea{width:100%;padding:10px 11px;border:1px solid #ddd8e5;border-radius:7px;background:#fff;color:#57515e;font:inherit;font-size:13px}.chantierOpStatus{padding:5px 8px;border-radius:999px;background:#f0edf5;color:#766e80;font-size:12px;font-weight:750;white-space:nowrap}.chantierOpStatus.isDone{background:#e9f6ed;color:#3b7b55}.chantierOpEmpty{min-height:150px;display:grid;place-items:center;align-content:center;gap:7px;border:1px dashed #ddd7e7;border-radius:9px;background:#fcfbfd;color:#9d97a1}.chantierOpEmpty strong{font-size:13px}
-      .chantierTechnicalCreate{padding:14px;display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:11px;border:1px solid #dcd3f1;border-radius:9px;background:#faf8ff}.chantierTechnicalCreateTitle{grid-column:1/-1;display:grid;gap:3px}.chantierTechnicalCreateTitle strong{font-size:15px}.chantierTechnicalCreateTitle span{color:#746e7a;font-size:13px}.chantierTechnicalCreate label{display:grid;gap:5px}.chantierTechnicalCreate label>span{font-size:12px;font-weight:750;color:#615a68}.chantierTechnicalCreate .isWide{grid-column:1/-1}.chantierQuotePicker{display:grid;grid-template-columns:minmax(180px,.6fr) minmax(0,1.4fr);gap:9px}.chantierQuotePicker>p{grid-column:1/-1;margin:0;color:#746e7a;font-size:12px}.chantierQuotePicker>p.isWarning{padding:8px 10px;border:1px solid #e7d1ad;border-radius:7px;background:#fffaf0;color:#8d642d}
-      .chantierTechnicalCheck{grid-column:1/-1;display:flex!important;grid-template-columns:auto 1fr!important;align-items:center;justify-content:flex-start;gap:7px!important;color:#615a68;font-size:13px}.chantierTechnicalCheck input{width:auto!important}.chantierTechnicalActions{grid-column:1/-1;display:flex;justify-content:flex-end;gap:7px}.chantierTechnicalActions button,.chantierInstallRow>button{min-height:36px;padding:0 10px;display:inline-flex;align-items:center;justify-content:center;gap:6px;border:1px solid #ddd8e5;border-radius:7px;background:#fff;color:#625b69;font-size:13px}.chantierTechnicalActions button.isPrimary,.chantierInstallRow>button{border-color:#8e7bd9;background:#8e7bd9;color:white;font-weight:750}
-      .chantierInstallRow{padding:11px;display:grid;grid-template-columns:minmax(0,1fr) 150px minmax(190px,.7fr) auto auto;gap:9px;align-items:center;border:1px solid #ece8f1;border-radius:8px;background:#fdfcff}.chantierInstallRow textarea{resize:vertical}.chantierFutureSpace{min-height:260px;display:grid;place-items:center;align-content:center;gap:8px;border:1px dashed #ded8e7;border-radius:10px;background:#fcfbfd;text-align:center}.chantierFutureSpace>span{width:44px;height:44px;display:grid;place-items:center;border-radius:11px;background:#eee9ff;color:#6855c1}.chantierFutureSpace strong{font-size:16px}.chantierFutureSpace p{max-width:560px;margin:0;color:#746e7a;font-size:13px}.chantierFutureSpace small{max-width:600px;color:#817b88;font-size:12px;line-height:1.45}.chantierOpSpaceTitle button:disabled,.chantierTechnicalActions button:disabled,.chantierInstallRow>button:disabled{opacity:.55}
-      @media(max-width:900px){.chantierOpRow{grid-template-columns:minmax(0,1fr) 160px}.chantierOpStatus{grid-column:1/-1;width:max-content}.chantierInstallRow{grid-template-columns:1fr 160px}.chantierInstallRow textarea,.chantierInstallRow>button,.chantierInstallRow>.chantierOpStatus{grid-column:1/-1}.chantierInstallRow>button{width:max-content}.chantierTechnicalCreate{grid-template-columns:1fr}.chantierTechnicalCreateTitle,.chantierTechnicalCreate .isWide,.chantierTechnicalCheck,.chantierTechnicalActions{grid-column:auto}.chantierQuotePicker{grid-template-columns:1fr}}
-      @media(max-width:620px){.chantierOpSpaceTitle{flex-direction:column;align-items:stretch}.chantierOpRow,.chantierInstallRow{grid-template-columns:1fr}.chantierOpRow select,.chantierInstallRow select{grid-column:1/-1}.chantierOperationalTabs{gap:3px}.chantierOperationalTabs button{padding:0 10px}}
+      .chantierOperationalWorkspace {
+        padding: 16px;
+        display: grid;
+        gap: 14px;
+        border: 1px solid #e9e5f0;
+        border-radius: 11px;
+        background: #fff;
+      }
+      .chantierOperationalTabs {
+        padding: 6px;
+        display: flex;
+        gap: 5px;
+        overflow-x: auto;
+        border: 1px solid #e3deed;
+        border-radius: 10px;
+        background: #faf8ff;
+      }
+      .chantierOperationalTabs button {
+        min-height: 42px;
+        padding: 0 13px;
+        display: inline-flex;
+        align-items: center;
+        gap: 7px;
+        flex: 0 0 auto;
+        border: 1px solid transparent;
+        border-radius: 8px;
+        background: transparent;
+        color: #706978;
+        font-size: 13px;
+        font-weight: 750;
+      }
+      .chantierOperationalTabs button:hover {
+        background: white;
+        color: #5f51a1;
+      }
+      .chantierOperationalTabs button.isActive {
+        border-color: #a894ec;
+        background: white;
+        color: #6551c7;
+        box-shadow: 0 2px 8px rgb(87 67 150 / 0.08);
+      }
+      .chantierOperationalTabs small {
+        min-width: 22px;
+        padding: 2px 6px;
+        border-radius: 999px;
+        background: #eeeaf6;
+        color: #766c86;
+        font-size: 11px;
+        text-align: center;
+      }
+      .chantierOperationalTabBody {
+        min-height: 320px;
+      }
+      .chantierOpSpace {
+        display: grid;
+        gap: 12px;
+      }
+      .chantierOpSpaceTitle {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 10px;
+      }
+      .chantierOpSpaceTitle > div {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        color: #5c50b3;
+      }
+      .chantierOpSpaceTitle > div > span {
+        display: grid;
+        gap: 2px;
+      }
+      .chantierOpSpaceTitle strong {
+        font-size: 16px;
+        color: #4f4956;
+      }
+      .chantierOpSpaceTitle small {
+        color: #817b88;
+        font-size: 13px;
+      }
+      .chantierOpSpaceTitle > button {
+        min-height: 37px;
+        padding: 0 11px;
+        display: inline-flex;
+        align-items: center;
+        gap: 6px;
+        border: 1px solid #a998e4;
+        border-radius: 7px;
+        background: #f7f3ff;
+        color: #6351bf;
+        font-size: 13px;
+        font-weight: 750;
+      }
+      .chantierOpHint {
+        margin: 0;
+        color: #746e7a;
+        font-size: 13px;
+        line-height: 1.5;
+      }
+      .chantierOpRows,
+      .chantierInstallRows {
+        display: grid;
+        gap: 8px;
+      }
+      .chantierOpRow {
+        padding: 11px 12px;
+        display: grid;
+        grid-template-columns: minmax(0, 1fr) 180px auto;
+        gap: 9px;
+        align-items: center;
+        border: 1px solid #ece8f1;
+        border-radius: 8px;
+        background: #fdfcff;
+      }
+      .chantierOpRowMain {
+        min-width: 0;
+        display: grid;
+        gap: 3px;
+      }
+      .chantierOpRowMain strong {
+        font-size: 14px;
+        color: #4e4954;
+      }
+      .chantierOpRowMain span {
+        overflow: hidden;
+        color: #746e7a;
+        font-size: 13px;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+      }
+      .chantierOpRow select,
+      .chantierInstallRow select,
+      .chantierTechnicalCreate select,
+      .chantierTechnicalCreate input,
+      .chantierInstallRow textarea {
+        width: 100%;
+        padding: 10px 11px;
+        border: 1px solid #ddd8e5;
+        border-radius: 7px;
+        background: #fff;
+        color: #57515e;
+        font: inherit;
+        font-size: 13px;
+      }
+      .chantierOpStatus {
+        padding: 5px 8px;
+        border-radius: 999px;
+        background: #f0edf5;
+        color: #766e80;
+        font-size: 12px;
+        font-weight: 750;
+        white-space: nowrap;
+      }
+      .chantierOpStatus.isDone {
+        background: #e9f6ed;
+        color: #3b7b55;
+      }
+      .chantierOpEmpty {
+        min-height: 150px;
+        display: grid;
+        place-items: center;
+        align-content: center;
+        gap: 7px;
+        border: 1px dashed #ddd7e7;
+        border-radius: 9px;
+        background: #fcfbfd;
+        color: #9d97a1;
+      }
+      .chantierOpEmpty strong {
+        font-size: 13px;
+      }
+      .chantierTechnicalCreate {
+        padding: 14px;
+        display: grid;
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+        gap: 11px;
+        border: 1px solid #dcd3f1;
+        border-radius: 9px;
+        background: #faf8ff;
+      }
+      .chantierTechnicalCreateTitle {
+        grid-column: 1/-1;
+        display: grid;
+        gap: 3px;
+      }
+      .chantierTechnicalCreateTitle strong {
+        font-size: 15px;
+      }
+      .chantierTechnicalCreateTitle span {
+        color: #746e7a;
+        font-size: 13px;
+      }
+      .chantierTechnicalCreate label {
+        display: grid;
+        gap: 5px;
+      }
+      .chantierTechnicalCreate label > span {
+        font-size: 12px;
+        font-weight: 750;
+        color: #615a68;
+      }
+      .chantierTechnicalCreate .isWide {
+        grid-column: 1/-1;
+      }
+      .chantierQuotePicker {
+        display: grid;
+        grid-template-columns: minmax(180px, 0.6fr) minmax(0, 1.4fr);
+        gap: 9px;
+      }
+      .chantierQuotePicker > p {
+        grid-column: 1/-1;
+        margin: 0;
+        color: #746e7a;
+        font-size: 12px;
+      }
+      .chantierQuotePicker > p.isWarning {
+        padding: 8px 10px;
+        border: 1px solid #e7d1ad;
+        border-radius: 7px;
+        background: #fffaf0;
+        color: #8d642d;
+      }
+      .chantierTechnicalCheck {
+        grid-column: 1/-1;
+        display: flex !important;
+        grid-template-columns: auto 1fr !important;
+        align-items: center;
+        justify-content: flex-start;
+        gap: 7px !important;
+        color: #615a68;
+        font-size: 13px;
+      }
+      .chantierTechnicalCheck input {
+        width: auto !important;
+      }
+      .chantierTechnicalActions {
+        grid-column: 1/-1;
+        display: flex;
+        justify-content: flex-end;
+        gap: 7px;
+      }
+      .chantierTechnicalActions button,
+      .chantierInstallRow > button {
+        min-height: 36px;
+        padding: 0 10px;
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        gap: 6px;
+        border: 1px solid #ddd8e5;
+        border-radius: 7px;
+        background: #fff;
+        color: #625b69;
+        font-size: 13px;
+      }
+      .chantierTechnicalActions button.isPrimary,
+      .chantierInstallRow > button {
+        border-color: #8e7bd9;
+        background: #8e7bd9;
+        color: white;
+        font-weight: 750;
+      }
+      .chantierInstallRow {
+        padding: 11px;
+        display: grid;
+        grid-template-columns: minmax(0, 1fr) 150px minmax(190px, 0.7fr) auto auto;
+        gap: 9px;
+        align-items: center;
+        border: 1px solid #ece8f1;
+        border-radius: 8px;
+        background: #fdfcff;
+      }
+      .chantierInstallRow textarea {
+        resize: vertical;
+      }
+      .chantierFutureSpace {
+        min-height: 260px;
+        display: grid;
+        place-items: center;
+        align-content: center;
+        gap: 8px;
+        border: 1px dashed #ded8e7;
+        border-radius: 10px;
+        background: #fcfbfd;
+        text-align: center;
+      }
+      .chantierFutureSpace > span {
+        width: 44px;
+        height: 44px;
+        display: grid;
+        place-items: center;
+        border-radius: 11px;
+        background: #eee9ff;
+        color: #6855c1;
+      }
+      .chantierFutureSpace strong {
+        font-size: 16px;
+      }
+      .chantierFutureSpace p {
+        max-width: 560px;
+        margin: 0;
+        color: #746e7a;
+        font-size: 13px;
+      }
+      .chantierFutureSpace small {
+        max-width: 600px;
+        color: #817b88;
+        font-size: 12px;
+        line-height: 1.45;
+      }
+      .chantierOpSpaceTitle button:disabled,
+      .chantierTechnicalActions button:disabled,
+      .chantierInstallRow > button:disabled {
+        opacity: 0.55;
+      }
+      @media (max-width: 900px) {
+        .chantierOpRow {
+          grid-template-columns: minmax(0, 1fr) 160px;
+        }
+        .chantierOpStatus {
+          grid-column: 1/-1;
+          width: max-content;
+        }
+        .chantierInstallRow {
+          grid-template-columns: 1fr 160px;
+        }
+        .chantierInstallRow textarea,
+        .chantierInstallRow > button,
+        .chantierInstallRow > .chantierOpStatus {
+          grid-column: 1/-1;
+        }
+        .chantierInstallRow > button {
+          width: max-content;
+        }
+        .chantierTechnicalCreate {
+          grid-template-columns: 1fr;
+        }
+        .chantierTechnicalCreateTitle,
+        .chantierTechnicalCreate .isWide,
+        .chantierTechnicalCheck,
+        .chantierTechnicalActions {
+          grid-column: auto;
+        }
+        .chantierQuotePicker {
+          grid-template-columns: 1fr;
+        }
+      }
+      @media (max-width: 620px) {
+        .chantierOpSpaceTitle {
+          flex-direction: column;
+          align-items: stretch;
+        }
+        .chantierOpRow,
+        .chantierInstallRow {
+          grid-template-columns: 1fr;
+        }
+        .chantierOpRow select,
+        .chantierInstallRow select {
+          grid-column: 1/-1;
+        }
+        .chantierOperationalTabs {
+          gap: 3px;
+        }
+        .chantierOperationalTabs button {
+          padding: 0 10px;
+        }
+      }
     `}</style>
   );
 }

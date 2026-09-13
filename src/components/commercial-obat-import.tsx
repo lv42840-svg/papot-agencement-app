@@ -116,7 +116,11 @@ export function CommercialObatImport() {
     try {
       const result = await requestObatAnalysis(mergedFiles);
       setAnalysis(result);
-      setName(result.projectName ?? result.clientName ?? (result.quoteNumber ? `Devis ${result.quoteNumber}` : ""));
+      setName(
+        result.projectName ??
+          result.clientName ??
+          (result.quoteNumber ? `Devis ${result.quoteNumber}` : ""),
+      );
       setClientName(result.clientName ?? "");
       setSiteLabel(result.projectName ?? result.siteAddress ?? "");
       setContactName(result.contactName ?? "");
@@ -216,7 +220,11 @@ export function CommercialObatImport() {
 
   return (
     <section className={`obatCommercial${open ? " isOpen" : ""}`}>
-      <button type="button" className="obatCommercialToggle" onClick={() => setOpen((value) => !value)}>
+      <button
+        type="button"
+        className="obatCommercialToggle"
+        onClick={() => setOpen((value) => !value)}
+      >
         <Upload size={15} />
         <span>Importer devis / bordereau OBAT</span>
         <small>PDF + CSV → champs et heures préremplis</small>
@@ -227,9 +235,14 @@ export function CommercialObatImport() {
           <div className="obatCommercialTop">
             <div>
               <strong>Import intelligent OBAT</strong>
-              <span>Dépose le devis PDF, le bordereau CSV, ou les deux. Tu peux aussi les ajouter l&apos;un après l&apos;autre.</span>
+              <span>
+                Dépose le devis PDF, le bordereau CSV, ou les deux. Tu peux aussi les ajouter
+                l&apos;un après l&apos;autre.
+              </span>
             </div>
-            <button type="button" onClick={() => setOpen(false)} aria-label="Fermer"><X size={15} /></button>
+            <button type="button" onClick={() => setOpen(false)} aria-label="Fermer">
+              <X size={15} />
+            </button>
           </div>
 
           <input
@@ -257,14 +270,23 @@ export function CommercialObatImport() {
             }}
           >
             {busy ? <RefreshCw className="obatSpin" size={18} /> : <FileText size={20} />}
-            <strong>{files.length ? files.map((file) => file.name).join(" + ") : "Déposer ou ajouter les documents OBAT"}</strong>
-            <span>Le PDF est lu directement, sans OCR, et le CSV fournit notamment ÉTUDES / FABRICATION / POSE.</span>
+            <strong>
+              {files.length
+                ? files.map((file) => file.name).join(" + ")
+                : "Déposer ou ajouter les documents OBAT"}
+            </strong>
+            <span>
+              Le PDF est lu directement, sans OCR, et le CSV fournit notamment ÉTUDES / FABRICATION
+              / POSE.
+            </span>
           </button>
 
           <div className="obatCsvHelp">
             <strong>Réglage du CSV dans OBAT</strong>
             <span>
-              Cocher uniquement <b>Cumulées</b>, <b>Afficher les déboursés secs</b> et <b>Cacher les ouvrages</b>, puis faire <b>Exporter les lignes → Lignes au format CSV</b>.
+              Cocher uniquement <b>Cumulées</b>, <b>Afficher les déboursés secs</b> et{" "}
+              <b>Cacher les ouvrages</b>, puis faire{" "}
+              <b>Exporter les lignes → Lignes au format CSV</b>.
             </span>
           </div>
 
@@ -273,63 +295,184 @@ export function CommercialObatImport() {
           {analysis ? (
             <>
               <div className="obatDetected">
-                <div><small>Devis</small><strong>{analysis.quoteNumber ?? "Non trouvé"}</strong></div>
-                <div><small>Client</small><strong>{analysis.clientName ?? "Non trouvé"}</strong></div>
-                <div><small>Chantier</small><strong>{analysis.projectName ?? "Non trouvé"}</strong></div>
-                <div><small>Début prévu</small><strong>{formatDate(analysis.plannedStartDate)}</strong></div>
-                <div><small>Total HT</small><strong>{formatMoney(analysis.totalNetHt)}</strong></div>
-                <div><small>Total TTC</small><strong>{formatMoney(analysis.totalTtc)}</strong></div>
+                <div>
+                  <small>Devis</small>
+                  <strong>{analysis.quoteNumber ?? "Non trouvé"}</strong>
+                </div>
+                <div>
+                  <small>Client</small>
+                  <strong>{analysis.clientName ?? "Non trouvé"}</strong>
+                </div>
+                <div>
+                  <small>Chantier</small>
+                  <strong>{analysis.projectName ?? "Non trouvé"}</strong>
+                </div>
+                <div>
+                  <small>Début prévu</small>
+                  <strong>{formatDate(analysis.plannedStartDate)}</strong>
+                </div>
+                <div>
+                  <small>Total HT</small>
+                  <strong>{formatMoney(analysis.totalNetHt)}</strong>
+                </div>
+                <div>
+                  <small>Total TTC</small>
+                  <strong>{formatMoney(analysis.totalTtc)}</strong>
+                </div>
               </div>
 
               <div className="obatHoursResult">
-                <span><small>BE</small><strong>{analysis.hours.be ?? "—"} h</strong></span>
-                <span><small>Atelier</small><strong>{analysis.hours.workshop ?? "—"} h</strong></span>
-                <span><small>Pose</small><strong>{analysis.hours.install ?? "—"} h</strong></span>
+                <span>
+                  <small>BE</small>
+                  <strong>{analysis.hours.be ?? "—"} h</strong>
+                </span>
+                <span>
+                  <small>Atelier</small>
+                  <strong>{analysis.hours.workshop ?? "—"} h</strong>
+                </span>
+                <span>
+                  <small>Pose</small>
+                  <strong>{analysis.hours.install ?? "—"} h</strong>
+                </span>
               </div>
 
               <div className="obatTargetModes">
-                <button type="button" className={targetMode === "create" ? "isActive" : ""} onClick={() => setTargetMode("create")}>Créer une affaire</button>
-                <button type="button" className={targetMode === "existing" ? "isActive" : ""} onClick={() => setTargetMode("existing")}>Compléter une affaire existante</button>
+                <button
+                  type="button"
+                  className={targetMode === "create" ? "isActive" : ""}
+                  onClick={() => setTargetMode("create")}
+                >
+                  Créer une affaire
+                </button>
+                <button
+                  type="button"
+                  className={targetMode === "existing" ? "isActive" : ""}
+                  onClick={() => setTargetMode("existing")}
+                >
+                  Compléter une affaire existante
+                </button>
               </div>
 
               {targetMode === "existing" ? (
                 <label className="obatField obatWide">
                   <span>Affaire à compléter *</span>
-                  <select value={targetCaseId} onChange={(event) => { setTargetCaseId(event.target.value); loadExisting(existingCases.find((item) => item.id === event.target.value) ?? null); }}>
+                  <select
+                    value={targetCaseId}
+                    onChange={(event) => {
+                      setTargetCaseId(event.target.value);
+                      loadExisting(
+                        existingCases.find((item) => item.id === event.target.value) ?? null,
+                      );
+                    }}
+                  >
                     <option value="">Choisir…</option>
-                    {existingCases.map((item) => <option value={item.id} key={item.id}>{item.name}</option>)}
+                    {existingCases.map((item) => (
+                      <option value={item.id} key={item.id}>
+                        {item.name}
+                      </option>
+                    ))}
                   </select>
                 </label>
               ) : null}
 
               <div className="obatEditGrid">
-                <label className="obatField"><span>Nom affaire *</span><input value={name} onChange={(event) => setName(event.target.value)} /></label>
-                <label className="obatField"><span>Client</span><input value={clientName} onChange={(event) => setClientName(event.target.value)} /></label>
-                <label className="obatField"><span>Lieu / chantier</span><input value={siteLabel} onChange={(event) => setSiteLabel(event.target.value)} /></label>
-                <label className="obatField"><span>Contact</span><input value={contactName} onChange={(event) => setContactName(event.target.value)} /></label>
-                {targetMode === "create" ? <label className="obatField"><span>Prochaine revue * <em>non présente dans OBAT</em></span><input type="date" value={reviewDate} onChange={(event) => setReviewDate(event.target.value)} /></label> : null}
-                <label className="obatField obatWide"><span>Description</span><textarea rows={2} value={description} onChange={(event) => setDescription(event.target.value)} /></label>
+                <label className="obatField">
+                  <span>Nom affaire *</span>
+                  <input value={name} onChange={(event) => setName(event.target.value)} />
+                </label>
+                <label className="obatField">
+                  <span>Client</span>
+                  <input
+                    value={clientName}
+                    onChange={(event) => setClientName(event.target.value)}
+                  />
+                </label>
+                <label className="obatField">
+                  <span>Lieu / chantier</span>
+                  <input value={siteLabel} onChange={(event) => setSiteLabel(event.target.value)} />
+                </label>
+                <label className="obatField">
+                  <span>Contact</span>
+                  <input
+                    value={contactName}
+                    onChange={(event) => setContactName(event.target.value)}
+                  />
+                </label>
+                {targetMode === "create" ? (
+                  <label className="obatField">
+                    <span>
+                      Prochaine revue * <em>non présente dans OBAT</em>
+                    </span>
+                    <input
+                      type="date"
+                      value={reviewDate}
+                      onChange={(event) => setReviewDate(event.target.value)}
+                    />
+                  </label>
+                ) : null}
+                <label className="obatField obatWide">
+                  <span>Description</span>
+                  <textarea
+                    rows={2}
+                    value={description}
+                    onChange={(event) => setDescription(event.target.value)}
+                  />
+                </label>
               </div>
 
               <div className="obatExtraInfo">
-                {analysis.contactName ? <span>Contact détecté : <strong>{analysis.contactName}</strong></span> : null}
-                {analysis.clientAddress ? <span>Adresse : <strong>{analysis.clientAddress}</strong></span> : null}
-                {analysis.clientSiren ? <span>SIREN : <strong>{analysis.clientSiren}</strong></span> : null}
-                {analysis.quoteDate ? <span>Devis du <strong>{formatDate(analysis.quoteDate)}</strong></span> : null}
-                {analysis.validUntil ? <span>Valable jusqu&apos;au <strong>{formatDate(analysis.validUntil)}</strong></span> : null}
-                {analysis.plannedEndDate ? <span>Fin prévue <strong>{formatDate(analysis.plannedEndDate)}</strong></span> : null}
+                {analysis.contactName ? (
+                  <span>
+                    Contact détecté : <strong>{analysis.contactName}</strong>
+                  </span>
+                ) : null}
+                {analysis.clientAddress ? (
+                  <span>
+                    Adresse : <strong>{analysis.clientAddress}</strong>
+                  </span>
+                ) : null}
+                {analysis.clientSiren ? (
+                  <span>
+                    SIREN : <strong>{analysis.clientSiren}</strong>
+                  </span>
+                ) : null}
+                {analysis.quoteDate ? (
+                  <span>
+                    Devis du <strong>{formatDate(analysis.quoteDate)}</strong>
+                  </span>
+                ) : null}
+                {analysis.validUntil ? (
+                  <span>
+                    Valable jusqu&apos;au <strong>{formatDate(analysis.validUntil)}</strong>
+                  </span>
+                ) : null}
+                {analysis.plannedEndDate ? (
+                  <span>
+                    Fin prévue <strong>{formatDate(analysis.plannedEndDate)}</strong>
+                  </span>
+                ) : null}
               </div>
 
-              {analysis.warnings.length ? <div className="obatWarnings">{analysis.warnings.map((warning) => <span key={warning}>{warning}</span>)}</div> : null}
+              {analysis.warnings.length ? (
+                <div className="obatWarnings">
+                  {analysis.warnings.map((warning) => (
+                    <span key={warning}>{warning}</span>
+                  ))}
+                </div>
+              ) : null}
 
               <button
                 type="button"
                 className="primaryButton obatApply"
-                disabled={busy || !name.trim() || (targetMode === "create" ? !reviewDate : !targetCaseId)}
+                disabled={
+                  busy || !name.trim() || (targetMode === "create" ? !reviewDate : !targetCaseId)
+                }
                 onClick={() => void applyImport()}
               >
                 <CheckCircle2 size={15} />
-                {targetMode === "create" ? "Créer et classer les documents" : "Compléter et classer les documents"}
+                {targetMode === "create"
+                  ? "Créer et classer les documents"
+                  : "Compléter et classer les documents"}
               </button>
             </>
           ) : null}
@@ -337,7 +480,261 @@ export function CommercialObatImport() {
       ) : null}
 
       <style jsx global>{`
-        .obatCommercial{margin-bottom:12px;border:1px solid #ddd4f4;border-radius:11px;background:#fff;overflow:hidden}.obatCommercialToggle{width:100%;min-height:48px;padding:9px 13px;display:grid;grid-template-columns:24px auto 1fr;align-items:center;gap:7px;border:0;background:linear-gradient(90deg,#f7f3ff,#fff);color:#5f4fc1;text-align:left}.obatCommercialToggle span{font-size:11px;font-weight:850}.obatCommercialToggle small{justify-self:end;color:#8a8297;font-size:8.5px;font-weight:600}.obatCommercialBody{padding:13px;display:grid;gap:11px;border-top:1px solid #eee9f7}.obatCommercialTop{display:flex;justify-content:space-between;gap:12px}.obatCommercialTop>div{display:grid;gap:2px}.obatCommercialTop strong{font-size:12px}.obatCommercialTop span{color:#817a8a;font-size:9px}.obatCommercialTop>button{border:0;background:transparent;color:#80788d}.obatDropZone{min-height:86px;padding:14px;display:grid;place-items:center;align-content:center;gap:4px;border:1px dashed #ad9be7;border-radius:10px;background:#faf8ff;color:#6653c7;text-align:center}.obatDropZone strong{font-size:10px}.obatDropZone span{max-width:760px;color:#8a8294;font-size:8.5px}.obatCsvHelp{padding:9px 11px;display:flex;align-items:flex-start;gap:8px;border:1px solid #e8dfbf;border-radius:8px;background:#fffdf4;color:#746538;font-size:8.5px}.obatCsvHelp strong{white-space:nowrap;font-size:8.5px}.obatCsvHelp span{line-height:1.45}.obatCommercialError{padding:9px 10px;border:1px solid #efc6bd;border-radius:8px;background:#fff5f3;color:#a34a3a;font-size:9px}.obatDetected{display:grid;grid-template-columns:repeat(6,minmax(0,1fr));gap:7px}.obatDetected>div{padding:8px;display:grid;gap:2px;border:1px solid #ece7f2;border-radius:8px;background:#fff}.obatDetected small,.obatHoursResult small{color:#8b8592;font-size:7.5px;font-weight:750;text-transform:uppercase;letter-spacing:.04em}.obatDetected strong{overflow:hidden;font-size:9px;text-overflow:ellipsis;white-space:nowrap}.obatHoursResult{display:grid;grid-template-columns:repeat(3,1fr);gap:7px}.obatHoursResult>span{padding:9px 11px;display:flex;align-items:center;justify-content:space-between;border:1px solid #d9d1ef;border-radius:8px;background:#f8f5ff}.obatHoursResult strong{font-size:12px;color:#5f4cc5}.obatTargetModes{display:flex;gap:5px}.obatTargetModes button{min-height:31px;padding:0 10px;border:1px solid #e0dae8;border-radius:7px;background:#fff;color:#716979;font-size:9px}.obatTargetModes button.isActive{border-color:#9f8ce6;background:#f2edff;color:#624fc4;font-weight:800}.obatEditGrid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px}.obatField{display:grid;gap:4px}.obatField>span{color:#615b68;font-size:8.5px;font-weight:750}.obatField em{color:#a06c36;font-size:7px;font-style:normal;font-weight:600}.obatField input,.obatField select,.obatField textarea{width:100%;padding:8px 9px;border:1px solid #dfdae6;border-radius:8px;background:#fff;font:inherit;font-size:9.5px}.obatWide{grid-column:1/-1}.obatExtraInfo{display:flex;flex-wrap:wrap;gap:6px}.obatExtraInfo span{padding:5px 7px;border-radius:999px;background:#f4f1f7;color:#756d7e;font-size:7.8px}.obatWarnings{display:grid;gap:3px;color:#9b693a;font-size:8px}.obatApply{width:max-content}.obatSpin{animation:obatSpin 1s linear infinite}@keyframes obatSpin{to{transform:rotate(360deg)}}@media(max-width:1050px){.obatDetected{grid-template-columns:repeat(3,1fr)}}@media(max-width:720px){.obatCommercialToggle{grid-template-columns:24px 1fr}.obatCommercialToggle small{display:none}.obatDetected,.obatHoursResult,.obatEditGrid{grid-template-columns:1fr}.obatWide{grid-column:auto}.obatCsvHelp{display:grid}}
+        .obatCommercial {
+          margin-bottom: 12px;
+          border: 1px solid #ddd4f4;
+          border-radius: 11px;
+          background: #fff;
+          overflow: hidden;
+        }
+        .obatCommercialToggle {
+          width: 100%;
+          min-height: 48px;
+          padding: 9px 13px;
+          display: grid;
+          grid-template-columns: 24px auto 1fr;
+          align-items: center;
+          gap: 7px;
+          border: 0;
+          background: linear-gradient(90deg, #f7f3ff, #fff);
+          color: #5f4fc1;
+          text-align: left;
+        }
+        .obatCommercialToggle span {
+          font-size: 11px;
+          font-weight: 850;
+        }
+        .obatCommercialToggle small {
+          justify-self: end;
+          color: #8a8297;
+          font-size: 8.5px;
+          font-weight: 600;
+        }
+        .obatCommercialBody {
+          padding: 13px;
+          display: grid;
+          gap: 11px;
+          border-top: 1px solid #eee9f7;
+        }
+        .obatCommercialTop {
+          display: flex;
+          justify-content: space-between;
+          gap: 12px;
+        }
+        .obatCommercialTop > div {
+          display: grid;
+          gap: 2px;
+        }
+        .obatCommercialTop strong {
+          font-size: 12px;
+        }
+        .obatCommercialTop span {
+          color: #817a8a;
+          font-size: 9px;
+        }
+        .obatCommercialTop > button {
+          border: 0;
+          background: transparent;
+          color: #80788d;
+        }
+        .obatDropZone {
+          min-height: 86px;
+          padding: 14px;
+          display: grid;
+          place-items: center;
+          align-content: center;
+          gap: 4px;
+          border: 1px dashed #ad9be7;
+          border-radius: 10px;
+          background: #faf8ff;
+          color: #6653c7;
+          text-align: center;
+        }
+        .obatDropZone strong {
+          font-size: 10px;
+        }
+        .obatDropZone span {
+          max-width: 760px;
+          color: #8a8294;
+          font-size: 8.5px;
+        }
+        .obatCsvHelp {
+          padding: 9px 11px;
+          display: flex;
+          align-items: flex-start;
+          gap: 8px;
+          border: 1px solid #e8dfbf;
+          border-radius: 8px;
+          background: #fffdf4;
+          color: #746538;
+          font-size: 8.5px;
+        }
+        .obatCsvHelp strong {
+          white-space: nowrap;
+          font-size: 8.5px;
+        }
+        .obatCsvHelp span {
+          line-height: 1.45;
+        }
+        .obatCommercialError {
+          padding: 9px 10px;
+          border: 1px solid #efc6bd;
+          border-radius: 8px;
+          background: #fff5f3;
+          color: #a34a3a;
+          font-size: 9px;
+        }
+        .obatDetected {
+          display: grid;
+          grid-template-columns: repeat(6, minmax(0, 1fr));
+          gap: 7px;
+        }
+        .obatDetected > div {
+          padding: 8px;
+          display: grid;
+          gap: 2px;
+          border: 1px solid #ece7f2;
+          border-radius: 8px;
+          background: #fff;
+        }
+        .obatDetected small,
+        .obatHoursResult small {
+          color: #8b8592;
+          font-size: 7.5px;
+          font-weight: 750;
+          text-transform: uppercase;
+          letter-spacing: 0.04em;
+        }
+        .obatDetected strong {
+          overflow: hidden;
+          font-size: 9px;
+          text-overflow: ellipsis;
+          white-space: nowrap;
+        }
+        .obatHoursResult {
+          display: grid;
+          grid-template-columns: repeat(3, 1fr);
+          gap: 7px;
+        }
+        .obatHoursResult > span {
+          padding: 9px 11px;
+          display: flex;
+          align-items: center;
+          justify-content: space-between;
+          border: 1px solid #d9d1ef;
+          border-radius: 8px;
+          background: #f8f5ff;
+        }
+        .obatHoursResult strong {
+          font-size: 12px;
+          color: #5f4cc5;
+        }
+        .obatTargetModes {
+          display: flex;
+          gap: 5px;
+        }
+        .obatTargetModes button {
+          min-height: 31px;
+          padding: 0 10px;
+          border: 1px solid #e0dae8;
+          border-radius: 7px;
+          background: #fff;
+          color: #716979;
+          font-size: 9px;
+        }
+        .obatTargetModes button.isActive {
+          border-color: #9f8ce6;
+          background: #f2edff;
+          color: #624fc4;
+          font-weight: 800;
+        }
+        .obatEditGrid {
+          display: grid;
+          grid-template-columns: repeat(2, minmax(0, 1fr));
+          gap: 8px;
+        }
+        .obatField {
+          display: grid;
+          gap: 4px;
+        }
+        .obatField > span {
+          color: #615b68;
+          font-size: 8.5px;
+          font-weight: 750;
+        }
+        .obatField em {
+          color: #a06c36;
+          font-size: 7px;
+          font-style: normal;
+          font-weight: 600;
+        }
+        .obatField input,
+        .obatField select,
+        .obatField textarea {
+          width: 100%;
+          padding: 8px 9px;
+          border: 1px solid #dfdae6;
+          border-radius: 8px;
+          background: #fff;
+          font: inherit;
+          font-size: 9.5px;
+        }
+        .obatWide {
+          grid-column: 1/-1;
+        }
+        .obatExtraInfo {
+          display: flex;
+          flex-wrap: wrap;
+          gap: 6px;
+        }
+        .obatExtraInfo span {
+          padding: 5px 7px;
+          border-radius: 999px;
+          background: #f4f1f7;
+          color: #756d7e;
+          font-size: 7.8px;
+        }
+        .obatWarnings {
+          display: grid;
+          gap: 3px;
+          color: #9b693a;
+          font-size: 8px;
+        }
+        .obatApply {
+          width: max-content;
+        }
+        .obatSpin {
+          animation: obatSpin 1s linear infinite;
+        }
+        @keyframes obatSpin {
+          to {
+            transform: rotate(360deg);
+          }
+        }
+        @media (max-width: 1050px) {
+          .obatDetected {
+            grid-template-columns: repeat(3, 1fr);
+          }
+        }
+        @media (max-width: 720px) {
+          .obatCommercialToggle {
+            grid-template-columns: 24px 1fr;
+          }
+          .obatCommercialToggle small {
+            display: none;
+          }
+          .obatDetected,
+          .obatHoursResult,
+          .obatEditGrid {
+            grid-template-columns: 1fr;
+          }
+          .obatWide {
+            grid-column: auto;
+          }
+          .obatCsvHelp {
+            display: grid;
+          }
+        }
       `}</style>
     </section>
   );

@@ -49,11 +49,7 @@ class FakeDav {
     return "written";
   }
 
-  async putTextIfMatch(
-    url: string,
-    body: string,
-    etag: string,
-  ): Promise<ConditionalWriteResult> {
+  async putTextIfMatch(url: string, body: string, etag: string): Promise<ConditionalWriteResult> {
     const current = this.files.get(url);
     if (!current || current.etag !== etag) return "precondition-failed";
     this.write(url, body);
@@ -186,9 +182,7 @@ describe("NextcloudResourceLockStore", () => {
       now,
     });
 
-    await expect(
-      locks.release({ resource, leaseId, owner: lucien }),
-    ).resolves.toBe(true);
+    await expect(locks.release({ resource, leaseId, owner: lucien })).resolves.toBe(true);
 
     const second = await locks.acquire({
       resource,

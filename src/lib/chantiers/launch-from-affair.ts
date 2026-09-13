@@ -1,11 +1,7 @@
 import { randomUUID } from "node:crypto";
 import { z } from "zod";
 import type { CommercialCase } from "@/lib/commercial/domain";
-import {
-  parseChantiersPayload,
-  type ChantierRecord,
-  type ChantiersPayload,
-} from "./domain";
+import { parseChantiersPayload, type ChantierRecord, type ChantiersPayload } from "./domain";
 
 export const launchChantierFromAffairSchema = z.object({
   commercialCaseId: z.string().uuid(),

@@ -21,10 +21,5 @@ export function verifySyncPackageSignature(input: SyncPackage, publicKeyPem: str
   const publicKey = createPublicKey(publicKeyPem);
   const signature = Buffer.from(parsed.proof.signature, "base64");
 
-  return verify(
-    null,
-    Buffer.from(syncPackageSigningText(parsed), "utf8"),
-    publicKey,
-    signature,
-  );
+  return verify(null, Buffer.from(syncPackageSigningText(parsed), "utf8"), publicKey, signature);
 }

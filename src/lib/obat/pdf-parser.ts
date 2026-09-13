@@ -50,7 +50,8 @@ function parseClientBlock(lines: string[]): {
     return { clientName: null, contactName: null, clientAddress: null, clientSiren: null };
   }
 
-  const clientSiren = firstMatch(lines[sirenIndex], /SIREN\s*:\s*([0-9 ]{9,20})/i)?.replace(/\s/g, "") ?? null;
+  const clientSiren =
+    firstMatch(lines[sirenIndex], /SIREN\s*:\s*([0-9 ]{9,20})/i)?.replace(/\s/g, "") ?? null;
   let addressIndex = -1;
   for (let index = sirenIndex - 1; index >= Math.max(0, sirenIndex - 10); index -= 1) {
     if (/^\d{1,4}\s+\S/.test(lines[index])) {
@@ -85,7 +86,8 @@ function parseClientBlock(lines: string[]): {
       : addressIndex > 0
         ? lines[addressIndex - 1]
         : null;
-  const contactName = honorificIndex >= 0 ? lines.slice(honorificIndex, addressIndex).join(" ") : null;
+  const contactName =
+    honorificIndex >= 0 ? lines.slice(honorificIndex, addressIndex).join(" ") : null;
   const clientAddress = normalizeAddress(lines.slice(addressIndex, sirenIndex));
 
   return {
@@ -135,7 +137,9 @@ function parseQuoteLines(lines: string[]): ObatQuoteLine[] {
 
     const ref = match[1];
     const rawDesignation = match[2];
-    const hadColumns = isQuantityLine(rawDesignation.replace(/^.*?\s(?=\d+(?:[.,]\d+)?\s*(?:ens|u|ml|m²|m2|m³|m3|kg|h)\b)/i, ""));
+    const hadColumns = isQuantityLine(
+      rawDesignation.replace(/^.*?\s(?=\d+(?:[.,]\d+)?\s*(?:ens|u|ml|m²|m2|m³|m3|kg|h)\b)/i, ""),
+    );
     const parts = [stripQuoteColumns(rawDesignation)].filter(Boolean);
 
     if (!hadColumns) {
@@ -159,11 +163,7 @@ function parseQuoteLines(lines: string[]): ObatQuoteLine[] {
 }
 
 export function parseObatQuoteText(rawText: string): PartialObatData {
-  const lines = rawText
-    .replace(/\r/g, "")
-    .split("\n")
-    .map(cleanLine)
-    .filter(Boolean);
+  const lines = rawText.replace(/\r/g, "").split("\n").map(cleanLine).filter(Boolean);
   const flat = lines.join(" ").replace(/\s+/g, " ").trim();
 
   const quoteNumber = firstMatch(flat, /\b(D\d{6,})\b/i)?.toUpperCase() ?? null;
@@ -183,7 +183,9 @@ export function parseObatQuoteText(rawText: string): PartialObatData {
   );
 
   let projectName: string | null = null;
-  const endDateLineIndex = lines.findIndex((line) => /Date limite de fin de chantier le\s*:/i.test(line));
+  const endDateLineIndex = lines.findIndex((line) =>
+    /Date limite de fin de chantier le\s*:/i.test(line),
+  );
   if (endDateLineIndex >= 0) {
     const candidate = lines[endDateLineIndex + 1];
     if (candidate && !/^N[°º]?$/i.test(candidate) && !/D[ÉE]SIGNATION/i.test(candidate)) {
@@ -283,9 +285,7 @@ function parseToUnicodeMap(cmap: Buffer): FontMap {
     for (const rawLine of block[1].split(/\r?\n/)) {
       const line = rawLine.trim();
       if (!line) continue;
-      const arrayRange = line.match(
-        /^<([0-9A-Fa-f]+)>\s*<([0-9A-Fa-f]+)>\s*\[([\s\S]*?)\]$/,
-      );
+      const arrayRange = line.match(/^<([0-9A-Fa-f]+)>\s*<([0-9A-Fa-f]+)>\s*\[([\s\S]*?)\]$/);
       if (arrayRange) {
         const start = Number.parseInt(arrayRange[1], 16);
         const end = Number.parseInt(arrayRange[2], 16);
@@ -382,7 +382,7 @@ function extractFormText(
   const stream = extractStream(objectBody);
   if (!stream) return "";
   const resourceMatch = objectBody.match(/\/Resources\s+(\d+)\s+0\s+R/);
-  const resources = resourceMatch ? objects.get(Number(resourceMatch[1])) ?? "" : objectBody;
+  const resources = resourceMatch ? (objects.get(Number(resourceMatch[1])) ?? "") : objectBody;
   const fonts = resourceRefs(resources, "Font");
   const xObjects = resourceRefs(resources, "XObject");
   let result = extractTextFromContent(stream, fonts, fontMaps);
@@ -417,7 +417,7 @@ export function extractPdfText(buffer: Buffer): string {
     const resourceReference = page.match(/\/Resources\s+(\d+)\s+0\s+R/);
     const contentReference = page.match(/\/Contents\s+(\d+)\s+0\s+R/);
     if (!contentReference) continue;
-    const resources = resourceReference ? objects.get(Number(resourceReference[1])) ?? "" : page;
+    const resources = resourceReference ? (objects.get(Number(resourceReference[1])) ?? "") : page;
     const fonts = resourceRefs(resources, "Font");
     const xObjects = resourceRefs(resources, "XObject");
     const contentObject = objects.get(Number(contentReference[1]));
