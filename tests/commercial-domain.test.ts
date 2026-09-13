@@ -18,7 +18,15 @@ const actor = {
 function createPiste(reviewDate = "2026-09-20") {
   return applyCommercialMutation(
     createInitialCommercialPayload(),
-    { action: "create", name: "Dupont - cuisine", clientName: "Dupont", siteLabel: "Roanne", reviewDate },
+    {
+      action: "create",
+      name: "Dupont - cuisine",
+      clientName: "Dupont",
+      siteLabel: "Roanne",
+      description: "",
+      nextAction: "",
+      reviewDate,
+    },
     actor,
     new Date("2026-09-13T08:00:00.000Z"),
   ).payload;
