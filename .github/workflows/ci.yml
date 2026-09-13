@@ -19,9 +19,4 @@ jobs:
       - run: npm run typecheck
       - run: npm test
       - run: npm run build
-      - name: Print quote Prettier diff
-        run: |
-          npx prettier --write src/app/api/desktop/quotes/route.ts src/lib/quotes/model.ts
-          git diff -- src/app/api/desktop/quotes/route.ts src/lib/quotes/model.ts
-          exit 1
       - run: npm run format:check
