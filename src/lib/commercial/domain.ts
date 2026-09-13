@@ -61,6 +61,7 @@ export const commercialHistoryEventSchema = z.object({
 
 export const commercialCaseSchema = z.object({
   id: z.string().uuid(),
+  sourceEntryId: z.string().uuid().nullable().default(null),
   name: z.string().trim().min(1).max(240),
   clientName: z.string().trim().max(240).nullable(),
   siteLabel: z.string().trim().max(240).nullable(),
