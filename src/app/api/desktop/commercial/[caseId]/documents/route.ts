@@ -1,16 +1,18 @@
 import { randomUUID } from "node:crypto";
 import { NextResponse } from "next/server";
 import { hasEffectiveSpecialPermission } from "@/lib/auth/permissions";
-import {
-  desktopRequestErrorStatus,
-  requireDesktopRequestContext,
-} from "@/lib/desktop/request-context";
+import { listCanonicalCommercialClients } from "@/lib/commercial/client-integration";
 import {
   cleanupCommercialDocuments,
   uploadCommercialDocuments,
 } from "@/lib/commercial/document-storage";
 import { commercialDocumentCategorySchema, parseCommercialPayload } from "@/lib/commercial/domain";
 import { listCommercialPeople, registerCommercialDocuments } from "@/lib/commercial/mutations";
+import {
+  desktopRequestErrorStatus,
+  requireDesktopRequestContext,
+} from "@/lib/desktop/request-context";
+import { createDesktopSharedResourceRuntime } from "@/lib/desktop/shared-resource-runtime";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -25,16 +27,19 @@ async function snapshot(
   payload: ReturnType<typeof parseCommercialPayload>,
   owner: Owner,
   user: { id: string },
+  desktop: ReturnType<typeof createDesktopSharedResourceRuntime>,
   focusCaseId?: string,
 ) {
   const actor = { userId: owner.userId, displayName: owner.displayName };
-  const [canCreate, canProvision, canConfirm] = await Promise.all([
+  const [canCreate, canProvision, canConfirm, clients] = await Promise.all([
     hasEffectiveSpecialPermission(user, "commercial.create"),
     hasEffectiveSpecialPermission(user, "commercial.provision"),
     hasEffectiveSpecialPermission(user, "commercial.confirm_launch"),
+    listCanonicalCommercialClients(desktop),
   ]);
+  const payloadForUi = { ...payload, clients };
   return {
-    payload,
+    payload: payloadForUi,
     actor,
     capabilities: {
       canCreate,
@@ -43,7 +48,7 @@ async function snapshot(
       canProvision,
       canConfirm,
     },
-    suggestedPeople: listCommercialPeople(payload, actor),
+    suggestedPeople: listCommercialPeople(payloadForUi, actor),
     focusCaseId,
     serverNow: new Date().toISOString(),
   };
@@ -145,7 +150,7 @@ export async function POST(request: Request, context: RouteContext) {
       if (saved.status === "conflict") throw new Error("COMMERCIAL_VERSION_CONFLICT");
 
       return NextResponse.json(
-        await snapshot(parseCommercialPayload(saved.resource.payload), owner, user, caseId),
+        await snapshot(parseCommercialPayload(saved.resource.payload), owner, user, desktop, caseId),
         { headers: { "Cache-Control": "no-store" } },
       );
     } catch (error) {
