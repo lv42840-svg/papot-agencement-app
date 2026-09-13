@@ -62,10 +62,10 @@ export async function listUserAdministration() {
        ORDER BY is_active DESC, lower(display_name), lower(email)`,
     ),
     db.query<{ user_id: string; module_key: string; access_level: AccessLevel }>(
-      `SELECT user_id, module_key, access_level FROM user_module_permission`,
+      "SELECT user_id, module_key, access_level FROM user_module_permission",
     ),
     db.query<{ user_id: string; permission_key: string; enabled: boolean }>(
-      `SELECT user_id, permission_key, enabled FROM user_special_permission WHERE enabled = true`,
+      "SELECT user_id, permission_key, enabled FROM user_special_permission WHERE enabled = true",
     ),
     db.query<{
       session_id: string;
@@ -163,18 +163,28 @@ export async function updateManagedUser(
 ) {
   const actor = await requirePermissionAdministrator();
   const existing = await db.query<{ can_manage_permissions: boolean; is_active: boolean }>(
-    `SELECT can_manage_permissions, is_active FROM app_user WHERE id = $1`,
+    "SELECT can_manage_permissions, is_active FROM app_user WHERE id = $1",
     [userId],
   );
   if (!existing.rows[0]) throw new Error("USER_NOT_FOUND");
 
   if (input.action === "setActive") {
     if (userId === actor.id && !input.active) throw new Error("ADMIN_SELF_DEACTIVATION_FORBIDDEN");
-    await db.query("UPDATE app_user SET is_active = $2, updated_at = now() WHERE id = $1", [
-      userId,
-      input.active,
-    ]);
-    if (!input.active) await db.query("DELETE FROM app_session WHERE user_id = $1", [userId]);
+    const client = await db.connect();
+    try {
+      await client.query("BEGIN");
+      await client.query("UPDATE app_user SET is_active = $2, updated_at = now() WHERE id = $1", [
+        userId,
+        input.active,
+      ]);
+      if (!input.active) await client.query("DELETE FROM app_session WHERE user_id = $1", [userId]);
+      await client.query("COMMIT");
+    } catch (error) {
+      await client.query("ROLLBACK");
+      throw error;
+    } finally {
+      client.release();
+    }
     return;
   }
 
@@ -195,59 +205,59 @@ export async function updateManagedUser(
 
   if (input.action === "forcePasswordReset") {
     const passwordHash = await hashPassword(input.temporaryPassword);
-    await db.query("BEGIN");
+    const client = await db.connect();
     try {
-      await db.query(
+      await client.query("BEGIN");
+      await client.query(
         `UPDATE app_user
          SET password_hash = $2, must_change_password = true, updated_at = now()
          WHERE id = $1`,
         [userId, passwordHash],
       );
-      await db.query("DELETE FROM app_session WHERE user_id = $1", [userId]);
-      await db.query("COMMIT");
+      await client.query("DELETE FROM app_session WHERE user_id = $1", [userId]);
+      await client.query("COMMIT");
     } catch (error) {
-      await db.query("ROLLBACK");
+      await client.query("ROLLBACK");
       throw error;
+    } finally {
+      client.release();
     }
     return;
   }
 
   const modules = Object.entries(input.modules).filter(([key]) => allowedModuleKey(key));
   const specials = Object.entries(input.specials).filter(([key]) => allowedSpecialKey(key));
-  await db.query("BEGIN");
+  const client = await db.connect();
   try {
-    await db.query("DELETE FROM user_module_permission WHERE user_id = $1", [userId]);
+    await client.query("BEGIN");
+    await client.query("DELETE FROM user_module_permission WHERE user_id = $1", [userId]);
     for (const [moduleKey, level] of modules) {
       if (level === "NONE") continue;
-      await db.query(
+      await client.query(
         `INSERT INTO user_module_permission(user_id, module_key, access_level)
          VALUES ($1, $2, $3)`,
         [userId, moduleKey, level],
       );
     }
-    await db.query("DELETE FROM user_special_permission WHERE user_id = $1", [userId]);
+    await client.query("DELETE FROM user_special_permission WHERE user_id = $1", [userId]);
     for (const [permissionKey, enabled] of specials) {
       if (!enabled) continue;
-      await db.query(
+      await client.query(
         `INSERT INTO user_special_permission(user_id, permission_key, enabled)
          VALUES ($1, $2, true)`,
         [userId, permissionKey],
       );
     }
-    await db.query("COMMIT");
+    await client.query("COMMIT");
   } catch (error) {
-    await db.query("ROLLBACK");
+    await client.query("ROLLBACK");
     throw error;
+  } finally {
+    client.release();
   }
 }
 
 export async function revokeManagedSession(sessionId: string) {
-  const actor = await requirePermissionAdministrator();
-  const target = await db.query<{ user_id: string }>(
-    "SELECT user_id FROM app_session WHERE session_id = $1",
-    [sessionId],
-  );
-  if (!target.rows[0]) return;
-  if (target.rows[0].user_id === actor.id) throw new Error("ADMIN_CURRENT_SESSION_REVOCATION_FORBIDDEN");
+  await requirePermissionAdministrator();
   await db.query("DELETE FROM app_session WHERE session_id = $1", [sessionId]);
 }
