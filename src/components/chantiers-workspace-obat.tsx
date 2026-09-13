@@ -54,7 +54,8 @@ function normalize(value: string): string {
   return value.trim().toLocaleLowerCase("fr-FR");
 }
 
-function formatDateOnly(value: string): string {
+function formatDateOnly(value: string | null): string {
+  if (!value) return "Pose à compléter";
   const [year, month, day] = value.split("-").map(Number);
   return new Intl.DateTimeFormat("fr-FR", { day: "numeric", month: "short", year: "numeric" }).format(
     new Date(year, month - 1, day, 12),
