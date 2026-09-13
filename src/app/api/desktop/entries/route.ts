@@ -25,9 +25,8 @@ async function requireEntriesContext(required: AccessLevel): Promise<EntriesCont
   if (!user) throw new Error("AUTH_REQUIRED");
   if (user.mustChangePassword) throw new Error("PASSWORD_CHANGE_REQUIRED");
 
-  const isAdmin = user.canManagePermissions;
-  const canWrite = isAdmin || (await hasModuleAccess(user.id, "capture", "WRITE"));
-  const canRead = canWrite || isAdmin || (await hasModuleAccess(user.id, "capture", "READ"));
+  const canWrite = await hasModuleAccess(user.id, "capture", "WRITE");
+  const canRead = canWrite || (await hasModuleAccess(user.id, "capture", "READ"));
   if (required === "WRITE" ? !canWrite : !canRead) throw new Error("MODULE_FORBIDDEN");
 
   return {
@@ -100,12 +99,12 @@ export async function POST(request: Request) {
     const input = entriesMutationSchema.parse(await request.json());
     const { actor } = await requireEntriesContext("WRITE");
     const mutation = await applyEntriesMutationInDatabase(input, actor);
-
+    const payload = await loadEntriesPayloadFromDatabase();
     console.info("[PAPOT][Entries] PostgreSQL mutation saved", {
       action: input.action,
       ms: Date.now() - startedAt,
     });
-    return noStoreJson(publicSnapshot(mutation.payload, actor, mutation.focusEntryId));
+    return noStoreJson(publicSnapshot(payload, actor, mutation.focusEntryId));
   } catch (error) {
     const code =
       error instanceof ZodError
