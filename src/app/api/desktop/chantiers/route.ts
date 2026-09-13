@@ -2,6 +2,10 @@ import { randomUUID } from "node:crypto";
 import { NextResponse } from "next/server";
 import { ZodError } from "zod";
 import {
+  hasEffectiveSpecialPermission,
+  requireSpecialPermission,
+} from "@/lib/auth/permissions";
+import {
   desktopRequestErrorStatus,
   requireDesktopRequestContext,
 } from "@/lib/desktop/request-context";
@@ -20,6 +24,7 @@ const CHANTIERS_RESOURCE = { resource_type: "CHANTIER" as const, resource_id: "r
 const LOCK_TTL_MS = 30_000;
 
 type Owner = { userId: string; deviceId: string; displayName: string };
+type PermissionUser = { id: string; canManagePermissions: boolean };
 
 function noStoreJson(body: unknown, init?: ResponseInit) {
   const response = NextResponse.json(body, init);
@@ -27,14 +32,19 @@ function noStoreJson(body: unknown, init?: ResponseInit) {
   return response;
 }
 
-function snapshot(
+async function snapshot(
   payload: ChantiersPayload,
   owner: Owner,
+  user: PermissionUser,
   canWrite: boolean,
   focusChantierId?: string,
 ) {
   const actor = { userId: owner.userId, displayName: owner.displayName };
   const baseCapabilities = chantierCapabilities(actor);
+  const [canLaunchSpecial, canArchiveSpecial] = await Promise.all([
+    hasEffectiveSpecialPermission(user, "commercial.confirm_launch"),
+    hasEffectiveSpecialPermission(user, "chantiers.archive_reactivate"),
+  ]);
   return {
     payload,
     actor,
@@ -42,8 +52,8 @@ function snapshot(
       ...baseCapabilities,
       canRead: true,
       canModify: canWrite,
-      canLaunch: canWrite,
-      canArchive: canWrite,
+      canLaunch: canWrite && canLaunchSpecial,
+      canArchive: canWrite && canArchiveSpecial,
     },
     focusChantierId,
     serverNow: new Date().toISOString(),
@@ -75,7 +85,9 @@ export async function GET() {
       });
     }
 
-    return noStoreJson(snapshot(payload, owner, context.moduleAccess.canWrite));
+    return noStoreJson(
+      await snapshot(payload, owner, context.user, context.moduleAccess.canWrite),
+    );
   } catch (error) {
     const code = error instanceof Error ? error.message : "CHANTIERS_LOAD_FAILED";
     return noStoreJson({ error: code }, { status: statusFor(code) });
@@ -94,6 +106,9 @@ export async function POST(request: Request) {
     const input = chantierMutationSchema.parse(await request.json());
     stage = "create-runtime";
     const context = await requireDesktopRequestContext("chantiers", "WRITE");
+    if (input.action === "archive" || input.action === "unarchive") {
+      await requireSpecialPermission(context.user, "chantiers.archive_reactivate");
+    }
     desktop = context.desktop;
     owner = context.owner;
     const actor = { userId: owner.userId, displayName: owner.displayName };
@@ -147,7 +162,7 @@ export async function POST(request: Request) {
     if (saved.status === "conflict") throw new Error("CHANTIERS_VERSION_CONFLICT");
     const payload = parseChantiersPayload(saved.resource.payload);
     console.info("[PAPOT][Chantiers] POST saved", { ms: Date.now() - startedAt });
-    return noStoreJson(snapshot(payload, owner, true, mutation.focusChantierId));
+    return noStoreJson(await snapshot(payload, owner, context.user, true, mutation.focusChantierId));
   } catch (error) {
     const code =
       error instanceof ZodError
