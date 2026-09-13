@@ -45,14 +45,14 @@ export async function listSpecialPermissions(userId: string): Promise<string[]> 
 }
 
 export async function hasEffectiveSpecialPermission(
-  user: Pick<CurrentUser, "id" | "canManagePermissions">,
+  user: Pick<CurrentUser, "id">,
   permissionKey: SpecialPermissionKey,
 ) {
-  return user.canManagePermissions || hasSpecialPermission(user.id, permissionKey);
+  return hasSpecialPermission(user.id, permissionKey);
 }
 
 export async function requireSpecialPermission(
-  user: Pick<CurrentUser, "id" | "canManagePermissions">,
+  user: Pick<CurrentUser, "id">,
   permissionKey: SpecialPermissionKey,
 ) {
   if (!(await hasEffectiveSpecialPermission(user, permissionKey))) {
