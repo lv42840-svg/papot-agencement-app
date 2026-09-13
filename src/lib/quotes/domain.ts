@@ -5,13 +5,7 @@ export const QUOTE_QUANTITY_PRECISION = 6;
 export const QUOTE_MAX_QUANTITY = 1_000_000_000;
 export const QUOTE_MAX_QUANTITY_EXPRESSION_LENGTH = 120;
 
-export const quoteStatusSchema = z.enum([
-  "DRAFT",
-  "SENT",
-  "ACCEPTED",
-  "REJECTED",
-  "CANCELLED",
-]);
+export const quoteStatusSchema = z.enum(["DRAFT", "SENT", "ACCEPTED", "REJECTED", "CANCELLED"]);
 
 export const quoteVersionSchema = z.number().int().min(1);
 export const quoteMoneyCentsSchema = z.number().int().safe().min(0);
