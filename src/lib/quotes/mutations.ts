@@ -235,7 +235,8 @@ export function applyQuotesMutation(
     const validityDays = input.validityDays ?? quote.validityDays;
     const updated = parseRecord({
       ...quote,
-      commercialCaseId: input.commercialCaseId ?? quote.commercialCaseId,
+      commercialCaseId:
+        input.commercialCaseId === undefined ? quote.commercialCaseId : input.commercialCaseId,
       clientId: input.clientId ?? quote.clientId,
       subject: input.subject ?? quote.subject,
       issueDate,
