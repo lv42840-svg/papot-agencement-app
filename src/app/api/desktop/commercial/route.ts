@@ -97,7 +97,9 @@ async function persistAutomaticTransitions(
     ownsLock = true;
 
     let opened = openedInitial;
-    let transition = applyCommercialAutomaticTransitions(parseCommercialPayload(opened.resource?.payload));
+    let transition = applyCommercialAutomaticTransitions(
+      parseCommercialPayload(opened.resource?.payload),
+    );
     if (!transition.changed) return transition.payload;
 
     let saved = await desktop.states.saveOpened({
@@ -108,7 +110,9 @@ async function persistAutomaticTransitions(
     });
     if (saved.status === "conflict") {
       opened = await desktop.states.openForUpdate(COMMERCIAL_RESOURCE);
-      transition = applyCommercialAutomaticTransitions(parseCommercialPayload(opened.resource?.payload));
+      transition = applyCommercialAutomaticTransitions(
+        parseCommercialPayload(opened.resource?.payload),
+      );
       if (!transition.changed) return transition.payload;
       saved = await desktop.states.saveOpened({
         resource: COMMERCIAL_RESOURCE,
@@ -153,9 +157,7 @@ export async function GET() {
       });
     }
 
-    return noStoreJson(
-      await snapshot(parsed, owner, context.moduleAccess.canWrite, context.user),
-    );
+    return noStoreJson(await snapshot(parsed, owner, context.moduleAccess.canWrite, context.user));
   } catch (error) {
     const code = error instanceof Error ? error.message : "COMMERCIAL_LOAD_FAILED";
     return noStoreJson({ error: code }, { status: statusFor(code) });
@@ -204,7 +206,11 @@ export async function POST(request: Request) {
 
     let opened = openedInitial;
     stage = "apply-mutation";
-    let mutation = applyCommercialMutation(parseCommercialPayload(opened.resource?.payload), input, actor);
+    let mutation = applyCommercialMutation(
+      parseCommercialPayload(opened.resource?.payload),
+      input,
+      actor,
+    );
 
     stage = "save-resource";
     let saved = await desktop.states.saveOpened({
@@ -218,7 +224,11 @@ export async function POST(request: Request) {
       stage = "reopen-after-conflict";
       opened = await desktop.states.openForUpdate(COMMERCIAL_RESOURCE);
       stage = "reapply-after-conflict";
-      mutation = applyCommercialMutation(parseCommercialPayload(opened.resource?.payload), input, actor);
+      mutation = applyCommercialMutation(
+        parseCommercialPayload(opened.resource?.payload),
+        input,
+        actor,
+      );
       stage = "save-after-conflict";
       saved = await desktop.states.saveOpened({
         resource: COMMERCIAL_RESOURCE,
@@ -231,9 +241,7 @@ export async function POST(request: Request) {
     if (saved.status === "conflict") throw new Error("COMMERCIAL_VERSION_CONFLICT");
     const payload = parseCommercialPayload(saved.resource.payload);
     console.info("[PAPOT][Commercial] POST saved", { ms: Date.now() - startedAt });
-    return noStoreJson(
-      await snapshot(payload, owner, true, context.user, mutation.focusCaseId),
-    );
+    return noStoreJson(await snapshot(payload, owner, true, context.user, mutation.focusCaseId));
   } catch (error) {
     const code =
       error instanceof ZodError

@@ -133,7 +133,11 @@ export async function POST(request: Request) {
 
     let opened = initialOpened;
     stage = "apply-mutation";
-    let mutation = applyEntriesMutation(parseEntriesPayload(opened.resource?.payload), input, actor);
+    let mutation = applyEntriesMutation(
+      parseEntriesPayload(opened.resource?.payload),
+      input,
+      actor,
+    );
 
     stage = "save-resource";
     let saved = await desktop.states.saveOpened({
@@ -158,10 +162,7 @@ export async function POST(request: Request) {
     }
 
     if (saved.status === "conflict") {
-      return noStoreJson(
-        { status: "error", error: "ENTRIES_VERSION_CONFLICT" },
-        { status: 409 },
-      );
+      return noStoreJson({ status: "error", error: "ENTRIES_VERSION_CONFLICT" }, { status: 409 });
     }
 
     console.info("[PAPOT][Entries] POST saved", { ms: Date.now() - startedAt });

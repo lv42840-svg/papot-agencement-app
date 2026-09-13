@@ -11,7 +11,9 @@ export async function PATCH(request: Request) {
     return NextResponse.json({ error: "Couleur non autorisée." }, { status: 400 });
   }
   await mutateAuthPayload(user.id, (payload) => {
-    const target = payload.users.find((candidate) => candidate.id === user.id && candidate.isActive);
+    const target = payload.users.find(
+      (candidate) => candidate.id === user.id && candidate.isActive,
+    );
     if (!target) throw new Error("AUTH_USER_NOT_FOUND");
     target.accentKey = body.accentKey!;
   });

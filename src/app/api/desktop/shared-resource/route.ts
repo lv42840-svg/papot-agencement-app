@@ -100,9 +100,6 @@ export async function POST(request: Request) {
   } catch (error) {
     const code = error instanceof Error ? error.message : "SHARED_RESOURCE_FAILED";
     const requestStatus = desktopRequestErrorStatus(code);
-    return NextResponse.json(
-      { status: "error", error: code },
-      { status: requestStatus ?? 409 },
-    );
+    return NextResponse.json({ status: "error", error: code }, { status: requestStatus ?? 409 });
   }
 }

@@ -15,7 +15,10 @@ export async function POST(request: Request) {
   const parsed = schema.safeParse(await request.json().catch(() => null));
   if (!parsed.success) {
     return NextResponse.json(
-      { error: "Nom, e-mail ou mot de passe invalide. Le mot de passe doit contenir au moins 12 caractères." },
+      {
+        error:
+          "Nom, e-mail ou mot de passe invalide. Le mot de passe doit contenir au moins 12 caractères.",
+      },
       { status: 400 },
     );
   }

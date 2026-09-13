@@ -22,7 +22,9 @@ export async function POST(request: Request) {
 
   const passwordHash = await hashPassword(parsed.data.password);
   await mutateAuthPayload(user.id, (payload) => {
-    const target = payload.users.find((candidate) => candidate.id === user.id && candidate.isActive);
+    const target = payload.users.find(
+      (candidate) => candidate.id === user.id && candidate.isActive,
+    );
     if (!target) throw new Error("AUTH_USER_NOT_FOUND");
     target.passwordHash = passwordHash;
     target.mustChangePassword = false;

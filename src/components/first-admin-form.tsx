@@ -55,7 +55,10 @@ export function FirstAdminForm() {
           disabled={busy}
         />
       </label>
-      <p className="muted">12 caractères minimum. Ce compte pourra ensuite créer les autres utilisateurs et leurs droits.</p>
+      <p className="muted">
+        12 caractères minimum. Ce compte pourra ensuite créer les autres utilisateurs et leurs
+        droits.
+      </p>
       {error ? <p className="formError">{error}</p> : null}
       <button className="primaryButton" type="submit" disabled={busy}>
         {busy ? "Création…" : "Créer l’administrateur PAPOT"}

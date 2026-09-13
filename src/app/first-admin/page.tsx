@@ -15,7 +15,8 @@ export default async function FirstAdminPage() {
         <div>
           <h1>Premier administrateur</h1>
           <p className="muted">
-            Créez le premier compte PAPOT AGENCEMENT. Les utilisateurs suivants seront créés depuis l’administration.
+            Créez le premier compte PAPOT AGENCEMENT. Les utilisateurs suivants seront créés depuis
+            l’administration.
           </p>
         </div>
         <FirstAdminForm />

@@ -131,9 +131,12 @@ export async function POST(request: Request, context: RouteContext) {
       }
       if (saved.status === "conflict") throw new Error("ENTRIES_VERSION_CONFLICT");
 
-      return NextResponse.json(snapshot(parseEntriesPayload(saved.resource.payload), actor, entryId), {
-        headers: { "Cache-Control": "no-store" },
-      });
+      return NextResponse.json(
+        snapshot(parseEntriesPayload(saved.resource.payload), actor, entryId),
+        {
+          headers: { "Cache-Control": "no-store" },
+        },
+      );
     } catch (error) {
       if (uploaded.length > 0) await cleanupEntryAttachments(transport, uploaded);
       throw error;

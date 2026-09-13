@@ -97,7 +97,9 @@ export async function getCurrentUser(): Promise<CurrentUser | null> {
   const session = payload.sessions.find((candidate) => candidate.tokenHash === hash);
   if (!session || Date.parse(session.expiresAt) <= Date.now()) return null;
 
-  const user = payload.users.find((candidate) => candidate.id === session.userId && candidate.isActive);
+  const user = payload.users.find(
+    (candidate) => candidate.id === session.userId && candidate.isActive,
+  );
   if (!user) return null;
   return {
     id: user.id,

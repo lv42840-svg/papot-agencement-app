@@ -49,9 +49,7 @@ function assertEmailAvailable(
 ) {
   const normalized = email.trim().toLowerCase();
   if (
-    users.some(
-      (user) => user.id !== exceptUserId && user.email.trim().toLowerCase() === normalized,
-    )
+    users.some((user) => user.id !== exceptUserId && user.email.trim().toLowerCase() === normalized)
   ) {
     throw new Error("USER_EMAIL_EXISTS");
   }

@@ -9,10 +9,7 @@ import {
   cleanupCommercialDocuments,
   uploadCommercialDocuments,
 } from "@/lib/commercial/document-storage";
-import {
-  commercialDocumentCategorySchema,
-  parseCommercialPayload,
-} from "@/lib/commercial/domain";
+import { commercialDocumentCategorySchema, parseCommercialPayload } from "@/lib/commercial/domain";
 import { listCommercialPeople, registerCommercialDocuments } from "@/lib/commercial/mutations";
 
 export const runtime = "nodejs";

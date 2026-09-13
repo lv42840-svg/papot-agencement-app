@@ -102,7 +102,10 @@ export function isResourceLockOwnedBy(
   );
 }
 
-export function resourceLockBlocksWrite(lock: SharedResourceLock | null, now: Date = new Date()): boolean {
+export function resourceLockBlocksWrite(
+  lock: SharedResourceLock | null,
+  now: Date = new Date(),
+): boolean {
   if (!lock) return false;
   return !isResourceLockExpired(lock, now);
 }
@@ -168,7 +171,10 @@ export function renewResourceLock(params: {
   });
 }
 
-export function hasSharedResourceVersionConflict(openedVersion: number, currentVersion: number): boolean {
+export function hasSharedResourceVersionConflict(
+  openedVersion: number,
+  currentVersion: number,
+): boolean {
   if (!Number.isInteger(openedVersion) || openedVersion < 0) {
     throw new Error("OPENED_VERSION_INVALID");
   }

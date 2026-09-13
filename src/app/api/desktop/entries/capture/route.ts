@@ -5,10 +5,7 @@ import {
   desktopRequestErrorStatus,
   requireDesktopRequestContext,
 } from "@/lib/desktop/request-context";
-import {
-  cleanupEntryAttachments,
-  uploadEntryAttachments,
-} from "@/lib/entries/attachment-storage";
+import { cleanupEntryAttachments, uploadEntryAttachments } from "@/lib/entries/attachment-storage";
 import { parseEntriesPayload } from "@/lib/entries/domain";
 import {
   applyEntriesMutation,
@@ -147,9 +144,12 @@ export async function POST(request: Request) {
     }
     if (saved.status === "conflict") throw new Error("ENTRIES_VERSION_CONFLICT");
 
-    return NextResponse.json(snapshot(parseEntriesPayload(saved.resource.payload), actor, entryId), {
-      headers: { "Cache-Control": "no-store" },
-    });
+    return NextResponse.json(
+      snapshot(parseEntriesPayload(saved.resource.payload), actor, entryId),
+      {
+        headers: { "Cache-Control": "no-store" },
+      },
+    );
   } catch (error) {
     if (transport && uploaded.length > 0) await cleanupEntryAttachments(transport, uploaded);
     const code = error instanceof Error ? error.message : "ENTRIES_CAPTURE_FAILED";
