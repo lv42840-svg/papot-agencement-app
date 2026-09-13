@@ -3,7 +3,7 @@
 const fs = require("node:fs");
 const path = require("node:path");
 const { Client } = require("pg");
-const { app, BrowserWindow, ipcMain, safeStorage, session } = require("electron");
+const { app, BrowserWindow, dialog, ipcMain, safeStorage, session } = require("electron");
 const {
   DEFAULT_DESKTOP_APP_URL,
   isAllowedDesktopNavigation,
@@ -18,6 +18,10 @@ const {
 } = require("./setup-store.cjs");
 const { openLocalDatabase } = require("./local-database.cjs");
 const { startDevelopmentServer, startPackagedServer } = require("./server-manager.cjs");
+const {
+  desktopMigrationsDirectory,
+  runDatabaseMigrations,
+} = require("./migration-runner.cjs");
 
 const appUrl = normalizeLocalAppUrl(process.env.PAPOT_APP_URL || DEFAULT_DESKTOP_APP_URL);
 let localDatabase;
@@ -41,6 +45,26 @@ function desktopUrl(pathname) {
 
 function authorization(login, password) {
   return `Basic ${Buffer.from(`${login}:${password}`, "utf8").toString("base64")}`;
+}
+
+function migrationsDirectory() {
+  return desktopMigrationsDirectory({
+    isPackaged: app.isPackaged,
+    resourcesPath: process.resourcesPath,
+    projectRoot: path.join(__dirname, ".."),
+  });
+}
+
+async function migrateDatabase(databaseUrl) {
+  try {
+    await runDatabaseMigrations({
+      connectionString: databaseUrl,
+      migrationsDirectory: migrationsDirectory(),
+    });
+  } catch (error) {
+    console.error("[PAPOT][Database] migration failed", error);
+    throw new Error("DESKTOP_DATABASE_MIGRATION_FAILED");
+  }
 }
 
 async function verifySharedDataPath(sharedDataPath) {
@@ -141,6 +165,7 @@ function publicSetupError(error) {
     "DESKTOP_DATABASE_URL_REQUIRED",
     "DESKTOP_DATABASE_URL_INVALID",
     "DESKTOP_DATABASE_UNREACHABLE",
+    "DESKTOP_DATABASE_MIGRATION_FAILED",
     "DESKTOP_NEXTCLOUD_URL_REQUIRED",
     "DESKTOP_NEXTCLOUD_URL_INVALID",
     "DESKTOP_NEXTCLOUD_HTTPS_REQUIRED",
@@ -166,7 +191,10 @@ function registerDesktopSetupHandler() {
         verifySharedDataPath(input.sharedDataPath),
         verifyDatabaseConnection(input.databaseUrl),
       ]);
-      const nextcloudUserId = await discoverAndVerifyNextcloud(input);
+      const [nextcloudUserId] = await Promise.all([
+        discoverAndVerifyNextcloud(input),
+        migrateDatabase(input.databaseUrl),
+      ]);
       const config = saveDesktopSetup({
         userDataPath: app.getPath("userData"),
         input,
@@ -238,9 +266,21 @@ function createMainWindow() {
 }
 
 app.whenReady().then(async () => {
-  exposeSetupToLocalServer(
-    readDesktopSetup({ userDataPath: app.getPath("userData"), safeStorage }),
-  );
+  const setup = readDesktopSetup({ userDataPath: app.getPath("userData"), safeStorage });
+  exposeSetupToLocalServer(setup);
+
+  if (setup) {
+    try {
+      await migrateDatabase(setup.databaseUrl);
+    } catch {
+      dialog.showErrorBox(
+        "PAPOT AGENCEMENT",
+        "La mise à jour de la base PostgreSQL a échoué. L’application ne peut pas démarrer sans une base à jour.",
+      );
+      app.quit();
+      return;
+    }
+  }
 
   const parsedAppUrl = new URL(appUrl);
   const serverConfig = {

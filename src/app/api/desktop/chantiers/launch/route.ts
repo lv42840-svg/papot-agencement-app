@@ -6,19 +6,18 @@ import {
   requireDesktopRequestContext,
 } from "@/lib/desktop/request-context";
 import { createDesktopSharedResourceRuntime } from "@/lib/desktop/shared-resource-runtime";
-import { parseCommercialPayload } from "@/lib/commercial/domain";
+import { loadCommercialCaseFromDatabase } from "@/lib/commercial/postgres";
 import { parseChantiersPayload } from "@/lib/chantiers/domain";
+import { chantierCapabilities } from "@/lib/chantiers/mutations";
 import {
-  chantierCapabilities,
-  launchChantierFromCommercial,
-  launchChantierSchema,
-} from "@/lib/chantiers/mutations";
+  launchChantierFromAffair,
+  launchChantierFromAffairSchema,
+} from "@/lib/chantiers/launch-from-affair";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
 const CHANTIERS_RESOURCE = { resource_type: "CHANTIER" as const, resource_id: "registry" };
-const COMMERCIAL_RESOURCE = { resource_type: "COMMERCIAL" as const, resource_id: "global" };
 const LOCK_TTL_MS = 30_000;
 
 type Owner = { userId: string; deviceId: string; displayName: string };
@@ -48,16 +47,16 @@ export async function POST(request: Request) {
   let stage = "parse-request";
 
   try {
-    const input = launchChantierSchema.parse(await request.json());
+    const input = launchChantierFromAffairSchema.parse(await request.json());
     stage = "create-runtime";
     const context = await requireDesktopRequestContext("chantiers", "WRITE");
     desktop = context.desktop;
     owner = context.owner;
     const actor = { userId: owner.userId, displayName: owner.displayName };
 
-    stage = "read-commercial-and-lock-chantiers";
-    const [commercialResource, lock, openedInitial] = await Promise.all([
-      desktop.states.get(COMMERCIAL_RESOURCE),
+    stage = "read-affair-and-lock-chantiers";
+    const [affair, lock, openedInitial] = await Promise.all([
+      loadCommercialCaseFromDatabase(input.commercialCaseId),
       desktop.locks.acquire({
         resource: CHANTIERS_RESOURCE,
         leaseId,
@@ -76,16 +75,13 @@ export async function POST(request: Request) {
       );
     }
     ownsLock = true;
-
-    const commercial = parseCommercialPayload(commercialResource?.payload);
-    const commercialCase = commercial.cases.find((item) => item.id === input.commercialCaseId);
-    if (!commercialCase) throw new Error("CHANTIER_COMMERCIAL_CASE_NOT_FOUND");
+    if (!affair) throw new Error("CHANTIER_COMMERCIAL_CASE_NOT_FOUND");
 
     let opened = openedInitial;
     stage = "apply-launch";
-    let mutation = launchChantierFromCommercial(
+    let mutation = launchChantierFromAffair(
       parseChantiersPayload(opened.resource?.payload),
-      commercialCase,
+      affair,
       input,
       actor,
     );
@@ -102,9 +98,9 @@ export async function POST(request: Request) {
       stage = "reopen-after-conflict";
       opened = await desktop.states.openForUpdate(CHANTIERS_RESOURCE);
       stage = "reapply-after-conflict";
-      mutation = launchChantierFromCommercial(
+      mutation = launchChantierFromAffair(
         parseChantiersPayload(opened.resource?.payload),
-        commercialCase,
+        affair,
         input,
         actor,
       );
@@ -119,7 +115,7 @@ export async function POST(request: Request) {
 
     if (saved.status === "conflict") throw new Error("CHANTIERS_VERSION_CONFLICT");
     const payload = parseChantiersPayload(saved.resource.payload);
-    console.info("[PAPOT][Chantiers] launch saved", { ms: Date.now() - startedAt });
+    console.info("[PAPOT][Chantiers] launch from affair saved", { ms: Date.now() - startedAt });
     return noStoreJson({
       payload,
       actor,

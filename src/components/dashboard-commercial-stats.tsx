@@ -1,12 +1,11 @@
 "use client";
 
 import Link from "next/link";
-import { BriefcaseBusiness, FileText } from "lucide-react";
+import { BriefcaseBusiness, Clock3 } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
 import {
   commercialNeedsFollowUp,
   isCommercialClosed,
-  isQuoteOverdue,
   type CommercialPayload,
 } from "@/lib/commercial/domain";
 
@@ -38,10 +37,8 @@ export function DashboardCommercialStats() {
     const cases = snapshot?.payload.cases ?? [];
     const now = new Date(snapshot?.serverNow ?? Date.now());
     return {
-      pistes: cases.filter((item) => item.status === "PISTE" && !isCommercialClosed(item)).length,
-      actions: cases.filter(
-        (item) => !isCommercialClosed(item) && (commercialNeedsFollowUp(item, now) || isQuoteOverdue(item, now)),
-      ).length,
+      active: cases.filter((item) => !isCommercialClosed(item) && item.status !== "CONFIRMED").length,
+      actions: cases.filter((item) => !isCommercialClosed(item) && commercialNeedsFollowUp(item, now)).length,
     };
   }, [snapshot]);
 
@@ -52,19 +49,19 @@ export function DashboardCommercialStats() {
           <BriefcaseBusiness size={20} />
         </span>
         <div>
-          <strong>{snapshot ? stats.pistes : "—"}</strong>
-          <span>Pistes commerciales</span>
-          <small>actives</small>
+          <strong>{snapshot ? stats.active : "—"}</strong>
+          <span>Affaires actives</span>
+          <small>suivi commercial</small>
         </div>
       </Link>
       <Link className="dashboardStat dashboardStatGold dashboardStatLink" href="/commercial">
         <span className="dashboardStatIcon">
-          <FileText size={20} />
+          <Clock3 size={20} />
         </span>
         <div>
           <strong>{snapshot ? stats.actions : "—"}</strong>
-          <span>Commercial à traiter</span>
-          <small>relances ou chiffrages en retard</small>
+          <span>À suivre</span>
+          <small>relances ou revues arrivées</small>
         </div>
       </Link>
       <style jsx global>{`
