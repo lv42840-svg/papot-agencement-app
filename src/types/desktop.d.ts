@@ -5,7 +5,6 @@ declare global {
     papotDesktop?: {
       saveSetup: (input: {
         sharedDataPath: string;
-        databaseUrl: string;
         nextcloudBaseUrl: string;
         nextcloudLogin: string;
         nextcloudAppPassword: string;
