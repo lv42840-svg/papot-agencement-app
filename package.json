@@ -82,6 +82,13 @@
       {
         "from": "public",
         "to": "server/public"
+      },
+      {
+        "from": "db/migrations",
+        "to": "db/migrations",
+        "filter": [
+          "*.sql"
+        ]
       }
     ],
     "win": {
