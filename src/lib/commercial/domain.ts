@@ -73,8 +73,8 @@ export const commercialClientSchema = z.object({
 export const commercialCaseSchema = z.object({
   id: z.string().uuid(),
   sourceEntryId: z.string().uuid().nullable().default(null),
-  clientId: z.string().uuid().nullable().default(null),
-  primaryContactId: z.string().uuid().nullable().default(null),
+  clientId: z.string().uuid().nullable().optional(),
+  primaryContactId: z.string().uuid().nullable().optional(),
   name: z.string().trim().min(1).max(240),
   clientName: z.string().trim().max(240).nullable(),
   siteLabel: z.string().trim().max(240).nullable(),
@@ -153,6 +153,8 @@ export function parseCommercialPayload(value: unknown): CommercialPayload {
     clients: parsed.clients ?? [],
     cases: parsed.cases.map((item) => ({
       ...item,
+      clientId: item.clientId ?? null,
+      primaryContactId: item.primaryContactId ?? null,
       documents: item.documents.map((document) => ({
         ...document,
         isSignedQuote: document.isSignedQuote ?? document.legacySignedQuote ?? false,
@@ -200,7 +202,7 @@ export function nextCommercialDeadline(item: CommercialCase): string | null {
 }
 
 export function isQuoteOverdue(item: CommercialCase, now: Date = new Date()): boolean {
-  return item.status === "CHIFFRAGE" && Boolean(item.quoteDueDate) && item.quoteDueDate < commercialParisDateKey(now);
+  return item.status === "CHIFFRAGE" && item.quoteDueDate !== null && item.quoteDueDate < commercialParisDateKey(now);
 }
 
 export function commercialHasSignedQuote(item: CommercialCase): boolean {
