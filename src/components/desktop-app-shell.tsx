@@ -1,3 +1,4 @@
+import { MODULE_PERMISSIONS } from "@/lib/auth/permission-catalog";
 import { listReadableModules } from "@/lib/auth/permissions";
 import { requireUser } from "@/lib/auth/session";
 import { DesktopSidebar } from "./desktop-sidebar";
@@ -8,19 +9,7 @@ type DesktopDeviceIdentity = {
   configured: boolean;
 };
 
-const ADMIN_VISIBLE_MODULES = [
-  "capture",
-  "commercial",
-  "chantiers",
-  "planning",
-  "hours",
-  "purchases",
-  "billing",
-  "treasury",
-  "team",
-  "pilotage",
-  "settings",
-];
+const ADMIN_VISIBLE_MODULES = MODULE_PERMISSIONS.map((module) => module.key);
 
 function readDesktopDeviceIdentity(): DesktopDeviceIdentity {
   const rawConfig = process.env.PAPOT_DESKTOP_CONFIG_JSON;
@@ -61,7 +50,10 @@ export async function DesktopAppShell({ children }: { children: React.ReactNode 
 
   return (
     <div className="desktopAppShellV2">
-      <DesktopSidebar allowedModules={allowedModules} />
+      <DesktopSidebar
+        allowedModules={allowedModules}
+        canManagePermissions={user.canManagePermissions}
+      />
 
       <div className="desktopWorkspace">
         <DesktopTopbar
