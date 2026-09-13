@@ -14,14 +14,12 @@ function minimalQuote() {
     issueDate: "2026-09-13",
     validityDays: 30,
     paymentTerms: "45 jours fin de mois",
-    globalDiscountPercent: 0,
     items: [
       {
         id: sectionId,
         kind: "SECTION" as const,
         parentId: null,
         title: "Mobilier",
-        discountPercent: 0,
       },
       {
         id: subsectionId,
@@ -37,9 +35,6 @@ function minimalQuote() {
         unit: "u",
         quantity: 21,
         quantityFormula: "2+6+4+9",
-        unitPriceCents: 12_500,
-        discountPercent: 0,
-        vatRatePercent: 20,
       },
       {
         id: commentId,
@@ -91,11 +86,10 @@ describe("minimal native quote model", () => {
     };
     expect(() => parseQuoteModel(missingParent)).toThrow("QUOTE_ITEM_PARENT_NOT_FOUND");
 
-    const duplicate = minimalQuote();
-    duplicate.items[3] = { ...duplicate.items[3], id: lineId };
-    expect(() => validateQuoteItemHierarchy(parseQuoteModel(minimalQuote()).items.concat(duplicate.items[3]))).toThrow(
-      "QUOTE_ITEM_ID_DUPLICATE",
-    );
+    const duplicateItems = parseQuoteModel(minimalQuote()).items;
+    expect(() =>
+      validateQuoteItemHierarchy([...duplicateItems, { ...duplicateItems[2] }]),
+    ).toThrow("QUOTE_ITEM_ID_DUPLICATE");
   });
 
   it("rejects an invalid calendar date", () => {
