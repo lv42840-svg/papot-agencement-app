@@ -1,5 +1,9 @@
 import { describe, expect, it } from "vitest";
-import { createInitialClientsPayload } from "../src/lib/clients/domain";
+import {
+  clientConfirmationMissingFields,
+  createInitialClientsPayload,
+  isClientReadyForConfirmation,
+} from "../src/lib/clients/domain";
 import { applyClientsMutation } from "../src/lib/clients/mutations";
 
 const actor = {
@@ -37,6 +41,52 @@ describe("clients domain", () => {
     expect(result.payload.clients[0].companyName).toBe("Dupont Agencement");
     expect(result.payload.clients[0].paymentTerms).toBe("45 jours fin de mois");
     expect(result.payload.clients[0].isArchived).toBe(false);
+    expect(isClientReadyForConfirmation(result.payload.clients[0])).toBe(true);
+  });
+
+  it("allows a provisional client while the quote is still being prepared", () => {
+    const result = applyClientsMutation(
+      createInitialClientsPayload(),
+      {
+        action: "create",
+        ...baseFields,
+        addressLine1: "",
+        postalCode: "",
+        city: "",
+        siret: "",
+        paymentTerms: "",
+      },
+      actor,
+    );
+
+    const client = result.payload.clients[0];
+    expect(client.companyName).toBe("Dupont Agencement");
+    expect(isClientReadyForConfirmation(client)).toBe(false);
+    expect(clientConfirmationMissingFields(client)).toEqual([
+      "addressLine1",
+      "postalCode",
+      "city",
+      "siret",
+      "paymentTerms",
+    ]);
+  });
+
+  it("does not require SIRET from a private individual before confirmation", () => {
+    const result = applyClientsMutation(
+      createInitialClientsPayload(),
+      {
+        action: "create",
+        ...baseFields,
+        type: "PARTICULIER",
+        companyName: "",
+        firstName: "Marie",
+        lastName: "Durand",
+        siret: "",
+      },
+      actor,
+    );
+
+    expect(clientConfirmationMissingFields(result.payload.clients[0])).toEqual([]);
   });
 
   it("updates contacts and payment terms without changing the client id", () => {
