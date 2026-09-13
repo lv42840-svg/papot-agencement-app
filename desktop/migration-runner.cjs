@@ -22,10 +22,12 @@ async function runDatabaseMigrations({ connectionString, migrationsDirectory }) 
     connectionTimeoutMillis: 8_000,
     statement_timeout: 60_000,
   });
+  let locked = false;
 
   try {
     await client.connect();
     await client.query("SELECT pg_advisory_lock(hashtext($1)::bigint)", [MIGRATION_LOCK_KEY]);
+    locked = true;
     await client.query(`
       CREATE TABLE IF NOT EXISTS schema_migration (
         filename text PRIMARY KEY,
@@ -53,7 +55,7 @@ async function runDatabaseMigrations({ connectionString, migrationsDirectory }) 
       console.info(`[PAPOT][Database] migration applied: ${filename}`);
     }
   } finally {
-    if (client._connected) {
+    if (locked) {
       await client
         .query("SELECT pg_advisory_unlock(hashtext($1)::bigint)", [MIGRATION_LOCK_KEY])
         .catch(() => undefined);
