@@ -52,9 +52,17 @@ function parseClientBlock(lines: string[]): {
   const clientSiren = firstMatch(lines[sirenIndex], /SIREN\s*:\s*([0-9 ]{9,20})/i)?.replace(/\s/g, "") ?? null;
   let addressIndex = -1;
   for (let index = sirenIndex - 1; index >= Math.max(0, sirenIndex - 10); index -= 1) {
-    if (/^\d{1,5}\s+\S/.test(lines[index])) {
+    if (/^\d{1,4}\s+\S/.test(lines[index])) {
       addressIndex = index;
       break;
+    }
+  }
+  if (addressIndex < 0) {
+    for (let index = sirenIndex - 1; index >= Math.max(0, sirenIndex - 10); index -= 1) {
+      if (/^\d{1,5}\s+\S/.test(lines[index])) {
+        addressIndex = index;
+        break;
+      }
     }
   }
 
