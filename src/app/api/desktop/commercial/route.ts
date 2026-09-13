@@ -1,10 +1,10 @@
 import { NextResponse } from "next/server";
 import { ZodError } from "zod";
 import { requireDesktopRequestContext } from "@/lib/desktop/request-context";
+import { listCommercialAssignableUsers } from "@/lib/commercial/people";
 import {
   applyCommercialMutationInDatabase,
   commercialPostgresMutationSchema,
-  listActiveCommercialUsers,
   loadCommercialPayloadFromDatabase,
 } from "@/lib/commercial/postgres";
 
@@ -25,10 +25,14 @@ function statusFor(code: string): number {
   return 400;
 }
 
-async function snapshot(canWrite: boolean, actor: { userId: string; displayName: string }, focusCaseId?: string) {
+async function snapshot(
+  canWrite: boolean,
+  actor: { userId: string; displayName: string },
+  focusCaseId?: string,
+) {
   const [payload, activeUsers] = await Promise.all([
     loadCommercialPayloadFromDatabase(),
-    listActiveCommercialUsers(),
+    listCommercialAssignableUsers(),
   ]);
   return {
     payload,
