@@ -61,15 +61,18 @@ describe("minimal native quote model", () => {
     expect(parseQuoteModel(minimalQuote())).toEqual(minimalQuote());
   });
 
-  it("keeps client reference, subject, date, validity and payment terms as quote-owned fields", () => {
-    const quote = parseQuoteModel(minimalQuote());
+  it(
+    "keeps client reference, subject, date, validity and payment terms as quote-owned fields",
+    () => {
+      const quote = parseQuoteModel(minimalQuote());
 
-    expect(quote.clientId).toBe("bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb");
-    expect(quote.subject).toBe("Agencement accueil");
-    expect(quote.issueDate).toBe("2026-09-13");
-    expect(quote.validityDays).toBe(30);
-    expect(quote.paymentTerms).toBe("45 jours fin de mois");
-  });
+      expect(quote.clientId).toBe("bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb");
+      expect(quote.subject).toBe("Agencement accueil");
+      expect(quote.issueDate).toBe("2026-09-13");
+      expect(quote.validityDays).toBe(30);
+      expect(quote.paymentTerms).toBe("45 jours fin de mois");
+    },
+  );
 
   it("allows a free line or comment outside sections", () => {
     const quote = minimalQuote();
@@ -94,7 +97,9 @@ describe("minimal native quote model", () => {
       ...missingParent.items[2],
       parentId: "99999999-9999-4999-8999-999999999999",
     };
-    expect(() => parseQuoteModel(missingParent)).toThrow("QUOTE_ITEM_PARENT_NOT_FOUND");
+    expect(() => parseQuoteModel(missingParent)).toThrow(
+      "QUOTE_ITEM_PARENT_NOT_FOUND",
+    );
 
     const duplicate = minimalQuote();
     duplicate.items.push({ ...duplicate.items[2] });
@@ -102,9 +107,9 @@ describe("minimal native quote model", () => {
   });
 
   it("rejects an invalid calendar date", () => {
-    expect(() => parseQuoteModel({ ...minimalQuote(), issueDate: "2026-02-31" })).toThrow(
-      "QUOTE_MODEL_INVALID",
-    );
+    expect(() =>
+      parseQuoteModel({ ...minimalQuote(), issueDate: "2026-02-31" }),
+    ).toThrow("QUOTE_MODEL_INVALID");
   });
 
   it("requires payment terms and a positive validity duration", () => {
@@ -129,7 +134,11 @@ describe("minimal native quote model", () => {
 
   it("rejects a plain number used as a fake formula memo", () => {
     const quote = minimalQuote();
-    quote.items[2] = { ...quote.items[2], quantity: 21, quantityFormula: "21" };
+    quote.items[2] = {
+      ...quote.items[2],
+      quantity: 21,
+      quantityFormula: "21",
+    };
     expect(() => parseQuoteModel(quote)).toThrow("QUOTE_LINE_FORMULA_INVALID");
   });
 });
