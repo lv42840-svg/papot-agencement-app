@@ -1,5 +1,6 @@
 import { inflateSync } from "node:zlib";
 import type { PartialObatData } from "./csv-parser";
+import type { ObatQuoteLine } from "./domain";
 
 type PdfObjectMap = Map<number, string>;
 type FontMap = Map<number, string>;
@@ -102,6 +103,61 @@ function extractMoney(flatText: string, label: string): number | null {
   );
 }
 
+function stripQuoteColumns(value: string): string {
+  return cleanLine(
+    value
+      .replace(
+        /\s+\d+(?:[.,]\d+)?\s*(?:ens|u|ml|m²|m2|m³|m3|kg|h)\s+[0-9][0-9\s.,]*\s*€[\s\S]*$/i,
+        "",
+      )
+      .replace(/\s+[0-9][0-9\s.,]*\s*€\s*$/, ""),
+  );
+}
+
+function isQuantityLine(value: string): boolean {
+  return /^\d+(?:[.,]\d+)?\s*(?:ens|u|ml|m²|m2|m³|m3|kg|h)\b/i.test(value);
+}
+
+function parseQuoteLines(lines: string[]): ObatQuoteLine[] {
+  const headerIndex = lines.findIndex(
+    (line) => /D[ÉE]SIGNATION/i.test(line) && /QT[ÉE]/i.test(line),
+  );
+  if (headerIndex < 0) return [];
+
+  const quoteLines: ObatQuoteLine[] = [];
+  const refPattern = /^(\d{1,2}(?:\.\d+)*)\s+(.+)$/;
+
+  for (let index = headerIndex + 1; index < lines.length; index += 1) {
+    const line = lines[index];
+    if (/^Total net HT\b/i.test(line)) break;
+    const match = line.match(refPattern);
+    if (!match) continue;
+
+    const ref = match[1];
+    const rawDesignation = match[2];
+    const hadColumns = isQuantityLine(rawDesignation.replace(/^.*?\s(?=\d+(?:[.,]\d+)?\s*(?:ens|u|ml|m²|m2|m³|m3|kg|h)\b)/i, ""));
+    const parts = [stripQuoteColumns(rawDesignation)].filter(Boolean);
+
+    if (!hadColumns) {
+      for (let cursor = index + 1; cursor < lines.length; cursor += 1) {
+        const next = lines[cursor];
+        if (refPattern.test(next) || isQuantityLine(next) || /^Total net HT\b/i.test(next)) break;
+        if (/^(PAPOT-LIBERAL|SIREN\s*:|Page\s+\d+)/i.test(next)) break;
+        if (/\bTVA\b/i.test(next) && /€/.test(next)) break;
+        if (/^\d{3,}\s+\S/.test(next)) break;
+        if (parts.length >= 3) break;
+        parts.push(stripQuoteColumns(next));
+      }
+    }
+
+    const designation = cleanLine(parts.filter(Boolean).join(" "));
+    if (!designation || designation === "%") continue;
+    quoteLines.push({ ref, designation, quantity: null, unit: null, totalHt: null });
+  }
+
+  return quoteLines;
+}
+
 export function parseObatQuoteText(rawText: string): PartialObatData {
   const lines = rawText
     .replace(/\r/g, "")
@@ -166,6 +222,7 @@ export function parseObatQuoteText(rawText: string): PartialObatData {
     vatAmount: parseFrenchNumber(vatAmount),
     totalTtc: extractMoney(flat, "Total TTC"),
     depositTtc: parseFrenchNumber(depositTtc),
+    quoteLines: parseQuoteLines(lines),
   };
 }
 
