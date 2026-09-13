@@ -3,6 +3,8 @@ import { Brand } from "@/components/brand";
 import { FirstAdminForm } from "@/components/first-admin-form";
 import { authHasUsers } from "@/lib/auth/store";
 
+export const dynamic = "force-dynamic";
+
 export default async function FirstAdminPage() {
   if (await authHasUsers()) redirect("/login");
 
@@ -12,7 +14,9 @@ export default async function FirstAdminPage() {
         <Brand />
         <div>
           <h1>Premier administrateur</h1>
-          <p className="muted">Créez le premier compte PAPOT AGENCEMENT. Les utilisateurs suivants seront créés depuis l’administration.</p>
+          <p className="muted">
+            Créez le premier compte PAPOT AGENCEMENT. Les utilisateurs suivants seront créés depuis l’administration.
+          </p>
         </div>
         <FirstAdminForm />
       </section>
