@@ -6,15 +6,11 @@ const path = require("node:path");
 const appUrl = process.env.PAPOT_APP_URL || "http://127.0.0.1:3217/desktop-setup";
 
 async function main() {
-  const electronBin = path.join(
-    process.cwd(),
-    "node_modules",
-    "electron",
-    "dist",
-    process.platform === "win32" ? "electron.exe" : "electron",
-  );
+  // Electron 42+ no longer downloads its native binary during npm install.
+  // Its CLI bootstrap downloads the pinned binary on first use, then launches it.
+  const electronCli = path.join(process.cwd(), "node_modules", "electron", "cli.js");
 
-  const electron = spawn(electronBin, ["desktop/main.cjs"], {
+  const electron = spawn(process.execPath, [electronCli, "desktop/main.cjs"], {
     stdio: "inherit",
     env: {
       ...process.env,
@@ -23,7 +19,10 @@ async function main() {
     },
   });
 
-  const exitCode = await new Promise((resolve) => electron.once("exit", resolve));
+  const exitCode = await new Promise((resolve, reject) => {
+    electron.once("error", reject);
+    electron.once("exit", resolve);
+  });
   process.exitCode = typeof exitCode === "number" ? exitCode : 0;
 }
 
