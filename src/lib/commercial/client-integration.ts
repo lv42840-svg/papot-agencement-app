@@ -8,8 +8,8 @@ import {
   type ClientRecord,
 } from "@/lib/clients/domain";
 import { applyClientsMutation } from "@/lib/clients/mutations";
+import type { CommercialClient, CommercialPayload } from "@/lib/commercial/domain";
 import { createDesktopSharedResourceRuntime } from "@/lib/desktop/shared-resource-runtime";
-import type { CommercialClient } from "@/lib/commercial/domain";
 
 const CLIENTS_RESOURCE = { resource_type: "CLIENTS" as const, resource_id: "global" };
 const CLIENTS_LOCK_TTL_MS = 30_000;
@@ -50,6 +50,22 @@ export async function listCanonicalCommercialClients(desktop: Desktop): Promise<
       phone: client.phone || null,
     }))
     .sort((a, b) => a.displayName.localeCompare(b.displayName, "fr-FR", { sensitivity: "base" }));
+}
+
+export function hydrateCommercialPayloadWithCanonicalClients(
+  payload: CommercialPayload,
+  clients: CommercialClient[],
+): CommercialPayload {
+  const clientsById = new Map(clients.map((client) => [client.id, client]));
+  return {
+    ...payload,
+    clients,
+    cases: payload.cases.map((item) => {
+      if (!item.clientId) return item;
+      const client = clientsById.get(item.clientId);
+      return client ? { ...item, clientName: client.displayName } : item;
+    }),
+  };
 }
 
 async function createProvisionalClient(
