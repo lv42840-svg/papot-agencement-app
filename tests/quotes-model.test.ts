@@ -1,12 +1,16 @@
 import { describe, expect, it } from "vitest";
-import { parseQuoteModel, validateQuoteItemHierarchy } from "../src/lib/quotes/model";
+import {
+  parseQuoteModel,
+  validateQuoteItemHierarchy,
+  type QuoteModel,
+} from "../src/lib/quotes/model";
 
 const sectionId = "11111111-1111-4111-8111-111111111111";
 const subsectionId = "22222222-2222-4222-8222-222222222222";
 const lineId = "33333333-3333-4333-8333-333333333333";
 const commentId = "44444444-4444-4444-8444-444444444444";
 
-function minimalQuote() {
+function minimalQuote(): QuoteModel {
   return {
     id: "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa",
     clientId: "bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb",
@@ -17,19 +21,19 @@ function minimalQuote() {
     items: [
       {
         id: sectionId,
-        kind: "SECTION" as const,
+        kind: "SECTION",
         parentId: null,
         title: "Mobilier",
       },
       {
         id: subsectionId,
-        kind: "SUBSECTION" as const,
+        kind: "SUBSECTION",
         parentId: sectionId,
         title: "Meubles bas",
       },
       {
         id: lineId,
-        kind: "LINE" as const,
+        kind: "LINE",
         parentId: subsectionId,
         description: "Caisson mélaminé",
         unit: "u",
@@ -38,7 +42,7 @@ function minimalQuote() {
       },
       {
         id: commentId,
-        kind: "COMMENT" as const,
+        kind: "COMMENT",
         parentId: sectionId,
         text: "Coloris à confirmer avec le client.",
       },
@@ -86,7 +90,7 @@ describe("minimal native quote model", () => {
     };
     expect(() => parseQuoteModel(missingParent)).toThrow("QUOTE_ITEM_PARENT_NOT_FOUND");
 
-    const duplicateItems = parseQuoteModel(minimalQuote()).items;
+    const duplicateItems = minimalQuote().items;
     expect(() =>
       validateQuoteItemHierarchy([...duplicateItems, { ...duplicateItems[2] }]),
     ).toThrow("QUOTE_ITEM_ID_DUPLICATE");
