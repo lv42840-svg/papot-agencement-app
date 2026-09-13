@@ -159,6 +159,11 @@ input[type="radio"] {
   min-height: 28px;
 }
 
+/* Technical module keys are implementation details, never user-facing labels. */
+.adminCheck > span > small {
+  display: none !important;
+}
+
 .adminResetForm label {
   flex: 0 1 620px !important;
   max-width: 620px;
