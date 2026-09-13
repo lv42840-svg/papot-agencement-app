@@ -11,11 +11,15 @@ import { applyEntriesMutation, registerEntryAttachments } from "../src/lib/entri
 const lucien = {
   userId: "11111111-1111-4111-8111-111111111111",
   displayName: "Lucien",
+  canQualify: true,
+  canManageTags: true,
 };
 
 const nadia = {
   userId: "22222222-2222-4222-8222-222222222222",
   displayName: "Nadia",
+  canQualify: true,
+  canManageTags: false,
 };
 
 describe("Entries business rules", () => {
@@ -31,6 +35,13 @@ describe("Entries business rules", () => {
     const wednesdayBeforeAscensionAtTenAmParis = new Date("2026-05-13T08:00:00.000Z");
     expect(addFrenchBusinessHours(wednesdayBeforeAscensionAtTenAmParis, 48).toISOString()).toBe(
       "2026-05-18T08:00:00.000Z",
+    );
+  });
+
+  it("includes the fixed Chiffrage seul tag", () => {
+    const initial = createInitialEntriesPayload();
+    expect(initial.tags).toContainEqual(
+      expect.objectContaining({ id: "chiffrage-seul", label: "Chiffrage seul", active: true }),
     );
   });
 
@@ -140,7 +151,7 @@ describe("Entries business rules", () => {
     });
   });
 
-  it("allows Voir plus tard only after the entry has reached attention and keeps its reason", () => {
+  it("allows Voir plus tard immediately and keeps its reason", () => {
     const initial = createInitialEntriesPayload();
     const createdAt = new Date("2026-09-07T08:00:00.000Z");
     const created = applyEntriesMutation(
@@ -151,15 +162,21 @@ describe("Entries business rules", () => {
     ).payload;
     const entry = created.entries[0];
     const attentionDate = addFrenchBusinessHours(createdAt, 48);
+    const immediatelyAfterCapture = new Date("2026-09-07T09:00:00.000Z");
 
-    expect(isQualificationAttentionDue(entry, new Date(attentionDate.getTime() - 1))).toBe(false);
+    expect(isQualificationAttentionDue(entry, immediatelyAfterCapture)).toBe(false);
     expect(isQualificationAttentionDue(entry, attentionDate)).toBe(true);
 
     const snoozed = applyEntriesMutation(
       created,
-      { action: "snooze", entryId: entry.id, untilDate: "2026-09-15", reason: "Attendre le retour du client" },
+      {
+        action: "snooze",
+        entryId: entry.id,
+        untilDate: "2026-09-15",
+        reason: "Attendre le retour du client",
+      },
       nadia,
-      attentionDate,
+      immediatelyAfterCapture,
     ).payload;
 
     expect(snoozed.entries[0].snoozedUntilDate).toBe("2026-09-15");

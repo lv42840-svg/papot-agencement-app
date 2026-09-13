@@ -10,6 +10,7 @@ import {
   entriesCapabilities,
   listSuggestedAssignees,
   registerEntryAttachments,
+  type EntriesActor,
 } from "@/lib/entries/mutations";
 
 export const runtime = "nodejs";
@@ -20,15 +21,23 @@ const LOCK_TTL_MS = 30_000;
 
 type RouteContext = { params: Promise<{ entryId: string }> };
 
+function actorFor(context: Awaited<ReturnType<typeof requireDesktopRequestContext>>): EntriesActor {
+  return {
+    userId: context.user.id,
+    displayName: context.user.displayName,
+    canQualify: context.moduleAccess.canWrite,
+    canManageTags: context.user.canManagePermissions,
+  };
+}
+
 function snapshot(
   payload: ReturnType<typeof parseEntriesPayload>,
-  owner: { userId: string; displayName: string },
+  actor: EntriesActor,
   focusEntryId?: string,
 ) {
-  const actor = { userId: owner.userId, displayName: owner.displayName };
   return {
     payload,
-    actor,
+    actor: { userId: actor.userId, displayName: actor.displayName },
     capabilities: entriesCapabilities(actor),
     suggestedAssignees: listSuggestedAssignees(payload, actor),
     focusEntryId,
@@ -51,13 +60,13 @@ export async function POST(request: Request, context: RouteContext) {
     const { entryId } = await context.params;
     const requestContext = await requireDesktopRequestContext("capture", "WRITE");
     const { desktop, owner } = requestContext;
+    const actor = actorFor(requestContext);
     const form = await request.formData();
     const files = form.getAll("files").filter((value): value is File => value instanceof File);
     if (files.length === 0) {
       return NextResponse.json({ error: "ENTRY_ATTACHMENTS_REQUIRED" }, { status: 400 });
     }
 
-    const actor = { userId: owner.userId, displayName: owner.displayName };
     const transport = {
       dav: desktop.dav,
       nextcloudUserId: desktop.nextcloudUserId,
@@ -122,7 +131,7 @@ export async function POST(request: Request, context: RouteContext) {
       }
       if (saved.status === "conflict") throw new Error("ENTRIES_VERSION_CONFLICT");
 
-      return NextResponse.json(snapshot(parseEntriesPayload(saved.resource.payload), owner, entryId), {
+      return NextResponse.json(snapshot(parseEntriesPayload(saved.resource.payload), actor, entryId), {
         headers: { "Cache-Control": "no-store" },
       });
     } catch (error) {

@@ -12,6 +12,7 @@ import {
   entriesCapabilities,
   entriesMutationSchema,
   listSuggestedAssignees,
+  type EntriesActor,
 } from "@/lib/entries/mutations";
 
 export const runtime = "nodejs";
@@ -24,6 +25,17 @@ const ENTRIES_RESOURCE = {
 const ENTRIES_WRITE_LOCK_TTL_MS = 30_000;
 const ENTRIES_OWN_LOCK_RECLAIM_AFTER_MS = 0;
 
+type Owner = { userId: string; deviceId: string; displayName: string };
+
+function actorFor(context: Awaited<ReturnType<typeof requireDesktopRequestContext>>): EntriesActor {
+  return {
+    userId: context.user.id,
+    displayName: context.user.displayName,
+    canQualify: context.moduleAccess.canWrite,
+    canManageTags: context.user.canManagePermissions,
+  };
+}
+
 function noStoreJson(body: unknown, init?: ResponseInit) {
   const response = NextResponse.json(body, init);
   response.headers.set("Cache-Control", "no-store");
@@ -32,13 +44,12 @@ function noStoreJson(body: unknown, init?: ResponseInit) {
 
 function publicSnapshot(
   payload: ReturnType<typeof parseEntriesPayload>,
-  owner: { userId: string; displayName: string },
+  actor: EntriesActor,
   focusEntryId?: string,
 ) {
-  const actor = { userId: owner.userId, displayName: owner.displayName };
   return {
     payload,
-    actor,
+    actor: { userId: actor.userId, displayName: actor.displayName },
     capabilities: entriesCapabilities(actor),
     suggestedAssignees: listSuggestedAssignees(payload, actor),
     focusEntryId,
@@ -58,7 +69,9 @@ function errorStatus(code: string): number {
 
 export async function GET() {
   try {
-    const { desktop, owner } = await requireDesktopRequestContext("capture", "READ");
+    const context = await requireDesktopRequestContext("capture", "READ");
+    const { desktop } = context;
+    const actor = actorFor(context);
     const cached = desktop.states.getCached(ENTRIES_RESOURCE);
 
     if (cached !== undefined) {
@@ -66,12 +79,11 @@ export async function GET() {
         const code = error instanceof Error ? error.message : "ENTRIES_REFRESH_FAILED";
         console.error("[PAPOT][Entries] background refresh failed", { code });
       });
-      return noStoreJson(publicSnapshot(parseEntriesPayload(cached?.payload), owner));
+      return noStoreJson(publicSnapshot(parseEntriesPayload(cached?.payload), actor));
     }
 
     const resource = await desktop.states.get(ENTRIES_RESOURCE);
-    const payload = parseEntriesPayload(resource?.payload);
-    return noStoreJson(publicSnapshot(payload, owner));
+    return noStoreJson(publicSnapshot(parseEntriesPayload(resource?.payload), actor));
   } catch (error) {
     const code = error instanceof Error ? error.message : "ENTRIES_LOAD_FAILED";
     return noStoreJson({ status: "error", error: code }, { status: errorStatus(code) });
@@ -82,7 +94,7 @@ export async function POST(request: Request) {
   const leaseId = randomUUID();
   const startedAt = Date.now();
   let desktop: ReturnType<typeof createDesktopSharedResourceRuntime> | null = null;
-  let owner: { userId: string; deviceId: string; displayName: string } | null = null;
+  let owner: Owner | null = null;
   let ownsLock = false;
   let stage = "parse-request";
 
@@ -92,6 +104,7 @@ export async function POST(request: Request) {
     const context = await requireDesktopRequestContext("capture", "WRITE");
     desktop = context.desktop;
     owner = context.owner;
+    const actor = actorFor(context);
 
     stage = "acquire-lock-and-open-resource";
     const [lockResult, initialOpened] = await Promise.all([
@@ -120,7 +133,6 @@ export async function POST(request: Request) {
 
     let opened = initialOpened;
     stage = "apply-mutation";
-    const actor = { userId: owner.userId, displayName: owner.displayName };
     let mutation = applyEntriesMutation(parseEntriesPayload(opened.resource?.payload), input, actor);
 
     stage = "save-resource";
@@ -154,7 +166,7 @@ export async function POST(request: Request) {
 
     console.info("[PAPOT][Entries] POST saved", { ms: Date.now() - startedAt });
     return noStoreJson(
-      publicSnapshot(parseEntriesPayload(saved.resource.payload), owner, mutation.focusEntryId),
+      publicSnapshot(parseEntriesPayload(saved.resource.payload), actor, mutation.focusEntryId),
     );
   } catch (error) {
     const code =
@@ -174,11 +186,7 @@ export async function POST(request: Request) {
       const releaseDesktop = desktop;
       const releaseOwner = owner;
       void releaseDesktop.locks
-        .release({
-          resource: ENTRIES_RESOURCE,
-          leaseId,
-          owner: releaseOwner,
-        })
+        .release({ resource: ENTRIES_RESOURCE, leaseId, owner: releaseOwner })
         .catch((error: unknown) => {
           const code = error instanceof Error ? error.message : "LOCK_RELEASE_FAILED";
           console.error("[PAPOT][Entries] lock release failed", { code });

@@ -5,11 +5,13 @@ import { applyEntriesMutation } from "../src/lib/entries/mutations";
 const lucien = {
   userId: "11111111-1111-4111-8111-111111111111",
   displayName: "Lucien",
+  canQualify: true,
 };
 
 const nadia = {
   userId: "22222222-2222-4222-8222-222222222222",
   displayName: "Nadia",
+  canQualify: true,
 };
 
 describe("Mes tâches updates", () => {

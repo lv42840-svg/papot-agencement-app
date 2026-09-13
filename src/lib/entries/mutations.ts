@@ -1,7 +1,6 @@
 import { randomUUID } from "node:crypto";
 import { z } from "zod";
 import {
-  isQualificationAttentionDue,
   normalizePersonName,
   parisDateKey,
   type EntriesPayload,
@@ -100,18 +99,19 @@ export const entriesMutationSchema = z.discriminatedUnion("action", [
 ]);
 
 export type EntriesMutation = z.infer<typeof entriesMutationSchema>;
-export type EntriesActor = { userId: string; displayName: string };
+export type EntriesActor = {
+  userId: string;
+  displayName: string;
+  canQualify?: boolean;
+  canManageTags?: boolean;
+};
 export type EntriesCapabilities = { canQualify: boolean; canManageTags: boolean };
 export type EntriesMutationResult = { payload: EntriesPayload; focusEntryId?: string };
 
-function isNamed(actor: EntriesActor, name: string): boolean {
-  return normalizePersonName(actor.displayName) === normalizePersonName(name);
-}
-
 export function entriesCapabilities(actor: EntriesActor): EntriesCapabilities {
   return {
-    canQualify: isNamed(actor, "Nadia") || isNamed(actor, "Lucien"),
-    canManageTags: isNamed(actor, "Lucien"),
+    canQualify: actor.canQualify === true,
+    canManageTags: actor.canManageTags === true,
   };
 }
 
@@ -394,9 +394,6 @@ export function applyEntriesMutation(
   if (input.action === "snooze") {
     requireCapability(capabilities.canQualify, "QUALIFICATION_FORBIDDEN");
     assertToQualify(entry);
-    if (!isQualificationAttentionDue(entry, nowDate)) {
-      throw new Error("ENTRY_NOT_DUE_FOR_SNOOZE");
-    }
     if (input.untilDate < parisDateKey(nowDate)) throw new Error("SNOOZE_DATE_IN_PAST");
     entry.snoozedUntilDate = input.untilDate;
     history(
@@ -515,10 +512,7 @@ export function applyEntriesMutation(
   throw new Error("ENTRY_MUTATION_UNSUPPORTED");
 }
 
-export function listSuggestedAssignees(
-  payload: EntriesPayload,
-  actor: EntriesActor,
-): string[] {
+export function listSuggestedAssignees(payload: EntriesPayload, actor: EntriesActor): string[] {
   const names = new Set<string>(["Nadia", "Lucien", actor.displayName]);
   for (const entry of payload.entries) {
     if (entry.assigneeName) names.add(entry.assigneeName);
