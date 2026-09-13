@@ -84,7 +84,10 @@ export const quoteRecordSchema = z
     subject: z.string().trim().min(1).max(240),
     status: quoteStatusSchema,
     version: quoteVersionSchema,
-    quoteNumber: z.string().regex(/^D-\d{4}-\d{4}$/).nullable(),
+    quoteNumber: z
+      .string()
+      .regex(/^D-\d{4}-\d{4}$/)
+      .nullable(),
     numberYear: z.number().int().min(2000).max(9999).nullable(),
     numberSequence: z.number().int().min(1).max(9999).nullable(),
     issueDate: dateOnlySchema,
