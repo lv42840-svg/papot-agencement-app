@@ -18,6 +18,7 @@ import {
 } from "lucide-react";
 import { useSearchParams } from "next/navigation";
 import { FormEvent, useCallback, useEffect, useMemo, useState } from "react";
+import { TaskCommercialBridge } from "@/components/task-commercial-bridge";
 import {
   isAssignedOverdue,
   normalizePersonName,
@@ -452,6 +453,8 @@ function TaskDetail({
         <span>Texte d&apos;origine</span>
         <p>{task.rawText}</p>
       </section>
+
+      <TaskCommercialBridge task={task} description={description} nextAction={nextAction} />
 
       <section className="taskDetailSection">
         <div className="taskSectionTitle"><Save size={15} /> Modifier la tâche</div>
