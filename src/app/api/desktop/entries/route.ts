@@ -18,7 +18,7 @@ const ENTRIES_RESOURCE = {
   resource_id: "global",
 };
 const ENTRIES_WRITE_LOCK_TTL_MS = 30_000;
-const ENTRIES_OWN_LOCK_RECLAIM_AFTER_MS = 15_000;
+const ENTRIES_OWN_LOCK_RECLAIM_AFTER_MS = 0;
 
 function noStoreJson(body: unknown, init?: ResponseInit) {
   const response = NextResponse.json(body, init);
@@ -64,6 +64,7 @@ export async function GET() {
 
 export async function POST(request: Request) {
   const leaseId = randomUUID();
+  const startedAt = Date.now();
   let desktop: ReturnType<typeof createDesktopSharedResourceRuntime> | null = null;
   let ownsLock = false;
   let stage = "parse-request";
@@ -73,16 +74,14 @@ export async function POST(request: Request) {
     stage = "create-runtime";
     desktop = createDesktopSharedResourceRuntime();
 
-    stage = "read-current-resource";
-    const before = await desktop.states.get(ENTRIES_RESOURCE);
-    const baseVersion = before?.version ?? 0;
-
+    // Acquire first, then read the resource once with the WebDAV ETag that will
+    // be reused for the conditional save. This removes several Nextcloud trips.
     stage = "acquire-lock";
     const lockResult = await desktop.locks.acquire({
       resource: ENTRIES_RESOURCE,
       leaseId,
       owner: desktop.owner,
-      baseVersion,
+      baseVersion: 0,
       ttlMs: ENTRIES_WRITE_LOCK_TTL_MS,
       reclaimOwnAfterMs: ENTRIES_OWN_LOCK_RECLAIM_AFTER_MS,
     });
@@ -99,14 +98,17 @@ export async function POST(request: Request) {
     }
     ownsLock = true;
 
+    stage = "open-current-resource";
+    let opened = await desktop.states.openForUpdate(ENTRIES_RESOURCE);
+
     stage = "apply-mutation";
     const actor = { userId: desktop.owner.userId, displayName: desktop.owner.displayName };
-    let mutation = applyEntriesMutation(parseEntriesPayload(before?.payload), input, actor);
+    let mutation = applyEntriesMutation(parseEntriesPayload(opened.resource?.payload), input, actor);
 
     stage = "save-resource";
-    let saved = await desktop.states.save({
+    let saved = await desktop.states.saveOpened({
       resource: ENTRIES_RESOURCE,
-      expectedVersion: baseVersion,
+      opened,
       payload: mutation.payload,
       actor: {
         userId: desktop.owner.userId,
@@ -114,19 +116,17 @@ export async function POST(request: Request) {
       },
     });
 
-    // If another workstation completed a save just before our lock acquisition,
-    // reapply the same business action once on the winning version while we own the lock.
-    if (saved.status === "conflict" && saved.current) {
+    // A pre-lock race can still make the opened ETag stale. Retry once while
+    // this workstation owns the lock, always from the latest winning payload.
+    if (saved.status === "conflict") {
+      stage = "reopen-after-conflict";
+      opened = await desktop.states.openForUpdate(ENTRIES_RESOURCE);
       stage = "reapply-after-conflict";
-      mutation = applyEntriesMutation(
-        parseEntriesPayload(saved.current.payload),
-        input,
-        actor,
-      );
+      mutation = applyEntriesMutation(parseEntriesPayload(opened.resource?.payload), input, actor);
       stage = "save-after-conflict";
-      saved = await desktop.states.save({
+      saved = await desktop.states.saveOpened({
         resource: ENTRIES_RESOURCE,
-        expectedVersion: saved.current.version,
+        opened,
         payload: mutation.payload,
         actor: {
           userId: desktop.owner.userId,
@@ -142,6 +142,7 @@ export async function POST(request: Request) {
       );
     }
 
+    console.info("[PAPOT][Entries] POST saved", { ms: Date.now() - startedAt });
     return noStoreJson(
       publicSnapshot(
         parseEntriesPayload(saved.resource.payload),
@@ -156,22 +157,27 @@ export async function POST(request: Request) {
         : error instanceof Error
           ? error.message
           : "ENTRIES_MUTATION_FAILED";
-    console.error("[PAPOT][Entries] POST failed", { stage, code });
+    console.error("[PAPOT][Entries] POST failed", {
+      stage,
+      code,
+      ms: Date.now() - startedAt,
+    });
     return noStoreJson({ status: "error", error: code }, { status: errorStatus(code) });
   } finally {
     if (desktop && ownsLock) {
-      try {
-        await desktop.locks.release({
+      const releaseDesktop = desktop;
+      // The resource save is already durable. Releasing the tiny lock should
+      // not keep the user waiting for another WebDAV round trip.
+      void releaseDesktop.locks
+        .release({
           resource: ENTRIES_RESOURCE,
           leaseId,
-          owner: desktop.owner,
+          owner: releaseDesktop.owner,
+        })
+        .catch((error: unknown) => {
+          const code = error instanceof Error ? error.message : "LOCK_RELEASE_FAILED";
+          console.error("[PAPOT][Entries] lock release failed", { code });
         });
-      } catch (error) {
-        const code = error instanceof Error ? error.message : "LOCK_RELEASE_FAILED";
-        console.error("[PAPOT][Entries] lock release failed", { code });
-        // A failed release no longer blocks this workstation for long:
-        // Entries locks are short-lived and the same device can reclaim a stale lease.
-      }
     }
   }
 }
