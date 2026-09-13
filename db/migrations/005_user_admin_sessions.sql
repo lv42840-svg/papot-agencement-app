@@ -3,6 +3,9 @@ BEGIN;
 ALTER TABLE app_user
   ADD COLUMN IF NOT EXISTS must_change_password boolean NOT NULL DEFAULT false;
 
+CREATE UNIQUE INDEX IF NOT EXISTS app_user_email_lower_uidx
+  ON app_user(lower(email));
+
 ALTER TABLE app_session
   ADD COLUMN IF NOT EXISTS session_id uuid NULL,
   ADD COLUMN IF NOT EXISTS device_id text NULL,
