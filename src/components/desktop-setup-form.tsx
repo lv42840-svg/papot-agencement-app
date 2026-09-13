@@ -13,9 +13,6 @@ const errorMessages: Record<string, string> = {
   DESKTOP_SHARED_PATH_REQUIRED: "Le chemin du dossier partagé est obligatoire.",
   DESKTOP_SHARED_PATH_INVALID: "Le chemin du dossier partagé n’est pas un chemin Windows valide.",
   DESKTOP_SHARED_PATH_UNAVAILABLE: "PAPOT n’arrive pas à lire et écrire dans le dossier partagé.",
-  DESKTOP_DATABASE_URL_REQUIRED: "La connexion PostgreSQL est obligatoire.",
-  DESKTOP_DATABASE_URL_INVALID: "La connexion PostgreSQL est invalide.",
-  DESKTOP_DATABASE_UNREACHABLE: "PAPOT n’arrive pas à se connecter à PostgreSQL.",
   DESKTOP_NEXTCLOUD_URL_REQUIRED: "L’adresse Nextcloud est obligatoire.",
   DESKTOP_NEXTCLOUD_URL_INVALID: "L’adresse Nextcloud est invalide.",
   DESKTOP_NEXTCLOUD_HTTPS_REQUIRED: "Nextcloud doit utiliser une adresse HTTPS.",
@@ -53,7 +50,6 @@ export function DesktopSetupForm() {
     try {
       const result = await bridge.saveSetup({
         sharedDataPath: String(form.get("sharedDataPath") ?? ""),
-        databaseUrl: String(form.get("databaseUrl") ?? ""),
         nextcloudBaseUrl: String(form.get("nextcloudBaseUrl") ?? ""),
         nextcloudLogin: String(form.get("nextcloudLogin") ?? ""),
         nextcloudAppPassword: String(form.get("nextcloudAppPassword") ?? ""),
@@ -71,7 +67,7 @@ export function DesktopSetupForm() {
       formElement.reset();
       setState({
         kind: "success",
-        message: `Poste « ${result.config.deviceLabel} » configuré. PostgreSQL, Nextcloud et le dossier partagé sont accessibles. Les secrets sont chiffrés dans le coffre Windows.`,
+        message: `Poste « ${result.config.deviceLabel} » configuré. Nextcloud et le dossier partagé sont accessibles. Le secret Nextcloud est chiffré dans le coffre Windows.`,
       });
       await bridge.finishSetup();
     } catch {
@@ -86,18 +82,6 @@ export function DesktopSetupForm() {
         <input
           name="sharedDataPath"
           placeholder="\\\\SERVEUR\\PAPOT"
-          autoComplete="off"
-          disabled={state.kind === "saving" || state.kind === "success"}
-          required
-        />
-      </label>
-
-      <label>
-        Connexion PostgreSQL
-        <input
-          name="databaseUrl"
-          type="password"
-          placeholder="postgresql://utilisateur:motdepasse@serveur:5432/papot"
           autoComplete="off"
           disabled={state.kind === "saving" || state.kind === "success"}
           required
