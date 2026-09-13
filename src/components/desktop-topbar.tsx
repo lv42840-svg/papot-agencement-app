@@ -81,7 +81,11 @@ export function DesktopTopbar({
             <span className="desktopAvatar">{initials}</span>
           </div>
           <form className="desktopLogoutForm" method="post" action="/api/auth/logout">
-            <button className="secondaryButton desktopLogoutButton" type="submit" title="Déconnexion">
+            <button
+              className="secondaryButton desktopLogoutButton"
+              type="submit"
+              title="Déconnexion"
+            >
               <LogOut size={15} aria-hidden="true" />
               <span className="desktopLogoutLabel">Déconnexion</span>
             </button>
