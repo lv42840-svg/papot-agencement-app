@@ -105,9 +105,9 @@ describe("minimal native quote model", () => {
   });
 
   it("rejects an invalid calendar date", () => {
-    expect(() => parseQuoteModel({ ...minimalQuote(), issueDate: "2026-02-31" })).toThrow(
-      "QUOTE_MODEL_INVALID",
-    );
+    expect(() =>
+      parseQuoteModel({ ...minimalQuote(), issueDate: "2026-02-31" }),
+    ).toThrow("QUOTE_MODEL_INVALID");
   });
 
   it("requires payment terms and a positive validity duration", () => {
