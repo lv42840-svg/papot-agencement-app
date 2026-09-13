@@ -4,10 +4,11 @@ import { ZodError } from "zod";
 import { commercialSpecialPermissionForMutation } from "@/lib/auth/action-permissions";
 import { hasEffectiveSpecialPermission, requireSpecialPermission } from "@/lib/auth/permissions";
 import {
-  desktopRequestErrorStatus,
-  requireDesktopRequestContext,
-} from "@/lib/desktop/request-context";
-import { createDesktopSharedResourceRuntime } from "@/lib/desktop/shared-resource-runtime";
+  assertCommercialClientReadyForConfirmation,
+  listCanonicalCommercialClients,
+  resolveCommercialClient,
+  type ResolvedCommercialClient,
+} from "@/lib/commercial/client-integration";
 import {
   applyCommercialAutomaticTransitions,
   parseCommercialPayload,
@@ -17,7 +18,14 @@ import {
   applyCommercialMutation,
   commercialMutationSchema,
   listCommercialPeople,
+  type CommercialMutation,
+  type CommercialMutationResult,
 } from "@/lib/commercial/mutations";
+import {
+  desktopRequestErrorStatus,
+  requireDesktopRequestContext,
+} from "@/lib/desktop/request-context";
+import { createDesktopSharedResourceRuntime } from "@/lib/desktop/shared-resource-runtime";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -26,6 +34,7 @@ const COMMERCIAL_RESOURCE = { resource_type: "COMMERCIAL" as const, resource_id:
 const LOCK_TTL_MS = 30_000;
 
 type Owner = { userId: string; deviceId: string; displayName: string };
+type RawRequest = Record<string, unknown>;
 
 function noStoreJson(body: unknown, init?: ResponseInit) {
   const response = NextResponse.json(body, init);
@@ -33,21 +42,67 @@ function noStoreJson(body: unknown, init?: ResponseInit) {
   return response;
 }
 
+function rawString(raw: RawRequest, key: string): string | undefined {
+  const value = raw[key];
+  return typeof value === "string" && value.trim() ? value.trim() : undefined;
+}
+
+function confirmationRequested(input: CommercialMutation): boolean {
+  return (
+    (input.action === "setStatus" && input.status === "CONFIRMED") ||
+    (input.action === "recordFollowUp" && input.nextStatus === "CONFIRMED")
+  );
+}
+
+function caseIdForMutation(input: CommercialMutation): string | null {
+  if (input.action === "create") return null;
+  return "caseId" in input ? input.caseId : null;
+}
+
+function linkResolvedClient(
+  mutation: CommercialMutationResult,
+  resolvedClient: ResolvedCommercialClient,
+  actorName: string,
+): void {
+  if (!mutation.focusCaseId) return;
+  const item = mutation.payload.cases.find((candidate) => candidate.id === mutation.focusCaseId);
+  if (!item) throw new Error("COMMERCIAL_CASE_NOT_FOUND");
+
+  const previousClientId = item.clientId ?? null;
+  const previousName = item.clientName ?? null;
+  item.clientId = resolvedClient.id;
+  item.primaryContactId = null;
+  item.clientName = resolvedClient.displayName;
+
+  if (previousClientId !== resolvedClient.id || previousName !== resolvedClient.displayName) {
+    item.history.push({
+      id: randomUUID(),
+      type: "CLIENT_LINKED",
+      at: new Date().toISOString(),
+      actorName,
+      summary: `Client lié : ${resolvedClient.displayName}.`,
+    });
+  }
+}
+
 async function snapshot(
   payload: CommercialPayload,
   owner: Owner,
   canWrite: boolean,
   user: { id: string },
+  desktop: ReturnType<typeof createDesktopSharedResourceRuntime>,
   focusCaseId?: string,
 ) {
   const actor = { userId: owner.userId, displayName: owner.displayName };
-  const [canCreate, canProvision, canConfirm] = await Promise.all([
+  const [canCreate, canProvision, canConfirm, clients] = await Promise.all([
     hasEffectiveSpecialPermission(user, "commercial.create"),
     hasEffectiveSpecialPermission(user, "commercial.provision"),
     hasEffectiveSpecialPermission(user, "commercial.confirm_launch"),
+    listCanonicalCommercialClients(desktop),
   ]);
+  const payloadForUi: CommercialPayload = { ...payload, clients };
   return {
-    payload,
+    payload: payloadForUi,
     actor,
     capabilities: {
       canCreate: canWrite && canCreate,
@@ -56,7 +111,7 @@ async function snapshot(
       canProvision: canWrite && canProvision,
       canConfirm: canWrite && canConfirm,
     },
-    suggestedPeople: listCommercialPeople(payload, actor),
+    suggestedPeople: listCommercialPeople(payloadForUi, actor),
     focusCaseId,
     serverNow: new Date().toISOString(),
   };
@@ -65,10 +120,16 @@ async function snapshot(
 function statusFor(code: string): number {
   const requestStatus = desktopRequestErrorStatus(code);
   if (requestStatus) return requestStatus;
-  if (code === "COMMERCIAL_LOCKED") return 423;
+  if (code === "COMMERCIAL_LOCKED" || code === "CLIENTS_LOCKED") return 423;
   if (code.endsWith("_NOT_FOUND")) return 404;
   if (code.endsWith("_FORBIDDEN")) return 403;
-  if (code.includes("CONFLICT") || code.includes("CLOSED")) return 409;
+  if (
+    code.includes("CONFLICT") ||
+    code.includes("CLOSED") ||
+    code === "COMMERCIAL_CLIENT_INCOMPLETE"
+  ) {
+    return 409;
+  }
   return 400;
 }
 
@@ -146,7 +207,13 @@ export async function GET() {
         ? await persistAutomaticTransitions(desktop, owner)
         : transition.payload;
       return noStoreJson(
-        await snapshot(payload, owner, context.moduleAccess.canWrite, context.user),
+        await snapshot(
+          payload,
+          owner,
+          context.moduleAccess.canWrite,
+          context.user,
+          desktop,
+        ),
       );
     }
 
@@ -157,7 +224,9 @@ export async function GET() {
       });
     }
 
-    return noStoreJson(await snapshot(parsed, owner, context.moduleAccess.canWrite, context.user));
+    return noStoreJson(
+      await snapshot(parsed, owner, context.moduleAccess.canWrite, context.user, desktop),
+    );
   } catch (error) {
     const code = error instanceof Error ? error.message : "COMMERCIAL_LOAD_FAILED";
     return noStoreJson({ error: code }, { status: statusFor(code) });
@@ -173,7 +242,8 @@ export async function POST(request: Request) {
   let stage = "parse-request";
 
   try {
-    const input = commercialMutationSchema.parse(await request.json());
+    const raw = (await request.json()) as RawRequest;
+    const input = commercialMutationSchema.parse(raw);
     stage = "create-runtime";
     const context = await requireDesktopRequestContext("commercial", "WRITE");
     const requiredSpecialPermission = commercialSpecialPermissionForMutation(input);
@@ -204,12 +274,53 @@ export async function POST(request: Request) {
     }
     ownsLock = true;
 
+    let resolvedClient: ResolvedCommercialClient | null = null;
+
+    const buildMutation = async (
+      source: CommercialPayload,
+      allowClientCreation: boolean,
+    ): Promise<CommercialMutationResult> => {
+      if (confirmationRequested(input)) {
+        const caseId = caseIdForMutation(input);
+        const item = caseId ? source.cases.find((candidate) => candidate.id === caseId) : null;
+        if (!item) throw new Error("COMMERCIAL_CASE_NOT_FOUND");
+        await assertCommercialClientReadyForConfirmation(desktop!, item.clientId);
+      }
+
+      const result = applyCommercialMutation(source, input, actor);
+
+      if (input.action === "create" || input.action === "updateDetails") {
+        const currentItem =
+          input.action === "updateDetails"
+            ? source.cases.find((candidate) => candidate.id === input.caseId)
+            : null;
+        if (input.action === "updateDetails" && !currentItem) {
+          throw new Error("COMMERCIAL_CASE_NOT_FOUND");
+        }
+
+        if (!resolvedClient) {
+          if (!allowClientCreation) throw new Error("COMMERCIAL_CLIENT_RESOLUTION_LOST");
+          stage = "resolve-client";
+          resolvedClient = await resolveCommercialClient({
+            desktop: desktop!,
+            owner: owner!,
+            actor,
+            existingClientId: rawString(raw, "existingClientId"),
+            newClientName: input.clientName,
+            currentClientId: currentItem?.clientId ?? null,
+          });
+        }
+        linkResolvedClient(result, resolvedClient, actor.displayName);
+      }
+
+      return result;
+    };
+
     let opened = openedInitial;
     stage = "apply-mutation";
-    let mutation = applyCommercialMutation(
+    let mutation = await buildMutation(
       parseCommercialPayload(opened.resource?.payload),
-      input,
-      actor,
+      true,
     );
 
     stage = "save-resource";
@@ -224,10 +335,9 @@ export async function POST(request: Request) {
       stage = "reopen-after-conflict";
       opened = await desktop.states.openForUpdate(COMMERCIAL_RESOURCE);
       stage = "reapply-after-conflict";
-      mutation = applyCommercialMutation(
+      mutation = await buildMutation(
         parseCommercialPayload(opened.resource?.payload),
-        input,
-        actor,
+        false,
       );
       stage = "save-after-conflict";
       saved = await desktop.states.saveOpened({
@@ -241,7 +351,9 @@ export async function POST(request: Request) {
     if (saved.status === "conflict") throw new Error("COMMERCIAL_VERSION_CONFLICT");
     const payload = parseCommercialPayload(saved.resource.payload);
     console.info("[PAPOT][Commercial] POST saved", { ms: Date.now() - startedAt });
-    return noStoreJson(await snapshot(payload, owner, true, context.user, mutation.focusCaseId));
+    return noStoreJson(
+      await snapshot(payload, owner, true, context.user, desktop, mutation.focusCaseId),
+    );
   } catch (error) {
     const code =
       error instanceof ZodError
@@ -249,7 +361,11 @@ export async function POST(request: Request) {
         : error instanceof Error
           ? error.message
           : "COMMERCIAL_MUTATION_FAILED";
-    console.error("[PAPOT][Commercial] POST failed", { stage, code, ms: Date.now() - startedAt });
+    console.error("[PAPOT][Commercial] POST failed", {
+      stage,
+      code,
+      ms: Date.now() - startedAt,
+    });
     return noStoreJson({ error: code }, { status: statusFor(code) });
   } finally {
     if (desktop && owner && ownsLock) {
