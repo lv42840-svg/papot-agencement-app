@@ -5,8 +5,8 @@ import {
   uploadCommercialDocuments,
 } from "@/lib/commercial/document-storage";
 import { commercialDocumentCategorySchema } from "@/lib/commercial/domain";
+import { listCommercialAssignableUsers } from "@/lib/commercial/people";
 import {
-  listActiveCommercialUsers,
   loadCommercialCaseFromDatabase,
   loadCommercialPayloadFromDatabase,
   registerAffairDocuments,
@@ -40,7 +40,9 @@ export async function POST(request: Request, context: RouteContext) {
     const legacySignedQuote = String(form.get("isSignedQuote") ?? "0") === "1";
 
     const item = await loadCommercialCaseFromDatabase(caseId);
-    if (!item) return NextResponse.json({ error: "COMMERCIAL_CASE_NOT_FOUND" }, { status: 404 });
+    if (!item) {
+      return NextResponse.json({ error: "COMMERCIAL_CASE_NOT_FOUND" }, { status: 404 });
+    }
 
     const transport = {
       dav: desktop.dav,
@@ -70,7 +72,7 @@ export async function POST(request: Request, context: RouteContext) {
 
     const [payload, activeUsers] = await Promise.all([
       loadCommercialPayloadFromDatabase(),
-      listActiveCommercialUsers(),
+      listCommercialAssignableUsers(),
     ]);
     return NextResponse.json(
       {
