@@ -1,5 +1,6 @@
 import Link from "next/link";
 import { BriefcaseBusiness, Clock3, FolderOpen, ListTodo, Plus } from "lucide-react";
+import { DashboardChantierStat } from "@/components/dashboard-chantier-stat";
 import { DashboardCommercialStats } from "@/components/dashboard-commercial-stats";
 import { DesktopAppShell } from "@/components/desktop-app-shell";
 import { DashboardTasksPanel } from "@/components/tasks-workspace";
@@ -20,16 +21,7 @@ export default function DesktopReadyPage() {
 
       <section className="dashboardStats" aria-label="Indicateurs principaux">
         <DashboardCommercialStats />
-        <article className="dashboardStat dashboardStatGreen">
-          <span className="dashboardStatIcon">
-            <FolderOpen size={20} />
-          </span>
-          <div>
-            <strong>0</strong>
-            <span>Chantiers en cours</span>
-            <small>cette semaine</small>
-          </div>
-        </article>
+        <DashboardChantierStat />
         <article className="dashboardStat dashboardStatBlue">
           <span className="dashboardStatIcon">
             <Clock3 size={20} />
@@ -76,8 +68,8 @@ export default function DesktopReadyPage() {
             <Link className="secondaryButton" href="/commercial">
               <BriefcaseBusiness size={17} /> Commercial
             </Link>
-            <Link className="secondaryButton" href="/chantiers/chantier-test-verrou">
-              <FolderOpen size={17} /> Fiche chantier
+            <Link className="secondaryButton" href="/chantiers">
+              <FolderOpen size={17} /> Chantiers
             </Link>
             <Link className="secondaryButton" href="/planning/2026-S38">
               <Clock3 size={17} /> Planning partagé
