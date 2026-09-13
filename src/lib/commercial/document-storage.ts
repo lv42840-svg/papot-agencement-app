@@ -31,10 +31,6 @@ function safeFileName(value: string): string {
   return (trimmed || "document").slice(0, 180);
 }
 
-function safeSegment(value: string): string {
-  return value.replace(/[^A-Za-z0-9._-]/g, "-").slice(0, 120) || "document";
-}
-
 function validateFiles(files: File[]): void {
   if (files.length === 0) throw new Error("COMMERCIAL_DOCUMENTS_REQUIRED");
   if (files.length > MAX_COMMERCIAL_DOCUMENTS_PER_UPLOAD) {
@@ -121,7 +117,7 @@ export async function uploadCommercialDocuments(
           params.caseId,
           category.toLowerCase(),
           id,
-          safeSegment(objectName),
+          objectName,
         ].join("/"),
         category,
         versionLabel: params.options.versionLabel?.trim() || null,
