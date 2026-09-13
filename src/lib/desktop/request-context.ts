@@ -24,10 +24,10 @@ export async function requireDesktopRequestContext(
 ): Promise<DesktopRequestContext> {
   const user = await getCurrentUser();
   if (!user) throw new Error("AUTH_REQUIRED");
+  if (user.mustChangePassword) throw new Error("PASSWORD_CHANGE_REQUIRED");
 
-  const isAdmin = user.canManagePermissions;
-  const canWrite = isAdmin || (await hasModuleAccess(user.id, moduleKey, "WRITE"));
-  const canRead = canWrite || isAdmin || (await hasModuleAccess(user.id, moduleKey, "READ"));
+  const canWrite = await hasModuleAccess(user.id, moduleKey, "WRITE");
+  const canRead = canWrite || (await hasModuleAccess(user.id, moduleKey, "READ"));
 
   if (required === "WRITE" ? !canWrite : !canRead) {
     throw new Error("MODULE_FORBIDDEN");
@@ -48,6 +48,7 @@ export async function requireDesktopRequestContext(
 
 export function desktopRequestErrorStatus(code: string): number | null {
   if (code === "AUTH_REQUIRED") return 401;
-  if (code === "MODULE_FORBIDDEN") return 403;
+  if (code === "PASSWORD_CHANGE_REQUIRED") return 403;
+  if (code === "MODULE_FORBIDDEN" || code === "SPECIAL_PERMISSION_FORBIDDEN") return 403;
   return null;
 }

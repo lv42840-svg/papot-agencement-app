@@ -3,7 +3,7 @@
 import { FormEvent, useState } from "react";
 import { useRouter } from "next/navigation";
 
-export function LoginForm() {
+export function ChangePasswordForm() {
   const router = useRouter();
   const [error, setError] = useState("");
   const [busy, setBusy] = useState(false);
@@ -11,33 +11,52 @@ export function LoginForm() {
   async function submit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     setError("");
-    setBusy(true);
     const data = new FormData(event.currentTarget);
-    const response = await fetch("/api/auth/login", {
+    const password = String(data.get("password") ?? "");
+    const confirmation = String(data.get("confirmation") ?? "");
+    if (password !== confirmation) {
+      setError("Les deux mots de passe ne correspondent pas.");
+      return;
+    }
+
+    setBusy(true);
+    const response = await fetch("/api/auth/change-password", {
       method: "POST",
       headers: { "content-type": "application/json" },
-      body: JSON.stringify({ email: data.get("email"), password: data.get("password") }),
+      body: JSON.stringify({ password }),
     });
     if (!response.ok) {
       const body = (await response.json().catch(() => null)) as { error?: string } | null;
-      setError(body?.error ?? "Connexion impossible.");
+      setError(body?.error ?? "Modification impossible.");
       setBusy(false);
       return;
     }
-    const body = (await response.json()) as { mustChangePassword?: boolean };
-    router.replace(body.mustChangePassword ? "/change-password" : "/");
+
+    router.replace("/");
     router.refresh();
   }
 
   return (
     <form className="loginForm" onSubmit={submit}>
       <label>
-        Adresse e-mail
-        <input name="email" type="email" autoComplete="username" required />
+        Nouveau mot de passe
+        <input
+          name="password"
+          type="password"
+          autoComplete="new-password"
+          minLength={12}
+          required
+        />
       </label>
       <label>
-        Mot de passe
-        <input name="password" type="password" autoComplete="current-password" required />
+        Confirmer le mot de passe
+        <input
+          name="confirmation"
+          type="password"
+          autoComplete="new-password"
+          minLength={12}
+          required
+        />
       </label>
       {error && (
         <p className="formError" role="alert">
@@ -45,7 +64,7 @@ export function LoginForm() {
         </p>
       )}
       <button className="primaryButton" type="submit" disabled={busy}>
-        {busy ? "Connexion…" : "Se connecter"}
+        {busy ? "Enregistrement…" : "Enregistrer le mot de passe"}
       </button>
     </form>
   );

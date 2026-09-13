@@ -8,20 +8,6 @@ type DesktopDeviceIdentity = {
   configured: boolean;
 };
 
-const ADMIN_VISIBLE_MODULES = [
-  "capture",
-  "commercial",
-  "chantiers",
-  "planning",
-  "hours",
-  "purchases",
-  "billing",
-  "treasury",
-  "team",
-  "pilotage",
-  "settings",
-];
-
 function readDesktopDeviceIdentity(): DesktopDeviceIdentity {
   const rawConfig = process.env.PAPOT_DESKTOP_CONFIG_JSON;
   if (!rawConfig) {
@@ -34,8 +20,7 @@ function readDesktopDeviceIdentity(): DesktopDeviceIdentity {
   try {
     const config = JSON.parse(rawConfig) as { device_label?: unknown };
     return {
-      deviceLabel:
-        typeof config.device_label === "string" ? config.device_label : "Poste PAPOT",
+      deviceLabel: typeof config.device_label === "string" ? config.device_label : "Poste PAPOT",
       configured: true,
     };
   } catch {
@@ -49,9 +34,7 @@ function readDesktopDeviceIdentity(): DesktopDeviceIdentity {
 export async function DesktopAppShell({ children }: { children: React.ReactNode }) {
   const user = await requireUser();
   const device = readDesktopDeviceIdentity();
-  const allowedModules = user.canManagePermissions
-    ? ADMIN_VISIBLE_MODULES
-    : await listReadableModules(user.id);
+  const allowedModules = await listReadableModules(user.id);
   const initials = user.displayName
     .split(/\s+/)
     .map((part) => part[0])
@@ -61,7 +44,10 @@ export async function DesktopAppShell({ children }: { children: React.ReactNode 
 
   return (
     <div className="desktopAppShellV2">
-      <DesktopSidebar allowedModules={allowedModules} />
+      <DesktopSidebar
+        allowedModules={allowedModules}
+        canManagePermissions={user.canManagePermissions}
+      />
 
       <div className="desktopWorkspace">
         <DesktopTopbar
