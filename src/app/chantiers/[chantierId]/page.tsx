@@ -1,5 +1,7 @@
-import { ChantierEditor } from "@/components/chantier-editor";
+import { ChantierWorkspace } from "@/components/chantier-workspace";
 import { DesktopAppShell } from "@/components/desktop-app-shell";
+
+export const dynamic = "force-dynamic";
 
 export default async function ChantierPage({
   params,
@@ -9,13 +11,7 @@ export default async function ChantierPage({
   const { chantierId } = await params;
   return (
     <DesktopAppShell>
-      <div className="pageHeader">
-        <div>
-          <p className="eyebrow">Chantier partagé</p>
-          <h1>Fiche chantier</h1>
-        </div>
-      </div>
-      <ChantierEditor chantierId={chantierId} />
+      <ChantierWorkspace chantierId={chantierId} />
     </DesktopAppShell>
   );
 }
