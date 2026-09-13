@@ -53,13 +53,13 @@ describe("chantier special permissions", () => {
 });
 
 describe("permission catalog", () => {
-  it("prepares distinct Devis and Facturation module permissions", () => {
-    expect(MODULE_PERMISSIONS).toEqual(
-      expect.arrayContaining([
-        expect.objectContaining({ key: "quotes", future: true }),
-        expect.objectContaining({ key: "billing", future: true }),
-      ]),
-    );
+  it("activates Devis while keeping Facturation prepared", () => {
+    const quotes = MODULE_PERMISSIONS.find((module) => module.key === "quotes");
+    const billing = MODULE_PERMISSIONS.find((module) => module.key === "billing");
+
+    expect(quotes).toEqual(expect.objectContaining({ key: "quotes" }));
+    expect(quotes).not.toHaveProperty("future");
+    expect(billing).toEqual(expect.objectContaining({ key: "billing", future: true }));
   });
 
   it("contains the validated planning special rights", () => {
