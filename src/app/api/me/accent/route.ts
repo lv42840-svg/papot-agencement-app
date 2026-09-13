@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { getCurrentUser } from "@/lib/auth/session";
-import { db } from "@/lib/db/pool";
+import { mutateAuthPayload } from "@/lib/auth/store";
 import { isAccentKey } from "@/lib/theme/palette";
 
 export async function PATCH(request: Request) {
@@ -10,9 +10,10 @@ export async function PATCH(request: Request) {
   if (!body?.accentKey || !isAccentKey(body.accentKey)) {
     return NextResponse.json({ error: "Couleur non autorisée." }, { status: 400 });
   }
-  await db.query("UPDATE app_user SET accent_key = $1, updated_at = now() WHERE id = $2", [
-    body.accentKey,
-    user.id,
-  ]);
+  await mutateAuthPayload(user.id, (payload) => {
+    const target = payload.users.find((candidate) => candidate.id === user.id && candidate.isActive);
+    if (!target) throw new Error("AUTH_USER_NOT_FOUND");
+    target.accentKey = body.accentKey!;
+  });
   return NextResponse.json({ ok: true });
 }
