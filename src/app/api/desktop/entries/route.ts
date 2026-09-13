@@ -1,6 +1,10 @@
 import { randomUUID } from "node:crypto";
 import { NextResponse } from "next/server";
 import { ZodError } from "zod";
+import {
+  desktopRequestErrorStatus,
+  requireDesktopRequestContext,
+} from "@/lib/desktop/request-context";
 import { createDesktopSharedResourceRuntime } from "@/lib/desktop/shared-resource-runtime";
 import { parseEntriesPayload } from "@/lib/entries/domain";
 import {
@@ -43,6 +47,8 @@ function publicSnapshot(
 }
 
 function errorStatus(code: string): number {
+  const requestStatus = desktopRequestErrorStatus(code);
+  if (requestStatus) return requestStatus;
   if (code.endsWith("_FORBIDDEN") || code === "ENTRY_NOT_ASSIGNED_TO_ACTOR") return 403;
   if (code === "ENTRIES_LOCKED") return 423;
   if (code.endsWith("_NOT_FOUND")) return 404;
@@ -52,7 +58,7 @@ function errorStatus(code: string): number {
 
 export async function GET() {
   try {
-    const desktop = createDesktopSharedResourceRuntime();
+    const { desktop, owner } = await requireDesktopRequestContext("capture", "READ");
     const cached = desktop.states.getCached(ENTRIES_RESOURCE);
 
     if (cached !== undefined) {
@@ -60,12 +66,12 @@ export async function GET() {
         const code = error instanceof Error ? error.message : "ENTRIES_REFRESH_FAILED";
         console.error("[PAPOT][Entries] background refresh failed", { code });
       });
-      return noStoreJson(publicSnapshot(parseEntriesPayload(cached?.payload), desktop.owner));
+      return noStoreJson(publicSnapshot(parseEntriesPayload(cached?.payload), owner));
     }
 
     const resource = await desktop.states.get(ENTRIES_RESOURCE);
     const payload = parseEntriesPayload(resource?.payload);
-    return noStoreJson(publicSnapshot(payload, desktop.owner));
+    return noStoreJson(publicSnapshot(payload, owner));
   } catch (error) {
     const code = error instanceof Error ? error.message : "ENTRIES_LOAD_FAILED";
     return noStoreJson({ status: "error", error: code }, { status: errorStatus(code) });
@@ -76,23 +82,23 @@ export async function POST(request: Request) {
   const leaseId = randomUUID();
   const startedAt = Date.now();
   let desktop: ReturnType<typeof createDesktopSharedResourceRuntime> | null = null;
+  let owner: { userId: string; deviceId: string; displayName: string } | null = null;
   let ownsLock = false;
   let stage = "parse-request";
 
   try {
     const input = entriesMutationSchema.parse(await request.json());
     stage = "create-runtime";
-    desktop = createDesktopSharedResourceRuntime();
+    const context = await requireDesktopRequestContext("capture", "WRITE");
+    desktop = context.desktop;
+    owner = context.owner;
 
-    // The lock creation and the DAV read are independent network trips. Run
-    // them together, then rely on the ETag conditional write to detect the
-    // rare race where another workstation saved between the read and our lock.
     stage = "acquire-lock-and-open-resource";
     const [lockResult, initialOpened] = await Promise.all([
       desktop.locks.acquire({
         resource: ENTRIES_RESOURCE,
         leaseId,
-        owner: desktop.owner,
+        owner,
         baseVersion: 0,
         ttlMs: ENTRIES_WRITE_LOCK_TTL_MS,
         reclaimOwnAfterMs: ENTRIES_OWN_LOCK_RECLAIM_AFTER_MS,
@@ -114,7 +120,7 @@ export async function POST(request: Request) {
 
     let opened = initialOpened;
     stage = "apply-mutation";
-    const actor = { userId: desktop.owner.userId, displayName: desktop.owner.displayName };
+    const actor = { userId: owner.userId, displayName: owner.displayName };
     let mutation = applyEntriesMutation(parseEntriesPayload(opened.resource?.payload), input, actor);
 
     stage = "save-resource";
@@ -122,14 +128,9 @@ export async function POST(request: Request) {
       resource: ENTRIES_RESOURCE,
       opened,
       payload: mutation.payload,
-      actor: {
-        userId: desktop.owner.userId,
-        deviceId: desktop.owner.deviceId,
-      },
+      actor: { userId: owner.userId, deviceId: owner.deviceId },
     });
 
-    // A pre-lock race can still make the opened ETag stale. Retry once while
-    // this workstation owns the lock, always from the latest winning payload.
     if (saved.status === "conflict") {
       stage = "reopen-after-conflict";
       opened = await desktop.states.openForUpdate(ENTRIES_RESOURCE);
@@ -140,10 +141,7 @@ export async function POST(request: Request) {
         resource: ENTRIES_RESOURCE,
         opened,
         payload: mutation.payload,
-        actor: {
-          userId: desktop.owner.userId,
-          deviceId: desktop.owner.deviceId,
-        },
+        actor: { userId: owner.userId, deviceId: owner.deviceId },
       });
     }
 
@@ -156,11 +154,7 @@ export async function POST(request: Request) {
 
     console.info("[PAPOT][Entries] POST saved", { ms: Date.now() - startedAt });
     return noStoreJson(
-      publicSnapshot(
-        parseEntriesPayload(saved.resource.payload),
-        desktop.owner,
-        mutation.focusEntryId,
-      ),
+      publicSnapshot(parseEntriesPayload(saved.resource.payload), owner, mutation.focusEntryId),
     );
   } catch (error) {
     const code =
@@ -176,15 +170,14 @@ export async function POST(request: Request) {
     });
     return noStoreJson({ status: "error", error: code }, { status: errorStatus(code) });
   } finally {
-    if (desktop && ownsLock) {
+    if (desktop && owner && ownsLock) {
       const releaseDesktop = desktop;
-      // The resource save is already durable. Releasing the tiny lock should
-      // not keep the user waiting for another WebDAV round trip.
+      const releaseOwner = owner;
       void releaseDesktop.locks
         .release({
           resource: ENTRIES_RESOURCE,
           leaseId,
-          owner: releaseDesktop.owner,
+          owner: releaseOwner,
         })
         .catch((error: unknown) => {
           const code = error instanceof Error ? error.message : "LOCK_RELEASE_FAILED";

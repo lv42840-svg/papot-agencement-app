@@ -11,8 +11,6 @@ type DesktopRuntimeConfig = {
   nextcloud_user_id: string;
   nextcloud_sync_root: string;
   device_id: string;
-  papot_user_id: string;
-  papot_user_display_name: string;
 };
 
 type DesktopSharedResourceRuntime = {
@@ -22,11 +20,7 @@ type DesktopSharedResourceRuntime = {
   dav: NextcloudDavClient;
   nextcloudUserId: string;
   syncRoot: string;
-  owner: {
-    userId: string;
-    deviceId: string;
-    displayName: string;
-  };
+  deviceId: string;
 };
 
 let cachedRuntime:
@@ -59,8 +53,6 @@ export function createDesktopSharedResourceRuntime(): DesktopSharedResourceRunti
     config.nextcloud_user_id,
     config.nextcloud_sync_root,
     config.device_id,
-    config.papot_user_id,
-    config.papot_user_display_name,
   ];
   if (required.some((value) => typeof value !== "string" || !value.trim())) {
     throw new Error("DESKTOP_RUNTIME_CONFIG_INVALID");
@@ -82,11 +74,7 @@ export function createDesktopSharedResourceRuntime(): DesktopSharedResourceRunti
     dav,
     nextcloudUserId: config.nextcloud_user_id,
     syncRoot: config.nextcloud_sync_root,
-    owner: {
-      userId: config.papot_user_id,
-      deviceId: config.device_id,
-      displayName: config.papot_user_display_name,
-    },
+    deviceId: config.device_id,
   };
 
   cachedRuntime = { rawConfig, appPassword, value };

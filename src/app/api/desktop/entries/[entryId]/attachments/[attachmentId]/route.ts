@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { createDesktopSharedResourceRuntime } from "@/lib/desktop/shared-resource-runtime";
+import { requireDesktopRequestContext } from "@/lib/desktop/request-context";
 import { attachmentUrl } from "@/lib/entries/attachment-storage";
 import { parseEntriesPayload } from "@/lib/entries/domain";
 
@@ -17,13 +17,15 @@ function contentDisposition(fileName: string, download: boolean): string {
 export async function GET(request: Request, context: RouteContext) {
   try {
     const { entryId, attachmentId } = await context.params;
-    const desktop = createDesktopSharedResourceRuntime();
+    const { desktop } = await requireDesktopRequestContext("capture", "READ");
     const resource = await desktop.states.get(ENTRIES_RESOURCE);
     const payload = parseEntriesPayload(resource?.payload);
     const entry = payload.entries.find((candidate) => candidate.id === entryId);
     if (!entry) return NextResponse.json({ error: "ENTRY_NOT_FOUND" }, { status: 404 });
     const attachment = entry.attachments.find((candidate) => candidate.id === attachmentId);
-    if (!attachment) return NextResponse.json({ error: "ENTRY_ATTACHMENT_NOT_FOUND" }, { status: 404 });
+    if (!attachment) {
+      return NextResponse.json({ error: "ENTRY_ATTACHMENT_NOT_FOUND" }, { status: 404 });
+    }
 
     const url = attachmentUrl(
       { dav: desktop.dav, nextcloudUserId: desktop.nextcloudUserId, syncRoot: desktop.syncRoot },
@@ -31,7 +33,8 @@ export async function GET(request: Request, context: RouteContext) {
     );
     const bytes = await desktop.dav.getBytes(url);
     const download = new URL(request.url).searchParams.get("download") === "1";
-    const canInline = attachment.contentType.startsWith("image/") || attachment.contentType === "application/pdf";
+    const canInline =
+      attachment.contentType.startsWith("image/") || attachment.contentType === "application/pdf";
 
     return new NextResponse(new Uint8Array(bytes), {
       status: 200,
@@ -45,6 +48,7 @@ export async function GET(request: Request, context: RouteContext) {
     });
   } catch (error) {
     const code = error instanceof Error ? error.message : "ENTRY_ATTACHMENT_READ_FAILED";
-    return NextResponse.json({ error: code }, { status: 400 });
+    const status = code === "AUTH_REQUIRED" ? 401 : code === "MODULE_FORBIDDEN" ? 403 : 400;
+    return NextResponse.json({ error: code }, { status });
   }
 }

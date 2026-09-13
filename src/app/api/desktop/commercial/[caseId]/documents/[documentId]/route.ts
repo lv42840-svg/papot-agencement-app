@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { createDesktopSharedResourceRuntime } from "@/lib/desktop/shared-resource-runtime";
+import { requireDesktopRequestContext } from "@/lib/desktop/request-context";
 import { commercialDocumentUrl } from "@/lib/commercial/document-storage";
 import { parseCommercialPayload } from "@/lib/commercial/domain";
 
@@ -17,13 +17,17 @@ function contentDisposition(fileName: string, download: boolean): string {
 export async function GET(request: Request, context: RouteContext) {
   try {
     const { caseId, documentId } = await context.params;
-    const desktop = createDesktopSharedResourceRuntime();
+    const { desktop } = await requireDesktopRequestContext("commercial", "READ");
     const resource = await desktop.states.get(COMMERCIAL_RESOURCE);
     const payload = parseCommercialPayload(resource?.payload);
     const item = payload.cases.find((candidate) => candidate.id === caseId);
-    if (!item) return NextResponse.json({ error: "COMMERCIAL_CASE_NOT_FOUND" }, { status: 404 });
+    if (!item) {
+      return NextResponse.json({ error: "COMMERCIAL_CASE_NOT_FOUND" }, { status: 404 });
+    }
     const document = item.documents.find((candidate) => candidate.id === documentId);
-    if (!document) return NextResponse.json({ error: "COMMERCIAL_DOCUMENT_NOT_FOUND" }, { status: 404 });
+    if (!document) {
+      return NextResponse.json({ error: "COMMERCIAL_DOCUMENT_NOT_FOUND" }, { status: 404 });
+    }
 
     const url = commercialDocumentUrl(
       { dav: desktop.dav, nextcloudUserId: desktop.nextcloudUserId, syncRoot: desktop.syncRoot },
@@ -31,7 +35,8 @@ export async function GET(request: Request, context: RouteContext) {
     );
     const bytes = await desktop.dav.getBytes(url);
     const download = new URL(request.url).searchParams.get("download") === "1";
-    const canInline = document.contentType.startsWith("image/") || document.contentType === "application/pdf";
+    const canInline =
+      document.contentType.startsWith("image/") || document.contentType === "application/pdf";
 
     return new NextResponse(new Uint8Array(bytes), {
       status: 200,
@@ -45,6 +50,7 @@ export async function GET(request: Request, context: RouteContext) {
     });
   } catch (error) {
     const code = error instanceof Error ? error.message : "COMMERCIAL_DOCUMENT_READ_FAILED";
-    return NextResponse.json({ error: code }, { status: 400 });
+    const status = code === "AUTH_REQUIRED" ? 401 : code === "MODULE_FORBIDDEN" ? 403 : 400;
+    return NextResponse.json({ error: code }, { status });
   }
 }

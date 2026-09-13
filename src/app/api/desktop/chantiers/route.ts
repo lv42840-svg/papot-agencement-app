@@ -1,6 +1,10 @@
 import { randomUUID } from "node:crypto";
 import { NextResponse } from "next/server";
 import { ZodError } from "zod";
+import {
+  desktopRequestErrorStatus,
+  requireDesktopRequestContext,
+} from "@/lib/desktop/request-context";
 import { createDesktopSharedResourceRuntime } from "@/lib/desktop/shared-resource-runtime";
 import { parseChantiersPayload, type ChantiersPayload } from "@/lib/chantiers/domain";
 import {
@@ -15,6 +19,8 @@ export const dynamic = "force-dynamic";
 const CHANTIERS_RESOURCE = { resource_type: "CHANTIER" as const, resource_id: "registry" };
 const LOCK_TTL_MS = 30_000;
 
+type Owner = { userId: string; deviceId: string; displayName: string };
+
 function noStoreJson(body: unknown, init?: ResponseInit) {
   const response = NextResponse.json(body, init);
   response.headers.set("Cache-Control", "no-store");
@@ -23,20 +29,30 @@ function noStoreJson(body: unknown, init?: ResponseInit) {
 
 function snapshot(
   payload: ChantiersPayload,
-  owner: { userId: string; displayName: string },
+  owner: Owner,
+  canWrite: boolean,
   focusChantierId?: string,
 ) {
   const actor = { userId: owner.userId, displayName: owner.displayName };
+  const baseCapabilities = chantierCapabilities(actor);
   return {
     payload,
     actor,
-    capabilities: chantierCapabilities(actor),
+    capabilities: {
+      ...baseCapabilities,
+      canRead: true,
+      canModify: canWrite,
+      canLaunch: canWrite,
+      canArchive: canWrite,
+    },
     focusChantierId,
     serverNow: new Date().toISOString(),
   };
 }
 
 function statusFor(code: string): number {
+  const requestStatus = desktopRequestErrorStatus(code);
+  if (requestStatus) return requestStatus;
   if (code === "CHANTIERS_LOCKED") return 423;
   if (code.endsWith("_NOT_FOUND")) return 404;
   if (code.endsWith("_FORBIDDEN")) return 403;
@@ -46,7 +62,8 @@ function statusFor(code: string): number {
 
 export async function GET() {
   try {
-    const desktop = createDesktopSharedResourceRuntime();
+    const context = await requireDesktopRequestContext("chantiers", "READ");
+    const { desktop, owner } = context;
     const cached = desktop.states.getCached(CHANTIERS_RESOURCE);
     const resource = cached !== undefined ? cached : await desktop.states.get(CHANTIERS_RESOURCE);
     const payload = parseChantiersPayload(resource?.payload);
@@ -58,7 +75,7 @@ export async function GET() {
       });
     }
 
-    return noStoreJson(snapshot(payload, desktop.owner));
+    return noStoreJson(snapshot(payload, owner, context.moduleAccess.canWrite));
   } catch (error) {
     const code = error instanceof Error ? error.message : "CHANTIERS_LOAD_FAILED";
     return noStoreJson({ error: code }, { status: statusFor(code) });
@@ -69,21 +86,24 @@ export async function POST(request: Request) {
   const leaseId = randomUUID();
   const startedAt = Date.now();
   let desktop: ReturnType<typeof createDesktopSharedResourceRuntime> | null = null;
+  let owner: Owner | null = null;
   let ownsLock = false;
   let stage = "parse-request";
 
   try {
     const input = chantierMutationSchema.parse(await request.json());
     stage = "create-runtime";
-    desktop = createDesktopSharedResourceRuntime();
-    const actor = { userId: desktop.owner.userId, displayName: desktop.owner.displayName };
+    const context = await requireDesktopRequestContext("chantiers", "WRITE");
+    desktop = context.desktop;
+    owner = context.owner;
+    const actor = { userId: owner.userId, displayName: owner.displayName };
 
     stage = "acquire-lock-and-open-resource";
     const [lock, openedInitial] = await Promise.all([
       desktop.locks.acquire({
         resource: CHANTIERS_RESOURCE,
         leaseId,
-        owner: desktop.owner,
+        owner,
         baseVersion: 0,
         ttlMs: LOCK_TTL_MS,
         reclaimOwnAfterMs: 0,
@@ -107,7 +127,7 @@ export async function POST(request: Request) {
       resource: CHANTIERS_RESOURCE,
       opened,
       payload: mutation.payload,
-      actor: { userId: desktop.owner.userId, deviceId: desktop.owner.deviceId },
+      actor: { userId: owner.userId, deviceId: owner.deviceId },
     });
 
     if (saved.status === "conflict") {
@@ -120,14 +140,14 @@ export async function POST(request: Request) {
         resource: CHANTIERS_RESOURCE,
         opened,
         payload: mutation.payload,
-        actor: { userId: desktop.owner.userId, deviceId: desktop.owner.deviceId },
+        actor: { userId: owner.userId, deviceId: owner.deviceId },
       });
     }
 
     if (saved.status === "conflict") throw new Error("CHANTIERS_VERSION_CONFLICT");
     const payload = parseChantiersPayload(saved.resource.payload);
     console.info("[PAPOT][Chantiers] POST saved", { ms: Date.now() - startedAt });
-    return noStoreJson(snapshot(payload, desktop.owner, mutation.focusChantierId));
+    return noStoreJson(snapshot(payload, owner, true, mutation.focusChantierId));
   } catch (error) {
     const code =
       error instanceof ZodError
@@ -138,10 +158,11 @@ export async function POST(request: Request) {
     console.error("[PAPOT][Chantiers] POST failed", { stage, code, ms: Date.now() - startedAt });
     return noStoreJson({ error: code }, { status: statusFor(code) });
   } finally {
-    if (desktop && ownsLock) {
+    if (desktop && owner && ownsLock) {
       const releaseDesktop = desktop;
+      const releaseOwner = owner;
       void releaseDesktop.locks
-        .release({ resource: CHANTIERS_RESOURCE, leaseId, owner: releaseDesktop.owner })
+        .release({ resource: CHANTIERS_RESOURCE, leaseId, owner: releaseOwner })
         .catch(() => undefined);
     }
   }

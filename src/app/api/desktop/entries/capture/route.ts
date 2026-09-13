@@ -1,7 +1,10 @@
 import { randomUUID } from "node:crypto";
 import { NextResponse } from "next/server";
 import { z } from "zod";
-import { createDesktopSharedResourceRuntime } from "@/lib/desktop/shared-resource-runtime";
+import {
+  desktopRequestErrorStatus,
+  requireDesktopRequestContext,
+} from "@/lib/desktop/request-context";
 import {
   cleanupEntryAttachments,
   uploadEntryAttachments,
@@ -42,6 +45,8 @@ function snapshot(
 }
 
 function statusFor(code: string): number {
+  const requestStatus = desktopRequestErrorStatus(code);
+  if (requestStatus) return requestStatus;
   if (code === "ENTRIES_LOCKED") return 423;
   if (code.includes("CONFLICT")) return 409;
   if (code.includes("TOO_LARGE")) return 413;
@@ -49,7 +54,13 @@ function statusFor(code: string): number {
 }
 
 export async function POST(request: Request) {
-  const desktop = createDesktopSharedResourceRuntime();
+  const context = await requireDesktopRequestContext("capture", "WRITE").catch((error: unknown) => {
+    const code = error instanceof Error ? error.message : "AUTH_REQUIRED";
+    return NextResponse.json({ error: code }, { status: statusFor(code) });
+  });
+  if (context instanceof NextResponse) return context;
+
+  const { desktop, owner } = context;
   const form = await request.formData();
   const files = form.getAll("files").filter((value): value is File => value instanceof File);
 
@@ -70,12 +81,12 @@ export async function POST(request: Request) {
   }
 
   const entryId = randomUUID();
-  const actor = { userId: desktop.owner.userId, displayName: desktop.owner.displayName };
+  const actor = { userId: owner.userId, displayName: owner.displayName };
   const transport = {
     dav: desktop.dav,
     nextcloudUserId: desktop.nextcloudUserId,
     syncRoot: desktop.syncRoot,
-    displayName: desktop.owner.displayName,
+    displayName: owner.displayName,
   };
   const leaseId = randomUUID();
   let uploaded = [] as Awaited<ReturnType<typeof uploadEntryAttachments>>;
@@ -86,7 +97,7 @@ export async function POST(request: Request) {
       desktop.locks.acquire({
         resource: ENTRIES_RESOURCE,
         leaseId,
-        owner: desktop.owner,
+        owner,
         baseVersion: 0,
         ttlMs: LOCK_TTL_MS,
         reclaimOwnAfterMs: 0,
@@ -121,7 +132,7 @@ export async function POST(request: Request) {
       resource: ENTRIES_RESOURCE,
       opened,
       payload: mutation.payload,
-      actor: { userId: desktop.owner.userId, deviceId: desktop.owner.deviceId },
+      actor: { userId: owner.userId, deviceId: owner.deviceId },
     });
 
     if (saved.status === "conflict") {
@@ -144,16 +155,15 @@ export async function POST(request: Request) {
         resource: ENTRIES_RESOURCE,
         opened,
         payload: mutation.payload,
-        actor: { userId: desktop.owner.userId, deviceId: desktop.owner.deviceId },
+        actor: { userId: owner.userId, deviceId: owner.deviceId },
       });
     }
 
     if (saved.status === "conflict") throw new Error("ENTRIES_VERSION_CONFLICT");
 
-    return NextResponse.json(
-      snapshot(parseEntriesPayload(saved.resource.payload), desktop.owner, entryId),
-      { headers: { "Cache-Control": "no-store" } },
-    );
+    return NextResponse.json(snapshot(parseEntriesPayload(saved.resource.payload), owner, entryId), {
+      headers: { "Cache-Control": "no-store" },
+    });
   } catch (error) {
     if (uploaded.length > 0) await cleanupEntryAttachments(transport, uploaded);
     const code = error instanceof Error ? error.message : "ENTRIES_CAPTURE_FAILED";
@@ -164,7 +174,7 @@ export async function POST(request: Request) {
   } finally {
     if (ownsLock) {
       void desktop.locks
-        .release({ resource: ENTRIES_RESOURCE, leaseId, owner: desktop.owner })
+        .release({ resource: ENTRIES_RESOURCE, leaseId, owner })
         .catch(() => undefined);
     }
   }
