@@ -1,29 +1,76 @@
 # PAPOT AGENCEMENT
 
-Fondations de la V1 de l'application interne PAPOT AGENCEMENT.
+Application interne PAPOT AGENCEMENT, V1 en développement.
 
-## Lot 1
+Le cahier des charges officiel Google Drive reste la source de vérité fonctionnelle. Le dépôt Git contient le code correspondant à l'état réellement développé ainsi que des notes techniques datées. En cas de contradiction, les décisions AGE les plus récentes du cahier des charges priment.
 
-Ce lot installe le socle technique et le premier vertical slice réel :
+## Etat actuel du socle
 
-`Connexion -> interface responsive -> Nouvelle capture -> PostgreSQL -> confirmation -> boîte À qualifier`
+Le projet comprend désormais :
 
-Le code est une application web responsive PWA à code commun PC/smartphone. PostgreSQL reste derrière la couche applicative et ne doit jamais être publié directement sur Internet. Le stockage documentaire Nextcloud est volontairement préparé pour les lots suivants mais aucun faux connecteur n'est simulé dans ce lot.
+- application Next.js / React / TypeScript ;
+- application Windows Electron avec installeur NSIS ;
+- PostgreSQL comme source de vérité métier ;
+- SQLite/local uniquement pour cache, configuration, état appareil et travaux de synchronisation ;
+- authentification PAPOT par session serveur ;
+- droits READ / WRITE par module et droits spéciaux ;
+- Nextcloud pour documents, synchronisation et mécanismes partagés ;
+- transport mobile asynchrone avec paquets signés, idempotence et ACK en cours de validation production ;
+- shell desktop lavande avec navigation latérale ;
+- premiers modules Entrées, Commercial, Chantiers et Planning encore en phase de reprise/audit métier.
+
+## Architecture retenue
+
+PostgreSQL reste la source de vérité des données métier V1 et ne doit jamais être exposé directement sur Internet.
+
+Nextcloud reste l'autorité pour les documents et les mécanismes de fichiers/versions/verrous partagés. Un relais HTTPS minimal peut être utilisé pour le transport mobile extérieur, sans exposer PostgreSQL ni transformer ce relais en API générale du back-office PAPOT.
+
+Chaque poste Windows possède un `device_id` stable. L'identité métier doit venir du **vrai utilisateur PAPOT connecté**, et non d'un utilisateur codé dans la configuration du poste.
+
+## Audit fonctionnel en cours
+
+La reprise module par module a validé :
+
+- le socle Electron / PostgreSQL / Nextcloud ;
+- le principe connexion / utilisateurs / droits ;
+- l'architecture visuelle PC existante ;
+- la fusion future de Capture et Entrées autour d'une seule source PostgreSQL.
+
+Les corrections techniques identifiées doivent être appliquées avant de considérer ces blocs terminés côté code :
+
+1. configurer et vérifier PostgreSQL au premier lancement installé ;
+2. supprimer l'utilisateur PAPOT lié au poste et utiliser la session authentifiée ;
+3. utiliser `user_id + device_id` pour verrous et historique ;
+4. appliquer les droits côté serveur sur toutes les API desktop ;
+5. terminer l'administration utilisateurs/droits ;
+6. fusionner l'ancien `/capture` et le module Entrées autour du même modèle PostgreSQL.
+
+Voir `docs/audit-status-2026-09-13.md` pour le gel courant des décisions récentes.
+
+## Devis / facturation natifs
+
+Le flux cible est désormais :
+
+`Capture -> Client -> Affaire -> Chiffrage -> Devis -> Confirmation -> Chantier -> Production -> TS -> Facture -> Paiement`
+
+OBAT n'est plus une dépendance centrale pour les nouveaux devis/factures PAPOT. Les anciens documents OBAT restent historiques.
+
+Le moteur documentaire Word -> données -> PDF a été validé en preuve de concept avec de vrais devis/factures. Son intégration production sera faite au moment où la reprise des modules arrivera naturellement au module Devis.
 
 ## Stack technique
 
 - Next.js App Router + React + TypeScript strict
+- Electron + electron-builder / NSIS
 - PostgreSQL via `pg`
+- SQLite local pour état non métier partagé
 - migrations SQL explicites
 - authentification locale par mot de passe `scrypt` et session serveur en cookie HttpOnly
 - Zod pour les validations d'entrée
+- Nextcloud WebDAV / OCS pour fichiers et synchronisation
 - Vitest pour les tests
 - ESLint + Prettier
-- PWA avec manifest et service worker minimal
 
-Le mécanisme d'authentification est isolé dans `src/lib/auth` pour rester remplaçable si l'infrastructure PAPOT impose ultérieurement un fournisseur d'identité différent.
-
-## Démarrage local
+## Démarrage développement
 
 Prérequis : Node.js 22+ et PostgreSQL.
 
@@ -35,66 +82,11 @@ npm run db:bootstrap
 npm run dev
 ```
 
-Avant `db:bootstrap`, remplacer toutes les valeurs `BOOTSTRAP_ADMIN_*` par de vraies valeurs locales. Elles ne doivent jamais être commitées.
-
-## Base de données
-
-`DATABASE_URL` doit viser PostgreSQL sur le réseau interne du serveur PAPOT. En production, PostgreSQL ne doit pas écouter directement sur Internet. L'accès distant à l'application doit arriver sur la couche web HTTPS uniquement.
-
-Migration initiale : `db/migrations/001_initial.sql`.
-
-Elle crée :
-
-- utilisateurs et sessions ;
-- droits par utilisateur et par module ;
-- permissions spéciales extensibles ;
-- préférence de couleur d'accent par utilisateur ;
-- référentiel de tags de Capture, désactivable sans perte historique ;
-- captures et relation multi-tags ;
-- identifiant idempotent `client_request_id` contre les doubles envois.
-
-## Authentification et premier utilisateur
-
-Aucun mot de passe n'est fourni dans Git. Le script `npm run db:bootstrap` crée ou met à jour le premier administrateur depuis les variables d'environnement et lui donne le droit `capture:WRITE`.
-
-Les droits sont stockés individuellement, et non déduits du nom d'une personne. Le champ d'administration des permissions permet de représenter le responsable autorisé sans codage en dur de son identité.
-
-## Capture, périmètre de ce lot
-
-Le premier parcours implémenté est la création d'une **piste commerciale** :
-
-- nom libre obligatoire ;
-- responsable obligatoire, prérempli avec l'utilisateur connecté ;
-- priorité `Normale` par défaut ou `Urgent` ;
-- date `À faire pour le` facultative ;
-- tags actifs facultatifs et multi-sélectionnables ;
-- auteur et horodatage automatiques ;
-- état initial `TO_QUALIFY` ;
-- protection idempotente contre le double envoi ;
-- confirmation `Capture envoyée` ;
-- visibilité immédiate sur l'accueil dans `À qualifier`.
-
-Le flux hors connexion complet, les photos/Nextcloud, la qualification détaillée, les clients/chantiers récents et les autres types de Capture sont volontairement reportés. Le service worker et la séparation repository/API/UI évitent de devoir refaire le socle quand ils seront ajoutés.
-
-## Design system V1
-
-- mode clair ;
-- Inter avec pile de repli système ;
-- thème lavande par défaut ;
-- palette d'accent prédéfinie enregistrée en base ;
-- couleurs d'état indépendantes du thème personnel ;
-- navigation latérale PC et navigation basse mobile ;
-- tableaux compacts qui deviennent des cartes sur smartphone ;
-- bordures fines, relief discret, arrondis modérés ;
-- badges texte + couleur ;
-- skeleton loader ;
-- confirmation discrète sans modale inutile.
-
-L'asset de maquette Drive reste une référence visuelle et n'est pas recopié pixel par pixel.
+Avant `db:bootstrap`, remplacer les valeurs `BOOTSTRAP_ADMIN_*` par de vraies valeurs locales. Elles ne doivent jamais être commitées.
 
 ## Qualité
 
-Commandes attendues avant merge :
+Commandes attendues avant fusion d'un lot fonctionnel :
 
 ```bash
 npm run format:check
@@ -113,14 +105,7 @@ Le workflow `.github/workflows/ci.yml` rejoue ces contrôles sur les Pull Reques
 - cookies de session HttpOnly, SameSite=Lax et Secure en production ;
 - sessions stockées côté serveur sous forme de hash de jeton ;
 - requêtes SQL paramétrées ;
-- validation Zod des entrées API ;
-- contrôles de droits côté serveur avant écriture.
-
-## Éléments volontairement reportés
-
-- stockage Nextcloud et photos ;
-- file locale IndexedDB et synchronisation hors connexion de Capture ;
-- qualification métier complète et délai 48 h ouvrées ;
-- clients/chantiers et raccourcis récents ;
-- `Mes tâches` complet ;
-- Planning et autres modules fonctionnels.
+- validation des entrées API ;
+- contrôles de droits côté serveur obligatoires ;
+- secrets Nextcloud/PostgreSQL installés localement via stockage chiffré Windows ;
+- PostgreSQL jamais publié directement sur Internet.
