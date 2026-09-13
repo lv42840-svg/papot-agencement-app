@@ -1,6 +1,6 @@
 "use client";
 
-import { Wifi, WifiOff } from "lucide-react";
+import { LogOut, Wifi, WifiOff } from "lucide-react";
 import { usePathname } from "next/navigation";
 import { useEffect, useMemo, useState } from "react";
 
@@ -80,6 +80,12 @@ export function DesktopTopbar({
             </div>
             <span className="desktopAvatar">{initials}</span>
           </div>
+          <form className="desktopLogoutForm" method="post" action="/api/auth/logout">
+            <button className="secondaryButton desktopLogoutButton" type="submit" title="Déconnexion">
+              <LogOut size={15} aria-hidden="true" />
+              <span className="desktopLogoutLabel">Déconnexion</span>
+            </button>
+          </form>
         </div>
       </header>
 
@@ -116,6 +122,16 @@ export function DesktopTopbar({
         .desktopConnection.isOffline {
           color: #b45309;
         }
+        .desktopLogoutForm {
+          margin: 0;
+        }
+        .desktopLogoutButton {
+          display: inline-flex;
+          align-items: center;
+          justify-content: center;
+          gap: 6px;
+          white-space: nowrap;
+        }
 
         @media (max-width: 1280px) {
           .desktopMain {
@@ -146,6 +162,13 @@ export function DesktopTopbar({
           }
           .desktopIdentity div span {
             display: none;
+          }
+          .desktopLogoutLabel {
+            display: none;
+          }
+          .desktopLogoutButton {
+            width: 36px;
+            padding: 0 !important;
           }
           .desktopMain {
             padding: 22px 18px 36px;
