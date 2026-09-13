@@ -1,6 +1,7 @@
 import { randomUUID } from "node:crypto";
 import { NextResponse } from "next/server";
 import { ZodError } from "zod";
+import { requireSpecialPermission } from "@/lib/auth/permissions";
 import {
   desktopRequestErrorStatus,
   requireDesktopRequestContext,
@@ -50,6 +51,7 @@ export async function POST(request: Request) {
     const input = launchChantierFromAffairSchema.parse(await request.json());
     stage = "create-runtime";
     const context = await requireDesktopRequestContext("chantiers", "WRITE");
+    await requireSpecialPermission(context.user, "commercial.confirm_launch");
     desktop = context.desktop;
     owner = context.owner;
     const actor = { userId: owner.userId, displayName: owner.displayName };
