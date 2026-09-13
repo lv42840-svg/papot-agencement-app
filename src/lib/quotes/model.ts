@@ -117,7 +117,12 @@ export const quoteRecordSchema = z
     }
 
     if (quote.status === "DRAFT") {
-      if (numbered || quote.sentAt !== null || quote.sentByName !== null || quote.clientSnapshot !== null) {
+      if (
+        numbered ||
+        quote.sentAt !== null ||
+        quote.sentByName !== null ||
+        quote.clientSnapshot !== null
+      ) {
         context.addIssue({ code: z.ZodIssueCode.custom, message: "QUOTE_DRAFT_STATE_INVALID" });
       }
     } else if (
