@@ -14,6 +14,7 @@ type DesktopTopbarProps = {
 const routeTitles: Array<{ prefix: string; title: string }> = [
   { prefix: "/desktop-ready", title: "Accueil" },
   { prefix: "/entrees", title: "Entrées" },
+  { prefix: "/tasks", title: "Mes tâches" },
   { prefix: "/commercial", title: "Commercial" },
   { prefix: "/chantiers", title: "Chantiers" },
   { prefix: "/planning", title: "Grand planning" },
@@ -65,7 +66,11 @@ export function DesktopTopbar({
 
         <div className="desktopTopbarRight">
           <div className={`desktopConnection${configured ? "" : " isOffline"}`}>
-            {configured ? <Wifi size={16} aria-hidden="true" /> : <WifiOff size={16} aria-hidden="true" />}
+            {configured ? (
+              <Wifi size={16} aria-hidden="true" />
+            ) : (
+              <WifiOff size={16} aria-hidden="true" />
+            )}
             <span>{configured ? "Configuration active" : "Configuration absente"}</span>
           </div>
           <div className="desktopIdentity">
@@ -79,6 +84,11 @@ export function DesktopTopbar({
       </header>
 
       <style jsx global>{`
+        .desktopMain {
+          width: 100%;
+          max-width: none;
+          margin: 0;
+        }
         .desktopTopbar {
           justify-content: space-between;
         }
