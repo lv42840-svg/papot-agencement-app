@@ -8,6 +8,7 @@ export const sharedResourceTypeSchema = z.enum([
   "PLANNING_WEEK",
   "TREASURY_MONTH",
   "ENTRIES",
+  "CLIENTS",
   "COMMERCIAL",
   "AUTH",
 ]);
