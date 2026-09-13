@@ -7,6 +7,7 @@ import { afterEach, describe, expect, it } from "vitest";
 const require = createRequire(import.meta.url);
 const setupStore = require("../desktop/setup-store.cjs") as {
   CONFIG_FILE_NAME: string;
+  DATABASE_SECRET_FILE_NAME: string;
   SECRET_FILE_NAME: string;
   normalizeSetupInput: (input: Record<string, unknown>) => Record<string, string>;
   readDesktopSetupConfig: (userDataPath: string) => Record<string, unknown> | null;
@@ -16,7 +17,11 @@ const setupStore = require("../desktop/setup-store.cjs") as {
       isEncryptionAvailable: () => boolean;
       decryptString: (value: Buffer) => string;
     };
-  }) => { config: Record<string, unknown>; nextcloudAppPassword: string } | null;
+  }) => {
+    config: Record<string, unknown>;
+    nextcloudAppPassword: string;
+    databaseUrl: string;
+  } | null;
   hasDesktopSetup: (params: {
     userDataPath: string;
     safeStorage: {
@@ -46,11 +51,11 @@ function makeTempDirectory() {
 function validInput() {
   return {
     sharedDataPath: "\\\\SERVEUR\\PAPOT",
+    databaseUrl: "postgresql://papot:db-secret@serveur-papot:5432/papot",
     nextcloudBaseUrl: "https://cloud.ideo-solutions.com/",
     nextcloudLogin: " Papot_Appli ",
     nextcloudAppPassword: " secret-app-password ",
     deviceLabel: " PC Lucien ",
-    papotUserDisplayName: " Lucien ",
   };
 }
 
@@ -72,7 +77,7 @@ afterEach(() => {
 });
 
 describe("desktop setup encrypted storage", () => {
-  it("writes public configuration without the plaintext Nextcloud password", () => {
+  it("writes public configuration without plaintext technical secrets", () => {
     const userDataPath = makeTempDirectory();
     const config = setupStore.saveDesktopSetup({
       userDataPath,
@@ -83,13 +88,17 @@ describe("desktop setup encrypted storage", () => {
 
     const rawConfig = fs.readFileSync(path.join(userDataPath, setupStore.CONFIG_FILE_NAME), "utf8");
     expect(rawConfig).not.toContain("secret-app-password");
+    expect(rawConfig).not.toContain("db-secret");
     expect(rawConfig).not.toContain("nextcloudAppPassword");
+    expect(rawConfig).not.toContain("databaseUrl");
     expect(config.nextcloud_user_id).toBe("Papot_Appli");
     expect(config.nextcloud_login).toBe("Papot_Appli");
     expect(config.device_label).toBe("PC Lucien");
+    expect(config).not.toHaveProperty("papot_user_id");
+    expect(config).not.toHaveProperty("papot_user_display_name");
   });
 
-  it("stores the encrypted secret separately from the JSON configuration", () => {
+  it("stores Nextcloud and PostgreSQL secrets separately from the JSON configuration", () => {
     const userDataPath = makeTempDirectory();
     setupStore.saveDesktopSetup({
       userDataPath,
@@ -98,11 +107,21 @@ describe("desktop setup encrypted storage", () => {
       safeStorage: fakeSafeStorage,
     });
 
-    const encrypted = fs.readFileSync(path.join(userDataPath, setupStore.SECRET_FILE_NAME), "utf8");
-    expect(encrypted).toBe("encrypted:secret-app-password");
+    const encryptedNextcloud = fs.readFileSync(
+      path.join(userDataPath, setupStore.SECRET_FILE_NAME),
+      "utf8",
+    );
+    const encryptedDatabase = fs.readFileSync(
+      path.join(userDataPath, setupStore.DATABASE_SECRET_FILE_NAME),
+      "utf8",
+    );
+    expect(encryptedNextcloud).toBe("encrypted:secret-app-password");
+    expect(encryptedDatabase).toBe(
+      "encrypted:postgresql://papot:db-secret@serveur-papot:5432/papot",
+    );
   });
 
-  it("reopens a complete setup and decrypts the reusable secret", () => {
+  it("reopens a complete setup and decrypts both reusable secrets", () => {
     const userDataPath = makeTempDirectory();
     setupStore.saveDesktopSetup({
       userDataPath,
@@ -116,13 +135,16 @@ describe("desktop setup encrypted storage", () => {
       safeStorage: fakeSafeStorageReader,
     });
     expect(reopened?.nextcloudAppPassword).toBe("secret-app-password");
+    expect(reopened?.databaseUrl).toBe(
+      "postgresql://papot:db-secret@serveur-papot:5432/papot",
+    );
     expect(reopened?.config.device_label).toBe("PC Lucien");
     expect(setupStore.hasDesktopSetup({ userDataPath, safeStorage: fakeSafeStorageReader })).toBe(
       true,
     );
   });
 
-  it("does not accept an unreadable encrypted secret as a completed setup", () => {
+  it("does not accept unreadable encrypted secrets as a completed setup", () => {
     const userDataPath = makeTempDirectory();
     setupStore.saveDesktopSetup({
       userDataPath,
@@ -142,7 +164,7 @@ describe("desktop setup encrypted storage", () => {
     );
   });
 
-  it("preserves stable device and PAPOT user identifiers when setup is saved again", () => {
+  it("preserves only the stable device identifier when setup is saved again", () => {
     const userDataPath = makeTempDirectory();
     const first = setupStore.saveDesktopSetup({
       userDataPath,
@@ -158,14 +180,20 @@ describe("desktop setup encrypted storage", () => {
     });
 
     expect(second.device_id).toBe(first.device_id);
-    expect(second.papot_user_id).toBe(first.papot_user_id);
     expect(second.device_label).toBe("PC Lucien Bureau");
+    expect(second).not.toHaveProperty("papot_user_id");
   });
 
   it("refuses a relative shared path", () => {
     expect(() =>
       setupStore.normalizeSetupInput({ ...validInput(), sharedDataPath: "Documents/PAPOT" }),
     ).toThrow("DESKTOP_SHARED_PATH_INVALID");
+  });
+
+  it("refuses an invalid PostgreSQL URL", () => {
+    expect(() =>
+      setupStore.normalizeSetupInput({ ...validInput(), databaseUrl: "https://serveur-papot/db" }),
+    ).toThrow("DESKTOP_DATABASE_URL_INVALID");
   });
 
   it("refuses a non-HTTPS Nextcloud URL", () => {

@@ -5,7 +5,6 @@ import {
   localDesktopSetupContainsPlaintextSecret,
 } from "../src/lib/desktop/setup-config";
 
-const PAPOT_USER_ID = "d4510da0-ac5b-480d-a8f0-03a36669ebb3";
 const DEVICE_ID = "cb8ede85-641f-45ad-ab2a-68f53a1d52ce";
 
 function baseInput() {
@@ -15,8 +14,6 @@ function baseInput() {
     nextcloudLogin: "Papot_Appli",
     nextcloudUserId: "Papot_Appli",
     deviceLabel: "PC Lucien",
-    papotUserId: PAPOT_USER_ID,
-    papotUserDisplayName: "Lucien",
     deviceId: DEVICE_ID,
   };
 }
@@ -58,27 +55,29 @@ describe("local desktop setup configuration", () => {
     ).toThrow("NEXTCLOUD_HTTPS_REQUIRED");
   });
 
-  it("keeps only a secret reference and no plaintext application password", () => {
+  it("keeps only secret references and no plaintext credentials", () => {
     const config = createLocalDesktopSetupConfig(baseInput());
 
     expect(config.nextcloud_app_password_secret_key).toBe("nextcloud-app-password");
+    expect(config.database_url_secret_key).toBe("database-url");
     expect(localDesktopSetupContainsPlaintextSecret(config)).toBe(false);
     expect("nextcloud_app_password" in config).toBe(false);
+    expect("database_url" in config).toBe(false);
   });
 
-  it("rejects unknown plaintext password fields", () => {
+  it("rejects unknown plaintext credential fields", () => {
     const config = createLocalDesktopSetupConfig(baseInput());
 
     expect(() =>
       localDesktopSetupConfigSchema.parse({
         ...config,
-        password: "must-never-be-here",
+        database_url: "postgresql://user:secret@server:5432/papot",
       }),
     ).toThrow();
     expect(
       localDesktopSetupContainsPlaintextSecret({
         ...config,
-        password: "must-never-be-here",
+        database_url: "postgresql://user:secret@server:5432/papot",
       }),
     ).toBe(true);
   });
@@ -88,11 +87,9 @@ describe("local desktop setup configuration", () => {
       ...baseInput(),
       nextcloudLogin: "  Papot_Appli  ",
       deviceLabel: "  PC Lucien  ",
-      papotUserDisplayName: "  Lucien  ",
     });
 
     expect(config.nextcloud_login).toBe("Papot_Appli");
     expect(config.device_label).toBe("PC Lucien");
-    expect(config.papot_user_display_name).toBe("Lucien");
   });
 });

@@ -22,26 +22,35 @@ import {
 
 const navigation = [
   { label: "Accueil", icon: Home, href: "/desktop-ready" },
-  { label: "Entrées", icon: ClipboardList, href: "/entrees" },
-  { label: "Commercial", icon: BriefcaseBusiness, href: "/commercial" },
-  { label: "Chantiers", icon: FolderOpen, href: "/chantiers" },
-  { label: "Grand planning", icon: CalendarDays, href: "/planning/2026-S38" },
-  { label: "Petit planning", icon: CalendarDays },
-  { label: "Heures", icon: Clock3 },
-  { label: "Achats", icon: ShoppingCart },
-  { label: "Facturation", icon: FileText },
-  { label: "Trésorerie", icon: Landmark },
-  { label: "Équipe", icon: Users },
-  { label: "Pilotage", icon: ChartNoAxesCombined },
-  { label: "Paramètres", icon: Settings },
+  { label: "Entrées", icon: ClipboardList, href: "/entrees", moduleKey: "capture" },
+  { label: "Commercial", icon: BriefcaseBusiness, href: "/commercial", moduleKey: "commercial" },
+  { label: "Chantiers", icon: FolderOpen, href: "/chantiers", moduleKey: "chantiers" },
+  {
+    label: "Grand planning",
+    icon: CalendarDays,
+    href: "/planning/2026-S38",
+    moduleKey: "planning",
+  },
+  { label: "Petit planning", icon: CalendarDays, moduleKey: "planning" },
+  { label: "Heures", icon: Clock3, moduleKey: "hours" },
+  { label: "Achats", icon: ShoppingCart, moduleKey: "purchases" },
+  { label: "Facturation", icon: FileText, moduleKey: "billing" },
+  { label: "Trésorerie", icon: Landmark, moduleKey: "treasury" },
+  { label: "Équipe", icon: Users, moduleKey: "team" },
+  { label: "Pilotage", icon: ChartNoAxesCombined, moduleKey: "pilotage" },
+  { label: "Paramètres", icon: Settings, moduleKey: "settings" },
 ];
 
 const STORAGE_KEY = "papot.desktop.sidebar.collapsed";
 const COMPACT_BREAKPOINT = 1180;
 
-export function DesktopSidebar() {
+export function DesktopSidebar({ allowedModules }: { allowedModules: string[] }) {
   const pathname = usePathname();
   const [collapsed, setCollapsed] = useState(false);
+  const allowed = new Set(allowedModules);
+  const visibleNavigation = navigation.filter(
+    (item) => !item.moduleKey || allowed.has(item.moduleKey),
+  );
 
   useEffect(() => {
     const applyPreference = () => {
@@ -98,7 +107,7 @@ export function DesktopSidebar() {
         </button>
 
         <nav className="desktopNavV2" aria-label="Navigation principale">
-          {navigation.map(({ label, icon: Icon, href }) => {
+          {visibleNavigation.map(({ label, icon: Icon, href }) => {
             const active =
               href === "/desktop-ready"
                 ? pathname === href

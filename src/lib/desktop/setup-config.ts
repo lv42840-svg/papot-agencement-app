@@ -1,7 +1,7 @@
 import { randomUUID } from "node:crypto";
 import { z } from "zod";
 
-export const LOCAL_DESKTOP_SETUP_SCHEMA_VERSION = 1 as const;
+export const LOCAL_DESKTOP_SETUP_SCHEMA_VERSION = 2 as const;
 export const DEFAULT_NEXTCLOUD_SYNC_ROOT = "PAPOT_SYNC";
 
 const windowsSharedPathSchema = z
@@ -38,9 +38,8 @@ export const localDesktopSetupConfigSchema = z
     nextcloud_sync_root: safeSyncRootSchema,
     device_id: z.string().uuid(),
     device_label: z.string().trim().min(1).max(120),
-    papot_user_id: z.string().uuid(),
-    papot_user_display_name: z.string().trim().min(1).max(120),
     nextcloud_app_password_secret_key: z.string().trim().min(1).max(120),
+    database_url_secret_key: z.string().trim().min(1).max(120),
   })
   .strict();
 
@@ -52,11 +51,10 @@ export type CreateLocalDesktopSetupInput = {
   nextcloudLogin: string;
   nextcloudUserId: string;
   deviceLabel: string;
-  papotUserId: string;
-  papotUserDisplayName: string;
   deviceId?: string;
   nextcloudSyncRoot?: string;
   nextcloudAppPasswordSecretKey?: string;
+  databaseUrlSecretKey?: string;
 };
 
 export function createLocalDesktopSetupConfig(
@@ -71,10 +69,9 @@ export function createLocalDesktopSetupConfig(
     nextcloud_sync_root: input.nextcloudSyncRoot ?? DEFAULT_NEXTCLOUD_SYNC_ROOT,
     device_id: input.deviceId ?? randomUUID(),
     device_label: input.deviceLabel,
-    papot_user_id: input.papotUserId,
-    papot_user_display_name: input.papotUserDisplayName,
     nextcloud_app_password_secret_key:
       input.nextcloudAppPasswordSecretKey ?? "nextcloud-app-password",
+    database_url_secret_key: input.databaseUrlSecretKey ?? "database-url",
   });
 }
 
@@ -86,6 +83,8 @@ export function localDesktopSetupContainsPlaintextSecret(value: unknown): boolea
     (key) =>
       key === "nextcloud_app_password" ||
       key === "app_password" ||
+      key === "database_url" ||
+      key === "connection_string" ||
       key === "password" ||
       key === "secret",
   );

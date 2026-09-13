@@ -1,6 +1,10 @@
 import { randomUUID } from "node:crypto";
 import { NextResponse } from "next/server";
 import { ZodError } from "zod";
+import {
+  desktopRequestErrorStatus,
+  requireDesktopRequestContext,
+} from "@/lib/desktop/request-context";
 import { createDesktopSharedResourceRuntime } from "@/lib/desktop/shared-resource-runtime";
 import {
   applyCommercialAutomaticTransitions,
@@ -20,6 +24,8 @@ export const dynamic = "force-dynamic";
 const COMMERCIAL_RESOURCE = { resource_type: "COMMERCIAL" as const, resource_id: "global" };
 const LOCK_TTL_MS = 30_000;
 
+type Owner = { userId: string; deviceId: string; displayName: string };
+
 function noStoreJson(body: unknown, init?: ResponseInit) {
   const response = NextResponse.json(body, init);
   response.headers.set("Cache-Control", "no-store");
@@ -28,14 +34,23 @@ function noStoreJson(body: unknown, init?: ResponseInit) {
 
 function snapshot(
   payload: CommercialPayload,
-  owner: { userId: string; displayName: string },
+  owner: Owner,
+  canWrite: boolean,
   focusCaseId?: string,
 ) {
   const actor = { userId: owner.userId, displayName: owner.displayName };
+  const baseCapabilities = commercialCapabilities(actor);
   return {
     payload,
     actor,
-    capabilities: commercialCapabilities(actor),
+    capabilities: {
+      ...baseCapabilities,
+      canCreate: canWrite,
+      canRead: true,
+      canModify: canWrite,
+      canProvision: canWrite,
+      canConfirm: canWrite,
+    },
     suggestedPeople: listCommercialPeople(payload, actor),
     focusCaseId,
     serverNow: new Date().toISOString(),
@@ -43,6 +58,8 @@ function snapshot(
 }
 
 function statusFor(code: string): number {
+  const requestStatus = desktopRequestErrorStatus(code);
+  if (requestStatus) return requestStatus;
   if (code === "COMMERCIAL_LOCKED") return 423;
   if (code.endsWith("_NOT_FOUND")) return 404;
   if (code.endsWith("_FORBIDDEN")) return 403;
@@ -52,6 +69,7 @@ function statusFor(code: string): number {
 
 async function persistAutomaticTransitions(
   desktop: ReturnType<typeof createDesktopSharedResourceRuntime>,
+  owner: Owner,
 ): Promise<CommercialPayload> {
   const leaseId = randomUUID();
   let ownsLock = false;
@@ -60,7 +78,7 @@ async function persistAutomaticTransitions(
       desktop.locks.acquire({
         resource: COMMERCIAL_RESOURCE,
         leaseId,
-        owner: desktop.owner,
+        owner,
         baseVersion: 0,
         ttlMs: LOCK_TTL_MS,
         reclaimOwnAfterMs: 0,
@@ -81,7 +99,7 @@ async function persistAutomaticTransitions(
       resource: COMMERCIAL_RESOURCE,
       opened,
       payload: transition.payload,
-      actor: { userId: desktop.owner.userId, deviceId: desktop.owner.deviceId },
+      actor: { userId: owner.userId, deviceId: owner.deviceId },
     });
     if (saved.status === "conflict") {
       opened = await desktop.states.openForUpdate(COMMERCIAL_RESOURCE);
@@ -91,7 +109,7 @@ async function persistAutomaticTransitions(
         resource: COMMERCIAL_RESOURCE,
         opened,
         payload: transition.payload,
-        actor: { userId: desktop.owner.userId, deviceId: desktop.owner.deviceId },
+        actor: { userId: owner.userId, deviceId: owner.deviceId },
       });
     }
     if (saved.status === "conflict") throw new Error("COMMERCIAL_VERSION_CONFLICT");
@@ -99,7 +117,7 @@ async function persistAutomaticTransitions(
   } finally {
     if (ownsLock) {
       void desktop.locks
-        .release({ resource: COMMERCIAL_RESOURCE, leaseId, owner: desktop.owner })
+        .release({ resource: COMMERCIAL_RESOURCE, leaseId, owner })
         .catch(() => undefined);
     }
   }
@@ -107,15 +125,18 @@ async function persistAutomaticTransitions(
 
 export async function GET() {
   try {
-    const desktop = createDesktopSharedResourceRuntime();
+    const context = await requireDesktopRequestContext("commercial", "READ");
+    const { desktop, owner } = context;
     const cached = desktop.states.getCached(COMMERCIAL_RESOURCE);
     const resource = cached !== undefined ? cached : await desktop.states.get(COMMERCIAL_RESOURCE);
     const parsed = parseCommercialPayload(resource?.payload);
     const transition = applyCommercialAutomaticTransitions(parsed);
 
     if (transition.changed) {
-      const payload = await persistAutomaticTransitions(desktop);
-      return noStoreJson(snapshot(payload, desktop.owner));
+      const payload = context.moduleAccess.canWrite
+        ? await persistAutomaticTransitions(desktop, owner)
+        : transition.payload;
+      return noStoreJson(snapshot(payload, owner, context.moduleAccess.canWrite));
     }
 
     if (cached !== undefined) {
@@ -125,7 +146,7 @@ export async function GET() {
       });
     }
 
-    return noStoreJson(snapshot(parsed, desktop.owner));
+    return noStoreJson(snapshot(parsed, owner, context.moduleAccess.canWrite));
   } catch (error) {
     const code = error instanceof Error ? error.message : "COMMERCIAL_LOAD_FAILED";
     return noStoreJson({ error: code }, { status: statusFor(code) });
@@ -136,21 +157,24 @@ export async function POST(request: Request) {
   const leaseId = randomUUID();
   const startedAt = Date.now();
   let desktop: ReturnType<typeof createDesktopSharedResourceRuntime> | null = null;
+  let owner: Owner | null = null;
   let ownsLock = false;
   let stage = "parse-request";
 
   try {
     const input = commercialMutationSchema.parse(await request.json());
     stage = "create-runtime";
-    desktop = createDesktopSharedResourceRuntime();
-    const actor = { userId: desktop.owner.userId, displayName: desktop.owner.displayName };
+    const context = await requireDesktopRequestContext("commercial", "WRITE");
+    desktop = context.desktop;
+    owner = context.owner;
+    const actor = { userId: owner.userId, displayName: owner.displayName };
 
     stage = "acquire-lock-and-open-resource";
     const [lock, openedInitial] = await Promise.all([
       desktop.locks.acquire({
         resource: COMMERCIAL_RESOURCE,
         leaseId,
-        owner: desktop.owner,
+        owner,
         baseVersion: 0,
         ttlMs: LOCK_TTL_MS,
         reclaimOwnAfterMs: 0,
@@ -174,7 +198,7 @@ export async function POST(request: Request) {
       resource: COMMERCIAL_RESOURCE,
       opened,
       payload: mutation.payload,
-      actor: { userId: desktop.owner.userId, deviceId: desktop.owner.deviceId },
+      actor: { userId: owner.userId, deviceId: owner.deviceId },
     });
 
     if (saved.status === "conflict") {
@@ -187,14 +211,14 @@ export async function POST(request: Request) {
         resource: COMMERCIAL_RESOURCE,
         opened,
         payload: mutation.payload,
-        actor: { userId: desktop.owner.userId, deviceId: desktop.owner.deviceId },
+        actor: { userId: owner.userId, deviceId: owner.deviceId },
       });
     }
 
     if (saved.status === "conflict") throw new Error("COMMERCIAL_VERSION_CONFLICT");
     const payload = parseCommercialPayload(saved.resource.payload);
     console.info("[PAPOT][Commercial] POST saved", { ms: Date.now() - startedAt });
-    return noStoreJson(snapshot(payload, desktop.owner, mutation.focusCaseId));
+    return noStoreJson(snapshot(payload, owner, true, mutation.focusCaseId));
   } catch (error) {
     const code =
       error instanceof ZodError
@@ -205,10 +229,11 @@ export async function POST(request: Request) {
     console.error("[PAPOT][Commercial] POST failed", { stage, code, ms: Date.now() - startedAt });
     return noStoreJson({ error: code }, { status: statusFor(code) });
   } finally {
-    if (desktop && ownsLock) {
+    if (desktop && owner && ownsLock) {
       const releaseDesktop = desktop;
+      const releaseOwner = owner;
       void releaseDesktop.locks
-        .release({ resource: COMMERCIAL_RESOURCE, leaseId, owner: releaseDesktop.owner })
+        .release({ resource: COMMERCIAL_RESOURCE, leaseId, owner: releaseOwner })
         .catch(() => undefined);
     }
   }

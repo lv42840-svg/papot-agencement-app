@@ -89,18 +89,19 @@ export type EntryPriority = z.infer<typeof entryPrioritySchema>;
 const DEFAULT_TAGS: EntriesTag[] = [
   { id: "contact", label: "Contact", active: true, sortOrder: 0 },
   { id: "devis", label: "Devis", active: true, sortOrder: 1 },
-  { id: "sav", label: "SAV", active: true, sortOrder: 2 },
+  { id: "chiffrage-seul", label: "Chiffrage seul", active: true, sortOrder: 2 },
+  { id: "sav", label: "SAV", active: true, sortOrder: 3 },
   {
     id: "intervention-chantier",
     label: "Intervention chantier",
     active: true,
-    sortOrder: 3,
+    sortOrder: 4,
   },
   {
     id: "compte-rendu-chantier",
     label: "Compte rendu de chantier",
     active: true,
-    sortOrder: 4,
+    sortOrder: 5,
   },
 ];
 
@@ -214,10 +215,7 @@ export function qualificationAttentionAt(entry: EntryRecord): Date {
   return addFrenchBusinessHours(new Date(entry.createdAt), 48);
 }
 
-export function isQualificationAttentionDue(
-  entry: EntryRecord,
-  now: Date = new Date(),
-): boolean {
+export function isQualificationAttentionDue(entry: EntryRecord, now: Date = new Date()): boolean {
   if (entry.status !== "TO_QUALIFY") return false;
   if (entry.snoozedUntilDate) return parisDateKey(now) >= entry.snoozedUntilDate;
   return now.getTime() >= qualificationAttentionAt(entry).getTime();

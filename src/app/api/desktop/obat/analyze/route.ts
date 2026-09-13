@@ -1,10 +1,13 @@
 import { NextResponse } from "next/server";
+import { requireDesktopRequestContext } from "@/lib/desktop/request-context";
 import { analyzeObatFiles } from "@/lib/obat/parser";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
 function statusFor(code: string): number {
+  if (code === "AUTH_REQUIRED") return 401;
+  if (code === "MODULE_FORBIDDEN") return 403;
   if (code === "OBAT_FILES_REQUIRED" || code === "OBAT_NOT_RECOGNIZED") return 400;
   if (code === "OBAT_TOO_MANY_FILES") return 400;
   if (code === "OBAT_FILE_TOO_LARGE") return 413;
@@ -15,13 +18,11 @@ function statusFor(code: string): number {
 
 export async function POST(request: Request) {
   try {
+    await requireDesktopRequestContext("commercial", "WRITE");
     const form = await request.formData();
     const files = form.getAll("files").filter((value): value is File => value instanceof File);
     const analysis = await analyzeObatFiles(files);
-    return NextResponse.json(
-      { analysis },
-      { headers: { "Cache-Control": "no-store" } },
-    );
+    return NextResponse.json({ analysis }, { headers: { "Cache-Control": "no-store" } });
   } catch (error) {
     const code = error instanceof Error ? error.message : "OBAT_ANALYSIS_FAILED";
     console.error("[PAPOT][OBAT] analysis failed", { code });

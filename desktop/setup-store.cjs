@@ -6,7 +6,9 @@ const path = require("node:path");
 
 const CONFIG_FILE_NAME = "papot-desktop-config.json";
 const SECRET_FILE_NAME = "papot-nextcloud-secret.bin";
+const DATABASE_SECRET_FILE_NAME = "papot-database-secret.bin";
 const SECRET_KEY_NAME = "nextcloud-app-password";
+const DATABASE_SECRET_KEY_NAME = "database-url";
 const DEFAULT_SYNC_ROOT = "PAPOT_SYNC";
 
 function requiredTrimmed(value, code) {
@@ -37,11 +39,29 @@ function normalizeNextcloudUrl(value) {
   return parsed.toString().replace(/\/$/, "");
 }
 
+function normalizeDatabaseUrl(value) {
+  const raw = requiredTrimmed(value, "DESKTOP_DATABASE_URL_REQUIRED");
+  let parsed;
+  try {
+    parsed = new URL(raw);
+  } catch {
+    throw new Error("DESKTOP_DATABASE_URL_INVALID");
+  }
+  if (parsed.protocol !== "postgres:" && parsed.protocol !== "postgresql:") {
+    throw new Error("DESKTOP_DATABASE_URL_INVALID");
+  }
+  if (!parsed.hostname || !parsed.pathname || parsed.pathname === "/") {
+    throw new Error("DESKTOP_DATABASE_URL_INVALID");
+  }
+  return raw;
+}
+
 function normalizeSetupInput(input) {
   if (!input || typeof input !== "object") throw new Error("DESKTOP_SETUP_INVALID");
 
   return {
     sharedDataPath: normalizeSharedPath(input.sharedDataPath),
+    databaseUrl: normalizeDatabaseUrl(input.databaseUrl),
     nextcloudBaseUrl: normalizeNextcloudUrl(input.nextcloudBaseUrl),
     nextcloudLogin: requiredTrimmed(input.nextcloudLogin, "DESKTOP_NEXTCLOUD_LOGIN_REQUIRED"),
     nextcloudAppPassword: requiredTrimmed(
@@ -49,10 +69,6 @@ function normalizeSetupInput(input) {
       "DESKTOP_NEXTCLOUD_PASSWORD_REQUIRED",
     ),
     deviceLabel: requiredTrimmed(input.deviceLabel, "DESKTOP_DEVICE_LABEL_REQUIRED"),
-    papotUserDisplayName: requiredTrimmed(
-      input.papotUserDisplayName,
-      "DESKTOP_PAPOT_USER_REQUIRED",
-    ),
   };
 }
 
@@ -62,6 +78,10 @@ function configPath(userDataPath) {
 
 function secretPath(userDataPath) {
   return path.join(userDataPath, SECRET_FILE_NAME);
+}
+
+function databaseSecretPath(userDataPath) {
+  return path.join(userDataPath, DATABASE_SECRET_FILE_NAME);
 }
 
 function readDesktopSetupConfig(userDataPath) {
@@ -78,17 +98,27 @@ function readDesktopSetupConfig(userDataPath) {
 
 function readDesktopSetup({ userDataPath, safeStorage }) {
   const config = readDesktopSetupConfig(userDataPath);
-  if (!config || !fs.existsSync(secretPath(userDataPath))) return null;
+  if (
+    !config ||
+    !fs.existsSync(secretPath(userDataPath)) ||
+    !fs.existsSync(databaseSecretPath(userDataPath))
+  ) {
+    return null;
+  }
   if (!safeStorage || typeof safeStorage.isEncryptionAvailable !== "function") return null;
   if (!safeStorage.isEncryptionAvailable() || typeof safeStorage.decryptString !== "function") {
     return null;
   }
 
   try {
-    const encrypted = fs.readFileSync(secretPath(userDataPath));
-    const nextcloudAppPassword = safeStorage.decryptString(encrypted);
+    const encryptedNextcloud = fs.readFileSync(secretPath(userDataPath));
+    const encryptedDatabase = fs.readFileSync(databaseSecretPath(userDataPath));
+    const nextcloudAppPassword = safeStorage.decryptString(encryptedNextcloud);
+    const databaseUrl = safeStorage.decryptString(encryptedDatabase);
     if (typeof nextcloudAppPassword !== "string" || !nextcloudAppPassword) return null;
-    return { config, nextcloudAppPassword };
+    if (typeof databaseUrl !== "string" || !databaseUrl) return null;
+    normalizeDatabaseUrl(databaseUrl);
+    return { config, nextcloudAppPassword, databaseUrl };
   } catch {
     return null;
   }
@@ -115,7 +145,7 @@ function saveDesktopSetup({ userDataPath, input, nextcloudUserId, safeStorage })
   fs.mkdirSync(userDataPath, { recursive: true });
   const previous = readDesktopSetupConfig(userDataPath);
   const config = {
-    schema_version: 1,
+    schema_version: 2,
     shared_data_path: normalized.sharedDataPath,
     nextcloud_base_url: normalized.nextcloudBaseUrl,
     nextcloud_login: normalized.nextcloudLogin,
@@ -126,20 +156,21 @@ function saveDesktopSetup({ userDataPath, input, nextcloudUserId, safeStorage })
         ? previous.device_id
         : randomUUID(),
     device_label: normalized.deviceLabel,
-    papot_user_id:
-      typeof previous?.papot_user_id === "string" && previous.papot_user_id
-        ? previous.papot_user_id
-        : randomUUID(),
-    papot_user_display_name: normalized.papotUserDisplayName,
     nextcloud_app_password_secret_key: SECRET_KEY_NAME,
+    database_url_secret_key: DATABASE_SECRET_KEY_NAME,
   };
 
-  const encrypted = safeStorage.encryptString(normalized.nextcloudAppPassword);
-  if (!Buffer.isBuffer(encrypted) || encrypted.length === 0) {
+  const encryptedNextcloud = safeStorage.encryptString(normalized.nextcloudAppPassword);
+  const encryptedDatabase = safeStorage.encryptString(normalized.databaseUrl);
+  if (!Buffer.isBuffer(encryptedNextcloud) || encryptedNextcloud.length === 0) {
+    throw new Error("DESKTOP_SECRET_ENCRYPTION_FAILED");
+  }
+  if (!Buffer.isBuffer(encryptedDatabase) || encryptedDatabase.length === 0) {
     throw new Error("DESKTOP_SECRET_ENCRYPTION_FAILED");
   }
 
-  fs.writeFileSync(secretPath(userDataPath), encrypted, { mode: 0o600 });
+  fs.writeFileSync(secretPath(userDataPath), encryptedNextcloud, { mode: 0o600 });
+  fs.writeFileSync(databaseSecretPath(userDataPath), encryptedDatabase, { mode: 0o600 });
   fs.writeFileSync(configPath(userDataPath), `${JSON.stringify(config, null, 2)}\n`, {
     encoding: "utf8",
     mode: 0o600,
@@ -150,9 +181,11 @@ function saveDesktopSetup({ userDataPath, input, nextcloudUserId, safeStorage })
 
 module.exports = {
   CONFIG_FILE_NAME,
+  DATABASE_SECRET_FILE_NAME,
   DEFAULT_SYNC_ROOT,
   SECRET_FILE_NAME,
   hasDesktopSetup,
+  normalizeDatabaseUrl,
   normalizeSetupInput,
   readDesktopSetup,
   readDesktopSetupConfig,

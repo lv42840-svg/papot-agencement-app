@@ -1,7 +1,10 @@
 import { NextResponse } from "next/server";
 import { z } from "zod";
-import { createDesktopSharedResourceRuntime } from "@/lib/desktop/shared-resource-runtime";
-import { sharedResourceRefSchema } from "@/lib/sync/resource-lock";
+import {
+  desktopRequestErrorStatus,
+  requireDesktopRequestContext,
+} from "@/lib/desktop/request-context";
+import { sharedResourceRefSchema, type SharedResourceType } from "@/lib/sync/resource-lock";
 
 export const runtime = "nodejs";
 
@@ -30,50 +33,74 @@ const requestSchema = z.discriminatedUnion("action", [
   }),
 ]);
 
+function moduleForResource(resourceType: SharedResourceType): string {
+  switch (resourceType) {
+    case "ENTRIES":
+      return "capture";
+    case "COMMERCIAL":
+      return "commercial";
+    case "CHANTIER":
+      return "chantiers";
+    case "PLANNING_WEEK":
+      return "planning";
+    case "TREASURY_MONTH":
+      return "treasury";
+  }
+}
+
 export async function POST(request: Request) {
   try {
     const input = requestSchema.parse(await request.json());
-    const runtime = createDesktopSharedResourceRuntime();
+    const requiredAccess = input.action === "open" ? "READ" : "WRITE";
+    const context = await requireDesktopRequestContext(
+      moduleForResource(input.resource.resource_type),
+      requiredAccess,
+    );
+    const { desktop, owner } = context;
 
     if (input.action === "open") {
       return NextResponse.json(
-        await runtime.coordinator.open({
+        await desktop.coordinator.open({
           resource: input.resource,
           leaseId: input.leaseId,
-          owner: runtime.owner,
+          owner,
         }),
       );
     }
     if (input.action === "save") {
       return NextResponse.json(
-        await runtime.coordinator.save({
+        await desktop.coordinator.save({
           resource: input.resource,
           leaseId: input.leaseId,
-          owner: runtime.owner,
+          owner,
           expectedVersion: input.expectedVersion,
           payload: input.payload,
         }),
       );
     }
     if (input.action === "renew") {
-      const lock = await runtime.locks.renew({
+      const lock = await desktop.locks.renew({
         resource: input.resource,
         leaseId: input.leaseId,
-        owner: runtime.owner,
+        owner,
       });
       return NextResponse.json({ status: "renewed", lock });
     }
 
     return NextResponse.json({
       status: "released",
-      released: await runtime.coordinator.release({
+      released: await desktop.coordinator.release({
         resource: input.resource,
         leaseId: input.leaseId,
-        owner: runtime.owner,
+        owner,
       }),
     });
   } catch (error) {
     const code = error instanceof Error ? error.message : "SHARED_RESOURCE_FAILED";
-    return NextResponse.json({ status: "error", error: code }, { status: 409 });
+    const requestStatus = desktopRequestErrorStatus(code);
+    return NextResponse.json(
+      { status: "error", error: code },
+      { status: requestStatus ?? 409 },
+    );
   }
 }
