@@ -38,18 +38,32 @@ const navigation = [
   { label: "Trésorerie", icon: Landmark, moduleKey: "treasury" },
   { label: "Équipe", icon: Users, moduleKey: "team" },
   { label: "Pilotage", icon: ChartNoAxesCombined, moduleKey: "pilotage" },
-  { label: "Paramètres", icon: Settings, moduleKey: "settings" },
+  {
+    label: "Paramètres",
+    icon: Settings,
+    href: "/settings/users",
+    moduleKey: "settings",
+    adminOnly: true,
+  },
 ];
 
 const STORAGE_KEY = "papot.desktop.sidebar.collapsed";
 const COMPACT_BREAKPOINT = 1180;
 
-export function DesktopSidebar({ allowedModules }: { allowedModules: string[] }) {
+export function DesktopSidebar({
+  allowedModules,
+  canManagePermissions,
+}: {
+  allowedModules: string[];
+  canManagePermissions: boolean;
+}) {
   const pathname = usePathname();
   const [collapsed, setCollapsed] = useState(false);
   const allowed = new Set(allowedModules);
   const visibleNavigation = navigation.filter(
-    (item) => !item.moduleKey || allowed.has(item.moduleKey),
+    (item) =>
+      (!item.moduleKey || allowed.has(item.moduleKey)) &&
+      (!("adminOnly" in item) || !item.adminOnly || canManagePermissions),
   );
 
   useEffect(() => {
