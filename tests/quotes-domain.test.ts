@@ -6,7 +6,7 @@ import {
   parseQuoteQuantityInput,
   percentageAmountCents,
   quoteValidityDate,
-} from "@/lib/quotes/domain";
+} from "../src/lib/quotes/domain";
 
 describe("native quote quantity expressions", () => {
   it("keeps a plain quantity without a formula memo", () => {
