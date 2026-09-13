@@ -1,10 +1,6 @@
 import { randomUUID } from "node:crypto";
 import { z } from "zod";
-import {
-  formatQuoteNumber,
-  parseQuoteQuantityInput,
-  quoteValidityDate,
-} from "./domain";
+import { formatQuoteNumber, parseQuoteQuantityInput, quoteValidityDate } from "./domain";
 import {
   findQuote,
   quoteClientSnapshotSchema,
