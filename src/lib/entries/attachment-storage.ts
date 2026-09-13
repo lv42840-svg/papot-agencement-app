@@ -103,8 +103,8 @@ export function attachmentUrl(
   transport: Pick<EntryAttachmentTransport, "dav" | "nextcloudUserId" | "syncRoot">,
   attachment: EntryAttachment,
 ): string {
-  const prefix = "documents/entries/";
-  if (!attachment.storagePath.startsWith(prefix)) {
+  const allowedPrefixes = ["documents/entries/", "documents/captures/"];
+  if (!allowedPrefixes.some((prefix) => attachment.storagePath.startsWith(prefix))) {
     throw new Error("ENTRY_ATTACHMENT_PATH_INVALID");
   }
   const segments = attachment.storagePath.split("/").filter(Boolean);
