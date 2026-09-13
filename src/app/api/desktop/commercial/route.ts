@@ -1,5 +1,9 @@
 import { NextResponse } from "next/server";
 import { ZodError } from "zod";
+import {
+  hasEffectiveSpecialPermission,
+  requireSpecialPermission,
+} from "@/lib/auth/permissions";
 import { requireDesktopRequestContext } from "@/lib/desktop/request-context";
 import { listCommercialAssignableUsers } from "@/lib/commercial/people";
 import {
@@ -19,7 +23,7 @@ function noStoreJson(body: unknown, init?: ResponseInit) {
 
 function statusFor(code: string): number {
   if (code === "AUTH_REQUIRED") return 401;
-  if (code === "MODULE_FORBIDDEN") return 403;
+  if (code === "MODULE_FORBIDDEN" || code === "SPECIAL_PERMISSION_FORBIDDEN") return 403;
   if (code.endsWith("_NOT_FOUND")) return 404;
   if (code.includes("CLOSED") || code.includes("ALREADY_LINKED")) return 409;
   return 400;
@@ -27,23 +31,29 @@ function statusFor(code: string): number {
 
 async function snapshot(
   canWrite: boolean,
+  user: { id: string; canManagePermissions: boolean },
   actor: { userId: string; displayName: string },
   focusCaseId?: string,
 ) {
-  const [payload, activeUsers] = await Promise.all([
-    loadCommercialPayloadFromDatabase(),
-    listCommercialAssignableUsers(),
-  ]);
+  const [payload, activeUsers, canCreateSpecial, canProvisionSpecial, canConfirmSpecial] =
+    await Promise.all([
+      loadCommercialPayloadFromDatabase(),
+      listCommercialAssignableUsers(),
+      hasEffectiveSpecialPermission(user, "commercial.create"),
+      hasEffectiveSpecialPermission(user, "commercial.provision"),
+      hasEffectiveSpecialPermission(user, "commercial.confirm_launch"),
+    ]);
   return {
     payload,
     actor,
     capabilities: {
-      canCreate: canWrite,
+      canCreate: canWrite && canCreateSpecial,
       canRead: true,
       canModify: canWrite,
-      canConfirm: canWrite,
+      canProvision: canWrite && canProvisionSpecial,
+      canConfirm: canWrite && canConfirmSpecial,
     },
-    suggestedPeople: activeUsers.map((user) => user.displayName),
+    suggestedPeople: activeUsers.map((activeUser) => activeUser.displayName),
     activeUsers,
     focusCaseId,
     serverNow: new Date().toISOString(),
@@ -54,7 +64,9 @@ export async function GET() {
   try {
     const context = await requireDesktopRequestContext("commercial", "READ");
     const actor = { userId: context.user.id, displayName: context.user.displayName };
-    return noStoreJson(await snapshot(context.moduleAccess.canWrite, actor));
+    return noStoreJson(
+      await snapshot(context.moduleAccess.canWrite, context.user, actor),
+    );
   } catch (error) {
     const code = error instanceof Error ? error.message : "COMMERCIAL_LOAD_FAILED";
     return noStoreJson({ error: code }, { status: statusFor(code) });
@@ -66,13 +78,23 @@ export async function POST(request: Request) {
   try {
     const input = commercialPostgresMutationSchema.parse(await request.json());
     const context = await requireDesktopRequestContext("commercial", "WRITE");
+    if (input.action === "create") {
+      await requireSpecialPermission(context.user, "commercial.create");
+    }
+    if (
+      (input.action === "setStatus" && input.status === "CONFIRMED") ||
+      (input.action === "recordFollowUp" && input.nextStatus === "CONFIRMED")
+    ) {
+      await requireSpecialPermission(context.user, "commercial.confirm_launch");
+    }
+
     const actor = { userId: context.user.id, displayName: context.user.displayName };
     const mutation = await applyCommercialMutationInDatabase(input, actor);
     console.info("[PAPOT][Commercial] PostgreSQL mutation saved", {
       action: input.action,
       ms: Date.now() - startedAt,
     });
-    return noStoreJson(await snapshot(true, actor, mutation.focusCaseId));
+    return noStoreJson(await snapshot(true, context.user, actor, mutation.focusCaseId));
   } catch (error) {
     const code =
       error instanceof ZodError
