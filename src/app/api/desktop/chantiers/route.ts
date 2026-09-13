@@ -1,6 +1,7 @@
 import { randomUUID } from "node:crypto";
 import { NextResponse } from "next/server";
 import { ZodError } from "zod";
+import { chantierSpecialPermissionForMutation } from "@/lib/auth/action-permissions";
 import {
   hasEffectiveSpecialPermission,
   requireSpecialPermission,
@@ -24,7 +25,7 @@ const CHANTIERS_RESOURCE = { resource_type: "CHANTIER" as const, resource_id: "r
 const LOCK_TTL_MS = 30_000;
 
 type Owner = { userId: string; deviceId: string; displayName: string };
-type PermissionUser = { id: string; canManagePermissions: boolean };
+type PermissionUser = { id: string };
 
 function noStoreJson(body: unknown, init?: ResponseInit) {
   const response = NextResponse.json(body, init);
@@ -85,9 +86,7 @@ export async function GET() {
       });
     }
 
-    return noStoreJson(
-      await snapshot(payload, owner, context.user, context.moduleAccess.canWrite),
-    );
+    return noStoreJson(await snapshot(payload, owner, context.user, context.moduleAccess.canWrite));
   } catch (error) {
     const code = error instanceof Error ? error.message : "CHANTIERS_LOAD_FAILED";
     return noStoreJson({ error: code }, { status: statusFor(code) });
@@ -106,8 +105,9 @@ export async function POST(request: Request) {
     const input = chantierMutationSchema.parse(await request.json());
     stage = "create-runtime";
     const context = await requireDesktopRequestContext("chantiers", "WRITE");
-    if (input.action === "archive" || input.action === "unarchive") {
-      await requireSpecialPermission(context.user, "chantiers.archive_reactivate");
+    const requiredSpecialPermission = chantierSpecialPermissionForMutation(input);
+    if (requiredSpecialPermission) {
+      await requireSpecialPermission(context.user, requiredSpecialPermission);
     }
     desktop = context.desktop;
     owner = context.owner;
