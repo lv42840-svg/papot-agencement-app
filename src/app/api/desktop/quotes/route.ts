@@ -124,10 +124,14 @@ async function applyApiMutation(params: {
   if (input.action === "create") {
     const client = await getClient(desktop, input.clientId);
     await assertCommercialLink(desktop, input.commercialCaseId, client.id);
-    return applyQuotesMutation(source, {
-      ...input,
-      paymentTerms: input.paymentTerms || client.paymentTerms,
-    }, actor);
+    return applyQuotesMutation(
+      source,
+      {
+        ...input,
+        paymentTerms: input.paymentTerms || client.paymentTerms,
+      },
+      actor,
+    );
   }
 
   const current = findQuote(source, input.quoteId);
@@ -139,11 +143,15 @@ async function applyApiMutation(params: {
       input.commercialCaseId === undefined ? current.commercialCaseId : input.commercialCaseId;
     await assertCommercialLink(desktop, commercialCaseId, client.id);
     const clientChanged = client.id !== current.clientId;
-    return applyQuotesMutation(source, {
-      ...input,
-      paymentTerms:
-        input.paymentTerms === undefined && clientChanged ? client.paymentTerms : input.paymentTerms,
-    }, actor);
+    return applyQuotesMutation(
+      source,
+      {
+        ...input,
+        paymentTerms:
+          input.paymentTerms === undefined && clientChanged ? client.paymentTerms : input.paymentTerms,
+      },
+      actor,
+    );
   }
 
   if (current.status === "SENT") {
@@ -276,7 +284,11 @@ export async function POST(request: Request) {
         : error instanceof Error
           ? error.message
           : "QUOTES_MUTATION_FAILED";
-    console.error("[PAPOT][Quotes] POST failed", { stage, code, ms: Date.now() - startedAt });
+    console.error("[PAPOT][Quotes] POST failed", {
+      stage,
+      code,
+      ms: Date.now() - startedAt,
+    });
     return noStoreJson({ error: code }, { status: errorStatus(code) });
   } finally {
     if (desktop && owner && ownsLock) {
