@@ -26,9 +26,8 @@ export async function requireDesktopRequestContext(
   if (!user) throw new Error("AUTH_REQUIRED");
   if (user.mustChangePassword) throw new Error("PASSWORD_CHANGE_REQUIRED");
 
-  const isAdmin = user.canManagePermissions;
-  const canWrite = isAdmin || (await hasModuleAccess(user.id, moduleKey, "WRITE"));
-  const canRead = canWrite || isAdmin || (await hasModuleAccess(user.id, moduleKey, "READ"));
+  const canWrite = await hasModuleAccess(user.id, moduleKey, "WRITE");
+  const canRead = canWrite || (await hasModuleAccess(user.id, moduleKey, "READ"));
 
   if (required === "WRITE" ? !canWrite : !canRead) {
     throw new Error("MODULE_FORBIDDEN");
