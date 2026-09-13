@@ -5,6 +5,7 @@ import {
   normalizePersonName,
   parisDateKey,
   type EntriesPayload,
+  type EntryAttachment,
   type EntryRecord,
 } from "./domain";
 
@@ -14,6 +15,7 @@ const tagIdsSchema = z.array(z.string().min(1).max(100)).max(12);
 export const entriesMutationSchema = z.discriminatedUnion("action", [
   z.object({
     action: z.literal("create"),
+    entryId: z.string().uuid().optional(),
     rawText: z.string().trim().min(1).max(4000),
     priority: z.enum(["NORMAL", "URGENT"]).default("NORMAL"),
     tagIds: tagIdsSchema.default([]),
@@ -90,29 +92,15 @@ export const entriesMutationSchema = z.discriminatedUnion("action", [
 ]);
 
 export type EntriesMutation = z.infer<typeof entriesMutationSchema>;
-
-export type EntriesActor = {
-  userId: string;
-  displayName: string;
-};
-
-export type EntriesCapabilities = {
-  canQualify: boolean;
-  canManageTags: boolean;
-};
-
-export type EntriesMutationResult = {
-  payload: EntriesPayload;
-  focusEntryId?: string;
-};
+export type EntriesActor = { userId: string; displayName: string };
+export type EntriesCapabilities = { canQualify: boolean; canManageTags: boolean };
+export type EntriesMutationResult = { payload: EntriesPayload; focusEntryId?: string };
 
 function isNamed(actor: EntriesActor, name: string): boolean {
   return normalizePersonName(actor.displayName) === normalizePersonName(name);
 }
 
 export function entriesCapabilities(actor: EntriesActor): EntriesCapabilities {
-  // AGE-12 / AGE-52: Nadia qualifie au quotidien et Lucien assure le relais complet.
-  // AGE-20: l'administration du référentiel de tags reste réservée à Lucien.
   return {
     canQualify: isNamed(actor, "Nadia") || isNamed(actor, "Lucien"),
     canManageTags: isNamed(actor, "Lucien"),
@@ -135,10 +123,7 @@ function assertToQualify(entry: EntryRecord): void {
 
 function assertAssignedToActor(entry: EntryRecord, actor: EntriesActor): void {
   if (entry.status !== "ASSIGNED") throw new Error("ENTRY_NOT_ASSIGNED");
-  if (
-    !entry.assigneeName ||
-    normalizePersonName(entry.assigneeName) !== normalizePersonName(actor.displayName)
-  ) {
+  if (!entry.assigneeName || normalizePersonName(entry.assigneeName) !== normalizePersonName(actor.displayName)) {
     throw new Error("ENTRY_NOT_ASSIGNED_TO_ACTOR");
   }
 }
@@ -148,50 +133,53 @@ function ensureTagIds(payload: EntriesPayload, tagIds: string[]): void {
   if (tagIds.some((tagId) => !known.has(tagId))) throw new Error("ENTRY_TAG_UNKNOWN");
 }
 
-function history(
-  entry: EntryRecord,
-  actor: EntriesActor,
-  type: EntryRecord["history"][number]["type"],
-  summary: string,
-  now: string,
-): void {
+function history(entry: EntryRecord, actor: EntriesActor, type: EntryRecord["history"][number]["type"], summary: string, now: string): void {
   entry.history.push({ id: randomUUID(), type, at: now, actorName: actor.displayName, summary });
 }
 
-function notify(
-  payload: EntriesPayload,
-  entryId: string,
-  recipientName: string,
-  message: string,
-  now: string,
-): void {
-  payload.notifications.push({
-    id: randomUUID(),
-    entryId,
-    recipientName,
-    createdAt: now,
-    message,
-    readAt: null,
-  });
+function notify(payload: EntriesPayload, entryId: string, recipientName: string, message: string, now: string): void {
+  payload.notifications.push({ id: randomUUID(), entryId, recipientName, createdAt: now, message, readAt: null });
 }
 
 function ensureUniqueTagLabel(payload: EntriesPayload, label: string, exceptId?: string): void {
   const key = normalizePersonName(label);
-  if (
-    payload.tags.some(
-      (tag) => tag.id !== exceptId && normalizePersonName(tag.label) === key,
-    )
-  ) {
+  if (payload.tags.some((tag) => tag.id !== exceptId && normalizePersonName(tag.label) === key)) {
     throw new Error("TAG_LABEL_EXISTS");
   }
 }
 
 function slugifyTag(label: string): string {
-  const base = normalizePersonName(label)
-    .replace(/[^a-z0-9]+/g, "-")
-    .replace(/^-+|-+$/g, "")
-    .slice(0, 40);
+  const base = normalizePersonName(label).replace(/[^a-z0-9]+/g, "-").replace(/^-+|-+$/g, "").slice(0, 40);
   return `${base || "tag"}-${randomUUID().slice(0, 8)}`;
+}
+
+export function registerEntryAttachments(
+  source: EntriesPayload,
+  entryId: string,
+  attachments: EntryAttachment[],
+  actor: EntriesActor,
+  nowDate: Date = new Date(),
+): EntriesMutationResult {
+  const payload = structuredClone(source);
+  const entry = findEntry(payload, entryId);
+  const knownIds = new Set(entry.attachments.map((item) => item.id));
+  const knownPaths = new Set(entry.attachments.map((item) => item.storagePath));
+  if (attachments.some((item) => knownIds.has(item.id) || knownPaths.has(item.storagePath))) {
+    throw new Error("ENTRY_ATTACHMENT_DUPLICATE");
+  }
+  entry.attachments.push(...attachments);
+  if (attachments.length > 0) {
+    const names = attachments.slice(0, 3).map((item) => item.fileName).join(", ");
+    const suffix = attachments.length > 3 ? ` +${attachments.length - 3}` : "";
+    history(
+      entry,
+      actor,
+      "ATTACHMENTS_ADDED",
+      `${attachments.length} pièce${attachments.length > 1 ? "s" : ""} jointe${attachments.length > 1 ? "s" : ""} ajoutée${attachments.length > 1 ? "s" : ""} : ${names}${suffix}.`,
+      nowDate.toISOString(),
+    );
+  }
+  return { payload, focusEntryId: entry.id };
 }
 
 export function applyEntriesMutation(
@@ -207,7 +195,7 @@ export function applyEntriesMutation(
   if (input.action === "create") {
     ensureTagIds(payload, input.tagIds);
     const entry: EntryRecord = {
-      id: randomUUID(),
+      id: input.entryId ?? randomUUID(),
       rawText: input.rawText,
       structuredDescription: null,
       nextAction: null,
@@ -223,6 +211,7 @@ export function applyEntriesMutation(
       completedAt: null,
       parentEntryId: null,
       derivedEntryIds: [],
+      attachments: [],
       history: [],
     };
     history(entry, actor, "CREATED", "Entrée créée dans À qualifier.", now);
@@ -233,9 +222,7 @@ export function applyEntriesMutation(
   if (input.action === "notificationRead") {
     const notification = payload.notifications.find((item) => item.id === input.notificationId);
     if (!notification) throw new Error("NOTIFICATION_NOT_FOUND");
-    if (
-      normalizePersonName(notification.recipientName) !== normalizePersonName(actor.displayName)
-    ) {
+    if (normalizePersonName(notification.recipientName) !== normalizePersonName(actor.displayName)) {
       throw new Error("NOTIFICATION_FORBIDDEN");
     }
     notification.readAt = now;
@@ -245,12 +232,7 @@ export function applyEntriesMutation(
   if (input.action === "tagAdd") {
     requireCapability(capabilities.canManageTags, "TAG_ADMIN_FORBIDDEN");
     ensureUniqueTagLabel(payload, input.label);
-    payload.tags.push({
-      id: slugifyTag(input.label),
-      label: input.label,
-      active: true,
-      sortOrder: payload.tags.length,
-    });
+    payload.tags.push({ id: slugifyTag(input.label), label: input.label, active: true, sortOrder: payload.tags.length });
     return { payload };
   }
 
@@ -288,13 +270,7 @@ export function applyEntriesMutation(
     entry.structuredDescription = input.description || null;
     entry.nextAction = input.nextAction || null;
     entry.tagIds = [...input.tagIds];
-    history(
-      entry,
-      actor,
-      "QUALIFICATION_SAVED",
-      "Qualification enregistrée sans sortir de la boîte.",
-      now,
-    );
+    history(entry, actor, "QUALIFICATION_SAVED", "Qualification enregistrée sans sortir de la boîte.", now);
     return { payload, focusEntryId: entry.id };
   }
 
@@ -309,20 +285,8 @@ export function applyEntriesMutation(
     entry.assigneeName = input.assigneeName;
     entry.dueDate = input.dueDate;
     entry.snoozedUntilDate = null;
-    history(
-      entry,
-      actor,
-      "QUALIFICATION_SAVED",
-      "Entrée qualifiée sans ressaisie du texte d'origine.",
-      now,
-    );
-    history(
-      entry,
-      actor,
-      "ASSIGNED",
-      `Affectée à ${input.assigneeName}, échéance ${input.dueDate}.`,
-      now,
-    );
+    history(entry, actor, "QUALIFICATION_SAVED", "Entrée qualifiée sans ressaisie du texte d'origine.", now);
+    history(entry, actor, "ASSIGNED", `Affectée à ${input.assigneeName}, échéance ${input.dueDate}.`, now);
     return { payload, focusEntryId: entry.id };
   }
 
@@ -335,62 +299,28 @@ export function applyEntriesMutation(
     entry.result = input.result || null;
     entry.completedAt = now;
     entry.snoozedUntilDate = null;
-    history(
-      entry,
-      actor,
-      "COMPLETED",
-      input.result ? `Traité / terminé : ${input.result}` : "Traité / terminé.",
-      now,
-    );
+    history(entry, actor, "COMPLETED", input.result ? `Traité / terminé : ${input.result}` : "Traité / terminé.", now);
     return { payload, focusEntryId: entry.id };
   }
 
   if (input.action === "snooze") {
     requireCapability(capabilities.canQualify, "QUALIFICATION_FORBIDDEN");
     assertToQualify(entry);
-    if (!isQualificationAttentionDue(entry, nowDate)) {
-      throw new Error("ENTRY_NOT_DUE_FOR_SNOOZE");
-    }
+    if (!isQualificationAttentionDue(entry, nowDate)) throw new Error("ENTRY_NOT_DUE_FOR_SNOOZE");
     if (input.untilDate < parisDateKey(nowDate)) throw new Error("SNOOZE_DATE_IN_PAST");
     entry.snoozedUntilDate = input.untilDate;
-    history(
-      entry,
-      actor,
-      "SNOOZED",
-      `Voir plus tard jusqu'au ${input.untilDate}. Motif : ${input.reason}`,
-      now,
-    );
+    history(entry, actor, "SNOOZED", `Voir plus tard jusqu'au ${input.untilDate}. Motif : ${input.reason}`, now);
     return { payload, focusEntryId: entry.id };
   }
 
   if (input.action === "postpone") {
     assertAssignedToActor(entry, actor);
-    if (!entry.dueDate || input.dueDate <= entry.dueDate) {
-      throw new Error("POSTPONE_DATE_NOT_LATER");
-    }
+    if (!entry.dueDate || input.dueDate <= entry.dueDate) throw new Error("POSTPONE_DATE_NOT_LATER");
     const oldDate = entry.dueDate;
     entry.dueDate = input.dueDate;
-    history(
-      entry,
-      actor,
-      "DEADLINE_POSTPONED",
-      `Échéance repoussée du ${oldDate} au ${input.dueDate}. Motif : ${input.reason}`,
-      now,
-    );
-    notify(
-      payload,
-      entry.id,
-      "Nadia",
-      `${actor.displayName} a repoussé « ${entry.rawText} » au ${input.dueDate}. Motif : ${input.reason}`,
-      now,
-    );
-    notify(
-      payload,
-      entry.id,
-      "Lucien",
-      `${actor.displayName} a repoussé « ${entry.rawText} » au ${input.dueDate}. Motif : ${input.reason}`,
-      now,
-    );
+    history(entry, actor, "DEADLINE_POSTPONED", `Échéance repoussée du ${oldDate} au ${input.dueDate}. Motif : ${input.reason}`, now);
+    notify(payload, entry.id, "Nadia", `${actor.displayName} a repoussé « ${entry.rawText} » au ${input.dueDate}. Motif : ${input.reason}`, now);
+    notify(payload, entry.id, "Lucien", `${actor.displayName} a repoussé « ${entry.rawText} » au ${input.dueDate}. Motif : ${input.reason}`, now);
     return { payload, focusEntryId: entry.id };
   }
 
@@ -398,20 +328,8 @@ export function applyEntriesMutation(
     assertAssignedToActor(entry, actor);
     const oldAssignee = entry.assigneeName ?? actor.displayName;
     entry.assigneeName = input.assigneeName;
-    history(
-      entry,
-      actor,
-      "REASSIGNED",
-      `Réaffectée de ${oldAssignee} à ${input.assigneeName}. Motif : ${input.reason}`,
-      now,
-    );
-    notify(
-      payload,
-      entry.id,
-      input.assigneeName,
-      `${actor.displayName} vous a réaffecté « ${entry.rawText} ». Échéance inchangée : ${entry.dueDate ?? "sans date"}.`,
-      now,
-    );
+    history(entry, actor, "REASSIGNED", `Réaffectée de ${oldAssignee} à ${input.assigneeName}. Motif : ${input.reason}`, now);
+    notify(payload, entry.id, input.assigneeName, `${actor.displayName} vous a réaffecté « ${entry.rawText} ». Échéance inchangée : ${entry.dueDate ?? "sans date"}.`, now);
     return { payload, focusEntryId: entry.id };
   }
 
@@ -420,13 +338,7 @@ export function applyEntriesMutation(
     entry.status = "DONE";
     entry.result = input.result || null;
     entry.completedAt = now;
-    history(
-      entry,
-      actor,
-      "COMPLETED",
-      input.result ? `Terminé : ${input.result}` : "Terminé.",
-      now,
-    );
+    history(entry, actor, "COMPLETED", input.result ? `Terminé : ${input.result}` : "Terminé.", now);
     return { payload, focusEntryId: entry.id };
   }
 
@@ -450,16 +362,11 @@ export function applyEntriesMutation(
       completedAt: null,
       parentEntryId: entry.id,
       derivedEntryIds: [],
+      attachments: [],
       history: [],
     };
     history(derived, actor, "CREATED", `Entrée dérivée de « ${entry.rawText} ».`, now);
-    history(
-      entry,
-      actor,
-      "DERIVED_CREATED",
-      `Entrée liée créée : « ${input.rawText} ».`,
-      now,
-    );
+    history(entry, actor, "DERIVED_CREATED", `Entrée liée créée : « ${input.rawText} ».`, now);
     entry.derivedEntryIds.push(derived.id);
     payload.entries.unshift(derived);
     return { payload, focusEntryId: derived.id };
