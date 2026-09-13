@@ -7,11 +7,17 @@ export async function createCaptureWithClient(
   creatorUserId: string,
   client: PoolClient,
 ) {
-  const responsible = await client.query(
-    "SELECT 1 FROM app_user WHERE id = $1 AND is_active = true",
-    [input.responsibleUserId],
-  );
+  const [responsible, creator] = await Promise.all([
+    client.query("SELECT 1 FROM app_user WHERE id = $1 AND is_active = true", [
+      input.responsibleUserId,
+    ]),
+    client.query<{ display_name: string }>(
+      "SELECT display_name FROM app_user WHERE id = $1 AND is_active = true",
+      [creatorUserId],
+    ),
+  ]);
   if (!responsible.rowCount) throw new Error("INVALID_RESPONSIBLE");
+  if (!creator.rows[0]) throw new Error("INVALID_CREATOR");
 
   const existing = await client.query<{ id: string }>(
     "SELECT id FROM capture_entry WHERE client_request_id = $1",
@@ -62,6 +68,19 @@ export async function createCaptureWithClient(
       );
     }
   }
+
+  await client.query(
+    `INSERT INTO capture_entry_history(
+       id, capture_entry_id, event_type, actor_user_id, actor_name, summary, occurred_at
+     ) VALUES ($1, $2, 'CREATED', $3, $4, $5, now())`,
+    [
+      randomUUID(),
+      id,
+      creatorUserId,
+      creator.rows[0].display_name,
+      "Entrée créée dans À qualifier.",
+    ],
+  );
 
   return { id, created: true };
 }
