@@ -10,8 +10,6 @@ import { useEffect } from "react";
  */
 export function CommercialFocusRelease() {
   useEffect(() => {
-    let timeoutId: number | undefined;
-
     const releaseFocus = () => {
       const url = new URL(window.location.href);
       if (!url.searchParams.has("focus")) return true;
@@ -30,11 +28,11 @@ export function CommercialFocusRelease() {
       if (releaseFocus()) observer.disconnect();
     });
     observer.observe(document.body, { childList: true, subtree: true });
-    timeoutId = window.setTimeout(() => observer.disconnect(), 10_000);
+    const timeoutId = window.setTimeout(() => observer.disconnect(), 10_000);
 
     return () => {
       observer.disconnect();
-      if (timeoutId !== undefined) window.clearTimeout(timeoutId);
+      window.clearTimeout(timeoutId);
     };
   }, []);
 
