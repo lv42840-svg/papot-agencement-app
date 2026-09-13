@@ -852,10 +852,9 @@ function ChantiersStyles() {
         min-height: 66px;
         padding: 10px 12px;
         display: grid;
-        grid-template-columns: 74px minmax(220px, 1.6fr) minmax(130px, 0.7fr) minmax(
-            120px,
-            0.55fr
-          ) 20px;
+        grid-template-columns:
+          74px minmax(220px, 1.6fr) minmax(130px, 0.7fr) minmax(120px, 0.55fr)
+          20px;
         gap: 10px;
         align-items: center;
         border-bottom: 1px solid #f0edf4;
