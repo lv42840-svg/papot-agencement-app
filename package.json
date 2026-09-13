@@ -17,9 +17,7 @@
     "format:check": "prettier --check .",
     "typecheck": "tsc --noEmit",
     "test": "vitest run",
-    "nextcloud:probe": "tsx scripts/nextcloud-probe.ts",
-    "sync:once": "tsx scripts/sync-worker.ts",
-    "sync:worker": "tsx scripts/sync-worker.ts --watch"
+    "nextcloud:probe": "tsx scripts/nextcloud-probe.ts"
   },
   "dependencies": {
     "lucide-react": "0.468.0",
