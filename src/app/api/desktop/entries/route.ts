@@ -53,6 +53,16 @@ function errorStatus(code: string): number {
 export async function GET() {
   try {
     const desktop = createDesktopSharedResourceRuntime();
+    const cached = desktop.states.getCached(ENTRIES_RESOURCE);
+
+    if (cached !== undefined) {
+      void desktop.states.get(ENTRIES_RESOURCE).catch((error: unknown) => {
+        const code = error instanceof Error ? error.message : "ENTRIES_REFRESH_FAILED";
+        console.error("[PAPOT][Entries] background refresh failed", { code });
+      });
+      return noStoreJson(publicSnapshot(parseEntriesPayload(cached?.payload), desktop.owner));
+    }
+
     const resource = await desktop.states.get(ENTRIES_RESOURCE);
     const payload = parseEntriesPayload(resource?.payload);
     return noStoreJson(publicSnapshot(payload, desktop.owner));
@@ -74,17 +84,21 @@ export async function POST(request: Request) {
     stage = "create-runtime";
     desktop = createDesktopSharedResourceRuntime();
 
-    // Acquire first, then read the resource once with the WebDAV ETag that will
-    // be reused for the conditional save. This removes several Nextcloud trips.
-    stage = "acquire-lock";
-    const lockResult = await desktop.locks.acquire({
-      resource: ENTRIES_RESOURCE,
-      leaseId,
-      owner: desktop.owner,
-      baseVersion: 0,
-      ttlMs: ENTRIES_WRITE_LOCK_TTL_MS,
-      reclaimOwnAfterMs: ENTRIES_OWN_LOCK_RECLAIM_AFTER_MS,
-    });
+    // The lock creation and the DAV read are independent network trips. Run
+    // them together, then rely on the ETag conditional write to detect the
+    // rare race where another workstation saved between the read and our lock.
+    stage = "acquire-lock-and-open-resource";
+    const [lockResult, initialOpened] = await Promise.all([
+      desktop.locks.acquire({
+        resource: ENTRIES_RESOURCE,
+        leaseId,
+        owner: desktop.owner,
+        baseVersion: 0,
+        ttlMs: ENTRIES_WRITE_LOCK_TTL_MS,
+        reclaimOwnAfterMs: ENTRIES_OWN_LOCK_RECLAIM_AFTER_MS,
+      }),
+      desktop.states.openForUpdate(ENTRIES_RESOURCE),
+    ]);
 
     if (lockResult.status === "locked") {
       return noStoreJson(
@@ -98,9 +112,7 @@ export async function POST(request: Request) {
     }
     ownsLock = true;
 
-    stage = "open-current-resource";
-    let opened = await desktop.states.openForUpdate(ENTRIES_RESOURCE);
-
+    let opened = initialOpened;
     stage = "apply-mutation";
     const actor = { userId: desktop.owner.userId, displayName: desktop.owner.displayName };
     let mutation = applyEntriesMutation(parseEntriesPayload(opened.resource?.payload), input, actor);
