@@ -430,6 +430,11 @@ function UserAdminCard({
 
       <section className="adminSection">
         <h3>Droits par module</h3>
+        {user.canManagePermissions ? (
+          <p className="muted">
+            Le droit d’administrer les utilisateurs est distinct des droits métier ci-dessous.
+          </p>
+        ) : null}
         <div className="adminModuleGrid">
           {modules.map((module) => (
             <label className="adminModuleRow" key={module.key}>
@@ -439,7 +444,6 @@ function UserAdminCard({
               </span>
               <select
                 value={moduleAccess[module.key] ?? "NONE"}
-                disabled={user.canManagePermissions}
                 onChange={(event) =>
                   setModuleAccess((current) => ({
                     ...current,
@@ -462,7 +466,6 @@ function UserAdminCard({
                 <input
                   type="checkbox"
                   checked={specials.has(permission.key)}
-                  disabled={user.canManagePermissions}
                   onChange={(event) => {
                     setSpecials((current) => {
                       const next = new Set(current);
@@ -480,15 +483,16 @@ function UserAdminCard({
           )}
         </div>
 
-        {user.canManagePermissions ? (
-          <p className="muted">Le compte administrateur dispose de tous les droits effectifs.</p>
-        ) : (
-          <div className="adminActions">
-            <button className="primaryButton" type="button" disabled={busy} onClick={() => void savePermissions()}>
-              Enregistrer les droits
-            </button>
-          </div>
-        )}
+        <div className="adminActions">
+          <button
+            className="primaryButton"
+            type="button"
+            disabled={busy}
+            onClick={() => void savePermissions()}
+          >
+            Enregistrer les droits
+          </button>
+        </div>
       </section>
 
       <section className="adminSection">
