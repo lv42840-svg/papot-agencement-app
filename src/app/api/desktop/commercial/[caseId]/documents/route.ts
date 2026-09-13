@@ -1,7 +1,10 @@
 import { randomUUID } from "node:crypto";
 import { NextResponse } from "next/server";
 import { hasEffectiveSpecialPermission } from "@/lib/auth/permissions";
-import { listCanonicalCommercialClients } from "@/lib/commercial/client-integration";
+import {
+  hydrateCommercialPayloadWithCanonicalClients,
+  listCanonicalCommercialClients,
+} from "@/lib/commercial/client-integration";
 import {
   cleanupCommercialDocuments,
   uploadCommercialDocuments,
@@ -37,7 +40,7 @@ async function snapshot(
     hasEffectiveSpecialPermission(user, "commercial.confirm_launch"),
     listCanonicalCommercialClients(desktop),
   ]);
-  const payloadForUi = { ...payload, clients };
+  const payloadForUi = hydrateCommercialPayloadWithCanonicalClients(payload, clients);
   return {
     payload: payloadForUi,
     actor,
