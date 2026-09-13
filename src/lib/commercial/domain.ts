@@ -33,7 +33,7 @@ export const commercialDocumentSchema = z.object({
   versionLabel: z.string().trim().max(80).nullable(),
   variantLabel: z.string().trim().max(80).nullable(),
   isCurrent: z.boolean(),
-  isSignedQuote: z.boolean(),
+  legacySignedQuote: z.boolean().default(false),
   uploadedAt: isoDateTimeSchema,
   uploadedByName: z.string().trim().min(1).max(120),
 });
@@ -44,14 +44,12 @@ export const commercialHistoryEventSchema = z.object({
     "CREATED",
     "DETAILS_UPDATED",
     "STATUS_CHANGED",
-    "QUOTE_SENT",
     "FOLLOW_UP",
-    "QUOTE_DUE_POSTPONED",
     "CLOSED",
     "REOPENED",
     "DOCUMENTS_ADDED",
-    "NOTES_UPDATED",
-    "PROVISION_UPDATED",
+    "CLIENT_LINKED",
+    "SOURCE_ENTRY_LINKED",
     "AUTO_DUE",
   ]),
   at: isoDateTimeSchema,
@@ -59,9 +57,19 @@ export const commercialHistoryEventSchema = z.object({
   summary: z.string().trim().min(1).max(1000),
 });
 
+export const commercialClientSchema = z.object({
+  id: z.string().uuid(),
+  type: z.enum(["COMPANY", "INDIVIDUAL"]),
+  displayName: z.string().trim().min(1).max(240),
+  email: z.string().trim().max(240).nullable(),
+  phone: z.string().trim().max(80).nullable(),
+});
+
 export const commercialCaseSchema = z.object({
   id: z.string().uuid(),
   sourceEntryId: z.string().uuid().nullable().default(null),
+  clientId: z.string().uuid().nullable().default(null),
+  primaryContactId: z.string().uuid().nullable().default(null),
   name: z.string().trim().min(1).max(240),
   clientName: z.string().trim().max(240).nullable(),
   siteLabel: z.string().trim().max(240).nullable(),
@@ -71,21 +79,12 @@ export const commercialCaseSchema = z.object({
   description: z.string().trim().max(4000).nullable(),
   nextAction: z.string().trim().max(2000).nullable(),
   status: commercialStatusSchema,
-  quoteOwnerName: z.string().trim().max(120).nullable(),
-  quoteDueDate: dateOnlySchema.nullable(),
   reviewDate: dateOnlySchema.nullable(),
   expectedConfirmationDate: dateOnlySchema.nullable(),
   plannedInstallDate: dateOnlySchema.nullable(),
-  quoteSentAt: isoDateTimeSchema.nullable(),
   confirmedAt: isoDateTimeSchema.nullable(),
   closedAt: isoDateTimeSchema.nullable(),
   closingReason: z.string().trim().max(2000).nullable(),
-  quoteNotes: z.string().max(12000),
-  provisionHours: z.object({
-    be: z.number().nonnegative(),
-    workshop: z.number().nonnegative(),
-    install: z.number().nonnegative(),
-  }),
   documents: z.array(commercialDocumentSchema),
   createdAt: isoDateTimeSchema,
   createdByName: z.string().trim().min(1).max(120),
@@ -95,7 +94,8 @@ export const commercialCaseSchema = z.object({
 });
 
 export const commercialPayloadSchema = z.object({
-  schemaVersion: z.literal(1),
+  schemaVersion: z.literal(2),
+  clients: z.array(commercialClientSchema),
   cases: z.array(commercialCaseSchema),
 });
 
@@ -103,6 +103,7 @@ export type CommercialStatus = z.infer<typeof commercialStatusSchema>;
 export type CommercialDocumentCategory = z.infer<typeof commercialDocumentCategorySchema>;
 export type CommercialDocument = z.infer<typeof commercialDocumentSchema>;
 export type CommercialHistoryEvent = z.infer<typeof commercialHistoryEventSchema>;
+export type CommercialClient = z.infer<typeof commercialClientSchema>;
 export type CommercialCase = z.infer<typeof commercialCaseSchema>;
 export type CommercialPayload = z.infer<typeof commercialPayloadSchema>;
 
@@ -119,14 +120,14 @@ export const COMMERCIAL_STATUS_LABELS: Record<CommercialStatus, string> = {
 
 export const COMMERCIAL_DOCUMENT_CATEGORY_LABELS: Record<CommercialDocumentCategory, string> = {
   RECEIVED: "Documents reçus",
-  INTERNAL_QUOTING: "Chiffrage interne",
-  QUOTE: "Devis",
-  COSTING: "Déboursé",
+  INTERNAL_QUOTING: "Chiffrage historique/interne",
+  QUOTE: "Devis historique",
+  COSTING: "Déboursé historique",
   MISC: "Divers",
 };
 
 export function createInitialCommercialPayload(): CommercialPayload {
-  return { schemaVersion: 1, cases: [] };
+  return { schemaVersion: 2, clients: [], cases: [] };
 }
 
 export function parseCommercialPayload(value: unknown): CommercialPayload {
@@ -153,18 +154,10 @@ export function isCommercialActive(item: CommercialCase): boolean {
   return !isCommercialClosed(item) && item.status !== "CONFIRMED";
 }
 
-export function isQuoteOverdue(item: CommercialCase, now: Date = new Date()): boolean {
-  return (
-    item.status === "CHIFFRAGE" &&
-    Boolean(item.quoteDueDate) &&
-    (item.quoteDueDate as string) < commercialParisDateKey(now)
-  );
-}
-
 export function commercialNeedsFollowUp(item: CommercialCase, now: Date = new Date()): boolean {
   if (item.status === "FOLLOW_UP") return true;
   const today = commercialParisDateKey(now);
-  if ((item.status === "PISTE" || item.status === "WAITING") && item.reviewDate) {
+  if ((item.status === "PISTE" || item.status === "WAITING" || item.status === "CHIFFRAGE") && item.reviewDate) {
     return item.reviewDate <= today;
   }
   if (item.status === "LIKELY" && item.expectedConfirmationDate) {
@@ -174,61 +167,9 @@ export function commercialNeedsFollowUp(item: CommercialCase, now: Date = new Da
 }
 
 export function nextCommercialDeadline(item: CommercialCase): string | null {
-  if (item.status === "CHIFFRAGE") return item.quoteDueDate;
-  if (item.status === "PISTE" || item.status === "WAITING") return item.reviewDate;
   if (item.status === "LIKELY") return item.expectedConfirmationDate;
-  return null;
-}
-
-export function commercialHasSignedQuote(item: CommercialCase): boolean {
-  return item.documents.some((document) => document.category === "QUOTE" && document.isSignedQuote);
-}
-
-function autoHistory(item: CommercialCase, summary: string, now: Date): void {
-  item.history.push({
-    id: globalThis.crypto.randomUUID(),
-    type: "AUTO_DUE",
-    at: now.toISOString(),
-    actorName: "PAPOT",
-    summary,
-  });
-}
-
-export function applyCommercialAutomaticTransitions(
-  source: CommercialPayload,
-  now: Date = new Date(),
-): { payload: CommercialPayload; changed: boolean } {
-  const payload = structuredClone(source);
-  const today = commercialParisDateKey(now);
-  let changed = false;
-
-  for (const item of payload.cases) {
-    if ((item.status === "PISTE" || item.status === "WAITING") && item.reviewDate && item.reviewDate <= today) {
-      const previous = item.status;
-      item.status = "FOLLOW_UP";
-      item.updatedAt = now.toISOString();
-      item.updatedByName = "PAPOT";
-      autoHistory(
-        item,
-        `${COMMERCIAL_STATUS_LABELS[previous]} arrivé à échéance le ${item.reviewDate} : passage automatique en À relancer.`,
-        now,
-      );
-      changed = true;
-      continue;
-    }
-
-    if (item.status === "LIKELY" && item.expectedConfirmationDate && item.expectedConfirmationDate <= today) {
-      item.status = "FOLLOW_UP";
-      item.updatedAt = now.toISOString();
-      item.updatedByName = "PAPOT";
-      autoHistory(
-        item,
-        `Date prévisionnelle de confirmation ${item.expectedConfirmationDate} atteinte : passage automatique en À relancer.`,
-        now,
-      );
-      changed = true;
-    }
+  if (item.status === "PISTE" || item.status === "WAITING" || item.status === "CHIFFRAGE") {
+    return item.reviewDate;
   }
-
-  return { payload, changed };
+  return null;
 }
