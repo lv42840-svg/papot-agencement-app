@@ -22,6 +22,9 @@ export const commercialMutationSchema = z.discriminatedUnion("action", [
     clientName: nullableText(240),
     siteLabel: nullableText(240),
     reviewDate: dateOnlySchema,
+    sourceEntryId: z.string().uuid().optional(),
+    description: nullableText(4000),
+    nextAction: nullableText(2000),
   }),
   z.object({
     action: z.literal("updateDetails"),
@@ -248,17 +251,22 @@ export function applyCommercialMutation(
   const payload = structuredClone(transitioned);
 
   if (input.action === "create") {
+    if (input.sourceEntryId && payload.cases.some((item) => item.sourceEntryId === input.sourceEntryId)) {
+      throw new Error("COMMERCIAL_SOURCE_TASK_ALREADY_LINKED");
+    }
+
     const timestamp = now.toISOString();
     const item: CommercialCase = {
       id: randomUUID(),
+      sourceEntryId: input.sourceEntryId ?? null,
       name: input.name,
       clientName: text(input.clientName),
       siteLabel: text(input.siteLabel),
       contactName: null,
       contactPhone: null,
       contactEmail: null,
-      description: null,
-      nextAction: null,
+      description: text(input.description),
+      nextAction: text(input.nextAction),
       status: "PISTE",
       quoteOwnerName: null,
       quoteDueDate: null,
@@ -278,7 +286,15 @@ export function applyCommercialMutation(
       updatedByName: actor.displayName,
       history: [],
     };
-    history(item, actor.displayName, "CREATED", `Affaire créée en Piste, prochaine revue le ${input.reviewDate}.`, now);
+    history(
+      item,
+      actor.displayName,
+      "CREATED",
+      input.sourceEntryId
+        ? `Affaire créée depuis une tâche PAPOT en Piste, prochaine revue le ${input.reviewDate}.`
+        : `Affaire créée en Piste, prochaine revue le ${input.reviewDate}.`,
+      now,
+    );
     payload.cases.unshift(item);
     return { payload, focusCaseId: item.id };
   }
