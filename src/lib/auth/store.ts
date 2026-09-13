@@ -1,6 +1,7 @@
 import "server-only";
 
 import { z } from "zod";
+import { MODULE_PERMISSIONS } from "@/lib/auth/permission-catalog";
 import { createDesktopSharedResourceRuntime } from "@/lib/desktop/shared-resource-runtime";
 
 export type AccessLevel = "READ" | "WRITE";
@@ -43,10 +44,25 @@ function emptyAuthPayload(): AuthPayload {
   return { schemaVersion: 1, users: [], sessions: [] };
 }
 
+function preserveLegacyFullAccess(payload: AuthPayload): void {
+  const legacyModuleKeys = MODULE_PERMISSIONS.map((module) => module.key).filter(
+    (moduleKey) => moduleKey !== "clients",
+  );
+
+  for (const user of payload.users) {
+    if (user.modulePermissions.clients) continue;
+    const hadFullWriteAccess = legacyModuleKeys.every(
+      (moduleKey) => user.modulePermissions[moduleKey] === "WRITE",
+    );
+    if (hadFullWriteAccess) user.modulePermissions.clients = "WRITE";
+  }
+}
+
 export function parseAuthPayload(value: unknown): AuthPayload {
   if (value == null) return emptyAuthPayload();
   const parsed = authPayloadSchema.safeParse(value);
   if (!parsed.success) throw new Error("AUTH_STORE_INVALID");
+  preserveLegacyFullAccess(parsed.data);
   return parsed.data;
 }
 
