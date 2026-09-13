@@ -89,6 +89,23 @@ export type ClientContact = z.infer<typeof clientContactSchema>;
 export type ClientRecord = z.infer<typeof clientRecordSchema>;
 export type ClientsPayload = z.infer<typeof clientsPayloadSchema>;
 
+export type ClientConfirmationMissingField =
+  | "identity"
+  | "addressLine1"
+  | "postalCode"
+  | "city"
+  | "siret"
+  | "paymentTerms";
+
+export const CLIENT_CONFIRMATION_FIELD_LABELS: Record<ClientConfirmationMissingField, string> = {
+  identity: "identité du client",
+  addressLine1: "adresse",
+  postalCode: "code postal",
+  city: "ville",
+  siret: "SIRET",
+  paymentTerms: "conditions de règlement",
+};
+
 export function createInitialClientsPayload(): ClientsPayload {
   return { schemaVersion: 1, clients: [] };
 }
@@ -105,6 +122,23 @@ export function clientDisplayName(client: ClientRecord): string {
     return [client.lastName, client.firstName].filter(Boolean).join(" ");
   }
   return client.companyName;
+}
+
+export function clientConfirmationMissingFields(
+  client: ClientRecord,
+): ClientConfirmationMissingField[] {
+  const missing: ClientConfirmationMissingField[] = [];
+  if (!clientDisplayName(client).trim()) missing.push("identity");
+  if (!client.addressLine1.trim()) missing.push("addressLine1");
+  if (!client.postalCode.trim()) missing.push("postalCode");
+  if (!client.city.trim()) missing.push("city");
+  if (client.type !== "PARTICULIER" && !client.siret.trim()) missing.push("siret");
+  if (!client.paymentTerms.trim()) missing.push("paymentTerms");
+  return missing;
+}
+
+export function isClientReadyForConfirmation(client: ClientRecord): boolean {
+  return !client.isArchived && clientConfirmationMissingFields(client).length === 0;
 }
 
 function normalizeSearchValue(value: string): string {
