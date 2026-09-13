@@ -5,11 +5,11 @@ declare global {
     papotDesktop?: {
       saveSetup: (input: {
         sharedDataPath: string;
+        databaseUrl: string;
         nextcloudBaseUrl: string;
         nextcloudLogin: string;
         nextcloudAppPassword: string;
         deviceLabel: string;
-        papotUserDisplayName: string;
       }) => Promise<
         | {
             ok: true;
@@ -17,7 +17,6 @@ declare global {
               deviceId: string;
               deviceLabel: string;
               nextcloudUserId: string;
-              papotUserDisplayName: string;
               sharedDataPath: string;
             };
           }

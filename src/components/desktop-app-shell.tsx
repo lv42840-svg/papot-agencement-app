@@ -1,47 +1,40 @@
+import { requireUser } from "@/lib/auth/session";
 import { DesktopSidebar } from "./desktop-sidebar";
 import { DesktopTopbar } from "./desktop-topbar";
 
-type DesktopIdentity = {
-  displayName: string;
+type DesktopDeviceIdentity = {
   deviceLabel: string;
   configured: boolean;
 };
 
-function readDesktopIdentity(): DesktopIdentity {
+function readDesktopDeviceIdentity(): DesktopDeviceIdentity {
   const rawConfig = process.env.PAPOT_DESKTOP_CONFIG_JSON;
   if (!rawConfig) {
     return {
-      displayName: "Utilisateur PAPOT",
       deviceLabel: "Poste PAPOT",
       configured: false,
     };
   }
+
   try {
-    const config = JSON.parse(rawConfig) as {
-      papot_user_display_name?: unknown;
-      device_label?: unknown;
-    };
+    const config = JSON.parse(rawConfig) as { device_label?: unknown };
     return {
-      displayName:
-        typeof config.papot_user_display_name === "string"
-          ? config.papot_user_display_name
-          : "Utilisateur PAPOT",
       deviceLabel:
         typeof config.device_label === "string" ? config.device_label : "Poste PAPOT",
       configured: true,
     };
   } catch {
     return {
-      displayName: "Utilisateur PAPOT",
       deviceLabel: "Poste PAPOT",
       configured: false,
     };
   }
 }
 
-export function DesktopAppShell({ children }: { children: React.ReactNode }) {
-  const identity = readDesktopIdentity();
-  const initials = identity.displayName
+export async function DesktopAppShell({ children }: { children: React.ReactNode }) {
+  const user = await requireUser();
+  const device = readDesktopDeviceIdentity();
+  const initials = user.displayName
     .split(/\s+/)
     .map((part) => part[0])
     .join("")
@@ -54,10 +47,10 @@ export function DesktopAppShell({ children }: { children: React.ReactNode }) {
 
       <div className="desktopWorkspace">
         <DesktopTopbar
-          displayName={identity.displayName}
-          deviceLabel={identity.deviceLabel}
+          displayName={user.displayName}
+          deviceLabel={device.deviceLabel}
           initials={initials}
-          configured={identity.configured}
+          configured={device.configured}
         />
         <main className="desktopMain">{children}</main>
       </div>

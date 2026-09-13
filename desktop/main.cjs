@@ -2,6 +2,7 @@
 
 const fs = require("node:fs");
 const path = require("node:path");
+const { Client } = require("pg");
 const { app, BrowserWindow, ipcMain, safeStorage, session } = require("electron");
 const {
   DEFAULT_DESKTOP_APP_URL,
@@ -26,10 +27,12 @@ function exposeSetupToLocalServer(setup) {
   if (!setup) {
     delete process.env.PAPOT_DESKTOP_CONFIG_JSON;
     delete process.env.PAPOT_NEXTCLOUD_APP_PASSWORD;
+    delete process.env.DATABASE_URL;
     return;
   }
   process.env.PAPOT_DESKTOP_CONFIG_JSON = JSON.stringify(setup.config);
   process.env.PAPOT_NEXTCLOUD_APP_PASSWORD = setup.nextcloudAppPassword;
+  process.env.DATABASE_URL = setup.databaseUrl;
 }
 
 function desktopUrl(pathname) {
@@ -45,6 +48,22 @@ async function verifySharedDataPath(sharedDataPath) {
     await fs.promises.access(sharedDataPath, fs.constants.R_OK | fs.constants.W_OK);
   } catch {
     throw new Error("DESKTOP_SHARED_PATH_UNAVAILABLE");
+  }
+}
+
+async function verifyDatabaseConnection(databaseUrl) {
+  const client = new Client({
+    connectionString: databaseUrl,
+    connectionTimeoutMillis: 5_000,
+    statement_timeout: 5_000,
+  });
+  try {
+    await client.connect();
+    await client.query("SELECT 1");
+  } catch {
+    throw new Error("DESKTOP_DATABASE_UNREACHABLE");
+  } finally {
+    await client.end().catch(() => undefined);
   }
 }
 
@@ -119,13 +138,15 @@ function publicSetupError(error) {
     "DESKTOP_SHARED_PATH_REQUIRED",
     "DESKTOP_SHARED_PATH_INVALID",
     "DESKTOP_SHARED_PATH_UNAVAILABLE",
+    "DESKTOP_DATABASE_URL_REQUIRED",
+    "DESKTOP_DATABASE_URL_INVALID",
+    "DESKTOP_DATABASE_UNREACHABLE",
     "DESKTOP_NEXTCLOUD_URL_REQUIRED",
     "DESKTOP_NEXTCLOUD_URL_INVALID",
     "DESKTOP_NEXTCLOUD_HTTPS_REQUIRED",
     "DESKTOP_NEXTCLOUD_LOGIN_REQUIRED",
     "DESKTOP_NEXTCLOUD_PASSWORD_REQUIRED",
     "DESKTOP_DEVICE_LABEL_REQUIRED",
-    "DESKTOP_PAPOT_USER_REQUIRED",
     "DESKTOP_NEXTCLOUD_AUTH_FAILED",
     "DESKTOP_NEXTCLOUD_UNREACHABLE",
     "DESKTOP_NEXTCLOUD_INVALID_RESPONSE",
@@ -141,7 +162,10 @@ function registerDesktopSetupHandler() {
   ipcMain.handle("papot:desktop-setup:save", async (_event, rawInput) => {
     try {
       const input = normalizeSetupInput(rawInput);
-      await verifySharedDataPath(input.sharedDataPath);
+      await Promise.all([
+        verifySharedDataPath(input.sharedDataPath),
+        verifyDatabaseConnection(input.databaseUrl),
+      ]);
       const nextcloudUserId = await discoverAndVerifyNextcloud(input);
       const config = saveDesktopSetup({
         userDataPath: app.getPath("userData"),
@@ -161,7 +185,6 @@ function registerDesktopSetupHandler() {
           deviceId: config.device_id,
           deviceLabel: config.device_label,
           nextcloudUserId: config.nextcloud_user_id,
-          papotUserDisplayName: config.papot_user_display_name,
           sharedDataPath: config.shared_data_path,
         },
       };
@@ -174,7 +197,7 @@ function registerDesktopSetupHandler() {
     if (!hasDesktopSetup({ userDataPath: app.getPath("userData"), safeStorage })) {
       return { ok: false };
     }
-    event.sender.loadURL(desktopUrl("/desktop-ready"));
+    event.sender.loadURL(desktopUrl("/login"));
     return { ok: true };
   });
 }
