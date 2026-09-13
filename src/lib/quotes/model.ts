@@ -2,8 +2,6 @@ import { z } from "zod";
 import {
   QUOTE_MAX_QUANTITY,
   QUOTE_MAX_QUANTITY_EXPRESSION_LENGTH,
-  quoteMoneyCentsSchema,
-  quotePercentSchema,
   parseQuoteQuantityInput,
 } from "./domain";
 
@@ -22,7 +20,6 @@ export const quoteSectionSchema = z.object({
   kind: z.literal("SECTION"),
   parentId: z.null(),
   title: z.string().trim().min(1).max(500),
-  discountPercent: quotePercentSchema,
 });
 
 export const quoteSubsectionSchema = z.object({
@@ -45,9 +42,6 @@ export const quoteLineSchema = z.object({
     .min(1)
     .max(QUOTE_MAX_QUANTITY_EXPRESSION_LENGTH)
     .nullable(),
-  unitPriceCents: quoteMoneyCentsSchema,
-  discountPercent: quotePercentSchema,
-  vatRatePercent: quotePercentSchema,
 });
 
 export const quoteCommentSchema = z.object({
@@ -71,7 +65,6 @@ export const quoteModelSchema = z.object({
   issueDate: quoteDateSchema,
   validityDays: z.number().int().min(1).max(365),
   paymentTerms: z.string().trim().min(1).max(1000),
-  globalDiscountPercent: quotePercentSchema,
   items: z.array(quoteItemSchema).max(1000),
 });
 
