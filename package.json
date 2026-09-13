@@ -17,8 +17,6 @@
     "format:check": "prettier --check .",
     "typecheck": "tsc --noEmit",
     "test": "vitest run",
-    "db:migrate": "tsx scripts/migrate.ts",
-    "db:bootstrap": "tsx scripts/bootstrap-admin.ts",
     "nextcloud:probe": "tsx scripts/nextcloud-probe.ts",
     "sync:once": "tsx scripts/sync-worker.ts",
     "sync:worker": "tsx scripts/sync-worker.ts --watch"
@@ -26,7 +24,6 @@
   "dependencies": {
     "lucide-react": "0.468.0",
     "next": "15.5.24",
-    "pg": "8.13.1",
     "react": "19.1.1",
     "react-dom": "19.1.1",
     "server-only": "0.0.1",
@@ -35,7 +32,6 @@
   "devDependencies": {
     "@eslint/eslintrc": "3.2.0",
     "@types/node": "22.10.2",
-    "@types/pg": "8.11.10",
     "@types/react": "19.0.3",
     "@types/react-dom": "19.0.2",
     "electron": "44.3.0",
@@ -82,13 +78,6 @@
       {
         "from": "public",
         "to": "server/public"
-      },
-      {
-        "from": "db/migrations",
-        "to": "db/migrations",
-        "filter": [
-          "*.sql"
-        ]
       }
     ],
     "win": {
