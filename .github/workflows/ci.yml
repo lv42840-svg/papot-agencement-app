@@ -5,81 +5,16 @@ on:
   push:
     branches: [main]
 
-permissions:
-  contents: write
-
 jobs:
   quality:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-        with:
-          ref: ${{ github.head_ref }}
       - uses: actions/setup-node@v4
         with:
           node-version: 22
           cache: npm
       - run: npm ci
-      - name: Normalize quote workspace once
-        shell: bash
-        run: |
-          python3 - <<'PY'
-          from pathlib import Path
-          path = Path("src/components/quotes-workspace.tsx")
-          text = path.read_text()
-          text = text.replace(
-              'import { FormEvent, useCallback, useMemo, useState } from "react";',
-              'import { FormEvent, useCallback, useEffect, useMemo, useState } from "react";',
-          )
-          text = text.replace(
-              'import type { QuoteItem, QuoteRecord, QuotesPayload, QuoteVatRate } from "@/lib/quotes/model";',
-              'import type { QuoteRecord, QuotesPayload, QuoteVatRate } from "@/lib/quotes/model";',
-          )
-          old = '''      const current = selectedId
-        ? quotesBody.payload.quotes.find((quote) => quote.id === selectedId)
-        : null;
-      const selected = current ?? quotesBody.payload.quotes[0] ?? null;
-      setSelectedId(selected?.id ?? null);
-      setDraft(selected ? quoteToDraft(selected) : null);
-    } catch (loadError) {
-      const code = loadError instanceof Error ? loadError.message : "QUOTES_LOAD_FAILED";
-      setError(errorMessages[code] ?? "Impossible de charger le module Devis.");
-    } finally {
-      setLoading(false);
-    }
-  }, [selectedId]);
-
-  useState(() => {
-    void load();
-  });'''
-          new = '''      const selected = quotesBody.payload.quotes[0] ?? null;
-      setSelectedId(selected?.id ?? null);
-      setDraft(selected ? quoteToDraft(selected) : null);
-    } catch (loadError) {
-      const code = loadError instanceof Error ? loadError.message : "QUOTES_LOAD_FAILED";
-      setError(errorMessages[code] ?? "Impossible de charger le module Devis.");
-    } finally {
-      setLoading(false);
-    }
-  }, []);
-
-  useEffect(() => {
-    void load();
-  }, [load]);'''
-          if old not in text:
-              raise SystemExit("QUOTE_WORKSPACE_LOAD_BLOCK_NOT_FOUND")
-          path.write_text(text.replace(old, new))
-          PY
-          npx prettier --write src/components/quotes-workspace.tsx
-          if git diff --quiet -- src/components/quotes-workspace.tsx; then
-            echo "Quote workspace already normalized"
-          else
-            git config user.name "PAPOT CI"
-            git config user.email "papot-ci@users.noreply.github.com"
-            git add src/components/quotes-workspace.tsx
-            git commit -m "Normalize quote workspace loading"
-            git push origin HEAD:${{ github.head_ref }}
-          fi
       - run: npm run lint
       - run: npm run typecheck
       - run: npm test
