@@ -5,6 +5,7 @@ import { commercialSpecialPermissionForMutation } from "@/lib/auth/action-permis
 import { hasEffectiveSpecialPermission, requireSpecialPermission } from "@/lib/auth/permissions";
 import {
   assertCommercialClientReadyForConfirmation,
+  hydrateCommercialPayloadWithCanonicalClients,
   listCanonicalCommercialClients,
   resolveCommercialClient,
   type ResolvedCommercialClient,
@@ -100,7 +101,7 @@ async function snapshot(
     hasEffectiveSpecialPermission(user, "commercial.confirm_launch"),
     listCanonicalCommercialClients(desktop),
   ]);
-  const payloadForUi: CommercialPayload = { ...payload, clients };
+  const payloadForUi = hydrateCommercialPayloadWithCanonicalClients(payload, clients);
   return {
     payload: payloadForUi,
     actor,
