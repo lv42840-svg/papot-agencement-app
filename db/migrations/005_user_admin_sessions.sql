@@ -27,4 +27,37 @@ ALTER TABLE app_session
 CREATE UNIQUE INDEX IF NOT EXISTS app_session_session_id_idx
   ON app_session(session_id);
 
+-- Before this migration, permission administrators implicitly bypassed module and special
+-- permission checks. Preserve their effective access explicitly, then the application can
+-- keep administration privilege independent from business permissions.
+INSERT INTO user_module_permission(user_id, module_key, access_level)
+SELECT u.id, module_key, 'WRITE'
+FROM app_user u
+CROSS JOIN unnest(ARRAY[
+  'capture', 'commercial', 'quotes', 'chantiers', 'planning', 'hours',
+  'purchases', 'billing', 'treasury', 'team', 'payroll', 'pilotage', 'settings'
+]) AS module_key
+WHERE u.can_manage_permissions = true
+ON CONFLICT (user_id, module_key) DO UPDATE SET access_level = EXCLUDED.access_level;
+
+INSERT INTO user_special_permission(user_id, permission_key, enabled)
+SELECT u.id, permission_key, true
+FROM app_user u
+CROSS JOIN unnest(ARRAY[
+  'commercial.create',
+  'commercial.provision',
+  'commercial.confirm_launch',
+  'planning.edit_macro',
+  'planning.edit_daily',
+  'planning.enter_actual_hours',
+  'planning.manage_schedules',
+  'chantiers.archive_reactivate',
+  'purchases.view_supplier_credentials',
+  'purchases.send_orders',
+  'purchases.mark_paid',
+  'dashboard.view_global'
+]) AS permission_key
+WHERE u.can_manage_permissions = true
+ON CONFLICT (user_id, permission_key) DO UPDATE SET enabled = true;
+
 COMMIT;
