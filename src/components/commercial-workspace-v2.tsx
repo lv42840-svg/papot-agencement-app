@@ -51,6 +51,11 @@ const errors: Record<string, string> = {
   COMMERCIAL_REQUEST_INVALID: "Certains champs sont invalides.",
   COMMERCIAL_CASE_NOT_FOUND: "Cette affaire n’existe plus.",
   COMMERCIAL_CLIENT_NOT_FOUND: "Ce client n’existe plus.",
+  COMMERCIAL_CLIENT_REQUIRED: "Choisis ou crée un client avant de continuer.",
+  COMMERCIAL_CLIENT_INCOMPLETE:
+    "Le devis est validé : complète la fiche client (identité, adresse, code postal, ville, conditions de règlement et SIRET si professionnel) avant de confirmer l’affaire.",
+  CLIENTS_LOCKED: "Le fichier clients est modifié sur un autre poste. Réessaie dans quelques secondes.",
+  CLIENTS_VERSION_CONFLICT: "Le fichier clients a changé sur un autre poste. Réessaie.",
   COMMERCIAL_CASE_CLOSED: "Cette affaire est clôturée. Rouvre-la avant modification.",
   COMMERCIAL_REVIEW_DATE_REQUIRED: "Une date de prochaine revue est obligatoire.",
   COMMERCIAL_CONFIRMATION_DATE_REQUIRED: "La date prévisionnelle de confirmation est obligatoire.",
@@ -339,7 +344,7 @@ function CreateAffair({ clients, busy, onCancel, onSubmit }: {
       <label><span>Client</span><select value={clientMode} onChange={(event) => setClientMode(event.target.value as "existing" | "new")}><option value="existing" disabled={!clients.length}>Client existant</option><option value="new">Nouveau client</option></select></label>
       {clientMode === "existing" ? (
         <label><span>Client existant *</span><select value={clientId} onChange={(event) => setClientId(event.target.value)} required>{clients.map((client) => <option key={client.id} value={client.id}>{client.displayName}</option>)}</select></label>
-      ) : <label><span>Nouveau client</span><input name="clientName" placeholder="Nom du client" /></label>}
+      ) : <label><span>Nouveau client</span><input name="clientName" placeholder="Nom du client" required /></label>}
       <label><span>Lieu chantier</span><input name="siteLabel" /></label>
       <label><span>Prochaine revue *</span><input name="reviewDate" type="date" required /></label>
       <label className="wide"><span>Description</span><textarea name="description" rows={2} /></label>
@@ -495,7 +500,7 @@ function Documents({ item, busy, canModify, upload }: {
   return (
     <section className="commercialV2Section">
       <h3><Paperclip size={15} /> Documents de l’affaire</h3>
-      <p className="commercialV2Info">Nextcloud stocke les fichiers. PostgreSQL garde leurs métadonnées. Les anciens devis et déboursés restent consultables comme documents historiques.</p>
+      <p className="commercialV2Info">Nextcloud stocke les fichiers et les métadonnées de l’affaire. Les anciens devis et déboursés restent consultables comme documents historiques.</p>
       {canModify ? <div className="commercialV2Upload"><select value={category} onChange={(event) => setCategory(event.target.value as CommercialDocumentCategory)}>{Object.entries(COMMERCIAL_DOCUMENT_CATEGORY_LABELS).map(([value, label]) => <option key={value} value={value}>{label}</option>)}</select><input ref={inputRef} type="file" multiple hidden onChange={(event) => { const files = Array.from(event.target.files ?? []); event.currentTarget.value = ""; void upload(item.id, files, category); }} /><button className="secondaryButton" type="button" disabled={busy} onClick={() => inputRef.current?.click()}><Upload size={14} /> Ajouter</button></div> : null}
       <div className="commercialV2Docs">{item.documents.length ? item.documents.slice().reverse().map((document) => (
         <article key={document.id}><FileText size={18} /><div><strong>{document.fileName}</strong><span>{COMMERCIAL_DOCUMENT_CATEGORY_LABELS[document.category]} · {bytes(document.sizeBytes)} · {dateTime(document.uploadedAt)}</span></div><a className="secondaryButton" href={`/api/desktop/affaires/${item.id}/documents/${document.id}?download=1`}><Download size={13} /> Télécharger</a></article>
