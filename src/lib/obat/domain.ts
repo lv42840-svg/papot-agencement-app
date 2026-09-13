@@ -7,6 +7,14 @@ export type ObatAnalyzedFile = {
   quoteNumber: string | null;
 };
 
+export type ObatQuoteLine = {
+  ref: string;
+  designation: string;
+  quantity: number | null;
+  unit: string | null;
+  totalHt: number | null;
+};
+
 export type ObatImportAnalysis = {
   quoteNumber: string | null;
   quoteDate: string | null;
@@ -25,6 +33,7 @@ export type ObatImportAnalysis = {
   vatAmount: number | null;
   totalTtc: number | null;
   depositTtc: number | null;
+  quoteLines: ObatQuoteLine[];
   hours: {
     be: number | null;
     workshop: number | null;
@@ -57,6 +66,7 @@ export function emptyObatImportAnalysis(): ObatImportAnalysis {
     vatAmount: null,
     totalTtc: null,
     depositTtc: null,
+    quoteLines: [],
     hours: { be: null, workshop: null, install: null },
     sources: { quotePdf: false, costingCsv: false },
     files: [],
