@@ -6,6 +6,10 @@ const nullableText = (max: number) => z.string().trim().max(max).nullable();
 
 export const chantierStatusSchema = z.enum(["ACTIVE", "DONE", "ARCHIVED"]);
 export const launchDocumentStateSchema = z.enum(["PRESENT", "MISSING_DECLARED"]);
+export const technicalOriginSchema = z.enum(["QUOTE_LINE", "TS"]);
+export const beItemStatusSchema = z.enum(["TODO", "DRAW", "VALIDATION", "VALIDATED"]);
+export const workshopItemStatusSchema = z.enum(["PREPARE", "READY", "IN_PROGRESS", "DONE"]);
+export const installItemStatusSchema = z.enum(["TODO", "IN_PROGRESS", "DONE"]);
 
 export const chantierHoursSchema = z.object({
   be: z.number().nonnegative(),
@@ -13,12 +17,54 @@ export const chantierHoursSchema = z.object({
   install: z.number().nonnegative(),
 });
 
+const technicalBaseSchema = z.object({
+  id: z.string().uuid(),
+  name: z.string().trim().min(1).max(240),
+  originKind: technicalOriginSchema,
+  originLabel: nullableText(500),
+  installedByUs: z.boolean(),
+  createdAt: isoDateTimeSchema,
+  updatedAt: isoDateTimeSchema,
+});
+
+export const beItemSchema = technicalBaseSchema.extend({
+  status: beItemStatusSchema,
+});
+
+export const workshopItemSchema = technicalBaseSchema.extend({
+  sourceBeItemId: z.string().uuid().nullable(),
+  status: workshopItemStatusSchema,
+});
+
+export const installItemSchema = z.object({
+  id: z.string().uuid(),
+  sourceBeItemId: z.string().uuid().nullable(),
+  sourceWorkshopItemId: z.string().uuid().nullable(),
+  name: z.string().trim().min(1).max(240),
+  originKind: technicalOriginSchema,
+  originLabel: nullableText(500),
+  status: installItemStatusSchema,
+  note: nullableText(2000),
+  createdAt: isoDateTimeSchema,
+  updatedAt: isoDateTimeSchema,
+});
+
+export const chantierOperationalSchema = z
+  .object({
+    beItems: z.array(beItemSchema).default([]),
+    workshopItems: z.array(workshopItemSchema).default([]),
+    installItems: z.array(installItemSchema).default([]),
+  })
+  .default({ beItems: [], workshopItems: [], installItems: [] });
+
 export const chantierHistoryEventSchema = z.object({
   id: z.string().uuid(),
   type: z.enum([
     "LAUNCHED",
     "DETAILS_UPDATED",
     "PLANNED_HOURS_UPDATED",
+    "OPERATIONAL_ITEM_CREATED",
+    "OPERATIONAL_STATUS_UPDATED",
     "MARKED_DONE",
     "REACTIVATED",
     "ARCHIVED",
@@ -55,6 +101,7 @@ export const chantierRecordSchema = z.object({
   signedQuoteReminder: z.boolean(),
   plannedHours: chantierHoursSchema,
   actualHours: chantierHoursSchema,
+  operational: chantierOperationalSchema,
   launchedAt: isoDateTimeSchema,
   launchedByName: z.string().trim().min(1).max(120),
   completedAt: isoDateTimeSchema.nullable(),
@@ -72,6 +119,14 @@ export const chantiersPayloadSchema = z.object({
 
 export type ChantierStatus = z.infer<typeof chantierStatusSchema>;
 export type ChantierHours = z.infer<typeof chantierHoursSchema>;
+export type TechnicalOrigin = z.infer<typeof technicalOriginSchema>;
+export type BeItemStatus = z.infer<typeof beItemStatusSchema>;
+export type WorkshopItemStatus = z.infer<typeof workshopItemStatusSchema>;
+export type InstallItemStatus = z.infer<typeof installItemStatusSchema>;
+export type BeItem = z.infer<typeof beItemSchema>;
+export type WorkshopItem = z.infer<typeof workshopItemSchema>;
+export type InstallItem = z.infer<typeof installItemSchema>;
+export type ChantierOperational = z.infer<typeof chantierOperationalSchema>;
 export type ChantierHistoryEvent = z.infer<typeof chantierHistoryEventSchema>;
 export type ChantierRecord = z.infer<typeof chantierRecordSchema>;
 export type ChantiersPayload = z.infer<typeof chantiersPayloadSchema>;
@@ -80,6 +135,26 @@ export const CHANTIER_STATUS_LABELS: Record<ChantierStatus, string> = {
   ACTIVE: "Actif",
   DONE: "Terminé",
   ARCHIVED: "Archivé",
+};
+
+export const BE_STATUS_LABELS: Record<BeItemStatus, string> = {
+  TODO: "À faire",
+  DRAW: "À dessiner",
+  VALIDATION: "En validation",
+  VALIDATED: "Validé",
+};
+
+export const WORKSHOP_STATUS_LABELS: Record<WorkshopItemStatus, string> = {
+  PREPARE: "À préparer",
+  READY: "Prêt à fabriquer",
+  IN_PROGRESS: "En fabrication",
+  DONE: "Terminé",
+};
+
+export const INSTALL_STATUS_LABELS: Record<InstallItemStatus, string> = {
+  TODO: "À faire",
+  IN_PROGRESS: "En cours",
+  DONE: "Terminé",
 };
 
 export const CHANTIER_OPERATIONAL_SPACES = [
