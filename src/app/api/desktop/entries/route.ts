@@ -66,13 +66,18 @@ export async function POST(request: Request) {
   const leaseId = randomUUID();
   let desktop: ReturnType<typeof createDesktopSharedResourceRuntime> | null = null;
   let ownsLock = false;
+  let stage = "parse-request";
 
   try {
     const input = entriesMutationSchema.parse(await request.json());
+    stage = "create-runtime";
     desktop = createDesktopSharedResourceRuntime();
 
+    stage = "read-current-resource";
     const before = await desktop.states.get(ENTRIES_RESOURCE);
     const baseVersion = before?.version ?? 0;
+
+    stage = "acquire-lock";
     const lockResult = await desktop.locks.acquire({
       resource: ENTRIES_RESOURCE,
       leaseId,
@@ -94,8 +99,11 @@ export async function POST(request: Request) {
     }
     ownsLock = true;
 
+    stage = "apply-mutation";
     const actor = { userId: desktop.owner.userId, displayName: desktop.owner.displayName };
     let mutation = applyEntriesMutation(parseEntriesPayload(before?.payload), input, actor);
+
+    stage = "save-resource";
     let saved = await desktop.states.save({
       resource: ENTRIES_RESOURCE,
       expectedVersion: baseVersion,
@@ -109,11 +117,13 @@ export async function POST(request: Request) {
     // If another workstation completed a save just before our lock acquisition,
     // reapply the same business action once on the winning version while we own the lock.
     if (saved.status === "conflict" && saved.current) {
+      stage = "reapply-after-conflict";
       mutation = applyEntriesMutation(
         parseEntriesPayload(saved.current.payload),
         input,
         actor,
       );
+      stage = "save-after-conflict";
       saved = await desktop.states.save({
         resource: ENTRIES_RESOURCE,
         expectedVersion: saved.current.version,
@@ -146,6 +156,7 @@ export async function POST(request: Request) {
         : error instanceof Error
           ? error.message
           : "ENTRIES_MUTATION_FAILED";
+    console.error("[PAPOT][Entries] POST failed", { stage, code });
     return noStoreJson({ status: "error", error: code }, { status: errorStatus(code) });
   } finally {
     if (desktop && ownsLock) {
@@ -155,7 +166,9 @@ export async function POST(request: Request) {
           leaseId,
           owner: desktop.owner,
         });
-      } catch {
+      } catch (error) {
+        const code = error instanceof Error ? error.message : "LOCK_RELEASE_FAILED";
+        console.error("[PAPOT][Entries] lock release failed", { code });
         // A failed release no longer blocks this workstation for long:
         // Entries locks are short-lived and the same device can reclaim a stale lease.
       }
