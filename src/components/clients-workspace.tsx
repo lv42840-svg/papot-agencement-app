@@ -62,6 +62,21 @@ const typeLabels: Record<ClientType, string> = {
   AUTRE: "Autre",
 };
 
+const paymentTermsOptions = [
+  "Comptant",
+  "À réception de facture",
+  "30 jours date de facture",
+  "30 jours fin de mois",
+  "45 jours date de facture",
+  "45 jours fin de mois",
+  "60 jours date de facture",
+  "60 jours fin de mois",
+] as const;
+
+function isPresetPaymentTerm(value: string): boolean {
+  return paymentTermsOptions.includes(value as (typeof paymentTermsOptions)[number]);
+}
+
 const errorMessages: Record<string, string> = {
   MODULE_FORBIDDEN: "Vous n’avez pas accès au fichier clients.",
   CLIENTS_LOCKED:
@@ -605,13 +620,21 @@ export function ClientsWorkspace() {
                 </p>
                 <label className="clientsField">
                   Conditions applicables à ce client
-                  <textarea
+                  <select
                     value={draft.paymentTerms}
                     onChange={(event) => updateDraft("paymentTerms", event.target.value)}
                     disabled={!editable}
-                    rows={3}
-                    placeholder="Ex. 45 jours fin de mois"
-                  />
+                  >
+                    <option value="">À définir</option>
+                    {paymentTermsOptions.map((option) => (
+                      <option key={option} value={option}>
+                        {option}
+                      </option>
+                    ))}
+                    {draft.paymentTerms && !isPresetPaymentTerm(draft.paymentTerms) ? (
+                      <option value={draft.paymentTerms}>{draft.paymentTerms}</option>
+                    ) : null}
+                  </select>
                 </label>
               </div>
 
