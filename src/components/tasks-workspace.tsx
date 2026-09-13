@@ -179,14 +179,16 @@ function useTasksData() {
         const result = (await response.json()) as TasksSnapshot & { error?: string };
         if (!response.ok) {
           throw new Error(
-            errorMessages[result.error ?? ""] ?? "L'action sur la tâche n'a pas pu être enregistrée.",
+            errorMessages[result.error ?? ""] ??
+              "L'action sur la tâche n'a pas pu être enregistrée.",
           );
         }
         setSnapshot(result);
         setNotice(successMessage);
         return true;
       } catch (mutationError) {
-        const message = mutationError instanceof Error ? mutationError.message : "L'action a échoué.";
+        const message =
+          mutationError instanceof Error ? mutationError.message : "L'action a échoué.";
         setError(message);
         return false;
       } finally {

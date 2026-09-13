@@ -2,7 +2,11 @@ import { randomUUID } from "node:crypto";
 import { NextcloudDavClient } from "../src/lib/sync/nextcloud-dav";
 import { SharedResourceEditCoordinator } from "../src/lib/sync/resource-edit-coordinator";
 import { NextcloudResourceLockStore } from "../src/lib/sync/resource-lock-store";
-import { resourceLockPathSegments, type ResourceLockOwner, type SharedResourceRef } from "../src/lib/sync/resource-lock";
+import {
+  resourceLockPathSegments,
+  type ResourceLockOwner,
+  type SharedResourceRef,
+} from "../src/lib/sync/resource-lock";
 import { NextcloudSharedResourceStore } from "../src/lib/sync/resource-state-store";
 
 const baseUrl = process.env.NEXTCLOUD_BASE_URL?.trim() || "https://cloud.ideo-solutions.com";
@@ -178,7 +182,9 @@ async function main(): Promise<void> {
     console.log("[ok] Fichiers temporaires supprimes");
 
     console.log("\n--- VERDICT ---");
-    console.log("[pass] Coordination reelle validee: verrou + lecture seule + version + passage de relais fonctionnent ensemble sur Nextcloud.");
+    console.log(
+      "[pass] Coordination reelle validee: verrou + lecture seule + version + passage de relais fonctionnent ensemble sur Nextcloud.",
+    );
   } catch (error) {
     if (nadiaOwns) {
       await coordinator

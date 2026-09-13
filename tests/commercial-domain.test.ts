@@ -35,7 +35,12 @@ function createPiste(reviewDate = "2026-09-20") {
 describe("Commercial V1", () => {
   it("creates a real piste with a mandatory review date", () => {
     expect(() =>
-      commercialMutationSchema.parse({ action: "create", name: "Sans date", clientName: "", siteLabel: "" }),
+      commercialMutationSchema.parse({
+        action: "create",
+        name: "Sans date",
+        clientName: "",
+        siteLabel: "",
+      }),
     ).toThrow();
 
     const payload = createPiste();
@@ -45,7 +50,10 @@ describe("Commercial V1", () => {
 
   it("automatically moves a due piste to À relancer and keeps history", () => {
     const source = createPiste("2026-09-13");
-    const result = applyCommercialAutomaticTransitions(source, new Date("2026-09-13T10:00:00.000Z"));
+    const result = applyCommercialAutomaticTransitions(
+      source,
+      new Date("2026-09-13T10:00:00.000Z"),
+    );
     expect(result.changed).toBe(true);
     expect(result.payload.cases[0].status).toBe("FOLLOW_UP");
     expect(result.payload.cases[0].history.at(-1)?.type).toBe("AUTO_DUE");
@@ -55,11 +63,7 @@ describe("Commercial V1", () => {
     const source = createPiste();
     const caseId = source.cases[0].id;
     expect(() =>
-      applyCommercialMutation(
-        source,
-        { action: "setStatus", caseId, status: "CHIFFRAGE" },
-        actor,
-      ),
+      applyCommercialMutation(source, { action: "setStatus", caseId, status: "CHIFFRAGE" }, actor),
     ).toThrow("COMMERCIAL_QUOTE_OWNER_AND_DATE_REQUIRED");
 
     const result = applyCommercialMutation(

@@ -123,9 +123,12 @@ export function parseObatCostingCsvText(rawText: string): PartialObatData {
       });
     }
 
-    quoteNumber ??= afterPrefix(first, /Bordereau de chantier sur devis\s*:\s*(D\d{6,})/i)?.toUpperCase() ?? null;
+    quoteNumber ??=
+      afterPrefix(first, /Bordereau de chantier sur devis\s*:\s*(D\d{6,})/i)?.toUpperCase() ?? null;
     quoteDate ??= dateToIso(afterPrefix(first, /En date du\s*:\s*(\d{2}\/\d{2}\/\d{4})/i));
-    validUntil ??= dateToIso(afterPrefix(first, /Valable jusqu['’]?au\s*:\s*(\d{2}\/\d{2}\/\d{4})/i));
+    validUntil ??= dateToIso(
+      afterPrefix(first, /Valable jusqu['’]?au\s*:\s*(\d{2}\/\d{2}\/\d{4})/i),
+    );
 
     const csvClient = afterPrefix(first, /Client\s*:\s*(.+)$/i);
     if (!clientName && csvClient) {

@@ -262,7 +262,9 @@ describe("Chantiers V1 foundation", () => {
     expect(result.operational.workshopItems).toHaveLength(1);
     expect(result.operational.workshopItems[0].sourceBeItemId).toBeNull();
     expect(result.operational.installItems).toHaveLength(1);
-    expect(result.operational.installItems[0].sourceWorkshopItemId).toBe(result.operational.workshopItems[0].id);
+    expect(result.operational.installItems[0].sourceWorkshopItemId).toBe(
+      result.operational.workshopItems[0].id,
+    );
   });
 
   it("keeps Atelier and Pose progress independent", () => {
@@ -330,10 +332,18 @@ describe("Chantiers V1 foundation", () => {
     const source = launch().payload;
     const id = source.chantiers[0].id;
     expect(() =>
-      applyChantierMutation(source, { action: "archive", chantierId: id, openItemsReviewed: true }, actor),
+      applyChantierMutation(
+        source,
+        { action: "archive", chantierId: id, openItemsReviewed: true },
+        actor,
+      ),
     ).toThrow("CHANTIER_NOT_DONE");
 
-    const done = applyChantierMutation(source, { action: "markDone", chantierId: id }, actor).payload;
+    const done = applyChantierMutation(
+      source,
+      { action: "markDone", chantierId: id },
+      actor,
+    ).payload;
     const archived = applyChantierMutation(
       done,
       { action: "archive", chantierId: id, openItemsReviewed: true },

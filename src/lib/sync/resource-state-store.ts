@@ -123,7 +123,9 @@ export class NextcloudSharedResourceStore {
     const record = await this.readRecordAt(url);
     const envelope = record?.envelope ?? null;
     this.envelopeCache.set(resourceCacheKey(resource), envelope);
-    return record ? { resource: record.envelope, etag: record.etag } : { resource: null, etag: null };
+    return record
+      ? { resource: record.envelope, etag: record.etag }
+      : { resource: null, etag: null };
   }
 
   async saveOpened(params: {

@@ -3,9 +3,7 @@ import { describeSharedResourceAccess } from "../src/lib/sync/resource-access-pr
 
 describe("shared resource access presentation", () => {
   it("shows editable state with the opened version", () => {
-    expect(
-      describeSharedResourceAccess({ status: "editable", version: 12 }),
-    ).toEqual({
+    expect(describeSharedResourceAccess({ status: "editable", version: 12 })).toEqual({
       canEdit: true,
       heading: "Modification autorisée",
       detail: "Vous avez la main sur cet élément.",
@@ -27,20 +25,20 @@ describe("shared resource access presentation", () => {
   });
 
   it("uses a safe fallback when the lock owner name is unavailable", () => {
-    expect(
-      describeSharedResourceAccess({ status: "read-only", version: 2 }).detail,
-    ).toBe("Un autre utilisateur modifie actuellement cet élément.");
+    expect(describeSharedResourceAccess({ status: "read-only", version: 2 }).detail).toBe(
+      "Un autre utilisateur modifie actuellement cet élément.",
+    );
   });
 
   it("labels version zero as a new resource", () => {
-    expect(
-      describeSharedResourceAccess({ status: "editable", version: 0 }).versionLabel,
-    ).toBe("Nouveau");
+    expect(describeSharedResourceAccess({ status: "editable", version: 0 }).versionLabel).toBe(
+      "Nouveau",
+    );
   });
 
   it("refuses an invalid resource version", () => {
-    expect(() =>
-      describeSharedResourceAccess({ status: "editable", version: -1 }),
-    ).toThrow("RESOURCE_VERSION_INVALID");
+    expect(() => describeSharedResourceAccess({ status: "editable", version: -1 })).toThrow(
+      "RESOURCE_VERSION_INVALID",
+    );
   });
 });

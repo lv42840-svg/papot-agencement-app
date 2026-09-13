@@ -19,9 +19,7 @@ type SharedResourceEditorOptions<Payload> = {
 
 const endpoint = "/api/desktop/shared-resource";
 
-export function useSharedResourceEditor<Payload>(
-  options: SharedResourceEditorOptions<Payload>,
-) {
+export function useSharedResourceEditor<Payload>(options: SharedResourceEditorOptions<Payload>) {
   const optionsRef = useRef(options);
   const resource = useRef(options.resource);
   const leaseId = useRef(crypto.randomUUID());
@@ -50,7 +48,9 @@ export function useSharedResourceEditor<Payload>(
         const result = await response.json();
         if (!response.ok) throw new Error(result.error ?? "Ouverture impossible");
         if (!active) return;
-        setPayload((result.resource?.payload as Payload | undefined) ?? optionsRef.current.emptyPayload);
+        setPayload(
+          (result.resource?.payload as Payload | undefined) ?? optionsRef.current.emptyPayload,
+        );
         setAccess({
           status: result.status,
           version: result.baseVersion,

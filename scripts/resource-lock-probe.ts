@@ -112,7 +112,9 @@ async function main(): Promise<void> {
   if (second.lock.owner_display_name !== lucien.displayName) {
     throw new Error("LOCK_OWNER_UNEXPECTED");
   }
-  console.log(`[ok] Nadia est bloquee en modification: verrou detenu par ${second.lock.owner_display_name}`);
+  console.log(
+    `[ok] Nadia est bloquee en modification: verrou detenu par ${second.lock.owner_display_name}`,
+  );
   console.log("[ok] Nadia doit etre affichee en lecture seule");
 
   console.log("\n--- 4. LUCIEN FERME LE CHANTIER ---");
@@ -151,7 +153,9 @@ async function main(): Promise<void> {
   console.log("[ok] Verrou temporaire supprime");
 
   console.log("\n--- VERDICT ---");
-  console.log("[pass] Verrou reel Nextcloud valide: Lucien edite, Nadia lit, puis Nadia peut reprendre apres liberation.");
+  console.log(
+    "[pass] Verrou reel Nextcloud valide: Lucien edite, Nadia lit, puis Nadia peut reprendre apres liberation.",
+  );
 }
 
 main()

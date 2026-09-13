@@ -100,11 +100,13 @@ export const commercialCaseSchema = z.object({
   quoteDueDate: dateOnlySchema.nullable().default(null),
   quoteSentAt: isoDateTimeSchema.nullable().default(null),
   quoteNotes: z.string().default(""),
-  provisionHours: z.object({
-    be: z.number().nonnegative(),
-    workshop: z.number().nonnegative(),
-    install: z.number().nonnegative(),
-  }).default({ be: 0, workshop: 0, install: 0 }),
+  provisionHours: z
+    .object({
+      be: z.number().nonnegative(),
+      workshop: z.number().nonnegative(),
+      install: z.number().nonnegative(),
+    })
+    .default({ be: 0, workshop: 0, install: 0 }),
 });
 
 export const commercialPayloadSchema = z.object({
@@ -186,7 +188,10 @@ export function isCommercialActive(item: CommercialCase): boolean {
 export function commercialNeedsFollowUp(item: CommercialCase, now: Date = new Date()): boolean {
   if (item.status === "FOLLOW_UP") return true;
   const today = commercialParisDateKey(now);
-  if ((item.status === "PISTE" || item.status === "WAITING" || item.status === "CHIFFRAGE") && item.reviewDate) {
+  if (
+    (item.status === "PISTE" || item.status === "WAITING" || item.status === "CHIFFRAGE") &&
+    item.reviewDate
+  ) {
     return item.reviewDate <= today;
   }
   if (item.status === "LIKELY" && item.expectedConfirmationDate) {
@@ -197,16 +202,24 @@ export function commercialNeedsFollowUp(item: CommercialCase, now: Date = new Da
 
 export function nextCommercialDeadline(item: CommercialCase): string | null {
   if (item.status === "LIKELY") return item.expectedConfirmationDate;
-  if (item.status === "PISTE" || item.status === "WAITING" || item.status === "CHIFFRAGE") return item.reviewDate;
+  if (item.status === "PISTE" || item.status === "WAITING" || item.status === "CHIFFRAGE")
+    return item.reviewDate;
   return null;
 }
 
 export function isQuoteOverdue(item: CommercialCase, now: Date = new Date()): boolean {
-  return item.status === "CHIFFRAGE" && item.quoteDueDate !== null && item.quoteDueDate < commercialParisDateKey(now);
+  return (
+    item.status === "CHIFFRAGE" &&
+    item.quoteDueDate !== null &&
+    item.quoteDueDate < commercialParisDateKey(now)
+  );
 }
 
 export function commercialHasSignedQuote(item: CommercialCase): boolean {
-  return item.documents.some((document) => document.category === "QUOTE" && (document.legacySignedQuote || document.isSignedQuote));
+  return item.documents.some(
+    (document) =>
+      document.category === "QUOTE" && (document.legacySignedQuote || document.isSignedQuote),
+  );
 }
 
 export function applyCommercialAutomaticTransitions(
@@ -217,7 +230,11 @@ export function applyCommercialAutomaticTransitions(
   const today = commercialParisDateKey(now);
   let changed = false;
   for (const item of payload.cases) {
-    if ((item.status === "PISTE" || item.status === "WAITING") && item.reviewDate && item.reviewDate <= today) {
+    if (
+      (item.status === "PISTE" || item.status === "WAITING") &&
+      item.reviewDate &&
+      item.reviewDate <= today
+    ) {
       const previous = item.status;
       item.status = "FOLLOW_UP";
       item.updatedAt = now.toISOString();

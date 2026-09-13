@@ -37,8 +37,11 @@ export function DashboardCommercialStats() {
     const cases = snapshot?.payload.cases ?? [];
     const now = new Date(snapshot?.serverNow ?? Date.now());
     return {
-      active: cases.filter((item) => !isCommercialClosed(item) && item.status !== "CONFIRMED").length,
-      actions: cases.filter((item) => !isCommercialClosed(item) && commercialNeedsFollowUp(item, now)).length,
+      active: cases.filter((item) => !isCommercialClosed(item) && item.status !== "CONFIRMED")
+        .length,
+      actions: cases.filter(
+        (item) => !isCommercialClosed(item) && commercialNeedsFollowUp(item, now),
+      ).length,
     };
   }, [snapshot]);
 

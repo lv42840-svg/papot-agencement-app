@@ -217,7 +217,8 @@ export function registerCommercialDocuments(
   const payload = structuredClone(source);
   const item = findCase(payload, caseId);
   const ids = new Set(item.documents.map((document) => document.id));
-  if (documents.some((document) => ids.has(document.id))) throw new Error("COMMERCIAL_DOCUMENT_DUPLICATE");
+  if (documents.some((document) => ids.has(document.id)))
+    throw new Error("COMMERCIAL_DOCUMENT_DUPLICATE");
 
   for (const document of documents) {
     if (document.isCurrent) {
@@ -247,11 +248,17 @@ export function applyCommercialMutation(
   actor: CommercialActor,
   now: Date = new Date(),
 ): CommercialMutationResult {
-  const transitioned = applyCommercialAutomaticTransitions(parseCommercialPayload(rawSource), now).payload;
+  const transitioned = applyCommercialAutomaticTransitions(
+    parseCommercialPayload(rawSource),
+    now,
+  ).payload;
   const payload = structuredClone(transitioned);
 
   if (input.action === "create") {
-    if (input.sourceEntryId && payload.cases.some((item) => item.sourceEntryId === input.sourceEntryId)) {
+    if (
+      input.sourceEntryId &&
+      payload.cases.some((item) => item.sourceEntryId === input.sourceEntryId)
+    ) {
       throw new Error("COMMERCIAL_SOURCE_TASK_ALREADY_LINKED");
     }
 
@@ -312,7 +319,13 @@ export function applyCommercialMutation(
     item.description = text(input.description);
     item.nextAction = text(input.nextAction);
     touch(item, actor, now);
-    history(item, actor.displayName, "DETAILS_UPDATED", "Informations commerciales mises à jour.", now);
+    history(
+      item,
+      actor.displayName,
+      "DETAILS_UPDATED",
+      "Informations commerciales mises à jour.",
+      now,
+    );
     return { payload, focusCaseId: item.id };
   }
 
@@ -338,7 +351,13 @@ export function applyCommercialMutation(
       now,
     );
     if (previous !== "WAITING") {
-      history(item, actor.displayName, "STATUS_CHANGED", `Statut : ${COMMERCIAL_STATUS_LABELS[previous]} → En attente.`, now);
+      history(
+        item,
+        actor.displayName,
+        "STATUS_CHANGED",
+        `Statut : ${COMMERCIAL_STATUS_LABELS[previous]} → En attente.`,
+        now,
+      );
     }
     return { payload, focusCaseId: item.id };
   }
@@ -375,7 +394,13 @@ export function applyCommercialMutation(
         now,
       );
     } else if (input.nextStatus === "CONFIRMED") {
-      setActiveStatus(item, "CONFIRMED", { plannedInstallDate: input.plannedInstallDate }, actor, now);
+      setActiveStatus(
+        item,
+        "CONFIRMED",
+        { plannedInstallDate: input.plannedInstallDate },
+        actor,
+        now,
+      );
     } else if (input.nextStatus === "PISTE") {
       setActiveStatus(item, "PISTE", { reviewDate: input.nextDate }, actor, now);
     } else if (input.nextStatus === "FOLLOW_UP") {
@@ -388,7 +413,8 @@ export function applyCommercialMutation(
 
   if (input.action === "postponeQuoteDue") {
     assertOpen(item);
-    if (item.status !== "CHIFFRAGE" || !item.quoteDueDate) throw new Error("COMMERCIAL_NOT_IN_QUOTING");
+    if (item.status !== "CHIFFRAGE" || !item.quoteDueDate)
+      throw new Error("COMMERCIAL_NOT_IN_QUOTING");
     if (input.newDate <= item.quoteDueDate) throw new Error("COMMERCIAL_QUOTE_DATE_NOT_LATER");
     const oldDate = item.quoteDueDate;
     item.quoteDueDate = input.newDate;
@@ -407,7 +433,13 @@ export function applyCommercialMutation(
     assertOpen(item);
     item.quoteNotes = input.quoteNotes;
     touch(item, actor, now);
-    history(item, actor.displayName, "NOTES_UPDATED", "Notes internes de chiffrage mises à jour.", now);
+    history(
+      item,
+      actor.displayName,
+      "NOTES_UPDATED",
+      "Notes internes de chiffrage mises à jour.",
+      now,
+    );
     return { payload, focusCaseId: item.id };
   }
 

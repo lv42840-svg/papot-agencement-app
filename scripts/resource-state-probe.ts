@@ -119,7 +119,9 @@ async function main(): Promise<void> {
     console.log("[ok] Ressource temporaire supprimee");
 
     console.log("\n--- VERDICT ---");
-    console.log("[pass] Controle de version reel Nextcloud valide: une ancienne copie ne peut pas ecraser une version plus recente.");
+    console.log(
+      "[pass] Controle de version reel Nextcloud valide: une ancienne copie ne peut pas ecraser une version plus recente.",
+    );
   } catch (error) {
     await dav.delete(fileUrl, true).catch(() => undefined);
     throw error;

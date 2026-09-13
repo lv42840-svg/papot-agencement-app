@@ -6,10 +6,7 @@ import {
   syncPackageSigningText,
   type SyncPackage,
 } from "../src/lib/sync/protocol";
-import {
-  syncBusinessRequestHash,
-  verifySyncPackageSignature,
-} from "../src/lib/sync/signature";
+import { syncBusinessRequestHash, verifySyncPackageSignature } from "../src/lib/sync/signature";
 
 const packageId = "11111111-1111-4111-8111-111111111111";
 const userId = "22222222-2222-4222-8222-222222222222";
@@ -56,9 +53,11 @@ function unsignedPackage() {
 function signedPackage(): { packet: SyncPackage; publicKeyPem: string } {
   const { privateKey, publicKey } = generateKeyPairSync("ed25519");
   const draft = syncPackageSchema.parse(unsignedPackage());
-  const signature = sign(null, Buffer.from(syncPackageSigningText(draft), "utf8"), privateKey).toString(
-    "base64",
-  );
+  const signature = sign(
+    null,
+    Buffer.from(syncPackageSigningText(draft), "utf8"),
+    privateKey,
+  ).toString("base64");
   const packet = syncPackageSchema.parse({
     ...draft,
     proof: { ...draft.proof, signature },
@@ -82,9 +81,7 @@ describe("sync package protocol", () => {
   });
 
   it("canonicalizes object keys deterministically", () => {
-    expect(canonicalizeJson({ z: 1, a: { d: 2, c: 3 } })).toBe(
-      '{"a":{"c":3,"d":2},"z":1}',
-    );
+    expect(canonicalizeJson({ z: 1, a: { d: 2, c: 3 } })).toBe('{"a":{"c":3,"d":2},"z":1}');
   });
 
   it("keeps the business idempotence hash across a repackaged retry", () => {

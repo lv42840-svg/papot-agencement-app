@@ -156,7 +156,12 @@ describe("Entries business rules", () => {
     const createdAt = new Date("2026-09-07T08:00:00.000Z");
     const created = applyEntriesMutation(
       initial,
-      { action: "create", rawText: "Appeler le client Durand", priority: "NORMAL", tagIds: ["contact"] },
+      {
+        action: "create",
+        rawText: "Appeler le client Durand",
+        priority: "NORMAL",
+        tagIds: ["contact"],
+      },
       lucien,
       createdAt,
     ).payload;

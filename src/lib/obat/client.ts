@@ -21,9 +21,13 @@ export async function requestObatAnalysis(files: File[]): Promise<ObatImportAnal
   return body.analysis;
 }
 
-export function obatKindForFile(file: File, analysis: ObatImportAnalysis): "QUOTE" | "COSTING" | "UNKNOWN" {
+export function obatKindForFile(
+  file: File,
+  analysis: ObatImportAnalysis,
+): "QUOTE" | "COSTING" | "UNKNOWN" {
   return (
-    analysis.files.find((candidate) => candidate.name === file.name && candidate.sizeBytes === file.size)?.kind ??
-    "UNKNOWN"
+    analysis.files.find(
+      (candidate) => candidate.name === file.name && candidate.sizeBytes === file.size,
+    )?.kind ?? "UNKNOWN"
   );
 }

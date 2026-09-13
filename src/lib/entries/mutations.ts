@@ -173,11 +173,7 @@ function notify(
 
 function ensureUniqueTagLabel(payload: EntriesPayload, label: string, exceptId?: string): void {
   const key = normalizePersonName(label);
-  if (
-    payload.tags.some(
-      (tag) => tag.id !== exceptId && normalizePersonName(tag.label) === key,
-    )
-  ) {
+  if (payload.tags.some((tag) => tag.id !== exceptId && normalizePersonName(tag.label) === key)) {
     throw new Error("TAG_LABEL_EXISTS");
   }
 }
@@ -497,13 +493,7 @@ export function applyEntriesMutation(
       history: [],
     };
     history(derived, actor, "CREATED", `Entrée dérivée de « ${entry.rawText} ».`, now);
-    history(
-      entry,
-      actor,
-      "DERIVED_CREATED",
-      `Entrée liée créée : « ${input.rawText} ».`,
-      now,
-    );
+    history(entry, actor, "DERIVED_CREATED", `Entrée liée créée : « ${input.rawText} ».`, now);
     entry.derivedEntryIds.push(derived.id);
     payload.entries.unshift(derived);
     return { payload, focusEntryId: derived.id };
