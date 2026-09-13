@@ -140,7 +140,7 @@ export function launchChantierFromCommercial(
 
   const timestamp = now.toISOString();
   const item: ChantierRecord = {
-    id: randomUUID(),
+    id: commercialCase.id,
     sourceCommercialCaseId: commercialCase.id,
     sourceEntryId: commercialCase.sourceEntryId,
     number: null,
