@@ -1,4 +1,3 @@
-import { randomUUID } from "node:crypto";
 import { z } from "zod";
 
 const isoDateTimeSchema = z.string().datetime({ offset: true });
@@ -186,7 +185,7 @@ export function commercialHasSignedQuote(item: CommercialCase): boolean {
 
 function autoHistory(item: CommercialCase, summary: string, now: Date): void {
   item.history.push({
-    id: randomUUID(),
+    id: globalThis.crypto.randomUUID(),
     type: "AUTO_DUE",
     at: now.toISOString(),
     actorName: "PAPOT",
