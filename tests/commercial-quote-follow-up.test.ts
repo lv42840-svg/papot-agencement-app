@@ -7,31 +7,19 @@ import {
 describe("commercial quote follow-up", () => {
   it("keeps a draft as Brouillon even when a follow-up date is past", () => {
     expect(
-      commercialQuoteDisplayStatus(
-        "DRAFT",
-        "2026-09-10",
-        new Date("2026-09-14T12:00:00+02:00"),
-      ),
+      commercialQuoteDisplayStatus("DRAFT", "2026-09-10", new Date("2026-09-14T12:00:00+02:00")),
     ).toBe("DRAFT");
   });
 
   it("shows a sent quote as Envoyé before its own follow-up date", () => {
     expect(
-      commercialQuoteDisplayStatus(
-        "SENT",
-        "2026-09-20",
-        new Date("2026-09-14T12:00:00+02:00"),
-      ),
+      commercialQuoteDisplayStatus("SENT", "2026-09-20", new Date("2026-09-14T12:00:00+02:00")),
     ).toBe("SENT");
   });
 
   it("shows a sent quote as À relancer when its own follow-up date is reached", () => {
     expect(
-      commercialQuoteDisplayStatus(
-        "SENT",
-        "2026-09-14",
-        new Date("2026-09-14T12:00:00+02:00"),
-      ),
+      commercialQuoteDisplayStatus("SENT", "2026-09-14", new Date("2026-09-14T12:00:00+02:00")),
     ).toBe("FOLLOW_UP");
   });
 
