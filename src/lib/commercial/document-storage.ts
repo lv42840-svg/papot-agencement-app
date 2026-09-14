@@ -1,6 +1,7 @@
 import "server-only";
 
-import { createHash, randomUUID } from "node:crypto";
+import { randomUUID } from "node:crypto";
+import type { ServerFileStore } from "@/lib/server-files/storage";
 import type { NextcloudDavClient } from "@/lib/sync/nextcloud-dav";
 import {
   commercialDocumentCategorySchema,
@@ -12,10 +13,14 @@ export const MAX_COMMERCIAL_DOCUMENTS_PER_UPLOAD = 12;
 export const MAX_COMMERCIAL_DOCUMENT_BYTES = 100 * 1024 * 1024;
 
 export type CommercialDocumentTransport = {
+  store: ServerFileStore;
+  displayName: string;
+};
+
+export type LegacyCommercialDocumentTransport = {
   dav: NextcloudDavClient;
   nextcloudUserId: string;
   syncRoot: string;
-  displayName: string;
 };
 
 export type CommercialDocumentUploadOptions = {
@@ -27,8 +32,11 @@ export type CommercialDocumentUploadOptions = {
 };
 
 function safeFileName(value: string): string {
-  const trimmed = value.trim().replace(/[\\/\0]/g, "-");
-  return (trimmed || "document").slice(0, 180);
+  const cleaned = value
+    .trim()
+    .replace(/[<>:"/\\|?*\x00-\x1F]/g, "-")
+    .replace(/[. ]+$/g, "");
+  return (cleaned || "document").slice(0, 180);
 }
 
 function validateFiles(files: File[]): void {
@@ -44,23 +52,15 @@ function validateFiles(files: File[]): void {
   }
 }
 
-async function documentCollection(
-  transport: CommercialDocumentTransport,
-  creationYear: number,
-  caseId: string,
-  category: CommercialDocumentCategory,
-  documentId: string,
-): Promise<string> {
-  const filesRoot = transport.dav.filesRoot(transport.nextcloudUserId);
-  return transport.dav.ensurePath(filesRoot, [
-    transport.syncRoot,
-    "documents",
-    "commercial",
-    String(creationYear),
-    caseId,
-    category.toLowerCase(),
-    documentId,
-  ]);
+function validateDocumentPath(document: CommercialDocument): string[] {
+  if (!document.storagePath.startsWith("documents/commercial/")) {
+    throw new Error("COMMERCIAL_DOCUMENT_PATH_INVALID");
+  }
+  const segments = document.storagePath.split("/").filter(Boolean);
+  if (segments.some((segment) => segment === "." || segment === "..")) {
+    throw new Error("COMMERCIAL_DOCUMENT_PATH_INVALID");
+  }
+  return segments;
 }
 
 export async function uploadCommercialDocuments(
@@ -86,39 +86,25 @@ export async function uploadCommercialDocuments(
     for (const file of params.files) {
       const id = randomUUID();
       const objectName = safeFileName(file.name);
-      const collection = await documentCollection(
-        transport,
-        params.creationYear,
+      const storagePath = [
+        "documents",
+        "commercial",
+        String(params.creationYear),
         params.caseId,
-        category,
+        category.toLowerCase(),
         id,
-      );
-      const url = transport.dav.childUrl(collection, objectName);
+        objectName,
+      ].join("/");
       const bytes = Buffer.from(await file.arrayBuffer());
-      const sha256 = createHash("sha256").update(bytes).digest("hex");
-
-      try {
-        await transport.dav.putBytes(url, bytes, file.type || "application/octet-stream");
-      } catch (error) {
-        await transport.dav.delete(collection, true).catch(() => undefined);
-        throw error;
-      }
+      const written = await transport.store.writeBytes(storagePath, bytes);
 
       uploaded.push({
         id,
         fileName: file.name,
         contentType: file.type || "application/octet-stream",
-        sizeBytes: file.size,
-        sha256,
-        storagePath: [
-          "documents",
-          "commercial",
-          String(params.creationYear),
-          params.caseId,
-          category.toLowerCase(),
-          id,
-          objectName,
-        ].join("/"),
+        sizeBytes: written.sizeBytes,
+        sha256: written.sha256,
+        storagePath: written.storagePath,
         category,
         versionLabel: params.options.versionLabel?.trim() || null,
         variantLabel: params.options.variantLabel?.trim() || null,
@@ -136,43 +122,43 @@ export async function uploadCommercialDocuments(
   }
 }
 
+export async function readCommercialDocument(
+  transport: Pick<CommercialDocumentTransport, "store">,
+  document: CommercialDocument,
+): Promise<Buffer> {
+  validateDocumentPath(document);
+  const bytes = await transport.store.readBytes(document.storagePath, document.sha256);
+  if (bytes.length !== document.sizeBytes) {
+    throw new Error("COMMERCIAL_DOCUMENT_INTEGRITY_MISMATCH");
+  }
+  return bytes;
+}
+
 export function commercialDocumentUrl(
-  transport: Pick<CommercialDocumentTransport, "dav" | "nextcloudUserId" | "syncRoot">,
+  transport: LegacyCommercialDocumentTransport,
   document: CommercialDocument,
 ): string {
-  const prefix = "documents/commercial/";
-  if (!document.storagePath.startsWith(prefix)) {
-    throw new Error("COMMERCIAL_DOCUMENT_PATH_INVALID");
-  }
-  const segments = document.storagePath.split("/").filter(Boolean);
-  if (segments.some((segment) => segment === "." || segment === "..")) {
-    throw new Error("COMMERCIAL_DOCUMENT_PATH_INVALID");
-  }
+  const segments = validateDocumentPath(document);
   let url = transport.dav.filesRoot(transport.nextcloudUserId);
   url = transport.dav.childUrl(url, transport.syncRoot);
   for (const segment of segments) url = transport.dav.childUrl(url, segment);
   return url;
 }
 
+export async function readLegacyCommercialDocumentBytes(
+  transport: LegacyCommercialDocumentTransport,
+  document: CommercialDocument,
+): Promise<Buffer> {
+  return transport.dav.getBytes(commercialDocumentUrl(transport, document));
+}
+
 export async function cleanupCommercialDocuments(
-  transport: CommercialDocumentTransport,
+  transport: Pick<CommercialDocumentTransport, "store">,
   documents: CommercialDocument[],
 ): Promise<void> {
   await Promise.all(
-    documents.map(async (document) => {
-      try {
-        const segments = document.storagePath.split("/").filter(Boolean);
-        const documentIdIndex = segments.indexOf(document.id);
-        if (documentIdIndex < 0) return;
-        let url = transport.dav.filesRoot(transport.nextcloudUserId);
-        url = transport.dav.childUrl(url, transport.syncRoot);
-        for (const segment of segments.slice(0, documentIdIndex + 1)) {
-          url = transport.dav.childUrl(url, segment);
-        }
-        await transport.dav.delete(url, true);
-      } catch {
-        // Best effort. Orphans can be cleaned up by maintenance if a remote failure occurs.
-      }
-    }),
+    documents.map((document) =>
+      transport.store.deleteFile(document.storagePath).catch(() => undefined),
+    ),
   );
 }
