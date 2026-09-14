@@ -53,7 +53,7 @@ export async function POST(request: Request, context: RouteContext) {
     const requestContext = await requireDesktopRequestContext("capture", "WRITE");
     const { desktop, owner } = requestContext;
     const actor = actorFor(requestContext);
-    const repository = createEntriesRepository(requestContext);
+    const repository = await createEntriesRepository(requestContext);
     const form = await request.formData();
     const files = form.getAll("files").filter((value): value is File => value instanceof File);
     if (files.length === 0) {
