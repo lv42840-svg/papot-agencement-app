@@ -4,6 +4,7 @@ out/
 coverage/
 release/
 build/*.png
+.papot-dev/
 .env
 .env.local
 .env.*.local
