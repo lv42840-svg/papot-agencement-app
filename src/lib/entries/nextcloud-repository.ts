@@ -34,7 +34,11 @@ export async function acquireNextcloudEntriesSnapshot(params: {
   const release = async () => {
     if (released) return;
     released = true;
-    await params.desktop.locks.release({ resource: ENTRIES_RESOURCE, leaseId, owner: params.owner });
+    await params.desktop.locks.release({
+      resource: ENTRIES_RESOURCE,
+      leaseId,
+      owner: params.owner,
+    });
   };
 
   try {

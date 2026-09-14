@@ -161,6 +161,8 @@ describeWithPostgres("Entries PostgreSQL cutover", () => {
 
     expect(row.rows[0]?.version).toBe(3);
     expect(loaded.entries).toHaveLength(2);
-    expect(loaded.entries.map((entry) => entry.id)).toEqual(expect.arrayContaining([entryA, entryB]));
+    expect(loaded.entries.map((entry) => entry.id)).toEqual(
+      expect.arrayContaining([entryA, entryB]),
+    );
   });
 });
