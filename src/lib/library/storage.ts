@@ -4,16 +4,8 @@ import type {
   NextcloudSharedResourceStore,
   SharedResourceActor,
 } from "../sync/resource-state-store";
-import {
-  libraryComponentSchema,
-  parseLibraryComponent,
-  type LibraryComponent,
-} from "./component";
-import {
-  libraryOuvrageSchema,
-  parseLibraryOuvrage,
-  type LibraryOuvrage,
-} from "./ouvrage";
+import { libraryComponentSchema, parseLibraryComponent, type LibraryComponent } from "./component";
+import { libraryOuvrageSchema, parseLibraryOuvrage, type LibraryOuvrage } from "./ouvrage";
 
 export const LIBRARY_STORAGE_SCHEMA_VERSION = 1 as const;
 

@@ -158,8 +158,7 @@ describe("Nextcloud Library storage", () => {
 
   it("rejects an ouvrage that references a component missing from the Library", () => {
     const payload = examplePayload();
-    payload.ouvrages[0].components[0].componentId =
-      "44444444-4444-4444-8444-444444444444";
+    payload.ouvrages[0].components[0].componentId = "44444444-4444-4444-8444-444444444444";
 
     expect(() => parseLibraryPayload(payload)).toThrow("LIBRARY_OUVRAGE_COMPONENT_NOT_FOUND");
   });
