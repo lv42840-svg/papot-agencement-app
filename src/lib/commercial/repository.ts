@@ -1,10 +1,14 @@
 import type { CommercialPayload } from "./domain";
 import type { CommercialMutationResult } from "./mutations";
 
+export type CommercialRepositoryMutation = CommercialMutationResult & {
+  shouldPersist?: boolean;
+};
+
 export type CommercialMutationTransform = (
   payload: CommercialPayload,
   isRetry: boolean,
-) => CommercialMutationResult | Promise<CommercialMutationResult>;
+) => CommercialRepositoryMutation | Promise<CommercialRepositoryMutation>;
 
 export interface CommercialRepository {
   load(): Promise<CommercialPayload>;
