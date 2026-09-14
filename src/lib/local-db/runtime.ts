@@ -160,7 +160,9 @@ export function withLocalDatabaseWrite<T>(
 export async function mutateLocalSnapshot<T, R>(
   resourceKey: string,
   parse: SnapshotParser<T>,
-  transform: (snapshot: LocalSnapshot<T>) => SnapshotMutation<T, R> | Promise<SnapshotMutation<T, R>>,
+  transform: (
+    snapshot: LocalSnapshot<T>,
+  ) => SnapshotMutation<T, R> | Promise<SnapshotMutation<T, R>>,
 ): Promise<R> {
   return withLocalDatabaseWrite(async (target) => {
     const current = readSnapshotFromDatabase(target, resourceKey, parse);
