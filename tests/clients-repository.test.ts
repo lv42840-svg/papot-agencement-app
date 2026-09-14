@@ -2,7 +2,6 @@ import { describe, expect, it, vi } from "vitest";
 import { createInitialClientsPayload } from "../src/lib/clients/domain";
 import { applyClientsMutation } from "../src/lib/clients/mutations";
 import { createNextcloudClientsRepository } from "../src/lib/clients/nextcloud-repository";
-import { ClientsRepositoryError } from "../src/lib/clients/repository";
 
 const owner = {
   userId: "11111111-1111-4111-8111-111111111111",
@@ -135,7 +134,7 @@ describe("clients repository", () => {
       lockResult: { status: "locked", lock: { owner_display_name: "Other User" } },
     });
 
-    await expect(repository.mutate(createInput, actor)).rejects.toMatchObject<ClientsRepositoryError>({
+    await expect(repository.mutate(createInput, actor)).rejects.toMatchObject({
       message: "CLIENTS_LOCKED",
       details: { lockedBy: "Other User" },
     });
