@@ -3,6 +3,8 @@ import { NextResponse } from "next/server";
 import { ZodError } from "zod";
 import { commercialSpecialPermissionForMutation } from "@/lib/auth/action-permissions";
 import { hasEffectiveSpecialPermission, requireSpecialPermission } from "@/lib/auth/permissions";
+import { createClientsRepository } from "@/lib/clients/create-repository";
+import type { ClientsRepository } from "@/lib/clients/repository";
 import {
   assertCommercialClientReadyForConfirmation,
   hydrateCommercialPayloadWithCanonicalClients,
@@ -10,9 +12,9 @@ import {
   resolveCommercialClient,
   type ResolvedCommercialClient,
 } from "@/lib/commercial/client-integration";
+import { createCommercialRepository } from "@/lib/commercial/create-repository";
 import {
   applyCommercialAutomaticTransitions,
-  parseCommercialPayload,
   type CommercialPayload,
 } from "@/lib/commercial/domain";
 import {
@@ -23,16 +25,16 @@ import {
   type CommercialMutationResult,
 } from "@/lib/commercial/mutations";
 import {
+  CommercialRepositoryError,
+  type CommercialRepository,
+} from "@/lib/commercial/repository";
+import {
   desktopRequestErrorStatus,
   requireDesktopRequestContext,
 } from "@/lib/desktop/request-context";
-import { createDesktopSharedResourceRuntime } from "@/lib/desktop/shared-resource-runtime";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
-
-const COMMERCIAL_RESOURCE = { resource_type: "COMMERCIAL" as const, resource_id: "global" };
-const LOCK_TTL_MS = 30_000;
 
 type Owner = { userId: string; deviceId: string; displayName: string };
 type RawRequest = Record<string, unknown>;
@@ -91,17 +93,17 @@ async function snapshot(
   owner: Owner,
   canWrite: boolean,
   user: { id: string },
-  desktop: ReturnType<typeof createDesktopSharedResourceRuntime>,
+  clients: ClientsRepository,
   focusCaseId?: string,
 ) {
   const actor = { userId: owner.userId, displayName: owner.displayName };
-  const [canCreate, canProvision, canConfirm, clients] = await Promise.all([
+  const [canCreate, canProvision, canConfirm, canonicalClients] = await Promise.all([
     hasEffectiveSpecialPermission(user, "commercial.create"),
     hasEffectiveSpecialPermission(user, "commercial.provision"),
     hasEffectiveSpecialPermission(user, "commercial.confirm_launch"),
-    listCanonicalCommercialClients(desktop),
+    listCanonicalCommercialClients(clients),
   ]);
-  const payloadForUi = hydrateCommercialPayloadWithCanonicalClients(payload, clients);
+  const payloadForUi = hydrateCommercialPayloadWithCanonicalClients(payload, canonicalClients);
   return {
     payload: payloadForUi,
     actor,
@@ -135,92 +137,39 @@ function statusFor(code: string): number {
 }
 
 async function persistAutomaticTransitions(
-  desktop: ReturnType<typeof createDesktopSharedResourceRuntime>,
-  owner: Owner,
+  repository: CommercialRepository,
 ): Promise<CommercialPayload> {
-  const leaseId = randomUUID();
-  let ownsLock = false;
-  try {
-    const [lock, openedInitial] = await Promise.all([
-      desktop.locks.acquire({
-        resource: COMMERCIAL_RESOURCE,
-        leaseId,
-        owner,
-        baseVersion: 0,
-        ttlMs: LOCK_TTL_MS,
-        reclaimOwnAfterMs: 0,
-      }),
-      desktop.states.openForUpdate(COMMERCIAL_RESOURCE),
-    ]);
-    if (lock.status === "locked") {
-      const current = await desktop.states.get(COMMERCIAL_RESOURCE);
-      return applyCommercialAutomaticTransitions(parseCommercialPayload(current?.payload)).payload;
-    }
-    ownsLock = true;
-
-    let opened = openedInitial;
-    let transition = applyCommercialAutomaticTransitions(
-      parseCommercialPayload(opened.resource?.payload),
-    );
-    if (!transition.changed) return transition.payload;
-
-    let saved = await desktop.states.saveOpened({
-      resource: COMMERCIAL_RESOURCE,
-      opened,
+  const mutation = await repository.mutate((source) => {
+    const transition = applyCommercialAutomaticTransitions(source);
+    return {
       payload: transition.payload,
-      actor: { userId: owner.userId, deviceId: owner.deviceId },
-    });
-    if (saved.status === "conflict") {
-      opened = await desktop.states.openForUpdate(COMMERCIAL_RESOURCE);
-      transition = applyCommercialAutomaticTransitions(
-        parseCommercialPayload(opened.resource?.payload),
-      );
-      if (!transition.changed) return transition.payload;
-      saved = await desktop.states.saveOpened({
-        resource: COMMERCIAL_RESOURCE,
-        opened,
-        payload: transition.payload,
-        actor: { userId: owner.userId, deviceId: owner.deviceId },
-      });
-    }
-    if (saved.status === "conflict") throw new Error("COMMERCIAL_VERSION_CONFLICT");
-    return parseCommercialPayload(saved.resource.payload);
-  } finally {
-    if (ownsLock) {
-      void desktop.locks
-        .release({ resource: COMMERCIAL_RESOURCE, leaseId, owner })
-        .catch(() => undefined);
-    }
-  }
+      shouldPersist: transition.changed,
+    };
+  });
+  return mutation.payload;
 }
 
 export async function GET() {
   try {
     const context = await requireDesktopRequestContext("commercial", "READ");
-    const { desktop, owner } = context;
-    const cached = desktop.states.getCached(COMMERCIAL_RESOURCE);
-    const resource = cached !== undefined ? cached : await desktop.states.get(COMMERCIAL_RESOURCE);
-    const parsed = parseCommercialPayload(resource?.payload);
+    const repository = createCommercialRepository(context);
+    const clients = await createClientsRepository(context);
+    const parsed = await repository.load();
     const transition = applyCommercialAutomaticTransitions(parsed);
 
-    if (transition.changed) {
-      const payload = context.moduleAccess.canWrite
-        ? await persistAutomaticTransitions(desktop, owner)
+    const payload =
+      transition.changed && context.moduleAccess.canWrite
+        ? await persistAutomaticTransitions(repository)
         : transition.payload;
-      return noStoreJson(
-        await snapshot(payload, owner, context.moduleAccess.canWrite, context.user, desktop),
-      );
-    }
-
-    if (cached !== undefined) {
-      void desktop.states.get(COMMERCIAL_RESOURCE).catch((error: unknown) => {
-        const code = error instanceof Error ? error.message : "COMMERCIAL_REFRESH_FAILED";
-        console.error("[PAPOT][Commercial] background refresh failed", { code });
-      });
-    }
 
     return noStoreJson(
-      await snapshot(parsed, owner, context.moduleAccess.canWrite, context.user, desktop),
+      await snapshot(
+        payload,
+        context.owner,
+        context.moduleAccess.canWrite,
+        context.user,
+        clients,
+      ),
     );
   } catch (error) {
     const code = error instanceof Error ? error.message : "COMMERCIAL_LOAD_FAILED";
@@ -229,11 +178,7 @@ export async function GET() {
 }
 
 export async function POST(request: Request) {
-  const leaseId = randomUUID();
   const startedAt = Date.now();
-  let desktop: ReturnType<typeof createDesktopSharedResourceRuntime> | null = null;
-  let owner: Owner | null = null;
-  let ownsLock = false;
   let stage = "parse-request";
 
   try {
@@ -245,41 +190,21 @@ export async function POST(request: Request) {
     if (requiredSpecialPermission) {
       await requireSpecialPermission(context.user, requiredSpecialPermission);
     }
-    desktop = context.desktop;
-    owner = context.owner;
-    const actor = { userId: owner.userId, displayName: owner.displayName };
 
-    stage = "acquire-lock-and-open-resource";
-    const [lock, openedInitial] = await Promise.all([
-      desktop.locks.acquire({
-        resource: COMMERCIAL_RESOURCE,
-        leaseId,
-        owner,
-        baseVersion: 0,
-        ttlMs: LOCK_TTL_MS,
-        reclaimOwnAfterMs: 0,
-      }),
-      desktop.states.openForUpdate(COMMERCIAL_RESOURCE),
-    ]);
-    if (lock.status === "locked") {
-      return noStoreJson(
-        { error: "COMMERCIAL_LOCKED", lockedBy: lock.lock.owner_display_name },
-        { status: 423 },
-      );
-    }
-    ownsLock = true;
-
+    const repository = createCommercialRepository(context);
+    const clients = await createClientsRepository(context);
+    const actor = { userId: context.owner.userId, displayName: context.owner.displayName };
     let resolvedClient: ResolvedCommercialClient | null = null;
 
     const buildMutation = async (
       source: CommercialPayload,
-      allowClientCreation: boolean,
+      isRetry: boolean,
     ): Promise<CommercialMutationResult> => {
       if (confirmationRequested(input)) {
         const caseId = caseIdForMutation(input);
         const item = caseId ? source.cases.find((candidate) => candidate.id === caseId) : null;
         if (!item) throw new Error("COMMERCIAL_CASE_NOT_FOUND");
-        await assertCommercialClientReadyForConfirmation(desktop!, item.clientId);
+        await assertCommercialClientReadyForConfirmation(clients, item.clientId);
       }
 
       const result = applyCommercialMutation(source, input, actor);
@@ -294,11 +219,10 @@ export async function POST(request: Request) {
         }
 
         if (!resolvedClient) {
-          if (!allowClientCreation) throw new Error("COMMERCIAL_CLIENT_RESOLUTION_LOST");
+          if (isRetry) throw new Error("COMMERCIAL_CLIENT_RESOLUTION_LOST");
           stage = "resolve-client";
           resolvedClient = await resolveCommercialClient({
-            desktop: desktop!,
-            owner: owner!,
+            clients,
             actor,
             existingClientId: rawString(raw, "existingClientId"),
             newClientName: input.clientName,
@@ -311,37 +235,11 @@ export async function POST(request: Request) {
       return result;
     };
 
-    let opened = openedInitial;
-    stage = "apply-mutation";
-    let mutation = await buildMutation(parseCommercialPayload(opened.resource?.payload), true);
-
-    stage = "save-resource";
-    let saved = await desktop.states.saveOpened({
-      resource: COMMERCIAL_RESOURCE,
-      opened,
-      payload: mutation.payload,
-      actor: { userId: owner.userId, deviceId: owner.deviceId },
-    });
-
-    if (saved.status === "conflict") {
-      stage = "reopen-after-conflict";
-      opened = await desktop.states.openForUpdate(COMMERCIAL_RESOURCE);
-      stage = "reapply-after-conflict";
-      mutation = await buildMutation(parseCommercialPayload(opened.resource?.payload), false);
-      stage = "save-after-conflict";
-      saved = await desktop.states.saveOpened({
-        resource: COMMERCIAL_RESOURCE,
-        opened,
-        payload: mutation.payload,
-        actor: { userId: owner.userId, deviceId: owner.deviceId },
-      });
-    }
-
-    if (saved.status === "conflict") throw new Error("COMMERCIAL_VERSION_CONFLICT");
-    const payload = parseCommercialPayload(saved.resource.payload);
+    stage = "apply-and-save-mutation";
+    const mutation = await repository.mutate(buildMutation);
     console.info("[PAPOT][Commercial] POST saved", { ms: Date.now() - startedAt });
     return noStoreJson(
-      await snapshot(payload, owner, true, context.user, desktop, mutation.focusCaseId),
+      await snapshot(mutation.payload, context.owner, true, context.user, clients, mutation.focusCaseId),
     );
   } catch (error) {
     const code =
@@ -355,14 +253,10 @@ export async function POST(request: Request) {
       code,
       ms: Date.now() - startedAt,
     });
-    return noStoreJson({ error: code }, { status: statusFor(code) });
-  } finally {
-    if (desktop && owner && ownsLock) {
-      const releaseDesktop = desktop;
-      const releaseOwner = owner;
-      void releaseDesktop.locks
-        .release({ resource: COMMERCIAL_RESOURCE, leaseId, owner: releaseOwner })
-        .catch(() => undefined);
-    }
+    const body =
+      error instanceof CommercialRepositoryError && error.details?.lockedBy
+        ? { error: code, lockedBy: error.details.lockedBy }
+        : { error: code };
+    return noStoreJson(body, { status: statusFor(code) });
   }
 }
