@@ -20,6 +20,7 @@ import {
 } from "lucide-react";
 import { useSearchParams } from "next/navigation";
 import { FormEvent, useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { CommercialAffairQuotes } from "@/components/commercial-affair-quotes";
 import {
   COMMERCIAL_DOCUMENT_CATEGORY_LABELS,
   COMMERCIAL_STATUS_LABELS,
@@ -846,6 +847,7 @@ function FollowForm({
 
   return (
     <div className="commercialV2FollowGrid">
+      <CommercialAffairQuotes item={item} />
       <section className="commercialV2Section">
         <h3>
           <CalendarClock size={15} /> Statut et prochaine échéance
