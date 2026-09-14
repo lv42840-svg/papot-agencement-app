@@ -6,10 +6,12 @@ import { DashboardCommercialStats } from "@/components/dashboard-commercial-stat
 import { DesktopAppShell } from "@/components/desktop-app-shell";
 import { DashboardTasksPanel } from "@/components/tasks-workspace";
 import { authHasUsers } from "@/lib/auth/store";
+import { hasDesktopDatabaseConfig } from "@/lib/desktop/database-config";
 
 export const dynamic = "force-dynamic";
 
 export default async function DesktopReadyPage() {
+  if (!hasDesktopDatabaseConfig()) redirect("/desktop-server-required");
   if (!(await authHasUsers())) redirect("/first-admin");
 
   return (
