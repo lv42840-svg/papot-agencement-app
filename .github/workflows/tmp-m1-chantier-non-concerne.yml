@@ -1,0 +1,119 @@
+name: Temporary M1 Chantier Non Concerne
+
+on:
+  push:
+    branches: [feat/chantier-non-concerne]
+    paths:
+      - .github/workflows/tmp-m1-chantier-non-concerne.yml
+
+permissions:
+  contents: write
+
+jobs:
+  patch:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: feat/chantier-non-concerne
+          fetch-depth: 0
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - name: Apply M1 patch
+        shell: bash
+        run: |
+          python3 <<'PY'
+          from pathlib import Path
+
+          def replace_once(path, old, new):
+              p = Path(path)
+              text = p.read_text(encoding="utf-8")
+              if old not in text:
+                  raise SystemExit(f"pattern not found in {path}: {old[:80]!r}")
+              p.write_text(text.replace(old, new, 1), encoding="utf-8")
+
+          domain = "src/lib/chantiers/domain.ts"
+          replace_once(
+              domain,
+              'export const installItemStatusSchema = z.enum(["TODO", "IN_PROGRESS", "DONE"]);\n',
+              'export const installItemStatusSchema = z.enum(["TODO", "IN_PROGRESS", "DONE"]);\nexport const operationalSpaceIdSchema = z.enum([\n  "admin",\n  "be",\n  "workshop",\n  "install",\n  "meeting",\n  "mail",\n  "reception",\n]);\nexport const operationalSpaceStateSchema = z.enum(["APPLICABLE", "NOT_APPLICABLE"]);\n\nconst defaultOperationalSpaceStates = {\n  admin: "APPLICABLE",\n  be: "APPLICABLE",\n  workshop: "APPLICABLE",\n  install: "APPLICABLE",\n  meeting: "APPLICABLE",\n  mail: "APPLICABLE",\n  reception: "APPLICABLE",\n} as const;\n\nexport const operationalSpaceStatesSchema = z\n  .object({\n    admin: operationalSpaceStateSchema,\n    be: operationalSpaceStateSchema,\n    workshop: operationalSpaceStateSchema,\n    install: operationalSpaceStateSchema,\n    meeting: operationalSpaceStateSchema,\n    mail: operationalSpaceStateSchema,\n    reception: operationalSpaceStateSchema,\n  })\n  .default(defaultOperationalSpaceStates);\n'
+          )
+          replace_once(
+              domain,
+              'export const chantierOperationalSchema = z\n  .object({\n    beItems: z.array(beItemSchema).default([]),\n    workshopItems: z.array(workshopItemSchema).default([]),\n    installItems: z.array(installItemSchema).default([]),\n  })\n  .default({ beItems: [], workshopItems: [], installItems: [] });',
+              'export const chantierOperationalSchema = z\n  .object({\n    spaces: operationalSpaceStatesSchema,\n    beItems: z.array(beItemSchema).default([]),\n    workshopItems: z.array(workshopItemSchema).default([]),\n    installItems: z.array(installItemSchema).default([]),\n  })\n  .default({\n    spaces: defaultOperationalSpaceStates,\n    beItems: [],\n    workshopItems: [],\n    installItems: [],\n  });'
+          )
+          replace_once(
+              domain,
+              '    "OPERATIONAL_STATUS_UPDATED",\n    "MARKED_DONE",',
+              '    "OPERATIONAL_STATUS_UPDATED",\n    "OPERATIONAL_SPACE_STATE_UPDATED",\n    "MARKED_DONE",'
+          )
+          replace_once(
+              domain,
+              'export type InstallItemStatus = z.infer<typeof installItemStatusSchema>;\n',
+              'export type InstallItemStatus = z.infer<typeof installItemStatusSchema>;\nexport type OperationalSpaceId = z.infer<typeof operationalSpaceIdSchema>;\nexport type OperationalSpaceState = z.infer<typeof operationalSpaceStateSchema>;\n'
+          )
+
+          mutations = "src/lib/chantiers/mutations.ts"
+          replace_once(
+              mutations,
+              '  z.object({\n    action: z.literal("markDone"),\n    chantierId: z.string().uuid(),\n  }),',
+              '  z.object({\n    action: z.literal("setOperationalSpaceState"),\n    chantierId: z.string().uuid(),\n    spaceId: z.enum(["admin", "be", "workshop", "install", "meeting", "mail", "reception"]),\n    state: z.enum(["APPLICABLE", "NOT_APPLICABLE"]),\n  }),\n  z.object({\n    action: z.literal("markDone"),\n    chantierId: z.string().uuid(),\n  }),'
+          )
+          replace_once(
+              mutations,
+              '    operational: { beItems: [], workshopItems: [], installItems: [] },',
+              '    operational: {\n      spaces: {\n        admin: "APPLICABLE",\n        be: "APPLICABLE",\n        workshop: "APPLICABLE",\n        install: "APPLICABLE",\n        meeting: "APPLICABLE",\n        mail: "APPLICABLE",\n        reception: "APPLICABLE",\n      },\n      beItems: [],\n      workshopItems: [],\n      installItems: [],\n    },'
+          )
+          replace_once(
+              mutations,
+              '  if (input.action === "markDone") {\n',
+              '  if (input.action === "setOperationalSpaceState") {\n    ensureOperationalEditable(item);\n    const previous = item.operational.spaces[input.spaceId];\n    if (previous === input.state) throw new Error("CHANTIER_OPERATIONAL_SPACE_UNCHANGED");\n    item.operational.spaces[input.spaceId] = input.state;\n    touch(item, actor, now);\n    const label =\n      input.spaceId === "workshop"\n        ? "Atelier"\n        : input.spaceId === "install"\n          ? "Pose"\n          : input.spaceId === "meeting"\n            ? "Réunion de chantier"\n            : input.spaceId === "reception"\n              ? "Réception"\n              : input.spaceId === "admin"\n                ? "Admin"\n                : input.spaceId.toUpperCase();\n    history(\n      item,\n      actor.displayName,\n      "OPERATIONAL_SPACE_STATE_UPDATED",\n      `${label} : ${input.state === "NOT_APPLICABLE" ? "déclaré Non concerné" : "réactivé"}.`,\n      now,\n    );\n    return { payload, focusChantierId: item.id };\n  }\n\n  if (input.action === "markDone") {\n'
+          )
+
+          ui = "src/components/chantier-operational-workspace.tsx"
+          replace_once(
+              ui,
+              '  const [quoteLinesError, setQuoteLinesError] = useState<string | null>(null);\n',
+              '  const [quoteLinesError, setQuoteLinesError] = useState<string | null>(null);\n  const spaceState = chantier.operational.spaces[space];\n  const spaceLabel = CHANTIER_OPERATIONAL_SPACES.find((item) => item.id === space)?.label ?? space;\n'
+          )
+          replace_once(
+              ui,
+              '        {CHANTIER_OPERATIONAL_SPACES.map((item) => {\n          const count = countForSpace(chantier, item.id);\n',
+              '        {CHANTIER_OPERATIONAL_SPACES.map((item) => {\n          const count = countForSpace(chantier, item.id);\n          const state = chantier.operational.spaces[item.id];\n'
+          )
+          replace_once(
+              ui,
+              '              {count !== null ? <small>{count}</small> : null}\n',
+              '              {state === "NOT_APPLICABLE" ? <small>N/C</small> : count !== null ? <small>{count}</small> : null}\n'
+          )
+          old_body = '''      <div className="chantierOperationalTabBody">\n        {space === "be" ? (\n          <BeSpace\n            chantier={chantier}\n            busy={busy}\n            canModify={canModify}\n            mutate={mutate}\n            quoteGroups={quoteGroups}\n            quoteLinesLoading={quoteLinesLoading}\n            quoteLinesError={quoteLinesError}\n          />\n        ) : null}\n        {space === "workshop" ? (\n          <WorkshopSpace\n            chantier={chantier}\n            busy={busy}\n            canModify={canModify}\n            mutate={mutate}\n            quoteGroups={quoteGroups}\n            quoteLinesLoading={quoteLinesLoading}\n            quoteLinesError={quoteLinesError}\n          />\n        ) : null}\n        {space === "install" ? (\n          <InstallSpace chantier={chantier} busy={busy} canModify={canModify} mutate={mutate} />\n        ) : null}\n        {space !== "be" && space !== "workshop" && space !== "install" ? (\n          <FutureSpace id={space} />\n        ) : null}\n      </div>'''
+          new_body = '''      <div className="chantierOperationalTabBody">\n        <div className="chantierOpSpaceTitle">\n          <div>\n            {spaceIcon(space)}\n            <span>\n              <strong>{spaceLabel}</strong>\n              <small>{spaceDescriptions[space]}</small>\n            </span>\n          </div>\n          {canModify ? (\n            <button\n              type="button"\n              disabled={busy}\n              onClick={() =>\n                void mutate(\n                  {\n                    action: "setOperationalSpaceState",\n                    chantierId: chantier.id,\n                    spaceId: space,\n                    state: spaceState === "NOT_APPLICABLE" ? "APPLICABLE" : "NOT_APPLICABLE",\n                  },\n                  spaceState === "NOT_APPLICABLE"\n                    ? `${spaceLabel} réactivé.`\n                    : `${spaceLabel} déclaré Non concerné.`,\n                )\n              }\n            >\n              {spaceState === "NOT_APPLICABLE" ? "Réactiver cet espace" : "Marquer Non concerné"}\n            </button>\n          ) : null}\n        </div>\n\n        {spaceState === "NOT_APPLICABLE" ? (\n          <OperationalEmpty label="Cet espace est déclaré Non concerné pour ce chantier." />\n        ) : (\n          <>\n            {space === "be" ? (\n              <BeSpace\n                chantier={chantier}\n                busy={busy}\n                canModify={canModify}\n                mutate={mutate}\n                quoteGroups={quoteGroups}\n                quoteLinesLoading={quoteLinesLoading}\n                quoteLinesError={quoteLinesError}\n              />\n            ) : null}\n            {space === "workshop" ? (\n              <WorkshopSpace\n                chantier={chantier}\n                busy={busy}\n                canModify={canModify}\n                mutate={mutate}\n                quoteGroups={quoteGroups}\n                quoteLinesLoading={quoteLinesLoading}\n                quoteLinesError={quoteLinesError}\n              />\n            ) : null}\n            {space === "install" ? (\n              <InstallSpace chantier={chantier} busy={busy} canModify={canModify} mutate={mutate} />\n            ) : null}\n            {space !== "be" && space !== "workshop" && space !== "install" ? (\n              <FutureSpace id={space} />\n            ) : null}\n          </>\n        )}\n      </div>'''
+          replace_once(ui, old_body, new_body)
+
+          tests = "tests/chantiers-domain.test.ts"
+          replace_once(
+              tests,
+              'import { createInitialChantiersPayload } from "../src/lib/chantiers/domain";\n',
+              'import {\n  createInitialChantiersPayload,\n  parseChantiersPayload,\n} from "../src/lib/chantiers/domain";\n'
+          )
+          replace_once(
+              tests,
+              '    expect(item.operational).toEqual({ beItems: [], workshopItems: [], installItems: [] });',
+              '    expect(item.operational).toEqual({\n      spaces: {\n        admin: "APPLICABLE",\n        be: "APPLICABLE",\n        workshop: "APPLICABLE",\n        install: "APPLICABLE",\n        meeting: "APPLICABLE",\n        mail: "APPLICABLE",\n        reception: "APPLICABLE",\n      },\n      beItems: [],\n      workshopItems: [],\n      installItems: [],\n    });'
+          )
+          marker = '  it("supports Active → Terminé → Active without recreating the chantier", () => {'
+          addition = '''  it("defaults legacy operational spaces to Applicable", () => {\n    const source = launch().payload;\n    const legacy = JSON.parse(JSON.stringify(source)) as {\n      chantiers: Array<{ operational: { spaces?: unknown } }>;\n    };\n    delete legacy.chantiers[0].operational.spaces;\n\n    const parsed = parseChantiersPayload(legacy);\n    expect(parsed.chantiers[0].operational.spaces).toEqual({\n      admin: "APPLICABLE",\n      be: "APPLICABLE",\n      workshop: "APPLICABLE",\n      install: "APPLICABLE",\n      meeting: "APPLICABLE",\n      mail: "APPLICABLE",\n      reception: "APPLICABLE",\n    });\n  });\n\n  it("marks an operational space Non concerné without deleting its data", () => {\n    let source = launch().payload;\n    const chantierId = source.chantiers[0].id;\n    source = applyChantierMutation(\n      source,\n      {\n        action: "createBeItem",\n        chantierId,\n        name: "Banque accueil",\n        originKind: "QUOTE_LINE",\n        originLabel: "1.2 Banque accueil",\n        installedByUs: true,\n      },\n      actor,\n    ).payload;\n\n    const excluded = applyChantierMutation(\n      source,\n      { action: "setOperationalSpaceState", chantierId, spaceId: "be", state: "NOT_APPLICABLE" },\n      actor,\n    ).payload.chantiers[0];\n    expect(excluded.operational.spaces.be).toBe("NOT_APPLICABLE");\n    expect(excluded.operational.beItems).toHaveLength(1);\n    expect(excluded.history.at(-1)?.type).toBe("OPERATIONAL_SPACE_STATE_UPDATED");\n\n    const restored = applyChantierMutation(\n      { schemaVersion: 1, chantiers: [excluded] },\n      { action: "setOperationalSpaceState", chantierId, spaceId: "be", state: "APPLICABLE" },\n      actor,\n    ).payload.chantiers[0];\n    expect(restored.operational.spaces.be).toBe("APPLICABLE");\n    expect(restored.operational.beItems).toHaveLength(1);\n  });\n\n'''
+          replace_once(tests, marker, addition + marker)
+          PY
+      - run: npx prettier --write src/lib/chantiers/domain.ts src/lib/chantiers/mutations.ts src/components/chantier-operational-workspace.tsx tests/chantiers-domain.test.ts
+      - name: Commit M1
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add src/lib/chantiers/domain.ts src/lib/chantiers/mutations.ts src/components/chantier-operational-workspace.tsx tests/chantiers-domain.test.ts
+          git commit -m "M1 add non-applicable chantier spaces"
+          git push origin HEAD:feat/chantier-non-concerne
