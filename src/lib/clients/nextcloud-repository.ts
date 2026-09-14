@@ -64,7 +64,11 @@ export function createNextcloudClientsRepository(params: {
         ownsLock = true;
 
         let opened = initialOpened;
-        let mutation = applyClientsMutation(parseClientsPayload(opened.resource?.payload), input, actor);
+        let mutation = applyClientsMutation(
+          parseClientsPayload(opened.resource?.payload),
+          input,
+          actor,
+        );
         let saved = await params.states.saveOpened({
           resource: CLIENTS_RESOURCE,
           opened,
@@ -74,7 +78,11 @@ export function createNextcloudClientsRepository(params: {
 
         if (saved.status === "conflict") {
           opened = await params.states.openForUpdate(CLIENTS_RESOURCE);
-          mutation = applyClientsMutation(parseClientsPayload(opened.resource?.payload), input, actor);
+          mutation = applyClientsMutation(
+            parseClientsPayload(opened.resource?.payload),
+            input,
+            actor,
+          );
           saved = await params.states.saveOpened({
             resource: CLIENTS_RESOURCE,
             opened,
