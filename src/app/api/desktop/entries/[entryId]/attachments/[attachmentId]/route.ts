@@ -18,7 +18,7 @@ export async function GET(request: Request, context: RouteContext) {
     const { entryId, attachmentId } = await context.params;
     const requestContext = await requireDesktopRequestContext("capture", "READ");
     const { desktop } = requestContext;
-    const repository = createEntriesRepository(requestContext);
+    const repository = await createEntriesRepository(requestContext);
     const payload = await repository.load();
     const entry = payload.entries.find((candidate) => candidate.id === entryId);
     if (!entry) return NextResponse.json({ error: "ENTRY_NOT_FOUND" }, { status: 404 });
