@@ -1,3 +1,5 @@
+"use client";
+
 import { Calculator, FileText, LibraryBig, Percent, Sigma } from "lucide-react";
 
 const foundations = [
