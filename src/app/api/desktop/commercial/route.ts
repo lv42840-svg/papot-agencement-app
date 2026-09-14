@@ -149,7 +149,7 @@ async function persistAutomaticTransitions(
 export async function GET() {
   try {
     const context = await requireDesktopRequestContext("commercial", "READ");
-    const repository = createCommercialRepository(context);
+    const repository = await createCommercialRepository(context);
     const clients = await createClientsRepository(context);
     const parsed = await repository.load();
     const transition = applyCommercialAutomaticTransitions(parsed);
@@ -182,7 +182,7 @@ export async function POST(request: Request) {
       await requireSpecialPermission(context.user, requiredSpecialPermission);
     }
 
-    const repository = createCommercialRepository(context);
+    const repository = await createCommercialRepository(context);
     const clients = await createClientsRepository(context);
     const actor = { userId: context.owner.userId, displayName: context.owner.displayName };
     let resolvedClient: ResolvedCommercialClient | null = null;
