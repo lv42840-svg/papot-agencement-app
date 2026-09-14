@@ -41,6 +41,8 @@ function moduleForResource(resourceType: SharedResourceType): string {
       return "clients";
     case "COMMERCIAL":
       return "commercial";
+    case "LIBRARY":
+      return "quotes";
     case "CHANTIER":
       return "chantiers";
     case "PLANNING_WEEK":

@@ -10,6 +10,7 @@ export const sharedResourceTypeSchema = z.enum([
   "ENTRIES",
   "CLIENTS",
   "COMMERCIAL",
+  "LIBRARY",
   "AUTH",
 ]);
 
