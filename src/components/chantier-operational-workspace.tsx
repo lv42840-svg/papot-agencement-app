@@ -121,6 +121,8 @@ export function ChantierOperationalWorkspace({ chantier, busy, canModify, mutate
   const [quoteGroups, setQuoteGroups] = useState<QuoteGroup[]>([]);
   const [quoteLinesLoading, setQuoteLinesLoading] = useState(true);
   const [quoteLinesError, setQuoteLinesError] = useState<string | null>(null);
+  const spaceState = chantier.operational.spaces[space];
+  const spaceLabel = CHANTIER_OPERATIONAL_SPACES.find((item) => item.id === space)?.label ?? space;
 
   useEffect(() => {
     let cancelled = false;
@@ -209,6 +211,7 @@ export function ChantierOperationalWorkspace({ chantier, busy, canModify, mutate
       <nav className="chantierOperationalTabs" aria-label="Rubriques du suivi chantier">
         {CHANTIER_OPERATIONAL_SPACES.map((item) => {
           const count = countForSpace(chantier, item.id);
+          const state = chantier.operational.spaces[item.id];
           return (
             <button
               key={item.id}
@@ -218,41 +221,82 @@ export function ChantierOperationalWorkspace({ chantier, busy, canModify, mutate
             >
               {spaceIcon(item.id)}
               <span>{item.label}</span>
-              {count !== null ? <small>{count}</small> : null}
+              {state === "NOT_APPLICABLE" ? (
+                <small>N/C</small>
+              ) : count !== null ? (
+                <small>{count}</small>
+              ) : null}
             </button>
           );
         })}
       </nav>
 
       <div className="chantierOperationalTabBody">
-        {space === "be" ? (
-          <BeSpace
-            chantier={chantier}
-            busy={busy}
-            canModify={canModify}
-            mutate={mutate}
-            quoteGroups={quoteGroups}
-            quoteLinesLoading={quoteLinesLoading}
-            quoteLinesError={quoteLinesError}
-          />
-        ) : null}
-        {space === "workshop" ? (
-          <WorkshopSpace
-            chantier={chantier}
-            busy={busy}
-            canModify={canModify}
-            mutate={mutate}
-            quoteGroups={quoteGroups}
-            quoteLinesLoading={quoteLinesLoading}
-            quoteLinesError={quoteLinesError}
-          />
-        ) : null}
-        {space === "install" ? (
-          <InstallSpace chantier={chantier} busy={busy} canModify={canModify} mutate={mutate} />
-        ) : null}
-        {space !== "be" && space !== "workshop" && space !== "install" ? (
-          <FutureSpace id={space} />
-        ) : null}
+        <div className="chantierOpSpaceTitle">
+          <div>
+            {spaceIcon(space)}
+            <span>
+              <strong>{spaceLabel}</strong>
+              <small>{spaceDescriptions[space]}</small>
+            </span>
+          </div>
+          {canModify ? (
+            <button
+              type="button"
+              disabled={busy}
+              onClick={() =>
+                void mutate(
+                  {
+                    action: "setOperationalSpaceState",
+                    chantierId: chantier.id,
+                    spaceId: space,
+                    state: spaceState === "NOT_APPLICABLE" ? "APPLICABLE" : "NOT_APPLICABLE",
+                  },
+                  spaceState === "NOT_APPLICABLE"
+                    ? `${spaceLabel} réactivé.`
+                    : `${spaceLabel} déclaré Non concerné.`,
+                )
+              }
+            >
+              {spaceState === "NOT_APPLICABLE" ? "Réactiver cet espace" : "Marquer Non concerné"}
+            </button>
+          ) : null}
+        </div>
+
+        {spaceState === "NOT_APPLICABLE" ? (
+          <OperationalEmpty label="Cet espace est déclaré Non concerné pour ce chantier." />
+        ) : (
+          <>
+            {space === "be" ? (
+              <BeSpace
+                chantier={chantier}
+                busy={busy}
+                canModify={canModify}
+                mutate={mutate}
+                quoteGroups={quoteGroups}
+                quoteLinesLoading={quoteLinesLoading}
+                quoteLinesError={quoteLinesError}
+              />
+            ) : null}
+            {space === "workshop" ? (
+              <WorkshopSpace
+                chantier={chantier}
+                busy={busy}
+                canModify={canModify}
+                mutate={mutate}
+                quoteGroups={quoteGroups}
+                quoteLinesLoading={quoteLinesLoading}
+                quoteLinesError={quoteLinesError}
+              />
+            ) : null}
+            {space === "install" ? (
+              <InstallSpace chantier={chantier} busy={busy} canModify={canModify} mutate={mutate} />
+            ) : null}
+            {space !== "be" && space !== "workshop" && space !== "install" ? (
+              <FutureSpace id={space} />
+            ) : null}
+          </>
+        )}
       </div>
       <OperationalStyles />
     </section>
