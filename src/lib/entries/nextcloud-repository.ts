@@ -1,7 +1,11 @@
 import { randomUUID } from "node:crypto";
 import type { DesktopRequestContext } from "@/lib/desktop/request-context";
 import { parseEntriesPayload } from "./domain";
-import { applyEntriesMutation, registerEntryAttachments, type EntriesMutationResult } from "./mutations";
+import {
+  applyEntriesMutation,
+  registerEntryAttachments,
+  type EntriesMutationResult,
+} from "./mutations";
 import type { EntriesRepository } from "./repository";
 
 const ENTRIES_RESOURCE = { resource_type: "ENTRIES" as const, resource_id: "global" };
@@ -89,7 +93,9 @@ export function createNextcloudEntriesRepository(params: {
       return persist((payload) => applyEntriesMutation(payload, input, actor));
     },
     async registerAttachments(entryId, attachments, actor) {
-      return persist((payload) => registerEntryAttachments(payload, entryId, attachments, actor));
+      return persist((payload) =>
+        registerEntryAttachments(payload, entryId, attachments, actor),
+      );
     },
   };
 }
