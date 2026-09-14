@@ -2,7 +2,7 @@ export const MODULE_PERMISSIONS = [
   { key: "capture", label: "Entrées" },
   { key: "clients", label: "Clients" },
   { key: "commercial", label: "Commercial" },
-  { key: "quotes", label: "Devis / Chiffrage" },
+  { key: "quotes", label: "Devis / Chiffrage", future: true },
   { key: "chantiers", label: "Chantiers" },
   { key: "planning", label: "Planning" },
   { key: "hours", label: "Heures" },
