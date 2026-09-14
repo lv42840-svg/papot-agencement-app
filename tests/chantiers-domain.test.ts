@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { createInitialCommercialPayload } from "../src/lib/commercial/domain";
 import { applyCommercialMutation } from "../src/lib/commercial/mutations";
-import { createInitialChantiersPayload } from "../src/lib/chantiers/domain";
+import { createInitialChantiersPayload, parseChantiersPayload } from "../src/lib/chantiers/domain";
 import {
   applyChantierMutation,
   chantierMutationSchema,
@@ -140,7 +140,20 @@ describe("Chantiers V1 foundation", () => {
     expect(item.plannedHours).toEqual({ be: 0, workshop: 32, install: 16 });
     expect(item.sourceCommercialCaseId).toBe(commercialCase.id);
     expect(item.id).toBe(commercialCase.id);
-    expect(item.operational).toEqual({ beItems: [], workshopItems: [], installItems: [] });
+    expect(item.operational).toEqual({
+      spaces: {
+        admin: "APPLICABLE",
+        be: "APPLICABLE",
+        workshop: "APPLICABLE",
+        install: "APPLICABLE",
+        meeting: "APPLICABLE",
+        mail: "APPLICABLE",
+        reception: "APPLICABLE",
+      },
+      beItems: [],
+      workshopItems: [],
+      installItems: [],
+    });
     expect(item.launchDocuments).toEqual({
       quote: "MISSING_DECLARED",
       signedQuote: "MISSING_DECLARED",
@@ -307,6 +320,59 @@ describe("Chantiers V1 foundation", () => {
     expect(afterInstall.operational.workshopItems[0].status).toBe("DONE");
     expect(afterInstall.operational.installItems[0].status).toBe("IN_PROGRESS");
     expect(afterInstall.operational.installItems[0].note).toBe("Première zone posée");
+  });
+
+  it("defaults legacy operational spaces to Applicable", () => {
+    const source = launch().payload;
+    const legacy = JSON.parse(JSON.stringify(source)) as {
+      chantiers: Array<{ operational: { spaces?: unknown } }>;
+    };
+    delete legacy.chantiers[0].operational.spaces;
+
+    const parsed = parseChantiersPayload(legacy);
+    expect(parsed.chantiers[0].operational.spaces).toEqual({
+      admin: "APPLICABLE",
+      be: "APPLICABLE",
+      workshop: "APPLICABLE",
+      install: "APPLICABLE",
+      meeting: "APPLICABLE",
+      mail: "APPLICABLE",
+      reception: "APPLICABLE",
+    });
+  });
+
+  it("marks an operational space Non concerné without deleting its data", () => {
+    let source = launch().payload;
+    const chantierId = source.chantiers[0].id;
+    source = applyChantierMutation(
+      source,
+      {
+        action: "createBeItem",
+        chantierId,
+        name: "Banque accueil",
+        originKind: "QUOTE_LINE",
+        originLabel: "1.2 Banque accueil",
+        installedByUs: true,
+      },
+      actor,
+    ).payload;
+
+    const excluded = applyChantierMutation(
+      source,
+      { action: "setOperationalSpaceState", chantierId, spaceId: "be", state: "NOT_APPLICABLE" },
+      actor,
+    ).payload.chantiers[0];
+    expect(excluded.operational.spaces.be).toBe("NOT_APPLICABLE");
+    expect(excluded.operational.beItems).toHaveLength(1);
+    expect(excluded.history.at(-1)?.type).toBe("OPERATIONAL_SPACE_STATE_UPDATED");
+
+    const restored = applyChantierMutation(
+      { schemaVersion: 1, chantiers: [excluded] },
+      { action: "setOperationalSpaceState", chantierId, spaceId: "be", state: "APPLICABLE" },
+      actor,
+    ).payload.chantiers[0];
+    expect(restored.operational.spaces.be).toBe("APPLICABLE");
+    expect(restored.operational.beItems).toHaveLength(1);
   });
 
   it("supports Active → Terminé → Active without recreating the chantier", () => {

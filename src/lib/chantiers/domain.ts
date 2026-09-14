@@ -10,6 +10,38 @@ export const technicalOriginSchema = z.enum(["QUOTE_LINE", "TS"]);
 export const beItemStatusSchema = z.enum(["TODO", "DRAW", "VALIDATION", "VALIDATED"]);
 export const workshopItemStatusSchema = z.enum(["PREPARE", "READY", "IN_PROGRESS", "DONE"]);
 export const installItemStatusSchema = z.enum(["TODO", "IN_PROGRESS", "DONE"]);
+export const operationalSpaceIdSchema = z.enum([
+  "admin",
+  "be",
+  "workshop",
+  "install",
+  "meeting",
+  "mail",
+  "reception",
+]);
+export const operationalSpaceStateSchema = z.enum(["APPLICABLE", "NOT_APPLICABLE"]);
+
+const defaultOperationalSpaceStates = {
+  admin: "APPLICABLE",
+  be: "APPLICABLE",
+  workshop: "APPLICABLE",
+  install: "APPLICABLE",
+  meeting: "APPLICABLE",
+  mail: "APPLICABLE",
+  reception: "APPLICABLE",
+} as const;
+
+export const operationalSpaceStatesSchema = z
+  .object({
+    admin: operationalSpaceStateSchema,
+    be: operationalSpaceStateSchema,
+    workshop: operationalSpaceStateSchema,
+    install: operationalSpaceStateSchema,
+    meeting: operationalSpaceStateSchema,
+    mail: operationalSpaceStateSchema,
+    reception: operationalSpaceStateSchema,
+  })
+  .default(defaultOperationalSpaceStates);
 
 export const chantierHoursSchema = z.object({
   be: z.number().nonnegative(),
@@ -51,11 +83,17 @@ export const installItemSchema = z.object({
 
 export const chantierOperationalSchema = z
   .object({
+    spaces: operationalSpaceStatesSchema,
     beItems: z.array(beItemSchema).default([]),
     workshopItems: z.array(workshopItemSchema).default([]),
     installItems: z.array(installItemSchema).default([]),
   })
-  .default({ beItems: [], workshopItems: [], installItems: [] });
+  .default({
+    spaces: defaultOperationalSpaceStates,
+    beItems: [],
+    workshopItems: [],
+    installItems: [],
+  });
 
 export const chantierHistoryEventSchema = z.object({
   id: z.string().uuid(),
@@ -65,6 +103,7 @@ export const chantierHistoryEventSchema = z.object({
     "PLANNED_HOURS_UPDATED",
     "OPERATIONAL_ITEM_CREATED",
     "OPERATIONAL_STATUS_UPDATED",
+    "OPERATIONAL_SPACE_STATE_UPDATED",
     "MARKED_DONE",
     "REACTIVATED",
     "ARCHIVED",
@@ -123,6 +162,8 @@ export type TechnicalOrigin = z.infer<typeof technicalOriginSchema>;
 export type BeItemStatus = z.infer<typeof beItemStatusSchema>;
 export type WorkshopItemStatus = z.infer<typeof workshopItemStatusSchema>;
 export type InstallItemStatus = z.infer<typeof installItemStatusSchema>;
+export type OperationalSpaceId = z.infer<typeof operationalSpaceIdSchema>;
+export type OperationalSpaceState = z.infer<typeof operationalSpaceStateSchema>;
 export type BeItem = z.infer<typeof beItemSchema>;
 export type WorkshopItem = z.infer<typeof workshopItemSchema>;
 export type InstallItem = z.infer<typeof installItemSchema>;

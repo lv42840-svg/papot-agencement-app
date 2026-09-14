@@ -84,6 +84,12 @@ export const chantierMutationSchema = z.discriminatedUnion("action", [
     note: nullableText(2000),
   }),
   z.object({
+    action: z.literal("setOperationalSpaceState"),
+    chantierId: z.string().uuid(),
+    spaceId: z.enum(["admin", "be", "workshop", "install", "meeting", "mail", "reception"]),
+    state: z.enum(["APPLICABLE", "NOT_APPLICABLE"]),
+  }),
+  z.object({
     action: z.literal("markDone"),
     chantierId: z.string().uuid(),
   }),
@@ -285,7 +291,20 @@ export function launchChantierFromCommercial(
     signedQuoteReminder: quotePresent && !signedQuotePresent,
     plannedHours: { be: input.be, workshop: input.workshop, install: input.install },
     actualHours: { be: 0, workshop: 0, install: 0 },
-    operational: { beItems: [], workshopItems: [], installItems: [] },
+    operational: {
+      spaces: {
+        admin: "APPLICABLE",
+        be: "APPLICABLE",
+        workshop: "APPLICABLE",
+        install: "APPLICABLE",
+        meeting: "APPLICABLE",
+        mail: "APPLICABLE",
+        reception: "APPLICABLE",
+      },
+      beItems: [],
+      workshopItems: [],
+      installItems: [],
+    },
     launchedAt: timestamp,
     launchedByName: actor.displayName,
     completedAt: null,
@@ -496,6 +515,34 @@ export function applyChantierMutation(
       actor.displayName,
       "OPERATIONAL_STATUS_UPDATED",
       `Pose · ${installItem.name} : ${INSTALL_STATUS_LABELS[previous]} → ${INSTALL_STATUS_LABELS[input.status]}${installItem.note ? ` · ${installItem.note}` : ""}.`,
+      now,
+    );
+    return { payload, focusChantierId: item.id };
+  }
+
+  if (input.action === "setOperationalSpaceState") {
+    ensureOperationalEditable(item);
+    const previous = item.operational.spaces[input.spaceId];
+    if (previous === input.state) throw new Error("CHANTIER_OPERATIONAL_SPACE_UNCHANGED");
+    item.operational.spaces[input.spaceId] = input.state;
+    touch(item, actor, now);
+    const label =
+      input.spaceId === "workshop"
+        ? "Atelier"
+        : input.spaceId === "install"
+          ? "Pose"
+          : input.spaceId === "meeting"
+            ? "Réunion de chantier"
+            : input.spaceId === "reception"
+              ? "Réception"
+              : input.spaceId === "admin"
+                ? "Admin"
+                : input.spaceId.toUpperCase();
+    history(
+      item,
+      actor.displayName,
+      "OPERATIONAL_SPACE_STATE_UPDATED",
+      `${label} : ${input.state === "NOT_APPLICABLE" ? "déclaré Non concerné" : "réactivé"}.`,
       now,
     );
     return { payload, focusChantierId: item.id };
