@@ -128,9 +128,9 @@ describe("desktop quote draft helpers", () => {
 
   it("rejects malformed screen values", () => {
     expect(() => eurosInputToQuoteCents("-1")).toThrow("QUOTE_MONEY_INVALID");
-    expect(() => updateQuoteLineQuantityInput(appendFreeQuoteLine(draft(), { id: lineId }), lineId, "2/0")).toThrow(
-      "QUOTE_QUANTITY_DIVISION_BY_ZERO",
-    );
+    expect(() =>
+      updateQuoteLineQuantityInput(appendFreeQuoteLine(draft(), { id: lineId }), lineId, "2/0"),
+    ).toThrow("QUOTE_QUANTITY_DIVISION_BY_ZERO");
     expect(() => removeQuoteItemTree(draft(), lineId)).toThrow("QUOTE_ITEM_NOT_FOUND");
   });
 });

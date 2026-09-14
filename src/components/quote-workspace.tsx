@@ -3,11 +3,7 @@
 import Link from "next/link";
 import { BookOpen, Boxes, FileText, Layers3, Plus, Search, Trash2, X } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
-import {
-  clientDisplayName,
-  parseClientsPayload,
-  type ClientRecord,
-} from "@/lib/clients/domain";
+import { clientDisplayName, parseClientsPayload, type ClientRecord } from "@/lib/clients/domain";
 import type { LibraryPayload } from "@/lib/library/storage";
 import {
   appendFreeQuoteLine,
@@ -26,7 +22,12 @@ import {
   insertLibraryComponentIntoQuote,
   insertLibraryOuvrageIntoQuote,
 } from "@/lib/quotes/library-link";
-import { parseQuoteModel, type QuoteItem, type QuoteLine, type QuoteModel } from "@/lib/quotes/model";
+import {
+  parseQuoteModel,
+  type QuoteItem,
+  type QuoteLine,
+  type QuoteModel,
+} from "@/lib/quotes/model";
 
 type ClientsResponse = {
   payload?: unknown;
@@ -119,7 +120,9 @@ export function QuoteWorkspace({
         const payload = parseClientsPayload(result.payload);
         const activeClients = payload.clients
           .filter((client) => !client.isArchived)
-          .sort((left, right) => clientDisplayName(left).localeCompare(clientDisplayName(right), "fr"));
+          .sort((left, right) =>
+            clientDisplayName(left).localeCompare(clientDisplayName(right), "fr"),
+          );
         if (cancelled) return;
         setClients(activeClients);
         if (activeClients.length > 0) {
@@ -294,7 +297,9 @@ export function QuoteWorkspace({
     clearMessages();
     setQuote({
       ...quote,
-      items: quote.items.map((item) => (item.id === itemId ? ({ ...item, ...patch } as QuoteItem) : item)),
+      items: quote.items.map((item) =>
+        item.id === itemId ? ({ ...item, ...patch } as QuoteItem) : item,
+      ),
     });
   }
 
@@ -310,7 +315,14 @@ export function QuoteWorkspace({
           : item.kind === "LINE"
             ? "Nouvelle ligne"
             : "Nouveau commentaire";
-    updateItemRaw(item.id, item.kind === "COMMENT" ? { text: fallback } : item.kind === "LINE" ? { description: fallback } : { title: fallback });
+    updateItemRaw(
+      item.id,
+      item.kind === "COMMENT"
+        ? { text: fallback }
+        : item.kind === "LINE"
+          ? { description: fallback }
+          : { title: fallback },
+    );
   }
 
   function deleteItem(itemId: string) {
@@ -452,7 +464,9 @@ export function QuoteWorkspace({
             <p className="muted">Chargement du premier éditeur natif…</p>
           </div>
         </header>
-        <section className="panel quoteLoading">Chargement des clients et de la bibliothèque…</section>
+        <section className="panel quoteLoading">
+          Chargement des clients et de la bibliothèque…
+        </section>
       </div>
     );
   }
@@ -487,10 +501,17 @@ export function QuoteWorkspace({
             <h1>Devis</h1>
             <span className="quoteDraftBadge">Brouillon non enregistré</span>
           </div>
-          <p className="muted">Construis le devis natif. Le stockage partagé viendra dans une brique dédiée.</p>
+          <p className="muted">
+            Construis le devis natif. Le stockage partagé viendra dans une brique dédiée.
+          </p>
         </div>
         <div className="quoteHeaderActions">
-          <button className="secondaryButton" type="button" onClick={() => newQuote()} disabled={!canWrite}>
+          <button
+            className="secondaryButton"
+            type="button"
+            onClick={() => newQuote()}
+            disabled={!canWrite}
+          >
             <Plus size={15} aria-hidden="true" />
             Nouveau devis
           </button>
@@ -501,7 +522,9 @@ export function QuoteWorkspace({
         </div>
       </header>
 
-      {!canWrite ? <div className="quoteAlert">Lecture seule : le droit Devis / Chiffrage est en lecture.</div> : null}
+      {!canWrite ? (
+        <div className="quoteAlert">Lecture seule : le droit Devis / Chiffrage est en lecture.</div>
+      ) : null}
       {error ? <div className="quoteAlert quoteAlertError">{error}</div> : null}
       {notice ? <div className="quoteAlert quoteAlertSuccess">{notice}</div> : null}
 
@@ -509,7 +532,11 @@ export function QuoteWorkspace({
         <div className="quoteIdentityGrid">
           <label className="quoteField quoteClientField">
             Client
-            <select value={quote.clientId} onChange={(event) => selectClient(event.target.value)} disabled={!canWrite}>
+            <select
+              value={quote.clientId}
+              onChange={(event) => selectClient(event.target.value)}
+              disabled={!canWrite}
+            >
               {clients.map((client) => (
                 <option key={client.id} value={client.id}>
                   {clientDisplayName(client)}
@@ -582,22 +609,49 @@ export function QuoteWorkspace({
           <div className="quoteEditorToolbar">
             <div>
               <h2>Contenu du devis</h2>
-              <p className="muted">Sections, lignes libres, commentaires et éléments de bibliothèque.</p>
+              <p className="muted">
+                Sections, lignes libres, commentaires et éléments de bibliothèque.
+              </p>
             </div>
             <div className="quoteAddActions">
-              <button className="secondaryButton" type="button" onClick={addSection} disabled={!canWrite}>
+              <button
+                className="secondaryButton"
+                type="button"
+                onClick={addSection}
+                disabled={!canWrite}
+              >
                 <Plus size={14} aria-hidden="true" /> Section
               </button>
-              <button className="secondaryButton" type="button" onClick={addSubsection} disabled={!canWrite || sections.length === 0}>
+              <button
+                className="secondaryButton"
+                type="button"
+                onClick={addSubsection}
+                disabled={!canWrite || sections.length === 0}
+              >
                 <Plus size={14} aria-hidden="true" /> Sous-section
               </button>
-              <button className="secondaryButton" type="button" onClick={addFreeLine} disabled={!canWrite}>
+              <button
+                className="secondaryButton"
+                type="button"
+                onClick={addFreeLine}
+                disabled={!canWrite}
+              >
                 <Plus size={14} aria-hidden="true" /> Ligne libre
               </button>
-              <button className="secondaryButton" type="button" onClick={addComment} disabled={!canWrite}>
+              <button
+                className="secondaryButton"
+                type="button"
+                onClick={addComment}
+                disabled={!canWrite}
+              >
                 <Plus size={14} aria-hidden="true" /> Commentaire
               </button>
-              <button className="primaryButton" type="button" onClick={() => setLibraryOpen(true)} disabled={!canWrite}>
+              <button
+                className="primaryButton"
+                type="button"
+                onClick={() => setLibraryOpen(true)}
+                disabled={!canWrite}
+              >
                 <BookOpen size={14} aria-hidden="true" /> Bibliothèque
               </button>
             </div>
@@ -609,7 +663,11 @@ export function QuoteWorkspace({
               <strong>Le devis est vide</strong>
               <span>Ajoute une section, une ligne libre ou un élément de la bibliothèque.</span>
               {canWrite ? (
-                <button className="primaryButton" type="button" onClick={() => setLibraryOpen(true)}>
+                <button
+                  className="primaryButton"
+                  type="button"
+                  onClick={() => setLibraryOpen(true)}
+                >
                   <BookOpen size={15} aria-hidden="true" /> Choisir dans la bibliothèque
                 </button>
               ) : null}
@@ -625,7 +683,14 @@ export function QuoteWorkspace({
                 <span />
               </div>
               {quote.items.map((item) => {
-                const depth = item.kind === "SUBSECTION" ? 1 : item.kind === "LINE" || item.kind === "COMMENT" ? (item.parentId ? 1 : 0) : 0;
+                const depth =
+                  item.kind === "SUBSECTION"
+                    ? 1
+                    : item.kind === "LINE" || item.kind === "COMMENT"
+                      ? item.parentId
+                        ? 1
+                        : 0
+                      : 0;
                 if (item.kind === "SECTION" || item.kind === "SUBSECTION") {
                   return (
                     <div className={`quoteItem quoteGroup quoteDepth${depth}`} key={item.id}>
@@ -633,7 +698,9 @@ export function QuoteWorkspace({
                         <span className="quoteKindBadge">{itemKindLabel(item)}</span>
                         <input
                           value={item.title}
-                          onChange={(event) => updateItemRaw(item.id, { title: event.target.value })}
+                          onChange={(event) =>
+                            updateItemRaw(item.id, { title: event.target.value })
+                          }
                           onBlur={() => normalizeRequiredText(item)}
                           maxLength={500}
                           disabled={!canWrite}
@@ -641,7 +708,14 @@ export function QuoteWorkspace({
                         />
                       </div>
                       <span className="quoteGroupRule" />
-                      <button className="iconButton quoteDeleteButton" type="button" onClick={() => deleteItem(item.id)} disabled={!canWrite} aria-label={`Supprimer ${item.title}`} title="Supprimer">
+                      <button
+                        className="iconButton quoteDeleteButton"
+                        type="button"
+                        onClick={() => deleteItem(item.id)}
+                        disabled={!canWrite}
+                        aria-label={`Supprimer ${item.title}`}
+                        title="Supprimer"
+                      >
                         <Trash2 size={15} aria-hidden="true" />
                       </button>
                     </div>
@@ -662,28 +736,44 @@ export function QuoteWorkspace({
                           disabled={!canWrite}
                         />
                       </div>
-                      <button className="iconButton quoteDeleteButton" type="button" onClick={() => deleteItem(item.id)} disabled={!canWrite} aria-label="Supprimer le commentaire" title="Supprimer">
+                      <button
+                        className="iconButton quoteDeleteButton"
+                        type="button"
+                        onClick={() => deleteItem(item.id)}
+                        disabled={!canWrite}
+                        aria-label="Supprimer le commentaire"
+                        title="Supprimer"
+                      >
                         <Trash2 size={15} aria-hidden="true" />
                       </button>
                     </div>
                   );
                 }
 
-                const quantityValue = quantityInputs[item.id] ?? item.quantityFormula ?? String(item.quantity).replace(".", ",");
+                const quantityValue =
+                  quantityInputs[item.id] ??
+                  item.quantityFormula ??
+                  String(item.quantity).replace(".", ",");
                 const priceValue = priceInputs[item.id] ?? centsInput(item.unitPriceCents);
                 return (
                   <div className={`quoteItem quoteLine quoteDepth${depth}`} key={item.id}>
                     <div className="quoteLineDescription">
-                      <span className={`quoteKindBadge${item.librarySource ? " fromLibrary" : ""}`}>{itemKindLabel(item)}</span>
+                      <span className={`quoteKindBadge${item.librarySource ? " fromLibrary" : ""}`}>
+                        {itemKindLabel(item)}
+                      </span>
                       <input
                         value={item.description}
-                        onChange={(event) => updateItemRaw(item.id, { description: event.target.value })}
+                        onChange={(event) =>
+                          updateItemRaw(item.id, { description: event.target.value })
+                        }
                         onBlur={() => normalizeRequiredText(item)}
                         maxLength={4000}
                         disabled={!canWrite}
                         aria-label="Désignation"
                       />
-                      {item.librarySource ? <small>Copie figée depuis la bibliothèque</small> : null}
+                      {item.librarySource ? (
+                        <small>Copie figée depuis la bibliothèque</small>
+                      ) : null}
                     </div>
                     <input
                       className="quoteCompactInput"
@@ -696,7 +786,12 @@ export function QuoteWorkspace({
                     <input
                       className="quoteCompactInput"
                       value={quantityValue}
-                      onChange={(event) => setQuantityInputs((current) => ({ ...current, [item.id]: event.target.value }))}
+                      onChange={(event) =>
+                        setQuantityInputs((current) => ({
+                          ...current,
+                          [item.id]: event.target.value,
+                        }))
+                      }
                       onBlur={() => commitQuantity(item)}
                       inputMode="decimal"
                       disabled={!canWrite}
@@ -707,7 +802,12 @@ export function QuoteWorkspace({
                       <input
                         className="quoteCompactInput"
                         value={priceValue}
-                        onChange={(event) => setPriceInputs((current) => ({ ...current, [item.id]: event.target.value }))}
+                        onChange={(event) =>
+                          setPriceInputs((current) => ({
+                            ...current,
+                            [item.id]: event.target.value,
+                          }))
+                        }
                         onBlur={() => commitPrice(item)}
                         inputMode="decimal"
                         disabled={!canWrite}
@@ -715,8 +815,17 @@ export function QuoteWorkspace({
                       />
                       <span>€</span>
                     </div>
-                    <strong className="quoteLineTotal">{formatMoney(quoteLineHtCents(item))}</strong>
-                    <button className="iconButton quoteDeleteButton" type="button" onClick={() => deleteItem(item.id)} disabled={!canWrite} aria-label={`Supprimer ${item.description}`} title="Supprimer">
+                    <strong className="quoteLineTotal">
+                      {formatMoney(quoteLineHtCents(item))}
+                    </strong>
+                    <button
+                      className="iconButton quoteDeleteButton"
+                      type="button"
+                      onClick={() => deleteItem(item.id)}
+                      disabled={!canWrite}
+                      aria-label={`Supprimer ${item.description}`}
+                      title="Supprimer"
+                    >
                       <Trash2 size={15} aria-hidden="true" />
                     </button>
                   </div>
@@ -731,68 +840,130 @@ export function QuoteWorkspace({
             <span className="quoteSummaryLabel">Total HT provisoire</span>
             <strong>{formatMoney(quoteTotal)}</strong>
             <div className="quoteSummaryStats">
-              <span><b>{quote.items.filter((item) => item.kind === "LINE").length}</b> ligne(s)</span>
-              <span><b>{sections.length}</b> section(s)</span>
+              <span>
+                <b>{quote.items.filter((item) => item.kind === "LINE").length}</b> ligne(s)
+              </span>
+              <span>
+                <b>{sections.length}</b> section(s)
+              </span>
             </div>
           </section>
           <section className="panel quoteScopeCard">
             <strong>Dans cette première version</strong>
             <p>Le devis est interactif mais volontairement non enregistré.</p>
-            <p>TVA, remises, déplacement avancé des lignes, PDF et envoi viendront dans les briques suivantes.</p>
+            <p>
+              TVA, remises, déplacement avancé des lignes, PDF et envoi viendront dans les briques
+              suivantes.
+            </p>
           </section>
         </aside>
       </div>
 
       {libraryOpen ? (
-        <div className="quoteLibraryBackdrop" role="presentation" onMouseDown={(event) => {
-          if (event.target === event.currentTarget) setLibraryOpen(false);
-        }}>
-          <section className="quoteLibraryPicker" role="dialog" aria-modal="true" aria-label="Ajouter depuis la bibliothèque">
+        <div
+          className="quoteLibraryBackdrop"
+          role="presentation"
+          onMouseDown={(event) => {
+            if (event.target === event.currentTarget) setLibraryOpen(false);
+          }}
+        >
+          <section
+            className="quoteLibraryPicker"
+            role="dialog"
+            aria-modal="true"
+            aria-label="Ajouter depuis la bibliothèque"
+          >
             <div className="quoteLibraryHeader">
               <div>
                 <h2>Ajouter depuis la bibliothèque</h2>
                 <p className="muted">L’élément sera copié et figé dans le devis.</p>
               </div>
-              <button className="iconButton" type="button" onClick={() => setLibraryOpen(false)} aria-label="Fermer la bibliothèque">
+              <button
+                className="iconButton"
+                type="button"
+                onClick={() => setLibraryOpen(false)}
+                aria-label="Fermer la bibliothèque"
+              >
                 <X size={17} aria-hidden="true" />
               </button>
             </div>
             <div className="quoteLibraryTabs">
-              <button type="button" className={libraryTab === "components" ? "isActive" : undefined} onClick={() => setLibraryTab("components")}>
-                <Boxes size={15} aria-hidden="true" /> Composants <span>{initialLibrary.components.length}</span>
+              <button
+                type="button"
+                className={libraryTab === "components" ? "isActive" : undefined}
+                onClick={() => setLibraryTab("components")}
+              >
+                <Boxes size={15} aria-hidden="true" /> Composants{" "}
+                <span>{initialLibrary.components.length}</span>
               </button>
-              <button type="button" className={libraryTab === "ouvrages" ? "isActive" : undefined} onClick={() => setLibraryTab("ouvrages")}>
-                <Layers3 size={15} aria-hidden="true" /> Ouvrages <span>{initialLibrary.ouvrages.length}</span>
+              <button
+                type="button"
+                className={libraryTab === "ouvrages" ? "isActive" : undefined}
+                onClick={() => setLibraryTab("ouvrages")}
+              >
+                <Layers3 size={15} aria-hidden="true" /> Ouvrages{" "}
+                <span>{initialLibrary.ouvrages.length}</span>
               </button>
             </div>
             <label className="quoteLibrarySearch">
               <Search size={15} aria-hidden="true" />
-              <input value={libraryQuery} onChange={(event) => setLibraryQuery(event.target.value)} placeholder="Rechercher…" autoFocus />
+              <input
+                value={libraryQuery}
+                onChange={(event) => setLibraryQuery(event.target.value)}
+                placeholder="Rechercher…"
+                autoFocus
+              />
             </label>
             <div className="quoteLibraryResults">
               {libraryTab === "components" ? (
-                visibleComponents.length === 0 ? <div className="quoteLibraryEmpty">Aucun composant trouvé.</div> : visibleComponents.map((component) => (
-                  <button className="quoteLibraryRow" type="button" key={component.id} onClick={() => addLibraryComponent(component.id)}>
-                    <span><strong>{component.name}</strong><small>{component.description || component.unit}</small></span>
-                    <span>{component.unit}</span>
-                    <strong>{formatMoney(component.salePriceCents)}</strong>
-                    <Plus size={16} aria-hidden="true" />
-                  </button>
-                ))
-              ) : visibleOuvrages.length === 0 ? <div className="quoteLibraryEmpty">Aucun ouvrage trouvé.</div> : visibleOuvrages.map((ouvrage) => {
-                const salePrice = ouvrage.components.reduce((total, line) => {
-                  const component = initialLibrary.components.find((candidate) => candidate.id === line.componentId);
-                  return total + Math.round((component?.salePriceCents ?? 0) * line.quantity);
-                }, 0);
-                return (
-                  <button className="quoteLibraryRow" type="button" key={ouvrage.id} onClick={() => addLibraryOuvrage(ouvrage.id)}>
-                    <span><strong>{ouvrage.name}</strong><small>{ouvrage.components.length} composant(s)</small></span>
-                    <span>Ouvrage</span>
-                    <strong>{formatMoney(salePrice)}</strong>
-                    <Plus size={16} aria-hidden="true" />
-                  </button>
-                );
-              })}
+                visibleComponents.length === 0 ? (
+                  <div className="quoteLibraryEmpty">Aucun composant trouvé.</div>
+                ) : (
+                  visibleComponents.map((component) => (
+                    <button
+                      className="quoteLibraryRow"
+                      type="button"
+                      key={component.id}
+                      onClick={() => addLibraryComponent(component.id)}
+                    >
+                      <span>
+                        <strong>{component.name}</strong>
+                        <small>{component.description || component.unit}</small>
+                      </span>
+                      <span>{component.unit}</span>
+                      <strong>{formatMoney(component.salePriceCents)}</strong>
+                      <Plus size={16} aria-hidden="true" />
+                    </button>
+                  ))
+                )
+              ) : visibleOuvrages.length === 0 ? (
+                <div className="quoteLibraryEmpty">Aucun ouvrage trouvé.</div>
+              ) : (
+                visibleOuvrages.map((ouvrage) => {
+                  const salePrice = ouvrage.components.reduce((total, line) => {
+                    const component = initialLibrary.components.find(
+                      (candidate) => candidate.id === line.componentId,
+                    );
+                    return total + Math.round((component?.salePriceCents ?? 0) * line.quantity);
+                  }, 0);
+                  return (
+                    <button
+                      className="quoteLibraryRow"
+                      type="button"
+                      key={ouvrage.id}
+                      onClick={() => addLibraryOuvrage(ouvrage.id)}
+                    >
+                      <span>
+                        <strong>{ouvrage.name}</strong>
+                        <small>{ouvrage.components.length} composant(s)</small>
+                      </span>
+                      <span>Ouvrage</span>
+                      <strong>{formatMoney(salePrice)}</strong>
+                      <Plus size={16} aria-hidden="true" />
+                    </button>
+                  );
+                })
+              )}
             </div>
           </section>
         </div>
@@ -869,7 +1040,10 @@ export function QuoteWorkspace({
         }
         .quoteIdentityGrid {
           display: grid;
-          grid-template-columns: minmax(210px, 1.1fr) minmax(280px, 2fr) 150px 120px minmax(240px, 1.4fr);
+          grid-template-columns: minmax(210px, 1.1fr) minmax(280px, 2fr) 150px 120px minmax(
+              240px,
+              1.4fr
+            );
           gap: 12px;
           align-items: end;
         }
