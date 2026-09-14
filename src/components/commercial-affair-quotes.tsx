@@ -98,10 +98,7 @@ export function CommercialAffairQuotes({ item }: { item: CommercialCase }) {
       ) : (
         <div className="commercialAffairQuotesList">
           {quotes.map((quote) => {
-            const displayStatus = commercialQuoteDisplayStatus(
-              quote.status,
-              quote.followUpDate,
-            );
+            const displayStatus = commercialQuoteDisplayStatus(quote.status, quote.followUpDate);
             return (
               <button
                 type="button"
