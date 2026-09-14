@@ -253,7 +253,9 @@ export function QuotesWorkspace({
           <div className="quoteEmptyState">
             <FileText size={28} aria-hidden="true" />
             <strong>Aucun devis natif pour le moment</strong>
-            <span>Le premier brouillon créé apparaîtra ici sans consommer de numéro définitif.</span>
+            <span>
+              Le premier brouillon créé apparaîtra ici sans consommer de numéro définitif.
+            </span>
           </div>
         ) : (
           <div className="quoteDraftList">
