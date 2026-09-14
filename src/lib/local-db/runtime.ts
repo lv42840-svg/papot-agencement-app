@@ -4,6 +4,8 @@ import fs from "node:fs";
 import path from "node:path";
 import { DatabaseSync } from "node:sqlite";
 
+export { isLocalStorageMode } from "./mode";
+
 export type LocalSnapshot<T> = {
   version: number;
   payload: T;
@@ -20,10 +22,6 @@ type SnapshotParser<T> = (value: unknown) => T;
 let database: DatabaseSync | undefined;
 let databasePath: string | undefined;
 let writeQueue: Promise<void> = Promise.resolve();
-
-export function isLocalStorageMode(): boolean {
-  return (process.env.PAPOT_STORAGE_MODE ?? "local").toLowerCase() === "local";
-}
 
 function resolveDatabasePath(): string {
   const configured = process.env.PAPOT_LOCAL_DB_PATH?.trim();
