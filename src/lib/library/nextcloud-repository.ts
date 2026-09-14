@@ -24,13 +24,14 @@ export function createNextcloudLibraryRepository(params: {
       });
     },
 
-    save(input) {
+    async save(input) {
+      const payload = parseLibraryPayload(input.payload);
       return params.desktop.coordinator.save({
         resource: LIBRARY_RESOURCE_REF,
         leaseId: input.leaseId,
         owner: params.owner,
         expectedVersion: input.expectedVersion,
-        payload: parseLibraryPayload(input.payload),
+        payload,
       });
     },
 
