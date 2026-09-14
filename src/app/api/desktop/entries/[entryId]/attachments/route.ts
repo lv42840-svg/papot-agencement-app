@@ -1,23 +1,19 @@
-import { randomUUID } from "node:crypto";
 import { NextResponse } from "next/server";
 import {
   desktopRequestErrorStatus,
   requireDesktopRequestContext,
 } from "@/lib/desktop/request-context";
 import { cleanupEntryAttachments, uploadEntryAttachments } from "@/lib/entries/attachment-storage";
-import { parseEntriesPayload } from "@/lib/entries/domain";
+import { createEntriesRepository } from "@/lib/entries/create-repository";
+import type { EntriesPayload } from "@/lib/entries/domain";
 import {
   entriesCapabilities,
   listSuggestedAssignees,
-  registerEntryAttachments,
   type EntriesActor,
 } from "@/lib/entries/mutations";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
-
-const ENTRIES_RESOURCE = { resource_type: "ENTRIES" as const, resource_id: "global" };
-const LOCK_TTL_MS = 30_000;
 
 type RouteContext = { params: Promise<{ entryId: string }> };
 
@@ -30,11 +26,7 @@ function actorFor(context: Awaited<ReturnType<typeof requireDesktopRequestContex
   };
 }
 
-function snapshot(
-  payload: ReturnType<typeof parseEntriesPayload>,
-  actor: EntriesActor,
-  focusEntryId?: string,
-) {
+function snapshot(payload: EntriesPayload, actor: EntriesActor, focusEntryId?: string) {
   return {
     payload,
     actor: { userId: actor.userId, displayName: actor.displayName },
@@ -61,6 +53,7 @@ export async function POST(request: Request, context: RouteContext) {
     const requestContext = await requireDesktopRequestContext("capture", "WRITE");
     const { desktop, owner } = requestContext;
     const actor = actorFor(requestContext);
+    const repository = createEntriesRepository(requestContext);
     const form = await request.formData();
     const files = form.getAll("files").filter((value): value is File => value instanceof File);
     if (files.length === 0) {
@@ -74,78 +67,21 @@ export async function POST(request: Request, context: RouteContext) {
       displayName: owner.displayName,
     };
 
-    const current = await desktop.states.get(ENTRIES_RESOURCE);
-    const currentPayload = parseEntriesPayload(current?.payload);
+    const currentPayload = await repository.load();
     if (!currentPayload.entries.some((entry) => entry.id === entryId)) {
       return NextResponse.json({ error: "ENTRY_NOT_FOUND" }, { status: 404 });
     }
 
     let uploaded = [] as Awaited<ReturnType<typeof uploadEntryAttachments>>;
-    const leaseId = randomUUID();
-    let ownsLock = false;
     try {
       uploaded = await uploadEntryAttachments(transport, entryId, files);
-
-      const [lock, openedInitial] = await Promise.all([
-        desktop.locks.acquire({
-          resource: ENTRIES_RESOURCE,
-          leaseId,
-          owner,
-          baseVersion: 0,
-          ttlMs: LOCK_TTL_MS,
-          reclaimOwnAfterMs: 0,
-        }),
-        desktop.states.openForUpdate(ENTRIES_RESOURCE),
-      ]);
-      if (lock.status === "locked") throw new Error("ENTRIES_LOCKED");
-      ownsLock = true;
-
-      let opened = openedInitial;
-      let mutation = registerEntryAttachments(
-        parseEntriesPayload(opened.resource?.payload),
-        entryId,
-        uploaded,
-        actor,
-      );
-      let saved = await desktop.states.saveOpened({
-        resource: ENTRIES_RESOURCE,
-        opened,
-        payload: mutation.payload,
-        actor: { userId: owner.userId, deviceId: owner.deviceId },
+      const mutation = await repository.registerAttachments(entryId, uploaded, actor);
+      return NextResponse.json(snapshot(mutation.payload, actor, mutation.focusEntryId), {
+        headers: { "Cache-Control": "no-store" },
       });
-
-      if (saved.status === "conflict") {
-        opened = await desktop.states.openForUpdate(ENTRIES_RESOURCE);
-        mutation = registerEntryAttachments(
-          parseEntriesPayload(opened.resource?.payload),
-          entryId,
-          uploaded,
-          actor,
-        );
-        saved = await desktop.states.saveOpened({
-          resource: ENTRIES_RESOURCE,
-          opened,
-          payload: mutation.payload,
-          actor: { userId: owner.userId, deviceId: owner.deviceId },
-        });
-      }
-      if (saved.status === "conflict") throw new Error("ENTRIES_VERSION_CONFLICT");
-
-      return NextResponse.json(
-        snapshot(parseEntriesPayload(saved.resource.payload), actor, entryId),
-        {
-          headers: { "Cache-Control": "no-store" },
-        },
-      );
     } catch (error) {
       if (uploaded.length > 0) await cleanupEntryAttachments(transport, uploaded);
       throw error;
-    } finally {
-      if (ownsLock) {
-        void desktop.locks
-          .release({ resource: ENTRIES_RESOURCE, leaseId, owner })
-          .catch(() => undefined);
-      }
     }
   } catch (error) {
     const code = error instanceof Error ? error.message : "ENTRY_ATTACHMENTS_FAILED";
