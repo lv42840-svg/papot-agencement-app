@@ -1,5 +1,8 @@
 import { describe, expect, it, vi } from "vitest";
-import { createInitialCommercialPayload } from "../src/lib/commercial/domain";
+import {
+  createInitialCommercialPayload,
+  parseCommercialPayload,
+} from "../src/lib/commercial/domain";
 import { applyCommercialMutation } from "../src/lib/commercial/mutations";
 import { createNextcloudCommercialRepository } from "../src/lib/commercial/nextcloud-repository";
 
@@ -92,7 +95,7 @@ describe("Commercial repository", () => {
     const cachedPayload = createPistePayload();
     const { repository, get } = createRepository({ cached: envelope(cachedPayload) });
 
-    await expect(repository.load()).resolves.toEqual(cachedPayload);
+    await expect(repository.load()).resolves.toEqual(parseCommercialPayload(cachedPayload));
     expect(get).toHaveBeenCalledTimes(1);
   });
 
@@ -153,7 +156,7 @@ describe("Commercial repository", () => {
       shouldPersist: false,
     }));
 
-    expect(result.payload).toEqual(source);
+    expect(result.payload).toEqual(parseCommercialPayload(source));
     expect(saveOpened).not.toHaveBeenCalled();
     expect(release).toHaveBeenCalledTimes(1);
   });
