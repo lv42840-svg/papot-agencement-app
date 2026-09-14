@@ -242,7 +242,7 @@ function snapshotFromEnvelope(envelope: ResourceEnvelope | null): LibrarySnapsho
 }
 
 async function sharedResourceRequest(body: Record<string, unknown>) {
-  const response = await fetch("/api/desktop/shared-resource", {
+  const response = await fetch("/api/desktop/library", {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify(body),
@@ -331,7 +331,7 @@ export function LibraryWorkspace({
     if (!session) return;
     const current = session;
     return () => {
-      void fetch("/api/desktop/shared-resource", {
+      void fetch("/api/desktop/library", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
