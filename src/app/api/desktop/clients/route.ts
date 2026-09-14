@@ -35,7 +35,7 @@ function errorStatus(code: string): number {
 export async function GET() {
   try {
     const context = await requireDesktopRequestContext("clients", "READ");
-    const repository = createClientsRepository(context);
+    const repository = await createClientsRepository(context);
     const payload = await repository.load();
     return noStoreJson(publicSnapshot(payload, context.moduleAccess.canWrite));
   } catch (error) {
@@ -52,7 +52,7 @@ export async function POST(request: Request) {
     const input = clientsMutationSchema.parse(await request.json());
     stage = "create-repository";
     const context = await requireDesktopRequestContext("clients", "WRITE");
-    const repository = createClientsRepository(context);
+    const repository = await createClientsRepository(context);
 
     stage = "mutate";
     const mutation = await repository.mutate(input, {
