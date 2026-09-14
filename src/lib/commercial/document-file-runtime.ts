@@ -1,6 +1,7 @@
 import "server-only";
 
 import type { DesktopRequestContext } from "@/lib/desktop/request-context";
+import { isLocalStorageMode } from "@/lib/local-db/runtime";
 import { getServerDbPool, runServerDbMigrations } from "@/lib/server-db";
 import { getServerFileStore } from "@/lib/server-files/runtime";
 import { ensureCommercialDocumentFilesCutover } from "./document-file-cutover";
@@ -12,11 +13,18 @@ import {
 export async function createCommercialDocumentTransport(
   context: Pick<DesktopRequestContext, "desktop" | "owner">,
 ): Promise<CommercialDocumentTransport> {
-  const pool = getServerDbPool();
-  await runServerDbMigrations(pool);
-
   const store = getServerFileStore();
   await store.assertReady();
+
+  if (isLocalStorageMode()) {
+    return {
+      store,
+      displayName: context.owner.displayName,
+    };
+  }
+
+  const pool = getServerDbPool();
+  await runServerDbMigrations(pool);
   await ensureCommercialDocumentFilesCutover({
     pool,
     store,
