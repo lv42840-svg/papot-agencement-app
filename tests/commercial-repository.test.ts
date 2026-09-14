@@ -2,7 +2,6 @@ import { describe, expect, it, vi } from "vitest";
 import { createInitialCommercialPayload } from "../src/lib/commercial/domain";
 import { applyCommercialMutation } from "../src/lib/commercial/mutations";
 import { createNextcloudCommercialRepository } from "../src/lib/commercial/nextcloud-repository";
-import { CommercialRepositoryError } from "../src/lib/commercial/repository";
 
 const owner = {
   userId: "11111111-1111-4111-8111-111111111111",
@@ -100,7 +99,7 @@ describe("Commercial repository", () => {
   it("persists a Commercial mutation and releases the resource lock", async () => {
     const { repository, saveOpened, release } = createRepository();
 
-    const result = await repository.mutate((payload) => ({ payload: createPistePayload() }));
+    const result = await repository.mutate(() => ({ payload: createPistePayload() }));
 
     expect(result.payload.cases).toHaveLength(1);
     expect(saveOpened).toHaveBeenCalledTimes(1);
@@ -138,9 +137,7 @@ describe("Commercial repository", () => {
       lockResult: { status: "locked", lock: { owner_display_name: "Poste atelier" } },
     });
 
-    await expect(
-      repository.mutate((payload) => ({ payload })),
-    ).rejects.toMatchObject<Partial<CommercialRepositoryError>>({
+    await expect(repository.mutate((payload) => ({ payload }))).rejects.toMatchObject({
       message: "COMMERCIAL_LOCKED",
       details: { lockedBy: "Poste atelier" },
     });
