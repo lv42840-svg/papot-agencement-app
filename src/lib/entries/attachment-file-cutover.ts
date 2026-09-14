@@ -37,7 +37,9 @@ async function findCutoverMarker(queryable: Queryable): Promise<CutoverMarkerRow
   return result.rows[0] ?? null;
 }
 
-function attachmentManifest(payload: ReturnType<typeof parseEntriesPayload>): AttachmentManifestItem[] {
+function attachmentManifest(
+  payload: ReturnType<typeof parseEntriesPayload>,
+): AttachmentManifestItem[] {
   return payload.entries
     .flatMap((entry) =>
       entry.attachments.map((attachment) => ({

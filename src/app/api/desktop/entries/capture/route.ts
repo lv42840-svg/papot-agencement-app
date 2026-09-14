@@ -88,10 +88,7 @@ export async function POST(request: Request) {
     if (files.length > 0) transport = await createEntryAttachmentTransport(context);
 
     const entryId = randomUUID();
-    const created = await repository.mutate(
-      { action: "create", entryId, ...parsed.data },
-      actor,
-    );
+    const created = await repository.mutate({ action: "create", entryId, ...parsed.data }, actor);
 
     if (!transport || files.length === 0) {
       return NextResponse.json(snapshot(created.payload, actor, created.focusEntryId), {
