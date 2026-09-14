@@ -15,6 +15,8 @@ const COMMERCIAL_STORAGE_VERSION = 5;
 const COMMERCIAL_STORAGE_NAME = "commercial_postgres_storage";
 const CHANTIERS_STORAGE_VERSION = 6;
 const CHANTIERS_STORAGE_NAME = "chantiers_postgres_storage";
+const LIBRARY_STORAGE_VERSION = 7;
+const LIBRARY_STORAGE_NAME = "library_postgres_storage";
 
 async function ensureMigrationRegistry(client: PoolClient): Promise<void> {
   await client.query(`
@@ -134,6 +136,26 @@ async function ensureChantiersStorage(client: PoolClient): Promise<void> {
   `);
 }
 
+async function ensureLibraryStorage(client: PoolClient): Promise<void> {
+  await client.query(`
+    CREATE TABLE IF NOT EXISTS papot_library_state (
+      scope TEXT PRIMARY KEY CHECK (scope = 'catalog'),
+      version INTEGER NOT NULL DEFAULT 0 CHECK (version >= 0),
+      payload JSONB NOT NULL CHECK (jsonb_typeof(payload) = 'object'),
+      updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+      updated_by_user_id UUID NOT NULL,
+      updated_by_device_id UUID NOT NULL
+    )
+  `);
+
+  await client.query(`
+    CREATE TABLE IF NOT EXISTS papot_library_edit_lock (
+      scope TEXT PRIMARY KEY CHECK (scope = 'catalog'),
+      lock_data JSONB NOT NULL CHECK (jsonb_typeof(lock_data) = 'object')
+    )
+  `);
+}
+
 export async function runServerDbMigrations(pool: Pool = getServerDbPool()): Promise<void> {
   const client = await pool.connect();
 
@@ -198,6 +220,16 @@ export async function runServerDbMigrations(pool: Pool = getServerDbPool()): Pro
         ON CONFLICT (version) DO NOTHING
       `,
       [CHANTIERS_STORAGE_VERSION, CHANTIERS_STORAGE_NAME],
+    );
+
+    await ensureLibraryStorage(client);
+    await client.query(
+      `
+        INSERT INTO papot_schema_migrations (version, name)
+        VALUES ($1, $2)
+        ON CONFLICT (version) DO NOTHING
+      `,
+      [LIBRARY_STORAGE_VERSION, LIBRARY_STORAGE_NAME],
     );
 
     await client.query("COMMIT");
