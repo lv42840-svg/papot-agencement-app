@@ -33,7 +33,15 @@ export function createLibraryComponentFromQuoteLine(input: {
     source: {
       schemaVersion: 1,
       kind: "COMPONENT",
-      component,
+      component: {
+        sourceComponentId: component.id,
+        name: component.name,
+        description: component.description,
+        unit: component.unit,
+        costPriceCents: component.costPriceCents,
+        marginPercent: component.marginPercent,
+        salePriceCents: component.salePriceCents,
+      },
     },
   };
 }
