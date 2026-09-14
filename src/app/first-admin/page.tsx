@@ -8,7 +8,15 @@ export const dynamic = "force-dynamic";
 
 export default async function FirstAdminPage() {
   if (!hasDesktopDatabaseConfig()) redirect("/desktop-server-required");
-  if (await authHasUsers()) redirect("/login");
+
+  let hasUsers: boolean;
+  try {
+    hasUsers = await authHasUsers();
+  } catch {
+    redirect("/desktop-server-required?reason=unavailable");
+  }
+
+  if (hasUsers) redirect("/login");
 
   return (
     <main className="loginPage">
