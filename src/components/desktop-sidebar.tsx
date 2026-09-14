@@ -51,8 +51,7 @@ export function DesktopSidebar({
   const allowed = new Set(allowedModules);
   const visibleNavigation = desktopNavigation.filter(
     (item) =>
-      (!item.moduleKey || allowed.has(item.moduleKey)) &&
-      (!item.adminOnly || canManagePermissions),
+      (!item.moduleKey || allowed.has(item.moduleKey)) && (!item.adminOnly || canManagePermissions),
   );
 
   useEffect(() => {
