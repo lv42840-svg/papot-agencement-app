@@ -19,7 +19,10 @@ export function upsertLibraryComponent(
   return parseLibraryPayload({ ...payload, components });
 }
 
-export function removeLibraryComponent(payload: LibraryPayload, componentId: string): LibraryPayload {
+export function removeLibraryComponent(
+  payload: LibraryPayload,
+  componentId: string,
+): LibraryPayload {
   const component = payload.components.find((item) => item.id === componentId);
   if (!component) throw new Error("LIBRARY_COMPONENT_NOT_FOUND");
 

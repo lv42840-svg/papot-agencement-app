@@ -1,16 +1,6 @@
 "use client";
 
-import {
-  Boxes,
-  Layers3,
-  LockKeyhole,
-  Pencil,
-  Plus,
-  Save,
-  Search,
-  Trash2,
-  X,
-} from "lucide-react";
+import { Boxes, Layers3, LockKeyhole, Pencil, Plus, Save, Search, Trash2, X } from "lucide-react";
 import { FormEvent, useEffect, useMemo, useState } from "react";
 import {
   calculateLibraryComponentMarginPercent,
@@ -110,7 +100,8 @@ const errorMessages: Record<string, string> = {
   LIBRARY_OUVRAGE_COMPONENT_NOT_FOUND:
     "Un composant utilisé par cet ouvrage n’existe plus dans la bibliothèque.",
   LIBRARY_OUVRAGE_NOT_FOUND: "Cet ouvrage n’existe plus dans la bibliothèque.",
-  LOCK_EXPIRED: "Le verrou de modification a expiré. Recharge la bibliothèque avant de recommencer.",
+  LOCK_EXPIRED:
+    "Le verrou de modification a expiré. Recharge la bibliothèque avant de recommencer.",
   LOCK_NOT_FOUND: "Le verrou de modification n’existe plus. Recharge la bibliothèque.",
   LOCK_NOT_OWNED: "La bibliothèque est maintenant modifiée depuis un autre poste.",
   LOCK_CHANGED: "Le verrou de la bibliothèque a changé. Recharge avant de recommencer.",
@@ -283,9 +274,9 @@ export function LibraryWorkspace({
     () =>
       snapshot.payload.components
         .filter((component) =>
-          normalizeSearch([component.name, component.description, component.unit].join(" ")).includes(
-            normalizedQuery,
-          ),
+          normalizeSearch(
+            [component.name, component.description, component.unit].join(" "),
+          ).includes(normalizedQuery),
         )
         .sort((a, b) => a.name.localeCompare(b.name, "fr-FR", { sensitivity: "base" })),
     [normalizedQuery, snapshot.payload.components],
@@ -300,9 +291,9 @@ export function LibraryWorkspace({
               snapshot.payload.components.find((component) => component.id === line.componentId)
                 ?.name ?? "",
           );
-          return normalizeSearch([ouvrage.name, ouvrage.description, ...componentNames].join(" ")).includes(
-            normalizedQuery,
-          );
+          return normalizeSearch(
+            [ouvrage.name, ouvrage.description, ...componentNames].join(" "),
+          ).includes(normalizedQuery);
         })
         .sort((a, b) => a.name.localeCompare(b.name, "fr-FR", { sensitivity: "base" })),
     [normalizedQuery, snapshot.payload.components, snapshot.payload.ouvrages],
@@ -733,14 +724,10 @@ export function LibraryWorkspace({
                 value={query}
                 onChange={(event) => setQuery(event.target.value)}
                 placeholder={
-                  activeTab === "components"
-                    ? "Rechercher un composant…"
-                    : "Rechercher un ouvrage…"
+                  activeTab === "components" ? "Rechercher un composant…" : "Rechercher un ouvrage…"
                 }
                 aria-label={
-                  activeTab === "components"
-                    ? "Rechercher un composant"
-                    : "Rechercher un ouvrage"
+                  activeTab === "components" ? "Rechercher un composant" : "Rechercher un ouvrage"
                 }
               />
             </div>
@@ -798,7 +785,8 @@ export function LibraryWorkspace({
                           {formatMoney(component.salePriceCents)}
                         </td>
                         <td className="numeric">
-                          {libraryComponentUsageCount(snapshot.payload.ouvrages, component)} ouvrage(s)
+                          {libraryComponentUsageCount(snapshot.payload.ouvrages, component)}{" "}
+                          ouvrage(s)
                         </td>
                         {canWrite ? (
                           <td className="libraryActions">
@@ -1011,14 +999,17 @@ export function LibraryWorkspace({
                   </div>
 
                   <p className="libraryPricingHint">
-                    Modifier la marge recalcule le prix de vente. Modifier le prix de vente recalcule la marge.
+                    Modifier la marge recalcule le prix de vente. Modifier le prix de vente
+                    recalcule la marge.
                   </p>
 
                   <label className="libraryField">
                     Description
                     <textarea
                       value={editor.draft.description}
-                      onChange={(event) => updateComponentDraft({ description: event.target.value })}
+                      onChange={(event) =>
+                        updateComponentDraft({ description: event.target.value })
+                      }
                       rows={4}
                       maxLength={4000}
                     />
