@@ -7,10 +7,7 @@ import { getServerDbPool } from "../server-db/pool";
 import { withServerDbTransaction } from "../server-db/transaction";
 import { parseAuthPayload, type AuthPayload } from "./domain";
 import type { LockedAuthSnapshot } from "./nextcloud-source";
-import {
-  loadAuthPayloadFromQueryable,
-  replaceAuthSnapshotOnClient,
-} from "./postgres-repository";
+import { loadAuthPayloadFromQueryable, replaceAuthSnapshotOnClient } from "./postgres-repository";
 
 const AUTH_CUTOVER_DOMAIN = "auth";
 const AUTH_CUTOVER_SOURCE = "nextcloud:AUTH/global";
@@ -29,7 +26,9 @@ function canonicalAuthPayload(payload: AuthPayload) {
       .map((user) => ({
         ...user,
         modulePermissions: Object.fromEntries(
-          Object.entries(user.modulePermissions).sort(([left], [right]) => left.localeCompare(right)),
+          Object.entries(user.modulePermissions).sort(([left], [right]) =>
+            left.localeCompare(right),
+          ),
         ),
         specialPermissions: [...user.specialPermissions].sort(),
       }))
@@ -39,7 +38,9 @@ function canonicalAuthPayload(payload: AuthPayload) {
 }
 
 export function authPayloadHash(payload: AuthPayload): string {
-  return createHash("sha256").update(JSON.stringify(canonicalAuthPayload(payload))).digest("hex");
+  return createHash("sha256")
+    .update(JSON.stringify(canonicalAuthPayload(payload)))
+    .digest("hex");
 }
 
 async function findCutoverMarker(
@@ -99,7 +100,12 @@ async function importSnapshot(
       )
       VALUES ($1, $2, $3, $4)
     `,
-    [AUTH_CUTOVER_DOMAIN, AUTH_CUTOVER_SOURCE, sourceHash, source.users.length + source.sessions.length],
+    [
+      AUTH_CUTOVER_DOMAIN,
+      AUTH_CUTOVER_SOURCE,
+      sourceHash,
+      source.users.length + source.sessions.length,
+    ],
   );
 }
 

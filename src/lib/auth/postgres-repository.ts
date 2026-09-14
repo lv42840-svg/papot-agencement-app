@@ -70,7 +70,11 @@ function rowToSession(row: SessionRow): AuthSessionRecord {
   };
 }
 
-async function insertUser(client: PoolClient, user: AuthUserRecord, version: number): Promise<void> {
+async function insertUser(
+  client: PoolClient,
+  user: AuthUserRecord,
+  version: number,
+): Promise<void> {
   await client.query(
     `
       INSERT INTO papot_auth_users (

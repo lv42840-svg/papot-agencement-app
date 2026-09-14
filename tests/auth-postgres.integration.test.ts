@@ -159,9 +159,7 @@ describeWithPostgres("Auth PostgreSQL foundation and cutover", () => {
       source: string;
       source_hash: string;
       record_count: number;
-    }>(
-      "SELECT source, source_hash, record_count FROM papot_domain_cutovers WHERE domain = 'auth'",
-    );
+    }>("SELECT source, source_hash, record_count FROM papot_domain_cutovers WHERE domain = 'auth'");
     expect(marker.rows[0]).toEqual({
       source: "nextcloud:AUTH/global",
       source_hash: authPayloadHash(initialPayload),
@@ -240,11 +238,11 @@ describeWithPostgres("Auth PostgreSQL foundation and cutover", () => {
     await Promise.all([firstMutation, secondMutation]);
 
     const finalPayload = await repository.load();
-    expect(finalPayload.users.find((user) => user.id === initialPayload.users[0].id)?.displayName).toBe(
-      "Nadia modifiée",
-    );
-    expect(finalPayload.users.find((user) => user.id === initialPayload.users[1].id)?.displayName).toBe(
-      "Atelier modifié",
-    );
+    expect(
+      finalPayload.users.find((user) => user.id === initialPayload.users[0].id)?.displayName,
+    ).toBe("Nadia modifiée");
+    expect(
+      finalPayload.users.find((user) => user.id === initialPayload.users[1].id)?.displayName,
+    ).toBe("Atelier modifié");
   });
 });

@@ -5,10 +5,7 @@ import { getServerDbPool, runServerDbMigrations } from "../server-db";
 import { ensureAuthPostgresCutover } from "./cutover";
 import { pruneExpiredSessions, type AuthPayload } from "./domain";
 import { acquireNextcloudAuthSnapshot } from "./nextcloud-source";
-import {
-  createPostgresAuthRepository,
-  type PostgresAuthRepository,
-} from "./postgres-repository";
+import { createPostgresAuthRepository, type PostgresAuthRepository } from "./postgres-repository";
 
 let repositoryPromise: Promise<PostgresAuthRepository> | undefined;
 
