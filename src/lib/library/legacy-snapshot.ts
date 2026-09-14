@@ -7,10 +7,7 @@ const LOCK_TTL_MS = 30_000;
 type Desktop = DesktopRequestContext["desktop"];
 type Owner = DesktopRequestContext["owner"];
 
-export async function acquireNextcloudLibrarySnapshot(params: {
-  desktop: Desktop;
-  owner: Owner;
-}) {
+export async function acquireNextcloudLibrarySnapshot(params: { desktop: Desktop; owner: Owner }) {
   const leaseId = randomUUID();
   const opened = await params.desktop.coordinator.open({
     resource: LIBRARY_RESOURCE_REF,
