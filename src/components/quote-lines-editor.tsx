@@ -111,9 +111,7 @@ export function QuoteLinesEditor({
     setEditingLineId(line.id);
     setDescription(line.description);
     setUnit(line.unit);
-    setQuantityInput(
-      line.quantityFormula ?? String(line.quantity).replace(".", ","),
-    );
+    setQuantityInput(line.quantityFormula ?? String(line.quantity).replace(".", ","));
     setUnitPriceEuros(centsToInput(line.unitPriceCents ?? 0));
     setSaveToLibrary(false);
     setLibraryName(line.description.slice(0, 240));
@@ -193,15 +191,27 @@ export function QuoteLinesEditor({
   }
 
   return (
-    <section className="panel quoteLinesPanel" aria-label={`Contenu du devis ${quote.model.subject}`}>
+    <section
+      className="panel quoteLinesPanel"
+      aria-label={`Contenu du devis ${quote.model.subject}`}
+    >
       <div className="panelHeader quoteLinesHeader">
         <div>
-          <p className="eyebrow">{quote.variantName} · V{quote.version}</p>
+          <p className="eyebrow">
+            {quote.variantName} · V{quote.version}
+          </p>
           <h2>{quote.model.subject}</h2>
-          <p className="muted">{lines.length} ligne{lines.length === 1 ? "" : "s"} dans ce brouillon</p>
+          <p className="muted">
+            {lines.length} ligne{lines.length === 1 ? "" : "s"} dans ce brouillon
+          </p>
         </div>
         {editable ? (
-          <button type="button" className="primaryButton" onClick={openNewLine} disabled={saving}>
+          <button
+            type="button"
+            className="primaryButton"
+            onClick={openNewLine}
+            disabled={saving}
+          >
             <Plus size={16} aria-hidden="true" />
             Ajouter une ligne
           </button>
@@ -215,7 +225,12 @@ export function QuoteLinesEditor({
               <p className="eyebrow">{editingLineId ? "Modifier" : "Nouvelle ligne"}</p>
               <h3>{editingLineId ? "Modifier la ligne" : "Ajouter au devis"}</h3>
             </div>
-            <button type="button" className="iconButton" onClick={closeForm} aria-label="Fermer">
+            <button
+              type="button"
+              className="iconButton"
+              onClick={closeForm}
+              aria-label="Fermer"
+            >
               <X size={16} aria-hidden="true" />
             </button>
           </div>
@@ -249,7 +264,11 @@ export function QuoteLinesEditor({
 
             <label className="quoteLineField">
               <span>Unité</span>
-              <input value={unit} onChange={(event) => setUnit(event.target.value)} maxLength={40} />
+              <input
+                value={unit}
+                onChange={(event) => setUnit(event.target.value)}
+                maxLength={40}
+              />
             </label>
 
             <label className="quoteLineField">
@@ -279,7 +298,9 @@ export function QuoteLinesEditor({
                 <LibraryBig size={17} aria-hidden="true" />
                 <span>
                   <strong>Ajouter aussi à la Bibliothèque</strong>
-                  <small>La ligne deviendra un composant réutilisable dans les prochains devis.</small>
+                  <small>
+                    La ligne deviendra un composant réutilisable dans les prochains devis.
+                  </small>
                 </span>
               </label>
 
@@ -304,7 +325,8 @@ export function QuoteLinesEditor({
                     />
                   </label>
                   <p>
-                    Le prix de vente vient de la ligne du devis. PAPOT calcule automatiquement la marge du composant.
+                    Le prix de vente vient de la ligne du devis. PAPOT calcule automatiquement la
+                    marge du composant.
                   </p>
                 </div>
               ) : null}
@@ -319,7 +341,12 @@ export function QuoteLinesEditor({
           {error ? <div className="quoteLineError">{error}</div> : null}
 
           <div className="quoteLineActions">
-            <button type="button" className="secondaryButton" onClick={closeForm} disabled={saving}>
+            <button
+              type="button"
+              className="secondaryButton"
+              onClick={closeForm}
+              disabled={saving}
+            >
               Annuler
             </button>
             <button type="submit" className="primaryButton" disabled={saving}>
