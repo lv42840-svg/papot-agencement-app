@@ -62,7 +62,9 @@ function createSnapshotSynchronizedPool(
   return {
     connect: async () => {
       const client = await pool.connect();
-      if (typeof client.processID === "number") connectionIds.add(client.processID);
+      const backend = await client.query<{ pid: number }>("SELECT pg_backend_pid() AS pid");
+      const backendPid = backend.rows[0]?.pid;
+      if (backendPid != null) connectionIds.add(backendPid);
 
       const query = client.query.bind(client) as unknown as (
         text: string,
