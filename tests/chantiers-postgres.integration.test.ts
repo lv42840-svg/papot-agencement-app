@@ -4,10 +4,7 @@ import { afterAll, beforeAll, beforeEach, describe, expect, it, vi } from "vites
 
 vi.mock("server-only", () => ({}));
 
-import {
-  chantiersPayloadHash,
-  ensureChantiersPostgresCutover,
-} from "../src/lib/chantiers/cutover";
+import { chantiersPayloadHash, ensureChantiersPostgresCutover } from "../src/lib/chantiers/cutover";
 import {
   createInitialChantiersPayload,
   parseChantiersPayload,
