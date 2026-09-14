@@ -4,7 +4,6 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useEffect, useState } from "react";
 import {
-  BookOpen,
   BriefcaseBusiness,
   CalendarDays,
   ChartNoAxesCombined,
@@ -20,35 +19,22 @@ import {
   ShoppingCart,
   Users,
 } from "lucide-react";
+import { desktopNavigation } from "@/lib/desktop/navigation";
 
-const navigation = [
-  { label: "Accueil", icon: Home, href: "/desktop-ready" },
-  { label: "Entrées", icon: ClipboardList, href: "/entrees", moduleKey: "capture" },
-  { label: "Clients", icon: Users, href: "/clients", moduleKey: "clients" },
-  { label: "Commercial", icon: BriefcaseBusiness, href: "/commercial", moduleKey: "commercial" },
-  { label: "Bibliothèque", icon: BookOpen, href: "/bibliotheque", moduleKey: "quotes" },
-  { label: "Chantiers", icon: FolderOpen, href: "/chantiers", moduleKey: "chantiers" },
-  {
-    label: "Grand planning",
-    icon: CalendarDays,
-    href: "/planning/2026-S38",
-    moduleKey: "planning",
-  },
-  { label: "Petit planning", icon: CalendarDays, moduleKey: "planning" },
-  { label: "Heures", icon: Clock3, moduleKey: "hours" },
-  { label: "Achats", icon: ShoppingCart, moduleKey: "purchases" },
-  { label: "Facturation", icon: FileText, moduleKey: "billing" },
-  { label: "Trésorerie", icon: Landmark, moduleKey: "treasury" },
-  { label: "Équipe", icon: Users, moduleKey: "team" },
-  { label: "Pilotage", icon: ChartNoAxesCombined, moduleKey: "pilotage" },
-  {
-    label: "Paramètres",
-    icon: Settings,
-    href: "/settings/users",
-    moduleKey: "settings",
-    adminOnly: true,
-  },
-];
+const navigationIcons = {
+  home: Home,
+  clipboard: ClipboardList,
+  users: Users,
+  commercial: BriefcaseBusiness,
+  file: FileText,
+  folder: FolderOpen,
+  calendar: CalendarDays,
+  clock: Clock3,
+  cart: ShoppingCart,
+  landmark: Landmark,
+  chart: ChartNoAxesCombined,
+  settings: Settings,
+} as const;
 
 const STORAGE_KEY = "papot.desktop.sidebar.collapsed";
 const COMPACT_BREAKPOINT = 1180;
@@ -63,10 +49,10 @@ export function DesktopSidebar({
   const pathname = usePathname();
   const [collapsed, setCollapsed] = useState(false);
   const allowed = new Set(allowedModules);
-  const visibleNavigation = navigation.filter(
+  const visibleNavigation = desktopNavigation.filter(
     (item) =>
       (!item.moduleKey || allowed.has(item.moduleKey)) &&
-      (!("adminOnly" in item) || !item.adminOnly || canManagePermissions),
+      (!item.adminOnly || canManagePermissions),
   );
 
   useEffect(() => {
@@ -124,7 +110,9 @@ export function DesktopSidebar({
         </button>
 
         <nav className="desktopNavV2" aria-label="Navigation principale">
-          {visibleNavigation.map(({ label, icon: Icon, href }) => {
+          {visibleNavigation.map((item) => {
+            const { label, href } = item;
+            const Icon = navigationIcons[item.icon];
             const active =
               href === "/desktop-ready"
                 ? pathname === href
