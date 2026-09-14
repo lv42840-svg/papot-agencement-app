@@ -3,6 +3,7 @@ import { z } from "zod";
 import {
   COMMERCIAL_STATUS_LABELS,
   applyCommercialAutomaticTransitions,
+  commercialSiteAddressSchema,
   commercialStatusSchema,
   isCommercialClosed,
   parseCommercialPayload,
@@ -21,6 +22,7 @@ export const commercialMutationSchema = z.discriminatedUnion("action", [
     name: z.string().trim().min(1).max(240),
     clientName: nullableText(240),
     siteLabel: nullableText(240),
+    siteAddressOverride: commercialSiteAddressSchema.nullable().optional(),
     reviewDate: dateOnlySchema,
     sourceEntryId: z.string().uuid().optional(),
     description: nullableText(4000),
@@ -32,6 +34,7 @@ export const commercialMutationSchema = z.discriminatedUnion("action", [
     name: z.string().trim().min(1).max(240),
     clientName: nullableText(240),
     siteLabel: nullableText(240),
+    siteAddressOverride: commercialSiteAddressSchema.nullable().optional(),
     contactName: nullableText(160),
     contactPhone: nullableText(80),
     contactEmail: nullableText(240),
@@ -269,6 +272,7 @@ export function applyCommercialMutation(
       name: input.name,
       clientName: text(input.clientName),
       siteLabel: text(input.siteLabel),
+      siteAddressOverride: input.siteAddressOverride ?? null,
       contactName: null,
       contactPhone: null,
       contactEmail: null,
@@ -313,6 +317,9 @@ export function applyCommercialMutation(
     item.name = input.name;
     item.clientName = text(input.clientName);
     item.siteLabel = text(input.siteLabel);
+    if (input.siteAddressOverride !== undefined) {
+      item.siteAddressOverride = input.siteAddressOverride;
+    }
     item.contactName = text(input.contactName);
     item.contactPhone = text(input.contactPhone);
     item.contactEmail = text(input.contactEmail);
