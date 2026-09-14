@@ -11,14 +11,14 @@ export default function DesktopServerRequiredPage() {
 
         <div>
           <p className="eyebrow">Installation Windows réussie</p>
-          <h1>Serveur PAPOT non configuré</h1>
+          <h1>Serveur PAPOT non configuré ou indisponible</h1>
           <p className="muted">
-            L’application est bien installée sur ce PC, mais la base PostgreSQL centrale n’est pas
-            encore configurée. PAPOT bloque volontairement l’accès aux données métier au lieu
-            d’afficher une erreur 500.
+            L’application est bien installée sur ce PC. La base PostgreSQL centrale n’est pas encore
+            configurée, ou elle n’est pas joignable. PAPOT bloque volontairement l’accès aux données
+            métier au lieu d’afficher une erreur 500.
           </p>
           <p className="muted">
-            Pour cette phase de développement, aucune intervention n’est nécessaire sur ce PC. La
+            Pour notre phase de développement actuelle, tu n’as rien à régler sur ce PC. La
             configuration définitive du serveur sera faite plus tard avec l’informaticien.
           </p>
         </div>
