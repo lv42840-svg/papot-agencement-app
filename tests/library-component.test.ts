@@ -1,5 +1,9 @@
 import { describe, expect, it } from "vitest";
-import { parseLibraryComponent } from "../src/lib/library/component";
+import {
+  calculateLibraryComponentMarginPercent,
+  calculateLibraryComponentSalePriceCents,
+  parseLibraryComponent,
+} from "../src/lib/library/component";
 
 function minimalComponent() {
   return {
@@ -32,6 +36,27 @@ describe("library component model", () => {
     expect(parseLibraryComponent(component)).toEqual(component);
   });
 
+  it("calculates the HT sale price when margin percent is entered", () => {
+    expect(calculateLibraryComponentSalePriceCents(10_000, 30)).toBe(13_000);
+  });
+
+  it("calculates margin percent when the HT sale price is entered", () => {
+    expect(calculateLibraryComponentMarginPercent(10_000, 13_000)).toBe(30);
+  });
+
+  it("rounds a calculated HT sale price to the nearest cent", () => {
+    expect(calculateLibraryComponentSalePriceCents(199, 30)).toBe(259);
+  });
+
+  it("rejects a stored margin and sale price that do not match", () => {
+    expect(() =>
+      parseLibraryComponent({
+        ...minimalComponent(),
+        salePriceCents: 5_524,
+      }),
+    ).toThrow("LIBRARY_COMPONENT_PRICING_MISMATCH");
+  });
+
   it("normalizes surrounding whitespace in text fields", () => {
     const component = parseLibraryComponent({
       ...minimalComponent(),
@@ -47,7 +72,7 @@ describe("library component model", () => {
     });
   });
 
-  it("allows zero cost, margin or sale price", () => {
+  it("allows a fully zero-priced component", () => {
     expect(
       parseLibraryComponent({
         ...minimalComponent(),
@@ -56,6 +81,13 @@ describe("library component model", () => {
         salePriceCents: 0,
       }),
     ).toMatchObject({ costPriceCents: 0, marginPercent: 0, salePriceCents: 0 });
+    expect(calculateLibraryComponentMarginPercent(0, 0)).toBe(0);
+  });
+
+  it("rejects a positive sale price when cost is zero because margin is undefined", () => {
+    expect(() => calculateLibraryComponentMarginPercent(0, 100)).toThrow(
+      "LIBRARY_COMPONENT_MARGIN_UNDEFINED",
+    );
   });
 
   it("does not keep VAT in the component model", () => {
@@ -97,6 +129,12 @@ describe("library component model", () => {
     );
     expect(() => parseLibraryComponent({ ...minimalComponent(), salePriceCents: 12.5 })).toThrow(
       "LIBRARY_COMPONENT_INVALID",
+    );
+  });
+
+  it("does not allow a negative margin through an entered sale price", () => {
+    expect(() => calculateLibraryComponentMarginPercent(10_000, 9_999)).toThrow(
+      "LIBRARY_COMPONENT_PRICING_INVALID",
     );
   });
 });
