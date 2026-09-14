@@ -6,9 +6,7 @@ export type ServerDbConfig = {
   idleTimeoutMillis: number;
 };
 
-type ServerDbEnv = {
-  PAPOT_DATABASE_URL?: string;
-};
+type ServerDbEnv = Record<string, string | undefined>;
 
 const DEFAULT_APPLICATION_NAME = "papot-agencement";
 
