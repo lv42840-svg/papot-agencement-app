@@ -1,4 +1,5 @@
-import { afterAll, describe, expect, it } from "vitest";
+import type { Pool } from "pg";
+import { afterAll, beforeAll, describe, expect, it } from "vitest";
 
 import { runServerDbMigrations } from "../src/lib/server-db/migrations";
 import { closeServerDbPool, getServerDbPool } from "../src/lib/server-db/pool";
@@ -7,10 +8,14 @@ import { withServerDbTransaction } from "../src/lib/server-db/transaction";
 const describeWithPostgres = process.env.PAPOT_DATABASE_URL ? describe : describe.skip;
 
 describeWithPostgres("central PostgreSQL foundation", () => {
-  const pool = getServerDbPool();
+  let pool: Pool;
   const suffix = `${process.pid}_${Date.now()}`;
   const committedTable = `papot_tx_commit_${suffix}`;
   const rolledBackTable = `papot_tx_rollback_${suffix}`;
+
+  beforeAll(() => {
+    pool = getServerDbPool();
+  });
 
   afterAll(async () => {
     await pool.query(`DROP TABLE IF EXISTS ${committedTable}`);
