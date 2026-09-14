@@ -1,7 +1,7 @@
 import "server-only";
 
 import { createHash } from "node:crypto";
-import { promises as fs } from "node:fs";
+import { constants, promises as fs } from "node:fs";
 import path from "node:path";
 
 const WINDOWS_INVALID_SEGMENT = /[<>:"|?*\x00-\x1F]/;
@@ -69,7 +69,7 @@ export class ServerFileStore {
 
   async assertReady(): Promise<void> {
     try {
-      await fs.access(this.rootPath);
+      await fs.access(this.rootPath, constants.R_OK | constants.W_OK);
     } catch {
       throw new Error("SERVER_FILE_ROOT_UNAVAILABLE");
     }
@@ -88,7 +88,11 @@ export class ServerFileStore {
       await handle.sync();
     } catch (error) {
       if (errorCode(error) === "EEXIST") throw new Error("SERVER_FILE_EXISTS");
-      if (created) await fs.unlink(target.absolute).catch(() => undefined);
+      if (created) {
+        await handle?.close().catch(() => undefined);
+        handle = undefined;
+        await fs.unlink(target.absolute).catch(() => undefined);
+      }
       throw error;
     } finally {
       await handle?.close().catch(() => undefined);
