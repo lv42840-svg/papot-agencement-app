@@ -1,4 +1,8 @@
-import { nativeQuoteRecordSchema, parseNativeQuotesPayload, type NativeQuotesPayload } from "./store";
+import {
+  nativeQuoteRecordSchema,
+  parseNativeQuotesPayload,
+  type NativeQuotesPayload,
+} from "./store";
 
 export type QuoteSendActor = {
   userId: string;
