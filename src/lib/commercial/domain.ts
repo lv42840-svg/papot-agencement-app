@@ -22,6 +22,13 @@ export const commercialDocumentCategorySchema = z.enum([
   "MISC",
 ]);
 
+export const commercialSiteAddressSchema = z.object({
+  addressLine1: z.string().trim().max(240).default(""),
+  addressLine2: z.string().trim().max(240).default(""),
+  postalCode: z.string().trim().max(20).default(""),
+  city: z.string().trim().max(160).default(""),
+});
+
 export const commercialDocumentSchema = z.object({
   id: z.string().uuid(),
   fileName: z.string().trim().min(1).max(255),
@@ -68,6 +75,10 @@ export const commercialClientSchema = z.object({
   displayName: z.string().trim().min(1).max(240),
   email: z.string().trim().max(240).nullable(),
   phone: z.string().trim().max(80).nullable(),
+  addressLine1: z.string().trim().max(240).nullable().default(null),
+  addressLine2: z.string().trim().max(240).nullable().default(null),
+  postalCode: z.string().trim().max(20).nullable().default(null),
+  city: z.string().trim().max(160).nullable().default(null),
 });
 
 export const commercialCaseSchema = z.object({
@@ -78,6 +89,7 @@ export const commercialCaseSchema = z.object({
   name: z.string().trim().min(1).max(240),
   clientName: z.string().trim().max(240).nullable(),
   siteLabel: z.string().trim().max(240).nullable(),
+  siteAddressOverride: commercialSiteAddressSchema.nullable().default(null),
   contactName: z.string().trim().max(160).nullable(),
   contactPhone: z.string().trim().max(80).nullable(),
   contactEmail: z.string().trim().max(240).nullable(),
@@ -117,6 +129,7 @@ export const commercialPayloadSchema = z.object({
 
 export type CommercialStatus = z.infer<typeof commercialStatusSchema>;
 export type CommercialDocumentCategory = z.infer<typeof commercialDocumentCategorySchema>;
+export type CommercialSiteAddress = z.infer<typeof commercialSiteAddressSchema>;
 export type CommercialDocument = z.infer<typeof commercialDocumentSchema>;
 export type CommercialHistoryEvent = z.infer<typeof commercialHistoryEventSchema>;
 export type CommercialClient = z.infer<typeof commercialClientSchema>;

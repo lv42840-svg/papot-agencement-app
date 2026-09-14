@@ -30,6 +30,7 @@ import {
   type CommercialClient,
   type CommercialDocumentCategory,
   type CommercialPayload,
+  type CommercialSiteAddress,
   type CommercialStatus,
 } from "@/lib/commercial/domain";
 
@@ -94,6 +95,22 @@ function statusTone(status: CommercialStatus): string {
   if (status === "LOST" || status === "ABANDONED") return "closed";
   if (status === "WAITING") return "waiting";
   return "lead";
+}
+
+function siteAddressFromForm(form: FormData): CommercialSiteAddress {
+  return {
+    addressLine1: String(form.get("siteAddressLine1") ?? ""),
+    addressLine2: String(form.get("siteAddressLine2") ?? ""),
+    postalCode: String(form.get("sitePostalCode") ?? ""),
+    city: String(form.get("siteCity") ?? ""),
+  };
+}
+
+function clientAddressLabel(client: CommercialClient | undefined): string {
+  if (!client) return "Adresse client à compléter dans la fiche Client.";
+  const cityLine = [client.postalCode, client.city].filter(Boolean).join(" ");
+  const parts = [client.addressLine1, client.addressLine2, cityLine].filter(Boolean);
+  return parts.length ? parts.join(" · ") : "Adresse client à compléter dans la fiche Client.";
 }
 
 function useCommercial() {
@@ -205,6 +222,10 @@ export function CommercialWorkspaceV2() {
           item.name,
           item.clientName,
           item.siteLabel,
+          item.siteAddressOverride?.addressLine1,
+          item.siteAddressOverride?.addressLine2,
+          item.siteAddressOverride?.postalCode,
+          item.siteAddressOverride?.city,
           item.contactName,
           item.description,
           item.nextAction,
@@ -425,6 +446,10 @@ function CreateAffair({
     clients.length ? "existing" : "new",
   );
   const [clientId, setClientId] = useState(clients[0]?.id ?? "");
+  const [differentSiteAddress, setDifferentSiteAddress] = useState(false);
+  const selectedClient =
+    clientMode === "existing" ? clients.find((client) => client.id === clientId) : undefined;
+
   async function submit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     const form = new FormData(event.currentTarget);
@@ -434,6 +459,7 @@ function CreateAffair({
       existingClientId: clientMode === "existing" && clientId ? clientId : undefined,
       clientName: clientMode === "new" ? String(form.get("clientName") ?? "") : "",
       siteLabel: String(form.get("siteLabel") ?? ""),
+      siteAddressOverride: differentSiteAddress ? siteAddressFromForm(form) : null,
       reviewDate: String(form.get("reviewDate") ?? ""),
       description: String(form.get("description") ?? ""),
       nextAction: String(form.get("nextAction") ?? ""),
@@ -448,10 +474,6 @@ function CreateAffair({
         </button>
       </div>
       <label>
-        <span>Nom de l’affaire *</span>
-        <input name="name" required placeholder="Ex. Dupont · Cuisine" />
-      </label>
-      <label>
         <span>Client</span>
         <select
           value={clientMode}
@@ -465,7 +487,7 @@ function CreateAffair({
       </label>
       {clientMode === "existing" ? (
         <label>
-          <span>Client existant *</span>
+          <span>Fiche client *</span>
           <select value={clientId} onChange={(event) => setClientId(event.target.value)} required>
             {clients.map((client) => (
               <option key={client.id} value={client.id}>
@@ -481,9 +503,20 @@ function CreateAffair({
         </label>
       )}
       <label>
+        <span>Nom de l’affaire *</span>
+        <input name="name" required placeholder="Ex. Dupont · Cuisine" />
+      </label>
+      <label>
         <span>Lieu chantier</span>
         <input name="siteLabel" />
       </label>
+      <SiteAddressFields
+        different={differentSiteAddress}
+        onDifferentChange={setDifferentSiteAddress}
+        client={selectedClient}
+        address={null}
+        disabled={false}
+      />
       <label>
         <span>Prochaine revue *</span>
         <input name="reviewDate" type="date" required />
@@ -505,6 +538,72 @@ function CreateAffair({
         </button>
       </div>
     </form>
+  );
+}
+
+function SiteAddressFields({
+  different,
+  onDifferentChange,
+  client,
+  address,
+  disabled,
+}: {
+  different: boolean;
+  onDifferentChange: (value: boolean) => void;
+  client: CommercialClient | undefined;
+  address: CommercialSiteAddress | null;
+  disabled: boolean;
+}) {
+  return (
+    <div className="wide commercialV2SiteAddress">
+      <div className="commercialV2ClientAddress">
+        <span>Adresse utilisée par défaut</span>
+        <strong>{clientAddressLabel(client)}</strong>
+      </div>
+      <label className="commercialV2Checkbox">
+        <input
+          type="checkbox"
+          checked={different}
+          onChange={(event) => onDifferentChange(event.target.checked)}
+          disabled={disabled}
+        />
+        <span>Adresse de chantier différente de l’adresse du client</span>
+      </label>
+      <div className="commercialV2SiteAddressGrid" hidden={!different}>
+        <label className="wide">
+          <span>Adresse chantier</span>
+          <input
+            name="siteAddressLine1"
+            defaultValue={address?.addressLine1 ?? ""}
+            disabled={disabled || !different}
+          />
+        </label>
+        <label className="wide">
+          <span>Complément d’adresse</span>
+          <input
+            name="siteAddressLine2"
+            defaultValue={address?.addressLine2 ?? ""}
+            disabled={disabled || !different}
+          />
+        </label>
+        <label>
+          <span>Code postal</span>
+          <input
+            name="sitePostalCode"
+            defaultValue={address?.postalCode ?? ""}
+            disabled={disabled || !different}
+          />
+        </label>
+        <label>
+          <span>Ville</span>
+          <input
+            name="siteCity"
+            defaultValue={address?.city ?? ""}
+            disabled={disabled || !different}
+          />
+        </label>
+      </div>
+    </div>
   );
 }
 
@@ -592,6 +691,11 @@ function AffairForm({
   mutate: (body: Mutation, success: string) => Promise<Snapshot | null>;
 }) {
   const [clientId, setClientId] = useState(item.clientId ?? "");
+  const [differentSiteAddress, setDifferentSiteAddress] = useState(
+    item.siteAddressOverride !== null,
+  );
+  const selectedClient = clients.find((client) => client.id === clientId);
+
   async function submit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     const form = new FormData(event.currentTarget);
@@ -603,6 +707,7 @@ function AffairForm({
         existingClientId: clientId || undefined,
         clientName: clientId ? "" : String(form.get("clientName") ?? ""),
         siteLabel: String(form.get("siteLabel") ?? ""),
+        siteAddressOverride: differentSiteAddress ? siteAddressFromForm(form) : null,
         contactName: item.contactName ?? "",
         contactPhone: item.contactPhone ?? "",
         contactEmail: item.contactEmail ?? "",
@@ -643,6 +748,13 @@ function AffairForm({
         <span>Lieu chantier</span>
         <input name="siteLabel" defaultValue={item.siteLabel ?? ""} disabled={!canModify} />
       </label>
+      <SiteAddressFields
+        different={differentSiteAddress}
+        onDifferentChange={setDifferentSiteAddress}
+        client={selectedClient}
+        address={item.siteAddressOverride}
+        disabled={!canModify}
+      />
       <label className="wide">
         <span>Description</span>
         <textarea
@@ -1299,6 +1411,45 @@ function CommercialV2Styles() {
       .commercialV2Section .fit {
         width: max-content;
       }
+      .commercialV2SiteAddress {
+        display: grid;
+        gap: 9px;
+        padding: 10px;
+        border: 1px solid #e3deea;
+        border-radius: 9px;
+        background: #fcfbfe;
+      }
+      .commercialV2ClientAddress {
+        display: grid;
+        gap: 2px;
+        color: #766f7d;
+        font-size: 9px;
+      }
+      .commercialV2ClientAddress strong {
+        color: #514b58;
+        font-size: 10px;
+      }
+      .commercialV2Form .commercialV2Checkbox,
+      .commercialV2Create .commercialV2Checkbox {
+        display: flex;
+        align-items: center;
+        gap: 7px;
+      }
+      .commercialV2Form .commercialV2Checkbox input,
+      .commercialV2Create .commercialV2Checkbox input {
+        width: auto;
+        min-height: 0;
+        padding: 0;
+      }
+      .commercialV2SiteAddressGrid {
+        display: grid;
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+        gap: 9px;
+        padding-top: 2px;
+      }
+      .commercialV2SiteAddressGrid[hidden] {
+        display: none;
+      }
       .commercialV2FollowGrid {
         display: grid;
         grid-template-columns: repeat(2, minmax(0, 1fr));
@@ -1411,7 +1562,8 @@ function CommercialV2Styles() {
         }
         .commercialV2FollowGrid,
         .commercialV2Form,
-        .commercialV2Create {
+        .commercialV2Create,
+        .commercialV2SiteAddressGrid {
           grid-template-columns: 1fr;
         }
         .commercialV2Form .wide,
