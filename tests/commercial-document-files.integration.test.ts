@@ -69,12 +69,16 @@ describeWithPostgres("Commercial document files cutover", () => {
   });
 
   beforeEach(async () => {
-    await pool.query("DELETE FROM papot_domain_cutovers WHERE domain = 'commercial_document_files'");
+    await pool.query(
+      "DELETE FROM papot_domain_cutovers WHERE domain = 'commercial_document_files'",
+    );
     await pool.query("TRUNCATE TABLE papot_commercial_state");
   });
 
   afterAll(async () => {
-    await pool.query("DELETE FROM papot_domain_cutovers WHERE domain = 'commercial_document_files'");
+    await pool.query(
+      "DELETE FROM papot_domain_cutovers WHERE domain = 'commercial_document_files'",
+    );
     await pool.query("TRUNCATE TABLE papot_commercial_state");
     await Promise.all(tempRoots.map((root) => rm(root, { recursive: true, force: true })));
     await closeServerDbPool();
