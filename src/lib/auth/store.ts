@@ -1,18 +1,9 @@
 import "server-only";
 
 import { createDesktopSharedResourceRuntime } from "@/lib/desktop/shared-resource-runtime";
-import {
-  parseAuthPayload,
-  pruneExpiredSessions,
-  type AuthPayload,
-} from "./domain";
+import { parseAuthPayload, pruneExpiredSessions, type AuthPayload } from "./domain";
 
-export type {
-  AccessLevel,
-  AuthPayload,
-  AuthSessionRecord,
-  AuthUserRecord,
-} from "./domain";
+export type { AccessLevel, AuthPayload, AuthSessionRecord, AuthUserRecord } from "./domain";
 
 export const AUTH_RESOURCE = { resource_type: "AUTH" as const, resource_id: "global" };
 
