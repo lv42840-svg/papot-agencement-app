@@ -1,25 +1,22 @@
-import { randomUUID } from "node:crypto";
 import { NextResponse } from "next/server";
 import { ZodError } from "zod";
 import { chantierSpecialPermissionForMutation } from "@/lib/auth/action-permissions";
 import { hasEffectiveSpecialPermission, requireSpecialPermission } from "@/lib/auth/permissions";
-import {
-  desktopRequestErrorStatus,
-  requireDesktopRequestContext,
-} from "@/lib/desktop/request-context";
-import { createDesktopSharedResourceRuntime } from "@/lib/desktop/shared-resource-runtime";
-import { parseChantiersPayload, type ChantiersPayload } from "@/lib/chantiers/domain";
+import { createChantiersRepository } from "@/lib/chantiers/create-repository";
+import type { ChantiersPayload } from "@/lib/chantiers/domain";
 import {
   applyChantierMutation,
   chantierCapabilities,
   chantierMutationSchema,
 } from "@/lib/chantiers/mutations";
+import { ChantiersRepositoryError } from "@/lib/chantiers/repository";
+import {
+  desktopRequestErrorStatus,
+  requireDesktopRequestContext,
+} from "@/lib/desktop/request-context";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
-
-const CHANTIERS_RESOURCE = { resource_type: "CHANTIER" as const, resource_id: "registry" };
-const LOCK_TTL_MS = 30_000;
 
 type Owner = { userId: string; deviceId: string; displayName: string };
 type PermissionUser = { id: string };
@@ -71,19 +68,12 @@ function statusFor(code: string): number {
 export async function GET() {
   try {
     const context = await requireDesktopRequestContext("chantiers", "READ");
-    const { desktop, owner } = context;
-    const cached = desktop.states.getCached(CHANTIERS_RESOURCE);
-    const resource = cached !== undefined ? cached : await desktop.states.get(CHANTIERS_RESOURCE);
-    const payload = parseChantiersPayload(resource?.payload);
+    const repository = createChantiersRepository(context);
+    const payload = await repository.load();
 
-    if (cached !== undefined) {
-      void desktop.states.get(CHANTIERS_RESOURCE).catch((error: unknown) => {
-        const code = error instanceof Error ? error.message : "CHANTIERS_REFRESH_FAILED";
-        console.error("[PAPOT][Chantiers] background refresh failed", { code });
-      });
-    }
-
-    return noStoreJson(await snapshot(payload, owner, context.user, context.moduleAccess.canWrite));
+    return noStoreJson(
+      await snapshot(payload, context.owner, context.user, context.moduleAccess.canWrite),
+    );
   } catch (error) {
     const code = error instanceof Error ? error.message : "CHANTIERS_LOAD_FAILED";
     return noStoreJson({ error: code }, { status: statusFor(code) });
@@ -91,11 +81,7 @@ export async function GET() {
 }
 
 export async function POST(request: Request) {
-  const leaseId = randomUUID();
   const startedAt = Date.now();
-  let desktop: ReturnType<typeof createDesktopSharedResourceRuntime> | null = null;
-  let owner: Owner | null = null;
-  let ownsLock = false;
   let stage = "parse-request";
 
   try {
@@ -106,69 +92,18 @@ export async function POST(request: Request) {
     if (requiredSpecialPermission) {
       await requireSpecialPermission(context.user, requiredSpecialPermission);
     }
-    desktop = context.desktop;
-    owner = context.owner;
-    const actor = { userId: owner.userId, displayName: owner.displayName };
 
-    stage = "acquire-lock-and-open-resource";
-    const [lock, openedInitial] = await Promise.all([
-      desktop.locks.acquire({
-        resource: CHANTIERS_RESOURCE,
-        leaseId,
-        owner,
-        baseVersion: 0,
-        ttlMs: LOCK_TTL_MS,
-        reclaimOwnAfterMs: 0,
-      }),
-      desktop.states.openForUpdate(CHANTIERS_RESOURCE),
-    ]);
-    if (lock.status === "locked") {
-      return noStoreJson(
-        { error: "CHANTIERS_LOCKED", lockedBy: lock.lock.owner_display_name },
-        { status: 423 },
-      );
-    }
-    ownsLock = true;
+    const repository = createChantiersRepository(context);
+    const actor = { userId: context.owner.userId, displayName: context.owner.displayName };
 
-    let opened = openedInitial;
-    stage = "apply-mutation";
-    let mutation = applyChantierMutation(
-      parseChantiersPayload(opened.resource?.payload),
-      input,
-      actor,
+    stage = "apply-and-save-mutation";
+    const mutation = await repository.mutate((payload) =>
+      applyChantierMutation(payload, input, actor),
     );
 
-    stage = "save-resource";
-    let saved = await desktop.states.saveOpened({
-      resource: CHANTIERS_RESOURCE,
-      opened,
-      payload: mutation.payload,
-      actor: { userId: owner.userId, deviceId: owner.deviceId },
-    });
-
-    if (saved.status === "conflict") {
-      stage = "reopen-after-conflict";
-      opened = await desktop.states.openForUpdate(CHANTIERS_RESOURCE);
-      stage = "reapply-after-conflict";
-      mutation = applyChantierMutation(
-        parseChantiersPayload(opened.resource?.payload),
-        input,
-        actor,
-      );
-      stage = "save-after-conflict";
-      saved = await desktop.states.saveOpened({
-        resource: CHANTIERS_RESOURCE,
-        opened,
-        payload: mutation.payload,
-        actor: { userId: owner.userId, deviceId: owner.deviceId },
-      });
-    }
-
-    if (saved.status === "conflict") throw new Error("CHANTIERS_VERSION_CONFLICT");
-    const payload = parseChantiersPayload(saved.resource.payload);
     console.info("[PAPOT][Chantiers] POST saved", { ms: Date.now() - startedAt });
     return noStoreJson(
-      await snapshot(payload, owner, context.user, true, mutation.focusChantierId),
+      await snapshot(mutation.payload, context.owner, context.user, true, mutation.focusChantierId),
     );
   } catch (error) {
     const code =
@@ -178,14 +113,10 @@ export async function POST(request: Request) {
           ? error.message
           : "CHANTIERS_MUTATION_FAILED";
     console.error("[PAPOT][Chantiers] POST failed", { stage, code, ms: Date.now() - startedAt });
-    return noStoreJson({ error: code }, { status: statusFor(code) });
-  } finally {
-    if (desktop && owner && ownsLock) {
-      const releaseDesktop = desktop;
-      const releaseOwner = owner;
-      void releaseDesktop.locks
-        .release({ resource: CHANTIERS_RESOURCE, leaseId, owner: releaseOwner })
-        .catch(() => undefined);
-    }
+    const body =
+      error instanceof ChantiersRepositoryError && error.details?.lockedBy
+        ? { error: code, lockedBy: error.details.lockedBy }
+        : { error: code };
+    return noStoreJson(body, { status: statusFor(code) });
   }
 }
