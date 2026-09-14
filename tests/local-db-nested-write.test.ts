@@ -1,68 +1,85 @@
-import fs from "node:fs";
-import os from "node:os";
-import path from "node:path";
-import { afterAll, describe, expect, it, vi } from "vitest";
+import { describe, expect, it } from "vitest";
+import { createSerializedReentrantWriteExecutor } from "../src/lib/local-db/write-executor";
 
-vi.mock("server-only", () => ({}));
+type FakeDatabase = {
+  events: string[];
+  state: string[];
+  transactionStart: string[];
+};
 
-const originalDatabasePath = process.env.PAPOT_LOCAL_DB_PATH;
-const temporaryDirectory = fs.mkdtempSync(path.join(os.tmpdir(), "papot-local-nested-write-"));
-process.env.PAPOT_LOCAL_DB_PATH = path.join(temporaryDirectory, "papot-local.sqlite");
+function createFakeDatabaseExecutor() {
+  const database: FakeDatabase = {
+    events: [],
+    state: [],
+    transactionStart: [],
+  };
 
-function parseStringList(value: unknown): string[] {
-  if (value === null) return [];
-  if (!Array.isArray(value) || value.some((entry) => typeof entry !== "string")) {
-    throw new Error("TEST_INVALID_STRING_LIST");
-  }
-  return value;
+  const executeWrite = createSerializedReentrantWriteExecutor<FakeDatabase>({
+    getTarget: () => database,
+    begin: (target) => {
+      target.events.push("BEGIN");
+      target.transactionStart = [...target.state];
+    },
+    commit: (target) => {
+      target.events.push("COMMIT");
+      target.transactionStart = [];
+    },
+    rollback: (target) => {
+      target.events.push("ROLLBACK");
+      target.state = [...target.transactionStart];
+      target.transactionStart = [];
+    },
+  });
+
+  return { database, executeWrite };
 }
 
-afterAll(() => {
-  if (originalDatabasePath === undefined) delete process.env.PAPOT_LOCAL_DB_PATH;
-  else process.env.PAPOT_LOCAL_DB_PATH = originalDatabasePath;
-});
+describe("local database nested writes", () => {
+  it("reuses the active transaction for a nested client write during affair creation", async () => {
+    const { database, executeWrite } = createFakeDatabaseExecutor();
 
-describe("local SQLite nested writes", () => {
-  it("reuses the active transaction instead of deadlocking a nested repository write", async () => {
-    const { mutateLocalSnapshot, readLocalSnapshot } = await import("../src/lib/local-db/runtime");
+    await executeWrite(async (target) => {
+      target.events.push("AFFAIR_START");
+      target.state.push("Nouvelle affaire");
 
-    await mutateLocalSnapshot("commercial-test", parseStringList, async ({ payload }) => {
-      await mutateLocalSnapshot("clients-test", parseStringList, ({ payload: clients }) => ({
-        payload: [...clients, "Nouveau client"],
-        result: undefined,
-      }));
+      await executeWrite((nestedTarget) => {
+        nestedTarget.events.push("CLIENT_WRITE");
+        nestedTarget.state.push("Nouveau client");
+      });
 
-      return {
-        payload: [...payload, "Nouvelle affaire"],
-        result: undefined,
-      };
+      target.events.push("AFFAIR_END");
     });
 
-    expect(readLocalSnapshot("clients-test", parseStringList).payload).toEqual(["Nouveau client"]);
-    expect(readLocalSnapshot("commercial-test", parseStringList).payload).toEqual([
-      "Nouvelle affaire",
+    expect(database.events).toEqual([
+      "BEGIN",
+      "AFFAIR_START",
+      "CLIENT_WRITE",
+      "AFFAIR_END",
+      "COMMIT",
     ]);
+    expect(database.events.filter((event) => event === "BEGIN")).toHaveLength(1);
+    expect(database.state).toEqual(["Nouvelle affaire", "Nouveau client"]);
   });
 
   it("rolls back the nested client write when the outer affair write fails", async () => {
-    const { mutateLocalSnapshot, readLocalSnapshot } = await import("../src/lib/local-db/runtime");
-    const clientsBefore = readLocalSnapshot("clients-test", parseStringList);
+    const { database, executeWrite } = createFakeDatabaseExecutor();
+    database.state.push("État initial");
 
     await expect(
-      mutateLocalSnapshot("commercial-rollback-test", parseStringList, async ({ payload }) => {
-        await mutateLocalSnapshot("clients-test", parseStringList, ({ payload: clients }) => ({
-          payload: [...clients, "Client à annuler"],
-          result: undefined,
-        }));
+      executeWrite(async (target) => {
+        target.events.push("AFFAIR_START");
+        target.state.push("Nouvelle affaire");
 
-        throw new Error(`AFFAIR_CREATION_FAILED:${payload.length}`);
+        await executeWrite((nestedTarget) => {
+          nestedTarget.events.push("CLIENT_WRITE");
+          nestedTarget.state.push("Client à annuler");
+        });
+
+        throw new Error("AFFAIR_CREATION_FAILED");
       }),
     ).rejects.toThrow("AFFAIR_CREATION_FAILED");
 
-    expect(readLocalSnapshot("clients-test", parseStringList)).toEqual(clientsBefore);
-    expect(readLocalSnapshot("commercial-rollback-test", parseStringList)).toEqual({
-      version: 0,
-      payload: [],
-    });
+    expect(database.events).toEqual(["BEGIN", "AFFAIR_START", "CLIENT_WRITE", "ROLLBACK"]);
+    expect(database.state).toEqual(["État initial"]);
   });
 });
