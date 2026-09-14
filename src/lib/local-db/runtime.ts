@@ -1,5 +1,6 @@
 import "server-only";
 
+import { AsyncLocalStorage } from "node:async_hooks";
 import fs from "node:fs";
 import path from "node:path";
 import { DatabaseSync } from "node:sqlite";
@@ -22,6 +23,7 @@ type SnapshotParser<T> = (value: unknown) => T;
 let database: DatabaseSync | undefined;
 let databasePath: string | undefined;
 let writeQueue: Promise<void> = Promise.resolve();
+const activeWriteDatabase = new AsyncLocalStorage<DatabaseSync>();
 
 function resolveDatabasePath(): string {
   const configured = process.env.PAPOT_LOCAL_DB_PATH?.trim();
@@ -136,11 +138,16 @@ function persistSnapshot<T>(
 export function withLocalDatabaseWrite<T>(
   work: (target: DatabaseSync) => T | Promise<T>,
 ): Promise<T> {
+  const activeTarget = activeWriteDatabase.getStore();
+  if (activeTarget) {
+    return Promise.resolve().then(() => work(activeTarget));
+  }
+
   const run = async () => {
     const target = getLocalDatabase();
     target.exec("BEGIN IMMEDIATE");
     try {
-      const result = await work(target);
+      const result = await activeWriteDatabase.run(target, () => work(target));
       target.exec("COMMIT");
       return result;
     } catch (error) {
