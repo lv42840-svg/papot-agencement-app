@@ -7,6 +7,7 @@ import {
   CheckCircle2,
   Clock3,
   Download,
+  ExternalLink,
   FileText,
   History,
   Paperclip,
@@ -21,6 +22,7 @@ import {
 import { useSearchParams } from "next/navigation";
 import { FormEvent, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { CommercialAffairQuotes } from "@/components/commercial-affair-quotes";
+import { clientWorkspaceHref } from "@/lib/clients/navigation";
 import {
   COMMERCIAL_DOCUMENT_CATEGORY_LABELS,
   COMMERCIAL_STATUS_LABELS,
@@ -637,7 +639,17 @@ function AffairDetail({
           </span>
           <h2>{item.name}</h2>
           <p>
-            {item.clientName || "Client à préciser"}
+            {item.clientId ? (
+              <a
+                className="commercialV2ClientLink"
+                href={clientWorkspaceHref(item.clientId)}
+                title="Ouvrir la fiche client"
+              >
+                {item.clientName || "Fiche client"} <ExternalLink size={11} />
+              </a>
+            ) : (
+              item.clientName || "Client à préciser"
+            )}
             {item.siteLabel ? ` · ${item.siteLabel}` : ""}
           </p>
         </div>
@@ -1317,6 +1329,18 @@ function CommercialV2Styles() {
         margin: 0;
         color: #7f7886;
         font-size: 10px;
+      }
+      .commercialV2ClientLink {
+        display: inline-flex;
+        align-items: center;
+        gap: 3px;
+        color: #604dc4;
+        font-weight: 750;
+        text-decoration: none;
+      }
+      .commercialV2ClientLink:hover,
+      .commercialV2ClientLink:focus-visible {
+        text-decoration: underline;
       }
       .commercialV2Tabs {
         display: flex;
