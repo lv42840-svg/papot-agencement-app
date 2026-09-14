@@ -15,8 +15,7 @@ let cached: { cacheKey: string; store: ServerFileStore } | undefined;
 export function getServerFileStore(): ServerFileStore {
   if (isLocalStorageMode()) {
     const rootPath = path.resolve(
-      process.env.PAPOT_LOCAL_FILES_PATH?.trim() ||
-        path.join(process.cwd(), ".papot-dev", "files"),
+      process.env.PAPOT_LOCAL_FILES_PATH?.trim() || path.join(process.cwd(), ".papot-dev", "files"),
     );
     const cacheKey = `local:${rootPath}`;
     if (cached?.cacheKey === cacheKey) return cached.store;
