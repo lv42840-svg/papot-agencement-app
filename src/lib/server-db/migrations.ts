@@ -16,9 +16,7 @@ async function ensureMigrationRegistry(client: PoolClient): Promise<void> {
   `);
 }
 
-export async function runServerDbMigrations(
-  pool: Pool = getServerDbPool(),
-): Promise<void> {
+export async function runServerDbMigrations(pool: Pool = getServerDbPool()): Promise<void> {
   const client = await pool.connect();
 
   try {

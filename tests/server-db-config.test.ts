@@ -22,8 +22,8 @@ describe("central PostgreSQL configuration", () => {
   });
 
   it("rejects non-PostgreSQL protocols", () => {
-    expect(() =>
-      getServerDbConfig({ PAPOT_DATABASE_URL: "https://papot-server/papot" }),
-    ).toThrow("must use the postgresql:// or postgres:// protocol");
+    expect(() => getServerDbConfig({ PAPOT_DATABASE_URL: "https://papot-server/papot" })).toThrow(
+      "must use the postgresql:// or postgres:// protocol",
+    );
   });
 });

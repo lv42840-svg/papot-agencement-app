@@ -10,15 +10,11 @@ type ServerDbEnv = Record<string, string | undefined>;
 
 const DEFAULT_APPLICATION_NAME = "papot-agencement";
 
-export function getServerDbConfig(
-  env: ServerDbEnv = process.env,
-): ServerDbConfig {
+export function getServerDbConfig(env: ServerDbEnv = process.env): ServerDbConfig {
   const connectionString = env.PAPOT_DATABASE_URL?.trim();
 
   if (!connectionString) {
-    throw new Error(
-      "PAPOT_DATABASE_URL is required before using the central PostgreSQL database.",
-    );
+    throw new Error("PAPOT_DATABASE_URL is required before using the central PostgreSQL database.");
   }
 
   let parsedUrl: URL;
@@ -28,13 +24,8 @@ export function getServerDbConfig(
     throw new Error("PAPOT_DATABASE_URL must be a valid PostgreSQL URL.");
   }
 
-  if (
-    parsedUrl.protocol !== "postgresql:" &&
-    parsedUrl.protocol !== "postgres:"
-  ) {
-    throw new Error(
-      "PAPOT_DATABASE_URL must use the postgresql:// or postgres:// protocol.",
-    );
+  if (parsedUrl.protocol !== "postgresql:" && parsedUrl.protocol !== "postgres:") {
+    throw new Error("PAPOT_DATABASE_URL must use the postgresql:// or postgres:// protocol.");
   }
 
   return {
