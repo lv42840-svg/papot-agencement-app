@@ -11,6 +11,7 @@ import {
   UserRound,
   X,
 } from "lucide-react";
+import { useSearchParams } from "next/navigation";
 import { FormEvent, useCallback, useEffect, useMemo, useState } from "react";
 import {
   clientDisplayName,
@@ -19,6 +20,7 @@ import {
   type ClientsPayload,
   type ClientType,
 } from "@/lib/clients/domain";
+import { resolveClientWorkspaceSelection } from "@/lib/clients/navigation";
 
 type ClientsSnapshot = {
   payload: ClientsPayload;
@@ -147,6 +149,8 @@ function clientSubtitle(client: ClientRecord): string {
 }
 
 export function ClientsWorkspace() {
+  const searchParams = useSearchParams();
+  const requestedFocusId = searchParams.get("focus");
   const [snapshot, setSnapshot] = useState<ClientsSnapshot | null>(null);
   const [loading, setLoading] = useState(true);
   const [busy, setBusy] = useState(false);
@@ -154,7 +158,7 @@ export function ClientsWorkspace() {
   const [notice, setNotice] = useState<string | null>(null);
   const [query, setQuery] = useState("");
   const [showArchived, setShowArchived] = useState(false);
-  const [selectedId, setSelectedId] = useState<string | null>(null);
+  const [selectedId, setSelectedId] = useState<string | null>(requestedFocusId);
   const [mode, setMode] = useState<EditMode>("view");
   const [draft, setDraft] = useState<ClientDraft>(emptyDraft);
 
@@ -167,8 +171,13 @@ export function ClientsWorkspace() {
       if (!response.ok) throw new Error(body.error ?? "CLIENTS_LOAD_FAILED");
       setSnapshot(body);
       setSelectedId((current) => {
-        if (current && body.payload.clients.some((client) => client.id === current)) return current;
-        return body.payload.clients.find((client) => !client.isArchived)?.id ?? null;
+        const selection = resolveClientWorkspaceSelection(
+          body.payload.clients,
+          requestedFocusId,
+          current,
+        );
+        if (selection.revealArchived) setShowArchived(true);
+        return selection.selectedId;
       });
     } catch (loadError) {
       const code = loadError instanceof Error ? loadError.message : "CLIENTS_LOAD_FAILED";
@@ -176,7 +185,7 @@ export function ClientsWorkspace() {
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [requestedFocusId]);
 
   useEffect(() => {
     void load();
