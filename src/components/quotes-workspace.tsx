@@ -1,7 +1,8 @@
 "use client";
 
 import { type FormEvent, useMemo, useState } from "react";
-import { FilePlus2, FileText, LibraryBig, Percent, Sigma } from "lucide-react";
+import { FilePlus2, FileText } from "lucide-react";
+import { QuoteLinesEditor } from "@/components/quote-lines-editor";
 import type { NativeQuotesPayload } from "@/lib/quotes/store";
 
 export type QuoteAffairOption = {
@@ -25,24 +26,6 @@ const STATUS_LABELS = {
   REJECTED: "Refusé",
   CANCELLED: "Annulé",
 } as const;
-
-const foundations = [
-  {
-    icon: Sigma,
-    title: "Quantités et formules",
-    text: "Quantité directe ou formule légère conservée avec la ligne.",
-  },
-  {
-    icon: LibraryBig,
-    title: "Bibliothèque intégrée",
-    text: "Composants et ouvrages réutilisables accessibles dans ce même module.",
-  },
-  {
-    icon: Percent,
-    title: "Remises et TVA",
-    text: "Calculs de remises ligne, section et global, puis HT, TVA et TTC.",
-  },
-] as const;
 
 function quoteErrorLabel(code: string): string {
   if (code === "QUOTE_AFFAIR_NOT_FOUND") return "L’affaire sélectionnée n’existe plus.";
@@ -68,6 +51,7 @@ export function QuotesWorkspace({
   const [formOpen, setFormOpen] = useState(false);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
+  const [activeQuoteId, setActiveQuoteId] = useState(initialPayload.quotes[0]?.id ?? "");
   const [selectedAffairId, setSelectedAffairId] = useState(affairs[0]?.id ?? "");
   const firstAffair = affairs[0];
   const [subject, setSubject] = useState(firstAffair?.name ?? "");
@@ -82,6 +66,10 @@ export function QuotesWorkspace({
   const sortedQuotes = useMemo(
     () => [...payload.quotes].sort((left, right) => right.updatedAt.localeCompare(left.updatedAt)),
     [payload.quotes],
+  );
+  const activeQuote = useMemo(
+    () => payload.quotes.find((quote) => quote.id === activeQuoteId) ?? null,
+    [activeQuoteId, payload.quotes],
   );
 
   function selectAffair(affairId: string) {
@@ -126,6 +114,7 @@ export function QuotesWorkspace({
         return;
       }
       setPayload(data.payload);
+      if (data.focusQuoteId) setActiveQuoteId(data.focusQuoteId);
       setFormOpen(false);
     } catch {
       setError("Le brouillon n’a pas pu être enregistré.");
@@ -141,7 +130,7 @@ export function QuotesWorkspace({
           <div>
             <h2>Devis natifs</h2>
             <p className="muted">
-              Les brouillons restent rattachés à leur affaire, leur client et leur variante.
+              Brouillons, variantes et versions restent rattachés à leur affaire et leur client.
             </p>
           </div>
           <div className="quoteHeaderActions">
@@ -261,8 +250,15 @@ export function QuotesWorkspace({
           <div className="quoteDraftList">
             {sortedQuotes.map((quote) => {
               const affair = affairsById.get(quote.commercialCaseId);
+              const active = quote.id === activeQuoteId;
               return (
-                <article className="quoteDraftRow" key={quote.id}>
+                <button
+                  type="button"
+                  className={`quoteDraftRow${active ? " isActive" : ""}`}
+                  key={quote.id}
+                  onClick={() => setActiveQuoteId(quote.id)}
+                  aria-pressed={active}
+                >
                   <div className="quoteDraftMain">
                     <FileText size={17} aria-hidden="true" />
                     <div>
@@ -278,39 +274,14 @@ export function QuotesWorkspace({
                     <span>{quote.model.issueDate}</span>
                     <strong>{STATUS_LABELS[quote.status]}</strong>
                   </div>
-                </article>
+                </button>
               );
             })}
           </div>
         )}
       </section>
 
-      <section className="panel quoteWorkspacePanel">
-        <div className="quoteWorkspaceIntro">
-          <div className="quoteWorkspaceIcon" aria-hidden="true">
-            <FileText size={23} />
-          </div>
-          <div>
-            <h2>Fondation du futur éditeur</h2>
-            <p className="muted">
-              La prochaine brique ajoutera les sections et lignes du devis sans modifier le stockage
-              des brouillons créé ici.
-            </p>
-          </div>
-        </div>
-
-        <div className="quoteFoundationGrid">
-          {foundations.map(({ icon: Icon, title, text }) => (
-            <article key={title} className="quoteFoundationItem">
-              <Icon size={18} aria-hidden="true" />
-              <div>
-                <strong>{title}</strong>
-                <span>{text}</span>
-              </div>
-            </article>
-          ))}
-        </div>
-      </section>
+      <QuoteLinesEditor quote={activeQuote} canWrite={canWrite} onSaved={setPayload} />
 
       <style jsx>{`
         .quoteWorkspace {
@@ -321,16 +292,13 @@ export function QuotesWorkspace({
         .quoteHeaderActions,
         .quoteDraftFormHeader,
         .quoteDraftActions,
-        .quoteDraftRow,
         .quoteDraftMain,
-        .quoteDraftMeta,
-        .quoteWorkspaceIntro {
+        .quoteDraftMeta {
           display: flex;
           align-items: center;
         }
         .quoteListHeader,
-        .quoteDraftFormHeader,
-        .quoteDraftRow {
+        .quoteDraftFormHeader {
           justify-content: space-between;
           gap: 16px;
         }
@@ -426,9 +394,26 @@ export function QuotesWorkspace({
           border-top: 1px solid var(--border);
         }
         .quoteDraftRow {
+          width: 100%;
           min-height: 68px;
           padding: 12px 18px;
+          display: flex;
+          align-items: center;
+          justify-content: space-between;
+          gap: 16px;
+          border: 0;
           border-bottom: 1px solid var(--border);
+          border-radius: 0;
+          background: #fff;
+          color: inherit;
+          text-align: left;
+        }
+        .quoteDraftRow:hover,
+        .quoteDraftRow.isActive {
+          background: #faf8ff;
+        }
+        .quoteDraftRow.isActive {
+          box-shadow: inset 3px 0 0 var(--accent);
         }
         .quoteDraftRow:last-child {
           border-bottom: 0;
@@ -487,71 +472,14 @@ export function QuotesWorkspace({
           font-size: 12px;
           line-height: 1.5;
         }
-        .quoteWorkspacePanel {
-          display: grid;
-          gap: 18px;
-        }
-        .quoteWorkspaceIntro {
-          gap: 14px;
-          align-items: flex-start;
-        }
-        .quoteWorkspaceIntro h2,
-        .quoteWorkspaceIntro p {
-          margin-bottom: 0;
-        }
-        .quoteWorkspaceIcon {
-          width: 44px;
-          height: 44px;
-          flex: 0 0 auto;
-          display: grid;
-          place-items: center;
-          border-radius: 10px;
-          background: color-mix(in srgb, var(--accent) 11%, white);
-          color: var(--accent);
-        }
-        .quoteFoundationGrid {
-          display: grid;
-          grid-template-columns: repeat(3, minmax(0, 1fr));
-          gap: 10px;
-        }
-        .quoteFoundationItem {
-          min-height: 86px;
-          padding: 14px;
-          display: flex;
-          align-items: flex-start;
-          gap: 10px;
-          border: 1px solid var(--border);
-          border-radius: 9px;
-          background: var(--surface-soft);
-        }
-        .quoteFoundationItem > :global(svg) {
-          flex: 0 0 auto;
-          margin-top: 1px;
-          color: var(--accent);
-        }
-        .quoteFoundationItem strong,
-        .quoteFoundationItem span {
-          display: block;
-        }
-        .quoteFoundationItem strong {
-          margin-bottom: 4px;
-          font-size: 13px;
-        }
-        .quoteFoundationItem span {
-          color: var(--muted);
-          font-size: 12px;
-          line-height: 1.45;
-        }
         @media (max-width: 900px) {
-          .quoteDraftGrid,
-          .quoteFoundationGrid {
+          .quoteDraftGrid {
             grid-template-columns: 1fr;
           }
           .quoteFieldWide {
             grid-column: auto;
           }
-          .quoteDraftRow,
-          .quoteListHeader {
+          .quoteDraftRow {
             align-items: flex-start;
             flex-direction: column;
           }
