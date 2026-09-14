@@ -12,7 +12,15 @@ export const dynamic = "force-dynamic";
 
 export default async function DesktopReadyPage() {
   if (!hasDesktopDatabaseConfig()) redirect("/desktop-server-required");
-  if (!(await authHasUsers())) redirect("/first-admin");
+
+  let hasUsers: boolean;
+  try {
+    hasUsers = await authHasUsers();
+  } catch {
+    redirect("/desktop-server-required?reason=unavailable");
+  }
+
+  if (!hasUsers) redirect("/first-admin");
 
   return (
     <DesktopAppShell>
