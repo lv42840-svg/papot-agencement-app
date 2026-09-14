@@ -7,6 +7,7 @@ import {
   listCanonicalCommercialClients,
 } from "@/lib/commercial/client-integration";
 import { createCommercialRepository } from "@/lib/commercial/create-repository";
+import { createCommercialDocumentTransport } from "@/lib/commercial/document-file-runtime";
 import {
   cleanupCommercialDocuments,
   uploadCommercialDocuments,
@@ -60,6 +61,8 @@ function statusFor(code: string): number {
   if (requestStatus) return requestStatus;
   if (code === "COMMERCIAL_CASE_NOT_FOUND") return 404;
   if (code === "COMMERCIAL_LOCKED") return 423;
+  if (code === "SERVER_FILE_ROOT_UNAVAILABLE") return 503;
+  if (code.includes("INTEGRITY") || code.includes("CUTOVER_VALIDATION")) return 500;
   if (code.includes("CONFLICT")) return 409;
   if (code.includes("TOO_LARGE")) return 413;
   return 400;
@@ -69,7 +72,7 @@ export async function POST(request: Request, context: RouteContext) {
   try {
     const { caseId } = await context.params;
     const requestContext = await requireDesktopRequestContext("commercial", "WRITE");
-    const { desktop, owner, user } = requestContext;
+    const { owner, user } = requestContext;
     const repository = createCommercialRepository(requestContext);
     const clients = await createClientsRepository(requestContext);
     const form = await request.formData();
@@ -88,12 +91,7 @@ export async function POST(request: Request, context: RouteContext) {
 
     const creationYear = new Date(item.createdAt).getFullYear();
     const actor = { userId: owner.userId, displayName: owner.displayName };
-    const transport = {
-      dav: desktop.dav,
-      nextcloudUserId: desktop.nextcloudUserId,
-      syncRoot: desktop.syncRoot,
-      displayName: owner.displayName,
-    };
+    const transport = await createCommercialDocumentTransport(requestContext);
 
     let uploaded = [] as Awaited<ReturnType<typeof uploadCommercialDocuments>>;
     try {
