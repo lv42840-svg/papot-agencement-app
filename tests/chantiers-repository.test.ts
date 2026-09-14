@@ -1,8 +1,5 @@
 import { describe, expect, it, vi } from "vitest";
-import {
-  createInitialChantiersPayload,
-  parseChantiersPayload,
-} from "../src/lib/chantiers/domain";
+import { createInitialChantiersPayload, parseChantiersPayload } from "../src/lib/chantiers/domain";
 import { createNextcloudChantiersRepository } from "../src/lib/chantiers/nextcloud-repository";
 
 const owner = {
