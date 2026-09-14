@@ -4,6 +4,7 @@ import {
   desktopRequestErrorStatus,
   requireDesktopRequestContext,
 } from "@/lib/desktop/request-context";
+import { parseLibraryPayload } from "@/lib/library/storage";
 import { sharedResourceRefSchema, type SharedResourceType } from "@/lib/sync/resource-lock";
 
 export const runtime = "nodejs";
@@ -74,13 +75,17 @@ export async function POST(request: Request) {
       );
     }
     if (input.action === "save") {
+      const payload =
+        input.resource.resource_type === "LIBRARY"
+          ? parseLibraryPayload(input.payload)
+          : input.payload;
       return NextResponse.json(
         await desktop.coordinator.save({
           resource: input.resource,
           leaseId: input.leaseId,
           owner,
           expectedVersion: input.expectedVersion,
-          payload: input.payload,
+          payload,
         }),
       );
     }
