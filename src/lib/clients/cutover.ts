@@ -22,7 +22,9 @@ export type LockedClientsSnapshot = {
 };
 
 export function clientsPayloadHash(payload: ClientsPayload): string {
-  return createHash("sha256").update(JSON.stringify(parseClientsPayload(payload))).digest("hex");
+  return createHash("sha256")
+    .update(JSON.stringify(parseClientsPayload(payload)))
+    .digest("hex");
 }
 
 async function findCutoverMarker(
@@ -91,14 +93,7 @@ async function importSnapshot(
         )
         VALUES ($1, 1, $2, $3, $4, $5, $6)
       `,
-      [
-        record.id,
-        record.siret || null,
-        index,
-        record,
-        record.createdAt,
-        record.updatedAt,
-      ],
+      [record.id, record.siret || null, index, record, record.createdAt, record.updatedAt],
     );
   }
 

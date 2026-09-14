@@ -3,10 +3,7 @@ import { afterAll, beforeAll, beforeEach, describe, expect, it, vi } from "vites
 
 vi.mock("server-only", () => ({}));
 
-import {
-  clientsPayloadHash,
-  ensureClientsPostgresCutover,
-} from "../src/lib/clients/cutover";
+import { clientsPayloadHash, ensureClientsPostgresCutover } from "../src/lib/clients/cutover";
 import { createInitialClientsPayload } from "../src/lib/clients/domain";
 import { applyClientsMutation } from "../src/lib/clients/mutations";
 import { createPostgresClientsRepository } from "../src/lib/clients/postgres-repository";

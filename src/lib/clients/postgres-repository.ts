@@ -60,9 +60,7 @@ function throwMappedPostgresError(error: unknown): never {
   throw error;
 }
 
-export function createPostgresClientsRepository(
-  pool: Pool = getServerDbPool(),
-): ClientsRepository {
+export function createPostgresClientsRepository(pool: Pool = getServerDbPool()): ClientsRepository {
   return {
     async load() {
       return rowsToPayload(await loadRows(pool));

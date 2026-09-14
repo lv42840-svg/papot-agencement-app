@@ -53,7 +53,9 @@ export async function acquireNextcloudClientsSnapshot(params: {
   } catch (error) {
     await release().catch((releaseError: unknown) => {
       const code =
-        releaseError instanceof Error ? releaseError.message : "CLIENTS_CUTOVER_LOCK_RELEASE_FAILED";
+        releaseError instanceof Error
+          ? releaseError.message
+          : "CLIENTS_CUTOVER_LOCK_RELEASE_FAILED";
       console.error("[PAPOT][Clients] source lock release failed", { code });
     });
     throw error;
