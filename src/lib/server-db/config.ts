@@ -28,8 +28,13 @@ export function getServerDbConfig(
     throw new Error("PAPOT_DATABASE_URL must be a valid PostgreSQL URL.");
   }
 
-  if (parsedUrl.protocol !== "postgresql:" && parsedUrl.protocol !== "postgres:") {
-    throw new Error("PAPOT_DATABASE_URL must use the postgresql:// or postgres:// protocol.");
+  if (
+    parsedUrl.protocol !== "postgresql:" &&
+    parsedUrl.protocol !== "postgres:"
+  ) {
+    throw new Error(
+      "PAPOT_DATABASE_URL must use the postgresql:// or postgres:// protocol.",
+    );
   }
 
   return {
