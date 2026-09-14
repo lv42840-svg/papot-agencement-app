@@ -46,4 +46,4 @@ jobs:
           node-version: 22
           cache: npm
       - run: npm ci
-      - run: npm test -- tests/server-db.integration.test.ts tests/clients-postgres.integration.test.ts
+      - run: npm test -- tests/server-db.integration.test.ts tests/clients-postgres.integration.test.ts tests/clients-concurrency.integration.test.ts
