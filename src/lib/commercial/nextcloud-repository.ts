@@ -43,6 +43,10 @@ export function createNextcloudCommercialRepository(params: {
 
       let opened = initialOpened;
       let mutation = await transform(parseCommercialPayload(opened.resource?.payload), false);
+      if (mutation.shouldPersist === false) {
+        return { payload: mutation.payload, focusCaseId: mutation.focusCaseId };
+      }
+
       let saved = await params.desktop.states.saveOpened({
         resource: COMMERCIAL_RESOURCE,
         opened,
@@ -53,6 +57,9 @@ export function createNextcloudCommercialRepository(params: {
       if (saved.status === "conflict") {
         opened = await params.desktop.states.openForUpdate(COMMERCIAL_RESOURCE);
         mutation = await transform(parseCommercialPayload(opened.resource?.payload), true);
+        if (mutation.shouldPersist === false) {
+          return { payload: mutation.payload, focusCaseId: mutation.focusCaseId };
+        }
         saved = await params.desktop.states.saveOpened({
           resource: COMMERCIAL_RESOURCE,
           opened,
