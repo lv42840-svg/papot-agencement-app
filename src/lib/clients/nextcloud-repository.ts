@@ -1,7 +1,7 @@
 import { randomUUID } from "node:crypto";
 import type { NextcloudResourceLockStore } from "@/lib/sync/resource-lock-store";
 import type { NextcloudSharedResourceStore } from "@/lib/sync/resource-state-store";
-import { parseClientsPayload } from "./domain";
+import { parseClientsPayload, type ClientsPayload } from "./domain";
 import { applyClientsMutation } from "./mutations";
 import { ClientsRepositoryError, type ClientsRepository } from "./repository";
 
@@ -18,6 +18,49 @@ type ClientsStates = Pick<
   "getCached" | "get" | "openForUpdate" | "saveOpened"
 >;
 type ClientsLocks = Pick<NextcloudResourceLockStore, "acquire" | "release">;
+
+export async function acquireNextcloudClientsSnapshot(params: {
+  states: Pick<ClientsStates, "get">;
+  locks: ClientsLocks;
+  owner: Owner;
+}): Promise<{ payload: ClientsPayload; release(): Promise<void> }> {
+  const leaseId = randomUUID();
+  const lockResult = await params.locks.acquire({
+    resource: CLIENTS_RESOURCE,
+    leaseId,
+    owner: params.owner,
+    baseVersion: 0,
+    ttlMs: CLIENTS_WRITE_LOCK_TTL_MS,
+    reclaimOwnAfterMs: CLIENTS_OWN_LOCK_RECLAIM_AFTER_MS,
+  });
+
+  if (lockResult.status === "locked") {
+    throw new ClientsRepositoryError("CLIENTS_LOCKED", {
+      lockedBy: lockResult.lock.owner_display_name,
+    });
+  }
+
+  let released = false;
+  const release = async () => {
+    if (released) return;
+    released = true;
+    await params.locks.release({ resource: CLIENTS_RESOURCE, leaseId, owner: params.owner });
+  };
+
+  try {
+    const resource = await params.states.get(CLIENTS_RESOURCE);
+    return { payload: parseClientsPayload(resource?.payload), release };
+  } catch (error) {
+    await release().catch((releaseError: unknown) => {
+      const code =
+        releaseError instanceof Error
+          ? releaseError.message
+          : "CLIENTS_CUTOVER_LOCK_RELEASE_FAILED";
+      console.error("[PAPOT][Clients] source lock release failed", { code });
+    });
+    throw error;
+  }
+}
 
 export function createNextcloudClientsRepository(params: {
   states: ClientsStates;
