@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { type FormEvent, useMemo, useState } from "react";
 import { FilePlus2, FileText, LibraryBig, Percent, Sigma } from "lucide-react";
 import type { NativeQuotesPayload } from "@/lib/quotes/store";
 
@@ -103,7 +103,7 @@ export function QuotesWorkspace({
     setFormOpen(true);
   }
 
-  async function createDraft(event: React.FormEvent<HTMLFormElement>) {
+  async function createDraft(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     setSaving(true);
     setError("");
