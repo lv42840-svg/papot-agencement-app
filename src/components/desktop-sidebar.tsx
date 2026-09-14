@@ -4,6 +4,7 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useEffect, useState } from "react";
 import {
+  BookOpen,
   BriefcaseBusiness,
   CalendarDays,
   ChartNoAxesCombined,
@@ -25,6 +26,7 @@ const navigation = [
   { label: "Entrées", icon: ClipboardList, href: "/entrees", moduleKey: "capture" },
   { label: "Clients", icon: Users, href: "/clients", moduleKey: "clients" },
   { label: "Commercial", icon: BriefcaseBusiness, href: "/commercial", moduleKey: "commercial" },
+  { label: "Bibliothèque", icon: BookOpen, href: "/bibliotheque", moduleKey: "quotes" },
   { label: "Chantiers", icon: FolderOpen, href: "/chantiers", moduleKey: "chantiers" },
   {
     label: "Grand planning",
