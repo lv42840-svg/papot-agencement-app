@@ -603,9 +603,9 @@ function AffairForm({
         existingClientId: clientId || undefined,
         clientName: clientId ? "" : String(form.get("clientName") ?? ""),
         siteLabel: String(form.get("siteLabel") ?? ""),
-        contactName: String(form.get("contactName") ?? ""),
-        contactPhone: String(form.get("contactPhone") ?? ""),
-        contactEmail: String(form.get("contactEmail") ?? ""),
+        contactName: item.contactName ?? "",
+        contactPhone: item.contactPhone ?? "",
+        contactEmail: item.contactEmail ?? "",
         description: String(form.get("description") ?? ""),
         nextAction: String(form.get("nextAction") ?? ""),
       },
@@ -615,11 +615,7 @@ function AffairForm({
   return (
     <form className="commercialV2Form" onSubmit={(event) => void submit(event)}>
       <label>
-        <span>Nom affaire</span>
-        <input name="name" defaultValue={item.name} disabled={!canModify} required />
-      </label>
-      <label>
-        <span>Client existant</span>
+        <span>Client</span>
         <select
           value={clientId}
           onChange={(event) => setClientId(event.target.value)}
@@ -640,20 +636,12 @@ function AffairForm({
         </label>
       ) : null}
       <label>
+        <span>Nom affaire</span>
+        <input name="name" defaultValue={item.name} disabled={!canModify} required />
+      </label>
+      <label>
         <span>Lieu chantier</span>
         <input name="siteLabel" defaultValue={item.siteLabel ?? ""} disabled={!canModify} />
-      </label>
-      <label>
-        <span>Contact</span>
-        <input name="contactName" defaultValue={item.contactName ?? ""} disabled={!canModify} />
-      </label>
-      <label>
-        <span>Téléphone</span>
-        <input name="contactPhone" defaultValue={item.contactPhone ?? ""} disabled={!canModify} />
-      </label>
-      <label>
-        <span>Email</span>
-        <input name="contactEmail" defaultValue={item.contactEmail ?? ""} disabled={!canModify} />
       </label>
       <label className="wide">
         <span>Description</span>
