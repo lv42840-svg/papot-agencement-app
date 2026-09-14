@@ -7,13 +7,14 @@ function minimalComponent() {
     name: "Panneau mélaminé blanc",
     description: "Panneau décor blanc pour fabrication de mobilier.",
     unit: "m²",
-    unitPriceCents: 4_250,
-    vatRatePercent: 20,
+    costPriceCents: 4_250,
+    marginPercent: 30,
+    salePriceCents: 5_525,
   };
 }
 
 describe("library component model", () => {
-  it("accepts a reusable material component", () => {
+  it("accepts a reusable material component priced entirely HT", () => {
     expect(parseLibraryComponent(minimalComponent())).toEqual(minimalComponent());
   });
 
@@ -23,7 +24,9 @@ describe("library component model", () => {
       name: "Heure atelier",
       description: "",
       unit: "h",
-      unitPriceCents: 6_500,
+      costPriceCents: 6_500,
+      marginPercent: 40,
+      salePriceCents: 9_100,
     };
 
     expect(parseLibraryComponent(component)).toEqual(component);
@@ -44,14 +47,24 @@ describe("library component model", () => {
     });
   });
 
-  it("allows a zero sale price or zero VAT rate", () => {
+  it("allows zero cost, margin or sale price", () => {
     expect(
       parseLibraryComponent({
         ...minimalComponent(),
-        unitPriceCents: 0,
-        vatRatePercent: 0,
+        costPriceCents: 0,
+        marginPercent: 0,
+        salePriceCents: 0,
       }),
-    ).toMatchObject({ unitPriceCents: 0, vatRatePercent: 0 });
+    ).toMatchObject({ costPriceCents: 0, marginPercent: 0, salePriceCents: 0 });
+  });
+
+  it("does not keep VAT in the component model", () => {
+    expect(
+      parseLibraryComponent({
+        ...minimalComponent(),
+        vatRatePercent: 20,
+      }),
+    ).not.toHaveProperty("vatRatePercent");
   });
 
   it("requires a valid identity, name and unit", () => {
@@ -66,17 +79,23 @@ describe("library component model", () => {
     );
   });
 
-  it("rejects invalid financial values", () => {
-    expect(() => parseLibraryComponent({ ...minimalComponent(), unitPriceCents: -1 })).toThrow(
+  it("rejects invalid HT cost, margin and sale values", () => {
+    expect(() => parseLibraryComponent({ ...minimalComponent(), costPriceCents: -1 })).toThrow(
       "LIBRARY_COMPONENT_INVALID",
     );
-    expect(() => parseLibraryComponent({ ...minimalComponent(), unitPriceCents: 12.5 })).toThrow(
+    expect(() => parseLibraryComponent({ ...minimalComponent(), costPriceCents: 12.5 })).toThrow(
       "LIBRARY_COMPONENT_INVALID",
     );
-    expect(() => parseLibraryComponent({ ...minimalComponent(), vatRatePercent: -1 })).toThrow(
+    expect(() => parseLibraryComponent({ ...minimalComponent(), marginPercent: -1 })).toThrow(
       "LIBRARY_COMPONENT_INVALID",
     );
-    expect(() => parseLibraryComponent({ ...minimalComponent(), vatRatePercent: 101 })).toThrow(
+    expect(() => parseLibraryComponent({ ...minimalComponent(), marginPercent: Infinity })).toThrow(
+      "LIBRARY_COMPONENT_INVALID",
+    );
+    expect(() => parseLibraryComponent({ ...minimalComponent(), salePriceCents: -1 })).toThrow(
+      "LIBRARY_COMPONENT_INVALID",
+    );
+    expect(() => parseLibraryComponent({ ...minimalComponent(), salePriceCents: 12.5 })).toThrow(
       "LIBRARY_COMPONENT_INVALID",
     );
   });
