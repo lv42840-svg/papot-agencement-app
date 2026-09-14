@@ -11,6 +11,8 @@ const AUTH_STORAGE_VERSION = 3;
 const AUTH_STORAGE_NAME = "auth_postgres_storage";
 const ENTRIES_STORAGE_VERSION = 4;
 const ENTRIES_STORAGE_NAME = "entries_postgres_storage";
+const COMMERCIAL_STORAGE_VERSION = 5;
+const COMMERCIAL_STORAGE_NAME = "commercial_postgres_storage";
 
 async function ensureMigrationRegistry(client: PoolClient): Promise<void> {
   await client.query(`
@@ -108,6 +110,17 @@ async function ensureEntriesStorage(client: PoolClient): Promise<void> {
   `);
 }
 
+async function ensureCommercialStorage(client: PoolClient): Promise<void> {
+  await client.query(`
+    CREATE TABLE IF NOT EXISTS papot_commercial_state (
+      scope TEXT PRIMARY KEY CHECK (scope = 'global'),
+      version INTEGER NOT NULL DEFAULT 1 CHECK (version > 0),
+      payload JSONB NOT NULL CHECK (jsonb_typeof(payload) = 'object'),
+      updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+    )
+  `);
+}
+
 export async function runServerDbMigrations(pool: Pool = getServerDbPool()): Promise<void> {
   const client = await pool.connect();
 
@@ -152,6 +165,16 @@ export async function runServerDbMigrations(pool: Pool = getServerDbPool()): Pro
         ON CONFLICT (version) DO NOTHING
       `,
       [ENTRIES_STORAGE_VERSION, ENTRIES_STORAGE_NAME],
+    );
+
+    await ensureCommercialStorage(client);
+    await client.query(
+      `
+        INSERT INTO papot_schema_migrations (version, name)
+        VALUES ($1, $2)
+        ON CONFLICT (version) DO NOTHING
+      `,
+      [COMMERCIAL_STORAGE_VERSION, COMMERCIAL_STORAGE_NAME],
     );
 
     await client.query("COMMIT");
