@@ -80,7 +80,7 @@ export function QuoteLinesEditor({
   );
   const editable = canWrite && quote?.status === "DRAFT";
   const editingLine = editingLineId
-    ? lines.find((line) => line.id === editingLineId) ?? null
+    ? (lines.find((line) => line.id === editingLineId) ?? null)
     : null;
   const canAddCurrentLineToLibrary = !editingLine?.librarySource;
 
@@ -206,12 +206,7 @@ export function QuoteLinesEditor({
           </p>
         </div>
         {editable ? (
-          <button
-            type="button"
-            className="primaryButton"
-            onClick={openNewLine}
-            disabled={saving}
-          >
+          <button type="button" className="primaryButton" onClick={openNewLine} disabled={saving}>
             <Plus size={16} aria-hidden="true" />
             Ajouter une ligne
           </button>
@@ -225,12 +220,7 @@ export function QuoteLinesEditor({
               <p className="eyebrow">{editingLineId ? "Modifier" : "Nouvelle ligne"}</p>
               <h3>{editingLineId ? "Modifier la ligne" : "Ajouter au devis"}</h3>
             </div>
-            <button
-              type="button"
-              className="iconButton"
-              onClick={closeForm}
-              aria-label="Fermer"
-            >
+            <button type="button" className="iconButton" onClick={closeForm} aria-label="Fermer">
               <X size={16} aria-hidden="true" />
             </button>
           </div>
@@ -341,12 +331,7 @@ export function QuoteLinesEditor({
           {error ? <div className="quoteLineError">{error}</div> : null}
 
           <div className="quoteLineActions">
-            <button
-              type="button"
-              className="secondaryButton"
-              onClick={closeForm}
-              disabled={saving}
-            >
+            <button type="button" className="secondaryButton" onClick={closeForm} disabled={saving}>
               Annuler
             </button>
             <button type="submit" className="primaryButton" disabled={saving}>
