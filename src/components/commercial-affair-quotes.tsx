@@ -98,9 +98,10 @@ export function CommercialAffairQuotes({ item }: { item: CommercialCase }) {
       ) : (
         <div className="commercialAffairQuotesList">
           {quotes.map((quote) => {
-            const displayStatus = commercialQuoteDisplayStatus(quote.status, item);
-            const followUp =
-              displayStatus === "SENT" || displayStatus === "FOLLOW_UP" ? item.reviewDate : null;
+            const displayStatus = commercialQuoteDisplayStatus(
+              quote.status,
+              quote.followUpDate,
+            );
             return (
               <button
                 type="button"
@@ -122,7 +123,9 @@ export function CommercialAffairQuotes({ item }: { item: CommercialCase }) {
                   </div>
                 </div>
                 <div className="commercialAffairQuoteMeta">
-                  {followUp ? <small>Relance {dateLabel(followUp)}</small> : null}
+                  {quote.followUpDate ? (
+                    <small>Relance {dateLabel(quote.followUpDate)}</small>
+                  ) : null}
                   <span className={`commercialAffairQuoteStatus ${statusTone(displayStatus)}`}>
                     {COMMERCIAL_QUOTE_STATUS_LABELS[displayStatus]}
                   </span>
@@ -145,9 +148,15 @@ export function CommercialAffairQuotes({ item }: { item: CommercialCase }) {
           border-radius: 9px;
           background: #fcfbfe;
         }
-        .commercialAffairQuotesHeading {
+        .commercialAffairQuotesHeading,
+        .commercialAffairQuoteRow,
+        .commercialAffairQuoteMain,
+        .commercialAffairQuoteMeta {
           display: flex;
           align-items: center;
+        }
+        .commercialAffairQuotesHeading,
+        .commercialAffairQuoteRow {
           justify-content: space-between;
           gap: 10px;
         }
@@ -155,14 +164,12 @@ export function CommercialAffairQuotes({ item }: { item: CommercialCase }) {
           margin: 0;
         }
         .commercialAffairQuotesHeading > span {
-          min-width: 24px;
           padding: 2px 7px;
           border-radius: 999px;
           background: #eee9ff;
           color: #604dc4;
           font-size: 9px;
           font-weight: 800;
-          text-align: center;
         }
         .commercialAffairQuotesState {
           min-height: 58px;
@@ -187,10 +194,6 @@ export function CommercialAffairQuotes({ item }: { item: CommercialCase }) {
           width: 100%;
           min-height: 56px;
           padding: 9px 10px;
-          display: flex;
-          align-items: center;
-          justify-content: space-between;
-          gap: 12px;
           border: 0;
           border-bottom: 1px solid #eeeaf2;
           border-radius: 0;
@@ -207,8 +210,6 @@ export function CommercialAffairQuotes({ item }: { item: CommercialCase }) {
         }
         .commercialAffairQuoteMain,
         .commercialAffairQuoteMeta {
-          display: flex;
-          align-items: center;
           gap: 8px;
         }
         .commercialAffairQuoteMain {
@@ -230,7 +231,8 @@ export function CommercialAffairQuotes({ item }: { item: CommercialCase }) {
           font-size: 10px;
         }
         .commercialAffairQuoteMain span,
-        .commercialAffairQuoteMeta small {
+        .commercialAffairQuoteMeta small,
+        .commercialAffairQuotesHint {
           color: #8b8490;
           font-size: 8px;
         }
@@ -265,8 +267,6 @@ export function CommercialAffairQuotes({ item }: { item: CommercialCase }) {
         }
         .commercialAffairQuotesHint {
           margin: 0;
-          color: #91899a;
-          font-size: 8px;
         }
         @media (max-width: 700px) {
           .commercialAffairQuoteRow,
