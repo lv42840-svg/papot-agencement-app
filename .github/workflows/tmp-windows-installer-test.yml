@@ -1,0 +1,34 @@
+name: Temporary Windows Test Installer
+
+on:
+  push:
+    branches: [test/windows-installer-20260914]
+    paths:
+      - .github/workflows/tmp-windows-installer-test.yml
+
+permissions:
+  contents: read
+
+jobs:
+  build-windows-installer:
+    runs-on: windows-latest
+    env:
+      CSC_IDENTITY_AUTO_DISCOVERY: "false"
+      NEXT_TELEMETRY_DISABLED: "1"
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - run: npm run desktop:dist
+      - name: List installer output
+        shell: pwsh
+        run: Get-ChildItem -Path release -Recurse | Select-Object FullName, Length
+      - uses: actions/upload-artifact@v4
+        with:
+          name: PAPOT-AGENCEMENT-Windows-Test
+          path: release/*.exe
+          if-no-files-found: error
+          retention-days: 7
