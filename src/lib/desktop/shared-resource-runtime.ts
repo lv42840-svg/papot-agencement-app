@@ -1,5 +1,7 @@
 import "server-only";
 
+import { createLocalSharedResourceRuntime } from "@/lib/local-db/shared-resources";
+import { isLocalStorageMode } from "@/lib/local-db/runtime";
 import { NextcloudDavClient } from "@/lib/sync/nextcloud-dav";
 import { SharedResourceEditCoordinator } from "@/lib/sync/resource-edit-coordinator";
 import { NextcloudResourceLockStore } from "@/lib/sync/resource-lock-store";
@@ -13,7 +15,7 @@ type DesktopRuntimeConfig = {
   device_id: string;
 };
 
-type DesktopSharedResourceRuntime = {
+export type DesktopSharedResourceRuntime = {
   coordinator: SharedResourceEditCoordinator;
   locks: NextcloudResourceLockStore;
   states: NextcloudSharedResourceStore;
@@ -32,6 +34,19 @@ let cachedRuntime:
   | undefined;
 
 export function createDesktopSharedResourceRuntime(): DesktopSharedResourceRuntime {
+  if (isLocalStorageMode()) {
+    const local = createLocalSharedResourceRuntime();
+    return {
+      coordinator: local.coordinator,
+      locks: local.locks,
+      states: local.states,
+      dav: null,
+      nextcloudUserId: "local",
+      syncRoot: "LOCAL",
+      deviceId: local.deviceId,
+    } as unknown as DesktopSharedResourceRuntime;
+  }
+
   const rawConfig = process.env.PAPOT_DESKTOP_CONFIG_JSON;
   const appPassword = process.env.PAPOT_NEXTCLOUD_APP_PASSWORD;
   if (!rawConfig || !appPassword) throw new Error("DESKTOP_RUNTIME_NOT_CONFIGURED");
