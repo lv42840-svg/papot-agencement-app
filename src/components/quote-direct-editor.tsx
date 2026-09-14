@@ -4,6 +4,7 @@ import Link from "next/link";
 import { ArrowLeft, FileText } from "lucide-react";
 import { useMemo, useState } from "react";
 import { QuoteLinesEditor } from "@/components/quote-lines-editor";
+import { QuoteSendAction } from "@/components/quote-send-action";
 import type { NativeQuotesPayload } from "@/lib/quotes/store";
 
 export function QuoteDirectEditor({
@@ -42,6 +43,7 @@ export function QuoteDirectEditor({
         <FileText size={14} /> Devis ouvert directement depuis le suivi de l’affaire.
       </div>
 
+      <QuoteSendAction quote={quote} canWrite={canWrite} onSaved={setPayload} />
       <QuoteLinesEditor quote={quote} canWrite={canWrite} onSaved={setPayload} />
 
       <style jsx>{`
