@@ -1,27 +1,21 @@
-import { randomUUID } from "node:crypto";
 import { NextResponse } from "next/server";
 import { ZodError } from "zod";
 import { requireSpecialPermission } from "@/lib/auth/permissions";
-import { parseChantiersPayload } from "@/lib/chantiers/domain";
+import { createChantiersRepository } from "@/lib/chantiers/create-repository";
 import {
   launchChantierFromAffair,
   launchChantierFromAffairSchema,
 } from "@/lib/chantiers/launch-from-affair";
 import { chantierCapabilities } from "@/lib/chantiers/mutations";
+import { ChantiersRepositoryError } from "@/lib/chantiers/repository";
 import { createCommercialRepository } from "@/lib/commercial/create-repository";
 import {
   desktopRequestErrorStatus,
   requireDesktopRequestContext,
 } from "@/lib/desktop/request-context";
-import { createDesktopSharedResourceRuntime } from "@/lib/desktop/shared-resource-runtime";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
-
-const CHANTIERS_RESOURCE = { resource_type: "CHANTIER" as const, resource_id: "registry" };
-const LOCK_TTL_MS = 30_000;
-
-type Owner = { userId: string; deviceId: string; displayName: string };
 
 function noStoreJson(body: unknown, init?: ResponseInit) {
   const response = NextResponse.json(body, init);
@@ -40,11 +34,7 @@ function statusFor(code: string): number {
 }
 
 export async function POST(request: Request) {
-  const leaseId = randomUUID();
   const startedAt = Date.now();
-  let desktop: ReturnType<typeof createDesktopSharedResourceRuntime> | null = null;
-  let owner: Owner | null = null;
-  let ownsLock = false;
   let stage = "parse-request";
 
   try {
@@ -52,77 +42,23 @@ export async function POST(request: Request) {
     stage = "create-runtime";
     const context = await requireDesktopRequestContext("chantiers", "WRITE");
     await requireSpecialPermission(context.user, "commercial.confirm_launch");
-    desktop = context.desktop;
-    owner = context.owner;
-    const commercialRepository = createCommercialRepository(context);
-    const actor = { userId: owner.userId, displayName: owner.displayName };
+    const commercialRepository = await createCommercialRepository(context);
+    const chantiersRepository = createChantiersRepository(context);
+    const actor = { userId: context.owner.userId, displayName: context.owner.displayName };
 
-    stage = "read-affair-and-lock-chantiers";
-    const [commercial, lock, openedInitial] = await Promise.all([
-      commercialRepository.load(),
-      desktop.locks.acquire({
-        resource: CHANTIERS_RESOURCE,
-        leaseId,
-        owner,
-        baseVersion: 0,
-        ttlMs: LOCK_TTL_MS,
-        reclaimOwnAfterMs: 0,
-      }),
-      desktop.states.openForUpdate(CHANTIERS_RESOURCE),
-    ]);
-
-    if (lock.status === "locked") {
-      return noStoreJson(
-        { error: "CHANTIERS_LOCKED", lockedBy: lock.lock.owner_display_name },
-        { status: 423 },
-      );
-    }
-    ownsLock = true;
-
+    stage = "read-affair";
+    const commercial = await commercialRepository.load();
     const affair = commercial.cases.find((item) => item.id === input.commercialCaseId);
     if (!affair) throw new Error("CHANTIER_COMMERCIAL_CASE_NOT_FOUND");
 
-    let opened = openedInitial;
-    stage = "apply-launch";
-    let mutation = launchChantierFromAffair(
-      parseChantiersPayload(opened.resource?.payload),
-      affair,
-      input,
-      actor,
+    stage = "apply-and-save-launch";
+    const mutation = await chantiersRepository.mutate((payload) =>
+      launchChantierFromAffair(payload, affair, input, actor),
     );
 
-    stage = "save-resource";
-    let saved = await desktop.states.saveOpened({
-      resource: CHANTIERS_RESOURCE,
-      opened,
-      payload: mutation.payload,
-      actor: { userId: owner.userId, deviceId: owner.deviceId },
-    });
-
-    if (saved.status === "conflict") {
-      stage = "reopen-after-conflict";
-      opened = await desktop.states.openForUpdate(CHANTIERS_RESOURCE);
-      stage = "reapply-after-conflict";
-      mutation = launchChantierFromAffair(
-        parseChantiersPayload(opened.resource?.payload),
-        affair,
-        input,
-        actor,
-      );
-      stage = "save-after-conflict";
-      saved = await desktop.states.saveOpened({
-        resource: CHANTIERS_RESOURCE,
-        opened,
-        payload: mutation.payload,
-        actor: { userId: owner.userId, deviceId: owner.deviceId },
-      });
-    }
-
-    if (saved.status === "conflict") throw new Error("CHANTIERS_VERSION_CONFLICT");
-    const payload = parseChantiersPayload(saved.resource.payload);
     console.info("[PAPOT][Chantiers] launch from affair saved", { ms: Date.now() - startedAt });
     return noStoreJson({
-      payload,
+      payload: mutation.payload,
       actor,
       capabilities: {
         ...chantierCapabilities(actor),
@@ -142,14 +78,10 @@ export async function POST(request: Request) {
           ? error.message
           : "CHANTIER_LAUNCH_FAILED";
     console.error("[PAPOT][Chantiers] launch failed", { stage, code, ms: Date.now() - startedAt });
-    return noStoreJson({ error: code }, { status: statusFor(code) });
-  } finally {
-    if (desktop && owner && ownsLock) {
-      const releaseDesktop = desktop;
-      const releaseOwner = owner;
-      void releaseDesktop.locks
-        .release({ resource: CHANTIERS_RESOURCE, leaseId, owner: releaseOwner })
-        .catch(() => undefined);
-    }
+    const body =
+      error instanceof ChantiersRepositoryError && error.details?.lockedBy
+        ? { error: code, lockedBy: error.details.lockedBy }
+        : { error: code };
+    return noStoreJson(body, { status: statusFor(code) });
   }
 }
