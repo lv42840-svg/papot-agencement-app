@@ -1,22 +1,30 @@
 import "server-only";
 
-import { createHash, randomUUID } from "node:crypto";
-import type { EntryAttachment } from "./domain";
+import { randomUUID } from "node:crypto";
+import type { ServerFileStore } from "@/lib/server-files/storage";
 import type { NextcloudDavClient } from "@/lib/sync/nextcloud-dav";
+import type { EntryAttachment } from "./domain";
 
 export const MAX_ENTRY_ATTACHMENTS_PER_UPLOAD = 12;
 export const MAX_ENTRY_ATTACHMENT_BYTES = 100 * 1024 * 1024;
 
 export type EntryAttachmentTransport = {
-  dav: NextcloudDavClient;
-  nextcloudUserId: string;
-  syncRoot: string;
+  store: ServerFileStore;
   displayName: string;
 };
 
+export type LegacyEntryAttachmentTransport = {
+  dav: NextcloudDavClient;
+  nextcloudUserId: string;
+  syncRoot: string;
+};
+
 function safeFileName(value: string): string {
-  const trimmed = value.trim().replace(/[\\/\0]/g, "-");
-  return (trimmed || "piece-jointe").slice(0, 180);
+  const cleaned = value
+    .trim()
+    .replace(/[<>:"/\\|?*\x00-\x1F]/g, "-")
+    .replace(/[. ]+$/g, "");
+  return (cleaned || "piece-jointe").slice(0, 180);
 }
 
 function validateFiles(files: File[]): void {
@@ -31,24 +39,16 @@ function validateFiles(files: File[]): void {
   }
 }
 
-async function entryAttachmentRoot(
-  transport: EntryAttachmentTransport,
-  entryId: string,
-  attachmentId?: string,
-): Promise<string> {
-  const filesRoot = transport.dav.filesRoot(transport.nextcloudUserId);
-  const segments = [transport.syncRoot, "documents", "entries", entryId];
-  if (attachmentId) segments.push(attachmentId);
-  return transport.dav.ensurePath(filesRoot, segments);
-}
-
-async function deleteAttachmentCollection(
-  transport: EntryAttachmentTransport,
-  entryId: string,
-  attachmentId: string,
-): Promise<void> {
-  const collection = await entryAttachmentRoot(transport, entryId, attachmentId);
-  await transport.dav.delete(collection, true);
+function validateAttachmentPath(attachment: EntryAttachment): string[] {
+  const allowedPrefixes = ["documents/entries/", "documents/captures/"];
+  if (!allowedPrefixes.some((prefix) => attachment.storagePath.startsWith(prefix))) {
+    throw new Error("ENTRY_ATTACHMENT_PATH_INVALID");
+  }
+  const segments = attachment.storagePath.split("/").filter(Boolean);
+  if (segments.some((segment) => segment === "." || segment === "..")) {
+    throw new Error("ENTRY_ATTACHMENT_PATH_INVALID");
+  }
+  return segments;
 }
 
 export async function uploadEntryAttachments(
@@ -64,25 +64,17 @@ export async function uploadEntryAttachments(
     for (const file of files) {
       const id = randomUUID();
       const objectName = safeFileName(file.name);
-      const collection = await entryAttachmentRoot(transport, entryId, id);
-      const url = transport.dav.childUrl(collection, objectName);
+      const storagePath = `documents/entries/${entryId}/${id}/${objectName}`;
       const bytes = Buffer.from(await file.arrayBuffer());
-      const sha256 = createHash("sha256").update(bytes).digest("hex");
-
-      try {
-        await transport.dav.putBytes(url, bytes, file.type || "application/octet-stream");
-      } catch (error) {
-        await transport.dav.delete(collection, true).catch(() => undefined);
-        throw error;
-      }
+      const written = await transport.store.writeBytes(storagePath, bytes);
 
       uploaded.push({
         id,
         fileName: file.name,
         contentType: file.type || "application/octet-stream",
-        sizeBytes: file.size,
-        sha256,
-        storagePath: `documents/entries/${entryId}/${id}/${objectName}`,
+        sizeBytes: written.sizeBytes,
+        sha256: written.sha256,
+        storagePath: written.storagePath,
         uploadedAt: now.toISOString(),
         uploadedByName: transport.displayName,
       });
@@ -90,52 +82,41 @@ export async function uploadEntryAttachments(
 
     return uploaded;
   } catch (error) {
-    await Promise.all(
-      uploaded.map((attachment) =>
-        deleteAttachmentCollection(transport, entryId, attachment.id).catch(() => undefined),
-      ),
-    );
+    await cleanupEntryAttachments(transport, uploaded);
     throw error;
   }
 }
 
-export function attachmentUrl(
-  transport: Pick<EntryAttachmentTransport, "dav" | "nextcloudUserId" | "syncRoot">,
+export async function readEntryAttachment(
+  transport: Pick<EntryAttachmentTransport, "store">,
   attachment: EntryAttachment,
-): string {
-  const allowedPrefixes = ["documents/entries/", "documents/captures/"];
-  if (!allowedPrefixes.some((prefix) => attachment.storagePath.startsWith(prefix))) {
-    throw new Error("ENTRY_ATTACHMENT_PATH_INVALID");
+): Promise<Buffer> {
+  validateAttachmentPath(attachment);
+  const bytes = await transport.store.readBytes(attachment.storagePath, attachment.sha256);
+  if (bytes.length !== attachment.sizeBytes) {
+    throw new Error("ENTRY_ATTACHMENT_INTEGRITY_MISMATCH");
   }
-  const segments = attachment.storagePath.split("/").filter(Boolean);
-  if (segments.some((segment) => segment === "." || segment === "..")) {
-    throw new Error("ENTRY_ATTACHMENT_PATH_INVALID");
-  }
+  return bytes;
+}
+
+export async function readLegacyEntryAttachmentBytes(
+  transport: LegacyEntryAttachmentTransport,
+  attachment: EntryAttachment,
+): Promise<Buffer> {
+  const segments = validateAttachmentPath(attachment);
   let url = transport.dav.filesRoot(transport.nextcloudUserId);
   url = transport.dav.childUrl(url, transport.syncRoot);
   for (const segment of segments) url = transport.dav.childUrl(url, segment);
-  return url;
+  return transport.dav.getBytes(url);
 }
 
 export async function cleanupEntryAttachments(
-  transport: EntryAttachmentTransport,
+  transport: Pick<EntryAttachmentTransport, "store">,
   attachments: EntryAttachment[],
 ): Promise<void> {
   await Promise.all(
-    attachments.map(async (attachment) => {
-      try {
-        const segments = attachment.storagePath.split("/").filter(Boolean);
-        const attachmentIdIndex = segments.indexOf(attachment.id);
-        if (attachmentIdIndex < 0) return;
-        let url = transport.dav.filesRoot(transport.nextcloudUserId);
-        url = transport.dav.childUrl(url, transport.syncRoot);
-        for (const segment of segments.slice(0, attachmentIdIndex + 1)) {
-          url = transport.dav.childUrl(url, segment);
-        }
-        await transport.dav.delete(url, true);
-      } catch {
-        // Best effort cleanup only. Orphan cleanup can be retried separately.
-      }
-    }),
+    attachments.map((attachment) =>
+      transport.store.deleteFile(attachment.storagePath).catch(() => undefined),
+    ),
   );
 }
