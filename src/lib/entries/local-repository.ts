@@ -1,19 +1,20 @@
 import "server-only";
 
 import { mutateLocalSnapshot, readLocalSnapshot } from "@/lib/local-db/runtime";
-import { parseEntriesPayload } from "./domain";
-import { applyEntriesMutation, registerEntryAttachments } from "./mutations";
+import { parseEntriesPayload, type EntriesPayload } from "./domain";
+import {
+  applyEntriesMutation,
+  registerEntryAttachments,
+  type EntriesMutationResult,
+} from "./mutations";
 import type { EntriesRepository } from "./repository";
 
 const RESOURCE_KEY = "entries";
 
 export function createLocalEntriesRepository(): EntriesRepository {
-  const persist = <T>(
-    transform: (payload: ReturnType<typeof parseEntriesPayload>) => {
-      payload: ReturnType<typeof parseEntriesPayload>;
-      focusEntryId: string | null;
-    } & T,
-  ) =>
+  const persist = (
+    transform: (payload: EntriesPayload) => EntriesMutationResult,
+  ): Promise<EntriesMutationResult> =>
     mutateLocalSnapshot(RESOURCE_KEY, parseEntriesPayload, ({ payload }) => {
       const mutation = transform(structuredClone(payload));
       return { payload: mutation.payload, result: mutation };
