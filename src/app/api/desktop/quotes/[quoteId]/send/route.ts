@@ -35,10 +35,7 @@ function errorStatus(code: string): number {
   return 400;
 }
 
-export async function POST(
-  request: Request,
-  { params }: { params: Promise<{ quoteId: string }> },
-) {
+export async function POST(request: Request, { params }: { params: Promise<{ quoteId: string }> }) {
   try {
     const { quoteId } = await params;
     const input = sendQuoteSchema.parse(await request.json());
