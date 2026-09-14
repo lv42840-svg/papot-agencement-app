@@ -1,6 +1,6 @@
 import { randomUUID } from "node:crypto";
 import type { DesktopRequestContext } from "@/lib/desktop/request-context";
-import { parseCommercialPayload } from "./domain";
+import { parseCommercialPayload, type CommercialPayload } from "./domain";
 import {
   CommercialRepositoryError,
   type CommercialMutationTransform,
@@ -12,6 +12,52 @@ const LOCK_TTL_MS = 30_000;
 
 type Desktop = DesktopRequestContext["desktop"];
 type Owner = DesktopRequestContext["owner"];
+
+export async function acquireNextcloudCommercialSnapshot(params: {
+  desktop: Desktop;
+  owner: Owner;
+}): Promise<{ payload: CommercialPayload; release(): Promise<void> }> {
+  const leaseId = randomUUID();
+  const lockResult = await params.desktop.locks.acquire({
+    resource: COMMERCIAL_RESOURCE,
+    leaseId,
+    owner: params.owner,
+    baseVersion: 0,
+    ttlMs: LOCK_TTL_MS,
+    reclaimOwnAfterMs: 0,
+  });
+
+  if (lockResult.status === "locked") {
+    throw new CommercialRepositoryError("COMMERCIAL_LOCKED", {
+      lockedBy: lockResult.lock.owner_display_name,
+    });
+  }
+
+  let released = false;
+  const release = async () => {
+    if (released) return;
+    released = true;
+    await params.desktop.locks.release({
+      resource: COMMERCIAL_RESOURCE,
+      leaseId,
+      owner: params.owner,
+    });
+  };
+
+  try {
+    const resource = await params.desktop.states.get(COMMERCIAL_RESOURCE);
+    return { payload: parseCommercialPayload(resource?.payload), release };
+  } catch (error) {
+    await release().catch((releaseError: unknown) => {
+      const code =
+        releaseError instanceof Error
+          ? releaseError.message
+          : "COMMERCIAL_CUTOVER_LOCK_RELEASE_FAILED";
+      console.error("[PAPOT][Commercial] source lock release failed", { code });
+    });
+    throw error;
+  }
+}
 
 export function createNextcloudCommercialRepository(params: {
   desktop: Desktop;

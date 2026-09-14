@@ -51,3 +51,4 @@ jobs:
       - run: npm test -- tests/clients-concurrency.integration.test.ts
       - run: npm test -- tests/auth-postgres.integration.test.ts
       - run: npm test -- tests/entries-postgres.integration.test.ts
+      - run: npm test -- tests/commercial-postgres.integration.test.ts
