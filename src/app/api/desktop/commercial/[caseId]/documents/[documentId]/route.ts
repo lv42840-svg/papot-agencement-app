@@ -1,12 +1,11 @@
 import { NextResponse } from "next/server";
-import { requireDesktopRequestContext } from "@/lib/desktop/request-context";
+import { createCommercialRepository } from "@/lib/commercial/create-repository";
 import { commercialDocumentUrl } from "@/lib/commercial/document-storage";
-import { parseCommercialPayload } from "@/lib/commercial/domain";
+import { requireDesktopRequestContext } from "@/lib/desktop/request-context";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
-const COMMERCIAL_RESOURCE = { resource_type: "COMMERCIAL" as const, resource_id: "global" };
 type RouteContext = { params: Promise<{ caseId: string; documentId: string }> };
 
 function contentDisposition(fileName: string, download: boolean): string {
@@ -17,9 +16,10 @@ function contentDisposition(fileName: string, download: boolean): string {
 export async function GET(request: Request, context: RouteContext) {
   try {
     const { caseId, documentId } = await context.params;
-    const { desktop } = await requireDesktopRequestContext("commercial", "READ");
-    const resource = await desktop.states.get(COMMERCIAL_RESOURCE);
-    const payload = parseCommercialPayload(resource?.payload);
+    const requestContext = await requireDesktopRequestContext("commercial", "READ");
+    const { desktop } = requestContext;
+    const repository = createCommercialRepository(requestContext);
+    const payload = await repository.load();
     const item = payload.cases.find((candidate) => candidate.id === caseId);
     if (!item) {
       return NextResponse.json({ error: "COMMERCIAL_CASE_NOT_FOUND" }, { status: 404 });
