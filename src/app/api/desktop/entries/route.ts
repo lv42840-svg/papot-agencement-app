@@ -56,7 +56,7 @@ export async function GET() {
   try {
     const context = await requireDesktopRequestContext("capture", "READ");
     const actor = actorFor(context);
-    const repository = createEntriesRepository(context);
+    const repository = await createEntriesRepository(context);
     const payload = await repository.load();
     return noStoreJson(publicSnapshot(payload, actor));
   } catch (error) {
@@ -74,7 +74,7 @@ export async function POST(request: Request) {
     stage = "create-context";
     const context = await requireDesktopRequestContext("capture", "WRITE");
     const actor = actorFor(context);
-    const repository = createEntriesRepository(context);
+    const repository = await createEntriesRepository(context);
 
     stage = "mutate-repository";
     const mutation = await repository.mutate(input, actor);
