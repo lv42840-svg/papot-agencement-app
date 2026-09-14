@@ -93,9 +93,7 @@ export function createNextcloudEntriesRepository(params: {
       return persist((payload) => applyEntriesMutation(payload, input, actor));
     },
     async registerAttachments(entryId, attachments, actor) {
-      return persist((payload) =>
-        registerEntryAttachments(payload, entryId, attachments, actor),
-      );
+      return persist((payload) => registerEntryAttachments(payload, entryId, attachments, actor));
     },
   };
 }
