@@ -124,19 +124,20 @@ export async function ensureClientsPostgresCutover(params: {
   const pool = params.pool ?? getServerDbPool();
   if (await findCutoverMarker(pool)) return;
 
-  let lockedSource: LockedClientsSnapshot | null = null;
+  const sourceLock = { current: null as LockedClientsSnapshot | null };
 
   try {
     await withServerDbTransaction(async (client) => {
       await client.query("SELECT pg_advisory_xact_lock($1)", [CLIENTS_CUTOVER_LOCK_ID]);
       if (await findCutoverMarker(client)) return;
 
-      lockedSource = await params.acquireSource();
-      const source = parseClientsPayload(lockedSource.payload);
+      sourceLock.current = await params.acquireSource();
+      const source = parseClientsPayload(sourceLock.current.payload);
       const sourceHash = clientsPayloadHash(source);
       await importSnapshot(client, source, sourceHash);
     }, pool);
   } finally {
+    const lockedSource = sourceLock.current;
     if (lockedSource) {
       await lockedSource.release().catch((error: unknown) => {
         const code = error instanceof Error ? error.message : "CLIENTS_CUTOVER_LOCK_RELEASE_FAILED";
