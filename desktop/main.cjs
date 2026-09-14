@@ -17,6 +17,7 @@ const {
 } = require("./setup-store.cjs");
 const { openLocalDatabase } = require("./local-database.cjs");
 const { startDevelopmentServer, startPackagedServer } = require("./server-manager.cjs");
+const { selectDesktopStartPath } = require("./start-route.cjs");
 
 const appUrl = normalizeLocalAppUrl(process.env.PAPOT_APP_URL || DEFAULT_DESKTOP_APP_URL);
 let localDatabase;
@@ -209,7 +210,7 @@ function createMainWindow() {
 
   window.once("ready-to-show", () => window.show());
   const setupComplete = hasDesktopSetup({ userDataPath: app.getPath("userData"), safeStorage });
-  window.loadURL(setupComplete ? desktopUrl("/desktop-ready") : desktopUrl("/desktop-setup"));
+  window.loadURL(desktopUrl(selectDesktopStartPath({ setupComplete })));
 
   return window;
 }

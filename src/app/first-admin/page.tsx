@@ -2,11 +2,21 @@ import { redirect } from "next/navigation";
 import { Brand } from "@/components/brand";
 import { FirstAdminForm } from "@/components/first-admin-form";
 import { authHasUsers } from "@/lib/auth/store";
+import { hasDesktopDatabaseConfig } from "@/lib/desktop/database-config";
 
 export const dynamic = "force-dynamic";
 
 export default async function FirstAdminPage() {
-  if (await authHasUsers()) redirect("/login");
+  if (!hasDesktopDatabaseConfig()) redirect("/desktop-server-required");
+
+  let hasUsers: boolean;
+  try {
+    hasUsers = await authHasUsers();
+  } catch {
+    redirect("/desktop-server-required?reason=unavailable");
+  }
+
+  if (hasUsers) redirect("/login");
 
   return (
     <main className="loginPage">
