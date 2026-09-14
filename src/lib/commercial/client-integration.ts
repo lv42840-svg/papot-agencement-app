@@ -45,6 +45,10 @@ export async function listCanonicalCommercialClients(
       displayName: clientDisplayName(client),
       email: client.email || null,
       phone: client.phone || null,
+      addressLine1: client.addressLine1 || null,
+      addressLine2: client.addressLine2 || null,
+      postalCode: client.postalCode || null,
+      city: client.city || null,
     }))
     .sort((a, b) => a.displayName.localeCompare(b.displayName, "fr-FR", { sensitivity: "base" }));
 }
