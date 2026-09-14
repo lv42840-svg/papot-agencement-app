@@ -5,19 +5,34 @@ import { acquireNextcloudCommercialSnapshot } from "./nextcloud-repository";
 import { createPostgresCommercialRepository } from "./postgres-repository";
 import type { CommercialRepository } from "./repository";
 
-export async function createCommercialRepository(
+export function createCommercialRepository(
   context: Pick<DesktopRequestContext, "desktop" | "owner">,
-): Promise<CommercialRepository> {
-  const pool = getServerDbPool();
-  await runServerDbMigrations(pool);
-  await ensureCommercialPostgresCutover({
-    pool,
-    acquireSource: () =>
-      acquireNextcloudCommercialSnapshot({
-        desktop: context.desktop,
-        owner: context.owner,
-      }),
-  });
+): CommercialRepository {
+  let repositoryPromise: Promise<CommercialRepository> | null = null;
 
-  return createPostgresCommercialRepository(pool);
+  const initialize = () => {
+    repositoryPromise ??= (async () => {
+      const pool = getServerDbPool();
+      await runServerDbMigrations(pool);
+      await ensureCommercialPostgresCutover({
+        pool,
+        acquireSource: () =>
+          acquireNextcloudCommercialSnapshot({
+            desktop: context.desktop,
+            owner: context.owner,
+          }),
+      });
+      return createPostgresCommercialRepository(pool);
+    })();
+    return repositoryPromise;
+  };
+
+  return {
+    async load() {
+      return (await initialize()).load();
+    },
+    async mutate(transform) {
+      return (await initialize()).mutate(transform);
+    },
+  };
 }
