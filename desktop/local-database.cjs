@@ -4,7 +4,7 @@ const path = require("node:path");
 const { DatabaseSync } = require("node:sqlite");
 
 const DATABASE_FILE_NAME = "papot-local.sqlite";
-const LOCAL_DATABASE_SCHEMA_VERSION = 1;
+const LOCAL_DATABASE_SCHEMA_VERSION = 2;
 const FORBIDDEN_SETTING_KEY = /(password|secret|token|credential|private[_-]?key)/i;
 
 function databasePath(userDataPath) {
@@ -62,6 +62,35 @@ function migrate(database) {
           ON pending_operations (status, next_attempt_at, created_at);
 
         UPDATE local_schema SET version = 1 WHERE singleton = 1;
+      `);
+    }
+
+    if (current.version < 2) {
+      database.exec(`
+        CREATE TABLE IF NOT EXISTS local_business_snapshots (
+          resource_key TEXT PRIMARY KEY,
+          version INTEGER NOT NULL DEFAULT 0 CHECK (version >= 0),
+          payload_json TEXT NOT NULL,
+          updated_at TEXT NOT NULL
+        ) STRICT;
+
+        CREATE TABLE IF NOT EXISTS local_shared_resource_states (
+          resource_type TEXT NOT NULL,
+          resource_id TEXT NOT NULL,
+          envelope_json TEXT NOT NULL,
+          updated_at TEXT NOT NULL,
+          PRIMARY KEY (resource_type, resource_id)
+        ) STRICT;
+
+        CREATE TABLE IF NOT EXISTS local_shared_resource_locks (
+          resource_type TEXT NOT NULL,
+          resource_id TEXT NOT NULL,
+          lock_json TEXT NOT NULL,
+          updated_at TEXT NOT NULL,
+          PRIMARY KEY (resource_type, resource_id)
+        ) STRICT;
+
+        UPDATE local_schema SET version = 2 WHERE singleton = 1;
       `);
     }
 

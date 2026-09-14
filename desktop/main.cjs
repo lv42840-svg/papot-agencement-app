@@ -15,12 +15,16 @@ const {
   readDesktopSetup,
   saveDesktopSetup,
 } = require("./setup-store.cjs");
-const { openLocalDatabase } = require("./local-database.cjs");
+const { databasePath, openLocalDatabase } = require("./local-database.cjs");
 const { startDevelopmentServer, startPackagedServer } = require("./server-manager.cjs");
 
 const appUrl = normalizeLocalAppUrl(process.env.PAPOT_APP_URL || DEFAULT_DESKTOP_APP_URL);
 let localDatabase;
 let developmentServer;
+
+function isLocalStorageMode() {
+  return (process.env.PAPOT_STORAGE_MODE || "local").toLowerCase() === "local";
+}
 
 function exposeSetupToLocalServer(setup) {
   if (!setup) {
@@ -30,6 +34,16 @@ function exposeSetupToLocalServer(setup) {
   }
   process.env.PAPOT_DESKTOP_CONFIG_JSON = JSON.stringify(setup.config);
   process.env.PAPOT_NEXTCLOUD_APP_PASSWORD = setup.nextcloudAppPassword;
+}
+
+function configureLocalStorageEnvironment() {
+  const userDataPath = app.getPath("userData");
+  process.env.PAPOT_STORAGE_MODE = "local";
+  process.env.PAPOT_LOCAL_DB_PATH = process.env.PAPOT_LOCAL_DB_PATH || databasePath(userDataPath);
+  process.env.PAPOT_LOCAL_FILES_PATH =
+    process.env.PAPOT_LOCAL_FILES_PATH || path.join(userDataPath, "business-files");
+  fs.mkdirSync(process.env.PAPOT_LOCAL_FILES_PATH, { recursive: true });
+  exposeSetupToLocalServer(null);
 }
 
 function desktopUrl(pathname) {
@@ -209,14 +223,24 @@ function createMainWindow() {
 
   window.once("ready-to-show", () => window.show());
   const setupComplete = hasDesktopSetup({ userDataPath: app.getPath("userData"), safeStorage });
-  window.loadURL(setupComplete ? desktopUrl("/desktop-ready") : desktopUrl("/desktop-setup"));
+  window.loadURL(
+    isLocalStorageMode() || setupComplete
+      ? desktopUrl("/desktop-ready")
+      : desktopUrl("/desktop-setup"),
+  );
 
   return window;
 }
 
 app.whenReady().then(async () => {
-  const setup = readDesktopSetup({ userDataPath: app.getPath("userData"), safeStorage });
-  exposeSetupToLocalServer(setup);
+  if (isLocalStorageMode()) {
+    configureLocalStorageEnvironment();
+  } else {
+    const setup = readDesktopSetup({ userDataPath: app.getPath("userData"), safeStorage });
+    exposeSetupToLocalServer(setup);
+  }
+
+  localDatabase = openLocalDatabase(app.getPath("userData"));
 
   const parsedAppUrl = new URL(appUrl);
   const serverConfig = {
@@ -236,7 +260,6 @@ app.whenReady().then(async () => {
     });
   }
 
-  localDatabase = openLocalDatabase(app.getPath("userData"));
   registerDesktopSetupHandler();
 
   session.defaultSession.setPermissionCheckHandler(() => false);
