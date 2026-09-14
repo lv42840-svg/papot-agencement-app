@@ -55,9 +55,15 @@ describe("embedded local database", () => {
     database.close();
   });
 
-  it("creates cache and pending-operation tables for local-only state", () => {
+  it("creates local cache, queue and business storage tables", () => {
     const database = localDatabase.openLocalDatabase(makeTempDirectory());
-    for (const table of ["cache_entries", "pending_operations"]) {
+    for (const table of [
+      "cache_entries",
+      "pending_operations",
+      "local_business_snapshots",
+      "local_shared_resource_states",
+      "local_shared_resource_locks",
+    ]) {
       const row = database
         .prepare("SELECT name FROM sqlite_master WHERE type = 'table' AND name = ?")
         .get(table);
