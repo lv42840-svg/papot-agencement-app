@@ -1,12 +1,23 @@
 import type { DesktopRequestContext } from "@/lib/desktop/request-context";
-import { createNextcloudEntriesRepository } from "./nextcloud-repository";
+import { getServerDbPool, runServerDbMigrations } from "@/lib/server-db";
+import { ensureEntriesPostgresCutover } from "./cutover";
+import { acquireNextcloudEntriesSnapshot } from "./nextcloud-repository";
+import { createPostgresEntriesRepository } from "./postgres-repository";
 import type { EntriesRepository } from "./repository";
 
-export function createEntriesRepository(
+export async function createEntriesRepository(
   context: Pick<DesktopRequestContext, "desktop" | "owner">,
-): EntriesRepository {
-  return createNextcloudEntriesRepository({
-    desktop: context.desktop,
-    owner: context.owner,
+): Promise<EntriesRepository> {
+  const pool = getServerDbPool();
+  await runServerDbMigrations(pool);
+  await ensureEntriesPostgresCutover({
+    pool,
+    acquireSource: () =>
+      acquireNextcloudEntriesSnapshot({
+        desktop: context.desktop,
+        owner: context.owner,
+      }),
   });
+
+  return createPostgresEntriesRepository(pool);
 }
