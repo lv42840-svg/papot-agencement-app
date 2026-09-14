@@ -3,8 +3,8 @@ import "server-only";
 import { createHash } from "node:crypto";
 import type { Pool, PoolClient } from "pg";
 
-import { getServerDbPool } from "@/lib/server-db/pool";
-import { withServerDbTransaction } from "@/lib/server-db/transaction";
+import { getServerDbPool } from "../server-db/pool";
+import { withServerDbTransaction } from "../server-db/transaction";
 import { parseClientsPayload, type ClientsPayload } from "./domain";
 
 const CLIENTS_CUTOVER_DOMAIN = "clients";
