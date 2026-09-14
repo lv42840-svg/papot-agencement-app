@@ -7,7 +7,10 @@ import {
   commercialPayloadHash,
   ensureCommercialPostgresCutover,
 } from "../src/lib/commercial/cutover";
-import { createInitialCommercialPayload } from "../src/lib/commercial/domain";
+import {
+  createInitialCommercialPayload,
+  parseCommercialPayload,
+} from "../src/lib/commercial/domain";
 import { applyCommercialMutation } from "../src/lib/commercial/mutations";
 import { createPostgresCommercialRepository } from "../src/lib/commercial/postgres-repository";
 import { runServerDbMigrations } from "../src/lib/server-db/migrations";
@@ -21,20 +24,22 @@ const actor = {
 };
 
 function createCase(source: ReturnType<typeof createInitialCommercialPayload>, name: string) {
-  return applyCommercialMutation(
-    source,
-    {
-      action: "create",
-      name,
-      clientName: "Client test",
-      siteLabel: "Roanne",
-      reviewDate: "2026-09-30",
-      description: "",
-      nextAction: "",
-    },
-    actor,
-    new Date("2026-09-14T10:00:00.000Z"),
-  ).payload;
+  return parseCommercialPayload(
+    applyCommercialMutation(
+      source,
+      {
+        action: "create",
+        name,
+        clientName: "Client test",
+        siteLabel: "Roanne",
+        reviewDate: "2026-09-30",
+        description: "",
+        nextAction: "",
+      },
+      actor,
+      new Date("2026-09-14T10:00:00.000Z"),
+    ).payload,
+  );
 }
 
 describeWithPostgres("Commercial PostgreSQL cutover", () => {
