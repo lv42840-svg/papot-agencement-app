@@ -1,12 +1,13 @@
 import { describe, expect, it, vi } from "vitest";
 import { createInitialClientsPayload } from "../src/lib/clients/domain";
+import { applyClientsMutation } from "../src/lib/clients/mutations";
 import { createNextcloudClientsRepository } from "../src/lib/clients/nextcloud-repository";
 import { ClientsRepositoryError } from "../src/lib/clients/repository";
 
 const owner = {
   userId: "11111111-1111-4111-8111-111111111111",
   deviceId: "22222222-2222-4222-8222-222222222222",
-  displayName: "Lucien",
+  displayName: "Test User",
 };
 const actor = { userId: owner.userId, displayName: owner.displayName };
 const clientId = "33333333-3333-4333-8333-333333333333";
@@ -15,7 +16,7 @@ const createInput = {
   action: "create" as const,
   clientId,
   type: "ENTREPRISE" as const,
-  companyName: "Dupont Agencement",
+  companyName: "Test Agencement",
   firstName: "",
   lastName: "",
   addressLine1: "12 rue des Ateliers",
@@ -23,7 +24,7 @@ const createInput = {
   postalCode: "42300",
   city: "Roanne",
   phone: "04 77 00 00 00",
-  email: "contact@dupont.test",
+  email: "contact@example.test",
   siret: "12345678901234",
   paymentTerms: "45 jours fin de mois",
   notes: "Client test",
@@ -81,7 +82,7 @@ function createRepository(overrides?: {
     owner,
   });
 
-  return { repository, get, getCached, openForUpdate, saveOpened, acquire, release };
+  return { repository, get, openForUpdate, saveOpened, release };
 }
 
 describe("clients repository", () => {
@@ -105,42 +106,38 @@ describe("clients repository", () => {
   });
 
   it("reopens and retries once after a storage conflict", async () => {
-    const empty = createInitialClientsPayload();
-    const secondSavedPayload = {
-      ...empty,
-      clients: [],
-    };
-    const firstConflict = { status: "conflict", current: null };
+    const secondSavedPayload = applyClientsMutation(
+      createInitialClientsPayload(),
+      createInput,
+      actor,
+      new Date("2026-09-14T07:00:00.000Z"),
+    ).payload;
     const { repository, openForUpdate, saveOpened } = createRepository({
       openResults: [
         { resource: null, etag: null },
         { resource: null, etag: null },
       ],
       saveResults: [
-        firstConflict,
-        {
-          status: "saved",
-          resource: envelope(secondSavedPayload, 2),
-        },
+        { status: "conflict", current: null },
+        { status: "saved", resource: envelope(secondSavedPayload, 2) },
       ],
     });
 
-    await expect(repository.mutate(createInput, actor)).rejects.toThrow("CLIENTS_STORE_INVALID");
+    const result = await repository.mutate(createInput, actor);
+
+    expect(result.payload.clients[0].id).toBe(clientId);
     expect(openForUpdate).toHaveBeenCalledTimes(2);
     expect(saveOpened).toHaveBeenCalledTimes(2);
   });
 
   it("surfaces who owns a lock without releasing another device lock", async () => {
     const { repository, release } = createRepository({
-      lockResult: {
-        status: "locked",
-        lock: { owner_display_name: "Nadia" },
-      },
+      lockResult: { status: "locked", lock: { owner_display_name: "Other User" } },
     });
 
     await expect(repository.mutate(createInput, actor)).rejects.toMatchObject<ClientsRepositoryError>({
       message: "CLIENTS_LOCKED",
-      details: { lockedBy: "Nadia" },
+      details: { lockedBy: "Other User" },
     });
     expect(release).not.toHaveBeenCalled();
   });
