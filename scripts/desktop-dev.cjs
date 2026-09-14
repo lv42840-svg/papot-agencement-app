@@ -3,7 +3,7 @@
 const { spawn } = require("node:child_process");
 const path = require("node:path");
 
-const appUrl = process.env.PAPOT_APP_URL || "http://127.0.0.1:3217/desktop-setup";
+const appUrl = process.env.PAPOT_APP_URL || "http://127.0.0.1:3217/desktop-ready";
 
 async function main() {
   // Electron 42+ no longer downloads its native binary during npm install.
@@ -16,6 +16,7 @@ async function main() {
       ...process.env,
       PAPOT_APP_URL: appUrl,
       PAPOT_MANAGE_DEV_SERVER: "1",
+      PAPOT_STORAGE_MODE: process.env.PAPOT_STORAGE_MODE || "local",
     },
   });
 
