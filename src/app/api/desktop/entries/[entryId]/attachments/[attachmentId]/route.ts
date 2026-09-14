@@ -1,6 +1,10 @@
 import { NextResponse } from "next/server";
-import { requireDesktopRequestContext } from "@/lib/desktop/request-context";
-import { attachmentUrl } from "@/lib/entries/attachment-storage";
+import {
+  desktopRequestErrorStatus,
+  requireDesktopRequestContext,
+} from "@/lib/desktop/request-context";
+import { createEntryAttachmentTransport } from "@/lib/entries/attachment-file-runtime";
+import { readEntryAttachment } from "@/lib/entries/attachment-storage";
 import { createEntriesRepository } from "@/lib/entries/create-repository";
 
 export const runtime = "nodejs";
@@ -13,11 +17,20 @@ function contentDisposition(fileName: string, download: boolean): string {
   return `${download ? "attachment" : "inline"}; filename="${safeAscii}"; filename*=UTF-8''${encodeURIComponent(fileName)}`;
 }
 
+function statusFor(code: string): number {
+  const requestStatus = desktopRequestErrorStatus(code);
+  if (requestStatus) return requestStatus;
+  if (code === "ENTRY_NOT_FOUND" || code === "ENTRY_ATTACHMENT_NOT_FOUND") return 404;
+  if (code === "SERVER_FILE_NOT_FOUND") return 404;
+  if (code === "SERVER_FILE_ROOT_UNAVAILABLE") return 503;
+  if (code.includes("INTEGRITY") || code.includes("CUTOVER_VALIDATION")) return 500;
+  return 400;
+}
+
 export async function GET(request: Request, context: RouteContext) {
   try {
     const { entryId, attachmentId } = await context.params;
     const requestContext = await requireDesktopRequestContext("capture", "READ");
-    const { desktop } = requestContext;
     const repository = await createEntriesRepository(requestContext);
     const payload = await repository.load();
     const entry = payload.entries.find((candidate) => candidate.id === entryId);
@@ -27,11 +40,8 @@ export async function GET(request: Request, context: RouteContext) {
       return NextResponse.json({ error: "ENTRY_ATTACHMENT_NOT_FOUND" }, { status: 404 });
     }
 
-    const url = attachmentUrl(
-      { dav: desktop.dav, nextcloudUserId: desktop.nextcloudUserId, syncRoot: desktop.syncRoot },
-      attachment,
-    );
-    const bytes = await desktop.dav.getBytes(url);
+    const transport = await createEntryAttachmentTransport(requestContext);
+    const bytes = await readEntryAttachment(transport, attachment);
     const download = new URL(request.url).searchParams.get("download") === "1";
     const canInline =
       attachment.contentType.startsWith("image/") || attachment.contentType === "application/pdf";
@@ -48,7 +58,6 @@ export async function GET(request: Request, context: RouteContext) {
     });
   } catch (error) {
     const code = error instanceof Error ? error.message : "ENTRY_ATTACHMENT_READ_FAILED";
-    const status = code === "AUTH_REQUIRED" ? 401 : code === "MODULE_FORBIDDEN" ? 403 : 400;
-    return NextResponse.json({ error: code }, { status });
+    return NextResponse.json({ error: code }, { status: statusFor(code) });
   }
 }

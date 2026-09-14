@@ -3,6 +3,7 @@ import {
   desktopRequestErrorStatus,
   requireDesktopRequestContext,
 } from "@/lib/desktop/request-context";
+import { createEntryAttachmentTransport } from "@/lib/entries/attachment-file-runtime";
 import { cleanupEntryAttachments, uploadEntryAttachments } from "@/lib/entries/attachment-storage";
 import { createEntriesRepository } from "@/lib/entries/create-repository";
 import type { EntriesPayload } from "@/lib/entries/domain";
@@ -41,7 +42,8 @@ function statusFor(code: string): number {
   const requestStatus = desktopRequestErrorStatus(code);
   if (requestStatus) return requestStatus;
   if (code === "ENTRY_NOT_FOUND") return 404;
-  if (code === "ENTRIES_LOCKED") return 423;
+  if (code === "SERVER_FILE_ROOT_UNAVAILABLE") return 503;
+  if (code.includes("INTEGRITY") || code.includes("CUTOVER_VALIDATION")) return 500;
   if (code.includes("CONFLICT")) return 409;
   if (code.includes("TOO_LARGE")) return 413;
   return 400;
@@ -51,7 +53,6 @@ export async function POST(request: Request, context: RouteContext) {
   try {
     const { entryId } = await context.params;
     const requestContext = await requireDesktopRequestContext("capture", "WRITE");
-    const { desktop, owner } = requestContext;
     const actor = actorFor(requestContext);
     const repository = await createEntriesRepository(requestContext);
     const form = await request.formData();
@@ -60,18 +61,12 @@ export async function POST(request: Request, context: RouteContext) {
       return NextResponse.json({ error: "ENTRY_ATTACHMENTS_REQUIRED" }, { status: 400 });
     }
 
-    const transport = {
-      dav: desktop.dav,
-      nextcloudUserId: desktop.nextcloudUserId,
-      syncRoot: desktop.syncRoot,
-      displayName: owner.displayName,
-    };
-
     const currentPayload = await repository.load();
     if (!currentPayload.entries.some((entry) => entry.id === entryId)) {
       return NextResponse.json({ error: "ENTRY_NOT_FOUND" }, { status: 404 });
     }
 
+    const transport = await createEntryAttachmentTransport(requestContext);
     let uploaded = [] as Awaited<ReturnType<typeof uploadEntryAttachments>>;
     try {
       uploaded = await uploadEntryAttachments(transport, entryId, files);
