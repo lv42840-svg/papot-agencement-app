@@ -3,6 +3,7 @@ import {
   QUOTE_MAX_QUANTITY,
   QUOTE_MAX_QUANTITY_EXPRESSION_LENGTH,
   parseQuoteQuantityInput,
+  quoteMoneyCentsSchema,
 } from "./domain";
 
 export const quoteDateSchema = z
@@ -14,6 +15,52 @@ export const quoteDateSchema = z
   }, "QUOTE_DATE_INVALID");
 
 const nullableUuidSchema = z.string().uuid().nullable();
+
+export const quoteLibraryComponentSnapshotSchema = z
+  .object({
+    sourceComponentId: z.string().uuid(),
+    name: z.string().trim().min(1).max(240),
+    description: z.string().trim().max(4000),
+    unit: z.string().trim().min(1).max(40),
+    costPriceCents: quoteMoneyCentsSchema,
+    marginPercent: z.number().finite().min(0),
+    salePriceCents: quoteMoneyCentsSchema,
+  })
+  .strict();
+
+export const quoteLibraryComponentSourceSchema = z
+  .object({
+    schemaVersion: z.literal(1),
+    kind: z.literal("COMPONENT"),
+    component: quoteLibraryComponentSnapshotSchema,
+  })
+  .strict();
+
+export const quoteLibraryOuvrageComponentSnapshotSchema = z
+  .object({
+    sourceLineId: z.string().uuid(),
+    quantity: z.number().finite().positive(),
+    component: quoteLibraryComponentSnapshotSchema,
+  })
+  .strict();
+
+export const quoteLibraryOuvrageSourceSchema = z
+  .object({
+    schemaVersion: z.literal(1),
+    kind: z.literal("OUVRAGE"),
+    sourceOuvrageId: z.string().uuid(),
+    name: z.string().trim().min(1).max(240),
+    description: z.string().trim().max(4000),
+    costPriceCents: quoteMoneyCentsSchema,
+    salePriceCents: quoteMoneyCentsSchema,
+    components: z.array(quoteLibraryOuvrageComponentSnapshotSchema).min(1),
+  })
+  .strict();
+
+export const quoteLibrarySourceSchema = z.discriminatedUnion("kind", [
+  quoteLibraryComponentSourceSchema,
+  quoteLibraryOuvrageSourceSchema,
+]);
 
 export const quoteSectionSchema = z.object({
   id: z.string().uuid(),
@@ -37,6 +84,8 @@ export const quoteLineSchema = z.object({
   unit: z.string().trim().max(40),
   quantity: z.number().finite().positive().max(QUOTE_MAX_QUANTITY),
   quantityFormula: z.string().trim().min(1).max(QUOTE_MAX_QUANTITY_EXPRESSION_LENGTH).nullable(),
+  unitPriceCents: quoteMoneyCentsSchema.optional(),
+  librarySource: quoteLibrarySourceSchema.optional(),
 });
 
 export const quoteCommentSchema = z.object({
@@ -63,6 +112,13 @@ export const quoteModelSchema = z.object({
   items: z.array(quoteItemSchema).max(1000),
 });
 
+export type QuoteLibraryComponentSnapshot = z.infer<typeof quoteLibraryComponentSnapshotSchema>;
+export type QuoteLibraryComponentSource = z.infer<typeof quoteLibraryComponentSourceSchema>;
+export type QuoteLibraryOuvrageComponentSnapshot = z.infer<
+  typeof quoteLibraryOuvrageComponentSnapshotSchema
+>;
+export type QuoteLibraryOuvrageSource = z.infer<typeof quoteLibraryOuvrageSourceSchema>;
+export type QuoteLibrarySource = z.infer<typeof quoteLibrarySourceSchema>;
 export type QuoteSection = z.infer<typeof quoteSectionSchema>;
 export type QuoteSubsection = z.infer<typeof quoteSubsectionSchema>;
 export type QuoteLine = z.infer<typeof quoteLineSchema>;
@@ -113,13 +169,33 @@ function validateQuoteLineFormula(line: QuoteLine): void {
   }
 }
 
+function validateQuoteLineLibrarySource(line: QuoteLine): void {
+  if (!line.librarySource) return;
+  if (line.unitPriceCents === undefined) {
+    throw new Error("QUOTE_LINE_LIBRARY_PRICE_MISSING");
+  }
+
+  if (line.librarySource.kind === "OUVRAGE") {
+    const lineIds = new Set<string>();
+    for (const component of line.librarySource.components) {
+      if (lineIds.has(component.sourceLineId)) {
+        throw new Error("QUOTE_LINE_LIBRARY_SOURCE_INVALID");
+      }
+      lineIds.add(component.sourceLineId);
+    }
+  }
+}
+
 export function parseQuoteModel(value: unknown): QuoteModel {
   const parsed = quoteModelSchema.safeParse(value);
   if (!parsed.success) throw new Error("QUOTE_MODEL_INVALID");
 
   validateQuoteItemHierarchy(parsed.data.items);
   for (const item of parsed.data.items) {
-    if (item.kind === "LINE") validateQuoteLineFormula(item);
+    if (item.kind === "LINE") {
+      validateQuoteLineFormula(item);
+      validateQuoteLineLibrarySource(item);
+    }
   }
 
   return parsed.data;
