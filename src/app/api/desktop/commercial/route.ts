@@ -24,10 +24,7 @@ import {
   type CommercialMutation,
   type CommercialMutationResult,
 } from "@/lib/commercial/mutations";
-import {
-  CommercialRepositoryError,
-  type CommercialRepository,
-} from "@/lib/commercial/repository";
+import { CommercialRepositoryError, type CommercialRepository } from "@/lib/commercial/repository";
 import {
   desktopRequestErrorStatus,
   requireDesktopRequestContext,
@@ -163,13 +160,7 @@ export async function GET() {
         : transition.payload;
 
     return noStoreJson(
-      await snapshot(
-        payload,
-        context.owner,
-        context.moduleAccess.canWrite,
-        context.user,
-        clients,
-      ),
+      await snapshot(payload, context.owner, context.moduleAccess.canWrite, context.user, clients),
     );
   } catch (error) {
     const code = error instanceof Error ? error.message : "COMMERCIAL_LOAD_FAILED";
@@ -239,7 +230,14 @@ export async function POST(request: Request) {
     const mutation = await repository.mutate(buildMutation);
     console.info("[PAPOT][Commercial] POST saved", { ms: Date.now() - startedAt });
     return noStoreJson(
-      await snapshot(mutation.payload, context.owner, true, context.user, clients, mutation.focusCaseId),
+      await snapshot(
+        mutation.payload,
+        context.owner,
+        true,
+        context.user,
+        clients,
+        mutation.focusCaseId,
+      ),
     );
   } catch (error) {
     const code =

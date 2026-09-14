@@ -108,10 +108,9 @@ export async function POST(request: Request, context: RouteContext) {
         registerCommercialDocuments(payload, caseId, uploaded, actor),
       );
 
-      return NextResponse.json(
-        await snapshot(mutation.payload, owner, user, clients, caseId),
-        { headers: { "Cache-Control": "no-store" } },
-      );
+      return NextResponse.json(await snapshot(mutation.payload, owner, user, clients, caseId), {
+        headers: { "Cache-Control": "no-store" },
+      });
     } catch (error) {
       if (uploaded.length > 0) await cleanupCommercialDocuments(transport, uploaded);
       throw error;
