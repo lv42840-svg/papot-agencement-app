@@ -47,7 +47,9 @@ export async function acquireNextcloudLibrarySnapshot(params: {
   } catch (error) {
     await release().catch((releaseError: unknown) => {
       const code =
-        releaseError instanceof Error ? releaseError.message : "LIBRARY_CUTOVER_LOCK_RELEASE_FAILED";
+        releaseError instanceof Error
+          ? releaseError.message
+          : "LIBRARY_CUTOVER_LOCK_RELEASE_FAILED";
       console.error("[PAPOT][Library] source lock release failed", { code });
     });
     throw error;
