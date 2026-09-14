@@ -6,10 +6,14 @@ export type ServerDbConfig = {
   idleTimeoutMillis: number;
 };
 
+type ServerDbEnv = {
+  PAPOT_DATABASE_URL?: string;
+};
+
 const DEFAULT_APPLICATION_NAME = "papot-agencement";
 
 export function getServerDbConfig(
-  env: NodeJS.ProcessEnv = process.env,
+  env: ServerDbEnv = process.env,
 ): ServerDbConfig {
   const connectionString = env.PAPOT_DATABASE_URL?.trim();
 
