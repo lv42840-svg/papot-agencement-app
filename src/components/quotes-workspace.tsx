@@ -59,7 +59,9 @@ export function QuotesWorkspace() {
         <div className="panelHeader">
           <div>
             <h2>Devis</h2>
-            <p className="muted">La liste des brouillons apparaîtra ici dès la brique de stockage.</p>
+            <p className="muted">
+              La liste des brouillons apparaîtra ici dès la brique de stockage.
+            </p>
           </div>
           <span className="countBadge">0</span>
         </div>
