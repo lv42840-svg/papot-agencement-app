@@ -64,4 +64,51 @@ describe("commercial affair details", () => {
     expect(updated.contactPhone).toBe("0102030405");
     expect(updated.contactEmail).toBe("ancien@example.fr");
   });
+
+  it("stores a chantier address override only when the affair needs one", () => {
+    const created = applyCommercialMutation(
+      createInitialCommercialPayload(),
+      {
+        action: "create",
+        name: "Banque - accueil",
+        clientName: "Banque Exemple",
+        siteLabel: "Agence centre-ville",
+        siteAddressOverride: {
+          addressLine1: "12 rue du Chantier",
+          addressLine2: "Bâtiment B",
+          postalCode: "42300",
+          city: "Roanne",
+        },
+        reviewDate: "2026-09-20",
+        description: "",
+        nextAction: "",
+      },
+      actor,
+    ).payload;
+    const affair = created.cases[0];
+
+    expect(affair.siteAddressOverride).toEqual({
+      addressLine1: "12 rue du Chantier",
+      addressLine2: "Bâtiment B",
+      postalCode: "42300",
+      city: "Roanne",
+    });
+
+    const revertedToClientAddress = applyCommercialMutation(
+      created,
+      {
+        action: "updateDetails",
+        caseId: affair.id,
+        name: affair.name,
+        clientName: affair.clientName ?? "",
+        siteLabel: affair.siteLabel ?? "",
+        siteAddressOverride: null,
+        description: "",
+        nextAction: "",
+      },
+      actor,
+    ).payload.cases[0];
+
+    expect(revertedToClientAddress.siteAddressOverride).toBeNull();
+  });
 });
