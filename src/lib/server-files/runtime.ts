@@ -3,7 +3,7 @@ import "server-only";
 import fs from "node:fs";
 import path from "node:path";
 
-import { isLocalStorageMode } from "../local-db/runtime";
+import { isLocalStorageMode } from "../local-db/mode";
 import { ServerFileStore } from "./storage";
 
 type DesktopFileRuntimeConfig = {
