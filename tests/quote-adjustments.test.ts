@@ -43,6 +43,39 @@ function line(
   };
 }
 
+function lineWithPose(
+  id: string,
+  saleCents: number,
+  poseHours: number,
+  parentId: string | null = null,
+  description = id,
+  poseCostRateCents = 5_000,
+  poseSaleRateCents = 7_000,
+): QuoteLine {
+  return {
+    id,
+    kind: "LINE",
+    parentId,
+    description,
+    unit: "u",
+    quantity: 1,
+    quantityFormula: null,
+    unitPriceCents: saleCents,
+    components: [
+      {
+        id: crypto.randomUUID(),
+        description: "Heure pose",
+        unit: "h",
+        quantity: poseHours,
+        quantityFormula: null,
+        activity: "POSE",
+        costPriceCents: poseCostRateCents,
+        unitPriceCents: poseSaleRateCents,
+      },
+    ],
+  };
+}
+
 describe("quote global adjustments", () => {
   it("passes an architect percentage through at zero margin based on final HT", () => {
     const items: QuoteItem[] = [line(lineIds.a, 10_000_000, 6_000_000, null, "Base")];
@@ -91,11 +124,11 @@ describe("quote global adjustments", () => {
     expect(result.marginAmountCents).toBe(4_500_000);
   });
 
-  it("distributes travel pose hours pro rata over existing pose hours", () => {
+  it("derives pose hours from components and distributes travel pro rata", () => {
     const items: QuoteItem[] = [
-      line(lineIds.a, 1_000_000, 600_000),
-      line(lineIds.b, 500_000, 300_000),
-      line(lineIds.c, 500_000, 300_000),
+      lineWithPose(lineIds.a, 1_000_000, 20),
+      lineWithPose(lineIds.b, 500_000, 10),
+      lineWithPose(lineIds.c, 500_000, 10),
     ];
     const result = calculateQuoteAdjustedPricing(items, {
       adjustments: [
@@ -104,25 +137,62 @@ describe("quote global adjustments", () => {
           kind: "POSE_HOURS",
           label: "Déplacement chantier",
           active: true,
-          applyToOptions: true,
+          applyToOptions: false,
           marginTreatment: "MARGED",
           hours: 8,
-          costRateCents: 5_000,
-          marginPercent: 40,
         },
       ],
       options: [],
-      linePoseHours: [
-        { lineId: lineIds.a, hours: 20 },
-        { lineId: lineIds.b, hours: 10 },
-        { lineId: lineIds.c, hours: 10 },
-      ],
     });
 
+    expect(result.lines.map((entry) => entry.basePoseHours)).toEqual([20, 10, 10]);
     expect(result.lines.map((entry) => entry.poseHours)).toEqual([24, 12, 12]);
     expect(result.totalPoseHours).toBe(48);
-    expect(result.totalCostCents).toBe(1_240_000);
+    expect(result.totalCostCents).toBe(240_000);
     expect(result.totalSaleCents).toBe(2_056_000);
+  });
+
+  it("reuses the pose cost rate for a zero-margin travel adjustment", () => {
+    const items: QuoteItem[] = [lineWithPose(lineIds.a, 100_000, 10)];
+    const result = calculateQuoteAdjustedPricing(items, {
+      adjustments: [
+        {
+          id: "67676767-6767-4767-8767-676767676767",
+          kind: "POSE_HOURS",
+          label: "Déplacement sans marge",
+          active: true,
+          applyToOptions: false,
+          marginTreatment: "PASS_THROUGH",
+          hours: 2,
+        },
+      ],
+      options: [],
+    });
+
+    expect(result.totalPoseHours).toBe(12);
+    expect(result.totalCostCents).toBe(60_000);
+    expect(result.totalSaleCents).toBe(110_000);
+    expect(result.marginAmountCents).toBe(50_000);
+  });
+
+  it("counts only POSE components and respects the quote line quantity", () => {
+    const poseLine = lineWithPose(lineIds.a, 100_000, 3);
+    poseLine.quantity = 2;
+    poseLine.components?.push({
+      id: crypto.randomUUID(),
+      description: "Heure atelier",
+      unit: "h",
+      quantity: 50,
+      quantityFormula: null,
+      activity: "ATELIER",
+      costPriceCents: 4_000,
+      unitPriceCents: 6_000,
+    });
+
+    const result = calculateQuoteAdjustedPricing([poseLine], createEmptyQuotePricingConfig());
+
+    expect(result.lines[0].basePoseHours).toBe(6);
+    expect(result.totalPoseHours).toBe(6);
   });
 
   it("keeps pending single-line and group options outside the main total", () => {
@@ -135,7 +205,6 @@ describe("quote global adjustments", () => {
     ];
     const result = calculateQuoteAdjustedPricing(items, {
       adjustments: [],
-      linePoseHours: [],
       options: [
         {
           id: "88888888-8888-4888-8888-888888888888",
@@ -166,7 +235,6 @@ describe("quote global adjustments", () => {
     ];
     const result = calculateQuoteAdjustedPricing(items, {
       adjustments: [],
-      linePoseHours: [],
       options: [
         {
           id: "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa",
@@ -182,7 +250,7 @@ describe("quote global adjustments", () => {
     expect(result.pendingOptionsSaleCents).toBe(0);
   });
 
-  it("applies adjustments to pending option prices when configured", () => {
+  it("applies architect adjustment to pending option prices when configured", () => {
     const items: QuoteItem[] = [line(lineIds.a, 100_000, 60_000), line(lineIds.b, 20_000, 10_000)];
     const result = calculateQuoteAdjustedPricing(items, {
       adjustments: [
@@ -196,7 +264,6 @@ describe("quote global adjustments", () => {
           percent: 5,
         },
       ],
-      linePoseHours: [],
       options: [
         {
           id: "cccccccc-cccc-4ccc-8ccc-cccccccccccc",
@@ -210,6 +277,50 @@ describe("quote global adjustments", () => {
 
     expect(result.totalSaleCents).toBe(105_263);
     expect(result.options[0].saleCents).toBe(21_053);
+  });
+
+  it("keeps an option price stable when it becomes retained", () => {
+    const optionId = "abababab-abab-4bab-8bab-abababababab";
+    const items: QuoteItem[] = [line(lineIds.a, 100_000, 60_000), line(lineIds.b, 20_000, 10_000)];
+    const adjustments: QuotePricingConfig["adjustments"] = [
+      {
+        id: "acacacac-acac-4cac-8cac-acacacacacac",
+        kind: "PERCENTAGE",
+        label: "Commission architecte",
+        active: true,
+        applyToOptions: true,
+        marginTreatment: "PASS_THROUGH",
+        percent: 5,
+      },
+    ];
+    const pending = calculateQuoteAdjustedPricing(items, {
+      adjustments,
+      options: [
+        {
+          id: optionId,
+          targetItemId: lineIds.b,
+          targetKind: "LINE",
+          label: "Option",
+          status: "PENDING",
+        },
+      ],
+    });
+    const retained = calculateQuoteAdjustedPricing(items, {
+      adjustments,
+      options: [
+        {
+          id: optionId,
+          targetItemId: lineIds.b,
+          targetKind: "LINE",
+          label: "Option",
+          status: "RETAINED",
+        },
+      ],
+    });
+
+    expect(pending.options[0].saleCents).toBe(21_053);
+    expect(retained.options[0].saleCents).toBe(21_053);
+    expect(retained.totalSaleCents).toBe(126_316);
   });
 
   it("does not apply a disabled adjustment", () => {
