@@ -51,7 +51,10 @@ function reparentSourceBlock(
 
   return block.map((item, index) => {
     if (index !== 0) return item;
-    if (item.kind === "SUBSECTION") return { ...item, parentId };
+    if (item.kind === "SUBSECTION") {
+      if (parentId === null) throw new Error("QUOTE_ITEM_REORDER_BLOCKED");
+      return { ...item, parentId };
+    }
     if (item.kind === "LINE") return { ...item, parentId };
     return item;
   });
