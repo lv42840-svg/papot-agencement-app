@@ -530,7 +530,11 @@ export function QuoteStructuredLinesEditor({
   function chooseLibraryComponent(component: LibraryComponent) {
     const selected = formFromLibraryComponent(component);
     setComponents((current) => {
-      if (current.length === 1 && !current[0].description.trim() && !current[0].costPriceEuros.trim()) {
+      if (
+        current.length === 1 &&
+        !current[0].description.trim() &&
+        !current[0].costPriceEuros.trim()
+      ) {
         return [selected];
       }
       return [...current, selected];
@@ -631,7 +635,11 @@ export function QuoteStructuredLinesEditor({
 
   function renderComponentReadRows(lineComponents: QuoteOuvrageComponent[]) {
     if (lineComponents.length === 0) {
-      return <div className="quoteComponentEmpty">Clique sur le crayon pour détailler les composants.</div>;
+      return (
+        <div className="quoteComponentEmpty">
+          Clique sur le crayon pour détailler les composants.
+        </div>
+      );
     }
 
     return lineComponents.map((component) => {
@@ -643,7 +651,11 @@ export function QuoteStructuredLinesEditor({
           <span>{component.quantityFormula ?? component.quantity}</span>
           <span>{component.unit || "—"}</span>
           <span>{componentCost === null ? "—" : formatMoney(componentCost)}</span>
-          <span className={marginPercent !== null && marginPercent < 0 ? "quoteNegative" : "quotePositive"}>
+          <span
+            className={
+              marginPercent !== null && marginPercent < 0 ? "quoteNegative" : "quotePositive"
+            }
+          >
             {formatPercent(marginPercent)}
           </span>
           <span>{formatMoney(component.unitPriceCents)}</span>
@@ -669,30 +681,74 @@ export function QuoteStructuredLinesEditor({
           <span className="quoteNumber">{numbers.get(line.id) ?? "—"}</span>
           <div className="quoteLineDescription">
             <strong>{line.description}</strong>
-            <small>{lineComponents.length} composant{lineComponents.length === 1 ? "" : "s"}</small>
+            <small>
+              {lineComponents.length} composant{lineComponents.length === 1 ? "" : "s"}
+            </small>
           </div>
           <span>{line.quantityFormula ?? line.quantity}</span>
           <span>{line.unit || "—"}</span>
           <div className="quotePriceCell">
             <strong>{formatMoney(salePriceCents)}</strong>
             {line.forcedUnitPriceCents !== undefined ? (
-              <small className="quoteForcedBadge"><LockKeyhole size={10} aria-hidden="true" /> Forcé</small>
+              <small className="quoteForcedBadge">
+                <LockKeyhole size={10} aria-hidden="true" /> Forcé
+              </small>
             ) : null}
           </div>
-          <div className={`quoteMarginCell${marginAmountCents !== null && marginAmountCents < 0 ? " isNegative" : marginAmountCents === null ? " isMissing" : ""}`}>
-            {marginAmountCents === null ? <span>À renseigner</span> : <><strong>{formatMoney(marginAmountCents)}</strong><small>{formatPercent(marginPercent)}</small></>}
+          <div
+            className={`quoteMarginCell${marginAmountCents !== null && marginAmountCents < 0 ? " isNegative" : marginAmountCents === null ? " isMissing" : ""}`}
+          >
+            {marginAmountCents === null ? (
+              <span>À renseigner</span>
+            ) : (
+              <>
+                <strong>{formatMoney(marginAmountCents)}</strong>
+                <small>{formatPercent(marginPercent)}</small>
+              </>
+            )}
           </div>
           <div className="quoteRowActions">
             {editable ? (
               <>
-                <button type="button" className="miniLibraryButton" onClick={() => void addOuvrageToLibrary(line)} disabled={librarySavingLineId !== null || libraryAlreadyLinked || publishedNow} aria-label={`Ajouter ${line.description} à la Bibliothèque`} title={libraryAlreadyLinked || publishedNow ? "Ouvrage déjà dans la Bibliothèque" : "Ajouter l’ouvrage à la Bibliothèque"}>{librarySavingLineId === line.id ? "…" : "+B"}</button>
-                <button type="button" className="iconButton" onClick={() => openEditOuvrage(line)} disabled={formOpen || headingEditor !== null} aria-label={`Modifier ${line.description}`} title="Modifier l’ouvrage"><Pencil size={14} aria-hidden="true" /></button>
+                <button
+                  type="button"
+                  className="miniLibraryButton"
+                  onClick={() => void addOuvrageToLibrary(line)}
+                  disabled={librarySavingLineId !== null || libraryAlreadyLinked || publishedNow}
+                  aria-label={`Ajouter ${line.description} à la Bibliothèque`}
+                  title={
+                    libraryAlreadyLinked || publishedNow
+                      ? "Ouvrage déjà dans la Bibliothèque"
+                      : "Ajouter l’ouvrage à la Bibliothèque"
+                  }
+                >
+                  {librarySavingLineId === line.id ? "…" : "+B"}
+                </button>
+                <button
+                  type="button"
+                  className="iconButton"
+                  onClick={() => openEditOuvrage(line)}
+                  disabled={formOpen || headingEditor !== null}
+                  aria-label={`Modifier ${line.description}`}
+                  title="Modifier l’ouvrage"
+                >
+                  <Pencil size={14} aria-hidden="true" />
+                </button>
               </>
             ) : null}
           </div>
         </div>
         <div className="quoteComponentsTable">
-          <div className="quoteComponentsHeader"><span>Composant</span><span>Qté</span><span>Unité</span><span>Coût U. HT</span><span>Marge %</span><span>Vente U. HT</span><span>Total HT</span><span /></div>
+          <div className="quoteComponentsHeader">
+            <span>Composant</span>
+            <span>Qté</span>
+            <span>Unité</span>
+            <span>Coût U. HT</span>
+            <span>Marge %</span>
+            <span>Vente U. HT</span>
+            <span>Total HT</span>
+            <span />
+          </div>
           {renderComponentReadRows(lineComponents)}
         </div>
       </div>
@@ -700,52 +756,235 @@ export function QuoteStructuredLinesEditor({
   }
 
   function renderEditingOuvrage(key: string) {
-    const retainedPriceInput = priceForced ? forcedUnitPriceEuros : calculatedUnitPrice === null ? "0,00" : centsToInput(calculatedUnitPrice);
-    const number = editingLineId ? numbers.get(editingLineId) ?? "—" : "+";
+    const retainedPriceInput = priceForced
+      ? forcedUnitPriceEuros
+      : calculatedUnitPrice === null
+        ? "0,00"
+        : centsToInput(calculatedUnitPrice);
+    const number = editingLineId ? (numbers.get(editingLineId) ?? "—") : "+";
 
     return (
       <form className="quoteOuvrageGroup quoteOuvrageEditing" key={key} onSubmit={saveOuvrage}>
         <div className="quoteMainRow quoteLineRow">
           <span className="quoteNumber">{number}</span>
-          <input className="quoteInlineInput quoteDescriptionInput" value={description} onChange={(event) => setDescription(event.target.value)} placeholder="Désignation de l’ouvrage" required />
-          <input className="quoteInlineInput" value={quantityInput} onChange={(event) => setQuantityInput(event.target.value)} required aria-label="Quantité ouvrage" />
-          <input className="quoteInlineInput" value={unit} onChange={(event) => setUnit(event.target.value)} aria-label="Unité ouvrage" />
+          <input
+            className="quoteInlineInput quoteDescriptionInput"
+            value={description}
+            onChange={(event) => setDescription(event.target.value)}
+            placeholder="Désignation de l’ouvrage"
+            required
+          />
+          <input
+            className="quoteInlineInput"
+            value={quantityInput}
+            onChange={(event) => setQuantityInput(event.target.value)}
+            required
+            aria-label="Quantité ouvrage"
+          />
+          <input
+            className="quoteInlineInput"
+            value={unit}
+            onChange={(event) => setUnit(event.target.value)}
+            aria-label="Unité ouvrage"
+          />
           <div className="quoteInlinePrice">
-            <input className="quoteInlineInput" inputMode="decimal" value={retainedPriceInput} onChange={(event) => { setPriceForced(true); setForcedUnitPriceEuros(event.target.value); }} aria-label="Prix unitaire HT ouvrage" />
-            {priceForced ? <button type="button" className="quoteResetPrice" onClick={resetForcedPrice} title="Revenir au prix calculé" aria-label="Revenir au prix calculé"><RotateCcw size={12} aria-hidden="true" /></button> : null}
+            <input
+              className="quoteInlineInput"
+              inputMode="decimal"
+              value={retainedPriceInput}
+              onChange={(event) => {
+                setPriceForced(true);
+                setForcedUnitPriceEuros(event.target.value);
+              }}
+              aria-label="Prix unitaire HT ouvrage"
+            />
+            {priceForced ? (
+              <button
+                type="button"
+                className="quoteResetPrice"
+                onClick={resetForcedPrice}
+                title="Revenir au prix calculé"
+                aria-label="Revenir au prix calculé"
+              >
+                <RotateCcw size={12} aria-hidden="true" />
+              </button>
+            ) : null}
           </div>
-          <div className="quoteMarginCell"><strong>{formatPercent(currentMarginPercent)}</strong></div>
+          <div className="quoteMarginCell">
+            <strong>{formatPercent(currentMarginPercent)}</strong>
+          </div>
           <div className="quoteRowActions">
-            <button type="submit" className="miniActionButton quoteSaveButton" disabled={saving} title="Enregistrer" aria-label="Enregistrer"><Check size={14} aria-hidden="true" /></button>
-            <button type="button" className="miniActionButton" onClick={closeForm} disabled={saving} title="Annuler" aria-label="Annuler"><X size={14} aria-hidden="true" /></button>
+            <button
+              type="submit"
+              className="miniActionButton quoteSaveButton"
+              disabled={saving}
+              title="Enregistrer"
+              aria-label="Enregistrer"
+            >
+              <Check size={14} aria-hidden="true" />
+            </button>
+            <button
+              type="button"
+              className="miniActionButton"
+              onClick={closeForm}
+              disabled={saving}
+              title="Annuler"
+              aria-label="Annuler"
+            >
+              <X size={14} aria-hidden="true" />
+            </button>
           </div>
         </div>
 
         <div className="quoteComponentsTable quoteComponentsEditing">
           <div className="quoteComponentsHeader">
-            <div className="quoteComponentTitleActions"><span>Composant</span><button type="button" className="miniActionButton" onClick={addComponent} aria-label="Ajouter un composant libre" title="Ajouter un composant libre"><Plus size={12} aria-hidden="true" /></button><button type="button" className="miniLibraryButton" onClick={() => void openLibraryPicker()} aria-label="Ajouter un composant depuis la Bibliothèque" title="Chercher un composant dans la Bibliothèque">+B</button></div>
-            <span>Qté</span><span>Unité</span><span>Coût U. HT</span><span>Marge %</span><span>Vente U. HT</span><span>Total HT</span><span />
+            <div className="quoteComponentTitleActions">
+              <span>Composant</span>
+              <button
+                type="button"
+                className="miniActionButton"
+                onClick={addComponent}
+                aria-label="Ajouter un composant libre"
+                title="Ajouter un composant libre"
+              >
+                <Plus size={12} aria-hidden="true" />
+              </button>
+              <button
+                type="button"
+                className="miniLibraryButton"
+                onClick={() => void openLibraryPicker()}
+                aria-label="Ajouter un composant depuis la Bibliothèque"
+                title="Chercher un composant dans la Bibliothèque"
+              >
+                +B
+              </button>
+            </div>
+            <span>Qté</span>
+            <span>Unité</span>
+            <span>Coût U. HT</span>
+            <span>Marge %</span>
+            <span>Vente U. HT</span>
+            <span>Total HT</span>
+            <span />
           </div>
           {components.map((component, index) => {
             const total = componentTotalCents(component);
             const marginPercent = componentMarginPercent(component);
             return (
               <div className="quoteComponentRow quoteComponentRowEditing" key={component.key}>
-                <div className="quoteComponentNameEdit"><input className="quoteInlineInput" value={component.description} onChange={(event) => updateComponent(index, { description: event.target.value })} required aria-label={`Désignation composant ${index + 1}`} />{component.libraryComponentId ? <small>B</small> : null}</div>
-                <input className="quoteInlineInput" value={component.quantityInput} onChange={(event) => updateComponent(index, { quantityInput: event.target.value })} required aria-label={`Quantité composant ${index + 1}`} />
-                <input className="quoteInlineInput" value={component.unit} onChange={(event) => updateComponent(index, { unit: event.target.value })} aria-label={`Unité composant ${index + 1}`} />
-                <input className="quoteInlineInput" inputMode="decimal" value={component.costPriceEuros} onChange={(event) => updateComponent(index, { costPriceEuros: event.target.value })} placeholder="—" aria-label={`Coût composant ${index + 1}`} />
-                <span className={marginPercent !== null && marginPercent < 0 ? "quoteNegative" : "quotePositive"}>{formatPercent(marginPercent)}</span>
-                <input className="quoteInlineInput" inputMode="decimal" value={component.unitPriceEuros} onChange={(event) => updateComponent(index, { unitPriceEuros: event.target.value })} required aria-label={`Prix vente composant ${index + 1}`} />
+                <div className="quoteComponentNameEdit">
+                  <input
+                    className="quoteInlineInput"
+                    value={component.description}
+                    onChange={(event) =>
+                      updateComponent(index, { description: event.target.value })
+                    }
+                    required
+                    aria-label={`Désignation composant ${index + 1}`}
+                  />
+                  {component.libraryComponentId ? <small>B</small> : null}
+                </div>
+                <input
+                  className="quoteInlineInput"
+                  value={component.quantityInput}
+                  onChange={(event) =>
+                    updateComponent(index, { quantityInput: event.target.value })
+                  }
+                  required
+                  aria-label={`Quantité composant ${index + 1}`}
+                />
+                <input
+                  className="quoteInlineInput"
+                  value={component.unit}
+                  onChange={(event) => updateComponent(index, { unit: event.target.value })}
+                  aria-label={`Unité composant ${index + 1}`}
+                />
+                <input
+                  className="quoteInlineInput"
+                  inputMode="decimal"
+                  value={component.costPriceEuros}
+                  onChange={(event) =>
+                    updateComponent(index, { costPriceEuros: event.target.value })
+                  }
+                  placeholder="—"
+                  aria-label={`Coût composant ${index + 1}`}
+                />
+                <span
+                  className={
+                    marginPercent !== null && marginPercent < 0 ? "quoteNegative" : "quotePositive"
+                  }
+                >
+                  {formatPercent(marginPercent)}
+                </span>
+                <input
+                  className="quoteInlineInput"
+                  inputMode="decimal"
+                  value={component.unitPriceEuros}
+                  onChange={(event) =>
+                    updateComponent(index, { unitPriceEuros: event.target.value })
+                  }
+                  required
+                  aria-label={`Prix vente composant ${index + 1}`}
+                />
                 <strong>{total === null ? "—" : formatMoney(total)}</strong>
-                <button type="button" className="quoteDeleteComponent" onClick={() => removeComponent(index)} disabled={components.length === 1} aria-label={`Supprimer le composant ${index + 1}`} title="Supprimer le composant"><Trash2 size={13} aria-hidden="true" /></button>
+                <button
+                  type="button"
+                  className="quoteDeleteComponent"
+                  onClick={() => removeComponent(index)}
+                  disabled={components.length === 1}
+                  aria-label={`Supprimer le composant ${index + 1}`}
+                  title="Supprimer le composant"
+                >
+                  <Trash2 size={13} aria-hidden="true" />
+                </button>
               </div>
             );
           })}
           {libraryPickerOpen ? (
             <div className="quoteLibraryPicker">
-              <div className="quoteLibraryPickerTop"><div className="quoteLibrarySearch"><Search size={14} aria-hidden="true" /><input value={libraryQuery} onChange={(event) => setLibraryQuery(event.target.value)} placeholder="Rechercher un composant…" autoFocus /></div><button type="button" className="iconButton" onClick={() => setLibraryPickerOpen(false)} aria-label="Fermer la Bibliothèque"><X size={14} aria-hidden="true" /></button></div>
-              {libraryLoading ? <div className="quoteLibraryEmpty">Chargement…</div> : visibleLibraryComponents.length === 0 ? <div className="quoteLibraryEmpty">Aucun composant trouvé.</div> : <div className="quoteLibraryResults">{visibleLibraryComponents.slice(0, 30).map((component) => <button type="button" className="quoteLibraryResult" key={component.id} onClick={() => chooseLibraryComponent(component)}><span><strong>{component.name}</strong><small>{component.unit} · marge {formatPercent(component.marginPercent)}</small></span><strong>{formatMoney(component.salePriceCents)}</strong></button>)}</div>}
+              <div className="quoteLibraryPickerTop">
+                <div className="quoteLibrarySearch">
+                  <Search size={14} aria-hidden="true" />
+                  <input
+                    value={libraryQuery}
+                    onChange={(event) => setLibraryQuery(event.target.value)}
+                    placeholder="Rechercher un composant…"
+                    autoFocus
+                  />
+                </div>
+                <button
+                  type="button"
+                  className="iconButton"
+                  onClick={() => setLibraryPickerOpen(false)}
+                  aria-label="Fermer la Bibliothèque"
+                >
+                  <X size={14} aria-hidden="true" />
+                </button>
+              </div>
+              {libraryLoading ? (
+                <div className="quoteLibraryEmpty">Chargement…</div>
+              ) : visibleLibraryComponents.length === 0 ? (
+                <div className="quoteLibraryEmpty">Aucun composant trouvé.</div>
+              ) : (
+                <div className="quoteLibraryResults">
+                  {visibleLibraryComponents.slice(0, 30).map((component) => (
+                    <button
+                      type="button"
+                      className="quoteLibraryResult"
+                      key={component.id}
+                      onClick={() => chooseLibraryComponent(component)}
+                    >
+                      <span>
+                        <strong>{component.name}</strong>
+                        <small>
+                          {component.unit} · marge {formatPercent(component.marginPercent)}
+                        </small>
+                      </span>
+                      <strong>{formatMoney(component.salePriceCents)}</strong>
+                    </button>
+                  ))}
+                </div>
+              )}
             </div>
           ) : null}
         </div>
@@ -755,24 +994,80 @@ export function QuoteStructuredLinesEditor({
 
   function renderHeading(item: QuoteSection | QuoteSubsection) {
     const editing = headingEditor?.itemId === item.id;
-    if (editing && headingEditor) return renderHeadingEditor(headingEditor, numbers.get(item.id) ?? "—");
+    if (editing && headingEditor)
+      return renderHeadingEditor(headingEditor, numbers.get(item.id) ?? "—");
 
     return (
-      <div className={`quoteMainRow quoteHeadingRow ${item.kind === "SECTION" ? "isSection" : "isSubsection"}`} key={item.id}>
+      <div
+        className={`quoteMainRow quoteHeadingRow ${item.kind === "SECTION" ? "isSection" : "isSubsection"}`}
+        key={item.id}
+      >
         <span className="quoteNumber">{numbers.get(item.id) ?? "—"}</span>
-        <strong>{item.title}</strong><span /><span /><span /><span />
-        <div className="quoteRowActions">{editable ? <button type="button" className="iconButton" onClick={() => openEditHeading(item)} disabled={formOpen || headingEditor !== null} aria-label={`Modifier ${item.title}`} title="Modifier le titre"><Pencil size={14} aria-hidden="true" /></button> : null}</div>
+        <strong>{item.title}</strong>
+        <span />
+        <span />
+        <span />
+        <span />
+        <div className="quoteRowActions">
+          {editable ? (
+            <button
+              type="button"
+              className="iconButton"
+              onClick={() => openEditHeading(item)}
+              disabled={formOpen || headingEditor !== null}
+              aria-label={`Modifier ${item.title}`}
+              title="Modifier le titre"
+            >
+              <Pencil size={14} aria-hidden="true" />
+            </button>
+          ) : null}
+        </div>
       </div>
     );
   }
 
   function renderHeadingEditor(editor: NonNullable<HeadingEditor>, number = "+") {
     return (
-      <form className={`quoteMainRow quoteHeadingRow quoteHeadingEditing ${editor.kind === "SECTION" ? "isSection" : "isSubsection"}`} key={editor.itemId ?? `new-${editor.kind}`} onSubmit={saveHeading}>
+      <form
+        className={`quoteMainRow quoteHeadingRow quoteHeadingEditing ${editor.kind === "SECTION" ? "isSection" : "isSubsection"}`}
+        key={editor.itemId ?? `new-${editor.kind}`}
+        onSubmit={saveHeading}
+      >
         <span className="quoteNumber">{number}</span>
-        <input className="quoteInlineInput quoteDescriptionInput" value={editor.title} onChange={(event) => setHeadingEditor({ ...editor, title: event.target.value })} placeholder={editor.kind === "SECTION" ? "Grand titre" : "Sous-titre"} autoFocus required maxLength={500} />
-        <span /><span /><span /><span />
-        <div className="quoteRowActions"><button type="submit" className="miniActionButton quoteSaveButton" disabled={saving} title="Enregistrer" aria-label="Enregistrer"><Check size={14} aria-hidden="true" /></button><button type="button" className="miniActionButton" onClick={() => setHeadingEditor(null)} disabled={saving} title="Annuler" aria-label="Annuler"><X size={14} aria-hidden="true" /></button></div>
+        <input
+          className="quoteInlineInput quoteDescriptionInput"
+          value={editor.title}
+          onChange={(event) => setHeadingEditor({ ...editor, title: event.target.value })}
+          placeholder={editor.kind === "SECTION" ? "Grand titre" : "Sous-titre"}
+          autoFocus
+          required
+          maxLength={500}
+        />
+        <span />
+        <span />
+        <span />
+        <span />
+        <div className="quoteRowActions">
+          <button
+            type="submit"
+            className="miniActionButton quoteSaveButton"
+            disabled={saving}
+            title="Enregistrer"
+            aria-label="Enregistrer"
+          >
+            <Check size={14} aria-hidden="true" />
+          </button>
+          <button
+            type="button"
+            className="miniActionButton"
+            onClick={() => setHeadingEditor(null)}
+            disabled={saving}
+            title="Annuler"
+            aria-label="Annuler"
+          >
+            <X size={14} aria-hidden="true" />
+          </button>
+        </div>
       </form>
     );
   }
@@ -780,9 +1075,19 @@ export function QuoteStructuredLinesEditor({
   if (!quote) return null;
 
   return (
-    <section className="panel quoteLinesPanel" aria-label={`Contenu du devis ${quote.model.subject}`}>
+    <section
+      className="panel quoteLinesPanel"
+      aria-label={`Contenu du devis ${quote.model.subject}`}
+    >
       <div className="panelHeader quoteLinesHeader">
-        <div><p className="eyebrow">Devis</p><h2>{quote.model.subject}</h2><p className="muted">{quote.variantName} · V{quote.version} · {lines.length} ouvrage{lines.length === 1 ? "" : "s"}</p></div>
+        <div>
+          <p className="eyebrow">Devis</p>
+          <h2>{quote.model.subject}</h2>
+          <p className="muted">
+            {quote.variantName} · V{quote.version} · {lines.length} ouvrage
+            {lines.length === 1 ? "" : "s"}
+          </p>
+        </div>
         <div className="quoteLinesHeaderActions">{headerActions}</div>
       </div>
 
@@ -790,25 +1095,455 @@ export function QuoteStructuredLinesEditor({
       {notice ? <div className="quoteLineMessage quoteLineNotice">{notice}</div> : null}
 
       <div className="quoteLinesTable">
-        <div className="quoteMainRow quoteLinesTableHeader"><span>N°</span><span>Désignation</span><span>Qté</span><span>Unité</span><span>PU HT</span><span>Marge</span><span /></div>
+        <div className="quoteMainRow quoteLinesTableHeader">
+          <span>N°</span>
+          <span>Désignation</span>
+          <span>Qté</span>
+          <span>Unité</span>
+          <span>PU HT</span>
+          <span>Marge</span>
+          <span />
+        </div>
         {items.map((item) => {
           if (item.kind === "SECTION" || item.kind === "SUBSECTION") return renderHeading(item);
-          if (item.kind === "LINE") return formOpen && editingLineId === item.id ? renderEditingOuvrage(item.id) : renderReadOuvrage(item);
-          return <div className="quoteMainRow quoteCommentRow" key={item.id}><span className="quoteNumber">{numbers.get(item.id) ?? "—"}</span><span>{item.text}</span><span /><span /><span /><span /><span /></div>;
+          if (item.kind === "LINE")
+            return formOpen && editingLineId === item.id
+              ? renderEditingOuvrage(item.id)
+              : renderReadOuvrage(item);
+          return (
+            <div className="quoteMainRow quoteCommentRow" key={item.id}>
+              <span className="quoteNumber">{numbers.get(item.id) ?? "—"}</span>
+              <span>{item.text}</span>
+              <span />
+              <span />
+              <span />
+              <span />
+              <span />
+            </div>
+          );
         })}
         {headingEditor && !headingEditor.itemId ? renderHeadingEditor(headingEditor) : null}
         {formOpen && editingLineId === null ? renderEditingOuvrage("new-ouvrage") : null}
         {editable ? (
           <div className="quoteMainRow quoteAddRow">
             <span className="quoteNumber">+</span>
-            <div className="quoteAddActions"><button type="button" onClick={openNewOuvrage} disabled={formOpen || headingEditor !== null}><Plus size={13} aria-hidden="true" /> Ouvrage</button><button type="button" onClick={() => openNewHeading("SECTION")} disabled={formOpen || headingEditor !== null}><Plus size={13} aria-hidden="true" /> Titre</button><button type="button" onClick={() => openNewHeading("SUBSECTION")} disabled={!lastSection || formOpen || headingEditor !== null}><Plus size={13} aria-hidden="true" /> Sous-titre</button></div>
-            <span /><span /><span /><span /><span />
+            <div className="quoteAddActions">
+              <button
+                type="button"
+                onClick={openNewOuvrage}
+                disabled={formOpen || headingEditor !== null}
+              >
+                <Plus size={13} aria-hidden="true" /> Ouvrage
+              </button>
+              <button
+                type="button"
+                onClick={() => openNewHeading("SECTION")}
+                disabled={formOpen || headingEditor !== null}
+              >
+                <Plus size={13} aria-hidden="true" /> Titre
+              </button>
+              <button
+                type="button"
+                onClick={() => openNewHeading("SUBSECTION")}
+                disabled={!lastSection || formOpen || headingEditor !== null}
+              >
+                <Plus size={13} aria-hidden="true" /> Sous-titre
+              </button>
+            </div>
+            <span />
+            <span />
+            <span />
+            <span />
+            <span />
           </div>
         ) : null}
       </div>
 
       <style jsx>{`
-        .quoteLinesPanel{overflow:hidden}.quoteLinesHeader,.quoteLinesHeaderActions,.quoteRowActions,.quoteComponentTitleActions,.quoteInlinePrice,.quoteForcedBadge,.quoteLibraryPickerTop,.quoteLibrarySearch,.quoteLibraryResult,.quoteComponentNameEdit,.quoteAddActions{display:flex;align-items:center}.quoteLinesHeader{justify-content:space-between;gap:16px}.quoteLinesHeaderActions{justify-content:flex-end;gap:8px;flex-wrap:wrap}.quoteLinesHeader p,.quoteLinesHeader h2{margin-bottom:0}.quoteLineMessage{margin:0 18px 12px;padding:9px 11px;border-radius:7px;font-size:12px;font-weight:700}.quoteLineError{background:#fff0f0;color:#9c3434}.quoteLineNotice{background:#eef8f1;color:#31724b}.quoteLinesTable{border-top:1px solid var(--border);overflow-x:auto}.quoteMainRow{display:grid;grid-template-columns:52px minmax(260px,1fr) 82px 72px 135px 140px 82px;gap:10px;align-items:center;padding:9px 18px;min-width:920px}.quoteLinesTableHeader{min-height:38px;background:var(--surface-soft);color:var(--muted);font-size:10px;font-weight:800;text-transform:uppercase;letter-spacing:.04em}.quoteNumber{font-weight:900;color:#7867bb;font-variant-numeric:tabular-nums}.quoteOuvrageGroup{min-width:920px;border-top:1px solid var(--border)}.quoteOuvrageGroup:first-of-type{border-top:0}.quoteLineRow{min-height:58px;font-size:12px;background:#fff}.quoteOuvrageEditing .quoteLineRow{background:#fbfaff}.quoteLineDescription{min-width:0;display:grid;gap:2px}.quoteLineDescription strong{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}.quoteLineDescription small{color:var(--muted);font-size:9px}.quotePriceCell,.quoteMarginCell{min-width:0;display:grid;gap:3px;justify-items:start}.quoteMarginCell{color:#31724b}.quoteMarginCell.isNegative,.quoteNegative{color:#a53d3d}.quoteMarginCell.isMissing{color:var(--muted);font-size:10px;font-weight:700}.quotePositive{color:#31724b;font-weight:800}.quoteForcedBadge{width:fit-content;gap:4px;padding:3px 6px;border-radius:999px;background:#ece7fa;color:#6554b5;font-size:9px;font-weight:800;white-space:nowrap}.quoteRowActions{justify-content:flex-end;gap:5px}.miniLibraryButton,.miniActionButton,.quoteResetPrice,.quoteDeleteComponent{display:inline-grid;place-items:center;padding:0;border:1px solid var(--border);background:#fff;color:var(--muted);cursor:pointer}.miniLibraryButton{min-width:30px;height:28px;padding:0 6px;border-color:#d7cfed;border-radius:6px;color:#6554b5;font-size:10px;font-weight:900}.miniActionButton,.quoteResetPrice,.quoteDeleteComponent{width:26px;height:26px;border-radius:6px}.miniLibraryButton:hover:not(:disabled),.miniActionButton:hover:not(:disabled),.quoteResetPrice:hover:not(:disabled),.quoteDeleteComponent:hover:not(:disabled){border-color:var(--accent);color:var(--accent);background:#faf8ff}.miniLibraryButton:disabled,.miniActionButton:disabled,.quoteResetPrice:disabled,.quoteDeleteComponent:disabled{opacity:.45;cursor:default}.quoteSaveButton{color:#31724b}.quoteInlineInput{width:100%;min-width:0;height:32px;padding:5px 7px;border:1px solid #d7cfed;border-radius:6px;background:#fff;color:var(--text);font:inherit}.quoteInlineInput:focus{outline:2px solid color-mix(in srgb,var(--accent) 22%,transparent);border-color:var(--accent)}.quoteDescriptionInput{font-weight:750}.quoteInlinePrice{gap:4px}.quoteInlinePrice .quoteInlineInput{flex:1 1 auto}.quoteResetPrice{flex:0 0 26px}.quoteComponentsTable{margin:0 18px 12px 70px;overflow:hidden;border:1px solid #e4def2;border-radius:7px;background:#fcfbff}.quoteComponentsEditing{border-color:#d7cfed;background:#fff}.quoteComponentsHeader,.quoteComponentRow{display:grid;grid-template-columns:minmax(220px,1fr) 82px 70px 105px 82px 105px 105px 34px;gap:8px;align-items:center;padding:7px 10px}.quoteComponentsHeader{min-height:36px;background:#f6f3fc;color:var(--muted);font-size:9px;font-weight:800;text-transform:uppercase;letter-spacing:.04em}.quoteComponentRow{min-height:40px;border-top:1px solid #ebe6f4;font-size:11px}.quoteComponentTitleActions{gap:5px}.quoteComponentNameEdit{gap:5px}.quoteComponentNameEdit small{font-size:9px;font-weight:900;color:#6554b5}.quoteComponentEmpty{padding:14px;color:var(--muted);font-size:11px}.quoteLibraryPicker{margin:8px;border:1px solid #d7cfed;border-radius:8px;overflow:hidden;background:#fff}.quoteLibraryPickerTop{gap:8px;padding:8px;border-bottom:1px solid #ece7f5}.quoteLibrarySearch{flex:1;gap:6px}.quoteLibrarySearch input{width:100%;border:0;outline:0;background:transparent}.quoteLibraryResults{max-height:230px;overflow:auto}.quoteLibraryResult{width:100%;justify-content:space-between;gap:12px;padding:9px 11px;border:0;border-top:1px solid #f0edf6;background:#fff;text-align:left;cursor:pointer}.quoteLibraryResult:hover{background:#faf8ff}.quoteLibraryResult span{display:grid;gap:2px}.quoteLibraryResult small{color:var(--muted);font-size:9px}.quoteLibraryEmpty{padding:14px;color:var(--muted);font-size:11px}.quoteHeadingRow{border-top:1px solid var(--border);background:#fbfaff}.quoteHeadingRow.isSection{min-height:56px;background:#f1edfb}.quoteHeadingRow.isSection>strong{font-size:16px}.quoteHeadingRow.isSubsection{min-height:48px;background:#faf8ff}.quoteHeadingRow.isSubsection>strong{padding-left:14px;font-size:13px}.quoteHeadingEditing{background:#fff}.quoteCommentRow{border-top:1px solid var(--border);font-size:11px;color:var(--muted)}.quoteAddRow{border-top:1px dashed #d8d1e8;background:#fcfbff;min-height:54px}.quoteAddActions{gap:7px}.quoteAddActions button{display:inline-flex;align-items:center;gap:5px;height:30px;padding:0 10px;border:1px solid #d7cfed;border-radius:6px;background:#fff;color:#6554b5;font-size:11px;font-weight:800;cursor:pointer}.quoteAddActions button:hover:not(:disabled){border-color:var(--accent);color:var(--accent);background:#faf8ff}.quoteAddActions button:disabled{opacity:.4;cursor:default}@media(max-width:1000px){.quoteLinesTable{overflow-x:auto}.quoteMainRow,.quoteOuvrageGroup{min-width:920px}.quoteComponentsTable{min-width:780px}}
+        .quoteLinesPanel {
+          overflow: hidden;
+        }
+        .quoteLinesHeader,
+        .quoteLinesHeaderActions,
+        .quoteRowActions,
+        .quoteComponentTitleActions,
+        .quoteInlinePrice,
+        .quoteForcedBadge,
+        .quoteLibraryPickerTop,
+        .quoteLibrarySearch,
+        .quoteLibraryResult,
+        .quoteComponentNameEdit,
+        .quoteAddActions {
+          display: flex;
+          align-items: center;
+        }
+        .quoteLinesHeader {
+          justify-content: space-between;
+          gap: 16px;
+        }
+        .quoteLinesHeaderActions {
+          justify-content: flex-end;
+          gap: 8px;
+          flex-wrap: wrap;
+        }
+        .quoteLinesHeader p,
+        .quoteLinesHeader h2 {
+          margin-bottom: 0;
+        }
+        .quoteLineMessage {
+          margin: 0 18px 12px;
+          padding: 9px 11px;
+          border-radius: 7px;
+          font-size: 12px;
+          font-weight: 700;
+        }
+        .quoteLineError {
+          background: #fff0f0;
+          color: #9c3434;
+        }
+        .quoteLineNotice {
+          background: #eef8f1;
+          color: #31724b;
+        }
+        .quoteLinesTable {
+          border-top: 1px solid var(--border);
+          overflow-x: auto;
+        }
+        .quoteMainRow {
+          display: grid;
+          grid-template-columns: 52px minmax(260px, 1fr) 82px 72px 135px 140px 82px;
+          gap: 10px;
+          align-items: center;
+          padding: 9px 18px;
+          min-width: 920px;
+        }
+        .quoteLinesTableHeader {
+          min-height: 38px;
+          background: var(--surface-soft);
+          color: var(--muted);
+          font-size: 10px;
+          font-weight: 800;
+          text-transform: uppercase;
+          letter-spacing: 0.04em;
+        }
+        .quoteNumber {
+          font-weight: 900;
+          color: #7867bb;
+          font-variant-numeric: tabular-nums;
+        }
+        .quoteOuvrageGroup {
+          min-width: 920px;
+          border-top: 1px solid var(--border);
+        }
+        .quoteOuvrageGroup:first-of-type {
+          border-top: 0;
+        }
+        .quoteLineRow {
+          min-height: 58px;
+          font-size: 12px;
+          background: #fff;
+        }
+        .quoteOuvrageEditing .quoteLineRow {
+          background: #fbfaff;
+        }
+        .quoteLineDescription {
+          min-width: 0;
+          display: grid;
+          gap: 2px;
+        }
+        .quoteLineDescription strong {
+          overflow: hidden;
+          text-overflow: ellipsis;
+          white-space: nowrap;
+        }
+        .quoteLineDescription small {
+          color: var(--muted);
+          font-size: 9px;
+        }
+        .quotePriceCell,
+        .quoteMarginCell {
+          min-width: 0;
+          display: grid;
+          gap: 3px;
+          justify-items: start;
+        }
+        .quoteMarginCell {
+          color: #31724b;
+        }
+        .quoteMarginCell.isNegative,
+        .quoteNegative {
+          color: #a53d3d;
+        }
+        .quoteMarginCell.isMissing {
+          color: var(--muted);
+          font-size: 10px;
+          font-weight: 700;
+        }
+        .quotePositive {
+          color: #31724b;
+          font-weight: 800;
+        }
+        .quoteForcedBadge {
+          width: fit-content;
+          gap: 4px;
+          padding: 3px 6px;
+          border-radius: 999px;
+          background: #ece7fa;
+          color: #6554b5;
+          font-size: 9px;
+          font-weight: 800;
+          white-space: nowrap;
+        }
+        .quoteRowActions {
+          justify-content: flex-end;
+          gap: 5px;
+        }
+        .miniLibraryButton,
+        .miniActionButton,
+        .quoteResetPrice,
+        .quoteDeleteComponent {
+          display: inline-grid;
+          place-items: center;
+          padding: 0;
+          border: 1px solid var(--border);
+          background: #fff;
+          color: var(--muted);
+          cursor: pointer;
+        }
+        .miniLibraryButton {
+          min-width: 30px;
+          height: 28px;
+          padding: 0 6px;
+          border-color: #d7cfed;
+          border-radius: 6px;
+          color: #6554b5;
+          font-size: 10px;
+          font-weight: 900;
+        }
+        .miniActionButton,
+        .quoteResetPrice,
+        .quoteDeleteComponent {
+          width: 26px;
+          height: 26px;
+          border-radius: 6px;
+        }
+        .miniLibraryButton:hover:not(:disabled),
+        .miniActionButton:hover:not(:disabled),
+        .quoteResetPrice:hover:not(:disabled),
+        .quoteDeleteComponent:hover:not(:disabled) {
+          border-color: var(--accent);
+          color: var(--accent);
+          background: #faf8ff;
+        }
+        .miniLibraryButton:disabled,
+        .miniActionButton:disabled,
+        .quoteResetPrice:disabled,
+        .quoteDeleteComponent:disabled {
+          opacity: 0.45;
+          cursor: default;
+        }
+        .quoteSaveButton {
+          color: #31724b;
+        }
+        .quoteInlineInput {
+          width: 100%;
+          min-width: 0;
+          height: 32px;
+          padding: 5px 7px;
+          border: 1px solid #d7cfed;
+          border-radius: 6px;
+          background: #fff;
+          color: var(--text);
+          font: inherit;
+        }
+        .quoteInlineInput:focus {
+          outline: 2px solid color-mix(in srgb, var(--accent) 22%, transparent);
+          border-color: var(--accent);
+        }
+        .quoteDescriptionInput {
+          font-weight: 750;
+        }
+        .quoteInlinePrice {
+          gap: 4px;
+        }
+        .quoteInlinePrice .quoteInlineInput {
+          flex: 1 1 auto;
+        }
+        .quoteResetPrice {
+          flex: 0 0 26px;
+        }
+        .quoteComponentsTable {
+          margin: 0 18px 12px 70px;
+          overflow: hidden;
+          border: 1px solid #e4def2;
+          border-radius: 7px;
+          background: #fcfbff;
+        }
+        .quoteComponentsEditing {
+          border-color: #d7cfed;
+          background: #fff;
+        }
+        .quoteComponentsHeader,
+        .quoteComponentRow {
+          display: grid;
+          grid-template-columns: minmax(220px, 1fr) 82px 70px 105px 82px 105px 105px 34px;
+          gap: 8px;
+          align-items: center;
+          padding: 7px 10px;
+        }
+        .quoteComponentsHeader {
+          min-height: 36px;
+          background: #f6f3fc;
+          color: var(--muted);
+          font-size: 9px;
+          font-weight: 800;
+          text-transform: uppercase;
+          letter-spacing: 0.04em;
+        }
+        .quoteComponentRow {
+          min-height: 40px;
+          border-top: 1px solid #ebe6f4;
+          font-size: 11px;
+        }
+        .quoteComponentTitleActions {
+          gap: 5px;
+        }
+        .quoteComponentNameEdit {
+          gap: 5px;
+        }
+        .quoteComponentNameEdit small {
+          font-size: 9px;
+          font-weight: 900;
+          color: #6554b5;
+        }
+        .quoteComponentEmpty {
+          padding: 14px;
+          color: var(--muted);
+          font-size: 11px;
+        }
+        .quoteLibraryPicker {
+          margin: 8px;
+          border: 1px solid #d7cfed;
+          border-radius: 8px;
+          overflow: hidden;
+          background: #fff;
+        }
+        .quoteLibraryPickerTop {
+          gap: 8px;
+          padding: 8px;
+          border-bottom: 1px solid #ece7f5;
+        }
+        .quoteLibrarySearch {
+          flex: 1;
+          gap: 6px;
+        }
+        .quoteLibrarySearch input {
+          width: 100%;
+          border: 0;
+          outline: 0;
+          background: transparent;
+        }
+        .quoteLibraryResults {
+          max-height: 230px;
+          overflow: auto;
+        }
+        .quoteLibraryResult {
+          width: 100%;
+          justify-content: space-between;
+          gap: 12px;
+          padding: 9px 11px;
+          border: 0;
+          border-top: 1px solid #f0edf6;
+          background: #fff;
+          text-align: left;
+          cursor: pointer;
+        }
+        .quoteLibraryResult:hover {
+          background: #faf8ff;
+        }
+        .quoteLibraryResult span {
+          display: grid;
+          gap: 2px;
+        }
+        .quoteLibraryResult small {
+          color: var(--muted);
+          font-size: 9px;
+        }
+        .quoteLibraryEmpty {
+          padding: 14px;
+          color: var(--muted);
+          font-size: 11px;
+        }
+        .quoteHeadingRow {
+          border-top: 1px solid var(--border);
+          background: #fbfaff;
+        }
+        .quoteHeadingRow.isSection {
+          min-height: 56px;
+          background: #f1edfb;
+        }
+        .quoteHeadingRow.isSection > strong {
+          font-size: 16px;
+        }
+        .quoteHeadingRow.isSubsection {
+          min-height: 48px;
+          background: #faf8ff;
+        }
+        .quoteHeadingRow.isSubsection > strong {
+          padding-left: 14px;
+          font-size: 13px;
+        }
+        .quoteHeadingEditing {
+          background: #fff;
+        }
+        .quoteCommentRow {
+          border-top: 1px solid var(--border);
+          font-size: 11px;
+          color: var(--muted);
+        }
+        .quoteAddRow {
+          border-top: 1px dashed #d8d1e8;
+          background: #fcfbff;
+          min-height: 54px;
+        }
+        .quoteAddActions {
+          gap: 7px;
+        }
+        .quoteAddActions button {
+          display: inline-flex;
+          align-items: center;
+          gap: 5px;
+          height: 30px;
+          padding: 0 10px;
+          border: 1px solid #d7cfed;
+          border-radius: 6px;
+          background: #fff;
+          color: #6554b5;
+          font-size: 11px;
+          font-weight: 800;
+          cursor: pointer;
+        }
+        .quoteAddActions button:hover:not(:disabled) {
+          border-color: var(--accent);
+          color: var(--accent);
+          background: #faf8ff;
+        }
+        .quoteAddActions button:disabled {
+          opacity: 0.4;
+          cursor: default;
+        }
+        @media (max-width: 1000px) {
+          .quoteLinesTable {
+            overflow-x: auto;
+          }
+          .quoteMainRow,
+          .quoteOuvrageGroup {
+            min-width: 920px;
+          }
+          .quoteComponentsTable {
+            min-width: 780px;
+          }
+        }
       `}</style>
     </section>
   );

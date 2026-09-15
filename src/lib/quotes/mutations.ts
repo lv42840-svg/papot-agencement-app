@@ -363,8 +363,7 @@ function upsertDraftOuvrage(
   const line: QuoteLine = {
     id: input.lineId ?? globalThis.crypto.randomUUID(),
     kind: "LINE",
-    parentId:
-      input.parentId === undefined ? (existingLine?.parentId ?? null) : input.parentId,
+    parentId: input.parentId === undefined ? (existingLine?.parentId ?? null) : input.parentId,
     description: input.description,
     unit: input.unit,
     quantity: parsedQuantity.quantity,
