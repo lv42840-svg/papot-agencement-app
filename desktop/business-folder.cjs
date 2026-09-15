@@ -2,7 +2,18 @@
 
 const path = require("node:path");
 
-const UUID_PATTERN = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
+const WINDOWS_INVALID_SEGMENT = /[<>:"\\|?*\x00-\x1F]/;
+
+function invalidSegments(segments) {
+  return segments.some(
+    (segment) =>
+      !segment ||
+      segment === "." ||
+      segment === ".." ||
+      WINDOWS_INVALID_SEGMENT.test(segment) ||
+      /[. ]$/.test(segment),
+  );
+}
 
 function resolveBusinessFolderPath(rootPath, rawInput) {
   if (typeof rootPath !== "string" || !rootPath.trim() || !path.isAbsolute(rootPath)) {
@@ -12,15 +23,22 @@ function resolveBusinessFolderPath(rootPath, rawInput) {
     throw new Error("DESKTOP_BUSINESS_FOLDER_INVALID");
   }
 
-  const caseId = typeof rawInput.caseId === "string" ? rawInput.caseId.trim() : "";
-  const creationYear = rawInput.creationYear;
-  if (!UUID_PATTERN.test(caseId)) throw new Error("DESKTOP_BUSINESS_FOLDER_INVALID");
-  if (!Number.isInteger(creationYear) || creationYear < 2000 || creationYear > 9999) {
+  const storagePath = typeof rawInput.storagePath === "string" ? rawInput.storagePath.trim() : "";
+  const segments = storagePath.split("/");
+
+  if (
+    segments.length < 5 ||
+    segments[0] !== "Commercial" ||
+    !/^\d{4}$/.test(segments[1] || "") ||
+    Number(segments[1]) < 2000 ||
+    Number(segments[1]) > 9999 ||
+    invalidSegments(segments)
+  ) {
     throw new Error("DESKTOP_BUSINESS_FOLDER_INVALID");
   }
 
   const root = path.resolve(rootPath);
-  const target = path.resolve(root, "documents", "commercial", String(creationYear), caseId);
+  const target = path.resolve(root, ...segments.slice(0, 3));
   const relative = path.relative(root, target);
   if (!relative || relative.startsWith("..") || path.isAbsolute(relative)) {
     throw new Error("DESKTOP_BUSINESS_FOLDER_INVALID");

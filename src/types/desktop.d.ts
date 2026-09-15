@@ -24,8 +24,7 @@ declare global {
       finishSetup: () => Promise<{ ok: boolean }>;
       openBusinessFolder: (input: {
         kind: "commercial-case";
-        caseId: string;
-        creationYear: number;
+        storagePath: string;
       }) => Promise<{ ok: true } | { ok: false; error: string }>;
     };
   }

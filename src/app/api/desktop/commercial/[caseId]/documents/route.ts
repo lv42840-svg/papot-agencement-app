@@ -96,8 +96,9 @@ export async function POST(request: Request, context: RouteContext) {
     let uploaded = [] as Awaited<ReturnType<typeof uploadCommercialDocuments>>;
     try {
       uploaded = await uploadCommercialDocuments(transport, {
-        caseId,
         creationYear,
+        clientName: item.clientName,
+        caseName: item.name,
         files,
         options: { category, versionLabel, variantLabel, isCurrent, isSignedQuote },
       });

@@ -4,6 +4,8 @@ import { FolderOpen } from "lucide-react";
 import { useEffect, useState } from "react";
 
 const folderErrors: Record<string, string> = {
+  COMMERCIAL_CASE_NOT_FOUND: "Cette affaire n’existe plus.",
+  COMMERCIAL_FOLDER_NOT_FOUND: "Le dossier physique de cette affaire n’existe pas encore.",
   DESKTOP_BUSINESS_FOLDER_INVALID: "Le dossier de cette affaire ne peut pas être ouvert.",
   DESKTOP_BUSINESS_FOLDER_ROOT_UNAVAILABLE:
     "Le stockage des documents n’est pas disponible sur ce poste.",
@@ -13,7 +15,6 @@ const folderErrors: Record<string, string> = {
 
 export function CommercialOpenFolderButton({
   caseId,
-  createdAt,
   hasDocuments,
 }: {
   caseId: string;
@@ -32,21 +33,30 @@ export function CommercialOpenFolderButton({
 
   async function openFolder() {
     const bridge = window.papotDesktop;
-    if (!bridge?.openBusinessFolder || busy) return;
+    if (!bridge?.openBusinessFolder || busy || !hasDocuments) return;
 
     setBusy(true);
     setError(null);
     try {
+      const response = await fetch(`/api/desktop/commercial/${caseId}/folder`, {
+        cache: "no-store",
+      });
+      const body = (await response.json()) as { storagePath?: string; error?: string };
+      if (!response.ok || !body.storagePath) {
+        throw new Error(body.error ?? "COMMERCIAL_FOLDER_NOT_FOUND");
+      }
+
       const result = await bridge.openBusinessFolder({
         kind: "commercial-case",
-        caseId,
-        creationYear: new Date(createdAt).getFullYear(),
+        storagePath: body.storagePath,
       });
       if (!result.ok) {
         setError(folderErrors[result.error] ?? folderErrors.DESKTOP_BUSINESS_FOLDER_OPEN_FAILED);
       }
-    } catch {
-      setError(folderErrors.DESKTOP_BUSINESS_FOLDER_OPEN_FAILED);
+    } catch (openError) {
+      const code =
+        openError instanceof Error ? openError.message : "DESKTOP_BUSINESS_FOLDER_OPEN_FAILED";
+      setError(folderErrors[code] ?? folderErrors.DESKTOP_BUSINESS_FOLDER_OPEN_FAILED);
     } finally {
       setBusy(false);
     }
