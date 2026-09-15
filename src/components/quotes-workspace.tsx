@@ -45,16 +45,11 @@ export function QuotesWorkspace({
 
   return (
     <div className="quoteWorkspace">
-      <section
-        className="panel quoteListShell"
-        aria-label="Liste des devis natifs"
-      >
+      <section className="panel quoteListShell" aria-label="Liste des devis natifs">
         <div className="panelHeader quoteListHeader">
           <div>
             <h2>Devis</h2>
-            <p className="muted">
-              Ouvre un devis pour travailler dessus dans sa fiche dédiée.
-            </p>
+            <p className="muted">Ouvre un devis pour travailler dessus dans sa fiche dédiée.</p>
           </div>
           <div className="quoteHeaderActions">
             <span className="countBadge">{initialPayload.quotes.length}</span>
@@ -91,11 +86,7 @@ export function QuotesWorkspace({
             {sortedQuotes.map((quote) => {
               const affair = affairsById.get(quote.commercialCaseId);
               return (
-                <Link
-                  className="quoteDraftRow"
-                  key={quote.id}
-                  href={quoteHref(quote.id)}
-                >
+                <Link className="quoteDraftRow" key={quote.id} href={quoteHref(quote.id)}>
                   <div className="quoteDraftMain">
                     <FileText size={17} aria-hidden="true" />
                     <div>
