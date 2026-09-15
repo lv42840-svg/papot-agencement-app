@@ -45,7 +45,10 @@ export function QuotesWorkspace({
 
   return (
     <div className="quoteWorkspace">
-      <section className="panel quoteListShell" aria-label="Liste des devis natifs">
+      <section
+        className="panel quoteListShell"
+        aria-label="Liste des devis natifs"
+      >
         <div className="panelHeader quoteListHeader">
           <div>
             <h2>Devis</h2>
@@ -58,7 +61,9 @@ export function QuotesWorkspace({
             {canWrite ? (
               <Link
                 href={newQuoteHref}
-                className={`primaryButton quoteCreateLink${affairs.length === 0 ? " isDisabled" : ""}`}
+                className={`primaryButton quoteCreateLink${
+                  affairs.length === 0 ? " isDisabled" : ""
+                }`}
                 aria-disabled={affairs.length === 0}
                 tabIndex={affairs.length === 0 ? -1 : undefined}
               >
@@ -86,7 +91,11 @@ export function QuotesWorkspace({
             {sortedQuotes.map((quote) => {
               const affair = affairsById.get(quote.commercialCaseId);
               return (
-                <Link className="quoteDraftRow" key={quote.id} href={quoteHref(quote.id)}>
+                <Link
+                  className="quoteDraftRow"
+                  key={quote.id}
+                  href={quoteHref(quote.id)}
+                >
                   <div className="quoteDraftMain">
                     <FileText size={17} aria-hidden="true" />
                     <div>
