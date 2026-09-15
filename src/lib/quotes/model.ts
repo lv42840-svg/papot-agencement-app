@@ -233,7 +233,10 @@ function componentAmountCents(quantity: number, unitAmountCents: number): number
 export function calculateQuoteOuvrageUnitPriceCents(components: QuoteOuvrageComponent[]): number {
   let total = 0;
   for (const component of components) {
-    total = addMoneyCents(total, componentAmountCents(component.quantity, component.unitPriceCents));
+    total = addMoneyCents(
+      total,
+      componentAmountCents(component.quantity, component.unitPriceCents),
+    );
   }
   return total;
 }

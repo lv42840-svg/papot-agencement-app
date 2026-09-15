@@ -240,7 +240,8 @@ function upsertDraftOuvrage(
       ? existingComponents.get(componentInput.id)
       : undefined;
     const preservedCost =
-      existingComponent?.costPriceCents ?? existingComponent?.librarySource?.component.costPriceCents;
+      existingComponent?.costPriceCents ??
+      existingComponent?.librarySource?.component.costPriceCents;
     const costPriceCents = componentInput.costPriceCents ?? preservedCost;
 
     return {

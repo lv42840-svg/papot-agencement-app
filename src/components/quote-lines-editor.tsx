@@ -519,7 +519,9 @@ export function QuoteLinesEditor({
 
                     <div className="quoteComponentTotal">
                       <span>Coût total</span>
-                      <strong>{costTotal === null ? "Non renseigné" : formatMoney(costTotal)}</strong>
+                      <strong>
+                        {costTotal === null ? "Non renseigné" : formatMoney(costTotal)}
+                      </strong>
                     </div>
                     <div className="quoteComponentTotal">
                       <span>Vente totale</span>
@@ -593,8 +595,8 @@ export function QuoteLinesEditor({
                 )}
               </div>
               <small className="quoteOuvragePriceHelp">
-                La marge utilise le coût des composants. Le prix forcé remplace uniquement le prix de
-                vente de l’ouvrage, sans modifier sa composition.
+                La marge utilise le coût des composants. Le prix forcé remplace uniquement le prix
+                de vente de l’ouvrage, sans modifier sa composition.
               </small>
             </div>
           </div>

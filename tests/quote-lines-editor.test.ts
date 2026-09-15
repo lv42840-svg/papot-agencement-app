@@ -124,10 +124,9 @@ describe("native quote ouvrage editor", () => {
     });
     const forcedCost = calculateQuoteOuvrageUnitCostCents(forcedLine.components);
     expect(forcedCost).toBe(24_000);
-    expect(calculateQuoteOuvrageMarginPercent(forcedLine.unitPriceCents ?? 0, forcedCost)).toBeCloseTo(
-      66.666666,
-      5,
-    );
+    expect(
+      calculateQuoteOuvrageMarginPercent(forcedLine.unitPriceCents ?? 0, forcedCost),
+    ).toBeCloseTo(66.666666, 5);
 
     const reset = applyQuotesMutation(
       forced.payload,
