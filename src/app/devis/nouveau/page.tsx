@@ -1,22 +1,19 @@
 import { DesktopAppShell } from "@/components/desktop-app-shell";
+import { QuoteCreateWorkspace } from "@/components/quote-create-workspace";
 import { QuoteModuleNav } from "@/components/quote-module-nav";
-import { QuotesWorkspace } from "@/components/quotes-workspace";
 import { createClientsRepository } from "@/lib/clients/create-repository";
 import { clientDisplayName } from "@/lib/clients/domain";
 import { createCommercialRepository } from "@/lib/commercial/create-repository";
-import { isCommercialClosed } from "@/lib/commercial/domain";
+import { commercialParisDateKey, isCommercialClosed } from "@/lib/commercial/domain";
 import { requireDesktopRequestContext } from "@/lib/desktop/request-context";
-import { createQuotesRepository } from "@/lib/quotes/create-repository";
 
 export const dynamic = "force-dynamic";
 
-export default async function QuotesPage() {
+export default async function NewQuotePage() {
   const context = await requireDesktopRequestContext("quotes", "READ");
   const commercialRepository = createCommercialRepository(context);
   const clientsRepository = await createClientsRepository(context);
-  const quotesRepository = createQuotesRepository();
-  const [quotes, commercial, clients] = await Promise.all([
-    quotesRepository.load(),
+  const [commercial, clients] = await Promise.all([
     commercialRepository.load(),
     clientsRepository.load(),
   ]);
@@ -39,10 +36,10 @@ export default async function QuotesPage() {
   return (
     <DesktopAppShell>
       <QuoteModuleNav />
-      <QuotesWorkspace
-        initialPayload={quotes}
+      <QuoteCreateWorkspace
         affairs={affairs}
         canWrite={context.moduleAccess.canWrite}
+        today={commercialParisDateKey()}
       />
     </DesktopAppShell>
   );
