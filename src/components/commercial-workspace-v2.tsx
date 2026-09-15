@@ -26,6 +26,10 @@ import { CommercialOpenFolderButton } from "@/components/commercial-open-folder-
 import { clientWorkspaceHref } from "@/lib/clients/navigation";
 import { collectDroppedFiles } from "@/lib/commercial/document-drop";
 import {
+  filterCommercialDocuments,
+  type CommercialDocumentFilter,
+} from "@/lib/commercial/document-filter";
+import {
   COMMERCIAL_DOCUMENT_CATEGORY_LABELS,
   COMMERCIAL_STATUS_LABELS,
   commercialNeedsFollowUp,
@@ -1015,8 +1019,10 @@ function Documents({
   const inputRef = useRef<HTMLInputElement>(null);
   const dragDepth = useRef(0);
   const [category, setCategory] = useState<CommercialDocumentCategory>("RECEIVED");
+  const [filter, setFilter] = useState<CommercialDocumentFilter>("ALL");
   const [dragging, setDragging] = useState(false);
   const categoryLabel = COMMERCIAL_DOCUMENT_CATEGORY_LABELS[category];
+  const visibleDocuments = filterCommercialDocuments(item.documents, filter).reverse();
 
   function uploadFiles(files: File[]) {
     if (busy || files.length === 0) return;
@@ -1113,33 +1119,44 @@ function Documents({
           </div>
         </>
       ) : null}
+      <label className="commercialV2UploadCategory">
+        <span>Afficher</span>
+        <select
+          value={filter}
+          onChange={(event) => setFilter(event.target.value as CommercialDocumentFilter)}
+        >
+          <option value="ALL">Tous les documents ({item.documents.length})</option>
+          {Object.entries(COMMERCIAL_DOCUMENT_CATEGORY_LABELS).map(([value, label]) => (
+            <option key={value} value={value}>
+              {label}
+            </option>
+          ))}
+        </select>
+      </label>
       <div className="commercialV2Docs">
-        {item.documents.length ? (
-          item.documents
-            .slice()
-            .reverse()
-            .map((document) => (
-              <article key={document.id}>
-                <FileText size={18} />
-                <div>
-                  <strong>{document.fileName}</strong>
-                  <span>
-                    {COMMERCIAL_DOCUMENT_CATEGORY_LABELS[document.category]} ·{" "}
-                    {bytes(document.sizeBytes)} · {dateTime(document.uploadedAt)}
-                  </span>
-                </div>
-                <a
-                  className="secondaryButton"
-                  href={`/api/desktop/affaires/${item.id}/documents/${document.id}?download=1`}
-                >
-                  <Download size={13} /> Télécharger
-                </a>
-              </article>
-            ))
+        {visibleDocuments.length ? (
+          visibleDocuments.map((document) => (
+            <article key={document.id}>
+              <FileText size={18} />
+              <div>
+                <strong>{document.fileName}</strong>
+                <span>
+                  {COMMERCIAL_DOCUMENT_CATEGORY_LABELS[document.category]} ·{" "}
+                  {bytes(document.sizeBytes)} · {dateTime(document.uploadedAt)}
+                </span>
+              </div>
+              <a
+                className="secondaryButton"
+                href={`/api/desktop/affaires/${item.id}/documents/${document.id}?download=1`}
+              >
+                <Download size={13} /> Télécharger
+              </a>
+            </article>
+          ))
         ) : (
           <div className="commercialV2Empty">
             <Paperclip size={24} />
-            Aucun document
+            {item.documents.length ? "Aucun document pour ce type" : "Aucun document"}
           </div>
         )}
       </div>
