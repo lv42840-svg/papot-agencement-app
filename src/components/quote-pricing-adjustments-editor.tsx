@@ -15,10 +15,7 @@ type PricingApiResponse = {
   error?: string;
 };
 
-type OptionTarget = Exclude<
-  NativeQuoteRecord["model"]["items"][number],
-  { kind: "COMMENT" }
->;
+type OptionTarget = Exclude<NativeQuoteRecord["model"]["items"][number], { kind: "COMMENT" }>;
 
 const moneyFormatter = new Intl.NumberFormat("fr-FR", {
   style: "currency",
@@ -176,9 +173,7 @@ export function QuotePricingAdjustmentsEditor({
   const [value, setValue] = useState("5");
   const [costRate, setCostRate] = useState("0");
   const [marginPercent, setMarginPercent] = useState("0");
-  const [marginTreatment, setMarginTreatment] = useState<"MARGED" | "PASS_THROUGH">(
-    "PASS_THROUGH",
-  );
+  const [marginTreatment, setMarginTreatment] = useState<"MARGED" | "PASS_THROUGH">("PASS_THROUGH");
   const [applyToOptions, setApplyToOptions] = useState(true);
   const [optionTargetId, setOptionTargetId] = useState("");
   const [optionLabel, setOptionLabel] = useState("Option");
@@ -190,10 +185,7 @@ export function QuotePricingAdjustmentsEditor({
     [quote.model.items],
   );
   const optionTargets = useMemo(
-    () =>
-      quote.model.items.filter(
-        (item): item is OptionTarget => item.kind !== "COMMENT",
-      ),
+    () => quote.model.items.filter((item): item is OptionTarget => item.kind !== "COMMENT"),
     [quote.model.items],
   );
   const optionTargetIds = useMemo(
@@ -393,9 +385,7 @@ export function QuotePricingAdjustmentsEditor({
             <select
               disabled={!editable}
               value={marginTreatment}
-              onChange={(event) =>
-                setMarginTreatment(event.target.value as typeof marginTreatment)
-              }
+              onChange={(event) => setMarginTreatment(event.target.value as typeof marginTreatment)}
             >
               <option value="PASS_THROUGH">Répercuté sans marge</option>
               <option value="MARGED">Margé</option>
@@ -555,8 +545,8 @@ export function QuotePricingAdjustmentsEditor({
 
       {pricing.warnings.length > 0 ? (
         <p className="warning">
-          Certaines heures de trajet ne peuvent pas être réparties tant qu’aucune heure de
-          pose de base n’est renseignée.
+          Certaines heures de trajet ne peuvent pas être réparties tant qu’aucune heure de pose de
+          base n’est renseignée.
         </p>
       ) : null}
 

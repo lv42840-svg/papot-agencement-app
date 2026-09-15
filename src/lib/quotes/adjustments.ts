@@ -97,9 +97,7 @@ export const quotePricingConfigSchema = z
     }
   });
 
-export type QuoteAdjustmentMarginTreatment = z.infer<
-  typeof quoteAdjustmentMarginTreatmentSchema
->;
+export type QuoteAdjustmentMarginTreatment = z.infer<typeof quoteAdjustmentMarginTreatmentSchema>;
 export type QuotePricingAdjustment = z.infer<typeof quotePricingAdjustmentSchema>;
 export type QuotePercentageAdjustment = z.infer<typeof quotePercentageAdjustmentSchema>;
 export type QuotePoseHoursAdjustment = z.infer<typeof quotePoseHoursAdjustmentSchema>;
@@ -240,10 +238,7 @@ function moneyDistribution(
   );
 }
 
-function hoursDistribution(
-  totalHours: number,
-  lines: MutableLine[],
-): Map<string, number> {
+function hoursDistribution(totalHours: number, lines: MutableLine[]): Map<string, number> {
   const factor = 1_000_000;
   const totalUnits = Math.round(totalHours * factor);
   const units = integerDistribution(
@@ -361,15 +356,20 @@ export function calculateQuoteAdjustedPricing(
 ): QuoteAdjustedPricing {
   const parsedConfig = quotePricingConfigSchema.parse(config);
   const itemById = new Map(items.map((item) => [item.id, item]));
-  const optionByTarget = new Map(parsedConfig.options.map((option) => [option.targetItemId, option]));
-  const poseByLine = new Map(parsedConfig.linePoseHours.map((entry) => [entry.lineId, entry.hours]));
+  const optionByTarget = new Map(
+    parsedConfig.options.map((option) => [option.targetItemId, option]),
+  );
+  const poseByLine = new Map(
+    parsedConfig.linePoseHours.map((entry) => [entry.lineId, entry.hours]),
+  );
 
   const lines: MutableLine[] = items
     .filter((item): item is QuoteLine => item.kind === "LINE")
     .map((line) => {
       const baseSaleCents = lineAmountCents(line.quantity, line.unitPriceCents ?? 0);
       const components = line.components ?? [];
-      const unitCostCents = components.length > 0 ? calculateQuoteOuvrageUnitCostCents(components) : null;
+      const unitCostCents =
+        components.length > 0 ? calculateQuoteOuvrageUnitCostCents(components) : null;
       const baseCostCents =
         unitCostCents === null ? null : lineAmountCents(line.quantity, unitCostCents);
       const resolvedOption = optionForLine(line, itemById, optionByTarget);
@@ -428,8 +428,7 @@ export function calculateQuoteAdjustedPricing(
     totalSaleCents,
     totalCostCents,
     marginAmountCents,
-    marginPercent:
-      totalCostCents === null ? null : marginPercent(totalSaleCents, totalCostCents),
+    marginPercent: totalCostCents === null ? null : marginPercent(totalSaleCents, totalCostCents),
     totalPoseHours: sumPoseHours(mainLines),
     pendingOptionsSaleCents,
     options: optionSummaries,

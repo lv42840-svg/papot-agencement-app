@@ -5,7 +5,11 @@ import {
   quotePricingConfigSchema,
   type QuotePricingConfig,
 } from "./adjustments";
-import { nativeQuoteRecordSchema, parseNativeQuotesPayload, type NativeQuotesPayload } from "./store";
+import {
+  nativeQuoteRecordSchema,
+  parseNativeQuotesPayload,
+  type NativeQuotesPayload,
+} from "./store";
 
 const upsertAdjustmentSchema = z.object({
   action: z.literal("upsertAdjustment"),
@@ -100,7 +104,8 @@ function nextConfig(
     validateOptionTarget(items, mutation.option);
     const options = [...config.options];
     const sameTarget = options.find(
-      (item) => item.targetItemId === mutation.option.targetItemId && item.id !== mutation.option.id,
+      (item) =>
+        item.targetItemId === mutation.option.targetItemId && item.id !== mutation.option.id,
     );
     if (sameTarget) throw new Error("QUOTE_OPTION_TARGET_DUPLICATE");
     const index = options.findIndex((item) => item.id === mutation.option.id);
