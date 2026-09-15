@@ -86,6 +86,12 @@ const moveHeadingMutationSchema = z.object({
   direction: z.enum(["UP", "DOWN"]),
 });
 
+const duplicateHeadingMutationSchema = z.object({
+  action: z.literal("duplicateHeading"),
+  quoteId: z.string().uuid(),
+  itemId: z.string().uuid(),
+});
+
 const upsertSectionMutationSchema = z.object({
   action: z.literal("upsertSection"),
   quoteId: z.string().uuid(),
@@ -108,6 +114,7 @@ export const quotesMutationSchema = z.discriminatedUnion("action", [
   duplicateLineMutationSchema,
   moveLineMutationSchema,
   moveHeadingMutationSchema,
+  duplicateHeadingMutationSchema,
   upsertSectionMutationSchema,
   upsertSubsectionMutationSchema,
 ]);
@@ -349,6 +356,72 @@ function previousHeadingSiblingIndex(
   return -1;
 }
 
+function duplicateDraftHeading(
+  payload: NativeQuotesPayload,
+  input: Extract<QuotesMutation, { action: "duplicateHeading" }>,
+  actor: QuotesActor,
+  now: Date,
+): QuotesMutationResult {
+  const { quoteIndex, quote } = findDraftQuote(payload, input.quoteId);
+  const currentIndex = quote.model.items.findIndex((item) => item.id === input.itemId);
+  if (currentIndex < 0) throw new Error("QUOTE_HEADING_NOT_FOUND");
+
+  const heading = quote.model.items[currentIndex];
+  if (heading.kind !== "SECTION" && heading.kind !== "SUBSECTION") {
+    throw new Error("QUOTE_HEADING_NOT_FOUND");
+  }
+
+  const currentEnd = headingBlockEnd(quote.model.items, currentIndex);
+  const sourceBlock = quote.model.items.slice(currentIndex, currentEnd);
+  const newIds = new Map(sourceBlock.map((item) => [item.id, globalThis.crypto.randomUUID()]));
+  const duplicatedBlock: QuoteItem[] = sourceBlock.map((item) => {
+    const id = newIds.get(item.id);
+    if (!id) throw new Error("QUOTE_HEADING_DUPLICATION_FAILED");
+
+    if (item.kind === "SECTION") {
+      return { ...structuredClone(item), id };
+    }
+
+    if (item.kind === "SUBSECTION") {
+      return {
+        ...structuredClone(item),
+        id,
+        parentId: newIds.get(item.parentId) ?? item.parentId,
+      };
+    }
+
+    const parentId = item.parentId === null ? null : (newIds.get(item.parentId) ?? item.parentId);
+    if (item.kind === "LINE") {
+      return {
+        ...structuredClone(item),
+        id,
+        parentId,
+        components: item.components?.map((component) => ({
+          ...structuredClone(component),
+          id: globalThis.crypto.randomUUID(),
+        })),
+      };
+    }
+
+    return { ...structuredClone(item), id, parentId };
+  });
+
+  const items = [
+    ...quote.model.items.slice(0, currentEnd),
+    ...duplicatedBlock,
+    ...quote.model.items.slice(currentEnd),
+  ];
+  const timestamp = now.toISOString();
+  const updated = nativeQuoteRecordSchema.parse({
+    ...quote,
+    model: parseQuoteModel({ ...quote.model, items }),
+    updatedAt: timestamp,
+    updatedByName: actor.displayName,
+  });
+  payload.quotes[quoteIndex] = updated;
+  return { payload, focusQuoteId: updated.id };
+}
+
 function moveDraftHeading(
   payload: NativeQuotesPayload,
   input: Extract<QuotesMutation, { action: "moveHeading" }>,
@@ -586,6 +659,9 @@ export function applyQuotesMutation(
   }
   if (input.action === "moveHeading") {
     return moveDraftHeading(payload, input, actor, now);
+  }
+  if (input.action === "duplicateHeading") {
+    return duplicateDraftHeading(payload, input, actor, now);
   }
   if (input.action === "upsertOuvrage") {
     return upsertDraftOuvrage(payload, input, actor, now, libraryComponentSources);
