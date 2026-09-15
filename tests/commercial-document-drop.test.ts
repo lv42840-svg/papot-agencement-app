@@ -35,8 +35,8 @@ describe("commercial document drop", () => {
   it("falls back to the dropped FileList when items do not expose files", () => {
     const fallback = [{ name: "croquis.png" }, { name: "note.txt" }];
 
-    expect(
-      collectDroppedFiles([{ kind: "string", getAsFile: () => null }], fallback),
-    ).toEqual(fallback);
+    expect(collectDroppedFiles([{ kind: "string", getAsFile: () => null }], fallback)).toEqual(
+      fallback,
+    );
   });
 });
