@@ -47,8 +47,7 @@ export function commercialDocumentStoragePath(input: {
   }
 
   return [
-    "documents",
-    "commercial",
+    "Commercial",
     String(input.creationYear),
     commercialAffairFolderName(input.clientName, input.caseName),
     commercialDocumentFolderName(input.category),
