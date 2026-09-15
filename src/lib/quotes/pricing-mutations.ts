@@ -23,13 +23,6 @@ const removeAdjustmentSchema = z.object({
   adjustmentId: z.string().uuid(),
 });
 
-const setLinePoseHoursSchema = z.object({
-  action: z.literal("setLinePoseHours"),
-  quoteId: z.string().uuid(),
-  lineId: z.string().uuid(),
-  hours: z.number().finite().min(0).max(1_000_000),
-});
-
 const upsertOptionSchema = z.object({
   action: z.literal("upsertOption"),
   quoteId: z.string().uuid(),
@@ -45,7 +38,6 @@ const removeOptionSchema = z.object({
 export const quotePricingMutationSchema = z.discriminatedUnion("action", [
   upsertAdjustmentSchema,
   removeAdjustmentSchema,
-  setLinePoseHoursSchema,
   upsertOptionSchema,
   removeOptionSchema,
 ]);
@@ -90,14 +82,6 @@ function nextConfig(
       ...config,
       adjustments: config.adjustments.filter((item) => item.id !== mutation.adjustmentId),
     });
-  }
-
-  if (mutation.action === "setLinePoseHours") {
-    const line = items.find((item) => item.id === mutation.lineId);
-    if (!line || line.kind !== "LINE") throw new Error("QUOTE_LINE_NOT_FOUND");
-    const linePoseHours = config.linePoseHours.filter((item) => item.lineId !== mutation.lineId);
-    if (mutation.hours > 0) linePoseHours.push({ lineId: mutation.lineId, hours: mutation.hours });
-    return quotePricingConfigSchema.parse({ ...config, linePoseHours });
   }
 
   if (mutation.action === "upsertOption") {
