@@ -1,0 +1,27 @@
+name: Quote general details format
+
+on:
+  push:
+    branches:
+      - feat/quote-general-details
+
+permissions:
+  contents: read
+
+jobs:
+  format:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - run: npx prettier --write src/app/api/desktop/quotes/[quoteId]/details/route.ts src/components/quote-general-info-editor.tsx
+      - uses: actions/upload-artifact@v4
+        with:
+          name: quote-general-details-formatted
+          path: |
+            src/app/api/desktop/quotes/[quoteId]/details/route.ts
+            src/components/quote-general-info-editor.tsx
