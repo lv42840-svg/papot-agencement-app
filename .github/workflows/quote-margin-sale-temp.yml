@@ -1,0 +1,34 @@
+name: Quote margin sale temporary
+
+on:
+  push:
+    branches:
+      - feat/quote-margin-sale-sync
+
+permissions:
+  contents: write
+
+jobs:
+  patch:
+    if: github.actor != 'github-actions[bot]'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: feat/quote-margin-sale-sync
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - run: python scripts/patch-quote-margin-sale-sync.py
+      - run: npx prettier --write src/components/quote-structured-lines-editor.tsx src/lib/quotes/pricing.ts tests/quote-pricing.test.ts
+      - run: npm run typecheck
+      - run: npm test -- tests/quote-pricing.test.ts tests/quote-lines-editor.test.ts
+      - name: Commit margin sale sync
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add src/components/quote-structured-lines-editor.tsx src/lib/quotes/pricing.ts tests/quote-pricing.test.ts
+          git commit -m "feat(quotes): synchroniser marge et prix de vente"
+          git push
