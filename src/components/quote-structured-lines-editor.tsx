@@ -291,6 +291,8 @@ function lineErrorLabel(code: string): string {
     return "Ce titre ne peut pas être déplacé davantage à ce niveau.";
   }
   if (code === "QUOTE_HEADING_NOT_FOUND") return "Ce titre n’existe plus.";
+  if (code === "QUOTE_ITEM_NOT_FOUND") return "Cet élément n’existe plus.";
+  if (code === "QUOTE_ITEM_DELETE_UNSUPPORTED") return "Cet élément ne peut pas être supprimé ici.";
   if (code === "QUOTE_SECTION_NOT_FOUND") return "Le grand titre du sous-titre n’existe plus.";
   if (code === "QUOTE_LIBRARY_COMPONENT_NOT_FOUND") {
     return "Ce composant n’existe plus dans la Bibliothèque. Choisis-le à nouveau.";
@@ -384,6 +386,7 @@ export function QuoteStructuredLinesEditor({
   const [movingLineId, setMovingLineId] = useState<string | null>(null);
   const [movingHeadingId, setMovingHeadingId] = useState<string | null>(null);
   const [duplicatingHeadingId, setDuplicatingHeadingId] = useState<string | null>(null);
+  const [deletingItemId, setDeletingItemId] = useState<string | null>(null);
   const [error, setError] = useState("");
   const [notice, setNotice] = useState("");
   const [libraryPayload, setLibraryPayload] = useState<LibraryPayload | null>(null);
@@ -442,6 +445,7 @@ export function QuoteStructuredLinesEditor({
     setMovingLineId(null);
     setMovingHeadingId(null);
     setDuplicatingHeadingId(null);
+    setDeletingItemId(null);
     setError("");
     setNotice("");
     setLibraryPickerOpen(false);
@@ -641,6 +645,62 @@ export function QuoteStructuredLinesEditor({
       setError("Le titre n’a pas pu être déplacé.");
     } finally {
       setMovingHeadingId(null);
+    }
+  }
+
+  async function deleteItem(item: QuoteLine | QuoteSection | QuoteSubsection) {
+    if (
+      !quote ||
+      !editable ||
+      deletingItemId ||
+      movingHeadingId ||
+      duplicatingHeadingId ||
+      movingLineId ||
+      duplicatingLineId ||
+      formOpen ||
+      headingEditor
+    ) {
+      return;
+    }
+
+    const label =
+      item.kind === "LINE"
+        ? "cet ouvrage"
+        : item.kind === "SECTION"
+          ? "ce titre et tout son contenu"
+          : "ce sous-titre et tout son contenu";
+    if (!window.confirm(`Supprimer ${label} ?`)) return;
+
+    setDeletingItemId(item.id);
+    setError("");
+    setNotice("");
+    try {
+      const response = await fetch("/api/desktop/quotes", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          action: "deleteItem",
+          quoteId: quote.id,
+          itemId: item.id,
+        }),
+      });
+      const data = (await response.json()) as QuotesApiResponse;
+      if (!response.ok || !data.payload) {
+        setError(lineErrorLabel(data.error ?? "QUOTES_MUTATION_FAILED"));
+        return;
+      }
+      onSaved(data.payload);
+      setNotice(
+        item.kind === "LINE"
+          ? "Ouvrage supprimé."
+          : item.kind === "SECTION"
+            ? "Titre supprimé avec son contenu."
+            : "Sous-titre supprimé avec son contenu.",
+      );
+    } catch {
+      setError("La suppression n’a pas pu être enregistrée.");
+    } finally {
+      setDeletingItemId(null);
     }
   }
 
@@ -1319,12 +1379,29 @@ export function QuoteStructuredLinesEditor({
                     formOpen ||
                     headingEditor !== null ||
                     duplicatingLineId !== null ||
-                    movingLineId !== null
+                    movingLineId !== null ||
+                    deletingItemId !== null
                   }
                   aria-label={`Modifier ${line.description}`}
                   title="Modifier l’ouvrage"
                 >
                   <Pencil size={14} aria-hidden="true" />
+                </button>
+                <button
+                  type="button"
+                  className="iconButton quoteDeleteItemButton"
+                  onClick={() => void deleteItem(line)}
+                  disabled={
+                    formOpen ||
+                    headingEditor !== null ||
+                    duplicatingLineId !== null ||
+                    movingLineId !== null ||
+                    deletingItemId !== null
+                  }
+                  aria-label={`Supprimer ${line.description}`}
+                  title="Supprimer l’ouvrage"
+                >
+                  <Trash2 size={14} aria-hidden="true" />
                 </button>
               </>
             ) : null}
@@ -1702,12 +1779,35 @@ export function QuoteStructuredLinesEditor({
                   formOpen ||
                   headingEditor !== null ||
                   movingHeadingId !== null ||
-                  movingLineId !== null
+                  movingLineId !== null ||
+                  deletingItemId !== null
                 }
                 aria-label={`Modifier ${item.title}`}
                 title="Modifier le titre"
               >
                 <Pencil size={14} aria-hidden="true" />
+              </button>
+              <button
+                type="button"
+                className="iconButton quoteDeleteItemButton"
+                onClick={() => void deleteItem(item)}
+                disabled={
+                  formOpen ||
+                  headingEditor !== null ||
+                  movingHeadingId !== null ||
+                  duplicatingHeadingId !== null ||
+                  movingLineId !== null ||
+                  duplicatingLineId !== null ||
+                  deletingItemId !== null
+                }
+                aria-label={`Supprimer ${item.title}`}
+                title={
+                  item.kind === "SECTION"
+                    ? "Supprimer le titre et son contenu"
+                    : "Supprimer le sous-titre et son contenu"
+                }
+              >
+                <Trash2 size={14} aria-hidden="true" />
               </button>
             </>
           ) : null}
@@ -1895,6 +1995,9 @@ export function QuoteStructuredLinesEditor({
         .quoteLineError {
           background: #fff0f0;
           color: #9c3434;
+        }
+        .quoteDeleteItemButton {
+          color: #a53d3d;
         }
         .quoteLineNotice {
           background: #eef8f1;

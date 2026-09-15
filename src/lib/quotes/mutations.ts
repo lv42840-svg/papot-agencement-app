@@ -92,6 +92,12 @@ const duplicateHeadingMutationSchema = z.object({
   itemId: z.string().uuid(),
 });
 
+const deleteItemMutationSchema = z.object({
+  action: z.literal("deleteItem"),
+  quoteId: z.string().uuid(),
+  itemId: z.string().uuid(),
+});
+
 const upsertSectionMutationSchema = z.object({
   action: z.literal("upsertSection"),
   quoteId: z.string().uuid(),
@@ -115,6 +121,7 @@ export const quotesMutationSchema = z.discriminatedUnion("action", [
   moveLineMutationSchema,
   moveHeadingMutationSchema,
   duplicateHeadingMutationSchema,
+  deleteItemMutationSchema,
   upsertSectionMutationSchema,
   upsertSubsectionMutationSchema,
 ]);
@@ -337,6 +344,35 @@ function headingBlockEnd(items: QuoteItem[], startIndex: number): number {
     }
   }
   return items.length;
+}
+
+function deleteDraftItem(
+  payload: NativeQuotesPayload,
+  input: Extract<QuotesMutation, { action: "deleteItem" }>,
+  actor: QuotesActor,
+  now: Date,
+): QuotesMutationResult {
+  const { quoteIndex, quote } = findDraftQuote(payload, input.quoteId);
+  const itemIndex = quote.model.items.findIndex((item) => item.id === input.itemId);
+  if (itemIndex < 0) throw new Error("QUOTE_ITEM_NOT_FOUND");
+
+  const item = quote.model.items[itemIndex];
+  if (item.kind === "COMMENT") throw new Error("QUOTE_ITEM_DELETE_UNSUPPORTED");
+
+  const deleteEnd =
+    item.kind === "SECTION" || item.kind === "SUBSECTION"
+      ? headingBlockEnd(quote.model.items, itemIndex)
+      : itemIndex + 1;
+  const items = [...quote.model.items.slice(0, itemIndex), ...quote.model.items.slice(deleteEnd)];
+  const timestamp = now.toISOString();
+  const updated = nativeQuoteRecordSchema.parse({
+    ...quote,
+    model: parseQuoteModel({ ...quote.model, items }),
+    updatedAt: timestamp,
+    updatedByName: actor.displayName,
+  });
+  payload.quotes[quoteIndex] = updated;
+  return { payload, focusQuoteId: updated.id };
 }
 
 function previousHeadingSiblingIndex(
@@ -662,6 +698,9 @@ export function applyQuotesMutation(
   }
   if (input.action === "duplicateHeading") {
     return duplicateDraftHeading(payload, input, actor, now);
+  }
+  if (input.action === "deleteItem") {
+    return deleteDraftItem(payload, input, actor, now);
   }
   if (input.action === "upsertOuvrage") {
     return upsertDraftOuvrage(payload, input, actor, now, libraryComponentSources);
