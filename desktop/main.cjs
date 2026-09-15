@@ -16,10 +16,7 @@ const {
   saveDesktopSetup,
 } = require("./setup-store.cjs");
 const { databasePath, openLocalDatabase } = require("./local-database.cjs");
-const {
-  resolveBusinessFilePath,
-  resolveBusinessFolderPath,
-} = require("./business-folder.cjs");
+const { resolveBusinessFilePath, resolveBusinessFolderPath } = require("./business-folder.cjs");
 const { startDevelopmentServer, startPackagedServer } = require("./server-manager.cjs");
 
 const appUrl = normalizeLocalAppUrl(process.env.PAPOT_APP_URL || DEFAULT_DESKTOP_APP_URL);
