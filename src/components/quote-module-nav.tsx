@@ -24,7 +24,11 @@ export function QuoteModuleNav() {
 
       <nav className="quoteModuleTabs" aria-label="Navigation du module Devis">
         {tabs.map(({ label, href, icon: Icon }) => {
-          const active = href === "/devis" ? pathname === href : pathname.startsWith(href);
+          const active =
+            href === "/devis"
+              ? pathname === "/devis" ||
+                (pathname.startsWith("/devis/") && !pathname.startsWith("/devis/bibliotheque"))
+              : pathname.startsWith(href);
           return (
             <Link
               key={href}
