@@ -108,6 +108,7 @@ export function CommercialDocumentActions({
   previewOpen,
   onTogglePreview,
 }: {
+  caseId: string;
   document: CommercialDocument;
   previewOpen: boolean;
   onTogglePreview: () => void;
