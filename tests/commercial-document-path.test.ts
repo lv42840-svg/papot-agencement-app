@@ -16,7 +16,7 @@ describe("commercial document path", () => {
         category: "RECEIVED",
         fileName: "plan client.pdf",
       }),
-    ).toBe("documents/commercial/2026/Dupont_Cuisine Lyon/Documents reçus/plan client.pdf");
+    ).toBe("Commercial/2026/Dupont_Cuisine Lyon/Documents reçus/plan client.pdf");
   });
 
   it("uses clear business folder names for every commercial classification", () => {
