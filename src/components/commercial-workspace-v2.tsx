@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import {
   Archive,
   BriefcaseBusiness,
@@ -18,7 +19,7 @@ import {
   Users,
   X,
 } from "lucide-react";
-import { useSearchParams } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import { FormEvent, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { CommercialAffairQuotes } from "@/components/commercial-affair-quotes";
 import {
@@ -45,6 +46,7 @@ import {
   type CommercialStatus,
 } from "@/lib/commercial/domain";
 import { filterCommercialCases, type CommercialListFilter } from "@/lib/commercial/list-filter";
+import { commercialAffairHref } from "@/lib/commercial/navigation";
 
 type Snapshot = {
   payload: CommercialPayload;
@@ -225,13 +227,13 @@ function useCommercial() {
   return { snapshot, loading, busy, error, notice, load, mutate, upload };
 }
 
-export function CommercialWorkspaceV2() {
+export function CommercialWorkspaceV2({ affairId }: { affairId?: string }) {
+  const router = useRouter();
   const searchParams = useSearchParams();
   const focus = searchParams.get("focus");
   const { snapshot, loading, busy, error, notice, load, mutate, upload } = useCommercial();
   const [mode, setMode] = useState<CommercialListFilter>("active");
   const [query, setQuery] = useState("");
-  const [selectedId, setSelectedId] = useState<string | null>(focus);
   const [createOpen, setCreateOpen] = useState(false);
 
   const clients = snapshot?.payload.clients ?? [];
@@ -261,21 +263,66 @@ export function CommercialWorkspaceV2() {
     return list;
   }, [cases, mode, normalized, now]);
 
-  const selected = visible.find((item) => item.id === selectedId) ?? visible[0] ?? null;
+  const selected = affairId ? (cases.find((item) => item.id === affairId) ?? null) : null;
+
   useEffect(() => {
-    if (focus && cases.some((item) => item.id === focus)) {
-      setSelectedId(focus);
-      return;
-    }
-    if (!selectedId || !visible.some((item) => item.id === selectedId)) {
-      setSelectedId(visible[0]?.id ?? null);
-    }
-  }, [cases, focus, selectedId, visible]);
+    if (affairId || !focus || !cases.some((item) => item.id === focus)) return;
+    router.replace(commercialAffairHref(focus));
+  }, [affairId, cases, focus, router]);
 
   const active = filterCommercialCases(cases, "active", now).length;
   const due = filterCommercialCases(cases, "follow-up", now).length;
   const confirmed = filterCommercialCases(cases, "confirmed", now).length;
   const archived = filterCommercialCases(cases, "archives", now).length;
+
+  if (affairId) {
+    return (
+      <div className="commercialV2 commercialV2AffairPage">
+        <div className="commercialV2StandaloneTop">
+          <Link href="/commercial" className="commercialV2Back">
+            ← Toutes les affaires
+          </Link>
+          <button
+            className="secondaryButton"
+            type="button"
+            onClick={() => void load()}
+            disabled={busy}
+          >
+            <RefreshCw size={15} /> Actualiser
+          </button>
+        </div>
+
+        {error ? <div className="commercialV2Message error">{error}</div> : null}
+        {notice ? <div className="commercialV2Message success">{notice}</div> : null}
+
+        {loading && !snapshot ? (
+          <div className="commercialV2Loading">
+            <RefreshCw size={18} /> Chargement…
+          </div>
+        ) : selected && snapshot ? (
+          <main className="commercialV2Detail commercialV2DetailStandalone">
+            <AffairDetail
+              key={selected.id}
+              item={selected}
+              clients={clients}
+              busy={busy}
+              canModify={snapshot.capabilities.canModify}
+              mutate={mutate}
+              upload={upload}
+            />
+          </main>
+        ) : (
+          <div className="commercialV2Empty commercialV2MissingAffair">
+            <BriefcaseBusiness size={30} />
+            <strong>Affaire introuvable</strong>
+            <Link href="/commercial">Retour à la liste</Link>
+          </div>
+        )}
+
+        <CommercialV2Styles />
+      </div>
+    );
+  }
 
   return (
     <div className="commercialV2">
@@ -316,9 +363,9 @@ export function CommercialWorkspaceV2() {
           onSubmit={async (body) => {
             const result = await mutate(body, "Affaire créée.");
             if (result?.focusCaseId) {
-              setSelectedId(result.focusCaseId);
               setMode("active");
               setCreateOpen(false);
+              router.push(commercialAffairHref(result.focusCaseId));
             }
           }}
         />
@@ -377,15 +424,14 @@ export function CommercialWorkspaceV2() {
           <RefreshCw size={18} /> Chargement…
         </div>
       ) : (
-        <div className="commercialV2Grid">
-          <aside className="commercialV2List">
+        <div className="commercialV2ListShell">
+          <aside className="commercialV2List commercialV2ListFull">
             {visible.length ? (
               visible.map((item) => (
-                <button
-                  type="button"
+                <Link
                   key={item.id}
-                  className={selected?.id === item.id ? "selected" : ""}
-                  onClick={() => setSelectedId(item.id)}
+                  href={commercialAffairHref(item.id)}
+                  className="commercialV2ListRow"
                 >
                   <div>
                     <strong>{item.name}</strong>
@@ -397,7 +443,7 @@ export function CommercialWorkspaceV2() {
                     </span>
                     <small>{dateLabel(nextCommercialDeadline(item))}</small>
                   </div>
-                </button>
+                </Link>
               ))
             ) : (
               <div className="commercialV2Empty">
@@ -406,25 +452,6 @@ export function CommercialWorkspaceV2() {
               </div>
             )}
           </aside>
-
-          <main className="commercialV2Detail">
-            {selected && snapshot ? (
-              <AffairDetail
-                key={selected.id}
-                item={selected}
-                clients={clients}
-                busy={busy}
-                canModify={snapshot.capabilities.canModify}
-                mutate={mutate}
-                upload={upload}
-              />
-            ) : (
-              <div className="commercialV2Empty">
-                <BriefcaseBusiness size={30} />
-                Sélectionne une affaire
-              </div>
-            )}
-          </main>
         </div>
       )}
 
@@ -1226,6 +1253,23 @@ function CommercialV2Styles() {
         align-items: center;
         gap: 8px;
       }
+      .commercialV2StandaloneTop {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 12px;
+      }
+      .commercialV2Back {
+        width: max-content;
+        color: #604dc4;
+        font-size: 10px;
+        font-weight: 800;
+        text-decoration: none;
+      }
+      .commercialV2Back:hover,
+      .commercialV2Back:focus-visible {
+        text-decoration: underline;
+      }
       .commercialV2Message {
         padding: 9px 12px;
         border-radius: 9px;
@@ -1316,35 +1360,39 @@ function CommercialV2Styles() {
         border: 0;
         background: transparent;
       }
-      .commercialV2Grid {
+      .commercialV2ListShell,
+      .commercialV2DetailStandalone {
         min-height: 520px;
-        display: grid;
-        grid-template-columns: minmax(260px, 320px) minmax(0, 1fr);
         border: 1px solid #e3deea;
         border-radius: 12px;
         overflow: hidden;
         background: white;
       }
       .commercialV2List {
-        border-right: 1px solid #e8e3ed;
         background: #fbfaff;
         overflow: auto;
       }
-      .commercialV2List > button {
+      .commercialV2ListFull {
+        min-height: 520px;
+      }
+      .commercialV2List > a {
         width: 100%;
         padding: 12px;
         display: grid;
         gap: 8px;
-        border: 0;
         border-bottom: 1px solid #eeeaf2;
         background: transparent;
+        color: inherit;
         text-align: left;
+        text-decoration: none;
       }
-      .commercialV2List > button.selected {
-        background: #f1edff;
+      .commercialV2List > a:hover,
+      .commercialV2List > a:focus-visible {
+        background: #f4f0ff;
         box-shadow: inset 3px 0 #7563d7;
+        outline: none;
       }
-      .commercialV2List > button > div:first-child {
+      .commercialV2List > a > div:first-child {
         display: grid;
         gap: 2px;
       }
@@ -1407,6 +1455,9 @@ function CommercialV2Styles() {
       .commercialV2Detail {
         min-width: 0;
         overflow: auto;
+      }
+      .commercialV2DetailStandalone {
+        width: 100%;
       }
       .commercialV2DetailHeader {
         padding: 18px 20px 13px;
@@ -1734,17 +1785,19 @@ function CommercialV2Styles() {
         color: #918a98;
         font-size: 10px;
       }
+      .commercialV2MissingAffair {
+        min-height: 420px;
+        border: 1px solid #e3deea;
+        border-radius: 12px;
+        background: white;
+      }
+      .commercialV2MissingAffair a {
+        color: #604dc4;
+        font-weight: 800;
+      }
       @media (max-width: 900px) {
         .commercialV2Stats {
           grid-template-columns: repeat(2, minmax(0, 1fr));
-        }
-        .commercialV2Grid {
-          grid-template-columns: 1fr;
-        }
-        .commercialV2List {
-          max-height: 260px;
-          border-right: 0;
-          border-bottom: 1px solid #e8e3ed;
         }
         .commercialV2FollowGrid,
         .commercialV2Form,
@@ -1774,6 +1827,10 @@ function CommercialV2Styles() {
         }
       }
       @media (max-width: 700px) {
+        .commercialV2StandaloneTop {
+          align-items: stretch;
+          flex-direction: column;
+        }
         .commercialV2Docs article {
           grid-template-columns: auto 1fr;
         }
