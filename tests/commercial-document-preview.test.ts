@@ -25,9 +25,7 @@ describe("commercial document preview", () => {
   it("keeps the adjustable preview height inside safe bounds", () => {
     expect(clampCommercialDocumentPreviewHeight(120)).toBe(COMMERCIAL_DOCUMENT_PREVIEW_MIN_HEIGHT);
     expect(clampCommercialDocumentPreviewHeight(520)).toBe(520);
-    expect(clampCommercialDocumentPreviewHeight(1400)).toBe(
-      COMMERCIAL_DOCUMENT_PREVIEW_MAX_HEIGHT,
-    );
+    expect(clampCommercialDocumentPreviewHeight(1400)).toBe(COMMERCIAL_DOCUMENT_PREVIEW_MAX_HEIGHT);
     expect(clampCommercialDocumentPreviewHeight(Number.NaN)).toBe(
       COMMERCIAL_DOCUMENT_PREVIEW_DEFAULT_HEIGHT,
     );
