@@ -263,7 +263,7 @@ export function CommercialWorkspaceV2({ affairId }: { affairId?: string }) {
     return list;
   }, [cases, mode, normalized, now]);
 
-  const selected = affairId ? cases.find((item) => item.id === affairId) ?? null : null;
+  const selected = affairId ? (cases.find((item) => item.id === affairId) ?? null) : null;
 
   useEffect(() => {
     if (affairId || !focus || !cases.some((item) => item.id === focus)) return;
