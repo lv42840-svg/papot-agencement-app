@@ -16,7 +16,7 @@ const {
   saveDesktopSetup,
 } = require("./setup-store.cjs");
 const { databasePath, openLocalDatabase } = require("./local-database.cjs");
-const { resolveBusinessFolderPath } = require("./business-folder.cjs");
+const { resolveBusinessFilePath, resolveBusinessFolderPath } = require("./business-folder.cjs");
 const { startDevelopmentServer, startPackagedServer } = require("./server-manager.cjs");
 
 const appUrl = normalizeLocalAppUrl(process.env.PAPOT_APP_URL || DEFAULT_DESKTOP_APP_URL);
@@ -223,6 +223,23 @@ function publicBusinessFolderError(error) {
   return known.has(code) ? code : "DESKTOP_BUSINESS_FOLDER_OPEN_FAILED";
 }
 
+function publicBusinessFileError(error) {
+  const code = error instanceof Error ? error.message : "DESKTOP_BUSINESS_FILE_OPEN_FAILED";
+  const known = new Set([
+    "DESKTOP_BUSINESS_FILE_INVALID",
+    "DESKTOP_BUSINESS_FILE_ROOT_UNAVAILABLE",
+    "DESKTOP_BUSINESS_FILE_NOT_FOUND",
+    "DESKTOP_BUSINESS_FILE_OPEN_FAILED",
+  ]);
+  if (
+    code === "DESKTOP_BUSINESS_FILE_ROOT_INVALID" ||
+    code === "DESKTOP_BUSINESS_FOLDER_ROOT_UNAVAILABLE"
+  ) {
+    return "DESKTOP_BUSINESS_FILE_ROOT_UNAVAILABLE";
+  }
+  return known.has(code) ? code : "DESKTOP_BUSINESS_FILE_OPEN_FAILED";
+}
+
 function registerBusinessFolderHandler() {
   ipcMain.handle("papot:business-folder:open", async (_event, rawInput) => {
     try {
@@ -243,6 +260,30 @@ function registerBusinessFolderHandler() {
       return { ok: true };
     } catch (error) {
       return { ok: false, error: publicBusinessFolderError(error) };
+    }
+  });
+}
+
+function registerBusinessFileHandler() {
+  ipcMain.handle("papot:business-file:open", async (_event, rawInput) => {
+    try {
+      const target = resolveBusinessFilePath(businessFilesRoot(), rawInput);
+      let stats;
+      try {
+        stats = await fs.promises.stat(target);
+      } catch (error) {
+        if (error && typeof error === "object" && error.code === "ENOENT") {
+          throw new Error("DESKTOP_BUSINESS_FILE_NOT_FOUND");
+        }
+        throw error;
+      }
+      if (!stats.isFile()) throw new Error("DESKTOP_BUSINESS_FILE_NOT_FOUND");
+
+      const openError = await shell.openPath(target);
+      if (openError) throw new Error("DESKTOP_BUSINESS_FILE_OPEN_FAILED");
+      return { ok: true };
+    } catch (error) {
+      return { ok: false, error: publicBusinessFileError(error) };
     }
   });
 }
@@ -316,6 +357,7 @@ app.whenReady().then(async () => {
 
   registerDesktopSetupHandler();
   registerBusinessFolderHandler();
+  registerBusinessFileHandler();
 
   session.defaultSession.setPermissionCheckHandler(() => false);
   session.defaultSession.setPermissionRequestHandler((_webContents, _permission, callback) => {
