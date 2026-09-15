@@ -22,6 +22,7 @@ import {
 import { useSearchParams } from "next/navigation";
 import { FormEvent, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { CommercialAffairQuotes } from "@/components/commercial-affair-quotes";
+import { CommercialOpenFolderButton } from "@/components/commercial-open-folder-button";
 import { clientWorkspaceHref } from "@/lib/clients/navigation";
 import { collectDroppedFiles } from "@/lib/commercial/document-drop";
 import {
@@ -1031,6 +1032,11 @@ function Documents({
         Choisis la catégorie puis glisse les fichiers ici ou utilise Ajouter. PAPOT les classe
         automatiquement dans le dossier de l’affaire.
       </p>
+      <CommercialOpenFolderButton
+        caseId={item.id}
+        createdAt={item.createdAt}
+        hasDocuments={item.documents.length > 0}
+      />
       {canModify ? (
         <>
           <div className="commercialV2Upload">
