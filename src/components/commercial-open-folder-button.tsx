@@ -1,16 +1,9 @@
 "use client";
 
-import { ExternalLink, Eye, FolderOpen, Minus, Plus, X } from "lucide-react";
-import { useEffect, useRef, useState } from "react";
-import {
-  COMMERCIAL_DOCUMENT_PREVIEW_DEFAULT_HEIGHT,
-  canPreviewCommercialDocument,
-  clampCommercialDocumentPreviewHeight,
-} from "@/lib/commercial/document-preview";
+import { ExternalLink, Eye, FolderOpen, X } from "lucide-react";
+import { useEffect, useState } from "react";
+import { canPreviewCommercialDocument } from "@/lib/commercial/document-preview";
 import type { CommercialDocument } from "@/lib/commercial/domain";
-
-const HEIGHT_STEP = 80;
-const KEYBOARD_STEP = 40;
 
 const folderErrors: Record<string, string> = {
   COMMERCIAL_CASE_NOT_FOUND: "Cette affaire n’existe plus.",
@@ -59,16 +52,14 @@ export function CommercialOpenFolderButton({
   const [viewerError, setViewerError] = useState<string | null>(null);
   const [documents, setDocuments] = useState<CommercialDocument[]>([]);
   const [selectedDocumentId, setSelectedDocumentId] = useState<string | null>(null);
-  const [height, setHeight] = useState(COMMERCIAL_DOCUMENT_PREVIEW_DEFAULT_HEIGHT);
-  const dragState = useRef<{
-    pointerId: number;
-    startY: number;
-    startHeight: number;
-  } | null>(null);
 
   const selectedDocument =
     documents.find((document) => document.id === selectedDocumentId) ?? documents[0] ?? null;
   const previewable = selectedDocument ? canPreviewCommercialDocument(selectedDocument) : false;
+  const previewSource =
+    selectedDocument && previewable
+      ? `/api/desktop/affaires/${caseId}/documents/${selectedDocument.id}`
+      : null;
 
   useEffect(() => {
     setFolderAvailable(Boolean(window.papotDesktop?.openBusinessFolder));
@@ -81,7 +72,6 @@ export function CommercialOpenFolderButton({
     setFileError(null);
     setDocuments([]);
     setSelectedDocumentId(null);
-    setHeight(COMMERCIAL_DOCUMENT_PREVIEW_DEFAULT_HEIGHT);
   }, [caseId]);
 
   async function openFolder() {
@@ -123,14 +113,17 @@ export function CommercialOpenFolderButton({
 
     setFileBusy(true);
     setFileError(null);
-    const result = await bridge.openBusinessFile({
-      kind: "commercial-document",
-      storagePath: selectedDocument.storagePath,
-    });
-    if (!result.ok) {
-      setFileError(fileErrors[result.error] ?? fileErrors.DESKTOP_BUSINESS_FILE_OPEN_FAILED);
+    try {
+      const result = await bridge.openBusinessFile({
+        kind: "commercial-document",
+        storagePath: selectedDocument.storagePath,
+      });
+      if (!result.ok) {
+        setFileError(fileErrors[result.error] ?? fileErrors.DESKTOP_BUSINESS_FILE_OPEN_FAILED);
+      }
+    } finally {
+      setFileBusy(false);
     }
-    setFileBusy(false);
   }
 
   async function toggleViewer() {
@@ -155,13 +148,12 @@ export function CommercialOpenFolderButton({
       if (!item) throw new Error("COMMERCIAL_CASE_NOT_FOUND");
 
       const nextDocuments = item.documents ?? [];
-      const firstDocument = nextDocuments.find(canPreviewCommercialDocument) ?? nextDocuments[0] ?? null;
+      const firstDocument =
+        nextDocuments.find(canPreviewCommercialDocument) ?? nextDocuments[0] ?? null;
       setDocuments(nextDocuments);
       setSelectedDocumentId(firstDocument?.id ?? null);
       setViewerOpen(true);
-      if (!nextDocuments.length) {
-        setViewerError("Aucun document dans cette affaire.");
-      }
+      if (!nextDocuments.length) setViewerError("Aucun document dans cette affaire.");
     } catch {
       setViewerError("Impossible de charger les documents à visualiser.");
       setViewerOpen(true);
@@ -170,19 +162,8 @@ export function CommercialOpenFolderButton({
     }
   }
 
-  function adjustHeight(delta: number) {
-    setHeight((current) => clampCommercialDocumentPreviewHeight(current + delta));
-  }
-
-  const previewSource =
-    selectedDocument && previewable
-      ? `/api/desktop/affaires/${caseId}/documents/${selectedDocument.id}`
-      : null;
-
   return (
-    <div
-      className={`commercialDocumentTools${fileOpenAvailable ? " fileOpenAvailable" : ""}`}
-    >
+    <div className={`commercialDocumentTools${fileOpenAvailable ? " fileOpenAvailable" : ""}`}>
       <div className="commercialDocumentToolActions">
         {folderAvailable ? (
           <button
@@ -243,33 +224,11 @@ export function CommercialOpenFolderButton({
                   type="button"
                   className="secondaryButton commercialDocumentOpenButton"
                   disabled={fileBusy}
-                  title="Ouvrir directement le fichier enregistré avec le logiciel Windows par défaut"
+                  title="Ouvrir le fichier original avec le logiciel Windows par défaut"
                   onClick={() => void openSelectedDocument()}
                 >
                   <ExternalLink size={14} /> {fileBusy ? "Ouverture…" : "Ouvrir"}
                 </button>
-              ) : null}
-              {previewable ? (
-                <>
-                  <button
-                    type="button"
-                    className="secondaryButton"
-                    title="Réduire la hauteur"
-                    aria-label="Réduire la hauteur de l’aperçu"
-                    onClick={() => adjustHeight(-HEIGHT_STEP)}
-                  >
-                    <Minus size={14} />
-                  </button>
-                  <button
-                    type="button"
-                    className="secondaryButton"
-                    title="Augmenter la hauteur"
-                    aria-label="Augmenter la hauteur de l’aperçu"
-                    onClick={() => adjustHeight(HEIGHT_STEP)}
-                  >
-                    <Plus size={14} />
-                  </button>
-                </>
               ) : null}
               <button
                 type="button"
@@ -288,66 +247,21 @@ export function CommercialOpenFolderButton({
           {!viewerError && selectedDocument && !previewable ? (
             <div className="commercialDocumentPreviewEmpty">
               Ce format ne se prévisualise pas dans PAPOT. Utilise Ouvrir pour lancer directement le
-              fichier enregistré.
+              fichier original.
             </div>
           ) : null}
           {previewSource && !viewerError ? (
-            <div className="commercialDocumentPreviewFrame" style={{ height }}>
-              <iframe
-                src={previewSource}
-                title={`Aperçu de ${selectedDocument?.fileName ?? "document"}`}
-              />
-            </div>
-          ) : null}
-
-          {previewSource && !viewerError ? (
-            <div
-              className="commercialDocumentPreviewResize"
-              role="separator"
-              aria-orientation="horizontal"
-              aria-label="Redimensionner la hauteur du visualiseur"
-              tabIndex={0}
-              onPointerDown={(event) => {
-                dragState.current = {
-                  pointerId: event.pointerId,
-                  startY: event.clientY,
-                  startHeight: height,
-                };
-                event.currentTarget.setPointerCapture(event.pointerId);
-              }}
-              onPointerMove={(event) => {
-                const drag = dragState.current;
-                if (!drag || drag.pointerId !== event.pointerId) return;
-                setHeight(
-                  clampCommercialDocumentPreviewHeight(
-                    drag.startHeight + (event.clientY - drag.startY),
-                  ),
-                );
-              }}
-              onPointerUp={(event) => {
-                if (dragState.current?.pointerId !== event.pointerId) return;
-                dragState.current = null;
-                if (event.currentTarget.hasPointerCapture(event.pointerId)) {
-                  event.currentTarget.releasePointerCapture(event.pointerId);
-                }
-              }}
-              onLostPointerCapture={() => {
-                dragState.current = null;
-              }}
-              onKeyDown={(event) => {
-                if (event.key === "ArrowUp") {
-                  event.preventDefault();
-                  adjustHeight(-KEYBOARD_STEP);
-                }
-                if (event.key === "ArrowDown") {
-                  event.preventDefault();
-                  adjustHeight(KEYBOARD_STEP);
-                }
-              }}
-            >
-              <span aria-hidden="true" />
-              <small>↕ Glisser pour régler la hauteur</small>
-            </div>
+            <>
+              <div className="commercialDocumentPreviewFrame">
+                <iframe
+                  src={previewSource}
+                  title={`Aperçu de ${selectedDocument?.fileName ?? "document"}`}
+                />
+              </div>
+              <small className="commercialDocumentPreviewHint">
+                ↕ Tire le bord inférieur de l’aperçu pour régler sa hauteur.
+              </small>
+            </>
           ) : null}
         </section>
       ) : null}
@@ -416,8 +330,11 @@ export function CommercialOpenFolderButton({
           padding-inline: 9px;
         }
         .commercialDocumentPreviewFrame {
+          height: 460px;
           min-height: 220px;
           max-height: 900px;
+          overflow: auto;
+          resize: vertical;
           background: #ebe8ef;
         }
         .commercialDocumentPreviewFrame iframe {
@@ -426,6 +343,14 @@ export function CommercialOpenFolderButton({
           display: block;
           border: 0;
           background: white;
+        }
+        .commercialDocumentPreviewHint {
+          padding: 6px 10px;
+          border-top: 1px solid #e2dce8;
+          background: white;
+          color: #81778e;
+          font-size: 8px;
+          text-align: center;
         }
         .commercialDocumentPreviewEmpty {
           min-height: 120px;
@@ -442,32 +367,6 @@ export function CommercialOpenFolderButton({
           background: #fff1ef;
           color: #9d4438;
           font-size: 9px;
-        }
-        .commercialDocumentPreviewResize {
-          min-height: 30px;
-          display: flex;
-          align-items: center;
-          justify-content: center;
-          gap: 7px;
-          border-top: 1px solid #e2dce8;
-          background: white;
-          color: #81778e;
-          cursor: ns-resize;
-          user-select: none;
-          touch-action: none;
-          outline: 0;
-        }
-        .commercialDocumentPreviewResize:focus-visible {
-          box-shadow: inset 0 0 0 2px #8f80dd;
-        }
-        .commercialDocumentPreviewResize > span {
-          width: 28px;
-          height: 3px;
-          border-radius: 999px;
-          background: #c8c0d2;
-        }
-        .commercialDocumentPreviewResize small {
-          font-size: 8px;
         }
         @media (max-width: 620px) {
           .commercialDocumentPreview header {
