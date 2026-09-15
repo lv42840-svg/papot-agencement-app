@@ -192,7 +192,12 @@ export function QuoteGeneralInfoEditor({
             <button className="primaryButton" type="submit" disabled={saving}>
               <Check size={14} aria-hidden="true" /> {saving ? "Enregistrement…" : "Enregistrer"}
             </button>
-            <button className="secondaryButton" type="button" onClick={closeEditor} disabled={saving}>
+            <button
+              className="secondaryButton"
+              type="button"
+              onClick={closeEditor}
+              disabled={saving}
+            >
               <X size={14} aria-hidden="true" /> Annuler
             </button>
           </div>
