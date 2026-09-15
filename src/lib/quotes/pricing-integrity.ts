@@ -3,10 +3,9 @@ import { quotePricingConfigSchema } from "./adjustments";
 import type { QuoteItem } from "./model";
 import type { NativeQuotesPayload } from "./store";
 
-function optionTarget(
-  items: QuoteItem[],
-  option: QuoteOption,
-): Exclude<QuoteItem, { kind: "COMMENT" }> {
+type OptionTarget = Exclude<QuoteItem, { kind: "COMMENT" }>;
+
+function optionTarget(items: QuoteItem[], option: QuoteOption): OptionTarget {
   const target = items.find((item) => item.id === option.targetItemId);
   if (!target) throw new Error("QUOTE_OPTION_TARGET_NOT_FOUND");
   if (target.kind === "COMMENT" || target.kind !== option.targetKind) {
@@ -17,8 +16,8 @@ function optionTarget(
 
 function targetContains(
   items: QuoteItem[],
-  ancestor: Exclude<QuoteItem, { kind: "COMMENT" }>,
-  descendant: Exclude<QuoteItem, { kind: "COMMENT" }>,
+  ancestor: OptionTarget,
+  descendant: OptionTarget,
 ): boolean {
   if (ancestor.id === descendant.id) return true;
   if (ancestor.kind === "LINE") return false;
@@ -53,8 +52,11 @@ export function assertQuoteOptionCanBeUpserted(
   }
 }
 
-export function assertQuotePricingIntegrity(items: QuoteItem[], config: QuotePricingConfig): void {
-  const parsed = quotePricingConfigSchema.parse(config);
+export function assertQuotePricingIntegrity(
+  items: QuoteItem[],
+  pricingConfig: QuotePricingConfig,
+): void {
+  const parsed = quotePricingConfigSchema.parse(pricingConfig);
   for (const option of parsed.options) optionTarget(items, option);
 
   for (let leftIndex = 0; leftIndex < parsed.options.length; leftIndex += 1) {
