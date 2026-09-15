@@ -54,7 +54,8 @@ export function CommercialOpenFolderButton({
         setError(folderErrors[result.error] ?? folderErrors.DESKTOP_BUSINESS_FOLDER_OPEN_FAILED);
       }
     } catch (openError) {
-      const code = openError instanceof Error ? openError.message : "DESKTOP_BUSINESS_FOLDER_OPEN_FAILED";
+      const code =
+        openError instanceof Error ? openError.message : "DESKTOP_BUSINESS_FOLDER_OPEN_FAILED";
       setError(folderErrors[code] ?? folderErrors.DESKTOP_BUSINESS_FOLDER_OPEN_FAILED);
     } finally {
       setBusy(false);
