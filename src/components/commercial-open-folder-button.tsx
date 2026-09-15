@@ -11,15 +11,7 @@ const folderErrors: Record<string, string> = {
   DESKTOP_BUSINESS_FOLDER_OPEN_FAILED: "Windows n’a pas pu ouvrir le dossier de cette affaire.",
 };
 
-export function CommercialOpenFolderButton({
-  caseId,
-  createdAt,
-  hasDocuments,
-}: {
-  caseId: string;
-  createdAt: string;
-  hasDocuments: boolean;
-}) {
+export function CommercialOpenFolderButton({ storagePath }: { storagePath: string | null }) {
   const [available, setAvailable] = useState(false);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -32,15 +24,14 @@ export function CommercialOpenFolderButton({
 
   async function openFolder() {
     const bridge = window.papotDesktop;
-    if (!bridge?.openBusinessFolder || busy) return;
+    if (!bridge?.openBusinessFolder || busy || !storagePath) return;
 
     setBusy(true);
     setError(null);
     try {
       const result = await bridge.openBusinessFolder({
         kind: "commercial-case",
-        caseId,
-        creationYear: new Date(createdAt).getFullYear(),
+        storagePath,
       });
       if (!result.ok) {
         setError(folderErrors[result.error] ?? folderErrors.DESKTOP_BUSINESS_FOLDER_OPEN_FAILED);
@@ -57,9 +48,9 @@ export function CommercialOpenFolderButton({
       <button
         className="secondaryButton"
         type="button"
-        disabled={busy || !hasDocuments}
+        disabled={busy || !storagePath}
         title={
-          hasDocuments
+          storagePath
             ? "Ouvrir le dossier physique de l’affaire"
             : "Ajoute d’abord un document à l’affaire"
         }
