@@ -7,7 +7,6 @@ import {
   type QuoteOption,
   type QuotePricingAdjustment,
 } from "@/lib/quotes/adjustments";
-import type { QuoteLine } from "@/lib/quotes/model";
 import type { NativeQuoteRecord, NativeQuotesPayload } from "@/lib/quotes/store";
 
 type PricingApiResponse = {
@@ -35,12 +34,6 @@ function parseNumber(value: string, allowZero = false): number {
   return parsed;
 }
 
-function eurosToCents(value: string): number {
-  const cents = Math.round(parseNumber(value, true) * 100);
-  if (!Number.isSafeInteger(cents)) throw new Error("NUMBER_INVALID");
-  return cents;
-}
-
 function itemLabel(item: OptionTarget): string {
   if (item.kind === "SECTION") return `Groupe · ${item.title}`;
   if (item.kind === "SUBSECTION") return `Sous-groupe · ${item.title}`;
@@ -53,11 +46,22 @@ function pricingErrorLabel(code: string): string {
   if (code === "QUOTE_PASS_THROUGH_PERCENT_INVALID") {
     return "Le total des pourcentages répercutés doit rester inférieur à 100 %.";
   }
-  if (code === "QUOTE_LINE_NOT_FOUND" || code === "QUOTE_OPTION_TARGET_NOT_FOUND") {
-    return "L’élément ciblé n’existe plus.";
-  }
+  if (code === "QUOTE_OPTION_TARGET_NOT_FOUND") return "L’élément ciblé n’existe plus.";
   if (code === "NUMBER_INVALID") return "La valeur saisie n’est pas valide.";
   return "La modification du chiffrage n’a pas pu être enregistrée.";
+}
+
+function pricingWarningLabel(code: string): string {
+  if (code.startsWith("QUOTE_POSE_HOURS_NO_BASE:")) {
+    return "Le trajet ne peut pas être réparti : aucune ligne du périmètre ne contient d’heures « Heure pose ».";
+  }
+  if (code.startsWith("QUOTE_POSE_HOURS_COST_MISSING:")) {
+    return "Un trajet sans marge ne peut pas être valorisé correctement car un coût « Heure pose » manque.";
+  }
+  if (code.startsWith("QUOTE_POSE_HOURS_ZERO_RATE:")) {
+    return "Un tarif « Heure pose » vaut 0 €. Les heures sont bien ajoutées, mais leur prix n’augmente pas.";
+  }
+  return "Un ajustement de chiffrage nécessite une vérification.";
 }
 
 async function postPricing(body: Record<string, unknown>): Promise<NativeQuotesPayload> {
@@ -73,91 +77,6 @@ async function postPricing(body: Record<string, unknown>): Promise<NativeQuotesP
   return data.payload;
 }
 
-function PoseHoursInput({
-  quoteId,
-  line,
-  hours,
-  editable,
-  onSaved,
-  onError,
-}: {
-  quoteId: string;
-  line: QuoteLine;
-  hours: number;
-  editable: boolean;
-  onSaved: (payload: NativeQuotesPayload) => void;
-  onError: (message: string) => void;
-}) {
-  const [value, setValue] = useState(String(hours).replace(".", ","));
-  const [saving, setSaving] = useState(false);
-
-  async function save() {
-    if (!editable || saving) return;
-    try {
-      const nextHours = parseNumber(value || "0", true);
-      if (nextHours === hours) return;
-      setSaving(true);
-      onSaved(
-        await postPricing({
-          action: "setLinePoseHours",
-          quoteId,
-          lineId: line.id,
-          hours: nextHours,
-        }),
-      );
-    } catch (error) {
-      onError(pricingErrorLabel(error instanceof Error ? error.message : ""));
-    } finally {
-      setSaving(false);
-    }
-  }
-
-  return (
-    <label className="poseRow">
-      <span title={line.description}>{line.description}</span>
-      <input
-        aria-label={`Heures de pose ${line.description}`}
-        disabled={!editable || saving}
-        inputMode="decimal"
-        value={value}
-        onBlur={() => void save()}
-        onChange={(event) => setValue(event.target.value)}
-        onKeyDown={(event) => {
-          if (event.key === "Enter") event.currentTarget.blur();
-        }}
-      />
-      <small>h</small>
-      <style jsx>{`
-        .poseRow {
-          display: grid;
-          grid-template-columns: minmax(0, 1fr) 82px 16px;
-          gap: 7px;
-          align-items: center;
-        }
-        .poseRow span {
-          overflow: hidden;
-          text-overflow: ellipsis;
-          white-space: nowrap;
-          font-size: 12px;
-          font-weight: 750;
-        }
-        .poseRow input {
-          width: 100%;
-          box-sizing: border-box;
-          padding: 7px 8px;
-          border: 1px solid #d9d2e8;
-          border-radius: 7px;
-          text-align: right;
-        }
-        .poseRow small {
-          color: var(--muted);
-          font-weight: 800;
-        }
-      `}</style>
-    </label>
-  );
-}
-
 export function QuotePricingAdjustmentsEditor({
   quote,
   canWrite,
@@ -171,19 +90,15 @@ export function QuotePricingAdjustmentsEditor({
   const [kind, setKind] = useState<"PERCENTAGE" | "POSE_HOURS">("PERCENTAGE");
   const [label, setLabel] = useState("Commission architecte");
   const [value, setValue] = useState("5");
-  const [costRate, setCostRate] = useState("0");
-  const [marginPercent, setMarginPercent] = useState("0");
-  const [marginTreatment, setMarginTreatment] = useState<"MARGED" | "PASS_THROUGH">("PASS_THROUGH");
+  const [marginTreatment, setMarginTreatment] = useState<"MARGED" | "PASS_THROUGH">(
+    "PASS_THROUGH",
+  );
   const [applyToOptions, setApplyToOptions] = useState(true);
   const [optionTargetId, setOptionTargetId] = useState("");
   const [optionLabel, setOptionLabel] = useState("Option");
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
 
-  const lines = useMemo(
-    () => quote.model.items.filter((item): item is QuoteLine => item.kind === "LINE"),
-    [quote.model.items],
-  );
   const optionTargets = useMemo(
     () => quote.model.items.filter((item): item is OptionTarget => item.kind !== "COMMENT"),
     [quote.model.items],
@@ -192,14 +107,33 @@ export function QuotePricingAdjustmentsEditor({
     () => new Set(quote.pricingConfig.options.map((option) => option.targetItemId)),
     [quote.pricingConfig.options],
   );
-  const poseHours = useMemo(
-    () => new Map(quote.pricingConfig.linePoseHours.map((entry) => [entry.lineId, entry.hours])),
-    [quote.pricingConfig.linePoseHours],
-  );
   const pricing = useMemo(
     () => calculateQuoteAdjustedPricing(quote.model.items, quote.pricingConfig),
     [quote.model.items, quote.pricingConfig],
   );
+  const poseLines = useMemo(
+    () => pricing.lines.filter((line) => line.basePoseHours > 0),
+    [pricing.lines],
+  );
+  const warningLabels = useMemo(
+    () => Array.from(new Set(pricing.warnings.map(pricingWarningLabel))),
+    [pricing.warnings],
+  );
+
+  function changeKind(nextKind: "PERCENTAGE" | "POSE_HOURS") {
+    setKind(nextKind);
+    if (nextKind === "POSE_HOURS") {
+      setLabel("Déplacement chantier");
+      setValue("8");
+      setMarginTreatment("MARGED");
+      setApplyToOptions(false);
+      return;
+    }
+    setLabel("Commission architecte");
+    setValue("5");
+    setMarginTreatment("PASS_THROUGH");
+    setApplyToOptions(true);
+  }
 
   async function saveAdjustment(adjustment: QuotePricingAdjustment) {
     onSaved(
@@ -226,13 +160,7 @@ export function QuotePricingAdjustmentsEditor({
       if (kind === "PERCENTAGE") {
         await saveAdjustment({ ...common, kind, percent: parseNumber(value) });
       } else {
-        await saveAdjustment({
-          ...common,
-          kind,
-          hours: parseNumber(value),
-          costRateCents: eurosToCents(costRate),
-          marginPercent: parseNumber(marginPercent, true),
-        });
+        await saveAdjustment({ ...common, kind, hours: parseNumber(value) });
       }
     } catch (caught) {
       setError(pricingErrorLabel(caught instanceof Error ? caught.message : ""));
@@ -332,7 +260,7 @@ export function QuotePricingAdjustmentsEditor({
             Options en attente <strong>{formatMoney(pricing.pendingOptionsSaleCents)}</strong>
           </span>
           <span>
-            Pose <strong>{pricing.totalPoseHours.toLocaleString("fr-FR")} h</strong>
+            Pose ferme <strong>{pricing.totalPoseHours.toLocaleString("fr-FR")} h</strong>
           </span>
         </div>
       </header>
@@ -342,11 +270,14 @@ export function QuotePricingAdjustmentsEditor({
       <div className="columns">
         <div className="panel">
           <h3>Ajustements internes</h3>
+          <p className="hint">
+            Ils modifient les prix ou les heures sans créer de ligne visible pour le client.
+          </p>
           <div className="formRow">
             <select
               disabled={!editable}
               value={kind}
-              onChange={(event) => setKind(event.target.value as typeof kind)}
+              onChange={(event) => changeKind(event.target.value as typeof kind)}
             >
               <option value="PERCENTAGE">Pourcentage</option>
               <option value="POSE_HOURS">Heures de pose / trajet</option>
@@ -364,28 +295,12 @@ export function QuotePricingAdjustmentsEditor({
               value={value}
               onChange={(event) => setValue(event.target.value)}
             />
-            {kind === "POSE_HOURS" ? (
-              <>
-                <input
-                  disabled={!editable}
-                  inputMode="decimal"
-                  placeholder="Coût €/h"
-                  value={costRate}
-                  onChange={(event) => setCostRate(event.target.value)}
-                />
-                <input
-                  disabled={!editable || marginTreatment === "PASS_THROUGH"}
-                  inputMode="decimal"
-                  placeholder="Marge %"
-                  value={marginPercent}
-                  onChange={(event) => setMarginPercent(event.target.value)}
-                />
-              </>
-            ) : null}
             <select
               disabled={!editable}
               value={marginTreatment}
-              onChange={(event) => setMarginTreatment(event.target.value as typeof marginTreatment)}
+              onChange={(event) =>
+                setMarginTreatment(event.target.value as typeof marginTreatment)
+              }
             >
               <option value="PASS_THROUGH">Répercuté sans marge</option>
               <option value="MARGED">Margé</option>
@@ -449,20 +364,20 @@ export function QuotePricingAdjustmentsEditor({
         </div>
 
         <div className="panel">
-          <h3>Heures de pose de base</h3>
-          <p className="hint">Le trajet est réparti au prorata de ces heures.</p>
+          <h3>Heures de pose détectées</h3>
+          <p className="hint">
+            Elles viennent automatiquement des composants « Heure pose ». Les trajets sont répartis
+            au prorata, sans ressaisie.
+          </p>
           <div className="poseList">
-            {lines.length === 0 ? <p className="empty">Ajoute d’abord un ouvrage.</p> : null}
-            {lines.map((line) => (
-              <PoseHoursInput
-                editable={editable}
-                hours={poseHours.get(line.id) ?? 0}
-                key={`${line.id}-${poseHours.get(line.id) ?? 0}`}
-                line={line}
-                quoteId={quote.id}
-                onError={setError}
-                onSaved={onSaved}
-              />
+            {poseLines.length === 0 ? (
+              <p className="empty">Aucune heure de pose dans les ouvrages pour le moment.</p>
+            ) : null}
+            {poseLines.map((line) => (
+              <div className="poseRow" key={line.lineId}>
+                <span title={line.description}>{line.description}</span>
+                <strong>{line.basePoseHours.toLocaleString("fr-FR")} h</strong>
+              </div>
             ))}
           </div>
         </div>
@@ -470,6 +385,10 @@ export function QuotePricingAdjustmentsEditor({
 
       <div className="panel">
         <h3>Options client hors total</h3>
+        <p className="hint">
+          Une ligne, un groupe ou un sous-groupe peut être chiffré et affiché au client sans entrer
+          dans le total principal tant que l’option n’est pas retenue.
+        </p>
         <div className="formRow optionForm">
           <select
             disabled={!editable}
@@ -515,6 +434,9 @@ export function QuotePricingAdjustmentsEditor({
                   <small>
                     {target ? itemLabel(target) : "Élément introuvable"} ·{" "}
                     {formatMoney(summary?.saleCents ?? 0)}
+                    {summary && summary.poseHours > 0
+                      ? ` · ${summary.poseHours.toLocaleString("fr-FR")} h pose`
+                      : ""}
                   </small>
                 </div>
                 <select
@@ -543,12 +465,11 @@ export function QuotePricingAdjustmentsEditor({
         </div>
       </div>
 
-      {pricing.warnings.length > 0 ? (
-        <p className="warning">
-          Certaines heures de trajet ne peuvent pas être réparties tant qu’aucune heure de pose de
-          base n’est renseignée.
+      {warningLabels.map((warning) => (
+        <p className="warning" key={warning}>
+          {warning}
         </p>
-      ) : null}
+      ))}
 
       <style jsx>{`
         .pricingCard {
@@ -684,6 +605,20 @@ export function QuotePricingAdjustmentsEditor({
         }
         .optionRow {
           grid-template-columns: minmax(0, 1fr) auto auto;
+        }
+        .poseRow {
+          display: grid;
+          grid-template-columns: minmax(0, 1fr) auto;
+          gap: 8px;
+          align-items: center;
+          padding-top: 6px;
+          border-top: 1px solid #f0edf5;
+          font-size: 11px;
+        }
+        .poseRow span {
+          overflow: hidden;
+          text-overflow: ellipsis;
+          white-space: nowrap;
         }
         .list strong {
           display: block;
