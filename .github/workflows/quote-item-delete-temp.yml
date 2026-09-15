@@ -1,0 +1,35 @@
+name: Quote item delete temporary
+
+on:
+  push:
+    branches:
+      - feat/quote-item-delete
+
+permissions:
+  contents: write
+
+jobs:
+  patch:
+    if: github.actor != 'github-actions[bot]'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: feat/quote-item-delete
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - run: python scripts/patch-quote-item-delete.py
+      - run: npx prettier --write src/lib/quotes/mutations.ts src/components/quote-structured-lines-editor.tsx tests/quote-item-delete.test.ts
+      - run: npm run lint
+      - run: npm run typecheck
+      - run: npm test -- tests/quote-item-delete.test.ts tests/quote-lines-editor.test.ts tests/quote-heading-mutations.test.ts
+      - name: Commit deletion brick
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add src/lib/quotes/mutations.ts src/components/quote-structured-lines-editor.tsx tests/quote-item-delete.test.ts
+          git commit -m "feat(quotes): supprimer ouvrages titres et sous-titres"
+          git push
