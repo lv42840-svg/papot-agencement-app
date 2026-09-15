@@ -6,7 +6,6 @@ import {
   CalendarClock,
   CheckCircle2,
   Clock3,
-  Download,
   ExternalLink,
   FileText,
   History,
@@ -22,7 +21,10 @@ import {
 import { useSearchParams } from "next/navigation";
 import { FormEvent, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { CommercialAffairQuotes } from "@/components/commercial-affair-quotes";
-import { CommercialOpenFolderButton } from "@/components/commercial-open-folder-button";
+import {
+  CommercialDocumentActions,
+  CommercialOpenFolderButton,
+} from "@/components/commercial-open-folder-button";
 import { clientWorkspaceHref } from "@/lib/clients/navigation";
 import { collectDroppedFiles } from "@/lib/commercial/document-drop";
 import {
@@ -31,8 +33,8 @@ import {
 } from "@/lib/commercial/document-filter";
 import {
   COMMERCIAL_DOCUMENT_CATEGORY_LABELS,
+  COMMERCIAL_FOLLOW_STATUS_OPTIONS,
   COMMERCIAL_STATUS_LABELS,
-  commercialNeedsFollowUp,
   isCommercialClosed,
   nextCommercialDeadline,
   type CommercialCase,
@@ -42,6 +44,10 @@ import {
   type CommercialSiteAddress,
   type CommercialStatus,
 } from "@/lib/commercial/domain";
+import {
+  filterCommercialCases,
+  type CommercialListFilter,
+} from "@/lib/commercial/list-filter";
 
 type Snapshot = {
   payload: CommercialPayload;
@@ -54,7 +60,6 @@ type Snapshot = {
 };
 
 type Mutation = Record<string, unknown> & { action: string };
-type Mode = "active" | "confirmed" | "archives";
 type DetailTab = "affair" | "follow" | "documents" | "history";
 
 const errors: Record<string, string> = {
@@ -104,12 +109,19 @@ function bytes(value: number): string {
 
 function statusTone(status: CommercialStatus): string {
   if (status === "FOLLOW_UP") return "follow";
+  if (status === "SENT") return "sent";
   if (status === "CHIFFRAGE") return "quote";
   if (status === "LIKELY") return "likely";
   if (status === "CONFIRMED") return "confirmed";
   if (status === "LOST" || status === "ABANDONED") return "closed";
   if (status === "WAITING") return "waiting";
   return "lead";
+}
+
+function followStatusForUi(status: CommercialStatus): CommercialStatus {
+  if (status === "CHIFFRAGE") return "PISTE";
+  if (status === "LIKELY") return "WAITING";
+  return status;
 }
 
 function siteAddressFromForm(form: FormData): CommercialSiteAddress {
@@ -220,7 +232,7 @@ export function CommercialWorkspaceV2() {
   const searchParams = useSearchParams();
   const focus = searchParams.get("focus");
   const { snapshot, loading, busy, error, notice, load, mutate, upload } = useCommercial();
-  const [mode, setMode] = useState<Mode>("active");
+  const [mode, setMode] = useState<CommercialListFilter>("active");
   const [query, setQuery] = useState("");
   const [selectedId, setSelectedId] = useState<string | null>(focus);
   const [createOpen, setCreateOpen] = useState(false);
@@ -230,7 +242,7 @@ export function CommercialWorkspaceV2() {
   const now = useMemo(() => new Date(snapshot?.serverNow ?? Date.now()), [snapshot?.serverNow]);
   const normalized = query.trim().toLocaleLowerCase("fr-FR");
   const visible = useMemo(() => {
-    let list = cases;
+    let list = filterCommercialCases(cases, mode, now);
     if (normalized) {
       list = list.filter((item) =>
         [
@@ -248,31 +260,25 @@ export function CommercialWorkspaceV2() {
           .filter(Boolean)
           .some((value) => String(value).toLocaleLowerCase("fr-FR").includes(normalized)),
       );
-    } else if (mode === "archives") {
-      list = list.filter(isCommercialClosed);
-    } else if (mode === "confirmed") {
-      list = list.filter((item) => item.status === "CONFIRMED");
-    } else {
-      list = list.filter((item) => !isCommercialClosed(item) && item.status !== "CONFIRMED");
     }
     return list;
-  }, [cases, mode, normalized]);
+  }, [cases, mode, normalized, now]);
 
-  const selected = cases.find((item) => item.id === selectedId) ?? visible[0] ?? null;
+  const selected = visible.find((item) => item.id === selectedId) ?? visible[0] ?? null;
   useEffect(() => {
-    if (focus && cases.some((item) => item.id === focus)) setSelectedId(focus);
-    else if (!selectedId || !cases.some((item) => item.id === selectedId))
+    if (focus && cases.some((item) => item.id === focus)) {
+      setSelectedId(focus);
+      return;
+    }
+    if (!selectedId || !visible.some((item) => item.id === selectedId)) {
       setSelectedId(visible[0]?.id ?? null);
+    }
   }, [cases, focus, selectedId, visible]);
 
-  const active = cases.filter(
-    (item) => !isCommercialClosed(item) && item.status !== "CONFIRMED",
-  ).length;
-  const due = cases.filter(
-    (item) => !isCommercialClosed(item) && commercialNeedsFollowUp(item, now),
-  ).length;
-  const confirmed = cases.filter((item) => item.status === "CONFIRMED").length;
-  const archived = cases.filter(isCommercialClosed).length;
+  const active = filterCommercialCases(cases, "active", now).length;
+  const due = filterCommercialCases(cases, "follow-up", now).length;
+  const confirmed = filterCommercialCases(cases, "confirmed", now).length;
+  const archived = filterCommercialCases(cases, "archives", now).length;
 
   return (
     <div className="commercialV2">
@@ -280,7 +286,7 @@ export function CommercialWorkspaceV2() {
         <div>
           <h1>Commercial · Affaires</h1>
           <p>
-            Un client, une affaire, un suivi. Le chiffrage et le devis auront leur propre module.
+            Un client, une affaire, un suivi. Le chiffrage et le devis ont leur propre module.
           </p>
         </div>
         <div className="commercialV2HeadingActions">
@@ -324,36 +330,44 @@ export function CommercialWorkspaceV2() {
       ) : null}
 
       <section className="commercialV2Stats">
-        <Stat icon={BriefcaseBusiness} label="Actives" value={active} />
-        <Stat icon={Clock3} label="À suivre" value={due} alert={due > 0} />
-        <Stat icon={CheckCircle2} label="Confirmées" value={confirmed} />
-        <Stat icon={Archive} label="Archives" value={archived} />
+        <Stat
+          icon={BriefcaseBusiness}
+          label="Actives"
+          value={active}
+          selected={mode === "active"}
+          onClick={() => setMode("active")}
+        />
+        <Stat
+          icon={Clock3}
+          label="À relancer"
+          value={due}
+          alert={due > 0}
+          selected={mode === "follow-up"}
+          onClick={() => setMode("follow-up")}
+        />
+        <Stat
+          icon={CheckCircle2}
+          label="Validées"
+          value={confirmed}
+          selected={mode === "confirmed"}
+          onClick={() => setMode("confirmed")}
+        />
+        <Stat
+          icon={Archive}
+          label="Archives"
+          value={archived}
+          selected={mode === "archives"}
+          onClick={() => setMode("archives")}
+        />
       </section>
 
       <section className="commercialV2Toolbar">
-        <div className="commercialV2Modes">
-          <button className={mode === "active" ? "active" : ""} onClick={() => setMode("active")}>
-            Actives
-          </button>
-          <button
-            className={mode === "confirmed" ? "active" : ""}
-            onClick={() => setMode("confirmed")}
-          >
-            Confirmées
-          </button>
-          <button
-            className={mode === "archives" ? "active" : ""}
-            onClick={() => setMode("archives")}
-          >
-            Archives
-          </button>
-        </div>
         <label className="commercialV2Search">
           <Search size={14} />
           <input
             value={query}
             onChange={(event) => setQuery(event.target.value)}
-            placeholder="Rechercher affaire, client, lieu…"
+            placeholder="Rechercher affaire ou client…"
           />
           {query ? (
             <button type="button" onClick={() => setQuery("")}>
@@ -429,20 +443,29 @@ function Stat({
   label,
   value,
   alert = false,
+  selected,
+  onClick,
 }: {
   icon: typeof BriefcaseBusiness;
   label: string;
   value: number;
   alert?: boolean;
+  selected: boolean;
+  onClick: () => void;
 }) {
   return (
-    <article className={alert ? "alert" : ""}>
+    <button
+      type="button"
+      className={`${alert ? "alert " : ""}${selected ? "active" : ""}`}
+      aria-pressed={selected}
+      onClick={onClick}
+    >
       <Icon size={18} />
       <div>
         <strong>{value}</strong>
         <span>{label}</span>
       </div>
-    </article>
+    </button>
   );
 }
 
@@ -473,11 +496,11 @@ function CreateAffair({
       name: String(form.get("name") ?? ""),
       existingClientId: clientMode === "existing" && clientId ? clientId : undefined,
       clientName: clientMode === "new" ? String(form.get("clientName") ?? "") : "",
-      siteLabel: String(form.get("siteLabel") ?? ""),
+      siteLabel: "",
       siteAddressOverride: differentSiteAddress ? siteAddressFromForm(form) : null,
       reviewDate: String(form.get("reviewDate") ?? ""),
       description: String(form.get("description") ?? ""),
-      nextAction: String(form.get("nextAction") ?? ""),
+      nextAction: "",
     });
   }
   return (
@@ -522,8 +545,12 @@ function CreateAffair({
         <input name="name" required placeholder="Ex. Dupont · Cuisine" />
       </label>
       <label>
-        <span>Lieu chantier</span>
-        <input name="siteLabel" />
+        <span>Prochaine revue *</span>
+        <input name="reviewDate" type="date" required />
+      </label>
+      <label className="wide">
+        <span>Description</span>
+        <textarea name="description" rows={2} />
       </label>
       <SiteAddressFields
         different={differentSiteAddress}
@@ -532,18 +559,6 @@ function CreateAffair({
         address={null}
         disabled={false}
       />
-      <label>
-        <span>Prochaine revue *</span>
-        <input name="reviewDate" type="date" required />
-      </label>
-      <label className="wide">
-        <span>Description</span>
-        <textarea name="description" rows={2} />
-      </label>
-      <label className="wide">
-        <span>Prochaine action</span>
-        <input name="nextAction" />
-      </label>
       <div className="wide commercialV2FormActions">
         <button className="primaryButton" disabled={busy}>
           <Plus size={14} /> Créer
@@ -662,7 +677,6 @@ function AffairDetail({
             ) : (
               item.clientName || "Client à préciser"
             )}
-            {item.siteLabel ? ` · ${item.siteLabel}` : ""}
           </p>
         </div>
       </header>
@@ -673,7 +687,10 @@ function AffairDetail({
         <button className={tab === "follow" ? "active" : ""} onClick={() => setTab("follow")}>
           <Clock3 size={14} /> Suivi
         </button>
-        <button className={tab === "documents" ? "active" : ""} onClick={() => setTab("documents")}>
+        <button
+          className={tab === "documents" ? "active" : ""}
+          onClick={() => setTab("documents")}
+        >
           <Paperclip size={14} /> Documents <small>{item.documents.length}</small>
         </button>
         <button className={tab === "history" ? "active" : ""} onClick={() => setTab("history")}>
@@ -728,23 +745,23 @@ function AffairForm({
       {
         action: "updateDetails",
         caseId: item.id,
-        name: String(form.get("name") ?? ""),
+        name: item.name,
         existingClientId: clientId || undefined,
         clientName: clientId ? "" : String(form.get("clientName") ?? ""),
-        siteLabel: String(form.get("siteLabel") ?? ""),
+        siteLabel: item.siteLabel ?? "",
         siteAddressOverride: differentSiteAddress ? siteAddressFromForm(form) : null,
         contactName: item.contactName ?? "",
         contactPhone: item.contactPhone ?? "",
         contactEmail: item.contactEmail ?? "",
         description: String(form.get("description") ?? ""),
-        nextAction: String(form.get("nextAction") ?? ""),
+        nextAction: item.nextAction ?? "",
       },
       "Affaire mise à jour.",
     );
   }
   return (
     <form className="commercialV2Form" onSubmit={(event) => void submit(event)}>
-      <label>
+      <label className="wide">
         <span>Client</span>
         <select
           value={clientId}
@@ -760,26 +777,11 @@ function AffairForm({
         </select>
       </label>
       {!clientId ? (
-        <label>
+        <label className="wide">
           <span>Nouveau client</span>
           <input name="clientName" defaultValue={item.clientName ?? ""} disabled={!canModify} />
         </label>
       ) : null}
-      <label>
-        <span>Nom affaire</span>
-        <input name="name" defaultValue={item.name} disabled={!canModify} required />
-      </label>
-      <label>
-        <span>Lieu chantier</span>
-        <input name="siteLabel" defaultValue={item.siteLabel ?? ""} disabled={!canModify} />
-      </label>
-      <SiteAddressFields
-        different={differentSiteAddress}
-        onDifferentChange={setDifferentSiteAddress}
-        client={selectedClient}
-        address={item.siteAddressOverride}
-        disabled={!canModify}
-      />
       <label className="wide">
         <span>Description</span>
         <textarea
@@ -789,10 +791,13 @@ function AffairForm({
           disabled={!canModify}
         />
       </label>
-      <label className="wide">
-        <span>Prochaine action</span>
-        <input name="nextAction" defaultValue={item.nextAction ?? ""} disabled={!canModify} />
-      </label>
+      <SiteAddressFields
+        different={differentSiteAddress}
+        onDifferentChange={setDifferentSiteAddress}
+        client={selectedClient}
+        address={item.siteAddressOverride}
+        disabled={!canModify}
+      />
       {canModify ? (
         <button className="primaryButton wide fit" disabled={busy}>
           <Save size={14} /> Enregistrer
@@ -813,12 +818,12 @@ function FollowForm({
   canModify: boolean;
   mutate: (body: Mutation, success: string) => Promise<Snapshot | null>;
 }) {
-  const [status, setStatus] = useState<CommercialStatus>(item.status);
+  const [status, setStatus] = useState<CommercialStatus>(followStatusForUi(item.status));
   const [date, setDate] = useState(nextCommercialDeadline(item) ?? item.plannedInstallDate ?? "");
   const open = !isCommercialClosed(item);
   const dateTitle =
-    status === "LIKELY"
-      ? "Confirmation prévue"
+    status === "SENT"
+      ? "Date de relance"
       : status === "CONFIRMED"
         ? "Pose prévue"
         : status === "FOLLOW_UP"
@@ -835,8 +840,7 @@ function FollowForm({
         action: "setStatus",
         caseId: item.id,
         status,
-        reviewDate: ["PISTE", "WAITING", "CHIFFRAGE"].includes(status) ? date : undefined,
-        expectedConfirmationDate: status === "LIKELY" ? date : undefined,
+        reviewDate: ["PISTE", "SENT", "WAITING"].includes(status) ? date : undefined,
         plannedInstallDate: status === "CONFIRMED" ? date : undefined,
       },
       "Suivi commercial mis à jour.",
@@ -874,7 +878,7 @@ function FollowForm({
       <CommercialAffairQuotes item={item} />
       <section className="commercialV2Section">
         <h3>
-          <CalendarClock size={15} /> Statut et prochaine échéance
+          <CalendarClock size={15} /> Suivi global
         </h3>
         <label>
           <span>Statut</span>
@@ -883,14 +887,14 @@ function FollowForm({
             onChange={(event) => setStatus(event.target.value as CommercialStatus)}
             disabled={!canModify}
           >
-            {Object.entries(COMMERCIAL_STATUS_LABELS).map(([value, label]) => (
+            {COMMERCIAL_FOLLOW_STATUS_OPTIONS.map((value) => (
               <option key={value} value={value}>
-                {label}
+                {COMMERCIAL_STATUS_LABELS[value]}
               </option>
             ))}
           </select>
         </label>
-        {status !== "FOLLOW_UP" && status !== "LOST" && status !== "ABANDONED" ? (
+        {status !== "FOLLOW_UP" ? (
           <label>
             <span>{dateTitle}</span>
             <input
@@ -910,12 +914,6 @@ function FollowForm({
           >
             <Save size={14} /> Enregistrer
           </button>
-        ) : null}
-        {status === "CHIFFRAGE" ? (
-          <div className="commercialV2Info">
-            Le détail du chiffrage n’est plus stocké ici. Le futur module Devis / Chiffrage prendra
-            le relais.
-          </div>
         ) : null}
       </section>
       <FollowUp item={item} busy={busy} canModify={canModify} mutate={mutate} />
@@ -958,16 +956,16 @@ function FollowUp({
           onChange={(event) => setNextStatus(event.target.value as CommercialStatus)}
           disabled={!canModify}
         >
-          {Object.entries(COMMERCIAL_STATUS_LABELS).map(([value, label]) => (
+          {COMMERCIAL_FOLLOW_STATUS_OPTIONS.map((value) => (
             <option key={value} value={value}>
-              {label}
+              {COMMERCIAL_STATUS_LABELS[value]}
             </option>
           ))}
         </select>
       </label>
-      {nextStatus !== "FOLLOW_UP" && nextStatus !== "LOST" && nextStatus !== "ABANDONED" ? (
+      {nextStatus !== "FOLLOW_UP" ? (
         <label>
-          <span>Date suivante</span>
+          <span>{nextStatus === "SENT" ? "Date de relance" : "Date suivante"}</span>
           <input
             type="date"
             value={nextDate}
@@ -1021,6 +1019,7 @@ function Documents({
   const [category, setCategory] = useState<CommercialDocumentCategory>("RECEIVED");
   const [filter, setFilter] = useState<CommercialDocumentFilter>("ALL");
   const [dragging, setDragging] = useState(false);
+  const [previewDocumentId, setPreviewDocumentId] = useState<string | null>(null);
   const categoryLabel = COMMERCIAL_DOCUMENT_CATEGORY_LABELS[category];
   const visibleDocuments = filterCommercialDocuments(item.documents, filter).reverse();
 
@@ -1135,24 +1134,40 @@ function Documents({
       </label>
       <div className="commercialV2Docs">
         {visibleDocuments.length ? (
-          visibleDocuments.map((document) => (
-            <article key={document.id}>
-              <FileText size={18} />
-              <div>
-                <strong>{document.fileName}</strong>
-                <span>
-                  {COMMERCIAL_DOCUMENT_CATEGORY_LABELS[document.category]} ·{" "}
-                  {bytes(document.sizeBytes)} · {dateTime(document.uploadedAt)}
-                </span>
-              </div>
-              <a
-                className="secondaryButton"
-                href={`/api/desktop/affaires/${item.id}/documents/${document.id}?download=1`}
-              >
-                <Download size={13} /> Télécharger
-              </a>
-            </article>
-          ))
+          visibleDocuments.map((document) => {
+            const previewOpen = previewDocumentId === document.id;
+            return (
+              <article key={document.id}>
+                <FileText size={18} />
+                <div className="commercialV2DocMeta">
+                  <strong>{document.fileName}</strong>
+                  <span>
+                    {COMMERCIAL_DOCUMENT_CATEGORY_LABELS[document.category]} ·{" "}
+                    {bytes(document.sizeBytes)} · {dateTime(document.uploadedAt)}
+                  </span>
+                </div>
+                <CommercialDocumentActions
+                  caseId={item.id}
+                  document={document}
+                  previewOpen={previewOpen}
+                  onTogglePreview={() =>
+                    setPreviewDocumentId((current) => (current === document.id ? null : document.id))
+                  }
+                />
+                {previewOpen ? (
+                  <div className="commercialV2DocPreview">
+                    <div className="commercialV2DocPreviewFrame">
+                      <iframe
+                        src={`/api/desktop/affaires/${item.id}/documents/${document.id}`}
+                        title={`Aperçu de ${document.fileName}`}
+                      />
+                    </div>
+                    <small>↕ Tire le bord inférieur pour régler la hauteur de l’aperçu.</small>
+                  </div>
+                ) : null}
+              </article>
+            );
+          })
         ) : (
           <div className="commercialV2Empty">
             <Paperclip size={24} />
@@ -1237,7 +1252,7 @@ function CommercialV2Styles() {
         grid-template-columns: repeat(4, minmax(0, 1fr));
         gap: 9px;
       }
-      .commercialV2Stats article {
+      .commercialV2Stats > button {
         min-height: 72px;
         padding: 12px;
         display: flex;
@@ -1246,12 +1261,28 @@ function CommercialV2Styles() {
         border: 1px solid #e6e1ed;
         border-radius: 11px;
         background: white;
+        color: inherit;
+        text-align: left;
       }
-      .commercialV2Stats article.alert {
+      .commercialV2Stats > button:hover,
+      .commercialV2Stats > button:focus-visible {
+        border-color: #cfc5ea;
+        background: #faf8ff;
+      }
+      .commercialV2Stats > button.active {
+        border-color: #8d7ce0;
+        background: #f4f0ff;
+        box-shadow: inset 0 0 0 1px #8d7ce0;
+      }
+      .commercialV2Stats > button.alert {
         border-color: #efc7b3;
         background: #fff9f5;
       }
-      .commercialV2Stats article div {
+      .commercialV2Stats > button.alert.active {
+        border-color: #d98f69;
+        box-shadow: inset 0 0 0 1px #d98f69;
+      }
+      .commercialV2Stats > button div {
         display: grid;
       }
       .commercialV2Stats strong {
@@ -1266,28 +1297,8 @@ function CommercialV2Styles() {
       .commercialV2Toolbar {
         display: flex;
         align-items: center;
-        justify-content: space-between;
+        justify-content: flex-end;
         gap: 12px;
-      }
-      .commercialV2Modes {
-        display: flex;
-        padding: 3px;
-        border: 1px solid #e1dce9;
-        border-radius: 9px;
-        background: #f8f6fb;
-      }
-      .commercialV2Modes button {
-        padding: 7px 12px;
-        border: 0;
-        border-radius: 7px;
-        background: transparent;
-        color: #746e7c;
-        font-size: 10px;
-      }
-      .commercialV2Modes button.active {
-        background: white;
-        color: #5f4cc7;
-        box-shadow: 0 1px 5px rgb(60 45 95 / 0.1);
       }
       .commercialV2Search {
         min-width: 300px;
@@ -1379,6 +1390,10 @@ function CommercialV2Styles() {
         background: #fff0e9;
         color: #a85c37;
       }
+      .commercialV2Badge.sent {
+        background: #eaf4ff;
+        color: #3d6f9d;
+      }
       .commercialV2Badge.likely {
         background: #fff7d9;
         color: #8c7125;
@@ -1392,8 +1407,8 @@ function CommercialV2Styles() {
         color: #77717c;
       }
       .commercialV2Badge.waiting {
-        background: #eaf4ff;
-        color: #3d6f9d;
+        background: #f0eef8;
+        color: #6d6680;
       }
       .commercialV2Detail {
         min-width: 0;
@@ -1646,7 +1661,7 @@ function CommercialV2Styles() {
         border: 1px solid #ece8f0;
         border-radius: 9px;
       }
-      .commercialV2Docs article > div {
+      .commercialV2DocMeta {
         min-width: 0;
         display: grid;
         gap: 2px;
@@ -1661,9 +1676,36 @@ function CommercialV2Styles() {
         color: #8b8490;
         font-size: 8px;
       }
-      .commercialV2Docs a {
-        min-height: 30px;
+      .commercialV2DocPreview {
+        grid-column: 1 / -1;
+        width: 100%;
+        display: grid;
+        overflow: hidden;
+        border: 1px solid #ddd7e8;
+        border-radius: 9px;
+        background: white;
+      }
+      .commercialV2DocPreviewFrame {
+        height: 460px;
+        min-height: 220px;
+        max-height: 900px;
+        overflow: auto;
+        resize: vertical;
+        background: #ebe8ef;
+      }
+      .commercialV2DocPreview iframe {
+        width: 100%;
+        height: 100%;
+        display: block;
+        border: 0;
+        background: white;
+      }
+      .commercialV2DocPreview > small {
+        padding: 6px 10px;
+        border-top: 1px solid #e2dce8;
+        color: #81778e;
         font-size: 8px;
+        text-align: center;
       }
       .commercialV2History {
         display: grid;
@@ -1735,6 +1777,14 @@ function CommercialV2Styles() {
         }
         .commercialV2UploadCategory {
           width: 100%;
+        }
+      }
+      @media (max-width: 700px) {
+        .commercialV2Docs article {
+          grid-template-columns: auto 1fr;
+        }
+        .commercialV2Docs article > :global(.commercialDocumentRowActions) {
+          grid-column: 1 / -1;
         }
       }
     `}</style>
