@@ -22,6 +22,7 @@ import {
 } from "@/lib/library/storage";
 import {
   canMoveQuoteComponent,
+  duplicateQuoteComponent,
   moveQuoteComponent,
   type QuoteComponentMoveDirection,
 } from "@/lib/quotes/component-order";
@@ -818,6 +819,12 @@ export function QuoteStructuredLinesEditor({
     setComponents((current) => moveQuoteComponent(current, index, direction));
   }
 
+  function duplicateComponent(index: number) {
+    setComponents((current) =>
+      duplicateQuoteComponent(current, index, () => globalThis.crypto.randomUUID()),
+    );
+  }
+
   function removeComponent(index: number) {
     setComponents((current) => {
       if (current.length <= 1) return current;
@@ -1495,6 +1502,15 @@ export function QuoteStructuredLinesEditor({
                   </button>
                   <button
                     type="button"
+                    className="miniActionButton"
+                    onClick={() => duplicateComponent(index)}
+                    aria-label={`Dupliquer le composant ${index + 1}`}
+                    title="Dupliquer le composant"
+                  >
+                    <Copy size={13} aria-hidden="true" />
+                  </button>
+                  <button
+                    type="button"
                     className="quoteDeleteComponent"
                     onClick={() => removeComponent(index)}
                     disabled={components.length === 1}
@@ -2003,7 +2019,7 @@ export function QuoteStructuredLinesEditor({
         .quoteComponentsHeader,
         .quoteComponentRow {
           display: grid;
-          grid-template-columns: minmax(220px, 1fr) 82px 70px 105px 82px 105px 105px 92px;
+          grid-template-columns: minmax(220px, 1fr) 82px 70px 105px 82px 105px 105px 122px;
           gap: 8px;
           align-items: center;
           padding: 7px 10px;
