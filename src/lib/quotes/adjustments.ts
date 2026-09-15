@@ -1,6 +1,11 @@
 import { z } from "zod";
-import { calculateQuoteOuvrageUnitCostCents, type QuoteItem, type QuoteLine } from "./model";
-import { calculateQuoteSalePriceFromMarginCents } from "./pricing";
+import {
+  calculateQuoteOuvrageUnitCostCents,
+  quoteOuvrageComponentCostPriceCents,
+  type QuoteItem,
+  type QuoteLine,
+  type QuoteOuvrageComponent,
+} from "./model";
 
 export const quoteAdjustmentMarginTreatmentSchema = z.enum(["MARGED", "PASS_THROUGH"]);
 export const quoteOptionStatusSchema = z.enum(["PENDING", "RETAINED", "REJECTED"]);
@@ -22,8 +27,6 @@ export const quotePercentageAdjustmentSchema = adjustmentBaseSchema.extend({
 export const quotePoseHoursAdjustmentSchema = adjustmentBaseSchema.extend({
   kind: z.literal("POSE_HOURS"),
   hours: z.number().finite().gt(0).max(1_000_000),
-  costRateCents: z.number().int().safe().min(0),
-  marginPercent: z.number().finite().min(-100).max(10_000),
 });
 
 export const quotePricingAdjustmentSchema = z.discriminatedUnion("kind", [
@@ -39,16 +42,10 @@ export const quoteOptionSchema = z.object({
   status: quoteOptionStatusSchema,
 });
 
-export const quoteLinePoseHoursSchema = z.object({
-  lineId: z.string().uuid(),
-  hours: z.number().finite().min(0).max(1_000_000),
-});
-
 export const quotePricingConfigSchema = z
   .object({
     adjustments: z.array(quotePricingAdjustmentSchema).max(100),
     options: z.array(quoteOptionSchema).max(500),
-    linePoseHours: z.array(quoteLinePoseHoursSchema).max(1000),
   })
   .superRefine((config, context) => {
     const adjustmentIds = new Set<string>();
@@ -83,21 +80,11 @@ export const quotePricingConfigSchema = z
       optionIds.add(option.id);
       optionTargets.add(option.targetItemId);
     }
-
-    const poseLines = new Set<string>();
-    for (const entry of config.linePoseHours) {
-      if (poseLines.has(entry.lineId)) {
-        context.addIssue({
-          code: z.ZodIssueCode.custom,
-          path: ["linePoseHours"],
-          message: "QUOTE_POSE_HOURS_LINE_DUPLICATE",
-        });
-      }
-      poseLines.add(entry.lineId);
-    }
   });
 
-export type QuoteAdjustmentMarginTreatment = z.infer<typeof quoteAdjustmentMarginTreatmentSchema>;
+export type QuoteAdjustmentMarginTreatment = z.infer<
+  typeof quoteAdjustmentMarginTreatmentSchema
+>;
 export type QuotePricingAdjustment = z.infer<typeof quotePricingAdjustmentSchema>;
 export type QuotePercentageAdjustment = z.infer<typeof quotePercentageAdjustmentSchema>;
 export type QuotePoseHoursAdjustment = z.infer<typeof quotePoseHoursAdjustmentSchema>;
@@ -106,7 +93,7 @@ export type QuoteOption = z.infer<typeof quoteOptionSchema>;
 export type QuotePricingConfig = z.infer<typeof quotePricingConfigSchema>;
 
 export function createEmptyQuotePricingConfig(): QuotePricingConfig {
-  return { adjustments: [], options: [], linePoseHours: [] };
+  return { adjustments: [], options: [] };
 }
 
 export type QuoteAdjustedLine = {
@@ -145,6 +132,8 @@ export type QuoteAdjustedPricing = {
 type MutableLine = QuoteAdjustedLine & {
   line: QuoteLine;
   resolvedOption: QuoteOption | null;
+  poseCostRateCents: number | null;
+  poseSaleRateCents: number | null;
 };
 
 function assertSafeMoney(value: number): number {
@@ -160,6 +149,49 @@ function lineAmountCents(quantity: number, unitAmountCents: number): number {
 
 function addMoney(left: number, right: number): number {
   return assertSafeMoney(left + right);
+}
+
+function componentActivity(component: QuoteOuvrageComponent): "BE" | "ATELIER" | "POSE" | null {
+  return component.activity ?? component.librarySource?.component.activity ?? null;
+}
+
+function linePoseProfile(line: QuoteLine): {
+  hours: number;
+  costRateCents: number | null;
+  saleRateCents: number | null;
+} {
+  const poseComponents = (line.components ?? []).filter(
+    (component) => componentActivity(component) === "POSE",
+  );
+  if (poseComponents.length === 0) {
+    return { hours: 0, costRateCents: null, saleRateCents: null };
+  }
+
+  let hoursPerLineUnit = 0;
+  let saleAmountPerLineUnit = 0;
+  let costAmountPerLineUnit = 0;
+  let costComplete = true;
+
+  for (const component of poseComponents) {
+    hoursPerLineUnit += component.quantity;
+    saleAmountPerLineUnit += component.quantity * component.unitPriceCents;
+    const costRate = quoteOuvrageComponentCostPriceCents(component);
+    if (costRate === null) {
+      costComplete = false;
+    } else {
+      costAmountPerLineUnit += component.quantity * costRate;
+    }
+  }
+
+  if (!Number.isFinite(hoursPerLineUnit) || hoursPerLineUnit <= 0) {
+    return { hours: 0, costRateCents: null, saleRateCents: null };
+  }
+
+  return {
+    hours: Math.round(line.quantity * hoursPerLineUnit * 1_000_000) / 1_000_000,
+    saleRateCents: saleAmountPerLineUnit / hoursPerLineUnit,
+    costRateCents: costComplete ? costAmountPerLineUnit / hoursPerLineUnit : null,
+  };
 }
 
 function optionForLine(
@@ -269,6 +301,51 @@ function scopeSale(lines: MutableLine[]): number {
   return lines.reduce((total, line) => addMoney(total, line.saleCents), 0);
 }
 
+function applyPoseHoursAdjustment(
+  lines: MutableLine[],
+  adjustment: QuotePoseHoursAdjustment,
+  warnings: string[],
+  scopeLabel: string,
+) {
+  const eligible = lines.filter((line) => line.basePoseHours > 0 && line.poseSaleRateCents !== null);
+  if (eligible.length === 0) {
+    warnings.push(`QUOTE_POSE_HOURS_NO_BASE:${adjustment.id}:${scopeLabel}`);
+    return;
+  }
+
+  const distributedHours = hoursDistribution(adjustment.hours, eligible);
+  let zeroRateDetected = false;
+
+  for (const line of eligible) {
+    const addedHours = distributedHours.get(line.lineId) ?? 0;
+    line.poseHours = Math.round((line.poseHours + addedHours) * 1_000_000) / 1_000_000;
+
+    const costRate = line.poseCostRateCents;
+    const costIncrement = costRate === null ? null : Math.round(addedHours * costRate);
+    if (line.costCents !== null) {
+      if (costIncrement === null) {
+        line.costCents = null;
+      } else {
+        line.costCents = addMoney(line.costCents, assertSafeMoney(costIncrement));
+      }
+    }
+
+    const saleRate =
+      adjustment.marginTreatment === "PASS_THROUGH" ? costRate : line.poseSaleRateCents;
+    if (saleRate === null) {
+      warnings.push(`QUOTE_POSE_HOURS_COST_MISSING:${adjustment.id}:${line.lineId}`);
+      continue;
+    }
+    if (saleRate === 0) zeroRateDetected = true;
+    const saleIncrement = assertSafeMoney(Math.round(addedHours * saleRate));
+    line.saleCents = addMoney(line.saleCents, saleIncrement);
+  }
+
+  if (zeroRateDetected) {
+    warnings.push(`QUOTE_POSE_HOURS_ZERO_RATE:${adjustment.id}:${scopeLabel}`);
+  }
+}
+
 function applyScopeAdjustments(
   lines: MutableLine[],
   adjustments: QuotePricingAdjustment[],
@@ -291,34 +368,7 @@ function applyScopeAdjustments(
 
   for (const adjustment of applicable) {
     if (adjustment.kind !== "POSE_HOURS") continue;
-    const eligible = lines.filter((line) => line.basePoseHours > 0);
-    if (eligible.length === 0) {
-      warnings.push(`QUOTE_POSE_HOURS_NO_BASE:${adjustment.id}:${scopeLabel}`);
-      continue;
-    }
-
-    const distributedHours = hoursDistribution(adjustment.hours, eligible);
-    for (const line of eligible) {
-      line.poseHours += distributedHours.get(line.lineId) ?? 0;
-    }
-
-    const totalCostIncrementCents = assertSafeMoney(
-      Math.round(adjustment.hours * adjustment.costRateCents),
-    );
-    const saleRateCents =
-      adjustment.marginTreatment === "PASS_THROUGH"
-        ? adjustment.costRateCents
-        : calculateQuoteSalePriceFromMarginCents(
-            adjustment.costRateCents,
-            adjustment.marginPercent,
-          );
-    const totalSaleIncrementCents = assertSafeMoney(Math.round(adjustment.hours * saleRateCents));
-    applyMoneyToLines(
-      eligible,
-      totalSaleIncrementCents,
-      totalCostIncrementCents,
-      (line) => distributedHours.get(line.lineId) ?? 0,
-    );
+    applyPoseHoursAdjustment(lines, adjustment, warnings, scopeLabel);
   }
 
   const passThroughPercent = applicable.reduce((sum, adjustment) => {
@@ -359,9 +409,6 @@ export function calculateQuoteAdjustedPricing(
   const optionByTarget = new Map(
     parsedConfig.options.map((option) => [option.targetItemId, option]),
   );
-  const poseByLine = new Map(
-    parsedConfig.linePoseHours.map((entry) => [entry.lineId, entry.hours]),
-  );
 
   const lines: MutableLine[] = items
     .filter((item): item is QuoteLine => item.kind === "LINE")
@@ -373,7 +420,7 @@ export function calculateQuoteAdjustedPricing(
       const baseCostCents =
         unitCostCents === null ? null : lineAmountCents(line.quantity, unitCostCents);
       const resolvedOption = optionForLine(line, itemById, optionByTarget);
-      const basePoseHours = poseByLine.get(line.id) ?? 0;
+      const poseProfile = linePoseProfile(line);
       return {
         line,
         lineId: line.id,
@@ -385,22 +432,28 @@ export function calculateQuoteAdjustedPricing(
         saleCents: baseSaleCents,
         baseCostCents,
         costCents: baseCostCents,
-        basePoseHours,
-        poseHours: basePoseHours,
+        basePoseHours: poseProfile.hours,
+        poseHours: poseProfile.hours,
+        poseCostRateCents: poseProfile.costRateCents,
+        poseSaleRateCents: poseProfile.saleRateCents,
       };
     });
 
   const warnings: string[] = [];
-  const mainLines = lines.filter(
-    (line) => !line.resolvedOption || line.resolvedOption.status === "RETAINED",
-  );
-  applyScopeAdjustments(mainLines, parsedConfig.adjustments, false, warnings, "MAIN");
+  const mainBaseLines = lines.filter((line) => !line.resolvedOption);
+  applyScopeAdjustments(mainBaseLines, parsedConfig.adjustments, false, warnings, "MAIN");
 
   for (const option of parsedConfig.options) {
-    if (option.status === "RETAINED") continue;
     const optionLines = lines.filter((line) => line.resolvedOption?.id === option.id);
     applyScopeAdjustments(optionLines, parsedConfig.adjustments, true, warnings, option.id);
   }
+
+  const retainedOptionIds = new Set(
+    parsedConfig.options.filter((option) => option.status === "RETAINED").map((option) => option.id),
+  );
+  const mainLines = lines.filter(
+    (line) => !line.resolvedOption || retainedOptionIds.has(line.resolvedOption.id),
+  );
 
   const totalSaleCents = scopeSale(mainLines);
   const costComplete = mainLines.every((line) => line.costCents !== null);
@@ -424,11 +477,20 @@ export function calculateQuoteAdjustedPricing(
     .reduce((total, option) => addMoney(total, option.saleCents), 0);
 
   return {
-    lines: lines.map(({ line: _line, resolvedOption: _resolvedOption, ...line }) => line),
+    lines: lines.map(
+      ({
+        line: _line,
+        resolvedOption: _resolvedOption,
+        poseCostRateCents: _poseCostRateCents,
+        poseSaleRateCents: _poseSaleRateCents,
+        ...line
+      }) => line,
+    ),
     totalSaleCents,
     totalCostCents,
     marginAmountCents,
-    marginPercent: totalCostCents === null ? null : marginPercent(totalSaleCents, totalCostCents),
+    marginPercent:
+      totalCostCents === null ? null : marginPercent(totalSaleCents, totalCostCents),
     totalPoseHours: sumPoseHours(mainLines),
     pendingOptionsSaleCents,
     options: optionSummaries,
