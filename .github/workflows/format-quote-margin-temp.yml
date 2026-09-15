@@ -1,0 +1,34 @@
+name: Format quote margin temporary
+
+on:
+  push:
+    branches:
+      - feat/quote-ouvrage-margin-forced-price
+
+permissions:
+  contents: write
+
+jobs:
+  format:
+    if: github.actor != 'github-actions[bot]'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: feat/quote-ouvrage-margin-forced-price
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - run: npx prettier --write src/components/quote-lines-editor.tsx src/lib/quotes/model.ts src/lib/quotes/mutations.ts tests/quote-lines-editor.test.ts
+      - name: Commit formatting
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add src/components/quote-lines-editor.tsx src/lib/quotes/model.ts src/lib/quotes/mutations.ts tests/quote-lines-editor.test.ts
+          if git diff --cached --quiet; then
+            exit 0
+          fi
+          git commit -m "chore: formater marge et prix ouvrage"
+          git push
