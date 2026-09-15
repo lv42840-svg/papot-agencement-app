@@ -19,7 +19,6 @@ export const nativeQuoteRecordSchema = z
     pricingConfig: quotePricingConfigSchema.optional().default({
       adjustments: [],
       options: [],
-      linePoseHours: [],
     }),
     model: quoteModelSchema,
     createdAt: isoDateTimeSchema,
