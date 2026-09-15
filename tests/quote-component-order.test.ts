@@ -1,8 +1,5 @@
 import { describe, expect, it } from "vitest";
-import {
-  canMoveQuoteComponent,
-  moveQuoteComponent,
-} from "../src/lib/quotes/component-order";
+import { canMoveQuoteComponent, moveQuoteComponent } from "../src/lib/quotes/component-order";
 
 describe("quote component order", () => {
   it("moves a component up without mutating the source array", () => {
