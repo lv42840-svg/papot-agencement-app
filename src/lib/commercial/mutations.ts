@@ -159,7 +159,7 @@ function setActiveStatus(
   actor: CommercialActor,
   now: Date,
 ): void {
-  if ((status === "PISTE" || status === "WAITING") && !params.reviewDate) {
+  if ((status === "PISTE" || status === "SENT" || status === "WAITING") && !params.reviewDate) {
     throw new Error("COMMERCIAL_REVIEW_DATE_REQUIRED");
   }
   if (status === "LIKELY" && !params.expectedConfirmationDate) {
@@ -177,7 +177,7 @@ function setActiveStatus(
   item.closedAt = null;
   item.closingReason = null;
 
-  if (status === "PISTE" || status === "WAITING") {
+  if (status === "PISTE" || status === "SENT" || status === "WAITING") {
     item.reviewDate = params.reviewDate ?? null;
     item.expectedConfirmationDate = null;
   } else if (status === "LIKELY") {
@@ -345,7 +345,7 @@ export function applyCommercialMutation(
   if (input.action === "markQuoteSent") {
     assertOpen(item);
     const previous = item.status;
-    item.status = "WAITING";
+    item.status = "SENT";
     item.quoteSentAt = now.toISOString();
     item.reviewDate = input.followUpDate;
     item.expectedConfirmationDate = null;
@@ -357,12 +357,12 @@ export function applyCommercialMutation(
       `Devis marqué envoyé. Relance obligatoire prévue le ${input.followUpDate}.`,
       now,
     );
-    if (previous !== "WAITING") {
+    if (previous !== "SENT") {
       history(
         item,
         actor.displayName,
         "STATUS_CHANGED",
-        `Statut : ${COMMERCIAL_STATUS_LABELS[previous]} → En attente.`,
+        `Statut : ${COMMERCIAL_STATUS_LABELS[previous]} → Envoyé.`,
         now,
       );
     }
@@ -410,6 +410,8 @@ export function applyCommercialMutation(
       );
     } else if (input.nextStatus === "PISTE") {
       setActiveStatus(item, "PISTE", { reviewDate: input.nextDate }, actor, now);
+    } else if (input.nextStatus === "SENT") {
+      setActiveStatus(item, "SENT", { reviewDate: input.nextDate }, actor, now);
     } else if (input.nextStatus === "FOLLOW_UP") {
       setActiveStatus(item, "FOLLOW_UP", {}, actor, now);
     } else {
