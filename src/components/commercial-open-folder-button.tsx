@@ -5,7 +5,8 @@ import { useEffect, useState } from "react";
 
 const folderErrors: Record<string, string> = {
   DESKTOP_BUSINESS_FOLDER_INVALID: "Le dossier de cette affaire ne peut pas être ouvert.",
-  DESKTOP_BUSINESS_FOLDER_ROOT_UNAVAILABLE: "Le stockage des documents n’est pas disponible sur ce poste.",
+  DESKTOP_BUSINESS_FOLDER_ROOT_UNAVAILABLE:
+    "Le stockage des documents n’est pas disponible sur ce poste.",
   DESKTOP_BUSINESS_FOLDER_NOT_FOUND: "Le dossier physique de cette affaire n’existe pas encore.",
   DESKTOP_BUSINESS_FOLDER_OPEN_FAILED: "Windows n’a pas pu ouvrir le dossier de cette affaire.",
 };
@@ -42,7 +43,9 @@ export function CommercialOpenFolderButton({
         creationYear: new Date(createdAt).getFullYear(),
       });
       if (!result.ok) {
-        setError(folderErrors[result.error] ?? folderErrors.DESKTOP_BUSINESS_FOLDER_OPEN_FAILED);
+        setError(
+          folderErrors[result.error] ?? folderErrors.DESKTOP_BUSINESS_FOLDER_OPEN_FAILED,
+        );
       }
     } catch {
       setError(folderErrors.DESKTOP_BUSINESS_FOLDER_OPEN_FAILED);
@@ -57,7 +60,11 @@ export function CommercialOpenFolderButton({
         className="secondaryButton"
         type="button"
         disabled={busy || !hasDocuments}
-        title={hasDocuments ? "Ouvrir le dossier physique de l’affaire" : "Ajoute d’abord un document à l’affaire"}
+        title={
+          hasDocuments
+            ? "Ouvrir le dossier physique de l’affaire"
+            : "Ajoute d’abord un document à l’affaire"
+        }
         onClick={() => void openFolder()}
       >
         <FolderOpen size={14} /> {busy ? "Ouverture…" : "Ouvrir le dossier"}
