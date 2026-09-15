@@ -40,7 +40,8 @@ function errorStatus(code: string): number {
     code === "QUOTE_AFFAIR_NOT_FOUND" ||
     code === "QUOTE_CLIENT_NOT_FOUND" ||
     code === "QUOTE_NOT_FOUND" ||
-    code === "QUOTE_LINE_NOT_FOUND"
+    code === "QUOTE_LINE_NOT_FOUND" ||
+    code === "QUOTE_LIBRARY_COMPONENT_NOT_FOUND"
   ) {
     return 404;
   }
@@ -140,6 +141,40 @@ export async function POST(request: Request) {
       };
     }
 
+    let libraryComponentSources: ReadonlyMap<string, QuoteLibraryComponentSource> | undefined;
+    if (input.action === "upsertOuvrage") {
+      const requestedComponentIds = Array.from(
+        new Set(
+          input.components
+            .map((component) => component.libraryComponentId)
+            .filter((componentId): componentId is string => Boolean(componentId)),
+        ),
+      );
+
+      if (requestedComponentIds.length > 0) {
+        const library = await createLibraryRepository(context).load();
+        const sources = new Map<string, QuoteLibraryComponentSource>();
+
+        for (const componentId of requestedComponentIds) {
+          const component = library.payload.components.find((item) => item.id === componentId);
+          if (!component) throw new Error("QUOTE_LIBRARY_COMPONENT_NOT_FOUND");
+          sources.set(
+            componentId,
+            createLibraryComponentFromQuoteLine({
+              componentId: component.id,
+              name: component.name,
+              description: component.description,
+              unit: component.unit,
+              costPriceCents: component.costPriceCents,
+              salePriceCents: component.salePriceCents,
+            }).source,
+          );
+        }
+
+        libraryComponentSources = sources;
+      }
+    }
+
     const repository = createQuotesRepository();
     const mutation = await repository.mutate(async (payload) => {
       const result = applyQuotesMutation(
@@ -149,6 +184,7 @@ export async function POST(request: Request) {
         undefined,
         new Date(),
         librarySession?.source,
+        libraryComponentSources,
       );
 
       if (librarySession) {
