@@ -1,6 +1,9 @@
 import { describe, expect, it } from "vitest";
 import { createInitialLibraryPayload } from "../src/lib/library/storage";
-import { publishQuoteOuvrageToLibrary } from "../src/lib/quotes/library-publish";
+import {
+  publishQuoteComponentToLibrary,
+  publishQuoteOuvrageToLibrary,
+} from "../src/lib/quotes/library-publish";
 import type { QuoteLine } from "../src/lib/quotes/model";
 
 const lineId = "11111111-1111-4111-8111-111111111111";
@@ -54,6 +57,66 @@ function ids() {
     return value;
   };
 }
+
+describe("publish quote component to Library", () => {
+  it("creates one reusable component from a quote component", () => {
+    const component = quoteLine().components![0];
+    const result = publishQuoteComponentToLibrary(
+      createInitialLibraryPayload(),
+      component,
+      ids(),
+    );
+
+    expect(result.created).toBe(true);
+    expect(result.payload.components).toHaveLength(1);
+    expect(result.payload.components[0]).toMatchObject({
+      id: result.componentId,
+      name: "Panneau mélaminé blanc",
+      unit: "m²",
+      costPriceCents: 4_000,
+      marginPercent: 30,
+      salePriceCents: 5_200,
+    });
+    expect(result.payload.ouvrages).toHaveLength(0);
+  });
+
+  it("reuses an unchanged component already coming from the Library", () => {
+    const sourceComponentId = "99999999-9999-4999-8999-999999999999";
+    const payload = createInitialLibraryPayload();
+    payload.components.push({
+      id: sourceComponentId,
+      name: "Panneau mélaminé blanc",
+      description: "Panneau décor blanc 19 mm.",
+      unit: "m²",
+      costPriceCents: 4_000,
+      marginPercent: 30,
+      salePriceCents: 5_200,
+    });
+    const sourceComponent = quoteLine().components![0];
+    const component = {
+      ...sourceComponent,
+      librarySource: {
+        schemaVersion: 1 as const,
+        kind: "COMPONENT" as const,
+        component: {
+          sourceComponentId,
+          name: "Panneau mélaminé blanc",
+          description: "Panneau décor blanc 19 mm.",
+          unit: "m²",
+          costPriceCents: 4_000,
+          marginPercent: 30,
+          salePriceCents: 5_200,
+        },
+      },
+    };
+
+    const result = publishQuoteComponentToLibrary(payload, component, ids());
+
+    expect(result.created).toBe(false);
+    expect(result.componentId).toBe(sourceComponentId);
+    expect(result.payload.components).toHaveLength(1);
+  });
+});
 
 describe("publish quote ouvrage to Library", () => {
   it("creates reusable components and one ouvrage from the quote composition", () => {
