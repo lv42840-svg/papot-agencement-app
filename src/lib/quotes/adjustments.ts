@@ -358,17 +358,24 @@ function applyScopeAdjustments(
     (adjustment) => adjustment.active && (!isOption || adjustment.applyToOptions),
   );
 
-  const baseSaleCents = lines.reduce((total, line) => addMoney(total, line.baseSaleCents), 0);
-
-  for (const adjustment of applicable) {
-    if (adjustment.kind !== "PERCENTAGE" || adjustment.marginTreatment !== "MARGED") continue;
-    const incrementCents = assertSafeMoney(Math.round((baseSaleCents * adjustment.percent) / 100));
-    applyMoneyToLines(lines, incrementCents, 0, (line) => line.baseSaleCents);
-  }
-
+  // Règle métier PAPOT : 1) heures de pose / trajet, 2) marge supplémentaire PAPOT,
+  // 3) commissions et autres pourcentages répercutés sans marge.
   for (const adjustment of applicable) {
     if (adjustment.kind !== "POSE_HOURS") continue;
     applyPoseHoursAdjustment(lines, adjustment, warnings, scopeLabel);
+  }
+
+  const margedPercent = applicable.reduce((sum, adjustment) => {
+    if (adjustment.kind !== "PERCENTAGE" || adjustment.marginTreatment !== "MARGED") {
+      return sum;
+    }
+    return sum + adjustment.percent;
+  }, 0);
+
+  if (margedPercent > 0) {
+    const currentSaleCents = scopeSale(lines);
+    const incrementCents = assertSafeMoney(Math.round((currentSaleCents * margedPercent) / 100));
+    applyMoneyToLines(lines, incrementCents, 0, (line) => line.saleCents);
   }
 
   const passThroughPercent = applicable.reduce((sum, adjustment) => {

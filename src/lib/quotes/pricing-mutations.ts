@@ -1,10 +1,12 @@
 import { z } from "zod";
 import {
+  calculateQuoteAdjustedPricing,
   quoteOptionSchema,
   quotePricingAdjustmentSchema,
   quotePricingConfigSchema,
   type QuotePricingConfig,
 } from "./adjustments";
+import { assertQuoteOptionCanBeUpserted, assertQuotePricingIntegrity } from "./pricing-integrity";
 import {
   nativeQuoteRecordSchema,
   parseNativeQuotesPayload,
@@ -54,16 +56,6 @@ export type QuotePricingMutationResult = {
   focusQuoteId: string;
 };
 
-function validateOptionTarget(
-  items: NativeQuotesPayload["quotes"][number]["model"]["items"],
-  option: Extract<QuotePricingMutation, { action: "upsertOption" }>["option"],
-) {
-  const target = items.find((item) => item.id === option.targetItemId);
-  if (!target) throw new Error("QUOTE_OPTION_TARGET_NOT_FOUND");
-  if (target.kind === "COMMENT") throw new Error("QUOTE_OPTION_TARGET_INVALID");
-  if (target.kind !== option.targetKind) throw new Error("QUOTE_OPTION_TARGET_INVALID");
-}
-
 function nextConfig(
   config: QuotePricingConfig,
   items: NativeQuotesPayload["quotes"][number]["model"]["items"],
@@ -85,13 +77,8 @@ function nextConfig(
   }
 
   if (mutation.action === "upsertOption") {
-    validateOptionTarget(items, mutation.option);
+    assertQuoteOptionCanBeUpserted(items, config.options, mutation.option);
     const options = [...config.options];
-    const sameTarget = options.find(
-      (item) =>
-        item.targetItemId === mutation.option.targetItemId && item.id !== mutation.option.id,
-    );
-    if (sameTarget) throw new Error("QUOTE_OPTION_TARGET_DUPLICATE");
     const index = options.findIndex((item) => item.id === mutation.option.id);
     if (index >= 0) options[index] = mutation.option;
     else options.push(mutation.option);
@@ -118,6 +105,9 @@ export function applyQuotePricingMutation(
   if (quote.status !== "DRAFT") throw new Error("QUOTE_NOT_EDITABLE");
 
   const pricingConfig = nextConfig(quote.pricingConfig, quote.model.items, mutation);
+  assertQuotePricingIntegrity(quote.model.items, pricingConfig);
+  calculateQuoteAdjustedPricing(quote.model.items, pricingConfig);
+
   const updated = nativeQuoteRecordSchema.parse({
     ...quote,
     pricingConfig,
