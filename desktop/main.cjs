@@ -2,7 +2,7 @@
 
 const fs = require("node:fs");
 const path = require("node:path");
-const { app, BrowserWindow, ipcMain, safeStorage, session } = require("electron");
+const { app, BrowserWindow, ipcMain, safeStorage, session, shell } = require("electron");
 const {
   DEFAULT_DESKTOP_APP_URL,
   isAllowedDesktopNavigation,
@@ -16,6 +16,7 @@ const {
   saveDesktopSetup,
 } = require("./setup-store.cjs");
 const { databasePath, openLocalDatabase } = require("./local-database.cjs");
+const { resolveBusinessFolderPath } = require("./business-folder.cjs");
 const { startDevelopmentServer, startPackagedServer } = require("./server-manager.cjs");
 
 const appUrl = normalizeLocalAppUrl(process.env.PAPOT_APP_URL || DEFAULT_DESKTOP_APP_URL);
@@ -193,6 +194,59 @@ function registerDesktopSetupHandler() {
   });
 }
 
+function businessFilesRoot() {
+  if (isLocalStorageMode()) {
+    const rootPath = process.env.PAPOT_LOCAL_FILES_PATH;
+    if (!rootPath) throw new Error("DESKTOP_BUSINESS_FOLDER_ROOT_UNAVAILABLE");
+    return rootPath;
+  }
+
+  const setup = readDesktopSetup({ userDataPath: app.getPath("userData"), safeStorage });
+  const rootPath = setup?.config?.shared_data_path;
+  if (typeof rootPath !== "string" || !rootPath.trim()) {
+    throw new Error("DESKTOP_BUSINESS_FOLDER_ROOT_UNAVAILABLE");
+  }
+  return rootPath;
+}
+
+function publicBusinessFolderError(error) {
+  const code = error instanceof Error ? error.message : "DESKTOP_BUSINESS_FOLDER_OPEN_FAILED";
+  const known = new Set([
+    "DESKTOP_BUSINESS_FOLDER_INVALID",
+    "DESKTOP_BUSINESS_FOLDER_ROOT_UNAVAILABLE",
+    "DESKTOP_BUSINESS_FOLDER_NOT_FOUND",
+    "DESKTOP_BUSINESS_FOLDER_OPEN_FAILED",
+  ]);
+  if (code === "DESKTOP_BUSINESS_FOLDER_ROOT_INVALID") {
+    return "DESKTOP_BUSINESS_FOLDER_ROOT_UNAVAILABLE";
+  }
+  return known.has(code) ? code : "DESKTOP_BUSINESS_FOLDER_OPEN_FAILED";
+}
+
+function registerBusinessFolderHandler() {
+  ipcMain.handle("papot:business-folder:open", async (_event, rawInput) => {
+    try {
+      const target = resolveBusinessFolderPath(businessFilesRoot(), rawInput);
+      let stats;
+      try {
+        stats = await fs.promises.stat(target);
+      } catch (error) {
+        if (error && typeof error === "object" && error.code === "ENOENT") {
+          throw new Error("DESKTOP_BUSINESS_FOLDER_NOT_FOUND");
+        }
+        throw error;
+      }
+      if (!stats.isDirectory()) throw new Error("DESKTOP_BUSINESS_FOLDER_NOT_FOUND");
+
+      const openError = await shell.openPath(target);
+      if (openError) throw new Error("DESKTOP_BUSINESS_FOLDER_OPEN_FAILED");
+      return { ok: true };
+    } catch (error) {
+      return { ok: false, error: publicBusinessFolderError(error) };
+    }
+  });
+}
+
 function createMainWindow() {
   const window = new BrowserWindow({
     width: 1440,
@@ -261,6 +315,7 @@ app.whenReady().then(async () => {
   }
 
   registerDesktopSetupHandler();
+  registerBusinessFolderHandler();
 
   session.defaultSession.setPermissionCheckHandler(() => false);
   session.defaultSession.setPermissionRequestHandler((_webContents, _permission, callback) => {

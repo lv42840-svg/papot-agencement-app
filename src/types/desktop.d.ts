@@ -22,6 +22,11 @@ declare global {
         | { ok: false; error: string }
       >;
       finishSetup: () => Promise<{ ok: boolean }>;
+      openBusinessFolder: (input: {
+        kind: "commercial-case";
+        caseId: string;
+        creationYear: number;
+      }) => Promise<{ ok: true } | { ok: false; error: string }>;
     };
   }
 }
