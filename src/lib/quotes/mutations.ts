@@ -46,6 +46,7 @@ const ouvrageComponentMutationSchema = z.object({
   description: z.string().trim().min(1).max(4000),
   unit: z.string().trim().max(40),
   quantityInput: z.string().trim().min(1).max(QUOTE_MAX_QUANTITY_EXPRESSION_LENGTH),
+  costPriceCents: quoteMoneyCentsSchema.optional(),
   unitPriceCents: quoteMoneyCentsSchema,
 });
 
@@ -56,6 +57,7 @@ const upsertOuvrageMutationSchema = z.object({
   description: z.string().trim().min(1).max(4000),
   unit: z.string().trim().max(40).default("u"),
   quantityInput: z.string().trim().min(1).max(QUOTE_MAX_QUANTITY_EXPRESSION_LENGTH),
+  forcedUnitPriceCents: quoteMoneyCentsSchema.nullable().optional(),
   components: z.array(ouvrageComponentMutationSchema).min(1).max(200),
 });
 
@@ -237,18 +239,29 @@ function upsertDraftOuvrage(
     const existingComponent = componentInput.id
       ? existingComponents.get(componentInput.id)
       : undefined;
+    const preservedCost =
+      existingComponent?.costPriceCents ?? existingComponent?.librarySource?.component.costPriceCents;
+    const costPriceCents = componentInput.costPriceCents ?? preservedCost;
+
     return {
       id: componentInput.id ?? globalThis.crypto.randomUUID(),
       description: componentInput.description,
       unit: componentInput.unit,
       quantity: parsedComponentQuantity.quantity,
       quantityFormula: parsedComponentQuantity.formula,
+      ...(costPriceCents !== undefined ? { costPriceCents } : {}),
       unitPriceCents: componentInput.unitPriceCents,
       ...(existingComponent?.librarySource
         ? { librarySource: existingComponent.librarySource }
         : {}),
     };
   });
+
+  const automaticUnitPriceCents = calculateQuoteOuvrageUnitPriceCents(components);
+  const forcedUnitPriceCents =
+    input.forcedUnitPriceCents === undefined
+      ? existingLine?.forcedUnitPriceCents
+      : (input.forcedUnitPriceCents ?? undefined);
 
   const line: QuoteLine = {
     id: input.lineId ?? globalThis.crypto.randomUUID(),
@@ -258,7 +271,8 @@ function upsertDraftOuvrage(
     unit: input.unit,
     quantity: parsedQuantity.quantity,
     quantityFormula: parsedQuantity.formula,
-    unitPriceCents: calculateQuoteOuvrageUnitPriceCents(components),
+    unitPriceCents: forcedUnitPriceCents ?? automaticUnitPriceCents,
+    ...(forcedUnitPriceCents !== undefined ? { forcedUnitPriceCents } : {}),
     components,
     ...(existingLine?.librarySource ? { librarySource: existingLine.librarySource } : {}),
   };
