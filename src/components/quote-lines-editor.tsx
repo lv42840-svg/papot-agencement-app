@@ -325,9 +325,7 @@ export function QuoteLinesEditor({
           query,
         ),
       )
-      .sort((left, right) =>
-        left.name.localeCompare(right.name, "fr-FR", { sensitivity: "base" }),
-      );
+      .sort((left, right) => left.name.localeCompare(right.name, "fr-FR", { sensitivity: "base" }));
   }, [libraryPayload, libraryQuery]);
 
   useEffect(() => {
@@ -618,9 +616,7 @@ export function QuoteLinesEditor({
                   type="button"
                   className="miniLibraryButton"
                   onClick={() => void addOuvrageToLibrary(line)}
-                  disabled={
-                    librarySavingLineId !== null || libraryAlreadyLinked || publishedNow
-                  }
+                  disabled={librarySavingLineId !== null || libraryAlreadyLinked || publishedNow}
                   aria-label={`Ajouter ${line.description} à la Bibliothèque`}
                   title={
                     libraryAlreadyLinked || publishedNow
