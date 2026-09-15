@@ -4,7 +4,12 @@ import {
   insertLibraryComponentIntoQuote,
   insertLibraryOuvrageIntoQuote,
 } from "../src/lib/quotes/library-link";
-import { parseQuoteModel, type QuoteModel } from "../src/lib/quotes/model";
+import {
+  calculateQuoteOuvrageMarginPercent,
+  calculateQuoteOuvrageUnitCostCents,
+  parseQuoteModel,
+  type QuoteModel,
+} from "../src/lib/quotes/model";
 
 const sectionId = "11111111-1111-4111-8111-111111111111";
 const componentId = "22222222-2222-4222-8222-222222222222";
@@ -130,7 +135,7 @@ describe("Library to native quote link", () => {
     expect(line.components?.[0].unitPriceCents).toBe(5_200);
   });
 
-  it("copies an ouvrage and materializes all of its components in the quote", () => {
+  it("copies an ouvrage, materializes its components and exposes its frozen margin", () => {
     const result = insertLibraryOuvrageIntoQuote({
       quote: quote(),
       library: library(),
@@ -228,6 +233,10 @@ describe("Library to native quote link", () => {
         },
       ],
     });
+
+    const cost = calculateQuoteOuvrageUnitCostCents(line.components ?? []);
+    expect(cost).toBe(23_000);
+    expect(calculateQuoteOuvrageMarginPercent(line.unitPriceCents ?? 0, cost)).toBe(30);
   });
 
   it("keeps an inserted ouvrage frozen when its definition and components later change", () => {
