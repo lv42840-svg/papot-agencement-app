@@ -6,10 +6,7 @@ import {
   quotePricingConfigSchema,
   type QuotePricingConfig,
 } from "./adjustments";
-import {
-  assertQuoteOptionCanBeUpserted,
-  assertQuotePricingIntegrity,
-} from "./pricing-integrity";
+import { assertQuoteOptionCanBeUpserted, assertQuotePricingIntegrity } from "./pricing-integrity";
 import {
   nativeQuoteRecordSchema,
   parseNativeQuotesPayload,

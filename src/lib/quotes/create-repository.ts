@@ -16,10 +16,7 @@ export function createQuotesRepository(): QuotesRepository {
         const mutation = await transform(payload);
         return {
           ...mutation,
-          payload: normalizeQuotePricingAfterModelMutation(
-            mutation.payload,
-            mutation.focusQuoteId,
-          ),
+          payload: normalizeQuotePricingAfterModelMutation(mutation.payload, mutation.focusQuoteId),
         };
       }),
   };

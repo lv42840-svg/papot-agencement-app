@@ -33,7 +33,10 @@ function targetContains(
 function optionsOverlap(items: QuoteItem[], left: QuoteOption, right: QuoteOption): boolean {
   const leftTarget = optionTarget(items, left);
   const rightTarget = optionTarget(items, right);
-  return targetContains(items, leftTarget, rightTarget) || targetContains(items, rightTarget, leftTarget);
+  return (
+    targetContains(items, leftTarget, rightTarget) ||
+    targetContains(items, rightTarget, leftTarget)
+  );
 }
 
 export function assertQuoteOptionCanBeUpserted(
