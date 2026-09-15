@@ -22,6 +22,18 @@ jobs:
           cache: npm
       - run: npm ci
       - run: python scripts/patch-quote-heading-reorder.py
+      - name: Add heading type imports
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+          path = Path('src/lib/quotes/mutations.ts')
+          source = path.read_text(encoding='utf-8')
+          old = '  type QuoteOuvrageComponent,\n} from "./model";'
+          new = '  type QuoteOuvrageComponent,\n  type QuoteSection,\n  type QuoteSubsection,\n} from "./model";'
+          if source.count(old) != 1:
+              raise SystemExit('heading import anchor not found once')
+          path.write_text(source.replace(old, new, 1), encoding='utf-8')
+          PY
       - run: npx prettier --write src/lib/quotes/mutations.ts src/components/quote-structured-lines-editor.tsx tests/quote-heading-reorder.test.ts
       - run: npm run lint
       - run: npm run typecheck
