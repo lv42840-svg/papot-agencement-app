@@ -24,6 +24,13 @@ import {
   type QuoteSubsection,
 } from "@/lib/quotes/model";
 import { buildQuoteItemNumbers } from "@/lib/quotes/numbering";
+import {
+  calculateQuoteMarginFromSalePrice,
+  calculateQuoteSalePriceFromMarginCents,
+  parseQuoteMarginInput,
+  quoteMarginToInput,
+  type QuotePricingDriver,
+} from "@/lib/quotes/pricing";
 import type { NativeQuoteRecord, NativeQuotesPayload } from "@/lib/quotes/store";
 
 type QuotesApiResponse = {
@@ -64,7 +71,9 @@ type OuvrageComponentForm = {
   unit: string;
   quantityInput: string;
   costPriceEuros: string;
+  marginPercentInput: string;
   unitPriceEuros: string;
+  pricingDriver: QuotePricingDriver;
 };
 
 type HeadingEditor = {
@@ -117,7 +126,9 @@ function newComponentForm(): OuvrageComponentForm {
     unit: "u",
     quantityInput: "1",
     costPriceEuros: "",
+    marginPercentInput: "0",
     unitPriceEuros: "0,00",
+    pricingDriver: "MARGIN",
   };
 }
 
@@ -129,7 +140,9 @@ function formFromLibraryComponent(component: LibraryComponent): OuvrageComponent
     unit: component.unit,
     quantityInput: "1",
     costPriceEuros: centsToInput(component.costPriceCents),
+    marginPercentInput: quoteMarginToInput(component.marginPercent),
     unitPriceEuros: centsToInput(component.salePriceCents),
+    pricingDriver: "SALE_PRICE",
   };
 }
 
@@ -145,7 +158,14 @@ function formsFromLine(line: QuoteLine): OuvrageComponentForm[] {
         unit: component.unit,
         quantityInput: component.quantityFormula ?? String(component.quantity).replace(".", ","),
         costPriceEuros: costPriceCents === null ? "" : centsToInput(costPriceCents),
+        marginPercentInput:
+          costPriceCents === null
+            ? ""
+            : quoteMarginToInput(
+                calculateQuoteMarginFromSalePrice(costPriceCents, component.unitPriceCents),
+              ),
         unitPriceEuros: centsToInput(component.unitPriceCents),
+        pricingDriver: "SALE_PRICE",
       };
     });
   }
@@ -157,7 +177,9 @@ function formsFromLine(line: QuoteLine): OuvrageComponentForm[] {
       unit: line.unit || "u",
       quantityInput: "1",
       costPriceEuros: "",
+      marginPercentInput: "",
       unitPriceEuros: centsToInput(line.unitPriceCents ?? 0),
+      pricingDriver: "SALE_PRICE",
     },
   ];
 }
@@ -186,11 +208,14 @@ function componentCostTotalCents(component: OuvrageComponentForm): number | null
 
 function componentMarginPercent(component: OuvrageComponentForm): number | null {
   try {
+    if (component.marginPercentInput.trim()) {
+      return parseQuoteMarginInput(component.marginPercentInput);
+    }
     const costPriceCents = optionalEurosToCents(component.costPriceEuros);
     if (costPriceCents === undefined) return null;
-    return calculateQuoteOuvrageMarginPercent(
-      eurosToCents(component.unitPriceEuros),
+    return calculateQuoteMarginFromSalePrice(
       costPriceCents,
+      eurosToCents(component.unitPriceEuros),
     );
   } catch {
     return null;
@@ -326,6 +351,9 @@ export function QuoteStructuredLinesEditor({
   const [components, setComponents] = useState<OuvrageComponentForm[]>([newComponentForm()]);
   const [priceForced, setPriceForced] = useState(false);
   const [forcedUnitPriceEuros, setForcedUnitPriceEuros] = useState("0,00");
+  const [forcedMarginPercentInput, setForcedMarginPercentInput] = useState("");
+  const [ouvragePricingDriver, setOuvragePricingDriver] =
+    useState<QuotePricingDriver>("SALE_PRICE");
   const [headingEditor, setHeadingEditor] = useState<HeadingEditor>(null);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
@@ -362,6 +390,9 @@ export function QuoteStructuredLinesEditor({
     effectiveUnitPrice === null
       ? null
       : calculateQuoteOuvrageMarginPercent(effectiveUnitPrice, calculatedUnitCost);
+  const ouvrageMarginInput = priceForced
+    ? forcedMarginPercentInput
+    : quoteMarginToInput(currentMarginPercent);
 
   const visibleLibraryComponents = useMemo(() => {
     if (!libraryPayload) return [];
@@ -392,6 +423,37 @@ export function QuoteStructuredLinesEditor({
     return () => window.clearTimeout(timeout);
   }, [notice]);
 
+  useEffect(() => {
+    if (!priceForced || ouvragePricingDriver !== "MARGIN" || calculatedUnitCost === null) return;
+    try {
+      const next = centsToInput(
+        calculateQuoteSalePriceFromMarginCents(
+          calculatedUnitCost,
+          parseQuoteMarginInput(forcedMarginPercentInput),
+        ),
+      );
+      setForcedUnitPriceEuros((current) => (current === next ? current : next));
+    } catch {
+      // Keep the partial margin input while editing.
+    }
+  }, [calculatedUnitCost, forcedMarginPercentInput, ouvragePricingDriver, priceForced]);
+
+  useEffect(() => {
+    if (!priceForced || ouvragePricingDriver !== "SALE_PRICE") return;
+    if (calculatedUnitCost === null) {
+      setForcedMarginPercentInput("");
+      return;
+    }
+    try {
+      const next = quoteMarginToInput(
+        calculateQuoteMarginFromSalePrice(calculatedUnitCost, eurosToCents(forcedUnitPriceEuros)),
+      );
+      setForcedMarginPercentInput((current) => (current === next ? current : next));
+    } catch {
+      setForcedMarginPercentInput("");
+    }
+  }, [calculatedUnitCost, forcedUnitPriceEuros, ouvragePricingDriver, priceForced]);
+
   function resetForm() {
     setEditingLineId(null);
     setNewLineParentId(null);
@@ -401,6 +463,8 @@ export function QuoteStructuredLinesEditor({
     setComponents([newComponentForm()]);
     setPriceForced(false);
     setForcedUnitPriceEuros("0,00");
+    setForcedMarginPercentInput("");
+    setOuvragePricingDriver("SALE_PRICE");
     setLibraryPickerOpen(false);
     setLibraryQuery("");
     setError("");
@@ -423,6 +487,16 @@ export function QuoteStructuredLinesEditor({
     setComponents(formsFromLine(line));
     setPriceForced(line.forcedUnitPriceCents !== undefined);
     setForcedUnitPriceEuros(centsToInput(line.forcedUnitPriceCents ?? line.unitPriceCents ?? 0));
+    const lineCost = calculateQuoteOuvrageUnitCostCents(line.components ?? []);
+    setForcedMarginPercentInput(
+      quoteMarginToInput(
+        calculateQuoteMarginFromSalePrice(
+          lineCost ?? 0,
+          line.forcedUnitPriceCents ?? line.unitPriceCents ?? 0,
+        ),
+      ),
+    );
+    setOuvragePricingDriver("SALE_PRICE");
     setLibraryPickerOpen(false);
     setLibraryQuery("");
     setError("");
@@ -508,6 +582,126 @@ export function QuoteStructuredLinesEditor({
     );
   }
 
+  function updateComponentCost(index: number, value: string) {
+    setComponents((current) =>
+      current.map((component, componentIndex) => {
+        if (componentIndex !== index) return component;
+        const next = { ...component, costPriceEuros: value };
+        try {
+          const costPriceCents = optionalEurosToCents(value);
+          if (costPriceCents === undefined) return { ...next, marginPercentInput: "" };
+          if (component.pricingDriver === "MARGIN") {
+            return {
+              ...next,
+              unitPriceEuros: centsToInput(
+                calculateQuoteSalePriceFromMarginCents(
+                  costPriceCents,
+                  parseQuoteMarginInput(component.marginPercentInput),
+                ),
+              ),
+            };
+          }
+          return {
+            ...next,
+            marginPercentInput: quoteMarginToInput(
+              calculateQuoteMarginFromSalePrice(
+                costPriceCents,
+                eurosToCents(component.unitPriceEuros),
+              ),
+            ),
+          };
+        } catch {
+          return next;
+        }
+      }),
+    );
+  }
+
+  function updateComponentMargin(index: number, value: string) {
+    setComponents((current) =>
+      current.map((component, componentIndex) => {
+        if (componentIndex !== index) return component;
+        const next = {
+          ...component,
+          marginPercentInput: value,
+          pricingDriver: "MARGIN" as const,
+        };
+        try {
+          const costPriceCents = optionalEurosToCents(component.costPriceEuros);
+          if (costPriceCents === undefined) return next;
+          return {
+            ...next,
+            unitPriceEuros: centsToInput(
+              calculateQuoteSalePriceFromMarginCents(costPriceCents, parseQuoteMarginInput(value)),
+            ),
+          };
+        } catch {
+          return next;
+        }
+      }),
+    );
+  }
+
+  function updateComponentSalePrice(index: number, value: string) {
+    setComponents((current) =>
+      current.map((component, componentIndex) => {
+        if (componentIndex !== index) return component;
+        const next = {
+          ...component,
+          unitPriceEuros: value,
+          pricingDriver: "SALE_PRICE" as const,
+        };
+        try {
+          const costPriceCents = optionalEurosToCents(component.costPriceEuros);
+          if (costPriceCents === undefined) return { ...next, marginPercentInput: "" };
+          return {
+            ...next,
+            marginPercentInput: quoteMarginToInput(
+              calculateQuoteMarginFromSalePrice(costPriceCents, eurosToCents(value)),
+            ),
+          };
+        } catch {
+          return next;
+        }
+      }),
+    );
+  }
+
+  function updateOuvrageSalePrice(value: string) {
+    setPriceForced(true);
+    setOuvragePricingDriver("SALE_PRICE");
+    setForcedUnitPriceEuros(value);
+    try {
+      if (calculatedUnitCost === null) {
+        setForcedMarginPercentInput("");
+        return;
+      }
+      setForcedMarginPercentInput(
+        quoteMarginToInput(
+          calculateQuoteMarginFromSalePrice(calculatedUnitCost, eurosToCents(value)),
+        ),
+      );
+    } catch {
+      setForcedMarginPercentInput("");
+    }
+  }
+
+  function updateOuvrageMargin(value: string) {
+    setPriceForced(true);
+    setOuvragePricingDriver("MARGIN");
+    setForcedMarginPercentInput(value);
+    try {
+      if (calculatedUnitCost === null) return;
+      setForcedUnitPriceEuros(
+        centsToInput(
+          calculateQuoteSalePriceFromMarginCents(calculatedUnitCost, parseQuoteMarginInput(value)),
+        ),
+      );
+    } catch {
+      // Keep the partial input while the user is typing.
+    }
+  }
+
   function addComponent() {
     setComponents((current) => [...current, newComponentForm()]);
     setLibraryPickerOpen(false);
@@ -522,7 +716,15 @@ export function QuoteStructuredLinesEditor({
 
   function resetForcedPrice() {
     setPriceForced(false);
+    setOuvragePricingDriver("SALE_PRICE");
     setForcedUnitPriceEuros(centsToInput(calculatedUnitPrice ?? 0));
+    setForcedMarginPercentInput(
+      quoteMarginToInput(
+        calculatedUnitPrice === null
+          ? null
+          : calculateQuoteMarginFromSalePrice(calculatedUnitCost ?? 0, calculatedUnitPrice),
+      ),
+    );
   }
 
   async function openLibraryPicker() {
@@ -887,10 +1089,7 @@ export function QuoteStructuredLinesEditor({
               className="quoteInlineInput"
               inputMode="decimal"
               value={retainedPriceInput}
-              onChange={(event) => {
-                setPriceForced(true);
-                setForcedUnitPriceEuros(event.target.value);
-              }}
+              onChange={(event) => updateOuvrageSalePrice(event.target.value)}
               aria-label="Prix unitaire HT ouvrage"
             />
             {priceForced ? (
@@ -906,7 +1105,14 @@ export function QuoteStructuredLinesEditor({
             ) : null}
           </div>
           <div className="quoteMarginCell">
-            <strong>{formatPercent(currentMarginPercent)}</strong>
+            <input
+              className="quoteInlineInput"
+              inputMode="decimal"
+              value={ouvrageMarginInput}
+              onChange={(event) => updateOuvrageMargin(event.target.value)}
+              aria-label="Marge pourcentage ouvrage"
+              title="Saisir la marge pour calculer le prix de vente"
+            />
           </div>
           <strong className="quoteLineTotal">
             {currentLineTotal === null ? "—" : formatMoney(currentLineTotal)}
@@ -1001,26 +1207,26 @@ export function QuoteStructuredLinesEditor({
                   className="quoteInlineInput"
                   inputMode="decimal"
                   value={component.costPriceEuros}
-                  onChange={(event) =>
-                    updateComponent(index, { costPriceEuros: event.target.value })
-                  }
+                  onChange={(event) => updateComponentCost(index, event.target.value)}
                   placeholder="—"
                   aria-label={`Coût composant ${index + 1}`}
                 />
-                <span
-                  className={
-                    marginPercent !== null && marginPercent < 0 ? "quoteNegative" : "quotePositive"
-                  }
-                >
-                  {formatPercent(marginPercent)}
-                </span>
+                <input
+                  className={`quoteInlineInput${
+                    marginPercent !== null && marginPercent < 0 ? " quoteNegative" : ""
+                  }`}
+                  inputMode="decimal"
+                  value={component.marginPercentInput}
+                  onChange={(event) => updateComponentMargin(index, event.target.value)}
+                  placeholder="n/c"
+                  aria-label={`Marge composant ${index + 1}`}
+                  title="Saisir la marge pour calculer le prix de vente"
+                />
                 <input
                   className="quoteInlineInput"
                   inputMode="decimal"
                   value={component.unitPriceEuros}
-                  onChange={(event) =>
-                    updateComponent(index, { unitPriceEuros: event.target.value })
-                  }
+                  onChange={(event) => updateComponentSalePrice(index, event.target.value)}
                   required
                   aria-label={`Prix vente composant ${index + 1}`}
                 />
