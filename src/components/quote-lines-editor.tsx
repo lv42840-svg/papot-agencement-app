@@ -53,8 +53,9 @@ function newComponentForm(): OuvrageComponentForm {
 }
 
 function formsFromLine(line: QuoteLine): OuvrageComponentForm[] {
-  if (line.components.length > 0) {
-    return line.components.map((component) => ({
+  const lineComponents = line.components ?? [];
+  if (lineComponents.length > 0) {
+    return lineComponents.map((component) => ({
       key: component.id,
       id: component.id,
       description: component.description,
@@ -230,12 +231,6 @@ export function QuoteLinesEditor({
       }
 
       onSaved(data.payload);
-      if (data.focusQuoteId) {
-        const savedLineId = editingLineId;
-        if (savedLineId) {
-          setExpandedLineIds((current) => new Set(current).add(savedLineId));
-        }
-      }
       closeForm();
     } catch {
       setError("Vérifie les quantités et les prix des composants.");
@@ -345,79 +340,78 @@ export function QuoteLinesEditor({
               </button>
             </div>
 
-            {components.map((component, index) => (
-              <div className="quoteComponentCard" key={component.key}>
-                <div className="quoteComponentCardHeader">
-                  <strong>Composant {index + 1}</strong>
-                  <button
-                    type="button"
-                    className="iconButton"
-                    onClick={() => removeComponent(index)}
-                    disabled={components.length === 1}
-                    aria-label={`Supprimer le composant ${index + 1}`}
-                    title="Supprimer le composant"
-                  >
-                    <Trash2 size={15} aria-hidden="true" />
-                  </button>
-                </div>
+            {components.map((component, index) => {
+              const total = componentTotalCents(component);
+              return (
+                <div className="quoteComponentCard" key={component.key}>
+                  <div className="quoteComponentCardHeader">
+                    <strong>Composant {index + 1}</strong>
+                    <button
+                      type="button"
+                      className="iconButton"
+                      onClick={() => removeComponent(index)}
+                      disabled={components.length === 1}
+                      aria-label={`Supprimer le composant ${index + 1}`}
+                      title="Supprimer le composant"
+                    >
+                      <Trash2 size={15} aria-hidden="true" />
+                    </button>
+                  </div>
 
-                <div className="quoteComponentGrid">
-                  <label className="quoteLineField quoteLineFieldWide">
-                    <span>Désignation du composant</span>
-                    <input
-                      value={component.description}
-                      onChange={(event) =>
-                        updateComponent(index, { description: event.target.value })
-                      }
-                      maxLength={4000}
-                      required
-                    />
-                  </label>
+                  <div className="quoteComponentGrid">
+                    <label className="quoteLineField quoteLineFieldWide">
+                      <span>Désignation du composant</span>
+                      <input
+                        value={component.description}
+                        onChange={(event) =>
+                          updateComponent(index, { description: event.target.value })
+                        }
+                        maxLength={4000}
+                        required
+                      />
+                    </label>
 
-                  <label className="quoteLineField">
-                    <span>Quantité / formule</span>
-                    <input
-                      value={component.quantityInput}
-                      onChange={(event) =>
-                        updateComponent(index, { quantityInput: event.target.value })
-                      }
-                      placeholder="1 ou 2+3"
-                      required
-                    />
-                  </label>
+                    <label className="quoteLineField">
+                      <span>Quantité / formule</span>
+                      <input
+                        value={component.quantityInput}
+                        onChange={(event) =>
+                          updateComponent(index, { quantityInput: event.target.value })
+                        }
+                        placeholder="1 ou 2+3"
+                        required
+                      />
+                    </label>
 
-                  <label className="quoteLineField">
-                    <span>Unité</span>
-                    <input
-                      value={component.unit}
-                      onChange={(event) => updateComponent(index, { unit: event.target.value })}
-                      maxLength={40}
-                    />
-                  </label>
+                    <label className="quoteLineField">
+                      <span>Unité</span>
+                      <input
+                        value={component.unit}
+                        onChange={(event) => updateComponent(index, { unit: event.target.value })}
+                        maxLength={40}
+                      />
+                    </label>
 
-                  <label className="quoteLineField">
-                    <span>Prix de vente unitaire HT</span>
-                    <input
-                      inputMode="decimal"
-                      value={component.unitPriceEuros}
-                      onChange={(event) =>
-                        updateComponent(index, { unitPriceEuros: event.target.value })
-                      }
-                      required
-                    />
-                  </label>
+                    <label className="quoteLineField">
+                      <span>Prix de vente unitaire HT</span>
+                      <input
+                        inputMode="decimal"
+                        value={component.unitPriceEuros}
+                        onChange={(event) =>
+                          updateComponent(index, { unitPriceEuros: event.target.value })
+                        }
+                        required
+                      />
+                    </label>
 
-                  <div className="quoteComponentTotal">
-                    <span>Total composant</span>
-                    <strong>
-                      {componentTotalCents(component) === null
-                        ? "À vérifier"
-                        : formatMoney(componentTotalCents(component) ?? 0)}
-                    </strong>
+                    <div className="quoteComponentTotal">
+                      <span>Total composant</span>
+                      <strong>{total === null ? "À vérifier" : formatMoney(total)}</strong>
+                    </div>
                   </div>
                 </div>
-              </div>
-            ))}
+              );
+            })}
 
             <div className="quoteOuvragePrice">
               <span>Prix unitaire HT de l’ouvrage</span>
@@ -458,7 +452,8 @@ export function QuoteLinesEditor({
           </div>
           {lines.map((line) => {
             const expanded = expandedLineIds.has(line.id);
-            const componentCount = line.components.length;
+            const lineComponents = line.components ?? [];
+            const componentCount = lineComponents.length;
             return (
               <div className="quoteOuvrageGroup" key={line.id}>
                 <div className="quoteLineRow">
@@ -512,7 +507,7 @@ export function QuoteLinesEditor({
                       <span>PU HT</span>
                       <span>Total HT</span>
                     </div>
-                    {line.components.map((component) => (
+                    {lineComponents.map((component) => (
                       <div className="quoteComponentPreviewRow" key={component.id}>
                         <strong>{component.description}</strong>
                         <span>{component.quantityFormula ?? component.quantity}</span>
