@@ -90,9 +90,7 @@ export function QuotePricingAdjustmentsEditor({
   const [kind, setKind] = useState<"PERCENTAGE" | "POSE_HOURS">("PERCENTAGE");
   const [label, setLabel] = useState("Commission architecte");
   const [value, setValue] = useState("5");
-  const [marginTreatment, setMarginTreatment] = useState<"MARGED" | "PASS_THROUGH">(
-    "PASS_THROUGH",
-  );
+  const [marginTreatment, setMarginTreatment] = useState<"MARGED" | "PASS_THROUGH">("PASS_THROUGH");
   const [applyToOptions, setApplyToOptions] = useState(true);
   const [optionTargetId, setOptionTargetId] = useState("");
   const [optionLabel, setOptionLabel] = useState("Option");
@@ -298,9 +296,7 @@ export function QuotePricingAdjustmentsEditor({
             <select
               disabled={!editable}
               value={marginTreatment}
-              onChange={(event) =>
-                setMarginTreatment(event.target.value as typeof marginTreatment)
-              }
+              onChange={(event) => setMarginTreatment(event.target.value as typeof marginTreatment)}
             >
               <option value="PASS_THROUGH">Répercuté sans marge</option>
               <option value="MARGED">Margé</option>

@@ -82,9 +82,7 @@ export const quotePricingConfigSchema = z
     }
   });
 
-export type QuoteAdjustmentMarginTreatment = z.infer<
-  typeof quoteAdjustmentMarginTreatmentSchema
->;
+export type QuoteAdjustmentMarginTreatment = z.infer<typeof quoteAdjustmentMarginTreatmentSchema>;
 export type QuotePricingAdjustment = z.infer<typeof quotePricingAdjustmentSchema>;
 export type QuotePercentageAdjustment = z.infer<typeof quotePercentageAdjustmentSchema>;
 export type QuotePoseHoursAdjustment = z.infer<typeof quotePoseHoursAdjustmentSchema>;
@@ -307,7 +305,9 @@ function applyPoseHoursAdjustment(
   warnings: string[],
   scopeLabel: string,
 ) {
-  const eligible = lines.filter((line) => line.basePoseHours > 0 && line.poseSaleRateCents !== null);
+  const eligible = lines.filter(
+    (line) => line.basePoseHours > 0 && line.poseSaleRateCents !== null,
+  );
   if (eligible.length === 0) {
     warnings.push(`QUOTE_POSE_HOURS_NO_BASE:${adjustment.id}:${scopeLabel}`);
     return;
@@ -449,7 +449,9 @@ export function calculateQuoteAdjustedPricing(
   }
 
   const retainedOptionIds = new Set(
-    parsedConfig.options.filter((option) => option.status === "RETAINED").map((option) => option.id),
+    parsedConfig.options
+      .filter((option) => option.status === "RETAINED")
+      .map((option) => option.id),
   );
   const mainLines = lines.filter(
     (line) => !line.resolvedOption || retainedOptionIds.has(line.resolvedOption.id),
@@ -489,8 +491,7 @@ export function calculateQuoteAdjustedPricing(
     totalSaleCents,
     totalCostCents,
     marginAmountCents,
-    marginPercent:
-      totalCostCents === null ? null : marginPercent(totalSaleCents, totalCostCents),
+    marginPercent: totalCostCents === null ? null : marginPercent(totalSaleCents, totalCostCents),
     totalPoseHours: sumPoseHours(mainLines),
     pendingOptionsSaleCents,
     options: optionSummaries,
