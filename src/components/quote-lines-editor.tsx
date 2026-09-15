@@ -1,9 +1,23 @@
 "use client";
 
 import { type FormEvent, type ReactNode, useEffect, useMemo, useState } from "react";
-import { ChevronDown, ChevronRight, Pencil, Plus, Trash2, X } from "lucide-react";
+import {
+  ChevronDown,
+  ChevronRight,
+  LockKeyhole,
+  Pencil,
+  Plus,
+  RotateCcw,
+  Trash2,
+  X,
+} from "lucide-react";
 import { parseQuoteQuantityInput } from "@/lib/quotes/domain";
-import type { QuoteLine } from "@/lib/quotes/model";
+import {
+  calculateQuoteOuvrageMarginPercent,
+  calculateQuoteOuvrageUnitCostCents,
+  quoteOuvrageComponentCostPriceCents,
+  type QuoteLine,
+} from "@/lib/quotes/model";
 import type { NativeQuoteRecord, NativeQuotesPayload } from "@/lib/quotes/store";
 
 type QuotesApiResponse = {
@@ -17,6 +31,7 @@ type OuvrageComponentForm = {
   description: string;
   unit: string;
   quantityInput: string;
+  costPriceEuros: string;
   unitPriceEuros: string;
 };
 
@@ -26,8 +41,17 @@ const moneyFormatter = new Intl.NumberFormat("fr-FR", {
   minimumFractionDigits: 2,
 });
 
+const percentFormatter = new Intl.NumberFormat("fr-FR", {
+  minimumFractionDigits: 1,
+  maximumFractionDigits: 1,
+});
+
 function formatMoney(cents: number): string {
   return moneyFormatter.format(cents / 100);
+}
+
+function formatPercent(value: number | null): string {
+  return value === null ? "n/c" : `${percentFormatter.format(value)} %`;
 }
 
 function centsToInput(cents: number): string {
@@ -42,12 +66,18 @@ function eurosToCents(value: string): number {
   return cents;
 }
 
+function optionalEurosToCents(value: string): number | undefined {
+  if (!value.trim()) return undefined;
+  return eurosToCents(value);
+}
+
 function newComponentForm(): OuvrageComponentForm {
   return {
     key: globalThis.crypto.randomUUID(),
     description: "",
     unit: "u",
     quantityInput: "1",
+    costPriceEuros: "",
     unitPriceEuros: "0,00",
   };
 }
@@ -55,14 +85,18 @@ function newComponentForm(): OuvrageComponentForm {
 function formsFromLine(line: QuoteLine): OuvrageComponentForm[] {
   const lineComponents = line.components ?? [];
   if (lineComponents.length > 0) {
-    return lineComponents.map((component) => ({
-      key: component.id,
-      id: component.id,
-      description: component.description,
-      unit: component.unit,
-      quantityInput: component.quantityFormula ?? String(component.quantity).replace(".", ","),
-      unitPriceEuros: centsToInput(component.unitPriceCents),
-    }));
+    return lineComponents.map((component) => {
+      const costPriceCents = quoteOuvrageComponentCostPriceCents(component);
+      return {
+        key: component.id,
+        id: component.id,
+        description: component.description,
+        unit: component.unit,
+        quantityInput: component.quantityFormula ?? String(component.quantity).replace(".", ","),
+        costPriceEuros: costPriceCents === null ? "" : centsToInput(costPriceCents),
+        unitPriceEuros: centsToInput(component.unitPriceCents),
+      };
+    });
   }
 
   return [
@@ -71,6 +105,7 @@ function formsFromLine(line: QuoteLine): OuvrageComponentForm[] {
       description: line.description,
       unit: line.unit || "u",
       quantityInput: "1",
+      costPriceEuros: "",
       unitPriceEuros: centsToInput(line.unitPriceCents ?? 0),
     },
   ];
@@ -86,10 +121,33 @@ function componentTotalCents(component: OuvrageComponentForm): number | null {
   }
 }
 
+function componentCostTotalCents(component: OuvrageComponentForm): number | null {
+  try {
+    const costPriceCents = optionalEurosToCents(component.costPriceEuros);
+    if (costPriceCents === undefined) return null;
+    const quantity = parseQuoteQuantityInput(component.quantityInput).quantity;
+    const total = Math.round(quantity * costPriceCents);
+    return Number.isSafeInteger(total) && total >= 0 ? total : null;
+  } catch {
+    return null;
+  }
+}
+
 function ouvrageUnitPriceCents(components: OuvrageComponentForm[]): number | null {
   let total = 0;
   for (const component of components) {
     const componentTotal = componentTotalCents(component);
+    if (componentTotal === null) return null;
+    total += componentTotal;
+    if (!Number.isSafeInteger(total)) return null;
+  }
+  return total;
+}
+
+function ouvrageUnitCostCents(components: OuvrageComponentForm[]): number | null {
+  let total = 0;
+  for (const component of components) {
+    const componentTotal = componentCostTotalCents(component);
     if (componentTotal === null) return null;
     total += componentTotal;
     if (!Number.isSafeInteger(total)) return null;
@@ -122,6 +180,8 @@ export function QuoteLinesEditor({
   const [unit, setUnit] = useState("u");
   const [quantityInput, setQuantityInput] = useState("1");
   const [components, setComponents] = useState<OuvrageComponentForm[]>([newComponentForm()]);
+  const [priceForced, setPriceForced] = useState(false);
+  const [forcedUnitPriceEuros, setForcedUnitPriceEuros] = useState("0,00");
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
   const [expandedLineIds, setExpandedLineIds] = useState<Set<string>>(new Set());
@@ -132,6 +192,24 @@ export function QuoteLinesEditor({
   );
   const editable = canWrite && quote?.status === "DRAFT";
   const calculatedUnitPrice = useMemo(() => ouvrageUnitPriceCents(components), [components]);
+  const calculatedUnitCost = useMemo(() => ouvrageUnitCostCents(components), [components]);
+  const forcedUnitPrice = useMemo(() => {
+    if (!priceForced) return null;
+    try {
+      return eurosToCents(forcedUnitPriceEuros);
+    } catch {
+      return null;
+    }
+  }, [forcedUnitPriceEuros, priceForced]);
+  const effectiveUnitPrice = priceForced ? forcedUnitPrice : calculatedUnitPrice;
+  const currentMarginAmount =
+    effectiveUnitPrice !== null && calculatedUnitCost !== null
+      ? effectiveUnitPrice - calculatedUnitCost
+      : null;
+  const currentMarginPercent =
+    effectiveUnitPrice === null
+      ? null
+      : calculateQuoteOuvrageMarginPercent(effectiveUnitPrice, calculatedUnitCost);
 
   useEffect(() => {
     setFormOpen(false);
@@ -146,6 +224,8 @@ export function QuoteLinesEditor({
     setUnit("u");
     setQuantityInput("1");
     setComponents([newComponentForm()]);
+    setPriceForced(false);
+    setForcedUnitPriceEuros("0,00");
     setError("");
   }
 
@@ -160,6 +240,8 @@ export function QuoteLinesEditor({
     setUnit(line.unit || "u");
     setQuantityInput(line.quantityFormula ?? String(line.quantity).replace(".", ","));
     setComponents(formsFromLine(line));
+    setPriceForced(line.forcedUnitPriceCents !== undefined);
+    setForcedUnitPriceEuros(centsToInput(line.forcedUnitPriceCents ?? line.unitPriceCents ?? 0));
     setError("");
     setFormOpen(true);
   }
@@ -188,6 +270,16 @@ export function QuoteLinesEditor({
     });
   }
 
+  function enableForcedPrice() {
+    setForcedUnitPriceEuros(centsToInput(calculatedUnitPrice ?? 0));
+    setPriceForced(true);
+  }
+
+  function resetForcedPrice() {
+    setPriceForced(false);
+    setForcedUnitPriceEuros(centsToInput(calculatedUnitPrice ?? 0));
+  }
+
   function toggleLine(lineId: string) {
     setExpandedLineIds((current) => {
       const next = new Set(current);
@@ -214,11 +306,13 @@ export function QuoteLinesEditor({
           description,
           unit,
           quantityInput,
+          forcedUnitPriceCents: priceForced ? eurosToCents(forcedUnitPriceEuros) : null,
           components: components.map((component) => ({
             id: component.id,
             description: component.description,
             unit: component.unit,
             quantityInput: component.quantityInput,
+            costPriceCents: optionalEurosToCents(component.costPriceEuros),
             unitPriceCents: eurosToCents(component.unitPriceEuros),
           })),
         }),
@@ -232,7 +326,7 @@ export function QuoteLinesEditor({
       onSaved(data.payload);
       closeForm();
     } catch {
-      setError("Vérifie les quantités et les prix des composants.");
+      setError("Vérifie les quantités et les prix des composants ou le prix forcé.");
     } finally {
       setSaving(false);
     }
@@ -348,6 +442,7 @@ export function QuoteLinesEditor({
 
             {components.map((component, index) => {
               const total = componentTotalCents(component);
+              const costTotal = componentCostTotalCents(component);
               return (
                 <div className="quoteComponentCard" key={component.key}>
                   <div className="quoteComponentCardHeader">
@@ -399,6 +494,18 @@ export function QuoteLinesEditor({
                     </label>
 
                     <label className="quoteLineField">
+                      <span>Coût unitaire HT</span>
+                      <input
+                        inputMode="decimal"
+                        value={component.costPriceEuros}
+                        onChange={(event) =>
+                          updateComponent(index, { costPriceEuros: event.target.value })
+                        }
+                        placeholder="Pour calculer la marge"
+                      />
+                    </label>
+
+                    <label className="quoteLineField">
                       <span>Prix de vente unitaire HT</span>
                       <input
                         inputMode="decimal"
@@ -411,7 +518,11 @@ export function QuoteLinesEditor({
                     </label>
 
                     <div className="quoteComponentTotal">
-                      <span>Total composant</span>
+                      <span>Coût total</span>
+                      <strong>{costTotal === null ? "Non renseigné" : formatMoney(costTotal)}</strong>
+                    </div>
+                    <div className="quoteComponentTotal">
+                      <span>Vente totale</span>
                       <strong>{total === null ? "À vérifier" : formatMoney(total)}</strong>
                     </div>
                   </div>
@@ -419,12 +530,72 @@ export function QuoteLinesEditor({
               );
             })}
 
-            <div className="quoteOuvragePrice">
-              <span>Prix unitaire HT de l’ouvrage</span>
-              <strong>
-                {calculatedUnitPrice === null ? "À calculer" : formatMoney(calculatedUnitPrice)}
-              </strong>
-              <small>Calculé automatiquement à partir de tous les composants.</small>
+            <div className={`quoteOuvragePrice${priceForced ? " isForced" : ""}`}>
+              <div className="quoteOuvrageMetric">
+                <span>Coût HT de l’ouvrage</span>
+                <strong>
+                  {calculatedUnitCost === null ? "À renseigner" : formatMoney(calculatedUnitCost)}
+                </strong>
+              </div>
+              <div className="quoteOuvrageMetric">
+                <span>Prix calculé HT</span>
+                <strong>
+                  {calculatedUnitPrice === null ? "À calculer" : formatMoney(calculatedUnitPrice)}
+                </strong>
+              </div>
+              <div className="quoteOuvrageMetric quoteOuvrageRetainedPrice">
+                <span>Prix retenu HT</span>
+                {priceForced ? (
+                  <div className="quoteForcedInputWrap">
+                    <input
+                      inputMode="decimal"
+                      value={forcedUnitPriceEuros}
+                      onChange={(event) => setForcedUnitPriceEuros(event.target.value)}
+                      aria-label="Prix unitaire HT forcé de l’ouvrage"
+                      required
+                    />
+                    <small className="quoteForcedBadge">
+                      <LockKeyhole size={11} aria-hidden="true" /> Forcé
+                    </small>
+                  </div>
+                ) : (
+                  <strong>
+                    {calculatedUnitPrice === null ? "À calculer" : formatMoney(calculatedUnitPrice)}
+                  </strong>
+                )}
+              </div>
+              <div
+                className={`quoteOuvrageMetric quoteMarginMetric${
+                  currentMarginAmount !== null && currentMarginAmount < 0 ? " isNegative" : ""
+                }`}
+              >
+                <span>Marge de l’ouvrage</span>
+                <strong>
+                  {currentMarginAmount === null
+                    ? "À renseigner"
+                    : `${formatMoney(currentMarginAmount)} · ${formatPercent(currentMarginPercent)}`}
+                </strong>
+              </div>
+              <div className="quoteOuvragePriceActions">
+                {priceForced ? (
+                  <button type="button" className="secondaryButton" onClick={resetForcedPrice}>
+                    <RotateCcw size={14} aria-hidden="true" /> Revenir au prix calculé
+                  </button>
+                ) : (
+                  <button
+                    type="button"
+                    className="secondaryButton"
+                    onClick={enableForcedPrice}
+                    disabled={calculatedUnitPrice === null}
+                  >
+                    <LockKeyhole size={14} aria-hidden="true" /> Forcer le prix
+                  </button>
+                )}
+              </div>
+              <small className="quoteOuvragePriceHelp">
+                La marge utilise le coût des composants. Le prix forcé remplace uniquement le prix de
+                vente de l’ouvrage, sans modifier sa composition.
+              </small>
             </div>
           </div>
 
@@ -454,12 +625,21 @@ export function QuoteLinesEditor({
             <span>Qté</span>
             <span>Unité</span>
             <span>PU HT</span>
+            <span>Marge</span>
             <span />
           </div>
           {lines.map((line) => {
             const expanded = expandedLineIds.has(line.id);
             const lineComponents = line.components ?? [];
             const componentCount = lineComponents.length;
+            const salePriceCents = line.unitPriceCents ?? 0;
+            const costPriceCents = calculateQuoteOuvrageUnitCostCents(lineComponents);
+            const marginAmountCents =
+              costPriceCents === null ? null : salePriceCents - costPriceCents;
+            const marginPercent = calculateQuoteOuvrageMarginPercent(
+              salePriceCents,
+              costPriceCents,
+            );
             return (
               <div className="quoteOuvrageGroup" key={line.id}>
                 <div className="quoteLineRow">
@@ -490,7 +670,32 @@ export function QuoteLinesEditor({
                   <span>{componentCount || "—"}</span>
                   <span>{line.quantityFormula ?? line.quantity}</span>
                   <span>{line.unit || "—"}</span>
-                  <span>{formatMoney(line.unitPriceCents ?? 0)}</span>
+                  <div className="quotePriceCell">
+                    <strong>{formatMoney(salePriceCents)}</strong>
+                    {line.forcedUnitPriceCents !== undefined ? (
+                      <small className="quoteForcedBadge">
+                        <LockKeyhole size={10} aria-hidden="true" /> Forcé
+                      </small>
+                    ) : null}
+                  </div>
+                  <div
+                    className={`quoteMarginCell${
+                      marginAmountCents !== null && marginAmountCents < 0
+                        ? " isNegative"
+                        : marginAmountCents === null
+                          ? " isMissing"
+                          : ""
+                    }`}
+                  >
+                    {marginAmountCents === null ? (
+                      <span>À renseigner</span>
+                    ) : (
+                      <>
+                        <strong>{formatMoney(marginAmountCents)}</strong>
+                        <small>{formatPercent(marginPercent)}</small>
+                      </>
+                    )}
+                  </div>
                   <span>
                     {editable ? (
                       <button
@@ -512,20 +717,25 @@ export function QuoteLinesEditor({
                       <span>Composant</span>
                       <span>Qté</span>
                       <span>Unité</span>
-                      <span>PU HT</span>
+                      <span>Coût U. HT</span>
+                      <span>Vente U. HT</span>
                       <span>Total HT</span>
                     </div>
-                    {lineComponents.map((component) => (
-                      <div className="quoteComponentPreviewRow" key={component.id}>
-                        <strong>{component.description}</strong>
-                        <span>{component.quantityFormula ?? component.quantity}</span>
-                        <span>{component.unit || "—"}</span>
-                        <span>{formatMoney(component.unitPriceCents)}</span>
-                        <span>
-                          {formatMoney(Math.round(component.quantity * component.unitPriceCents))}
-                        </span>
-                      </div>
-                    ))}
+                    {lineComponents.map((component) => {
+                      const componentCost = quoteOuvrageComponentCostPriceCents(component);
+                      return (
+                        <div className="quoteComponentPreviewRow" key={component.id}>
+                          <strong>{component.description}</strong>
+                          <span>{component.quantityFormula ?? component.quantity}</span>
+                          <span>{component.unit || "—"}</span>
+                          <span>{componentCost === null ? "—" : formatMoney(componentCost)}</span>
+                          <span>{formatMoney(component.unitPriceCents)}</span>
+                          <span>
+                            {formatMoney(Math.round(component.quantity * component.unitPriceCents))}
+                          </span>
+                        </div>
+                      );
+                    })}
                   </div>
                 ) : null}
               </div>
@@ -543,7 +753,10 @@ export function QuoteLinesEditor({
         .quoteLineFormHeader,
         .quoteLineActions,
         .quoteComponentsEditorHeader,
-        .quoteComponentCardHeader {
+        .quoteComponentCardHeader,
+        .quoteOuvragePriceActions,
+        .quoteForcedInputWrap,
+        .quoteForcedBadge {
           display: flex;
           align-items: center;
         }
@@ -561,7 +774,8 @@ export function QuoteLinesEditor({
         }
         .quoteLinesHeader :global(.primaryButton),
         .quoteLineActions :global(button),
-        .quoteComponentsEditorHeader :global(.secondaryButton) {
+        .quoteComponentsEditorHeader :global(.secondaryButton),
+        .quoteOuvragePriceActions :global(.secondaryButton) {
           display: inline-flex;
           align-items: center;
           justify-content: center;
@@ -599,7 +813,7 @@ export function QuoteLinesEditor({
         }
         .quoteLineField span,
         .quoteComponentTotal span,
-        .quoteOuvragePrice span {
+        .quoteOuvrageMetric span {
           font-size: 11px;
           font-weight: 800;
           color: var(--muted);
@@ -607,7 +821,8 @@ export function QuoteLinesEditor({
           letter-spacing: 0.04em;
         }
         .quoteLineField input,
-        .quoteLineField textarea {
+        .quoteLineField textarea,
+        .quoteForcedInputWrap input {
           width: 100%;
           border: 1px solid var(--border);
           border-radius: 7px;
@@ -648,18 +863,57 @@ export function QuoteLinesEditor({
         }
         .quoteOuvragePrice {
           display: grid;
-          grid-template-columns: 1fr auto;
-          gap: 2px 12px;
-          align-items: center;
+          grid-template-columns: repeat(2, minmax(0, 1fr));
+          gap: 10px;
           padding: 12px;
+          border: 1px solid transparent;
           border-radius: 9px;
           background: #f3f0fb;
         }
-        .quoteOuvragePrice strong {
-          font-size: 16px;
-          color: var(--accent);
+        .quoteOuvragePrice.isForced {
+          border-color: #c9bfe8;
+          background: #faf8ff;
         }
-        .quoteOuvragePrice small {
+        .quoteOuvrageMetric {
+          min-width: 0;
+          padding: 9px 10px;
+          display: grid;
+          gap: 4px;
+          border-radius: 8px;
+          background: #fff;
+        }
+        .quoteOuvrageMetric strong {
+          font-size: 15px;
+          color: var(--text);
+        }
+        .quoteMarginMetric strong {
+          color: #31724b;
+        }
+        .quoteMarginMetric.isNegative strong {
+          color: #a53d3d;
+        }
+        .quoteForcedInputWrap {
+          gap: 8px;
+        }
+        .quoteForcedInputWrap input {
+          min-width: 0;
+        }
+        .quoteForcedBadge {
+          width: fit-content;
+          gap: 4px;
+          padding: 3px 6px;
+          border-radius: 999px;
+          background: #ece7fa;
+          color: #6554b5;
+          font-size: 9px;
+          font-weight: 800;
+          white-space: nowrap;
+        }
+        .quoteOuvragePriceActions {
+          grid-column: 1 / -1;
+          justify-content: flex-end;
+        }
+        .quoteOuvragePriceHelp {
           grid-column: 1 / -1;
           color: var(--muted);
           font-size: 10px;
@@ -694,7 +948,7 @@ export function QuoteLinesEditor({
         .quoteLinesTableHeader,
         .quoteLineRow {
           display: grid;
-          grid-template-columns: minmax(260px, 1fr) 90px 90px 80px 120px 42px;
+          grid-template-columns: minmax(250px, 1fr) 82px 78px 70px 125px 135px 42px;
           gap: 10px;
           align-items: center;
           padding: 10px 18px;
@@ -754,6 +1008,31 @@ export function QuoteLinesEditor({
         .quoteExpandButton:hover {
           color: var(--accent);
         }
+        .quotePriceCell,
+        .quoteMarginCell {
+          min-width: 0;
+          display: grid;
+          gap: 3px;
+          justify-items: start;
+        }
+        .quotePriceCell strong,
+        .quoteMarginCell strong {
+          white-space: nowrap;
+        }
+        .quoteMarginCell {
+          color: #31724b;
+        }
+        .quoteMarginCell small {
+          font-weight: 800;
+        }
+        .quoteMarginCell.isNegative {
+          color: #a53d3d;
+        }
+        .quoteMarginCell.isMissing {
+          color: var(--muted);
+          font-size: 10px;
+          font-weight: 700;
+        }
         .quoteComponentsPreview {
           margin: 0 18px 12px 49px;
           overflow: hidden;
@@ -764,7 +1043,7 @@ export function QuoteLinesEditor({
         .quoteComponentsPreviewHeader,
         .quoteComponentPreviewRow {
           display: grid;
-          grid-template-columns: minmax(220px, 1fr) 90px 80px 110px 110px;
+          grid-template-columns: minmax(210px, 1fr) 75px 70px 105px 105px 105px;
           gap: 10px;
           align-items: center;
           padding: 8px 12px;
@@ -789,10 +1068,13 @@ export function QuoteLinesEditor({
         }
         @media (max-width: 1000px) {
           .quoteLineGrid,
-          .quoteComponentGrid {
+          .quoteComponentGrid,
+          .quoteOuvragePrice {
             grid-template-columns: 1fr;
           }
-          .quoteLineFieldWide {
+          .quoteLineFieldWide,
+          .quoteOuvragePriceActions,
+          .quoteOuvragePriceHelp {
             grid-column: auto;
           }
           .quoteLinesTable {
@@ -800,10 +1082,10 @@ export function QuoteLinesEditor({
           }
           .quoteLinesTableHeader,
           .quoteLineRow {
-            min-width: 800px;
+            min-width: 930px;
           }
           .quoteComponentsPreview {
-            min-width: 700px;
+            min-width: 790px;
           }
         }
       `}</style>
