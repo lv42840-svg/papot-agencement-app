@@ -5,6 +5,7 @@ import { ArrowLeft } from "lucide-react";
 import { useMemo, useState } from "react";
 import { QuoteFixedSummary } from "@/components/quote-fixed-summary";
 import { QuoteGeneralInfoEditor } from "@/components/quote-general-info-editor";
+import { QuoteInternalNotesEditor } from "@/components/quote-internal-notes-editor";
 import { QuoteSendAction } from "@/components/quote-send-action";
 import { QuoteStructuredLinesEditor } from "@/components/quote-structured-lines-editor";
 import type { NativeQuotesPayload } from "@/lib/quotes/store";
@@ -39,6 +40,8 @@ export function QuoteDirectEditor({
         canWrite={canWrite}
         onSaved={setPayload}
       />
+
+      <QuoteInternalNotesEditor quote={quote} canWrite={canWrite} onSaved={setPayload} />
 
       <QuoteStructuredLinesEditor
         quote={quote}
