@@ -248,6 +248,8 @@ export function quoteOuvrageComponentCostPriceCents(
 export function calculateQuoteOuvrageUnitCostCents(
   components: QuoteOuvrageComponent[],
 ): number | null {
+  if (components.length === 0) return null;
+
   let total = 0;
   for (const component of components) {
     const unitCost = quoteOuvrageComponentCostPriceCents(component);
