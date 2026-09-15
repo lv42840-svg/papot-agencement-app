@@ -33,8 +33,7 @@ function optionsOverlap(items: QuoteItem[], left: QuoteOption, right: QuoteOptio
   const leftTarget = optionTarget(items, left);
   const rightTarget = optionTarget(items, right);
   return (
-    targetContains(items, leftTarget, rightTarget) ||
-    targetContains(items, rightTarget, leftTarget)
+    targetContains(items, leftTarget, rightTarget) || targetContains(items, rightTarget, leftTarget)
   );
 }
 
