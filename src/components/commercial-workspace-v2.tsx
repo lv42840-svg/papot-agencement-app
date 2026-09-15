@@ -71,7 +71,8 @@ const errors: Record<string, string> = {
   COMMERCIAL_DOCUMENTS_TOO_MANY: "Tu peux ajouter jusqu’à 12 documents à la fois.",
   COMMERCIAL_DOCUMENT_TOO_LARGE: "Un document dépasse la limite de 100 Mo.",
   COMMERCIAL_DOCUMENT_NAME_REQUIRED: "Un document n’a pas de nom exploitable.",
-  SERVER_FILE_ROOT_UNAVAILABLE: "Le stockage local des documents n’est pas disponible sur ce poste.",
+  SERVER_FILE_ROOT_UNAVAILABLE:
+    "Le stockage local des documents n’est pas disponible sur ce poste.",
   MODULE_FORBIDDEN: "Ton profil n’autorise pas cette action.",
 };
 
@@ -1098,7 +1099,9 @@ function Documents({
           >
             <Upload size={24} />
             <div>
-              <strong>{dragging ? "Dépose les fichiers ici" : "Glisse-dépose tes fichiers ici"}</strong>
+              <strong>
+                {dragging ? "Dépose les fichiers ici" : "Glisse-dépose tes fichiers ici"}
+              </strong>
               <span>Classement automatique : {categoryLabel}</span>
             </div>
           </div>
