@@ -60,8 +60,7 @@ function formsFromLine(line: QuoteLine): OuvrageComponentForm[] {
       id: component.id,
       description: component.description,
       unit: component.unit,
-      quantityInput:
-        component.quantityFormula ?? String(component.quantity).replace(".", ","),
+      quantityInput: component.quantityFormula ?? String(component.quantity).replace(".", ","),
       unitPriceEuros: centsToInput(component.unitPriceCents),
     }));
   }
@@ -263,7 +262,10 @@ export function QuoteLinesEditor({
   }
 
   return (
-    <section className="panel quoteLinesPanel" aria-label={`Contenu du devis ${quote.model.subject}`}>
+    <section
+      className="panel quoteLinesPanel"
+      aria-label={`Contenu du devis ${quote.model.subject}`}
+    >
       <div className="panelHeader quoteLinesHeader">
         <div>
           <p className="eyebrow">Devis</p>
@@ -325,7 +327,11 @@ export function QuoteLinesEditor({
 
             <label className="quoteLineField">
               <span>Unité ouvrage</span>
-              <input value={unit} onChange={(event) => setUnit(event.target.value)} maxLength={40} />
+              <input
+                value={unit}
+                onChange={(event) => setUnit(event.target.value)}
+                maxLength={40}
+              />
             </label>
           </div>
 
@@ -476,7 +482,9 @@ export function QuoteLinesEditor({
                     )}
                     <div>
                       <strong>{line.description}</strong>
-                      {componentCount === 0 ? <small>Ancien format, sans détail composant</small> : null}
+                      {componentCount === 0 ? (
+                        <small>Ancien format, sans détail composant</small>
+                      ) : null}
                     </div>
                   </div>
                   <span>{componentCount || "—"}</span>

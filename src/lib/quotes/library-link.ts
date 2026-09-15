@@ -145,7 +145,9 @@ export function insertLibraryComponentIntoQuote(params: QuoteLibraryComponentIns
   const quote = parseQuoteModel(params.quote);
   const component = findComponent(params.library, params.componentId);
   const componentSnapshot = snapshotComponent(component);
-  const components = [quoteComponentFromSnapshot(componentSnapshot, parseInsertQuantity(params.quantity))];
+  const components = [
+    quoteComponentFromSnapshot(componentSnapshot, parseInsertQuantity(params.quantity)),
+  ];
 
   return appendLibraryLine(quote, {
     id: params.lineId,
