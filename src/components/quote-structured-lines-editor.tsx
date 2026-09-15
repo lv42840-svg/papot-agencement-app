@@ -1,6 +1,13 @@
 "use client";
 
-import { type FormEvent, type ReactNode, useEffect, useMemo, useState } from "react";
+import {
+  type DragEvent,
+  type FormEvent,
+  type ReactNode,
+  useEffect,
+  useMemo,
+  useState,
+} from "react";
 import {
   ArrowDown,
   ArrowUp,
@@ -20,6 +27,8 @@ import {
   parseLibraryPayload,
   type LibraryPayload,
 } from "@/lib/library/storage";
+import { ensureRequiredLaborComponents } from "@/lib/library/required-labor-components";
+import { productionActivityLabel, type ProductionActivity } from "@/lib/production-activity";
 import {
   canMoveQuoteComponent,
   duplicateQuoteComponent,
@@ -42,6 +51,7 @@ import {
   type QuoteSubsection,
 } from "@/lib/quotes/model";
 import { buildQuoteItemNumbers } from "@/lib/quotes/numbering";
+import type { QuoteItemPlacement } from "@/lib/quotes/item-reorder";
 import {
   calculateQuoteMarginFromSalePrice,
   calculateQuoteSalePriceFromMarginCents,
@@ -87,6 +97,7 @@ type OuvrageComponentForm = {
   libraryComponentId?: string;
   description: string;
   unit: string;
+  activity?: ProductionActivity;
   quantityInput: string;
   costPriceEuros: string;
   marginPercentInput: string;
@@ -156,6 +167,7 @@ function formFromLibraryComponent(component: LibraryComponent): OuvrageComponent
     libraryComponentId: component.id,
     description: component.name,
     unit: component.unit,
+    activity: component.activity,
     quantityInput: "1",
     costPriceEuros: centsToInput(component.costPriceCents),
     marginPercentInput: quoteMarginToInput(component.marginPercent),
@@ -174,6 +186,7 @@ function formsFromLine(line: QuoteLine): OuvrageComponentForm[] {
         id: component.id,
         description: component.description,
         unit: component.unit,
+        activity: component.activity ?? component.librarySource?.component.activity,
         quantityInput: component.quantityFormula ?? String(component.quantity).replace(".", ","),
         costPriceEuros: costPriceCents === null ? "" : centsToInput(costPriceCents),
         marginPercentInput:
@@ -291,6 +304,11 @@ function lineErrorLabel(code: string): string {
     return "Ce titre ne peut pas être déplacé davantage à ce niveau.";
   }
   if (code === "QUOTE_HEADING_NOT_FOUND") return "Ce titre n’existe plus.";
+  if (code === "QUOTE_ITEM_NOT_FOUND") return "Cet élément n’existe plus.";
+  if (code === "QUOTE_ITEM_DELETE_UNSUPPORTED") return "Cet élément ne peut pas être supprimé ici.";
+  if (code === "QUOTE_ITEM_REORDER_BLOCKED") {
+    return "Dépose l’élément sur un emplacement compatible : titre, sous-titre ou ouvrage.";
+  }
   if (code === "QUOTE_SECTION_NOT_FOUND") return "Le grand titre du sous-titre n’existe plus.";
   if (code === "QUOTE_LIBRARY_COMPONENT_NOT_FOUND") {
     return "Ce composant n’existe plus dans la Bibliothèque. Choisis-le à nouveau.";
@@ -384,6 +402,13 @@ export function QuoteStructuredLinesEditor({
   const [movingLineId, setMovingLineId] = useState<string | null>(null);
   const [movingHeadingId, setMovingHeadingId] = useState<string | null>(null);
   const [duplicatingHeadingId, setDuplicatingHeadingId] = useState<string | null>(null);
+  const [deletingItemId, setDeletingItemId] = useState<string | null>(null);
+  const [draggingItemId, setDraggingItemId] = useState<string | null>(null);
+  const [reorderingItemId, setReorderingItemId] = useState<string | null>(null);
+  const [dropTarget, setDropTarget] = useState<{
+    itemId: string;
+    placement: QuoteItemPlacement;
+  } | null>(null);
   const [error, setError] = useState("");
   const [notice, setNotice] = useState("");
   const [libraryPayload, setLibraryPayload] = useState<LibraryPayload | null>(null);
@@ -427,9 +452,14 @@ export function QuoteStructuredLinesEditor({
     const query = normalizeSearch(libraryQuery);
     return libraryPayload.components
       .filter((component) =>
-        normalizeSearch([component.name, component.description, component.unit].join(" ")).includes(
-          query,
-        ),
+        normalizeSearch(
+          [
+            component.name,
+            component.description,
+            component.unit,
+            component.activity ? productionActivityLabel(component.activity) : "",
+          ].join(" "),
+        ).includes(query),
       )
       .sort((left, right) => left.name.localeCompare(right.name, "fr-FR", { sensitivity: "base" }));
   }, [libraryPayload, libraryQuery]);
@@ -442,6 +472,10 @@ export function QuoteStructuredLinesEditor({
     setMovingLineId(null);
     setMovingHeadingId(null);
     setDuplicatingHeadingId(null);
+    setDeletingItemId(null);
+    setDraggingItemId(null);
+    setReorderingItemId(null);
+    setDropTarget(null);
     setError("");
     setNotice("");
     setLibraryPickerOpen(false);
@@ -642,6 +676,192 @@ export function QuoteStructuredLinesEditor({
     } finally {
       setMovingHeadingId(null);
     }
+  }
+
+  async function deleteItem(item: QuoteLine | QuoteSection | QuoteSubsection) {
+    if (
+      !quote ||
+      !editable ||
+      deletingItemId ||
+      movingHeadingId ||
+      duplicatingHeadingId ||
+      movingLineId ||
+      duplicatingLineId ||
+      formOpen ||
+      headingEditor
+    ) {
+      return;
+    }
+
+    const label =
+      item.kind === "LINE"
+        ? "cet ouvrage"
+        : item.kind === "SECTION"
+          ? "ce titre et tout son contenu"
+          : "ce sous-titre et tout son contenu";
+    if (!window.confirm(`Supprimer ${label} ?`)) return;
+
+    setDeletingItemId(item.id);
+    setError("");
+    setNotice("");
+    try {
+      const response = await fetch("/api/desktop/quotes", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          action: "deleteItem",
+          quoteId: quote.id,
+          itemId: item.id,
+        }),
+      });
+      const data = (await response.json()) as QuotesApiResponse;
+      if (!response.ok || !data.payload) {
+        setError(lineErrorLabel(data.error ?? "QUOTES_MUTATION_FAILED"));
+        return;
+      }
+      onSaved(data.payload);
+      setNotice(
+        item.kind === "LINE"
+          ? "Ouvrage supprimé."
+          : item.kind === "SECTION"
+            ? "Titre supprimé avec son contenu."
+            : "Sous-titre supprimé avec son contenu.",
+      );
+    } catch {
+      setError("La suppression n’a pas pu être enregistrée.");
+    } finally {
+      setDeletingItemId(null);
+    }
+  }
+
+  function resolveDropPlacement(
+    event: DragEvent<HTMLElement>,
+    target: QuoteItem,
+  ): QuoteItemPlacement | null {
+    if (!draggingItemId || draggingItemId === target.id) return null;
+    const source = items.find((item) => item.id === draggingItemId);
+    if (!source || source.kind === "COMMENT") return null;
+
+    if (source.kind === "SECTION") {
+      if (target.kind !== "SECTION") return null;
+      const bounds = event.currentTarget.getBoundingClientRect();
+      return event.clientY < bounds.top + bounds.height / 2 ? "BEFORE" : "AFTER";
+    }
+
+    if (source.kind === "SUBSECTION") {
+      if (target.kind === "SECTION") return "INSIDE";
+      if (target.kind !== "SUBSECTION") return null;
+      const bounds = event.currentTarget.getBoundingClientRect();
+      return event.clientY < bounds.top + bounds.height / 2 ? "BEFORE" : "AFTER";
+    }
+
+    if (target.kind === "SECTION" || target.kind === "SUBSECTION") return "INSIDE";
+    if (target.kind !== "LINE") return null;
+    const bounds = event.currentTarget.getBoundingClientRect();
+    return event.clientY < bounds.top + bounds.height / 2 ? "BEFORE" : "AFTER";
+  }
+
+  function startItemDrag(
+    event: DragEvent<HTMLElement>,
+    item: QuoteLine | QuoteSection | QuoteSubsection,
+  ) {
+    const origin = event.target as HTMLElement;
+    if (
+      !editable ||
+      formOpen ||
+      headingEditor ||
+      deletingItemId ||
+      reorderingItemId ||
+      origin.closest("button, input, textarea, select")
+    ) {
+      event.preventDefault();
+      return;
+    }
+    setDraggingItemId(item.id);
+    setDropTarget(null);
+    event.dataTransfer.effectAllowed = "move";
+    event.dataTransfer.setData("text/plain", item.id);
+  }
+
+  function dragItemOver(event: DragEvent<HTMLElement>, target: QuoteItem) {
+    const placement = resolveDropPlacement(event, target);
+    if (!placement) return;
+    event.preventDefault();
+    event.dataTransfer.dropEffect = "move";
+    setDropTarget((current) =>
+      current?.itemId === target.id && current.placement === placement
+        ? current
+        : { itemId: target.id, placement },
+    );
+  }
+
+  function finishItemDrag() {
+    setDraggingItemId(null);
+    setDropTarget(null);
+  }
+
+  async function reorderItem(itemId: string, target: QuoteItem, placement: QuoteItemPlacement) {
+    if (!quote || !editable || reorderingItemId || itemId === target.id) return;
+    const source = items.find((item) => item.id === itemId);
+    if (!source || source.kind === "COMMENT") return;
+
+    setReorderingItemId(itemId);
+    setError("");
+    setNotice("");
+    try {
+      const response = await fetch("/api/desktop/quotes", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          action: "reorderItem",
+          quoteId: quote.id,
+          itemId,
+          targetId: target.id,
+          placement,
+        }),
+      });
+      const data = (await response.json()) as QuotesApiResponse;
+      if (!response.ok || !data.payload) {
+        setError(lineErrorLabel(data.error ?? "QUOTES_MUTATION_FAILED"));
+        return;
+      }
+      onSaved(data.payload);
+      setNotice(
+        source.kind === "LINE"
+          ? "Ouvrage déplacé."
+          : source.kind === "SECTION"
+            ? "Titre déplacé avec son contenu."
+            : "Sous-titre déplacé avec son contenu.",
+      );
+    } catch {
+      setError("L’élément n’a pas pu être déplacé.");
+    } finally {
+      setReorderingItemId(null);
+      finishItemDrag();
+    }
+  }
+
+  function dropItem(event: DragEvent<HTMLElement>, target: QuoteItem) {
+    const itemId = draggingItemId;
+    const placement = resolveDropPlacement(event, target);
+    if (!itemId || !placement) return;
+    event.preventDefault();
+    void reorderItem(itemId, target, placement);
+  }
+
+  function dropClass(itemId: string): string {
+    const classes: string[] = [];
+    if (draggingItemId === itemId) classes.push("isDragging");
+    if (dropTarget?.itemId === itemId) {
+      classes.push(
+        dropTarget.placement === "BEFORE"
+          ? "quoteDropBefore"
+          : dropTarget.placement === "AFTER"
+            ? "quoteDropAfter"
+            : "quoteDropInside",
+      );
+    }
+    return classes.length > 0 ? ` ${classes.join(" ")}` : "";
   }
 
   async function duplicateHeading(item: QuoteSection | QuoteSubsection) {
@@ -903,7 +1123,7 @@ export function QuoteStructuredLinesEditor({
       const response = await fetch("/api/desktop/library", { cache: "no-store" });
       const data = (await response.json()) as LibraryGetResponse;
       if (!response.ok || !data.payload) throw new Error(data.error ?? "LIBRARY_REQUEST_FAILED");
-      setLibraryPayload(data.payload);
+      setLibraryPayload(ensureRequiredLaborComponents(data.payload));
     } catch {
       setError("Impossible de charger les composants de la Bibliothèque.");
       setLibraryPickerOpen(false);
@@ -951,6 +1171,7 @@ export function QuoteStructuredLinesEditor({
             libraryComponentId: component.libraryComponentId,
             description: component.description,
             unit: component.unit,
+            activity: component.activity,
             quantityInput: component.quantityInput,
             costPriceCents: optionalEurosToCents(component.costPriceEuros),
             unitPriceCents: eurosToCents(component.unitPriceEuros),
@@ -1064,9 +1285,11 @@ export function QuoteStructuredLinesEditor({
       if (opened.status === "read-only") throw new Error("LIBRARY_LOCKED");
       leaseOwned = true;
 
-      const basePayload = opened.resource
-        ? parseLibraryPayload(opened.resource.payload)
-        : createInitialLibraryPayload();
+      const basePayload = ensureRequiredLaborComponents(
+        opened.resource
+          ? parseLibraryPayload(opened.resource.payload)
+          : createInitialLibraryPayload(),
+      );
       const published = publishQuoteOuvrageToLibrary(basePayload, line);
       const saved = (await postLibrary({
         action: "save",
@@ -1110,9 +1333,11 @@ export function QuoteStructuredLinesEditor({
       if (opened.status === "read-only") throw new Error("LIBRARY_LOCKED");
       leaseOwned = true;
 
-      const basePayload = opened.resource
-        ? parseLibraryPayload(opened.resource.payload)
-        : createInitialLibraryPayload();
+      const basePayload = ensureRequiredLaborComponents(
+        opened.resource
+          ? parseLibraryPayload(opened.resource.payload)
+          : createInitialLibraryPayload(),
+      );
       const published = publishQuoteComponentToLibrary(basePayload, component);
 
       if (!published.created) {
@@ -1164,7 +1389,14 @@ export function QuoteStructuredLinesEditor({
       const marginPercent = storedComponentMarginPercent(component);
       return (
         <div className="quoteComponentRow" key={component.id}>
-          <strong>{component.description}</strong>
+          <div className="quoteComponentLabel">
+            <strong>{component.description}</strong>
+            {component.activity ? (
+              <small className="quoteActivityTag">
+                {productionActivityLabel(component.activity)}
+              </small>
+            ) : null}
+          </div>
           <span>{component.quantityFormula ?? component.quantity}</span>
           <span>{component.unit || "—"}</span>
           <span>{componentCost === null ? "—" : formatMoney(componentCost)}</span>
@@ -1215,7 +1447,16 @@ export function QuoteStructuredLinesEditor({
     const lineTotalCents = Math.round(line.quantity * salePriceCents);
 
     return (
-      <div className="quoteOuvrageGroup" key={line.id}>
+      <div
+        className={`quoteOuvrageGroup quoteDraggableItem${dropClass(line.id)}`}
+        key={line.id}
+        draggable={editable && !formOpen && headingEditor === null && reorderingItemId === null}
+        onDragStart={(event) => startItemDrag(event, line)}
+        onDragOver={(event) => dragItemOver(event, line)}
+        onDrop={(event) => dropItem(event, line)}
+        onDragEnd={finishItemDrag}
+        title={editable ? "Glisser-déposer pour déplacer l’ouvrage" : undefined}
+      >
         <div className="quoteMainRow quoteLineRow">
           <span className="quoteNumber">{numbers.get(line.id) ?? "—"}</span>
           <div className="quoteLineDescription">
@@ -1319,12 +1560,29 @@ export function QuoteStructuredLinesEditor({
                     formOpen ||
                     headingEditor !== null ||
                     duplicatingLineId !== null ||
-                    movingLineId !== null
+                    movingLineId !== null ||
+                    deletingItemId !== null
                   }
                   aria-label={`Modifier ${line.description}`}
                   title="Modifier l’ouvrage"
                 >
                   <Pencil size={14} aria-hidden="true" />
+                </button>
+                <button
+                  type="button"
+                  className="iconButton quoteDeleteItemButton"
+                  onClick={() => void deleteItem(line)}
+                  disabled={
+                    formOpen ||
+                    headingEditor !== null ||
+                    duplicatingLineId !== null ||
+                    movingLineId !== null ||
+                    deletingItemId !== null
+                  }
+                  aria-label={`Supprimer ${line.description}`}
+                  title="Supprimer l’ouvrage"
+                >
+                  <Trash2 size={14} aria-hidden="true" />
                 </button>
               </>
             ) : null}
@@ -1482,7 +1740,13 @@ export function QuoteStructuredLinesEditor({
                     required
                     aria-label={`Désignation composant ${index + 1}`}
                   />
-                  {component.libraryComponentId ? <small>B</small> : null}
+                  {component.activity ? (
+                    <small className="quoteActivityTag">
+                      {productionActivityLabel(component.activity)}
+                    </small>
+                  ) : component.libraryComponentId ? (
+                    <small>B</small>
+                  ) : null}
                 </div>
                 <input
                   className="quoteInlineInput"
@@ -1608,6 +1872,9 @@ export function QuoteStructuredLinesEditor({
                       <span>
                         <strong>{component.name}</strong>
                         <small>
+                          {component.activity
+                            ? `${productionActivityLabel(component.activity)} · `
+                            : ""}
                           {component.unit} · marge {formatPercent(component.marginPercent)}
                         </small>
                       </span>
@@ -1630,8 +1897,14 @@ export function QuoteStructuredLinesEditor({
 
     return (
       <div
-        className={`quoteMainRow quoteHeadingRow ${item.kind === "SECTION" ? "isSection" : "isSubsection"}`}
+        className={`quoteMainRow quoteHeadingRow quoteDraggableItem ${item.kind === "SECTION" ? "isSection" : "isSubsection"}${dropClass(item.id)}`}
         key={item.id}
+        draggable={editable && !formOpen && headingEditor === null && reorderingItemId === null}
+        onDragStart={(event) => startItemDrag(event, item)}
+        onDragOver={(event) => dragItemOver(event, item)}
+        onDrop={(event) => dropItem(event, item)}
+        onDragEnd={finishItemDrag}
+        title={editable ? "Glisser-déposer pour déplacer ce bloc" : undefined}
       >
         <span className="quoteNumber">{numbers.get(item.id) ?? "—"}</span>
         <strong>{item.title}</strong>
@@ -1702,12 +1975,35 @@ export function QuoteStructuredLinesEditor({
                   formOpen ||
                   headingEditor !== null ||
                   movingHeadingId !== null ||
-                  movingLineId !== null
+                  movingLineId !== null ||
+                  deletingItemId !== null
                 }
                 aria-label={`Modifier ${item.title}`}
                 title="Modifier le titre"
               >
                 <Pencil size={14} aria-hidden="true" />
+              </button>
+              <button
+                type="button"
+                className="iconButton quoteDeleteItemButton"
+                onClick={() => void deleteItem(item)}
+                disabled={
+                  formOpen ||
+                  headingEditor !== null ||
+                  movingHeadingId !== null ||
+                  duplicatingHeadingId !== null ||
+                  movingLineId !== null ||
+                  duplicatingLineId !== null ||
+                  deletingItemId !== null
+                }
+                aria-label={`Supprimer ${item.title}`}
+                title={
+                  item.kind === "SECTION"
+                    ? "Supprimer le titre et son contenu"
+                    : "Supprimer le sous-titre et son contenu"
+                }
+              >
+                <Trash2 size={14} aria-hidden="true" />
               </button>
             </>
           ) : null}
@@ -1778,6 +2074,11 @@ export function QuoteStructuredLinesEditor({
             {quote.variantName} · V{quote.version} · {lines.length} ouvrage
             {lines.length === 1 ? "" : "s"}
           </p>
+          {editable ? (
+            <p className="quoteDragHint">
+              Glisse titres, sous-titres et ouvrages pour les réorganiser.
+            </p>
+          ) : null}
         </div>
         <div className="quoteLinesHeaderActions">{headerActions}</div>
       </div>
@@ -1895,6 +2196,30 @@ export function QuoteStructuredLinesEditor({
         .quoteLineError {
           background: #fff0f0;
           color: #9c3434;
+        }
+        .quoteDeleteItemButton {
+          color: #a53d3d;
+        }
+        .quoteDragHint {
+          margin: 4px 0 0;
+          color: var(--muted);
+          font-size: 10px;
+        }
+        .quoteDraggableItem[draggable="true"] {
+          cursor: grab;
+        }
+        .quoteDraggableItem.isDragging {
+          opacity: 0.45;
+        }
+        .quoteDropBefore {
+          box-shadow: inset 0 3px 0 #7867bb;
+        }
+        .quoteDropAfter {
+          box-shadow: inset 0 -3px 0 #7867bb;
+        }
+        .quoteDropInside {
+          outline: 2px dashed #7867bb;
+          outline-offset: -3px;
         }
         .quoteLineNotice {
           background: #eef8f1;
@@ -2112,8 +2437,24 @@ export function QuoteStructuredLinesEditor({
           justify-content: flex-end;
           gap: 4px;
         }
-        .quoteComponentNameEdit {
+        .quoteComponentNameEdit,
+        .quoteComponentLabel {
           gap: 5px;
+        }
+        .quoteComponentLabel {
+          display: flex;
+          align-items: center;
+          min-width: 0;
+        }
+        .quoteActivityTag {
+          flex: 0 0 auto;
+          padding: 2px 5px;
+          border-radius: 999px;
+          background: #ece7fa;
+          color: #6554b5;
+          font-size: 8px;
+          font-weight: 900;
+          text-transform: uppercase;
         }
         .quoteComponentNameEdit small {
           font-size: 9px;

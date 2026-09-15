@@ -9,6 +9,7 @@ import {
 } from "@/lib/desktop/request-context";
 import { upsertLibraryComponent } from "@/lib/library/catalog-edit";
 import { createLibraryRepository } from "@/lib/library/create-repository";
+import { ensureRequiredLaborComponents } from "@/lib/library/required-labor-components";
 import {
   createInitialLibraryPayload,
   parseLibraryPayload,
@@ -153,10 +154,11 @@ export async function POST(request: Request) {
 
       if (requestedComponentIds.length > 0) {
         const library = await createLibraryRepository(context).load();
+        const libraryPayload = ensureRequiredLaborComponents(library.payload);
         const sources = new Map<string, QuoteLibraryComponentSource>();
 
         for (const componentId of requestedComponentIds) {
-          const component = library.payload.components.find((item) => item.id === componentId);
+          const component = libraryPayload.components.find((item) => item.id === componentId);
           if (!component) throw new Error("QUOTE_LIBRARY_COMPONENT_NOT_FOUND");
           sources.set(
             componentId,
@@ -167,6 +169,7 @@ export async function POST(request: Request) {
               unit: component.unit,
               costPriceCents: component.costPriceCents,
               salePriceCents: component.salePriceCents,
+              activity: component.activity,
             }).source,
           );
         }

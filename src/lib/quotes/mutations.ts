@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { productionActivitySchema } from "../production-activity";
 import {
   QUOTE_DEFAULT_VALIDITY_DAYS,
   QUOTE_MAX_QUANTITY_EXPRESSION_LENGTH,
@@ -16,6 +17,7 @@ import {
   type QuoteSection,
   type QuoteSubsection,
 } from "./model";
+import { reorderQuoteItems } from "./item-reorder";
 import {
   nativeQuoteRecordSchema,
   parseNativeQuotesPayload,
@@ -52,6 +54,7 @@ const ouvrageComponentMutationSchema = z.object({
   quantityInput: z.string().trim().min(1).max(QUOTE_MAX_QUANTITY_EXPRESSION_LENGTH),
   costPriceCents: quoteMoneyCentsSchema.optional(),
   unitPriceCents: quoteMoneyCentsSchema,
+  activity: productionActivitySchema.optional(),
 });
 
 const upsertOuvrageMutationSchema = z.object({
@@ -79,6 +82,14 @@ const moveLineMutationSchema = z.object({
   direction: z.enum(["UP", "DOWN"]),
 });
 
+const reorderItemMutationSchema = z.object({
+  action: z.literal("reorderItem"),
+  quoteId: z.string().uuid(),
+  itemId: z.string().uuid(),
+  targetId: z.string().uuid(),
+  placement: z.enum(["BEFORE", "AFTER", "INSIDE"]),
+});
+
 const moveHeadingMutationSchema = z.object({
   action: z.literal("moveHeading"),
   quoteId: z.string().uuid(),
@@ -88,6 +99,12 @@ const moveHeadingMutationSchema = z.object({
 
 const duplicateHeadingMutationSchema = z.object({
   action: z.literal("duplicateHeading"),
+  quoteId: z.string().uuid(),
+  itemId: z.string().uuid(),
+});
+
+const deleteItemMutationSchema = z.object({
+  action: z.literal("deleteItem"),
   quoteId: z.string().uuid(),
   itemId: z.string().uuid(),
 });
@@ -113,8 +130,10 @@ export const quotesMutationSchema = z.discriminatedUnion("action", [
   upsertOuvrageMutationSchema,
   duplicateLineMutationSchema,
   moveLineMutationSchema,
+  reorderItemMutationSchema,
   moveHeadingMutationSchema,
   duplicateHeadingMutationSchema,
+  deleteItemMutationSchema,
   upsertSectionMutationSchema,
   upsertSubsectionMutationSchema,
 ]);
@@ -319,6 +338,25 @@ function moveDraftLine(
   return { payload, focusQuoteId: updated.id };
 }
 
+function reorderDraftItem(
+  payload: NativeQuotesPayload,
+  input: Extract<QuotesMutation, { action: "reorderItem" }>,
+  actor: QuotesActor,
+  now: Date,
+): QuotesMutationResult {
+  const { quoteIndex, quote } = findDraftQuote(payload, input.quoteId);
+  const items = reorderQuoteItems(quote.model.items, input.itemId, input.targetId, input.placement);
+  const timestamp = now.toISOString();
+  const updated = nativeQuoteRecordSchema.parse({
+    ...quote,
+    model: parseQuoteModel({ ...quote.model, items }),
+    updatedAt: timestamp,
+    updatedByName: actor.displayName,
+  });
+  payload.quotes[quoteIndex] = updated;
+  return { payload, focusQuoteId: updated.id };
+}
+
 function headingBlockEnd(items: QuoteItem[], startIndex: number): number {
   const heading = items[startIndex];
   if (!heading || (heading.kind !== "SECTION" && heading.kind !== "SUBSECTION")) {
@@ -337,6 +375,35 @@ function headingBlockEnd(items: QuoteItem[], startIndex: number): number {
     }
   }
   return items.length;
+}
+
+function deleteDraftItem(
+  payload: NativeQuotesPayload,
+  input: Extract<QuotesMutation, { action: "deleteItem" }>,
+  actor: QuotesActor,
+  now: Date,
+): QuotesMutationResult {
+  const { quoteIndex, quote } = findDraftQuote(payload, input.quoteId);
+  const itemIndex = quote.model.items.findIndex((item) => item.id === input.itemId);
+  if (itemIndex < 0) throw new Error("QUOTE_ITEM_NOT_FOUND");
+
+  const item = quote.model.items[itemIndex];
+  if (item.kind === "COMMENT") throw new Error("QUOTE_ITEM_DELETE_UNSUPPORTED");
+
+  const deleteEnd =
+    item.kind === "SECTION" || item.kind === "SUBSECTION"
+      ? headingBlockEnd(quote.model.items, itemIndex)
+      : itemIndex + 1;
+  const items = [...quote.model.items.slice(0, itemIndex), ...quote.model.items.slice(deleteEnd)];
+  const timestamp = now.toISOString();
+  const updated = nativeQuoteRecordSchema.parse({
+    ...quote,
+    model: parseQuoteModel({ ...quote.model, items }),
+    updatedAt: timestamp,
+    updatedByName: actor.displayName,
+  });
+  payload.quotes[quoteIndex] = updated;
+  return { payload, focusQuoteId: updated.id };
 }
 
 function previousHeadingSiblingIndex(
@@ -599,6 +666,11 @@ function upsertDraftOuvrage(
       selectedLibrarySource?.component.costPriceCents;
     const costPriceCents = componentInput.costPriceCents ?? preservedCost;
     const librarySource = selectedLibrarySource ?? existingComponent?.librarySource;
+    const activity =
+      componentInput.activity ??
+      existingComponent?.activity ??
+      selectedLibrarySource?.component.activity ??
+      existingComponent?.librarySource?.component.activity;
 
     return {
       id: componentInput.id ?? globalThis.crypto.randomUUID(),
@@ -608,6 +680,7 @@ function upsertDraftOuvrage(
       quantityFormula: parsedComponentQuantity.formula,
       ...(costPriceCents !== undefined ? { costPriceCents } : {}),
       unitPriceCents: componentInput.unitPriceCents,
+      ...(activity ? { activity } : {}),
       ...(librarySource ? { librarySource } : {}),
     };
   });
@@ -657,11 +730,17 @@ export function applyQuotesMutation(
   if (input.action === "moveLine") {
     return moveDraftLine(payload, input, actor, now);
   }
+  if (input.action === "reorderItem") {
+    return reorderDraftItem(payload, input, actor, now);
+  }
   if (input.action === "moveHeading") {
     return moveDraftHeading(payload, input, actor, now);
   }
   if (input.action === "duplicateHeading") {
     return duplicateDraftHeading(payload, input, actor, now);
+  }
+  if (input.action === "deleteItem") {
+    return deleteDraftItem(payload, input, actor, now);
   }
   if (input.action === "upsertOuvrage") {
     return upsertDraftOuvrage(payload, input, actor, now, libraryComponentSources);
