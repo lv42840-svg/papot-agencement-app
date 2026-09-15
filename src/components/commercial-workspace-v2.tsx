@@ -1028,6 +1028,10 @@ function Documents({
     void upload(item.id, files, category);
   }
 
+  function togglePreview(documentId: string) {
+    setPreviewDocumentId((current) => (current === documentId ? null : documentId));
+  }
+
   return (
     <section className="commercialV2Section">
       <h3>
@@ -1150,9 +1154,7 @@ function Documents({
                   caseId={item.id}
                   document={document}
                   previewOpen={previewOpen}
-                  onTogglePreview={() =>
-                    setPreviewDocumentId((current) => (current === document.id ? null : document.id))
-                  }
+                  onTogglePreview={() => togglePreview(document.id)}
                 />
                 {previewOpen ? (
                   <div className="commercialV2DocPreview">
