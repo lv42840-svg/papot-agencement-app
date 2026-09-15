@@ -6,6 +6,7 @@ const dateOnlySchema = z.string().regex(/^\d{4}-\d{2}-\d{2}$/);
 export const commercialStatusSchema = z.enum([
   "PISTE",
   "CHIFFRAGE",
+  "SENT",
   "WAITING",
   "FOLLOW_UP",
   "LIKELY",
@@ -139,13 +140,22 @@ export type CommercialPayload = z.infer<typeof commercialPayloadSchema>;
 export const COMMERCIAL_STATUS_LABELS: Record<CommercialStatus, string> = {
   PISTE: "Piste",
   CHIFFRAGE: "Chiffrage en cours",
+  SENT: "Envoyé",
   WAITING: "En attente",
   FOLLOW_UP: "À relancer",
   LIKELY: "Ça va tomber",
-  CONFIRMED: "Confirmée",
+  CONFIRMED: "Validé",
   LOST: "Perdu",
   ABANDONED: "Abandonné",
 };
+
+export const COMMERCIAL_FOLLOW_STATUS_OPTIONS = [
+  "PISTE",
+  "SENT",
+  "FOLLOW_UP",
+  "WAITING",
+  "CONFIRMED",
+] as const satisfies readonly CommercialStatus[];
 
 export const COMMERCIAL_DOCUMENT_CATEGORY_LABELS: Record<CommercialDocumentCategory, string> = {
   RECEIVED: "Documents reçus",
@@ -202,7 +212,10 @@ export function commercialNeedsFollowUp(item: CommercialCase, now: Date = new Da
   if (item.status === "FOLLOW_UP") return true;
   const today = commercialParisDateKey(now);
   if (
-    (item.status === "PISTE" || item.status === "WAITING" || item.status === "CHIFFRAGE") &&
+    (item.status === "PISTE" ||
+      item.status === "SENT" ||
+      item.status === "WAITING" ||
+      item.status === "CHIFFRAGE") &&
     item.reviewDate
   ) {
     return item.reviewDate <= today;
@@ -215,8 +228,14 @@ export function commercialNeedsFollowUp(item: CommercialCase, now: Date = new Da
 
 export function nextCommercialDeadline(item: CommercialCase): string | null {
   if (item.status === "LIKELY") return item.expectedConfirmationDate;
-  if (item.status === "PISTE" || item.status === "WAITING" || item.status === "CHIFFRAGE")
+  if (
+    item.status === "PISTE" ||
+    item.status === "SENT" ||
+    item.status === "WAITING" ||
+    item.status === "CHIFFRAGE"
+  ) {
     return item.reviewDate;
+  }
   return null;
 }
 
@@ -244,7 +263,7 @@ export function applyCommercialAutomaticTransitions(
   let changed = false;
   for (const item of payload.cases) {
     if (
-      (item.status === "PISTE" || item.status === "WAITING") &&
+      (item.status === "PISTE" || item.status === "SENT" || item.status === "WAITING") &&
       item.reviewDate &&
       item.reviewDate <= today
     ) {
