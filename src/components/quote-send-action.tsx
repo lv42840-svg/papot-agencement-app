@@ -6,6 +6,20 @@ import type { NativeQuoteRecord, NativeQuotesPayload } from "@/lib/quotes/store"
 
 type ApiResponse = { payload?: NativeQuotesPayload; error?: string };
 
+function sendErrorLabel(code?: string): string {
+  if (code === "MODULE_FORBIDDEN") {
+    return "Droit de modification Devis et Commercial requis.";
+  }
+  if (code === "QUOTE_PRICING_REVIEW_REQUIRED") {
+    return "Vérifie les ajustements de chiffrage signalés avant d’envoyer le devis.";
+  }
+  if (code === "QUOTE_OPTION_TARGET_DUPLICATE" || code === "QUOTE_OPTION_TARGET_INVALID") {
+    return "Vérifie les options du devis avant l’envoi.";
+  }
+  if (code === "QUOTE_NOT_EDITABLE") return "Ce devis n’est plus modifiable.";
+  return "Choisis une date de relance valide.";
+}
+
 export function QuoteSendAction({
   quote,
   canWrite,
@@ -32,11 +46,7 @@ export function QuoteSendAction({
       });
       const data = (await response.json()) as ApiResponse;
       if (!response.ok || !data.payload) {
-        setError(
-          data.error === "MODULE_FORBIDDEN"
-            ? "Droit de modification Devis et Commercial requis."
-            : "Choisis une date de relance valide.",
-        );
+        setError(sendErrorLabel(data.error));
         return;
       }
       onSaved(data.payload);

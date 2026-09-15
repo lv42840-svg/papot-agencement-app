@@ -9,7 +9,32 @@ import { QuoteInternalNotesEditor } from "@/components/quote-internal-notes-edit
 import { QuotePricingAdjustmentsEditor } from "@/components/quote-pricing-adjustments-editor";
 import { QuoteSendAction } from "@/components/quote-send-action";
 import { QuoteStructuredLinesEditor } from "@/components/quote-structured-lines-editor";
-import type { NativeQuotesPayload } from "@/lib/quotes/store";
+import { calculateQuoteAdjustedPricing } from "@/lib/quotes/adjustments";
+import type { NativeQuoteRecord, NativeQuotesPayload } from "@/lib/quotes/store";
+
+function quoteWithAdjustedDisplayPrices(quote: NativeQuoteRecord): NativeQuoteRecord {
+  const pricing = calculateQuoteAdjustedPricing(quote.model.items, quote.pricingConfig);
+  const adjustedByLineId = new Map(pricing.lines.map((line) => [line.lineId, line]));
+
+  return {
+    ...quote,
+    model: {
+      ...quote.model,
+      items: quote.model.items.map((item) => {
+        if (item.kind !== "LINE") return item;
+        const adjusted = adjustedByLineId.get(item.id);
+        if (!adjusted || item.quantity <= 0) return item;
+        return {
+          ...item,
+          // Vue uniquement : conserve le total de ligne exact, y compris les centimes
+          // distribués par le moteur. Les composants et prix de base restent inchangés
+          // et sont réutilisés dès qu'on ouvre l'édition de l'ouvrage.
+          unitPriceCents: adjusted.saleCents / item.quantity,
+        };
+      }),
+    },
+  };
+}
 
 export function QuoteDirectEditor({
   initialPayload,
@@ -29,8 +54,12 @@ export function QuoteDirectEditor({
     () => payload.quotes.find((candidate) => candidate.id === quoteId) ?? null,
     [payload.quotes, quoteId],
   );
+  const displayQuote = useMemo(
+    () => (quote ? quoteWithAdjustedDisplayPrices(quote) : null),
+    [quote],
+  );
 
-  if (!quote) return null;
+  if (!quote || !displayQuote) return null;
 
   return (
     <div className="quoteDirectWorkspace">
@@ -45,7 +74,7 @@ export function QuoteDirectEditor({
       <QuoteInternalNotesEditor quote={quote} canWrite={canWrite} onSaved={setPayload} />
 
       <QuoteStructuredLinesEditor
-        quote={quote}
+        quote={displayQuote}
         canWrite={canWrite}
         onSaved={setPayload}
         headerActions={
