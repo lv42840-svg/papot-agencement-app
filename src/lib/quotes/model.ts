@@ -82,6 +82,7 @@ export const quoteOuvrageComponentSchema = z.object({
   unit: z.string().trim().max(40),
   quantity: z.number().finite().positive().max(QUOTE_MAX_QUANTITY),
   quantityFormula: z.string().trim().min(1).max(QUOTE_MAX_QUANTITY_EXPRESSION_LENGTH).nullable(),
+  costPriceCents: quoteMoneyCentsSchema.optional(),
   unitPriceCents: quoteMoneyCentsSchema,
   librarySource: quoteLibraryComponentSourceSchema.optional(),
 });
@@ -95,6 +96,7 @@ export const quoteLineSchema = z.object({
   quantity: z.number().finite().positive().max(QUOTE_MAX_QUANTITY),
   quantityFormula: z.string().trim().min(1).max(QUOTE_MAX_QUANTITY_EXPRESSION_LENGTH).nullable(),
   unitPriceCents: quoteMoneyCentsSchema.optional(),
+  forcedUnitPriceCents: quoteMoneyCentsSchema.optional(),
   components: z.array(quoteOuvrageComponentSchema).max(200).optional(),
   librarySource: quoteLibrarySourceSchema.optional(),
 });
@@ -212,19 +214,56 @@ function validateQuoteLineLibrarySource(line: QuoteLine): void {
   }
 }
 
+function addMoneyCents(total: number, amount: number): number {
+  const next = total + amount;
+  if (!Number.isSafeInteger(next) || next < 0) {
+    throw new Error("QUOTE_OUVRAGE_PRICE_INVALID");
+  }
+  return next;
+}
+
+function componentAmountCents(quantity: number, unitAmountCents: number): number {
+  const amount = Math.round(quantity * unitAmountCents);
+  if (!Number.isSafeInteger(amount) || amount < 0) {
+    throw new Error("QUOTE_OUVRAGE_PRICE_INVALID");
+  }
+  return amount;
+}
+
 export function calculateQuoteOuvrageUnitPriceCents(components: QuoteOuvrageComponent[]): number {
   let total = 0;
   for (const component of components) {
-    const componentTotal = Math.round(component.quantity * component.unitPriceCents);
-    if (!Number.isSafeInteger(componentTotal) || componentTotal < 0) {
-      throw new Error("QUOTE_OUVRAGE_PRICE_INVALID");
-    }
-    total += componentTotal;
-    if (!Number.isSafeInteger(total) || total < 0) {
-      throw new Error("QUOTE_OUVRAGE_PRICE_INVALID");
-    }
+    total = addMoneyCents(total, componentAmountCents(component.quantity, component.unitPriceCents));
   }
   return total;
+}
+
+export function quoteOuvrageComponentCostPriceCents(
+  component: QuoteOuvrageComponent,
+): number | null {
+  if (component.costPriceCents !== undefined) return component.costPriceCents;
+  return component.librarySource?.component.costPriceCents ?? null;
+}
+
+export function calculateQuoteOuvrageUnitCostCents(
+  components: QuoteOuvrageComponent[],
+): number | null {
+  let total = 0;
+  for (const component of components) {
+    const unitCost = quoteOuvrageComponentCostPriceCents(component);
+    if (unitCost === null) return null;
+    total = addMoneyCents(total, componentAmountCents(component.quantity, unitCost));
+  }
+  return total;
+}
+
+export function calculateQuoteOuvrageMarginPercent(
+  salePriceCents: number,
+  costPriceCents: number | null,
+): number | null {
+  if (costPriceCents === null) return null;
+  if (costPriceCents === 0) return salePriceCents === 0 ? 0 : null;
+  return ((salePriceCents - costPriceCents) / costPriceCents) * 100;
 }
 
 function validateQuoteOuvrageComponents(line: QuoteLine): void {
@@ -244,7 +283,8 @@ function validateQuoteOuvrageComponents(line: QuoteLine): void {
   }
 
   if (line.unitPriceCents === undefined) throw new Error("QUOTE_OUVRAGE_PRICE_MISSING");
-  const expected = calculateQuoteOuvrageUnitPriceCents(components);
+  const automaticPrice = calculateQuoteOuvrageUnitPriceCents(components);
+  const expected = line.forcedUnitPriceCents ?? automaticPrice;
   if (expected !== line.unitPriceCents) throw new Error("QUOTE_OUVRAGE_PRICE_MISMATCH");
 }
 
