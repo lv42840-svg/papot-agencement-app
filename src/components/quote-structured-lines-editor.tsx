@@ -1,7 +1,19 @@
 "use client";
 
 import { type FormEvent, type ReactNode, useEffect, useMemo, useState } from "react";
-import { Check, Copy, LockKeyhole, Pencil, Plus, RotateCcw, Search, Trash2, X } from "lucide-react";
+import {
+  ArrowDown,
+  ArrowUp,
+  Check,
+  Copy,
+  LockKeyhole,
+  Pencil,
+  Plus,
+  RotateCcw,
+  Search,
+  Trash2,
+  X,
+} from "lucide-react";
 import type { LibraryComponent } from "@/lib/library/component";
 import {
   createInitialLibraryPayload,
@@ -266,6 +278,9 @@ function lineErrorLabel(code: string): string {
   if (code === "QUOTE_NOT_FOUND") return "Ce devis n’existe plus.";
   if (code === "QUOTE_NOT_EDITABLE") return "Seul un brouillon peut être modifié.";
   if (code === "QUOTE_LINE_NOT_FOUND") return "Cet ouvrage n’existe plus.";
+  if (code === "QUOTE_LINE_MOVE_BLOCKED") {
+    return "Cet ouvrage ne peut pas être déplacé davantage dans ce bloc.";
+  }
   if (code === "QUOTE_HEADING_NOT_FOUND") return "Ce titre n’existe plus.";
   if (code === "QUOTE_SECTION_NOT_FOUND") return "Le grand titre du sous-titre n’existe plus.";
   if (code === "QUOTE_LIBRARY_COMPONENT_NOT_FOUND") {
@@ -357,6 +372,7 @@ export function QuoteStructuredLinesEditor({
   const [headingEditor, setHeadingEditor] = useState<HeadingEditor>(null);
   const [saving, setSaving] = useState(false);
   const [duplicatingLineId, setDuplicatingLineId] = useState<string | null>(null);
+  const [movingLineId, setMovingLineId] = useState<string | null>(null);
   const [error, setError] = useState("");
   const [notice, setNotice] = useState("");
   const [libraryPayload, setLibraryPayload] = useState<LibraryPayload | null>(null);
@@ -412,6 +428,7 @@ export function QuoteStructuredLinesEditor({
     setEditingLineId(null);
     setHeadingEditor(null);
     setDuplicatingLineId(null);
+    setMovingLineId(null);
     setError("");
     setNotice("");
     setLibraryPickerOpen(false);
@@ -808,6 +825,54 @@ export function QuoteStructuredLinesEditor({
     }
   }
 
+  function canMoveOuvrage(line: QuoteLine, direction: "UP" | "DOWN") {
+    const index = items.findIndex((item) => item.id === line.id);
+    if (index < 0) return false;
+    const target = items[direction === "UP" ? index - 1 : index + 1];
+    return target?.kind === "LINE" && target.parentId === line.parentId;
+  }
+
+  async function moveOuvrage(line: QuoteLine, direction: "UP" | "DOWN") {
+    if (
+      !quote ||
+      !editable ||
+      movingLineId ||
+      duplicatingLineId ||
+      formOpen ||
+      headingEditor ||
+      !canMoveOuvrage(line, direction)
+    ) {
+      return;
+    }
+    setMovingLineId(line.id);
+    setError("");
+    setNotice("");
+
+    try {
+      const response = await fetch("/api/desktop/quotes", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          action: "moveLine",
+          quoteId: quote.id,
+          lineId: line.id,
+          direction,
+        }),
+      });
+      const data = (await response.json()) as QuotesApiResponse;
+      if (!response.ok || !data.payload) {
+        setError(lineErrorLabel(data.error ?? "QUOTES_MUTATION_FAILED"));
+        return;
+      }
+      onSaved(data.payload);
+      setNotice(direction === "UP" ? "Ouvrage remonté." : "Ouvrage descendu.");
+    } catch {
+      setError("L’ouvrage n’a pas pu être déplacé.");
+    } finally {
+      setMovingLineId(null);
+    }
+  }
+
   async function duplicateOuvrage(line: QuoteLine) {
     if (!quote || !editable || duplicatingLineId || formOpen || headingEditor) return;
     setDuplicatingLineId(line.id);
@@ -1055,8 +1120,45 @@ export function QuoteStructuredLinesEditor({
                 <button
                   type="button"
                   className="iconButton"
+                  onClick={() => void moveOuvrage(line, "UP")}
+                  disabled={
+                    formOpen ||
+                    headingEditor !== null ||
+                    duplicatingLineId !== null ||
+                    movingLineId !== null ||
+                    !canMoveOuvrage(line, "UP")
+                  }
+                  aria-label={`Remonter ${line.description}`}
+                  title="Remonter l’ouvrage"
+                >
+                  <ArrowUp size={14} aria-hidden="true" />
+                </button>
+                <button
+                  type="button"
+                  className="iconButton"
+                  onClick={() => void moveOuvrage(line, "DOWN")}
+                  disabled={
+                    formOpen ||
+                    headingEditor !== null ||
+                    duplicatingLineId !== null ||
+                    movingLineId !== null ||
+                    !canMoveOuvrage(line, "DOWN")
+                  }
+                  aria-label={`Descendre ${line.description}`}
+                  title="Descendre l’ouvrage"
+                >
+                  <ArrowDown size={14} aria-hidden="true" />
+                </button>
+                <button
+                  type="button"
+                  className="iconButton"
                   onClick={() => void duplicateOuvrage(line)}
-                  disabled={formOpen || headingEditor !== null || duplicatingLineId !== null}
+                  disabled={
+                    formOpen ||
+                    headingEditor !== null ||
+                    duplicatingLineId !== null ||
+                    movingLineId !== null
+                  }
                   aria-label={`Dupliquer ${line.description}`}
                   title="Dupliquer l’ouvrage"
                 >
@@ -1066,7 +1168,12 @@ export function QuoteStructuredLinesEditor({
                   type="button"
                   className="iconButton"
                   onClick={() => openEditOuvrage(line)}
-                  disabled={formOpen || headingEditor !== null || duplicatingLineId !== null}
+                  disabled={
+                    formOpen ||
+                    headingEditor !== null ||
+                    duplicatingLineId !== null ||
+                    movingLineId !== null
+                  }
                   aria-label={`Modifier ${line.description}`}
                   title="Modifier l’ouvrage"
                 >
