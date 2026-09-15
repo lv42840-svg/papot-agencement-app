@@ -24,18 +24,6 @@ describe("desktop business folder", () => {
     ).toBe(path.join(root, "Commercial", "2026", "Dupont_Cuisine Lyon"));
   });
 
-  it("keeps legacy affair folders openable", () => {
-    const root = path.resolve("/tmp/papot-business-files");
-    const caseId = "123e4567-e89b-12d3-a456-426614174000";
-
-    expect(
-      resolveBusinessFolderPath(root, {
-        kind: "commercial-case",
-        storagePath: `documents/commercial/2026/${caseId}/quote/88888888-8888-4888-8888-888888888888/devis.pdf`,
-      }),
-    ).toBe(path.join(root, "documents", "commercial", "2026", caseId));
-  });
-
   it("rejects an unsupported business folder kind", () => {
     const root = path.resolve("/tmp/papot-business-files");
 
@@ -65,6 +53,18 @@ describe("desktop business folder", () => {
       resolveBusinessFolderPath(root, {
         kind: "commercial-case",
         storagePath: "Chantier/2026/Dupont_Cuisine/Plans/plan.pdf",
+      }),
+    ).toThrow("DESKTOP_BUSINESS_FOLDER_INVALID");
+  });
+
+  it("rejects the obsolete technical commercial folder layout", () => {
+    const root = path.resolve("/tmp/papot-business-files");
+
+    expect(() =>
+      resolveBusinessFolderPath(root, {
+        kind: "commercial-case",
+        storagePath:
+          "documents/commercial/2026/123e4567-e89b-12d3-a456-426614174000/quote/id/devis.pdf",
       }),
     ).toThrow("DESKTOP_BUSINESS_FOLDER_INVALID");
   });
