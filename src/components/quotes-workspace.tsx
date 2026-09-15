@@ -36,7 +36,10 @@ export function QuotesWorkspace({
     [affairs],
   );
   const sortedQuotes = useMemo(
-    () => [...initialPayload.quotes].sort((left, right) => right.updatedAt.localeCompare(left.updatedAt)),
+    () =>
+      [...initialPayload.quotes].sort((left, right) =>
+        right.updatedAt.localeCompare(left.updatedAt),
+      ),
     [initialPayload.quotes],
   );
 
@@ -46,7 +49,9 @@ export function QuotesWorkspace({
         <div className="panelHeader quoteListHeader">
           <div>
             <h2>Devis</h2>
-            <p className="muted">Ouvre un devis pour travailler dessus dans sa fiche dédiée.</p>
+            <p className="muted">
+              Ouvre un devis pour travailler dessus dans sa fiche dédiée.
+            </p>
           </div>
           <div className="quoteHeaderActions">
             <span className="countBadge">{initialPayload.quotes.length}</span>
