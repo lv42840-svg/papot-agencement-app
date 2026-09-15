@@ -104,12 +104,10 @@ export function CommercialOpenFolderButton({
 }
 
 export function CommercialDocumentActions({
-  caseId,
   document,
   previewOpen,
   onTogglePreview,
 }: {
-  caseId: string;
   document: CommercialDocument;
   previewOpen: boolean;
   onTogglePreview: () => void;
