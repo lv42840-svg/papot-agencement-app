@@ -25,24 +25,20 @@ function resolveBusinessFolderPath(rootPath, rawInput) {
 
   const storagePath = typeof rawInput.storagePath === "string" ? rawInput.storagePath.trim() : "";
   const segments = storagePath.split("/");
-  const current = segments[0] === "Commercial";
-  const legacy = segments[0] === "documents" && segments[1] === "commercial";
-  const yearIndex = current ? 1 : 2;
-  const affairEndIndex = current ? 3 : 4;
 
   if (
-    (!current && !legacy) ||
-    segments.length < (current ? 5 : 6) ||
-    !/^\d{4}$/.test(segments[yearIndex] || "") ||
-    Number(segments[yearIndex]) < 2000 ||
-    Number(segments[yearIndex]) > 9999 ||
+    segments.length < 5 ||
+    segments[0] !== "Commercial" ||
+    !/^\d{4}$/.test(segments[1] || "") ||
+    Number(segments[1]) < 2000 ||
+    Number(segments[1]) > 9999 ||
     invalidSegments(segments)
   ) {
     throw new Error("DESKTOP_BUSINESS_FOLDER_INVALID");
   }
 
   const root = path.resolve(rootPath);
-  const target = path.resolve(root, ...segments.slice(0, affairEndIndex));
+  const target = path.resolve(root, ...segments.slice(0, 3));
   const relative = path.relative(root, target);
   if (!relative || relative.startsWith("..") || path.isAbsolute(relative)) {
     throw new Error("DESKTOP_BUSINESS_FOLDER_INVALID");
