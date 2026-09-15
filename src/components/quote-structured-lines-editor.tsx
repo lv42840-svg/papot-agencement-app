@@ -1,7 +1,7 @@
 "use client";
 
 import { type FormEvent, type ReactNode, useEffect, useMemo, useState } from "react";
-import { Check, LockKeyhole, Pencil, Plus, RotateCcw, Search, Trash2, X } from "lucide-react";
+import { Check, Copy, LockKeyhole, Pencil, Plus, RotateCcw, Search, Trash2, X } from "lucide-react";
 import type { LibraryComponent } from "@/lib/library/component";
 import {
   createInitialLibraryPayload,
@@ -356,6 +356,7 @@ export function QuoteStructuredLinesEditor({
     useState<QuotePricingDriver>("SALE_PRICE");
   const [headingEditor, setHeadingEditor] = useState<HeadingEditor>(null);
   const [saving, setSaving] = useState(false);
+  const [duplicatingLineId, setDuplicatingLineId] = useState<string | null>(null);
   const [error, setError] = useState("");
   const [notice, setNotice] = useState("");
   const [libraryPayload, setLibraryPayload] = useState<LibraryPayload | null>(null);
@@ -410,6 +411,7 @@ export function QuoteStructuredLinesEditor({
     setFormOpen(false);
     setEditingLineId(null);
     setHeadingEditor(null);
+    setDuplicatingLineId(null);
     setError("");
     setNotice("");
     setLibraryPickerOpen(false);
@@ -806,6 +808,36 @@ export function QuoteStructuredLinesEditor({
     }
   }
 
+  async function duplicateOuvrage(line: QuoteLine) {
+    if (!quote || !editable || duplicatingLineId || formOpen || headingEditor) return;
+    setDuplicatingLineId(line.id);
+    setError("");
+    setNotice("");
+
+    try {
+      const response = await fetch("/api/desktop/quotes", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          action: "duplicateLine",
+          quoteId: quote.id,
+          lineId: line.id,
+        }),
+      });
+      const data = (await response.json()) as QuotesApiResponse;
+      if (!response.ok || !data.payload) {
+        setError(lineErrorLabel(data.error ?? "QUOTES_MUTATION_FAILED"));
+        return;
+      }
+      onSaved(data.payload);
+      setNotice("Ouvrage dupliqué.");
+    } catch {
+      setError("L’ouvrage n’a pas pu être dupliqué.");
+    } finally {
+      setDuplicatingLineId(null);
+    }
+  }
+
   async function addOuvrageToLibrary(line: QuoteLine) {
     if (!editable || librarySavingLineId) return;
     setLibrarySavingLineId(line.id);
@@ -1023,8 +1055,18 @@ export function QuoteStructuredLinesEditor({
                 <button
                   type="button"
                   className="iconButton"
+                  onClick={() => void duplicateOuvrage(line)}
+                  disabled={formOpen || headingEditor !== null || duplicatingLineId !== null}
+                  aria-label={`Dupliquer ${line.description}`}
+                  title="Dupliquer l’ouvrage"
+                >
+                  <Copy size={14} aria-hidden="true" />
+                </button>
+                <button
+                  type="button"
+                  className="iconButton"
                   onClick={() => openEditOuvrage(line)}
-                  disabled={formOpen || headingEditor !== null}
+                  disabled={formOpen || headingEditor !== null || duplicatingLineId !== null}
                   aria-label={`Modifier ${line.description}`}
                   title="Modifier l’ouvrage"
                 >
