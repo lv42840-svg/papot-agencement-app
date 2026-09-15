@@ -21,13 +21,7 @@ function resolveBusinessFolderPath(rootPath, rawInput) {
   }
 
   const root = path.resolve(rootPath);
-  const target = path.resolve(
-    root,
-    "documents",
-    "commercial",
-    String(creationYear),
-    caseId,
-  );
+  const target = path.resolve(root, "documents", "commercial", String(creationYear), caseId);
   const relative = path.relative(root, target);
   if (!relative || relative.startsWith("..") || path.isAbsolute(relative)) {
     throw new Error("DESKTOP_BUSINESS_FOLDER_INVALID");
