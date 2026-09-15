@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { ArrowLeft } from "lucide-react";
 import { useMemo, useState } from "react";
-import { QuoteLinesEditor } from "@/components/quote-lines-editor";
+import { QuoteStructuredLinesEditor } from "@/components/quote-structured-lines-editor";
 import { QuoteSendAction } from "@/components/quote-send-action";
 import type { NativeQuotesPayload } from "@/lib/quotes/store";
 
@@ -26,7 +26,7 @@ export function QuoteDirectEditor({
 
   return (
     <>
-      <QuoteLinesEditor
+      <QuoteStructuredLinesEditor
         quote={quote}
         canWrite={canWrite}
         onSaved={setPayload}
