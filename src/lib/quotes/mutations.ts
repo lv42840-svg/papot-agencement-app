@@ -9,6 +9,7 @@ import {
   calculateQuoteOuvrageUnitPriceCents,
   parseQuoteModel,
   quoteDateSchema,
+  type QuoteItem,
   type QuoteLibraryComponentSource,
   type QuoteLine,
   type QuoteOuvrageComponent,
@@ -55,6 +56,7 @@ const upsertOuvrageMutationSchema = z.object({
   action: z.literal("upsertOuvrage"),
   quoteId: z.string().uuid(),
   lineId: z.string().uuid().optional(),
+  parentId: z.string().uuid().nullable().optional(),
   description: z.string().trim().min(1).max(4000),
   unit: z.string().trim().max(40).default("u"),
   quantityInput: z.string().trim().min(1).max(QUOTE_MAX_QUANTITY_EXPRESSION_LENGTH),
@@ -62,10 +64,27 @@ const upsertOuvrageMutationSchema = z.object({
   components: z.array(ouvrageComponentMutationSchema).min(1).max(200),
 });
 
+const upsertSectionMutationSchema = z.object({
+  action: z.literal("upsertSection"),
+  quoteId: z.string().uuid(),
+  itemId: z.string().uuid().optional(),
+  title: z.string().trim().min(1).max(500),
+});
+
+const upsertSubsectionMutationSchema = z.object({
+  action: z.literal("upsertSubsection"),
+  quoteId: z.string().uuid(),
+  itemId: z.string().uuid().optional(),
+  parentId: z.string().uuid(),
+  title: z.string().trim().min(1).max(500),
+});
+
 export const quotesMutationSchema = z.discriminatedUnion("action", [
   createDraftMutationSchema,
   upsertLineMutationSchema,
   upsertOuvrageMutationSchema,
+  upsertSectionMutationSchema,
+  upsertSubsectionMutationSchema,
 ]);
 
 export type QuotesMutation = z.infer<typeof quotesMutationSchema>;
@@ -141,12 +160,17 @@ function createDraft(
   return { payload, focusQuoteId: quoteId };
 }
 
-function findDraftLine(payload: NativeQuotesPayload, quoteId: string, lineId?: string) {
+function findDraftQuote(payload: NativeQuotesPayload, quoteId: string) {
   const quoteIndex = payload.quotes.findIndex((quote) => quote.id === quoteId);
   if (quoteIndex < 0) throw new Error("QUOTE_NOT_FOUND");
 
   const quote = payload.quotes[quoteIndex];
   if (quote.status !== "DRAFT") throw new Error("QUOTE_NOT_EDITABLE");
+  return { quoteIndex, quote };
+}
+
+function findDraftLine(payload: NativeQuotesPayload, quoteId: string, lineId?: string) {
+  const { quoteIndex, quote } = findDraftQuote(payload, quoteId);
 
   let existingLine: QuoteLine | undefined;
   let existingIndex = -1;
@@ -161,18 +185,18 @@ function findDraftLine(payload: NativeQuotesPayload, quoteId: string, lineId?: s
   return { quoteIndex, quote, existingLine, existingIndex };
 }
 
-function saveDraftLine(
+function saveDraftItem(
   payload: NativeQuotesPayload,
   quoteIndex: number,
-  line: QuoteLine,
+  item: QuoteItem,
   existingIndex: number,
   actor: QuotesActor,
   now: Date,
 ): QuotesMutationResult {
   const quote = payload.quotes[quoteIndex];
   const items = [...quote.model.items];
-  if (existingIndex >= 0) items[existingIndex] = line;
-  else items.push(line);
+  if (existingIndex >= 0) items[existingIndex] = item;
+  else items.push(item);
 
   const timestamp = now.toISOString();
   const updated = nativeQuoteRecordSchema.parse({
@@ -183,6 +207,69 @@ function saveDraftLine(
   });
   payload.quotes[quoteIndex] = updated;
   return { payload, focusQuoteId: updated.id };
+}
+
+function saveDraftLine(
+  payload: NativeQuotesPayload,
+  quoteIndex: number,
+  line: QuoteLine,
+  existingIndex: number,
+  actor: QuotesActor,
+  now: Date,
+): QuotesMutationResult {
+  return saveDraftItem(payload, quoteIndex, line, existingIndex, actor, now);
+}
+
+function upsertDraftHeading(
+  payload: NativeQuotesPayload,
+  input: Extract<QuotesMutation, { action: "upsertSection" | "upsertSubsection" }>,
+  actor: QuotesActor,
+  now: Date,
+): QuotesMutationResult {
+  const { quoteIndex, quote } = findDraftQuote(payload, input.quoteId);
+  const existingIndex = input.itemId
+    ? quote.model.items.findIndex((item) => item.id === input.itemId)
+    : -1;
+
+  if (input.itemId && existingIndex < 0) throw new Error("QUOTE_HEADING_NOT_FOUND");
+  if (existingIndex >= 0) {
+    const existing = quote.model.items[existingIndex];
+    const expectedKind = input.action === "upsertSection" ? "SECTION" : "SUBSECTION";
+    if (existing.kind !== expectedKind) throw new Error("QUOTE_HEADING_NOT_FOUND");
+  }
+
+  if (input.action === "upsertSection") {
+    return saveDraftItem(
+      payload,
+      quoteIndex,
+      {
+        id: input.itemId ?? globalThis.crypto.randomUUID(),
+        kind: "SECTION",
+        parentId: null,
+        title: input.title,
+      },
+      existingIndex,
+      actor,
+      now,
+    );
+  }
+
+  const parent = quote.model.items.find((item) => item.id === input.parentId);
+  if (!parent || parent.kind !== "SECTION") throw new Error("QUOTE_SECTION_NOT_FOUND");
+
+  return saveDraftItem(
+    payload,
+    quoteIndex,
+    {
+      id: input.itemId ?? globalThis.crypto.randomUUID(),
+      kind: "SUBSECTION",
+      parentId: input.parentId,
+      title: input.title,
+    },
+    existingIndex,
+    actor,
+    now,
+  );
 }
 
 function upsertDraftLine(
@@ -276,7 +363,7 @@ function upsertDraftOuvrage(
   const line: QuoteLine = {
     id: input.lineId ?? globalThis.crypto.randomUUID(),
     kind: "LINE",
-    parentId: existingLine?.parentId ?? null,
+    parentId: input.parentId === undefined ? (existingLine?.parentId ?? null) : input.parentId,
     description: input.description,
     unit: input.unit,
     quantity: parsedQuantity.quantity,
@@ -302,6 +389,9 @@ export function applyQuotesMutation(
   const payload = structuredClone(parseNativeQuotesPayload(source));
   if (input.action === "createDraft") {
     return createDraft(payload, input, actor, clientId, now);
+  }
+  if (input.action === "upsertSection" || input.action === "upsertSubsection") {
+    return upsertDraftHeading(payload, input, actor, now);
   }
   if (input.action === "upsertOuvrage") {
     return upsertDraftOuvrage(payload, input, actor, now, libraryComponentSources);
