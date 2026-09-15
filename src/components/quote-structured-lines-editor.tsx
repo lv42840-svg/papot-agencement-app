@@ -281,6 +281,9 @@ function lineErrorLabel(code: string): string {
   if (code === "QUOTE_LINE_MOVE_BLOCKED") {
     return "Cet ouvrage ne peut pas être déplacé davantage dans ce bloc.";
   }
+  if (code === "QUOTE_HEADING_MOVE_BLOCKED") {
+    return "Ce titre ne peut pas être déplacé davantage à ce niveau.";
+  }
   if (code === "QUOTE_HEADING_NOT_FOUND") return "Ce titre n’existe plus.";
   if (code === "QUOTE_SECTION_NOT_FOUND") return "Le grand titre du sous-titre n’existe plus.";
   if (code === "QUOTE_LIBRARY_COMPONENT_NOT_FOUND") {
@@ -373,6 +376,7 @@ export function QuoteStructuredLinesEditor({
   const [saving, setSaving] = useState(false);
   const [duplicatingLineId, setDuplicatingLineId] = useState<string | null>(null);
   const [movingLineId, setMovingLineId] = useState<string | null>(null);
+  const [movingHeadingId, setMovingHeadingId] = useState<string | null>(null);
   const [error, setError] = useState("");
   const [notice, setNotice] = useState("");
   const [libraryPayload, setLibraryPayload] = useState<LibraryPayload | null>(null);
@@ -429,6 +433,7 @@ export function QuoteStructuredLinesEditor({
     setHeadingEditor(null);
     setDuplicatingLineId(null);
     setMovingLineId(null);
+    setMovingHeadingId(null);
     setError("");
     setNotice("");
     setLibraryPickerOpen(false);
@@ -550,6 +555,84 @@ export function QuoteStructuredLinesEditor({
       parentId: item.kind === "SUBSECTION" ? item.parentId : undefined,
       title: item.title,
     });
+  }
+
+  function canMoveHeading(item: QuoteSection | QuoteSubsection, direction: "UP" | "DOWN") {
+    const currentIndex = items.findIndex((candidate) => candidate.id === item.id);
+    if (currentIndex < 0) return false;
+
+    if (item.kind === "SECTION") {
+      if (direction === "UP") {
+        return items.slice(0, currentIndex).some((candidate) => candidate.kind === "SECTION");
+      }
+      return items.slice(currentIndex + 1).some((candidate) => candidate.kind === "SECTION");
+    }
+
+    if (direction === "UP") {
+      for (let index = currentIndex - 1; index >= 0; index -= 1) {
+        const candidate = items[index];
+        if (candidate.kind === "SECTION") return false;
+        if (candidate.kind === "SUBSECTION" && candidate.parentId === item.parentId) return true;
+      }
+      return false;
+    }
+
+    for (let index = currentIndex + 1; index < items.length; index += 1) {
+      const candidate = items[index];
+      if (candidate.kind === "SECTION") return false;
+      if (candidate.kind === "SUBSECTION" && candidate.parentId === item.parentId) return true;
+    }
+    return false;
+  }
+
+  async function moveHeading(item: QuoteSection | QuoteSubsection, direction: "UP" | "DOWN") {
+    if (
+      !quote ||
+      !editable ||
+      movingHeadingId ||
+      movingLineId ||
+      duplicatingLineId ||
+      formOpen ||
+      headingEditor ||
+      !canMoveHeading(item, direction)
+    ) {
+      return;
+    }
+
+    setMovingHeadingId(item.id);
+    setError("");
+    setNotice("");
+    try {
+      const response = await fetch("/api/desktop/quotes", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          action: "moveHeading",
+          quoteId: quote.id,
+          itemId: item.id,
+          direction,
+        }),
+      });
+      const data = (await response.json()) as QuotesApiResponse;
+      if (!response.ok || !data.payload) {
+        setError(lineErrorLabel(data.error ?? "QUOTES_MUTATION_FAILED"));
+        return;
+      }
+      onSaved(data.payload);
+      setNotice(
+        item.kind === "SECTION"
+          ? direction === "UP"
+            ? "Titre remonté avec son contenu."
+            : "Titre descendu avec son contenu."
+          : direction === "UP"
+            ? "Sous-titre remonté avec son contenu."
+            : "Sous-titre descendu avec son contenu.",
+      );
+    } catch {
+      setError("Le titre n’a pas pu être déplacé.");
+    } finally {
+      setMovingHeadingId(null);
+    }
   }
 
   async function saveHeading(event: FormEvent<HTMLFormElement>) {
@@ -1464,16 +1547,55 @@ export function QuoteStructuredLinesEditor({
         <span />
         <div className="quoteRowActions">
           {editable ? (
-            <button
-              type="button"
-              className="iconButton"
-              onClick={() => openEditHeading(item)}
-              disabled={formOpen || headingEditor !== null}
-              aria-label={`Modifier ${item.title}`}
-              title="Modifier le titre"
-            >
-              <Pencil size={14} aria-hidden="true" />
-            </button>
+            <>
+              <button
+                type="button"
+                className="iconButton"
+                onClick={() => void moveHeading(item, "UP")}
+                disabled={
+                  formOpen ||
+                  headingEditor !== null ||
+                  movingHeadingId !== null ||
+                  movingLineId !== null ||
+                  !canMoveHeading(item, "UP")
+                }
+                aria-label={`Remonter ${item.title}`}
+                title={item.kind === "SECTION" ? "Remonter le titre" : "Remonter le sous-titre"}
+              >
+                <ArrowUp size={14} aria-hidden="true" />
+              </button>
+              <button
+                type="button"
+                className="iconButton"
+                onClick={() => void moveHeading(item, "DOWN")}
+                disabled={
+                  formOpen ||
+                  headingEditor !== null ||
+                  movingHeadingId !== null ||
+                  movingLineId !== null ||
+                  !canMoveHeading(item, "DOWN")
+                }
+                aria-label={`Descendre ${item.title}`}
+                title={item.kind === "SECTION" ? "Descendre le titre" : "Descendre le sous-titre"}
+              >
+                <ArrowDown size={14} aria-hidden="true" />
+              </button>
+              <button
+                type="button"
+                className="iconButton"
+                onClick={() => openEditHeading(item)}
+                disabled={
+                  formOpen ||
+                  headingEditor !== null ||
+                  movingHeadingId !== null ||
+                  movingLineId !== null
+                }
+                aria-label={`Modifier ${item.title}`}
+                title="Modifier le titre"
+              >
+                <Pencil size={14} aria-hidden="true" />
+              </button>
+            </>
           ) : null}
         </div>
       </div>
