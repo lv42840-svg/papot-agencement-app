@@ -4,7 +4,7 @@ import { QuotesWorkspace } from "@/components/quotes-workspace";
 import { createClientsRepository } from "@/lib/clients/create-repository";
 import { clientDisplayName } from "@/lib/clients/domain";
 import { createCommercialRepository } from "@/lib/commercial/create-repository";
-import { commercialParisDateKey, isCommercialClosed } from "@/lib/commercial/domain";
+import { isCommercialClosed } from "@/lib/commercial/domain";
 import { requireDesktopRequestContext } from "@/lib/desktop/request-context";
 import { createQuotesRepository } from "@/lib/quotes/create-repository";
 
@@ -43,7 +43,6 @@ export default async function QuotesPage() {
         initialPayload={quotes}
         affairs={affairs}
         canWrite={context.moduleAccess.canWrite}
-        today={commercialParisDateKey()}
       />
     </DesktopAppShell>
   );
