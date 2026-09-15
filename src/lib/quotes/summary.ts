@@ -27,7 +27,9 @@ function addAmount(total: number, amount: number): number {
   return next;
 }
 
-export function calculateQuoteEconomicSummary(items: QuoteItem[]): QuoteEconomicSummary {
+export function calculateQuoteEconomicSummary(
+  items: QuoteItem[],
+): QuoteEconomicSummary {
   let totalSaleCents = 0;
   let totalCostCents = 0;
   let costComplete = true;
@@ -72,6 +74,9 @@ export function calculateQuoteEconomicSummary(items: QuoteItem[]): QuoteEconomic
     totalSaleCents,
     totalCostCents,
     marginAmountCents,
-    marginPercent: calculateQuoteOuvrageMarginPercent(totalSaleCents, totalCostCents),
+    marginPercent: calculateQuoteOuvrageMarginPercent(
+      totalSaleCents,
+      totalCostCents,
+    ),
   };
 }
