@@ -4,18 +4,23 @@ import Link from "next/link";
 import { ArrowLeft } from "lucide-react";
 import { useMemo, useState } from "react";
 import { QuoteFixedSummary } from "@/components/quote-fixed-summary";
-import { QuoteStructuredLinesEditor } from "@/components/quote-structured-lines-editor";
+import { QuoteGeneralInfoEditor } from "@/components/quote-general-info-editor";
 import { QuoteSendAction } from "@/components/quote-send-action";
+import { QuoteStructuredLinesEditor } from "@/components/quote-structured-lines-editor";
 import type { NativeQuotesPayload } from "@/lib/quotes/store";
 
 export function QuoteDirectEditor({
   initialPayload,
   quoteId,
   canWrite,
+  clientName,
+  affairName,
 }: {
   initialPayload: NativeQuotesPayload;
   quoteId: string;
   canWrite: boolean;
+  clientName: string;
+  affairName: string;
 }) {
   const [payload, setPayload] = useState(initialPayload);
   const quote = useMemo(
@@ -26,7 +31,15 @@ export function QuoteDirectEditor({
   if (!quote) return null;
 
   return (
-    <>
+    <div className="quoteDirectWorkspace">
+      <QuoteGeneralInfoEditor
+        quote={quote}
+        clientName={clientName}
+        affairName={affairName}
+        canWrite={canWrite}
+        onSaved={setPayload}
+      />
+
       <QuoteStructuredLinesEditor
         quote={quote}
         canWrite={canWrite}
@@ -44,6 +57,10 @@ export function QuoteDirectEditor({
       <QuoteFixedSummary quote={quote} />
 
       <style jsx>{`
+        .quoteDirectWorkspace {
+          display: grid;
+          gap: 14px;
+        }
         .quoteDirectActions {
           display: flex;
           align-items: center;
@@ -61,6 +78,6 @@ export function QuoteDirectEditor({
           height: 78px;
         }
       `}</style>
-    </>
+    </div>
   );
 }
