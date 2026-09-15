@@ -61,11 +61,7 @@ function ids() {
 describe("publish quote component to Library", () => {
   it("creates one reusable component from a quote component", () => {
     const component = quoteLine().components![0];
-    const result = publishQuoteComponentToLibrary(
-      createInitialLibraryPayload(),
-      component,
-      ids(),
-    );
+    const result = publishQuoteComponentToLibrary(createInitialLibraryPayload(), component, ids());
 
     expect(result.created).toBe(true);
     expect(result.payload.components).toHaveLength(1);
