@@ -95,7 +95,7 @@ export const quoteLineSchema = z.object({
   quantity: z.number().finite().positive().max(QUOTE_MAX_QUANTITY),
   quantityFormula: z.string().trim().min(1).max(QUOTE_MAX_QUANTITY_EXPRESSION_LENGTH).nullable(),
   unitPriceCents: quoteMoneyCentsSchema.optional(),
-  components: z.array(quoteOuvrageComponentSchema).max(200).default([]),
+  components: z.array(quoteOuvrageComponentSchema).max(200).optional(),
   librarySource: quoteLibrarySourceSchema.optional(),
 });
 
@@ -165,24 +165,34 @@ export function validateQuoteItemHierarchy(items: QuoteItem[]): void {
   }
 }
 
-function validateQuantityFormula(quantity: number, quantityFormula: string | null, code: string): void {
+function validateQuantityFormula(
+  quantity: number,
+  quantityFormula: string | null,
+  invalidCode: string,
+  mismatchCode: string,
+): void {
   if (quantityFormula === null) return;
 
   let parsed;
   try {
     parsed = parseQuoteQuantityInput(quantityFormula);
   } catch {
-    throw new Error(code);
+    throw new Error(invalidCode);
   }
 
-  if (parsed.formula === null) throw new Error(code);
+  if (parsed.formula === null) throw new Error(invalidCode);
   if (Math.abs(parsed.quantity - quantity) > 10 ** -6) {
-    throw new Error(`${code}_MISMATCH`);
+    throw new Error(mismatchCode);
   }
 }
 
 function validateQuoteLineFormula(line: QuoteLine): void {
-  validateQuantityFormula(line.quantity, line.quantityFormula, "QUOTE_LINE_FORMULA_INVALID");
+  validateQuantityFormula(
+    line.quantity,
+    line.quantityFormula,
+    "QUOTE_LINE_FORMULA_INVALID",
+    "QUOTE_LINE_FORMULA_MISMATCH",
+  );
 }
 
 function validateQuoteLineLibrarySource(line: QuoteLine): void {
@@ -218,21 +228,23 @@ export function calculateQuoteOuvrageUnitPriceCents(components: QuoteOuvrageComp
 }
 
 function validateQuoteOuvrageComponents(line: QuoteLine): void {
-  if (line.components.length === 0) return;
+  const components = line.components ?? [];
+  if (components.length === 0) return;
 
   const ids = new Set<string>();
-  for (const component of line.components) {
+  for (const component of components) {
     if (ids.has(component.id)) throw new Error("QUOTE_OUVRAGE_COMPONENT_ID_DUPLICATE");
     ids.add(component.id);
     validateQuantityFormula(
       component.quantity,
       component.quantityFormula,
       "QUOTE_OUVRAGE_COMPONENT_FORMULA_INVALID",
+      "QUOTE_OUVRAGE_COMPONENT_FORMULA_MISMATCH",
     );
   }
 
   if (line.unitPriceCents === undefined) throw new Error("QUOTE_OUVRAGE_PRICE_MISSING");
-  const expected = calculateQuoteOuvrageUnitPriceCents(line.components);
+  const expected = calculateQuoteOuvrageUnitPriceCents(components);
   if (expected !== line.unitPriceCents) throw new Error("QUOTE_OUVRAGE_PRICE_MISMATCH");
 }
 
