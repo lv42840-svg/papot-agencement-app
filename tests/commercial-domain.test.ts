@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import {
+  COMMERCIAL_FOLLOW_STATUS_OPTIONS,
   applyCommercialAutomaticTransitions,
   commercialHasSignedQuote,
   createInitialCommercialPayload,
@@ -33,6 +34,16 @@ function createPiste(reviewDate = "2026-09-20") {
 }
 
 describe("Commercial V1", () => {
+  it("exposes only the five global follow-up statuses in the workspace", () => {
+    expect(COMMERCIAL_FOLLOW_STATUS_OPTIONS).toEqual([
+      "PISTE",
+      "SENT",
+      "FOLLOW_UP",
+      "WAITING",
+      "CONFIRMED",
+    ]);
+  });
+
   it("creates a real piste with a mandatory review date", () => {
     expect(() =>
       commercialMutationSchema.parse({
@@ -81,7 +92,7 @@ describe("Commercial V1", () => {
     expect(result.quoteDueDate).toBe("2026-09-18");
   });
 
-  it("marks a sent quote as En attente with a mandatory follow-up date", () => {
+  it("marks a sent quote as Envoyé with a mandatory follow-up date", () => {
     const source = createPiste();
     const caseId = source.cases[0].id;
     expect(() => commercialMutationSchema.parse({ action: "markQuoteSent", caseId })).toThrow();
@@ -92,9 +103,28 @@ describe("Commercial V1", () => {
       actor,
       new Date("2026-09-13T11:00:00.000Z"),
     ).payload.cases[0];
-    expect(result.status).toBe("WAITING");
+    expect(result.status).toBe("SENT");
     expect(result.reviewDate).toBe("2026-09-25");
     expect(result.quoteSentAt).not.toBeNull();
+  });
+
+  it("automatically moves a due sent quote to À relancer", () => {
+    const source = createPiste();
+    const caseId = source.cases[0].id;
+    const sent = applyCommercialMutation(
+      source,
+      { action: "markQuoteSent", caseId, followUpDate: "2026-09-14" },
+      actor,
+      new Date("2026-09-13T11:00:00.000Z"),
+    ).payload;
+
+    const result = applyCommercialAutomaticTransitions(
+      sent,
+      new Date("2026-09-14T10:00:00.000Z"),
+    );
+    expect(result.changed).toBe(true);
+    expect(result.payload.cases[0].status).toBe("FOLLOW_UP");
+    expect(result.payload.cases[0].history.at(-1)?.type).toBe("AUTO_DUE");
   });
 
   it("requires a free follow-up summary", () => {
