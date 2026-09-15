@@ -14,7 +14,7 @@
     "start": "next start",
     "lint": "eslint .",
     "format": "prettier --write .",
-    "format:check": "prettier --write src/components/commercial-workspace-v2.tsx src/lib/commercial/list-filter.ts tests/commercial-list-filter.test.ts && git diff --exit-code -- src/components/commercial-workspace-v2.tsx src/lib/commercial/list-filter.ts tests/commercial-list-filter.test.ts",
+    "format:check": "prettier --check .",
     "typecheck": "tsc --noEmit",
     "test": "vitest run",
     "nextcloud:probe": "tsx scripts/nextcloud-probe.ts"
@@ -33,7 +33,7 @@
     "@types/node": "22.10.2",
     "@types/pg": "8.15.5",
     "@types/react": "19.0.3",
-    "@types/react-dom": "19.0.2",
+    "@types/react-dom": "19.1.1",
     "electron": "44.3.0",
     "electron-builder": "26.15.3",
     "eslint": "9.17.0",
