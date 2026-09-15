@@ -11,6 +11,12 @@ import {
   type QuoteOuvrageComponent,
 } from "./model";
 
+export type QuoteComponentLibraryPublishResult = {
+  payload: LibraryPayload;
+  componentId: string;
+  created: boolean;
+};
+
 export type QuoteOuvrageLibraryPublishResult = {
   payload: LibraryPayload;
   ouvrageId: string;
@@ -85,6 +91,30 @@ function libraryComponentFromQuoteComponent(
   };
 }
 
+export function publishQuoteComponentToLibrary(
+  source: LibraryPayload,
+  component: QuoteOuvrageComponent,
+  idFactory: IdFactory = () => globalThis.crypto.randomUUID(),
+): QuoteComponentLibraryPublishResult {
+  let payload = parseLibraryPayload(source);
+  const costPriceCents = quoteOuvrageComponentCostPriceCents(component);
+  if (costPriceCents === null) {
+    throw new Error("QUOTE_LIBRARY_COMPONENT_COST_REQUIRED");
+  }
+
+  const reusable = reusableLibraryComponent(payload, component, costPriceCents);
+  if (reusable) {
+    return { payload, componentId: reusable.id, created: false };
+  }
+
+  const componentId = idFactory();
+  payload = upsertLibraryComponent(
+    payload,
+    libraryComponentFromQuoteComponent(component, componentId, costPriceCents),
+  );
+  return { payload, componentId, created: true };
+}
+
 export function publishQuoteOuvrageToLibrary(
   source: LibraryPayload,
   line: QuoteLine,
@@ -100,28 +130,13 @@ export function publishQuoteOuvrageToLibrary(
   const ouvrageComponents: LibraryOuvrage["components"] = [];
 
   for (const component of components) {
-    const costPriceCents = quoteOuvrageComponentCostPriceCents(component);
-    if (costPriceCents === null) {
-      throw new Error("QUOTE_LIBRARY_COMPONENT_COST_REQUIRED");
-    }
-
-    const reusable = reusableLibraryComponent(payload, component, costPriceCents);
-    let componentId = reusable?.id;
-
-    if (!componentId) {
-      componentId = idFactory();
-      const libraryComponent = libraryComponentFromQuoteComponent(
-        component,
-        componentId,
-        costPriceCents,
-      );
-      payload = upsertLibraryComponent(payload, libraryComponent);
-      createdComponentCount += 1;
-    }
+    const publishedComponent = publishQuoteComponentToLibrary(payload, component, idFactory);
+    payload = publishedComponent.payload;
+    if (publishedComponent.created) createdComponentCount += 1;
 
     ouvrageComponents.push({
       id: idFactory(),
-      componentId,
+      componentId: publishedComponent.componentId,
       quantity: component.quantity,
     });
   }

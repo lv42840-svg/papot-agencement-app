@@ -9,7 +9,10 @@ import {
   type LibraryPayload,
 } from "@/lib/library/storage";
 import { parseQuoteQuantityInput } from "@/lib/quotes/domain";
-import { publishQuoteOuvrageToLibrary } from "@/lib/quotes/library-publish";
+import {
+  publishQuoteComponentToLibrary,
+  publishQuoteOuvrageToLibrary,
+} from "@/lib/quotes/library-publish";
 import {
   calculateQuoteOuvrageMarginPercent,
   calculateQuoteOuvrageUnitCostCents,
@@ -332,7 +335,9 @@ export function QuoteStructuredLinesEditor({
   const [libraryQuery, setLibraryQuery] = useState("");
   const [libraryLoading, setLibraryLoading] = useState(false);
   const [librarySavingLineId, setLibrarySavingLineId] = useState<string | null>(null);
+  const [librarySavingComponentId, setLibrarySavingComponentId] = useState<string | null>(null);
   const [publishedLineIds, setPublishedLineIds] = useState<Set<string>>(new Set());
+  const [publishedComponentIds, setPublishedComponentIds] = useState<Set<string>>(new Set());
 
   const items = useMemo(() => quote?.model.items ?? [], [quote]);
   const lines = useMemo(
@@ -378,6 +383,7 @@ export function QuoteStructuredLinesEditor({
     setNotice("");
     setLibraryPickerOpen(false);
     setPublishedLineIds(new Set());
+    setPublishedComponentIds(new Set());
   }, [quote?.id]);
 
   useEffect(() => {
@@ -644,6 +650,60 @@ export function QuoteStructuredLinesEditor({
     }
   }
 
+  async function addComponentToLibrary(component: QuoteOuvrageComponent) {
+    if (!editable || librarySavingLineId || librarySavingComponentId) return;
+    setLibrarySavingComponentId(component.id);
+    setError("");
+    setNotice("");
+    const leaseId = globalThis.crypto.randomUUID();
+    let leaseOwned = false;
+
+    try {
+      const opened = (await postLibrary({ action: "open", leaseId })) as LibraryOpenResponse;
+      if (opened.status === "error") throw new Error(opened.error);
+      if (opened.status === "read-only") throw new Error("LIBRARY_LOCKED");
+      leaseOwned = true;
+
+      const basePayload = opened.resource
+        ? parseLibraryPayload(opened.resource.payload)
+        : createInitialLibraryPayload();
+      const published = publishQuoteComponentToLibrary(basePayload, component);
+
+      if (!published.created) {
+        setLibraryPayload(published.payload);
+        setPublishedComponentIds((current) => new Set(current).add(component.id));
+        setNotice("Composant déjà présent dans la Bibliothèque.");
+        return;
+      }
+
+      const saved = (await postLibrary({
+        action: "save",
+        leaseId,
+        expectedVersion: opened.baseVersion,
+        payload: published.payload,
+      })) as LibrarySaveResponse;
+
+      if (saved.status === "error") throw new Error(saved.error);
+      if (saved.status === "conflict") throw new Error("LIBRARY_VERSION_CONFLICT");
+
+      setLibraryPayload(parseLibraryPayload(saved.resource.payload));
+      setPublishedComponentIds((current) => new Set(current).add(component.id));
+      setNotice("Composant ajouté à la Bibliothèque.");
+    } catch (publishError) {
+      const code = publishError instanceof Error ? publishError.message : "LIBRARY_REQUEST_FAILED";
+      setError(libraryErrorLabel(code));
+    } finally {
+      if (leaseOwned) {
+        try {
+          await postLibrary({ action: "release", leaseId });
+        } catch {
+          // Best effort: the lease expires automatically.
+        }
+      }
+      setLibrarySavingComponentId(null);
+    }
+  }
+
   function renderComponentReadRows(lineComponents: QuoteOuvrageComponent[]) {
     if (lineComponents.length === 0) {
       return (
@@ -671,7 +731,28 @@ export function QuoteStructuredLinesEditor({
           </span>
           <span>{formatMoney(component.unitPriceCents)}</span>
           <span>{formatMoney(Math.round(component.quantity * component.unitPriceCents))}</span>
-          <span />
+          <div className="quoteRowActions">
+            {editable ? (
+              <button
+                type="button"
+                className="miniLibraryButton"
+                onClick={() => void addComponentToLibrary(component)}
+                disabled={
+                  librarySavingLineId !== null ||
+                  librarySavingComponentId !== null ||
+                  publishedComponentIds.has(component.id)
+                }
+                aria-label={`Ajouter ${component.description} à la Bibliothèque`}
+                title={
+                  publishedComponentIds.has(component.id)
+                    ? "Composant déjà ajouté à la Bibliothèque"
+                    : "Ajouter le composant à la Bibliothèque"
+                }
+              >
+                {librarySavingComponentId === component.id ? "…" : "+B"}
+              </button>
+            ) : null}
+          </div>
         </div>
       );
     });
