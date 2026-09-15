@@ -70,6 +70,13 @@ const duplicateLineMutationSchema = z.object({
   lineId: z.string().uuid(),
 });
 
+const moveLineMutationSchema = z.object({
+  action: z.literal("moveLine"),
+  quoteId: z.string().uuid(),
+  lineId: z.string().uuid(),
+  direction: z.enum(["UP", "DOWN"]),
+});
+
 const upsertSectionMutationSchema = z.object({
   action: z.literal("upsertSection"),
   quoteId: z.string().uuid(),
@@ -90,6 +97,7 @@ export const quotesMutationSchema = z.discriminatedUnion("action", [
   upsertLineMutationSchema,
   upsertOuvrageMutationSchema,
   duplicateLineMutationSchema,
+  moveLineMutationSchema,
   upsertSectionMutationSchema,
   upsertSubsectionMutationSchema,
 ]);
@@ -251,6 +259,38 @@ function duplicateDraftLine(
 
   const items = [...quote.model.items];
   items.splice(existingIndex + 1, 0, duplicatedLine);
+  const timestamp = now.toISOString();
+  const updated = nativeQuoteRecordSchema.parse({
+    ...quote,
+    model: parseQuoteModel({ ...quote.model, items }),
+    updatedAt: timestamp,
+    updatedByName: actor.displayName,
+  });
+  payload.quotes[quoteIndex] = updated;
+  return { payload, focusQuoteId: updated.id };
+}
+
+function moveDraftLine(
+  payload: NativeQuotesPayload,
+  input: Extract<QuotesMutation, { action: "moveLine" }>,
+  actor: QuotesActor,
+  now: Date,
+): QuotesMutationResult {
+  const { quoteIndex, quote, existingLine, existingIndex } = findDraftLine(
+    payload,
+    input.quoteId,
+    input.lineId,
+  );
+  if (!existingLine || existingIndex < 0) throw new Error("QUOTE_LINE_NOT_FOUND");
+
+  const targetIndex = input.direction === "UP" ? existingIndex - 1 : existingIndex + 1;
+  const target = quote.model.items[targetIndex];
+  if (!target || target.kind !== "LINE" || target.parentId !== existingLine.parentId) {
+    throw new Error("QUOTE_LINE_MOVE_BLOCKED");
+  }
+
+  const items = [...quote.model.items];
+  [items[existingIndex], items[targetIndex]] = [items[targetIndex], items[existingIndex]];
   const timestamp = now.toISOString();
   const updated = nativeQuoteRecordSchema.parse({
     ...quote,
@@ -437,6 +477,9 @@ export function applyQuotesMutation(
   }
   if (input.action === "duplicateLine") {
     return duplicateDraftLine(payload, input, actor, now);
+  }
+  if (input.action === "moveLine") {
+    return moveDraftLine(payload, input, actor, now);
   }
   if (input.action === "upsertOuvrage") {
     return upsertDraftOuvrage(payload, input, actor, now, libraryComponentSources);
