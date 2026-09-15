@@ -11,9 +11,7 @@ export function commercialCaseMatchesFilter(
   if (filter === "confirmed") return item.status === "CONFIRMED";
   if (filter === "follow-up") {
     return (
-      !isCommercialClosed(item) &&
-      item.status !== "CONFIRMED" &&
-      commercialNeedsFollowUp(item, now)
+      !isCommercialClosed(item) && item.status !== "CONFIRMED" && commercialNeedsFollowUp(item, now)
     );
   }
   return !isCommercialClosed(item) && item.status !== "CONFIRMED";
