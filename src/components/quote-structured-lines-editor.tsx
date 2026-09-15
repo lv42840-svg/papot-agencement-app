@@ -223,6 +223,17 @@ function ouvrageUnitCostCents(components: OuvrageComponentForm[]): number | null
   return total;
 }
 
+function ouvrageTotalCents(quantityInput: string, unitPriceCents: number | null): number | null {
+  if (unitPriceCents === null) return null;
+  try {
+    const quantity = parseQuoteQuantityInput(quantityInput).quantity;
+    const total = Math.round(quantity * unitPriceCents);
+    return Number.isSafeInteger(total) && total >= 0 ? total : null;
+  } catch {
+    return null;
+  }
+}
+
 function lineErrorLabel(code: string): string {
   if (code === "QUOTE_NOT_FOUND") return "Ce devis n’existe plus.";
   if (code === "QUOTE_NOT_EDITABLE") return "Seul un brouillon peut être modifié.";
@@ -674,6 +685,7 @@ export function QuoteStructuredLinesEditor({
     const marginPercent = calculateQuoteOuvrageMarginPercent(salePriceCents, costPriceCents);
     const libraryAlreadyLinked = line.librarySource?.kind === "OUVRAGE";
     const publishedNow = publishedLineIds.has(line.id);
+    const lineTotalCents = Math.round(line.quantity * salePriceCents);
 
     return (
       <div className="quoteOuvrageGroup" key={line.id}>
@@ -707,6 +719,7 @@ export function QuoteStructuredLinesEditor({
               </>
             )}
           </div>
+          <strong className="quoteLineTotal">{formatMoney(lineTotalCents)}</strong>
           <div className="quoteRowActions">
             {editable ? (
               <>
@@ -762,6 +775,7 @@ export function QuoteStructuredLinesEditor({
         ? "0,00"
         : centsToInput(calculatedUnitPrice);
     const number = editingLineId ? (numbers.get(editingLineId) ?? "—") : "+";
+    const currentLineTotal = ouvrageTotalCents(quantityInput, effectiveUnitPrice);
 
     return (
       <form className="quoteOuvrageGroup quoteOuvrageEditing" key={key} onSubmit={saveOuvrage}>
@@ -813,6 +827,9 @@ export function QuoteStructuredLinesEditor({
           <div className="quoteMarginCell">
             <strong>{formatPercent(currentMarginPercent)}</strong>
           </div>
+          <strong className="quoteLineTotal">
+            {currentLineTotal === null ? "—" : formatMoney(currentLineTotal)}
+          </strong>
           <div className="quoteRowActions">
             <button
               type="submit"
@@ -1008,6 +1025,7 @@ export function QuoteStructuredLinesEditor({
         <span />
         <span />
         <span />
+        <span />
         <div className="quoteRowActions">
           {editable ? (
             <button
@@ -1043,6 +1061,7 @@ export function QuoteStructuredLinesEditor({
           required
           maxLength={500}
         />
+        <span />
         <span />
         <span />
         <span />
@@ -1102,6 +1121,7 @@ export function QuoteStructuredLinesEditor({
           <span>Unité</span>
           <span>PU HT</span>
           <span>Marge</span>
+          <span>Total HT</span>
           <span />
         </div>
         {items.map((item) => {
@@ -1119,6 +1139,7 @@ export function QuoteStructuredLinesEditor({
               <span />
               <span />
               <span />
+              <span />
             </div>
           );
         })}
@@ -1126,7 +1147,7 @@ export function QuoteStructuredLinesEditor({
         {formOpen && editingLineId === null ? renderEditingOuvrage("new-ouvrage") : null}
         {editable ? (
           <div className="quoteMainRow quoteAddRow">
-            <span className="quoteNumber">+</span>
+            <span />
             <div className="quoteAddActions">
               <button
                 type="button"
@@ -1155,11 +1176,12 @@ export function QuoteStructuredLinesEditor({
             <span />
             <span />
             <span />
+            <span />
           </div>
         ) : null}
       </div>
 
-      <style jsx>{`
+      <style jsx global>{`
         .quoteLinesPanel {
           overflow: hidden;
         }
@@ -1211,11 +1233,11 @@ export function QuoteStructuredLinesEditor({
         }
         .quoteMainRow {
           display: grid;
-          grid-template-columns: 52px minmax(260px, 1fr) 82px 72px 135px 140px 82px;
+          grid-template-columns: 52px minmax(300px, 1fr) 82px 72px 120px 120px 120px 82px;
           gap: 10px;
           align-items: center;
           padding: 9px 18px;
-          min-width: 920px;
+          min-width: 1040px;
         }
         .quoteLinesTableHeader {
           min-height: 38px;
@@ -1232,7 +1254,7 @@ export function QuoteStructuredLinesEditor({
           font-variant-numeric: tabular-nums;
         }
         .quoteOuvrageGroup {
-          min-width: 920px;
+          min-width: 1040px;
           border-top: 1px solid var(--border);
         }
         .quoteOuvrageGroup:first-of-type {
@@ -1240,7 +1262,7 @@ export function QuoteStructuredLinesEditor({
         }
         .quoteLineRow {
           min-height: 58px;
-          font-size: 12px;
+          font-size: 13px;
           background: #fff;
         }
         .quoteOuvrageEditing .quoteLineRow {
@@ -1297,6 +1319,10 @@ export function QuoteStructuredLinesEditor({
         .quoteRowActions {
           justify-content: flex-end;
           gap: 5px;
+        }
+        .quoteLineTotal {
+          white-space: nowrap;
+          font-variant-numeric: tabular-nums;
         }
         .miniLibraryButton,
         .miniActionButton,
@@ -1374,6 +1400,7 @@ export function QuoteStructuredLinesEditor({
         }
         .quoteComponentsTable {
           margin: 0 18px 12px 70px;
+          min-width: 900px;
           overflow: hidden;
           border: 1px solid #e4def2;
           border-radius: 7px;
@@ -1403,7 +1430,7 @@ export function QuoteStructuredLinesEditor({
         .quoteComponentRow {
           min-height: 40px;
           border-top: 1px solid #ebe6f4;
-          font-size: 11px;
+          font-size: 13px;
         }
         .quoteComponentTitleActions {
           gap: 5px;
@@ -1483,7 +1510,7 @@ export function QuoteStructuredLinesEditor({
           background: #f1edfb;
         }
         .quoteHeadingRow.isSection > strong {
-          font-size: 16px;
+          font-size: 18px;
         }
         .quoteHeadingRow.isSubsection {
           min-height: 48px;
@@ -1491,7 +1518,7 @@ export function QuoteStructuredLinesEditor({
         }
         .quoteHeadingRow.isSubsection > strong {
           padding-left: 14px;
-          font-size: 13px;
+          font-size: 15px;
         }
         .quoteHeadingEditing {
           background: #fff;
@@ -1538,7 +1565,7 @@ export function QuoteStructuredLinesEditor({
           }
           .quoteMainRow,
           .quoteOuvrageGroup {
-            min-width: 920px;
+            min-width: 1040px;
           }
           .quoteComponentsTable {
             min-width: 780px;
