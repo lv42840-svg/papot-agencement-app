@@ -38,7 +38,12 @@ export async function PATCH(
         : error instanceof Error
           ? error.message
           : "QUOTE_DETAILS_UPDATE_FAILED";
-    const status = code === "QUOTE_NOT_FOUND" ? 404 : code === "QUOTE_NOT_EDITABLE" || code === "QUOTE_VARIANT_VERSION_CONFLICT" ? 409 : 400;
+    const status =
+      code === "QUOTE_NOT_FOUND"
+        ? 404
+        : code === "QUOTE_NOT_EDITABLE" || code === "QUOTE_VARIANT_VERSION_CONFLICT"
+          ? 409
+          : 400;
     return NextResponse.json({ error: code }, { status });
   }
 }
