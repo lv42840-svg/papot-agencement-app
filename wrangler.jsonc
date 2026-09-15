@@ -1,0 +1,17 @@
+﻿{
+  "$schema": "./node_modules/wrangler/config-schema.json",
+  "name": "papot-relay",
+  "main": "relay/worker.ts",
+  "compatibility_date": "2026-09-12",
+  "workers_dev": true,
+  "preview_urls": false,
+  "secrets": {
+    "required": [
+      "NEXTCLOUD_BASE_URL",
+      "NEXTCLOUD_LOGIN",
+      "NEXTCLOUD_APP_PASSWORD",
+      "NEXTCLOUD_USER_ID",
+      "RELAY_ACCESS_TOKEN",
+    ],
+  },
+}
