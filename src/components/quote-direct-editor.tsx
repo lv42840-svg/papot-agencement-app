@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { ArrowLeft } from "lucide-react";
 import { useMemo, useState } from "react";
+import { QuoteFixedSummary } from "@/components/quote-fixed-summary";
 import { QuoteStructuredLinesEditor } from "@/components/quote-structured-lines-editor";
 import { QuoteSendAction } from "@/components/quote-send-action";
 import type { NativeQuotesPayload } from "@/lib/quotes/store";
@@ -39,6 +40,8 @@ export function QuoteDirectEditor({
           </div>
         }
       />
+      <div className="quoteDirectSummarySpacer" aria-hidden="true" />
+      <QuoteFixedSummary quote={quote} />
 
       <style jsx>{`
         .quoteDirectActions {
@@ -53,6 +56,9 @@ export function QuoteDirectEditor({
           align-items: center;
           gap: 6px;
           text-decoration: none;
+        }
+        .quoteDirectSummarySpacer {
+          height: 78px;
         }
       `}</style>
     </>
