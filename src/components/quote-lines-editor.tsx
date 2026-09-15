@@ -1,6 +1,6 @@
 "use client";
 
-import { type FormEvent, useEffect, useMemo, useState } from "react";
+import { type FormEvent, type ReactNode, useEffect, useMemo, useState } from "react";
 import { LibraryBig, Pencil, Plus, X } from "lucide-react";
 import type { QuoteLine } from "@/lib/quotes/model";
 import type { NativeQuoteRecord, NativeQuotesPayload } from "@/lib/quotes/store";
@@ -57,10 +57,12 @@ export function QuoteLinesEditor({
   quote,
   canWrite,
   onSaved,
+  headerActions,
 }: {
   quote: NativeQuoteRecord | null;
   canWrite: boolean;
   onSaved: (payload: NativeQuotesPayload) => void;
+  headerActions?: ReactNode;
 }) {
   const [formOpen, setFormOpen] = useState(false);
   const [editingLineId, setEditingLineId] = useState<string | null>(null);
@@ -197,20 +199,22 @@ export function QuoteLinesEditor({
     >
       <div className="panelHeader quoteLinesHeader">
         <div>
-          <p className="eyebrow">
-            {quote.variantName} · V{quote.version}
-          </p>
+          <p className="eyebrow">Devis</p>
           <h2>{quote.model.subject}</h2>
           <p className="muted">
-            {lines.length} ligne{lines.length === 1 ? "" : "s"} dans ce brouillon
+            {quote.variantName} · V{quote.version} · {lines.length} ligne
+            {lines.length === 1 ? "" : "s"} dans ce brouillon
           </p>
         </div>
-        {editable ? (
-          <button type="button" className="primaryButton" onClick={openNewLine} disabled={saving}>
-            <Plus size={16} aria-hidden="true" />
-            Ajouter une ligne
-          </button>
-        ) : null}
+        <div className="quoteLinesHeaderActions">
+          {headerActions}
+          {editable ? (
+            <button type="button" className="primaryButton" onClick={openNewLine} disabled={saving}>
+              <Plus size={16} aria-hidden="true" />
+              Ajouter une ligne
+            </button>
+          ) : null}
+        </div>
       </div>
 
       {formOpen && editable ? (
@@ -391,6 +395,7 @@ export function QuoteLinesEditor({
           overflow: hidden;
         }
         .quoteLinesHeader,
+        .quoteLinesHeaderActions,
         .quoteLineFormHeader,
         .quoteLineActions,
         .quoteLibraryToggle,
@@ -403,6 +408,11 @@ export function QuoteLinesEditor({
         .quoteLineFormHeader {
           justify-content: space-between;
           gap: 16px;
+        }
+        .quoteLinesHeaderActions {
+          justify-content: flex-end;
+          gap: 8px;
+          flex-wrap: wrap;
         }
         .quoteLinesHeader :global(.primaryButton),
         .quoteLineActions :global(button) {
