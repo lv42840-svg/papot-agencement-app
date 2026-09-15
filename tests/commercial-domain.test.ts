@@ -118,10 +118,7 @@ describe("Commercial V1", () => {
       new Date("2026-09-13T11:00:00.000Z"),
     ).payload;
 
-    const result = applyCommercialAutomaticTransitions(
-      sent,
-      new Date("2026-09-14T10:00:00.000Z"),
-    );
+    const result = applyCommercialAutomaticTransitions(sent, new Date("2026-09-14T10:00:00.000Z"));
     expect(result.changed).toBe(true);
     expect(result.payload.cases[0].status).toBe("FOLLOW_UP");
     expect(result.payload.cases[0].history.at(-1)?.type).toBe("AUTO_DUE");
