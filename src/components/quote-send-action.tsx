@@ -58,7 +58,7 @@ export function QuoteSendAction({
   if (!open) {
     return (
       <button type="button" className="primaryButton" onClick={() => setOpen(true)}>
-        <Send size={15} aria-hidden="true" /> Marquer envoyé
+        <Send size={15} aria-hidden="true" /> Passer en envoyé
       </button>
     );
   }
