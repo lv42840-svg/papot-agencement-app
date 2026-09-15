@@ -79,6 +79,40 @@ describe("native quote draft store", () => {
     expect(second.payload.quotes[1]).toMatchObject({ variantName: "Variante A", version: 1 });
   });
 
+  it("still reads a stored legacy line that has no components field", () => {
+    const created = applyQuotesMutation(
+      createInitialNativeQuotesPayload(),
+      draftInput(),
+      actor,
+      clientId,
+    );
+    const withLine = applyQuotesMutation(
+      created.payload,
+      quotesMutationSchema.parse({
+        action: "upsertLine",
+        quoteId: created.focusQuoteId,
+        description: "Ancienne ligne",
+        unit: "u",
+        quantityInput: "1",
+        unitPriceCents: 10_000,
+      }),
+      actor,
+    ).payload;
+
+    const legacy = structuredClone(withLine) as unknown as {
+      quotes: Array<{ model: { items: Array<Record<string, unknown>> } }>;
+    };
+    delete legacy.quotes[0].model.items[0].components;
+
+    const parsed = parseNativeQuotesPayload(legacy);
+    expect(parsed.quotes[0].model.items[0]).toMatchObject({
+      kind: "LINE",
+      description: "Ancienne ligne",
+      unitPriceCents: 10_000,
+    });
+    expect("components" in parsed.quotes[0].model.items[0]).toBe(false);
+  });
+
   it("refuses a stored record whose wrapper and quote model ids diverge", () => {
     const created = applyQuotesMutation(
       createInitialNativeQuotesPayload(),
