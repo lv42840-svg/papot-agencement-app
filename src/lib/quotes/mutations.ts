@@ -64,6 +64,12 @@ const upsertOuvrageMutationSchema = z.object({
   components: z.array(ouvrageComponentMutationSchema).min(1).max(200),
 });
 
+const duplicateLineMutationSchema = z.object({
+  action: z.literal("duplicateLine"),
+  quoteId: z.string().uuid(),
+  lineId: z.string().uuid(),
+});
+
 const upsertSectionMutationSchema = z.object({
   action: z.literal("upsertSection"),
   quoteId: z.string().uuid(),
@@ -83,6 +89,7 @@ export const quotesMutationSchema = z.discriminatedUnion("action", [
   createDraftMutationSchema,
   upsertLineMutationSchema,
   upsertOuvrageMutationSchema,
+  duplicateLineMutationSchema,
   upsertSectionMutationSchema,
   upsertSubsectionMutationSchema,
 ]);
@@ -218,6 +225,41 @@ function saveDraftLine(
   now: Date,
 ): QuotesMutationResult {
   return saveDraftItem(payload, quoteIndex, line, existingIndex, actor, now);
+}
+
+function duplicateDraftLine(
+  payload: NativeQuotesPayload,
+  input: Extract<QuotesMutation, { action: "duplicateLine" }>,
+  actor: QuotesActor,
+  now: Date,
+): QuotesMutationResult {
+  const { quoteIndex, quote, existingLine, existingIndex } = findDraftLine(
+    payload,
+    input.quoteId,
+    input.lineId,
+  );
+  if (!existingLine || existingIndex < 0) throw new Error("QUOTE_LINE_NOT_FOUND");
+
+  const duplicatedLine: QuoteLine = {
+    ...structuredClone(existingLine),
+    id: globalThis.crypto.randomUUID(),
+    components: (existingLine.components ?? []).map((component) => ({
+      ...structuredClone(component),
+      id: globalThis.crypto.randomUUID(),
+    })),
+  };
+
+  const items = [...quote.model.items];
+  items.splice(existingIndex + 1, 0, duplicatedLine);
+  const timestamp = now.toISOString();
+  const updated = nativeQuoteRecordSchema.parse({
+    ...quote,
+    model: parseQuoteModel({ ...quote.model, items }),
+    updatedAt: timestamp,
+    updatedByName: actor.displayName,
+  });
+  payload.quotes[quoteIndex] = updated;
+  return { payload, focusQuoteId: updated.id };
 }
 
 function upsertDraftHeading(
@@ -392,6 +434,9 @@ export function applyQuotesMutation(
   }
   if (input.action === "upsertSection" || input.action === "upsertSubsection") {
     return upsertDraftHeading(payload, input, actor, now);
+  }
+  if (input.action === "duplicateLine") {
+    return duplicateDraftLine(payload, input, actor, now);
   }
   if (input.action === "upsertOuvrage") {
     return upsertDraftOuvrage(payload, input, actor, now, libraryComponentSources);
