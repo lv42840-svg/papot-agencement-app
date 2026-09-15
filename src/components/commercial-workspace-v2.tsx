@@ -44,10 +44,7 @@ import {
   type CommercialSiteAddress,
   type CommercialStatus,
 } from "@/lib/commercial/domain";
-import {
-  filterCommercialCases,
-  type CommercialListFilter,
-} from "@/lib/commercial/list-filter";
+import { filterCommercialCases, type CommercialListFilter } from "@/lib/commercial/list-filter";
 
 type Snapshot = {
   payload: CommercialPayload;
@@ -285,9 +282,7 @@ export function CommercialWorkspaceV2() {
       <header className="commercialV2Heading">
         <div>
           <h1>Commercial · Affaires</h1>
-          <p>
-            Un client, une affaire, un suivi. Le chiffrage et le devis ont leur propre module.
-          </p>
+          <p>Un client, une affaire, un suivi. Le chiffrage et le devis ont leur propre module.</p>
         </div>
         <div className="commercialV2HeadingActions">
           {snapshot?.capabilities.canCreate ? (
@@ -687,10 +682,7 @@ function AffairDetail({
         <button className={tab === "follow" ? "active" : ""} onClick={() => setTab("follow")}>
           <Clock3 size={14} /> Suivi
         </button>
-        <button
-          className={tab === "documents" ? "active" : ""}
-          onClick={() => setTab("documents")}
-        >
+        <button className={tab === "documents" ? "active" : ""} onClick={() => setTab("documents")}>
           <Paperclip size={14} /> Documents <small>{item.documents.length}</small>
         </button>
         <button className={tab === "history" ? "active" : ""} onClick={() => setTab("history")}>
