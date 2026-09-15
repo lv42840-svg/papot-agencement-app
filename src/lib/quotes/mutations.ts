@@ -13,6 +13,8 @@ import {
   type QuoteLibraryComponentSource,
   type QuoteLine,
   type QuoteOuvrageComponent,
+  type QuoteSection,
+  type QuoteSubsection,
 } from "./model";
 import {
   nativeQuoteRecordSchema,
@@ -77,6 +79,13 @@ const moveLineMutationSchema = z.object({
   direction: z.enum(["UP", "DOWN"]),
 });
 
+const moveHeadingMutationSchema = z.object({
+  action: z.literal("moveHeading"),
+  quoteId: z.string().uuid(),
+  itemId: z.string().uuid(),
+  direction: z.enum(["UP", "DOWN"]),
+});
+
 const upsertSectionMutationSchema = z.object({
   action: z.literal("upsertSection"),
   quoteId: z.string().uuid(),
@@ -98,6 +107,7 @@ export const quotesMutationSchema = z.discriminatedUnion("action", [
   upsertOuvrageMutationSchema,
   duplicateLineMutationSchema,
   moveLineMutationSchema,
+  moveHeadingMutationSchema,
   upsertSectionMutationSchema,
   upsertSubsectionMutationSchema,
 ]);
@@ -302,6 +312,99 @@ function moveDraftLine(
   return { payload, focusQuoteId: updated.id };
 }
 
+function headingBlockEnd(items: QuoteItem[], startIndex: number): number {
+  const heading = items[startIndex];
+  if (!heading || (heading.kind !== "SECTION" && heading.kind !== "SUBSECTION")) {
+    return startIndex + 1;
+  }
+
+  for (let index = startIndex + 1; index < items.length; index += 1) {
+    const candidate = items[index];
+    if (candidate.kind === "SECTION") return index;
+    if (
+      heading.kind === "SUBSECTION" &&
+      candidate.kind === "SUBSECTION" &&
+      candidate.parentId === heading.parentId
+    ) {
+      return index;
+    }
+  }
+  return items.length;
+}
+
+function previousHeadingSiblingIndex(
+  items: QuoteItem[],
+  currentIndex: number,
+  heading: QuoteSection | QuoteSubsection,
+): number {
+  for (let index = currentIndex - 1; index >= 0; index -= 1) {
+    const candidate = items[index];
+    if (heading.kind === "SECTION") {
+      if (candidate.kind === "SECTION") return index;
+      continue;
+    }
+    if (candidate.kind === "SECTION") return -1;
+    if (candidate.kind === "SUBSECTION" && candidate.parentId === heading.parentId) return index;
+  }
+  return -1;
+}
+
+function moveDraftHeading(
+  payload: NativeQuotesPayload,
+  input: Extract<QuotesMutation, { action: "moveHeading" }>,
+  actor: QuotesActor,
+  now: Date,
+): QuotesMutationResult {
+  const { quoteIndex, quote } = findDraftQuote(payload, input.quoteId);
+  const currentIndex = quote.model.items.findIndex((item) => item.id === input.itemId);
+  if (currentIndex < 0) throw new Error("QUOTE_HEADING_NOT_FOUND");
+
+  const heading = quote.model.items[currentIndex];
+  if (heading.kind !== "SECTION" && heading.kind !== "SUBSECTION") {
+    throw new Error("QUOTE_HEADING_NOT_FOUND");
+  }
+
+  const items = [...quote.model.items];
+  const currentEnd = headingBlockEnd(items, currentIndex);
+  let reordered: QuoteItem[];
+
+  if (input.direction === "UP") {
+    const previousIndex = previousHeadingSiblingIndex(items, currentIndex, heading);
+    if (previousIndex < 0) throw new Error("QUOTE_HEADING_MOVE_BLOCKED");
+    reordered = [
+      ...items.slice(0, previousIndex),
+      ...items.slice(currentIndex, currentEnd),
+      ...items.slice(previousIndex, currentIndex),
+      ...items.slice(currentEnd),
+    ];
+  } else {
+    const nextIndex = currentEnd;
+    const nextHeading = items[nextIndex];
+    const isSibling =
+      heading.kind === "SECTION"
+        ? nextHeading?.kind === "SECTION"
+        : nextHeading?.kind === "SUBSECTION" && nextHeading.parentId === heading.parentId;
+    if (!isSibling || !nextHeading) throw new Error("QUOTE_HEADING_MOVE_BLOCKED");
+    const nextEnd = headingBlockEnd(items, nextIndex);
+    reordered = [
+      ...items.slice(0, currentIndex),
+      ...items.slice(nextIndex, nextEnd),
+      ...items.slice(currentIndex, currentEnd),
+      ...items.slice(nextEnd),
+    ];
+  }
+
+  const timestamp = now.toISOString();
+  const updated = nativeQuoteRecordSchema.parse({
+    ...quote,
+    model: parseQuoteModel({ ...quote.model, items: reordered }),
+    updatedAt: timestamp,
+    updatedByName: actor.displayName,
+  });
+  payload.quotes[quoteIndex] = updated;
+  return { payload, focusQuoteId: updated.id };
+}
+
 function upsertDraftHeading(
   payload: NativeQuotesPayload,
   input: Extract<QuotesMutation, { action: "upsertSection" | "upsertSubsection" }>,
@@ -480,6 +583,9 @@ export function applyQuotesMutation(
   }
   if (input.action === "moveLine") {
     return moveDraftLine(payload, input, actor, now);
+  }
+  if (input.action === "moveHeading") {
+    return moveDraftHeading(payload, input, actor, now);
   }
   if (input.action === "upsertOuvrage") {
     return upsertDraftOuvrage(payload, input, actor, now, libraryComponentSources);
