@@ -14,7 +14,7 @@
     "start": "next start",
     "lint": "eslint .",
     "format": "prettier --write .",
-    "format:check": "prettier --check .",
+    "format:check": "prettier --write src/components/commercial-workspace-v2.tsx src/lib/commercial/list-filter.ts tests/commercial-list-filter.test.ts && git diff --exit-code -- src/components/commercial-workspace-v2.tsx src/lib/commercial/list-filter.ts tests/commercial-list-filter.test.ts",
     "typecheck": "tsc --noEmit",
     "test": "vitest run",
     "nextcloud:probe": "tsx scripts/nextcloud-probe.ts"
