@@ -1,0 +1,35 @@
+name: Quote component reorder temporary
+
+on:
+  push:
+    branches:
+      - feat/quote-component-reorder
+
+permissions:
+  contents: write
+
+jobs:
+  patch:
+    if: github.actor != 'github-actions[bot]'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: feat/quote-component-reorder
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - run: python scripts/patch-quote-component-reorder.py
+      - run: npx prettier --write src/components/quote-structured-lines-editor.tsx src/lib/quotes/component-order.ts tests/quote-component-order.test.ts
+      - run: npm run lint
+      - run: npm run typecheck
+      - run: npm test -- tests/quote-component-order.test.ts tests/quote-heading-reorder.test.ts tests/quote-line-reorder.test.ts tests/quote-lines-editor.test.ts
+      - name: Commit component reorder
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add src/components/quote-structured-lines-editor.tsx src/lib/quotes/component-order.ts tests/quote-component-order.test.ts
+          git commit -m "feat(quotes): deplacer les composants"
+          git push
