@@ -1,5 +1,9 @@
 import { describe, expect, it } from "vitest";
-import type { QuoteItem, QuoteLine, QuoteOuvrageComponent } from "../src/lib/quotes/model";
+import type {
+  QuoteItem,
+  QuoteLine,
+  QuoteOuvrageComponent,
+} from "../src/lib/quotes/model";
 import { calculateQuoteEconomicSummary } from "../src/lib/quotes/summary";
 
 function component(
@@ -51,13 +55,27 @@ describe("quote economic summary", () => {
         "22222222-2222-4222-8222-222222222222",
         2,
         10_000,
-        [component("33333333-3333-4333-8333-333333333333", 2, 3_000, 5_000)],
+        [
+          component(
+            "33333333-3333-4333-8333-333333333333",
+            2,
+            3_000,
+            5_000,
+          ),
+        ],
       ),
       line(
         "44444444-4444-4444-8444-444444444444",
         1,
         5_000,
-        [component("55555555-5555-4555-8555-555555555555", 1, 2_000, 5_000)],
+        [
+          component(
+            "55555555-5555-4555-8555-555555555555",
+            1,
+            2_000,
+            5_000,
+          ),
+        ],
       ),
     ];
 
@@ -75,7 +93,14 @@ describe("quote economic summary", () => {
         "66666666-6666-4666-8666-666666666666",
         2,
         10_000,
-        [component("77777777-7777-4777-8777-777777777777", 1, undefined, 10_000)],
+        [
+          component(
+            "77777777-7777-4777-8777-777777777777",
+            1,
+            undefined,
+            10_000,
+          ),
+        ],
       ),
     ];
 
@@ -106,7 +131,14 @@ describe("quote economic summary", () => {
         "99999999-9999-4999-8999-999999999999",
         1,
         8_000,
-        [component("aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa", 1, 10_000, 8_000)],
+        [
+          component(
+            "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa",
+            1,
+            10_000,
+            8_000,
+          ),
+        ],
       ),
     ];
 
