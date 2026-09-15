@@ -1,7 +1,6 @@
 import { notFound } from "next/navigation";
 import { DesktopAppShell } from "@/components/desktop-app-shell";
 import { QuoteDirectEditor } from "@/components/quote-direct-editor";
-import { QuoteModuleNav } from "@/components/quote-module-nav";
 import { requireDesktopRequestContext } from "@/lib/desktop/request-context";
 import { createQuotesRepository } from "@/lib/quotes/create-repository";
 
@@ -15,7 +14,6 @@ export default async function QuotePage({ params }: { params: Promise<{ quoteId:
 
   return (
     <DesktopAppShell>
-      <QuoteModuleNav />
       <QuoteDirectEditor
         initialPayload={payload}
         quoteId={quoteId}
