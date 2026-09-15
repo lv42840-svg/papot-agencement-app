@@ -70,12 +70,11 @@ function insertedLine(result: QuoteModel) {
 }
 
 describe("Library to native quote link", () => {
-  it("copies a component into a quote-owned priced line", () => {
+  it("wraps a single Library component inside a quote ouvrage", () => {
     const sourceQuote = quote();
-    const sourceLibrary = library();
     const result = insertLibraryComponentIntoQuote({
       quote: sourceQuote,
-      library: sourceLibrary,
+      library: library(),
       componentId,
       lineId: insertedLineId,
       parentId: sectionId,
@@ -83,27 +82,31 @@ describe("Library to native quote link", () => {
     });
 
     expect(sourceQuote.items).toHaveLength(1);
-    expect(insertedLine(result)).toEqual({
+    const line = insertedLine(result);
+    expect(line).toMatchObject({
       id: insertedLineId,
       kind: "LINE",
       parentId: sectionId,
       description: "Panneau mélaminé blanc",
-      unit: "m²",
-      quantity: 2.5,
+      unit: "u",
+      quantity: 1,
       quantityFormula: null,
-      unitPriceCents: 5_200,
+      unitPriceCents: 13_000,
       librarySource: {
         schemaVersion: 1,
         kind: "COMPONENT",
-        component: {
-          sourceComponentId: componentId,
-          name: "Panneau mélaminé blanc",
-          description: "Panneau décor blanc 19 mm.",
-          unit: "m²",
-          costPriceCents: 4_000,
-          marginPercent: 30,
-          salePriceCents: 5_200,
-        },
+        component: { sourceComponentId: componentId },
+      },
+    });
+    expect(line.components).toHaveLength(1);
+    expect(line.components?.[0]).toMatchObject({
+      description: "Panneau mélaminé blanc",
+      unit: "m²",
+      quantity: 2.5,
+      unitPriceCents: 5_200,
+      librarySource: {
+        kind: "COMPONENT",
+        component: { sourceComponentId: componentId },
       },
     });
   });
@@ -123,14 +126,11 @@ describe("Library to native quote link", () => {
     const line = insertedLine(result);
     expect(line.description).toBe("Panneau mélaminé blanc");
     expect(line.unitPriceCents).toBe(5_200);
-    expect(line.librarySource?.kind).toBe("COMPONENT");
-    if (line.librarySource?.kind === "COMPONENT") {
-      expect(line.librarySource.component.name).toBe("Panneau mélaminé blanc");
-      expect(line.librarySource.component.salePriceCents).toBe(5_200);
-    }
+    expect(line.components?.[0].description).toBe("Panneau mélaminé blanc");
+    expect(line.components?.[0].unitPriceCents).toBe(5_200);
   });
 
-  it("copies an ouvrage and its component composition into one quote line", () => {
+  it("copies an ouvrage and materializes all of its components in the quote", () => {
     const result = insertLibraryOuvrageIntoQuote({
       quote: quote(),
       library: library(),
@@ -142,11 +142,55 @@ describe("Library to native quote link", () => {
     const line = insertedLine(result);
     expect(line).toMatchObject({
       description: "Meuble bas mélaminé 2 portes",
-      unit: "",
+      unit: "u",
       quantity: 1,
       quantityFormula: null,
       unitPriceCents: 29_900,
     });
+    expect(line.components).toEqual([
+      {
+        id: ouvrageLine1Id,
+        description: "Panneau mélaminé blanc",
+        unit: "m²",
+        quantity: 2,
+        quantityFormula: null,
+        unitPriceCents: 5_200,
+        librarySource: {
+          schemaVersion: 1,
+          kind: "COMPONENT",
+          component: {
+            sourceComponentId: componentId,
+            name: "Panneau mélaminé blanc",
+            description: "Panneau décor blanc 19 mm.",
+            unit: "m²",
+            costPriceCents: 4_000,
+            marginPercent: 30,
+            salePriceCents: 5_200,
+          },
+        },
+      },
+      {
+        id: ouvrageLine2Id,
+        description: "Heure atelier",
+        unit: "h",
+        quantity: 3,
+        quantityFormula: null,
+        unitPriceCents: 6_500,
+        librarySource: {
+          schemaVersion: 1,
+          kind: "COMPONENT",
+          component: {
+            sourceComponentId: labourId,
+            name: "Heure atelier",
+            description: "Fabrication en atelier.",
+            unit: "h",
+            costPriceCents: 5_000,
+            marginPercent: 30,
+            salePriceCents: 6_500,
+          },
+        },
+      },
+    ]);
     expect(line.librarySource).toEqual({
       schemaVersion: 1,
       kind: "OUVRAGE",
@@ -202,12 +246,8 @@ describe("Library to native quote link", () => {
     const line = insertedLine(result);
     expect(line.description).toBe("Meuble bas mélaminé 2 portes");
     expect(line.unitPriceCents).toBe(29_900);
-    expect(line.librarySource?.kind).toBe("OUVRAGE");
-    if (line.librarySource?.kind === "OUVRAGE") {
-      expect(line.librarySource.name).toBe("Meuble bas mélaminé 2 portes");
-      expect(line.librarySource.components[0].quantity).toBe(2);
-      expect(line.librarySource.components[0].component.name).toBe("Panneau mélaminé blanc");
-    }
+    expect(line.components?.[0].quantity).toBe(2);
+    expect(line.components?.[0].description).toBe("Panneau mélaminé blanc");
   });
 
   it("fails cleanly when the requested Library item cannot be resolved", () => {
@@ -253,10 +293,9 @@ describe("Library to native quote link", () => {
   });
 
   it("requires a quote-owned price whenever a frozen Library source is stored", () => {
-    const sourceLibrary = library();
     const inserted = insertLibraryComponentIntoQuote({
       quote: quote(),
-      library: sourceLibrary,
+      library: library(),
       componentId,
       lineId: insertedLineId,
     });

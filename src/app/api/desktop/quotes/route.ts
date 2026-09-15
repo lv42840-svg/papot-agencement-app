@@ -109,7 +109,7 @@ export async function POST(request: Request) {
       );
     }
 
-    if (input.saveToLibrary) {
+    if (input.action === "upsertLine" && input.saveToLibrary) {
       if (input.libraryCostPriceCents === undefined || !input.libraryName) {
         throw new Error("QUOTES_REQUEST_INVALID");
       }

@@ -76,6 +76,16 @@ export const quoteSubsectionSchema = z.object({
   title: z.string().trim().min(1).max(500),
 });
 
+export const quoteOuvrageComponentSchema = z.object({
+  id: z.string().uuid(),
+  description: z.string().trim().min(1).max(4000),
+  unit: z.string().trim().max(40),
+  quantity: z.number().finite().positive().max(QUOTE_MAX_QUANTITY),
+  quantityFormula: z.string().trim().min(1).max(QUOTE_MAX_QUANTITY_EXPRESSION_LENGTH).nullable(),
+  unitPriceCents: quoteMoneyCentsSchema,
+  librarySource: quoteLibraryComponentSourceSchema.optional(),
+});
+
 export const quoteLineSchema = z.object({
   id: z.string().uuid(),
   kind: z.literal("LINE"),
@@ -85,6 +95,7 @@ export const quoteLineSchema = z.object({
   quantity: z.number().finite().positive().max(QUOTE_MAX_QUANTITY),
   quantityFormula: z.string().trim().min(1).max(QUOTE_MAX_QUANTITY_EXPRESSION_LENGTH).nullable(),
   unitPriceCents: quoteMoneyCentsSchema.optional(),
+  components: z.array(quoteOuvrageComponentSchema).max(200).optional(),
   librarySource: quoteLibrarySourceSchema.optional(),
 });
 
@@ -121,6 +132,7 @@ export type QuoteLibraryOuvrageSource = z.infer<typeof quoteLibraryOuvrageSource
 export type QuoteLibrarySource = z.infer<typeof quoteLibrarySourceSchema>;
 export type QuoteSection = z.infer<typeof quoteSectionSchema>;
 export type QuoteSubsection = z.infer<typeof quoteSubsectionSchema>;
+export type QuoteOuvrageComponent = z.infer<typeof quoteOuvrageComponentSchema>;
 export type QuoteLine = z.infer<typeof quoteLineSchema>;
 export type QuoteComment = z.infer<typeof quoteCommentSchema>;
 export type QuoteItem = z.infer<typeof quoteItemSchema>;
@@ -153,20 +165,34 @@ export function validateQuoteItemHierarchy(items: QuoteItem[]): void {
   }
 }
 
-function validateQuoteLineFormula(line: QuoteLine): void {
-  if (line.quantityFormula === null) return;
+function validateQuantityFormula(
+  quantity: number,
+  quantityFormula: string | null,
+  invalidCode: string,
+  mismatchCode: string,
+): void {
+  if (quantityFormula === null) return;
 
   let parsed;
   try {
-    parsed = parseQuoteQuantityInput(line.quantityFormula);
+    parsed = parseQuoteQuantityInput(quantityFormula);
   } catch {
-    throw new Error("QUOTE_LINE_FORMULA_INVALID");
+    throw new Error(invalidCode);
   }
 
-  if (parsed.formula === null) throw new Error("QUOTE_LINE_FORMULA_INVALID");
-  if (Math.abs(parsed.quantity - line.quantity) > 10 ** -6) {
-    throw new Error("QUOTE_LINE_FORMULA_MISMATCH");
+  if (parsed.formula === null) throw new Error(invalidCode);
+  if (Math.abs(parsed.quantity - quantity) > 10 ** -6) {
+    throw new Error(mismatchCode);
   }
+}
+
+function validateQuoteLineFormula(line: QuoteLine): void {
+  validateQuantityFormula(
+    line.quantity,
+    line.quantityFormula,
+    "QUOTE_LINE_FORMULA_INVALID",
+    "QUOTE_LINE_FORMULA_MISMATCH",
+  );
 }
 
 function validateQuoteLineLibrarySource(line: QuoteLine): void {
@@ -186,6 +212,42 @@ function validateQuoteLineLibrarySource(line: QuoteLine): void {
   }
 }
 
+export function calculateQuoteOuvrageUnitPriceCents(components: QuoteOuvrageComponent[]): number {
+  let total = 0;
+  for (const component of components) {
+    const componentTotal = Math.round(component.quantity * component.unitPriceCents);
+    if (!Number.isSafeInteger(componentTotal) || componentTotal < 0) {
+      throw new Error("QUOTE_OUVRAGE_PRICE_INVALID");
+    }
+    total += componentTotal;
+    if (!Number.isSafeInteger(total) || total < 0) {
+      throw new Error("QUOTE_OUVRAGE_PRICE_INVALID");
+    }
+  }
+  return total;
+}
+
+function validateQuoteOuvrageComponents(line: QuoteLine): void {
+  const components = line.components ?? [];
+  if (components.length === 0) return;
+
+  const ids = new Set<string>();
+  for (const component of components) {
+    if (ids.has(component.id)) throw new Error("QUOTE_OUVRAGE_COMPONENT_ID_DUPLICATE");
+    ids.add(component.id);
+    validateQuantityFormula(
+      component.quantity,
+      component.quantityFormula,
+      "QUOTE_OUVRAGE_COMPONENT_FORMULA_INVALID",
+      "QUOTE_OUVRAGE_COMPONENT_FORMULA_MISMATCH",
+    );
+  }
+
+  if (line.unitPriceCents === undefined) throw new Error("QUOTE_OUVRAGE_PRICE_MISSING");
+  const expected = calculateQuoteOuvrageUnitPriceCents(components);
+  if (expected !== line.unitPriceCents) throw new Error("QUOTE_OUVRAGE_PRICE_MISMATCH");
+}
+
 export function parseQuoteModel(value: unknown): QuoteModel {
   const parsed = quoteModelSchema.safeParse(value);
   if (!parsed.success) throw new Error("QUOTE_MODEL_INVALID");
@@ -195,6 +257,7 @@ export function parseQuoteModel(value: unknown): QuoteModel {
     if (item.kind === "LINE") {
       validateQuoteLineFormula(item);
       validateQuoteLineLibrarySource(item);
+      validateQuoteOuvrageComponents(item);
     }
   }
 

@@ -3,11 +3,13 @@ import type { LibraryOuvrage } from "../library/ouvrage";
 import type { LibraryPayload } from "../library/storage";
 import { QUOTE_MAX_QUANTITY } from "./domain";
 import {
+  calculateQuoteOuvrageUnitPriceCents,
   parseQuoteModel,
   type QuoteLibraryComponentSnapshot,
   type QuoteLibraryOuvrageSource,
   type QuoteLine,
   type QuoteModel,
+  type QuoteOuvrageComponent,
 } from "./model";
 
 type QuoteLibraryInsertBase = {
@@ -112,6 +114,26 @@ function snapshotOuvrage(
   };
 }
 
+function quoteComponentFromSnapshot(
+  snapshot: QuoteLibraryComponentSnapshot,
+  quantity: number,
+  id: string = globalThis.crypto.randomUUID(),
+): QuoteOuvrageComponent {
+  return {
+    id,
+    description: snapshot.name,
+    unit: snapshot.unit,
+    quantity,
+    quantityFormula: null,
+    unitPriceCents: snapshot.salePriceCents,
+    librarySource: {
+      schemaVersion: 1,
+      kind: "COMPONENT",
+      component: snapshot,
+    },
+  };
+}
+
 function appendLibraryLine(quote: QuoteModel, line: QuoteLine): QuoteModel {
   return parseQuoteModel({
     ...quote,
@@ -123,16 +145,20 @@ export function insertLibraryComponentIntoQuote(params: QuoteLibraryComponentIns
   const quote = parseQuoteModel(params.quote);
   const component = findComponent(params.library, params.componentId);
   const componentSnapshot = snapshotComponent(component);
+  const components = [
+    quoteComponentFromSnapshot(componentSnapshot, parseInsertQuantity(params.quantity)),
+  ];
 
   return appendLibraryLine(quote, {
     id: params.lineId,
     kind: "LINE",
     parentId: params.parentId ?? null,
     description: component.name,
-    unit: component.unit,
-    quantity: parseInsertQuantity(params.quantity),
+    unit: "u",
+    quantity: 1,
     quantityFormula: null,
-    unitPriceCents: component.salePriceCents,
+    unitPriceCents: calculateQuoteOuvrageUnitPriceCents(components),
+    components,
     librarySource: {
       schemaVersion: 1,
       kind: "COMPONENT",
@@ -145,16 +171,20 @@ export function insertLibraryOuvrageIntoQuote(params: QuoteLibraryOuvrageInsert)
   const quote = parseQuoteModel(params.quote);
   const ouvrage = findOuvrage(params.library, params.ouvrageId);
   const ouvrageSnapshot = snapshotOuvrage(params.library, ouvrage);
+  const components = ouvrageSnapshot.components.map((line) =>
+    quoteComponentFromSnapshot(line.component, line.quantity, line.sourceLineId),
+  );
 
   return appendLibraryLine(quote, {
     id: params.lineId,
     kind: "LINE",
     parentId: params.parentId ?? null,
     description: ouvrage.name,
-    unit: "",
+    unit: "u",
     quantity: parseInsertQuantity(params.quantity),
     quantityFormula: null,
-    unitPriceCents: ouvrageSnapshot.salePriceCents,
+    unitPriceCents: calculateQuoteOuvrageUnitPriceCents(components),
+    components,
     librarySource: ouvrageSnapshot,
   });
 }
