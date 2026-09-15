@@ -26,6 +26,10 @@ declare global {
         kind: "commercial-case";
         storagePath: string;
       }) => Promise<{ ok: true } | { ok: false; error: string }>;
+      openBusinessFile: (input: {
+        kind: "commercial-document";
+        storagePath: string;
+      }) => Promise<{ ok: true } | { ok: false; error: string }>;
     };
   }
 }
