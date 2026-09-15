@@ -27,9 +27,7 @@ function addAmount(total: number, amount: number): number {
   return next;
 }
 
-export function calculateQuoteEconomicSummary(
-  items: QuoteItem[],
-): QuoteEconomicSummary {
+export function calculateQuoteEconomicSummary(items: QuoteItem[]): QuoteEconomicSummary {
   let totalSaleCents = 0;
   let totalCostCents = 0;
   let costComplete = true;
@@ -54,10 +52,7 @@ export function calculateQuoteEconomicSummary(
       continue;
     }
 
-    totalCostCents = addAmount(
-      totalCostCents,
-      lineAmountCents(item.quantity, unitCostCents),
-    );
+    totalCostCents = addAmount(totalCostCents, lineAmountCents(item.quantity, unitCostCents));
   }
 
   if (!costComplete) {
@@ -74,9 +69,6 @@ export function calculateQuoteEconomicSummary(
     totalSaleCents,
     totalCostCents,
     marginAmountCents,
-    marginPercent: calculateQuoteOuvrageMarginPercent(
-      totalSaleCents,
-      totalCostCents,
-    ),
+    marginPercent: calculateQuoteOuvrageMarginPercent(totalSaleCents, totalCostCents),
   };
 }
