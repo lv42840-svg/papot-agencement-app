@@ -43,6 +43,7 @@ const upsertLineMutationSchema = z.object({
 
 const ouvrageComponentMutationSchema = z.object({
   id: z.string().uuid().optional(),
+  libraryComponentId: z.string().uuid().optional(),
   description: z.string().trim().min(1).max(4000),
   unit: z.string().trim().max(40),
   quantityInput: z.string().trim().min(1).max(QUOTE_MAX_QUANTITY_EXPRESSION_LENGTH),
@@ -223,6 +224,7 @@ function upsertDraftOuvrage(
   input: Extract<QuotesMutation, { action: "upsertOuvrage" }>,
   actor: QuotesActor,
   now: Date,
+  libraryComponentSources?: ReadonlyMap<string, QuoteLibraryComponentSource>,
 ): QuotesMutationResult {
   const { quoteIndex, existingLine, existingIndex } = findDraftLine(
     payload,
@@ -239,10 +241,19 @@ function upsertDraftOuvrage(
     const existingComponent = componentInput.id
       ? existingComponents.get(componentInput.id)
       : undefined;
+    const selectedLibrarySource = componentInput.libraryComponentId
+      ? libraryComponentSources?.get(componentInput.libraryComponentId)
+      : undefined;
+    if (componentInput.libraryComponentId && !selectedLibrarySource) {
+      throw new Error("QUOTE_LIBRARY_COMPONENT_NOT_FOUND");
+    }
+
     const preservedCost =
       existingComponent?.costPriceCents ??
-      existingComponent?.librarySource?.component.costPriceCents;
+      existingComponent?.librarySource?.component.costPriceCents ??
+      selectedLibrarySource?.component.costPriceCents;
     const costPriceCents = componentInput.costPriceCents ?? preservedCost;
+    const librarySource = selectedLibrarySource ?? existingComponent?.librarySource;
 
     return {
       id: componentInput.id ?? globalThis.crypto.randomUUID(),
@@ -252,9 +263,7 @@ function upsertDraftOuvrage(
       quantityFormula: parsedComponentQuantity.formula,
       ...(costPriceCents !== undefined ? { costPriceCents } : {}),
       unitPriceCents: componentInput.unitPriceCents,
-      ...(existingComponent?.librarySource
-        ? { librarySource: existingComponent.librarySource }
-        : {}),
+      ...(librarySource ? { librarySource } : {}),
     };
   });
 
@@ -288,13 +297,14 @@ export function applyQuotesMutation(
   clientId?: string,
   now: Date = new Date(),
   librarySource?: QuoteLibraryComponentSource,
+  libraryComponentSources?: ReadonlyMap<string, QuoteLibraryComponentSource>,
 ): QuotesMutationResult {
   const payload = structuredClone(parseNativeQuotesPayload(source));
   if (input.action === "createDraft") {
     return createDraft(payload, input, actor, clientId, now);
   }
   if (input.action === "upsertOuvrage") {
-    return upsertDraftOuvrage(payload, input, actor, now);
+    return upsertDraftOuvrage(payload, input, actor, now, libraryComponentSources);
   }
   return upsertDraftLine(payload, input, actor, now, librarySource);
 }
