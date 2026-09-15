@@ -23,6 +23,7 @@ import { useSearchParams } from "next/navigation";
 import { FormEvent, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { CommercialAffairQuotes } from "@/components/commercial-affair-quotes";
 import { clientWorkspaceHref } from "@/lib/clients/navigation";
+import { collectDroppedFiles } from "@/lib/commercial/document-drop";
 import {
   COMMERCIAL_DOCUMENT_CATEGORY_LABELS,
   COMMERCIAL_STATUS_LABELS,
@@ -66,6 +67,12 @@ const errors: Record<string, string> = {
   COMMERCIAL_CONFIRMATION_DATE_REQUIRED: "La date prévisionnelle de confirmation est obligatoire.",
   COMMERCIAL_INSTALL_DATE_REQUIRED: "La date prévisionnelle de pose est obligatoire.",
   COMMERCIAL_SOURCE_TASK_ALREADY_LINKED: "Cette entrée est déjà rattachée à une affaire.",
+  COMMERCIAL_DOCUMENTS_REQUIRED: "Aucun fichier à ajouter.",
+  COMMERCIAL_DOCUMENTS_TOO_MANY: "Tu peux ajouter jusqu’à 12 documents à la fois.",
+  COMMERCIAL_DOCUMENT_TOO_LARGE: "Un document dépasse la limite de 100 Mo.",
+  COMMERCIAL_DOCUMENT_NAME_REQUIRED: "Un document n’a pas de nom exploitable.",
+  SERVER_FILE_ROOT_UNAVAILABLE:
+    "Le stockage local des documents n’est pas disponible sur ce poste.",
   MODULE_FORBIDDEN: "Ton profil n’autorise pas cette action.",
 };
 
@@ -1005,48 +1012,100 @@ function Documents({
   ) => Promise<Snapshot | null>;
 }) {
   const inputRef = useRef<HTMLInputElement>(null);
+  const dragDepth = useRef(0);
   const [category, setCategory] = useState<CommercialDocumentCategory>("RECEIVED");
+  const [dragging, setDragging] = useState(false);
+  const categoryLabel = COMMERCIAL_DOCUMENT_CATEGORY_LABELS[category];
+
+  function uploadFiles(files: File[]) {
+    if (busy || files.length === 0) return;
+    void upload(item.id, files, category);
+  }
+
   return (
     <section className="commercialV2Section">
       <h3>
         <Paperclip size={15} /> Documents de l’affaire
       </h3>
       <p className="commercialV2Info">
-        Nextcloud stocke les fichiers et les métadonnées de l’affaire. Les anciens devis et
-        déboursés restent consultables comme documents historiques.
+        Choisis la catégorie puis glisse les fichiers ici ou utilise Ajouter. PAPOT les classe
+        automatiquement dans le dossier de l’affaire.
       </p>
       {canModify ? (
-        <div className="commercialV2Upload">
-          <select
-            value={category}
-            onChange={(event) => setCategory(event.target.value as CommercialDocumentCategory)}
-          >
-            {Object.entries(COMMERCIAL_DOCUMENT_CATEGORY_LABELS).map(([value, label]) => (
-              <option key={value} value={value}>
-                {label}
-              </option>
-            ))}
-          </select>
-          <input
-            ref={inputRef}
-            type="file"
-            multiple
-            hidden
-            onChange={(event) => {
-              const files = Array.from(event.target.files ?? []);
-              event.currentTarget.value = "";
-              void upload(item.id, files, category);
+        <>
+          <div className="commercialV2Upload">
+            <label className="commercialV2UploadCategory">
+              <span>Classer dans</span>
+              <select
+                value={category}
+                onChange={(event) => setCategory(event.target.value as CommercialDocumentCategory)}
+                disabled={busy}
+              >
+                {Object.entries(COMMERCIAL_DOCUMENT_CATEGORY_LABELS).map(([value, label]) => (
+                  <option key={value} value={value}>
+                    {label}
+                  </option>
+                ))}
+              </select>
+            </label>
+            <input
+              ref={inputRef}
+              type="file"
+              multiple
+              hidden
+              onChange={(event) => {
+                const files = Array.from(event.target.files ?? []);
+                event.currentTarget.value = "";
+                uploadFiles(files);
+              }}
+            />
+            <button
+              className="secondaryButton"
+              type="button"
+              disabled={busy}
+              onClick={() => inputRef.current?.click()}
+            >
+              <Upload size={14} /> Ajouter
+            </button>
+          </div>
+          <div
+            className={`commercialV2DropZone${dragging ? " dragging" : ""}${busy ? " busy" : ""}`}
+            aria-label={`Déposer des documents dans ${categoryLabel}`}
+            aria-disabled={busy}
+            onDragEnter={(event) => {
+              if (busy || !Array.from(event.dataTransfer.types).includes("Files")) return;
+              event.preventDefault();
+              dragDepth.current += 1;
+              setDragging(true);
             }}
-          />
-          <button
-            className="secondaryButton"
-            type="button"
-            disabled={busy}
-            onClick={() => inputRef.current?.click()}
+            onDragOver={(event) => {
+              if (busy || !Array.from(event.dataTransfer.types).includes("Files")) return;
+              event.preventDefault();
+              event.dataTransfer.dropEffect = "copy";
+            }}
+            onDragLeave={(event) => {
+              if (!dragging) return;
+              event.preventDefault();
+              dragDepth.current = Math.max(0, dragDepth.current - 1);
+              if (dragDepth.current === 0) setDragging(false);
+            }}
+            onDrop={(event) => {
+              event.preventDefault();
+              dragDepth.current = 0;
+              setDragging(false);
+              if (busy) return;
+              uploadFiles(collectDroppedFiles(event.dataTransfer.items, event.dataTransfer.files));
+            }}
           >
-            <Upload size={14} /> Ajouter
-          </button>
-        </div>
+            <Upload size={24} />
+            <div>
+              <strong>
+                {dragging ? "Dépose les fichiers ici" : "Glisse-dépose tes fichiers ici"}
+              </strong>
+              <span>Classement automatique : {categoryLabel}</span>
+            </div>
+          </div>
+        </>
       ) : null}
       <div className="commercialV2Docs">
         {item.documents.length ? (
@@ -1506,8 +1565,50 @@ function CommercialV2Styles() {
         font-size: 9px;
         line-height: 1.5;
       }
-      .commercialV2Upload select {
+      .commercialV2Upload {
+        align-items: end;
+      }
+      .commercialV2UploadCategory {
         width: 260px;
+      }
+      .commercialV2UploadCategory select {
+        width: 100%;
+      }
+      .commercialV2DropZone {
+        min-height: 108px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        gap: 12px;
+        padding: 18px;
+        border: 1.5px dashed #cec5e8;
+        border-radius: 11px;
+        background: #fbf9ff;
+        color: #756a8f;
+        transition:
+          border-color 120ms ease,
+          background 120ms ease,
+          transform 120ms ease;
+      }
+      .commercialV2DropZone.dragging {
+        border-color: #7563d7;
+        background: #f1edff;
+        transform: scale(1.005);
+      }
+      .commercialV2DropZone.busy {
+        opacity: 0.6;
+      }
+      .commercialV2DropZone > div {
+        display: grid;
+        gap: 3px;
+      }
+      .commercialV2DropZone strong {
+        color: #514b63;
+        font-size: 11px;
+      }
+      .commercialV2DropZone span {
+        color: #867d99;
+        font-size: 9px;
       }
       .commercialV2Docs {
         display: grid;
@@ -1604,6 +1705,13 @@ function CommercialV2Styles() {
         }
         .commercialV2Search {
           min-width: 0;
+        }
+        .commercialV2Upload {
+          align-items: stretch;
+          flex-direction: column;
+        }
+        .commercialV2UploadCategory {
+          width: 100%;
         }
       }
     `}</style>
