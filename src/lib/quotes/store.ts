@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { quotePricingConfigSchema } from "./adjustments";
 import { quoteStatusSchema, quoteVersionSchema } from "./domain";
 import { quoteModelSchema } from "./model";
 
@@ -15,6 +16,10 @@ export const nativeQuoteRecordSchema = z
     sentAt: isoDateTimeSchema.nullable().optional().default(null),
     followUpDate: dateOnlySchema.nullable().optional().default(null),
     internalNotes: z.string().trim().max(20_000).optional().default(""),
+    pricingConfig: quotePricingConfigSchema.optional().default({
+      adjustments: [],
+      options: [],
+    }),
     model: quoteModelSchema,
     createdAt: isoDateTimeSchema,
     createdByName: z.string().trim().min(1).max(160),

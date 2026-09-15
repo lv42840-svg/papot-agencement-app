@@ -1,7 +1,7 @@
 "use client";
 
+import { calculateQuoteAdjustedPricing } from "@/lib/quotes/adjustments";
 import type { NativeQuoteRecord } from "@/lib/quotes/store";
-import { calculateQuoteEconomicSummary } from "@/lib/quotes/summary";
 
 const moneyFormatter = new Intl.NumberFormat("fr-FR", {
   style: "currency",
@@ -23,7 +23,7 @@ function formatPercent(value: number | null): string {
 }
 
 export function QuoteFixedSummary({ quote }: { quote: NativeQuoteRecord }) {
-  const summary = calculateQuoteEconomicSummary(quote.model.items);
+  const summary = calculateQuoteAdjustedPricing(quote.model.items, quote.pricingConfig);
   const marginMissing = summary.marginAmountCents === null;
   const marginNegative = summary.marginAmountCents !== null && summary.marginAmountCents < 0;
 
@@ -34,9 +34,15 @@ export function QuoteFixedSummary({ quote }: { quote: NativeQuoteRecord }) {
       aria-live="polite"
     >
       <div className="quoteSummaryMetric">
-        <span>Total HT</span>
+        <span>Total HT principal</span>
         <strong>{formatMoney(summary.totalSaleCents)}</strong>
       </div>
+      {summary.pendingOptionsSaleCents > 0 ? (
+        <div className="quoteSummaryMetric optionMetric">
+          <span>Options hors total</span>
+          <strong>{formatMoney(summary.pendingOptionsSaleCents)}</strong>
+        </div>
+      ) : null}
       <div
         className={`quoteSummaryMetric${marginMissing ? " isMissing" : marginNegative ? " isNegative" : ""}`}
       >
@@ -76,6 +82,9 @@ export function QuoteFixedSummary({ quote }: { quote: NativeQuoteRecord }) {
           padding: 7px 10px;
           border-radius: 8px;
           background: #faf8ff;
+        }
+        .quoteSummaryMetric.optionMetric {
+          background: #fff9ec;
         }
         .quoteSummaryMetric > span {
           color: var(--muted);
