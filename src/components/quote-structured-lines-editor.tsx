@@ -20,6 +20,11 @@ import {
   parseLibraryPayload,
   type LibraryPayload,
 } from "@/lib/library/storage";
+import {
+  canMoveQuoteComponent,
+  moveQuoteComponent,
+  type QuoteComponentMoveDirection,
+} from "@/lib/quotes/component-order";
 import { parseQuoteQuantityInput } from "@/lib/quotes/domain";
 import {
   publishQuoteComponentToLibrary,
@@ -809,6 +814,10 @@ export function QuoteStructuredLinesEditor({
     setLibraryPickerOpen(false);
   }
 
+  function moveComponent(index: number, direction: QuoteComponentMoveDirection) {
+    setComponents((current) => moveQuoteComponent(current, index, direction));
+  }
+
   function removeComponent(index: number) {
     setComponents((current) => {
       if (current.length <= 1) return current;
@@ -1463,16 +1472,38 @@ export function QuoteStructuredLinesEditor({
                   aria-label={`Prix vente composant ${index + 1}`}
                 />
                 <strong>{total === null ? "—" : formatMoney(total)}</strong>
-                <button
-                  type="button"
-                  className="quoteDeleteComponent"
-                  onClick={() => removeComponent(index)}
-                  disabled={components.length === 1}
-                  aria-label={`Supprimer le composant ${index + 1}`}
-                  title="Supprimer le composant"
-                >
-                  <Trash2 size={13} aria-hidden="true" />
-                </button>
+                <div className="quoteComponentActions">
+                  <button
+                    type="button"
+                    className="miniActionButton"
+                    onClick={() => moveComponent(index, "UP")}
+                    disabled={!canMoveQuoteComponent(components.length, index, "UP")}
+                    aria-label={`Remonter le composant ${index + 1}`}
+                    title="Remonter le composant"
+                  >
+                    <ArrowUp size={13} aria-hidden="true" />
+                  </button>
+                  <button
+                    type="button"
+                    className="miniActionButton"
+                    onClick={() => moveComponent(index, "DOWN")}
+                    disabled={!canMoveQuoteComponent(components.length, index, "DOWN")}
+                    aria-label={`Descendre le composant ${index + 1}`}
+                    title="Descendre le composant"
+                  >
+                    <ArrowDown size={13} aria-hidden="true" />
+                  </button>
+                  <button
+                    type="button"
+                    className="quoteDeleteComponent"
+                    onClick={() => removeComponent(index)}
+                    disabled={components.length === 1}
+                    aria-label={`Supprimer le composant ${index + 1}`}
+                    title="Supprimer le composant"
+                  >
+                    <Trash2 size={13} aria-hidden="true" />
+                  </button>
+                </div>
               </div>
             );
           })}
@@ -1753,6 +1784,7 @@ export function QuoteStructuredLinesEditor({
         .quoteLibrarySearch,
         .quoteLibraryResult,
         .quoteComponentNameEdit,
+        .quoteComponentActions,
         .quoteAddActions {
           display: flex;
           align-items: center;
@@ -1971,7 +2003,7 @@ export function QuoteStructuredLinesEditor({
         .quoteComponentsHeader,
         .quoteComponentRow {
           display: grid;
-          grid-template-columns: minmax(220px, 1fr) 82px 70px 105px 82px 105px 105px 34px;
+          grid-template-columns: minmax(220px, 1fr) 82px 70px 105px 82px 105px 105px 92px;
           gap: 8px;
           align-items: center;
           padding: 7px 10px;
@@ -1992,6 +2024,10 @@ export function QuoteStructuredLinesEditor({
         }
         .quoteComponentTitleActions {
           gap: 5px;
+        }
+        .quoteComponentActions {
+          justify-content: flex-end;
+          gap: 4px;
         }
         .quoteComponentNameEdit {
           gap: 5px;
