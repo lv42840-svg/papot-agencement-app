@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { ArrowLeft, FileText } from "lucide-react";
+import { ArrowLeft } from "lucide-react";
 import { useMemo, useState } from "react";
 import { QuoteLinesEditor } from "@/components/quote-lines-editor";
 import { QuoteSendAction } from "@/components/quote-send-action";
@@ -34,16 +34,14 @@ export function QuoteDirectEditor({
             {quote.variantName} · V{quote.version}
           </span>
         </div>
-        <Link href="/devis" className="secondaryButton quoteDirectBack">
-          <ArrowLeft size={14} /> Tous les devis
-        </Link>
+        <div className="quoteDirectActions">
+          <Link href="/devis" className="secondaryButton quoteDirectBack">
+            <ArrowLeft size={14} /> Tous les devis
+          </Link>
+          <QuoteSendAction quote={quote} canWrite={canWrite} onSaved={setPayload} />
+        </div>
       </section>
 
-      <div className="quoteDirectHint">
-        <FileText size={14} /> Devis ouvert directement depuis le suivi de l’affaire.
-      </div>
-
-      <QuoteSendAction quote={quote} canWrite={canWrite} onSaved={setPayload} />
       <QuoteLinesEditor quote={quote} canWrite={canWrite} onSaved={setPayload} />
 
       <style jsx>{`
@@ -66,22 +64,18 @@ export function QuoteDirectEditor({
           color: var(--muted);
           font-size: 11px;
         }
+        .quoteDirectActions {
+          display: flex;
+          align-items: center;
+          justify-content: flex-end;
+          gap: 8px;
+          flex-wrap: wrap;
+        }
         .quoteDirectHeader :global(.quoteDirectBack) {
           display: inline-flex;
           align-items: center;
           gap: 6px;
           text-decoration: none;
-        }
-        .quoteDirectHint {
-          padding: 9px 12px;
-          display: flex;
-          align-items: center;
-          gap: 7px;
-          border: 1px solid #e1daf4;
-          border-radius: 8px;
-          background: #faf8ff;
-          color: #74688b;
-          font-size: 10px;
         }
       `}</style>
     </div>

@@ -1,6 +1,5 @@
 import { DesktopAppShell } from "@/components/desktop-app-shell";
 import { QuoteCreateWorkspace } from "@/components/quote-create-workspace";
-import { QuoteModuleNav } from "@/components/quote-module-nav";
 import { createClientsRepository } from "@/lib/clients/create-repository";
 import { clientDisplayName } from "@/lib/clients/domain";
 import { createCommercialRepository } from "@/lib/commercial/create-repository";
@@ -35,7 +34,6 @@ export default async function NewQuotePage() {
 
   return (
     <DesktopAppShell>
-      <QuoteModuleNav />
       <QuoteCreateWorkspace
         affairs={affairs}
         canWrite={context.moduleAccess.canWrite}
