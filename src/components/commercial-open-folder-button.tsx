@@ -43,9 +43,7 @@ export function CommercialOpenFolderButton({
         creationYear: new Date(createdAt).getFullYear(),
       });
       if (!result.ok) {
-        setError(
-          folderErrors[result.error] ?? folderErrors.DESKTOP_BUSINESS_FOLDER_OPEN_FAILED,
-        );
+        setError(folderErrors[result.error] ?? folderErrors.DESKTOP_BUSINESS_FOLDER_OPEN_FAILED);
       }
     } catch {
       setError(folderErrors.DESKTOP_BUSINESS_FOLDER_OPEN_FAILED);
