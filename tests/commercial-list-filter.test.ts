@@ -76,9 +76,11 @@ describe("commercial list filters", () => {
 
     const now = new Date("2026-09-15T08:00:00.000Z");
 
-    expect(filterCommercialCases(payload.cases, "active", now).map((item) => item.name).sort()).toEqual(
-      ["Devis envoyé", "Piste active"],
-    );
+    expect(
+      filterCommercialCases(payload.cases, "active", now)
+        .map((item) => item.name)
+        .sort(),
+    ).toEqual(["Devis envoyé", "Piste active"]);
     expect(filterCommercialCases(payload.cases, "follow-up", now).map((item) => item.name)).toEqual([
       "Devis envoyé",
     ]);
