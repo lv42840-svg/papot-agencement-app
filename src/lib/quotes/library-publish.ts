@@ -32,18 +32,21 @@ function sameLibraryPricing(
 ): boolean {
   const source = component.librarySource?.component;
   if (!source || source.sourceComponentId !== candidate.id) return false;
+  const activity = component.activity ?? source.activity;
 
   return (
     component.description === source.name &&
     component.unit === source.unit &&
     costPriceCents === source.costPriceCents &&
     component.unitPriceCents === source.salePriceCents &&
+    activity === source.activity &&
     candidate.name === source.name &&
     candidate.description === source.description &&
     candidate.unit === source.unit &&
     candidate.costPriceCents === source.costPriceCents &&
     candidate.marginPercent === source.marginPercent &&
-    candidate.salePriceCents === source.salePriceCents
+    candidate.salePriceCents === source.salePriceCents &&
+    candidate.activity === source.activity
   );
 }
 
@@ -80,6 +83,7 @@ function libraryComponentFromQuoteComponent(
     throw new Error("QUOTE_LIBRARY_COMPONENT_PRICING_INVALID");
   }
 
+  const activity = component.activity ?? component.librarySource?.component.activity;
   return {
     id,
     name,
@@ -88,6 +92,7 @@ function libraryComponentFromQuoteComponent(
     costPriceCents,
     marginPercent,
     salePriceCents: component.unitPriceCents,
+    ...(activity ? { activity } : {}),
   };
 }
 

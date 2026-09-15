@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { productionActivitySchema } from "../production-activity";
 
 const priceCentsSchema = z.number().int().safe().min(0);
 const marginPercentSchema = z.number().finite().min(0);
@@ -11,6 +12,7 @@ export const libraryComponentSchema = z.object({
   costPriceCents: priceCentsSchema,
   marginPercent: marginPercentSchema,
   salePriceCents: priceCentsSchema,
+  activity: productionActivitySchema.optional(),
 });
 
 export type LibraryComponent = z.infer<typeof libraryComponentSchema>;

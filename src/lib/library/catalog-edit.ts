@@ -1,5 +1,6 @@
 import { parseLibraryComponent, type LibraryComponent } from "./component";
 import { parseLibraryOuvrage, type LibraryOuvrage } from "./ouvrage";
+import { isRequiredLaborComponentId } from "./required-labor-components";
 import { parseLibraryPayload, type LibraryPayload } from "./storage";
 
 export function upsertLibraryComponent(
@@ -25,6 +26,7 @@ export function removeLibraryComponent(
 ): LibraryPayload {
   const component = payload.components.find((item) => item.id === componentId);
   if (!component) throw new Error("LIBRARY_COMPONENT_NOT_FOUND");
+  if (isRequiredLaborComponentId(componentId)) throw new Error("LIBRARY_COMPONENT_REQUIRED");
 
   const usedByOuvrage = payload.ouvrages.some((ouvrage) =>
     ouvrage.components.some((line) => line.componentId === componentId),

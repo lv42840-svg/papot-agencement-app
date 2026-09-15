@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { productionActivitySchema } from "../production-activity";
 import {
   QUOTE_MAX_QUANTITY,
   QUOTE_MAX_QUANTITY_EXPRESSION_LENGTH,
@@ -25,6 +26,7 @@ export const quoteLibraryComponentSnapshotSchema = z
     costPriceCents: quoteMoneyCentsSchema,
     marginPercent: z.number().finite().min(0),
     salePriceCents: quoteMoneyCentsSchema,
+    activity: productionActivitySchema.optional(),
   })
   .strict();
 
@@ -84,6 +86,7 @@ export const quoteOuvrageComponentSchema = z.object({
   quantityFormula: z.string().trim().min(1).max(QUOTE_MAX_QUANTITY_EXPRESSION_LENGTH).nullable(),
   costPriceCents: quoteMoneyCentsSchema.optional(),
   unitPriceCents: quoteMoneyCentsSchema,
+  activity: productionActivitySchema.optional(),
   librarySource: quoteLibraryComponentSourceSchema.optional(),
 });
 
