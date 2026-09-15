@@ -19,10 +19,9 @@ describe("desktop business folder", () => {
     expect(
       resolveBusinessFolderPath(root, {
         kind: "commercial-case",
-        storagePath:
-          "documents/commercial/2026/Dupont_Cuisine Lyon/Documents reçus/plan client.pdf",
+        storagePath: "Commercial/2026/Dupont_Cuisine Lyon/Documents reçus/plan client.pdf",
       }),
-    ).toBe(path.join(root, "documents", "commercial", "2026", "Dupont_Cuisine Lyon"));
+    ).toBe(path.join(root, "Commercial", "2026", "Dupont_Cuisine Lyon"));
   });
 
   it("keeps legacy affair folders openable", () => {
@@ -43,7 +42,7 @@ describe("desktop business folder", () => {
     expect(() =>
       resolveBusinessFolderPath(root, {
         kind: "arbitrary-path",
-        storagePath: "documents/commercial/2026/Dupont_Cuisine/Devis/devis.pdf",
+        storagePath: "Commercial/2026/Dupont_Cuisine/Devis/devis.pdf",
       }),
     ).toThrow("DESKTOP_BUSINESS_FOLDER_INVALID");
   });
@@ -54,7 +53,7 @@ describe("desktop business folder", () => {
     expect(() =>
       resolveBusinessFolderPath(root, {
         kind: "commercial-case",
-        storagePath: "documents/commercial/2026/../../Windows/system.ini",
+        storagePath: "Commercial/2026/../../Windows/system.ini",
       }),
     ).toThrow("DESKTOP_BUSINESS_FOLDER_INVALID");
   });
@@ -65,7 +64,7 @@ describe("desktop business folder", () => {
     expect(() =>
       resolveBusinessFolderPath(root, {
         kind: "commercial-case",
-        storagePath: "documents/chantiers/2026/Dupont_Cuisine/Plans/plan.pdf",
+        storagePath: "Chantier/2026/Dupont_Cuisine/Plans/plan.pdf",
       }),
     ).toThrow("DESKTOP_BUSINESS_FOLDER_INVALID");
   });
