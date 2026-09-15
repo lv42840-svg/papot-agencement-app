@@ -14,6 +14,7 @@ export const nativeQuoteRecordSchema = z
     status: quoteStatusSchema,
     sentAt: isoDateTimeSchema.nullable().optional().default(null),
     followUpDate: dateOnlySchema.nullable().optional().default(null),
+    internalNotes: z.string().trim().max(20_000).optional().default(""),
     model: quoteModelSchema,
     createdAt: isoDateTimeSchema,
     createdByName: z.string().trim().min(1).max(160),
