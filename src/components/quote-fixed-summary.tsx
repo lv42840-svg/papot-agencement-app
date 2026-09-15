@@ -25,8 +25,7 @@ function formatPercent(value: number | null): string {
 export function QuoteFixedSummary({ quote }: { quote: NativeQuoteRecord }) {
   const summary = calculateQuoteEconomicSummary(quote.model.items);
   const marginMissing = summary.marginAmountCents === null;
-  const marginNegative =
-    summary.marginAmountCents !== null && summary.marginAmountCents < 0;
+  const marginNegative = summary.marginAmountCents !== null && summary.marginAmountCents < 0;
 
   return (
     <aside
