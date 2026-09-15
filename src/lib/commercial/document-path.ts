@@ -42,7 +42,11 @@ export function commercialDocumentStoragePath(input: {
   category: CommercialDocumentCategory;
   fileName: string;
 }): string {
-  if (!Number.isInteger(input.creationYear) || input.creationYear < 2000 || input.creationYear > 9999) {
+  if (
+    !Number.isInteger(input.creationYear) ||
+    input.creationYear < 2000 ||
+    input.creationYear > 9999
+  ) {
     throw new Error("COMMERCIAL_DOCUMENT_YEAR_INVALID");
   }
 
