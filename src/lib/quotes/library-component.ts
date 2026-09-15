@@ -3,6 +3,7 @@ import {
   parseLibraryComponent,
   type LibraryComponent,
 } from "../library/component";
+import type { ProductionActivity } from "../production-activity";
 import type { QuoteLibraryComponentSource } from "./model";
 
 export function createLibraryComponentFromQuoteLine(input: {
@@ -12,6 +13,7 @@ export function createLibraryComponentFromQuoteLine(input: {
   unit: string;
   costPriceCents: number;
   salePriceCents: number;
+  activity?: ProductionActivity;
 }): { component: LibraryComponent; source: QuoteLibraryComponentSource } {
   if (!input.unit.trim()) throw new Error("LIBRARY_COMPONENT_UNIT_REQUIRED");
 
@@ -26,6 +28,7 @@ export function createLibraryComponentFromQuoteLine(input: {
       input.salePriceCents,
     ),
     salePriceCents: input.salePriceCents,
+    ...(input.activity ? { activity: input.activity } : {}),
   });
 
   return {
@@ -41,6 +44,7 @@ export function createLibraryComponentFromQuoteLine(input: {
         costPriceCents: component.costPriceCents,
         marginPercent: component.marginPercent,
         salePriceCents: component.salePriceCents,
+        ...(component.activity ? { activity: component.activity } : {}),
       },
     },
   };

@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { productionActivitySchema } from "../production-activity";
 import {
   QUOTE_DEFAULT_VALIDITY_DAYS,
   QUOTE_MAX_QUANTITY_EXPRESSION_LENGTH,
@@ -16,6 +17,7 @@ import {
   type QuoteSection,
   type QuoteSubsection,
 } from "./model";
+import { reorderQuoteItems } from "./item-reorder";
 import {
   nativeQuoteRecordSchema,
   parseNativeQuotesPayload,
@@ -52,6 +54,7 @@ const ouvrageComponentMutationSchema = z.object({
   quantityInput: z.string().trim().min(1).max(QUOTE_MAX_QUANTITY_EXPRESSION_LENGTH),
   costPriceCents: quoteMoneyCentsSchema.optional(),
   unitPriceCents: quoteMoneyCentsSchema,
+  activity: productionActivitySchema.optional(),
 });
 
 const upsertOuvrageMutationSchema = z.object({
@@ -77,6 +80,14 @@ const moveLineMutationSchema = z.object({
   quoteId: z.string().uuid(),
   lineId: z.string().uuid(),
   direction: z.enum(["UP", "DOWN"]),
+});
+
+const reorderItemMutationSchema = z.object({
+  action: z.literal("reorderItem"),
+  quoteId: z.string().uuid(),
+  itemId: z.string().uuid(),
+  targetId: z.string().uuid(),
+  placement: z.enum(["BEFORE", "AFTER", "INSIDE"]),
 });
 
 const moveHeadingMutationSchema = z.object({
@@ -119,6 +130,7 @@ export const quotesMutationSchema = z.discriminatedUnion("action", [
   upsertOuvrageMutationSchema,
   duplicateLineMutationSchema,
   moveLineMutationSchema,
+  reorderItemMutationSchema,
   moveHeadingMutationSchema,
   duplicateHeadingMutationSchema,
   deleteItemMutationSchema,
@@ -315,6 +327,25 @@ function moveDraftLine(
 
   const items = [...quote.model.items];
   [items[existingIndex], items[targetIndex]] = [items[targetIndex], items[existingIndex]];
+  const timestamp = now.toISOString();
+  const updated = nativeQuoteRecordSchema.parse({
+    ...quote,
+    model: parseQuoteModel({ ...quote.model, items }),
+    updatedAt: timestamp,
+    updatedByName: actor.displayName,
+  });
+  payload.quotes[quoteIndex] = updated;
+  return { payload, focusQuoteId: updated.id };
+}
+
+function reorderDraftItem(
+  payload: NativeQuotesPayload,
+  input: Extract<QuotesMutation, { action: "reorderItem" }>,
+  actor: QuotesActor,
+  now: Date,
+): QuotesMutationResult {
+  const { quoteIndex, quote } = findDraftQuote(payload, input.quoteId);
+  const items = reorderQuoteItems(quote.model.items, input.itemId, input.targetId, input.placement);
   const timestamp = now.toISOString();
   const updated = nativeQuoteRecordSchema.parse({
     ...quote,
@@ -635,6 +666,11 @@ function upsertDraftOuvrage(
       selectedLibrarySource?.component.costPriceCents;
     const costPriceCents = componentInput.costPriceCents ?? preservedCost;
     const librarySource = selectedLibrarySource ?? existingComponent?.librarySource;
+    const activity =
+      componentInput.activity ??
+      existingComponent?.activity ??
+      selectedLibrarySource?.component.activity ??
+      existingComponent?.librarySource?.component.activity;
 
     return {
       id: componentInput.id ?? globalThis.crypto.randomUUID(),
@@ -644,6 +680,7 @@ function upsertDraftOuvrage(
       quantityFormula: parsedComponentQuantity.formula,
       ...(costPriceCents !== undefined ? { costPriceCents } : {}),
       unitPriceCents: componentInput.unitPriceCents,
+      ...(activity ? { activity } : {}),
       ...(librarySource ? { librarySource } : {}),
     };
   });
@@ -692,6 +729,9 @@ export function applyQuotesMutation(
   }
   if (input.action === "moveLine") {
     return moveDraftLine(payload, input, actor, now);
+  }
+  if (input.action === "reorderItem") {
+    return reorderDraftItem(payload, input, actor, now);
   }
   if (input.action === "moveHeading") {
     return moveDraftHeading(payload, input, actor, now);

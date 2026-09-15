@@ -8,6 +8,11 @@ import {
   type LibraryComponent,
 } from "@/lib/library/component";
 import {
+  ensureRequiredLaborComponents,
+  isRequiredLaborComponentId,
+} from "@/lib/library/required-labor-components";
+import { productionActivityLabel, type ProductionActivity } from "@/lib/production-activity";
+import {
   libraryComponentUsageCount,
   removeLibraryComponent,
   removeLibraryOuvrage,
@@ -30,6 +35,7 @@ type ComponentDraft = {
   name: string;
   description: string;
   unit: string;
+  activity?: ProductionActivity;
   costPriceEuros: string;
   marginPercent: string;
   salePriceEuros: string;
@@ -95,6 +101,8 @@ const errorMessages: Record<string, string> = {
   LIBRARY_COMPONENT_IN_USE:
     "Ce composant est utilisé dans au moins un ouvrage. Retire-le d’abord des ouvrages concernés.",
   LIBRARY_COMPONENT_NOT_FOUND: "Ce composant n’existe plus dans la bibliothèque.",
+  LIBRARY_COMPONENT_REQUIRED:
+    "Les composants Heure BE, Heure atelier et Heure pose sont obligatoires.",
   LIBRARY_OUVRAGE_INVALID:
     "L’ouvrage doit avoir un nom et au moins un composant avec une quantité positive.",
   LIBRARY_OUVRAGE_COMPONENT_NOT_FOUND:
@@ -148,6 +156,7 @@ function componentToDraft(component: LibraryComponent): ComponentDraft {
     name: component.name,
     description: component.description,
     unit: component.unit,
+    activity: component.activity,
     costPriceEuros: centsToInput(component.costPriceCents),
     marginPercent: String(component.marginPercent).replace(".", ","),
     salePriceEuros: centsToInput(component.salePriceCents),
@@ -177,6 +186,7 @@ function componentFromDraft(draft: ComponentDraft): LibraryComponent {
     name: draft.name,
     description: draft.description,
     unit: draft.unit,
+    ...(draft.activity ? { activity: draft.activity } : {}),
     costPriceCents,
     marginPercent,
     salePriceCents,
@@ -232,12 +242,10 @@ function ouvrageFromDraft(draft: OuvrageDraft): LibraryOuvrage {
 }
 
 function snapshotFromEnvelope(envelope: ResourceEnvelope | null): LibrarySnapshot {
-  if (!envelope) {
-    return { version: 0, payload: createInitialLibraryPayload() };
-  }
+  const payload = envelope ? parseLibraryPayload(envelope.payload) : createInitialLibraryPayload();
   return {
-    version: envelope.version,
-    payload: parseLibraryPayload(envelope.payload),
+    version: envelope?.version ?? 0,
+    payload: ensureRequiredLaborComponents(payload),
   };
 }
 
@@ -259,7 +267,10 @@ export function LibraryWorkspace({
   initialSnapshot: LibrarySnapshot;
   canWrite: boolean;
 }) {
-  const [snapshot, setSnapshot] = useState(initialSnapshot);
+  const [snapshot, setSnapshot] = useState(() => ({
+    ...initialSnapshot,
+    payload: ensureRequiredLaborComponents(initialSnapshot.payload),
+  }));
   const [activeTab, setActiveTab] = useState<LibraryTab>("components");
   const [query, setQuery] = useState("");
   const [editor, setEditor] = useState<EditorState>(null);
@@ -275,7 +286,12 @@ export function LibraryWorkspace({
       snapshot.payload.components
         .filter((component) =>
           normalizeSearch(
-            [component.name, component.description, component.unit].join(" "),
+            [
+              component.name,
+              component.description,
+              component.unit,
+              component.activity ? productionActivityLabel(component.activity) : "",
+            ].join(" "),
           ).includes(normalizedQuery),
         )
         .sort((a, b) => a.name.localeCompare(b.name, "fr-FR", { sensitivity: "base" })),
@@ -774,7 +790,15 @@ export function LibraryWorkspace({
                       <tr key={component.id}>
                         <td>
                           <strong>{component.name}</strong>
-                          {component.description ? <small>{component.description}</small> : null}
+                          {component.activity || component.description ? (
+                            <small>
+                              {component.activity
+                                ? `Activité ${productionActivityLabel(component.activity)}`
+                                : ""}
+                              {component.activity && component.description ? " · " : ""}
+                              {component.description}
+                            </small>
+                          ) : null}
                         </td>
                         <td>{component.unit}</td>
                         <td className="numeric">{formatMoney(component.costPriceCents)}</td>
@@ -804,9 +828,15 @@ export function LibraryWorkspace({
                               className="iconButton libraryDeleteButton"
                               type="button"
                               onClick={() => void deleteComponent(component)}
-                              disabled={busy || Boolean(editor)}
+                              disabled={
+                                busy || Boolean(editor) || isRequiredLaborComponentId(component.id)
+                              }
                               aria-label={`Supprimer ${component.name}`}
-                              title="Supprimer"
+                              title={
+                                isRequiredLaborComponentId(component.id)
+                                  ? "Composant métier obligatoire"
+                                  : "Supprimer"
+                              }
                             >
                               <Trash2 size={15} aria-hidden="true" />
                             </button>
@@ -951,6 +981,12 @@ export function LibraryWorkspace({
                       autoFocus
                     />
                   </label>
+
+                  {editor.draft.activity ? (
+                    <p className="libraryPricingHint">
+                      Activité planning fixe : {productionActivityLabel(editor.draft.activity)}.
+                    </p>
+                  ) : null}
 
                   <div className="libraryFormGrid">
                     <label className="libraryField">

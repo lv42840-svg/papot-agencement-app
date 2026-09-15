@@ -55,7 +55,9 @@ export function ensureRequiredLaborComponents(payload: LibraryPayload): LibraryP
   const components = [...payload.components];
 
   for (const required of REQUIRED_LABOR_COMPONENTS) {
-    const existingForActivity = components.find((component) => component.activity === required.activity);
+    const existingForActivity = components.find(
+      (component) => component.activity === required.activity,
+    );
     if (existingForActivity) continue;
 
     const fixedIdIndex = components.findIndex((component) => component.id === required.id);

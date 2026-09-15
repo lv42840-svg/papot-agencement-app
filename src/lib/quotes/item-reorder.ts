@@ -36,9 +36,7 @@ function sourceBlockEnd(items: QuoteItem[], startIndex: number): number {
   return startIndex + 1;
 }
 
-function isDraggableItem(
-  item: QuoteItem,
-): item is QuoteLine | QuoteSection | QuoteSubsection {
+function isDraggableItem(item: QuoteItem): item is QuoteLine | QuoteSection | QuoteSubsection {
   return item.kind === "LINE" || item.kind === "SECTION" || item.kind === "SUBSECTION";
 }
 
@@ -116,10 +114,7 @@ export function reorderQuoteItems(
   }
 
   const sourceBlock = sourceItems.slice(sourceIndex, sourceEnd);
-  const remaining = [
-    ...sourceItems.slice(0, sourceIndex),
-    ...sourceItems.slice(sourceEnd),
-  ];
+  const remaining = [...sourceItems.slice(0, sourceIndex), ...sourceItems.slice(sourceEnd)];
   const remainingTargetIndex = findTargetIndex(remaining, targetId);
   const remainingTarget = remaining[remainingTargetIndex];
 
@@ -151,9 +146,5 @@ export function reorderQuoteItems(
   }
 
   const block = reparentSourceBlock(sourceBlock, source, nextParentId);
-  return [
-    ...remaining.slice(0, insertionIndex),
-    ...block,
-    ...remaining.slice(insertionIndex),
-  ];
+  return [...remaining.slice(0, insertionIndex), ...block, ...remaining.slice(insertionIndex)];
 }
