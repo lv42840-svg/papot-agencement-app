@@ -14,7 +14,7 @@
     "start": "next start",
     "lint": "eslint .",
     "format": "prettier --write .",
-    "format:check": "prettier --write src/components/quote-pricing-adjustments-editor.tsx src/lib/quotes/adjustments.ts && echo '===FORMAT_EDITOR===' && cat src/components/quote-pricing-adjustments-editor.tsx && echo '===FORMAT_ADJUSTMENTS===' && cat src/lib/quotes/adjustments.ts && echo '===FORMAT_END===' && exit 1",
+    "format:check": "prettier --check .",
     "typecheck": "tsc --noEmit",
     "test": "vitest run",
     "nextcloud:probe": "tsx scripts/nextcloud-probe.ts"
