@@ -383,6 +383,7 @@ export function QuoteStructuredLinesEditor({
   const [duplicatingLineId, setDuplicatingLineId] = useState<string | null>(null);
   const [movingLineId, setMovingLineId] = useState<string | null>(null);
   const [movingHeadingId, setMovingHeadingId] = useState<string | null>(null);
+  const [duplicatingHeadingId, setDuplicatingHeadingId] = useState<string | null>(null);
   const [error, setError] = useState("");
   const [notice, setNotice] = useState("");
   const [libraryPayload, setLibraryPayload] = useState<LibraryPayload | null>(null);
@@ -440,6 +441,7 @@ export function QuoteStructuredLinesEditor({
     setDuplicatingLineId(null);
     setMovingLineId(null);
     setMovingHeadingId(null);
+    setDuplicatingHeadingId(null);
     setError("");
     setNotice("");
     setLibraryPickerOpen(false);
@@ -596,6 +598,7 @@ export function QuoteStructuredLinesEditor({
       !quote ||
       !editable ||
       movingHeadingId ||
+      duplicatingHeadingId ||
       movingLineId ||
       duplicatingLineId ||
       formOpen ||
@@ -638,6 +641,51 @@ export function QuoteStructuredLinesEditor({
       setError("Le titre n’a pas pu être déplacé.");
     } finally {
       setMovingHeadingId(null);
+    }
+  }
+
+  async function duplicateHeading(item: QuoteSection | QuoteSubsection) {
+    if (
+      !quote ||
+      !editable ||
+      duplicatingHeadingId ||
+      movingHeadingId ||
+      movingLineId ||
+      duplicatingLineId ||
+      formOpen ||
+      headingEditor
+    ) {
+      return;
+    }
+
+    setDuplicatingHeadingId(item.id);
+    setError("");
+    setNotice("");
+    try {
+      const response = await fetch("/api/desktop/quotes", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          action: "duplicateHeading",
+          quoteId: quote.id,
+          itemId: item.id,
+        }),
+      });
+      const data = (await response.json()) as QuotesApiResponse;
+      if (!response.ok || !data.payload) {
+        setError(lineErrorLabel(data.error ?? "QUOTES_MUTATION_FAILED"));
+        return;
+      }
+      onSaved(data.payload);
+      setNotice(
+        item.kind === "SECTION"
+          ? "Titre dupliqué avec son contenu."
+          : "Sous-titre dupliqué avec son contenu.",
+      );
+    } catch {
+      setError("Le titre n’a pas pu être dupliqué.");
+    } finally {
+      setDuplicatingHeadingId(null);
     }
   }
 
@@ -1603,6 +1651,7 @@ export function QuoteStructuredLinesEditor({
                   formOpen ||
                   headingEditor !== null ||
                   movingHeadingId !== null ||
+                  duplicatingHeadingId !== null ||
                   movingLineId !== null ||
                   !canMoveHeading(item, "UP")
                 }
@@ -1619,6 +1668,7 @@ export function QuoteStructuredLinesEditor({
                   formOpen ||
                   headingEditor !== null ||
                   movingHeadingId !== null ||
+                  duplicatingHeadingId !== null ||
                   movingLineId !== null ||
                   !canMoveHeading(item, "DOWN")
                 }
@@ -1626,6 +1676,23 @@ export function QuoteStructuredLinesEditor({
                 title={item.kind === "SECTION" ? "Descendre le titre" : "Descendre le sous-titre"}
               >
                 <ArrowDown size={14} aria-hidden="true" />
+              </button>
+              <button
+                type="button"
+                className="iconButton"
+                onClick={() => void duplicateHeading(item)}
+                disabled={
+                  formOpen ||
+                  headingEditor !== null ||
+                  movingHeadingId !== null ||
+                  duplicatingHeadingId !== null ||
+                  movingLineId !== null ||
+                  duplicatingLineId !== null
+                }
+                aria-label={`Dupliquer ${item.title}`}
+                title={item.kind === "SECTION" ? "Dupliquer le titre" : "Dupliquer le sous-titre"}
+              >
+                <Copy size={14} aria-hidden="true" />
               </button>
               <button
                 type="button"
