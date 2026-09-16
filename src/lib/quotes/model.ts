@@ -17,6 +17,51 @@ export const quoteDateSchema = z
 
 const nullableUuidSchema = z.string().uuid().nullable();
 
+const quoteHexColorSchema = z.string().regex(/^#[0-9a-fA-F]{6}$/);
+export const quoteItemFontFamilySchema = z.enum([
+  "DEFAULT",
+  "ARIAL",
+  "CALIBRI",
+  "GEORGIA",
+  "TIMES_NEW_ROMAN",
+  "VERDANA",
+]);
+export const quoteItemTextStyleSchema = z
+  .object({
+    fontFamily: quoteItemFontFamilySchema,
+    fontSizePx: z.number().int().min(10).max(40),
+    textColor: quoteHexColorSchema,
+    highlightColor: quoteHexColorSchema.nullable(),
+    bold: z.boolean(),
+    italic: z.boolean(),
+  })
+  .strict();
+
+export const quoteItemPhotoSchema = z
+  .object({
+    id: z.string().uuid(),
+    fileName: z.string().trim().min(1).max(240),
+    contentType: z.enum(["image/jpeg", "image/png", "image/webp"]),
+    sizeBytes: z
+      .number()
+      .int()
+      .positive()
+      .max(15 * 1024 * 1024),
+    sha256: z.string().regex(/^[a-f0-9]{64}$/),
+    storagePath: z.string().trim().min(1).max(1200),
+    clientVisible: z.boolean(),
+    uploadedAt: z.string().datetime({ offset: true }),
+    uploadedByName: z.string().trim().min(1).max(160),
+  })
+  .strict();
+
+export const quoteItemPresentationSchema = z
+  .object({
+    textStyle: quoteItemTextStyleSchema.optional(),
+    photos: z.array(quoteItemPhotoSchema).max(20).optional().default([]),
+  })
+  .strict();
+
 export const quoteLibraryComponentSnapshotSchema = z
   .object({
     sourceComponentId: z.string().uuid(),
@@ -69,6 +114,7 @@ export const quoteSectionSchema = z.object({
   kind: z.literal("SECTION"),
   parentId: z.null(),
   title: z.string().trim().min(1).max(500),
+  presentation: quoteItemPresentationSchema.optional(),
 });
 
 export const quoteSubsectionSchema = z.object({
@@ -76,6 +122,7 @@ export const quoteSubsectionSchema = z.object({
   kind: z.literal("SUBSECTION"),
   parentId: z.string().uuid(),
   title: z.string().trim().min(1).max(500),
+  presentation: quoteItemPresentationSchema.optional(),
 });
 
 export const quoteOuvrageComponentSchema = z.object({
@@ -102,6 +149,7 @@ export const quoteLineSchema = z.object({
   forcedUnitPriceCents: quoteMoneyCentsSchema.optional(),
   components: z.array(quoteOuvrageComponentSchema).max(200).optional(),
   librarySource: quoteLibrarySourceSchema.optional(),
+  presentation: quoteItemPresentationSchema.optional(),
 });
 
 export const quoteCommentSchema = z.object({
@@ -109,6 +157,7 @@ export const quoteCommentSchema = z.object({
   kind: z.literal("COMMENT"),
   parentId: nullableUuidSchema,
   text: z.string().trim().min(1).max(4000),
+  presentation: quoteItemPresentationSchema.optional(),
 });
 
 export const quoteItemSchema = z.discriminatedUnion("kind", [
@@ -135,6 +184,10 @@ export type QuoteLibraryOuvrageComponentSnapshot = z.infer<
 >;
 export type QuoteLibraryOuvrageSource = z.infer<typeof quoteLibraryOuvrageSourceSchema>;
 export type QuoteLibrarySource = z.infer<typeof quoteLibrarySourceSchema>;
+export type QuoteItemFontFamily = z.infer<typeof quoteItemFontFamilySchema>;
+export type QuoteItemTextStyle = z.infer<typeof quoteItemTextStyleSchema>;
+export type QuoteItemPhoto = z.infer<typeof quoteItemPhotoSchema>;
+export type QuoteItemPresentation = z.infer<typeof quoteItemPresentationSchema>;
 export type QuoteSection = z.infer<typeof quoteSectionSchema>;
 export type QuoteSubsection = z.infer<typeof quoteSubsectionSchema>;
 export type QuoteOuvrageComponent = z.infer<typeof quoteOuvrageComponentSchema>;

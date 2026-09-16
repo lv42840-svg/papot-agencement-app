@@ -10,7 +10,7 @@ describe("quote table layout", () => {
   it("keeps inline quote editing styled as a table without hiding Total HT", () => {
     expect(source).toContain("<style jsx global>");
     expect(source).toContain(
-      "grid-template-columns: 44px minmax(250px, 1fr) 64px 56px 104px 100px 110px 170px;",
+      "grid-template-columns: 44px minmax(250px, 1fr) 64px 56px 104px 100px 110px 228px;",
     );
     expect(source).toContain("<span>Total HT</span>");
     expect(source).toContain("quoteLineTotal");
