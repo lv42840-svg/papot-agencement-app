@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { ArrowLeft } from "lucide-react";
 import { useMemo, useState } from "react";
+import { QuoteComponentCheck } from "@/components/quote-component-check";
 import { QuoteFixedSummary } from "@/components/quote-fixed-summary";
 import { QuoteGeneralInfoEditor } from "@/components/quote-general-info-editor";
 import { QuoteInternalNotesEditor } from "@/components/quote-internal-notes-editor";
@@ -79,6 +80,7 @@ export function QuoteDirectEditor({
         onSaved={setPayload}
         headerActions={
           <div className="quoteDirectActions">
+            <QuoteComponentCheck quote={quote} />
             <Link href="/devis" className="secondaryButton quoteDirectBack">
               <ArrowLeft size={14} /> Tous les devis
             </Link>
