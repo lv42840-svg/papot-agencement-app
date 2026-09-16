@@ -19,9 +19,7 @@ type Props = {
   maxLength: number;
 };
 
-const FONT_SIZES = [
-  10, 11, 12, 13, 14, 15, 16, 18, 20, 22, 24, 28, 32, 36, 40,
-];
+const FONT_SIZES = [10, 11, 12, 13, 14, 15, 16, 18, 20, 22, 24, 28, 32, 36, 40];
 
 function styleToCss(style: QuoteRichTextRunStyle) {
   return {
@@ -46,21 +44,15 @@ function renderRichText(root: HTMLElement, value: QuoteRichText) {
 }
 
 function styleFromNode(node: Node): QuoteRichTextRunStyle {
-  const span = node.parentElement?.closest<HTMLElement>(
-    "[data-quote-rich-run='true']",
-  );
+  const span = node.parentElement?.closest<HTMLElement>("[data-quote-rich-run='true']");
   if (!span) return { ...EMPTY_QUOTE_RICH_TEXT_STYLE };
   return {
     bold: Number(span.style.fontWeight || 400) >= 700,
     italic: span.style.fontStyle === "italic",
     underline: span.style.textDecorationLine.includes("underline"),
     textColor: span.style.color ? rgbToHex(span.style.color) : null,
-    highlightColor: span.style.backgroundColor
-      ? rgbToHex(span.style.backgroundColor)
-      : null,
-    fontSizePx: span.style.fontSize
-      ? Number.parseInt(span.style.fontSize, 10) || null
-      : null,
+    highlightColor: span.style.backgroundColor ? rgbToHex(span.style.backgroundColor) : null,
+    fontSizePx: span.style.fontSize ? Number.parseInt(span.style.fontSize, 10) || null : null,
   };
 }
 
@@ -74,10 +66,7 @@ function rgbToHex(value: string): string | null {
 }
 
 function readRichText(root: HTMLElement): QuoteRichText {
-  const walker = root.ownerDocument.createTreeWalker(
-    root,
-    NodeFilter.SHOW_TEXT,
-  );
+  const walker = root.ownerDocument.createTreeWalker(root, NodeFilter.SHOW_TEXT);
   const runs: QuoteRichText["runs"] = [];
   let node = walker.nextNode();
   while (node) {
@@ -88,11 +77,7 @@ function readRichText(root: HTMLElement): QuoteRichText {
   return normalizeQuoteRichText({ runs });
 }
 
-function textOffset(
-  root: HTMLElement,
-  node: Node,
-  offset: number,
-): number | null {
+function textOffset(root: HTMLElement, node: Node, offset: number): number | null {
   try {
     const range = root.ownerDocument.createRange();
     range.selectNodeContents(root);
@@ -107,10 +92,7 @@ function selectionOffsets(root: HTMLElement): SelectionOffsets | null {
   const selection = root.ownerDocument.defaultView?.getSelection();
   if (!selection || selection.rangeCount === 0) return null;
   const range = selection.getRangeAt(0);
-  if (
-    !root.contains(range.startContainer) ||
-    !root.contains(range.endContainer)
-  ) {
+  if (!root.contains(range.startContainer) || !root.contains(range.endContainer)) {
     return null;
   }
   const start = textOffset(root, range.startContainer, range.startOffset);
@@ -119,14 +101,8 @@ function selectionOffsets(root: HTMLElement): SelectionOffsets | null {
   return start <= end ? { start, end } : { start: end, end: start };
 }
 
-function pointAtOffset(
-  root: HTMLElement,
-  offset: number,
-): { node: Node; offset: number } | null {
-  const walker = root.ownerDocument.createTreeWalker(
-    root,
-    NodeFilter.SHOW_TEXT,
-  );
+function pointAtOffset(root: HTMLElement, offset: number): { node: Node; offset: number } | null {
+  const walker = root.ownerDocument.createTreeWalker(root, NodeFilter.SHOW_TEXT);
   let cursor = 0;
   let node = walker.nextNode();
   let lastNode: Node | null = null;
@@ -155,12 +131,7 @@ function restoreSelection(root: HTMLElement, offsets: SelectionOffsets) {
   selection?.addRange(range);
 }
 
-export function QuoteRichTextEditor({
-  value,
-  onChange,
-  ariaLabel,
-  maxLength,
-}: Props) {
+export function QuoteRichTextEditor({ value, onChange, ariaLabel, maxLength }: Props) {
   const editorRef = useRef<HTMLDivElement>(null);
   const selectionRef = useRef<SelectionOffsets>({ start: 0, end: 0 });
   const [selection, setSelection] = useState<SelectionOffsets>({
@@ -196,12 +167,7 @@ export function QuoteRichTextEditor({
     const root = editorRef.current;
     const offsets = selectionRef.current;
     if (!root || offsets.end <= offsets.start) return;
-    const next = applyQuoteRichTextStyle(
-      currentValue(),
-      offsets.start,
-      offsets.end,
-      patch,
-    );
+    const next = applyQuoteRichTextStyle(currentValue(), offsets.start, offsets.end, patch);
     renderRichText(root, next);
     restoreSelection(root, offsets);
     root.focus();
@@ -213,12 +179,7 @@ export function QuoteRichTextEditor({
     if (offsets.end <= offsets.start) return;
     const current = currentValue();
     applyPatch({
-      [key]: !quoteRichTextHasUniformBooleanStyle(
-        current,
-        offsets.start,
-        offsets.end,
-        key,
-      ),
+      [key]: !quoteRichTextHasUniformBooleanStyle(current, offsets.start, offsets.end, key),
     });
   }
 
@@ -239,28 +200,13 @@ export function QuoteRichTextEditor({
   const current = value;
   const boldActive =
     hasSelection &&
-    quoteRichTextHasUniformBooleanStyle(
-      current,
-      selection.start,
-      selection.end,
-      "bold",
-    );
+    quoteRichTextHasUniformBooleanStyle(current, selection.start, selection.end, "bold");
   const italicActive =
     hasSelection &&
-    quoteRichTextHasUniformBooleanStyle(
-      current,
-      selection.start,
-      selection.end,
-      "italic",
-    );
+    quoteRichTextHasUniformBooleanStyle(current, selection.start, selection.end, "italic");
   const underlineActive =
     hasSelection &&
-    quoteRichTextHasUniformBooleanStyle(
-      current,
-      selection.start,
-      selection.end,
-      "underline",
-    );
+    quoteRichTextHasUniformBooleanStyle(current, selection.start, selection.end, "underline");
 
   return (
     <div className="quoteRichEditorShell">
@@ -311,9 +257,7 @@ export function QuoteRichTextEditor({
             defaultValue="13"
             disabled={!hasSelection}
             onMouseDown={rememberSelection}
-            onChange={(event) =>
-              applyPatch({ fontSizePx: Number(event.target.value) })
-            }
+            onChange={(event) => applyPatch({ fontSizePx: Number(event.target.value) })}
           >
             {FONT_SIZES.map((size) => (
               <option value={size} key={size}>
@@ -342,9 +286,7 @@ export function QuoteRichTextEditor({
             defaultValue="#fff2a8"
             disabled={!hasSelection}
             onPointerDown={rememberSelection}
-            onChange={(event) =>
-              applyPatch({ highlightColor: event.target.value })
-            }
+            onChange={(event) => applyPatch({ highlightColor: event.target.value })}
             aria-label="Couleur de surlignage"
           />
         </label>
@@ -372,10 +314,7 @@ export function QuoteRichTextEditor({
         onInput={(event) => {
           const root = event.currentTarget;
           const next = readRichText(root);
-          const textLength = next.runs.reduce(
-            (total, run) => total + run.text.length,
-            0,
-          );
+          const textLength = next.runs.reduce((total, run) => total + run.text.length, 0);
           if (textLength <= maxLength) onChange(next);
           rememberSelection();
         }}
@@ -384,27 +323,18 @@ export function QuoteRichTextEditor({
         }}
         onPaste={(event) => {
           event.preventDefault();
-          const text = event.clipboardData
-            .getData("text/plain")
-            .replace(/[\r\n]+/g, " ");
+          const text = event.clipboardData.getData("text/plain").replace(/[\r\n]+/g, " ");
           const selection = rootSelection(editorRef.current);
           if (!selection || !editorRef.current) return;
           const currentRichText = readRichText(editorRef.current);
           const plain = currentRichText.runs.map((run) => run.text).join("");
-          if (
-            plain.length - (selection.end - selection.start) + text.length >
-            maxLength
-          ) {
+          if (plain.length - (selection.end - selection.start) + text.length > maxLength) {
             return;
           }
-          const range = editorRef.current.ownerDocument.defaultView
-            ?.getSelection()
-            ?.getRangeAt(0);
+          const range = editorRef.current.ownerDocument.defaultView?.getSelection()?.getRangeAt(0);
           if (!range) return;
           range.deleteContents();
-          range.insertNode(
-            editorRef.current.ownerDocument.createTextNode(text),
-          );
+          range.insertNode(editorRef.current.ownerDocument.createTextNode(text));
           onChange(readRichText(editorRef.current));
           rememberSelection();
         }}
