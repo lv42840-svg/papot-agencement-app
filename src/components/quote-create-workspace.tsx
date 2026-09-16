@@ -8,6 +8,16 @@ import type { QuoteAffairOption } from "@/components/quotes-workspace";
 import { quoteHref } from "@/lib/quotes/navigation";
 import type { NativeQuotesPayload } from "@/lib/quotes/store";
 
+type QuoteCreateAffairOption = QuoteAffairOption & {
+  quoteOwnerName: string;
+  quoteDueDate: string;
+};
+
+type QuoteOwnerOption = {
+  id: string;
+  displayName: string;
+};
+
 type QuotesApiResponse = {
   payload?: NativeQuotesPayload;
   focusQuoteId?: string;
@@ -16,11 +26,18 @@ type QuotesApiResponse = {
 
 function quoteErrorLabel(code: string): string {
   if (code === "QUOTE_AFFAIR_NOT_FOUND") return "L’affaire sélectionnée n’existe plus.";
-  if (code === "QUOTE_AFFAIR_CLOSED") return "Cette affaire est fermée.";
+  if (code === "QUOTE_AFFAIR_CLOSED" || code === "COMMERCIAL_CASE_CLOSED") {
+    return "Cette affaire est fermée.";
+  }
   if (code === "QUOTE_CLIENT_NOT_FOUND") return "Cette affaire doit être liée à un client.";
   if (code === "QUOTE_CLIENT_ARCHIVED") return "Le client lié à cette affaire est archivé.";
+  if (code === "COMMERCIAL_QUOTE_OWNER_AND_DATE_REQUIRED") {
+    return "Choisis le responsable du chiffrage et la date prévue d’envoi.";
+  }
   if (code === "QUOTES_REQUEST_INVALID") return "Vérifie les informations du brouillon.";
-  if (code === "MODULE_FORBIDDEN") return "Ton profil n’autorise pas la création de devis.";
+  if (code === "MODULE_FORBIDDEN") {
+    return "Ton profil n’autorise pas la création de devis ou la mise à jour commerciale.";
+  }
   return "Le brouillon n’a pas pu être enregistré.";
 }
 
@@ -30,12 +47,16 @@ export function QuoteCreateWorkspace({
   today,
   initialAffairId,
   paymentTermOptions,
+  quoteOwners,
+  defaultQuoteOwnerName,
 }: {
-  affairs: QuoteAffairOption[];
+  affairs: QuoteCreateAffairOption[];
   canWrite: boolean;
   today: string;
   initialAffairId?: string;
   paymentTermOptions: string[];
+  quoteOwners: QuoteOwnerOption[];
+  defaultQuoteOwnerName: string;
 }) {
   const router = useRouter();
   const affairsById = useMemo(
@@ -43,10 +64,17 @@ export function QuoteCreateWorkspace({
     [affairs],
   );
   const firstAffair = affairs.find((affair) => affair.id === initialAffairId) ?? affairs[0];
+  const defaultOwnerName = quoteOwners.some((owner) => owner.displayName === defaultQuoteOwnerName)
+    ? defaultQuoteOwnerName
+    : (quoteOwners[0]?.displayName ?? "");
   const [selectedAffairId, setSelectedAffairId] = useState(firstAffair?.id ?? "");
   const [subject, setSubject] = useState(firstAffair?.name ?? "");
   const [issueDate, setIssueDate] = useState(today);
   const [paymentTerms, setPaymentTerms] = useState(firstAffair?.paymentTerms ?? "");
+  const [quoteOwnerName, setQuoteOwnerName] = useState(
+    firstAffair?.quoteOwnerName || defaultOwnerName,
+  );
+  const [quoteDueDate, setQuoteDueDate] = useState(firstAffair?.quoteDueDate ?? "");
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
   const availablePaymentTerms = useMemo(
@@ -60,17 +88,30 @@ export function QuoteCreateWorkspace({
       ),
     [affairsById, paymentTermOptions, selectedAffairId],
   );
+  const availableQuoteOwners = useMemo(
+    () =>
+      Array.from(
+        new Set(
+          [quoteOwnerName, ...quoteOwners.map((owner) => owner.displayName)]
+            .map((value) => value.trim())
+            .filter((value) => value.length > 0),
+        ),
+      ),
+    [quoteOwnerName, quoteOwners],
+  );
 
   function selectAffair(affairId: string) {
     setSelectedAffairId(affairId);
     const affair = affairsById.get(affairId);
     setSubject(affair?.name ?? "");
     setPaymentTerms(affair?.paymentTerms ?? availablePaymentTerms[0] ?? "");
+    setQuoteOwnerName(affair?.quoteOwnerName || defaultOwnerName);
+    setQuoteDueDate(affair?.quoteDueDate ?? "");
   }
 
   async function createDraft(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
-    if (!canWrite || !selectedAffairId) return;
+    if (!canWrite || !selectedAffairId || !quoteOwnerName.trim() || !quoteDueDate) return;
     setSaving(true);
     setError("");
     try {
@@ -84,6 +125,8 @@ export function QuoteCreateWorkspace({
           issueDate,
           variantName: "Base",
           paymentTerms,
+          quoteOwnerName,
+          quoteDueDate,
         }),
       });
       const data = (await response.json()) as QuotesApiResponse;
@@ -125,6 +168,10 @@ export function QuoteCreateWorkspace({
         ) : affairs.length === 0 ? (
           <div className="quoteCreateNotice">
             Lie d’abord un client à une affaire active pour pouvoir créer son devis.
+          </div>
+        ) : quoteOwners.length === 0 ? (
+          <div className="quoteCreateNotice">
+            Aucun utilisateur actif ne peut être désigné responsable du chiffrage.
           </div>
         ) : (
           <form className="quoteCreateForm" onSubmit={createDraft}>
@@ -177,6 +224,33 @@ export function QuoteCreateWorkspace({
               />
             </label>
 
+            <label className="quoteField">
+              <span>Responsable du chiffrage</span>
+              <select
+                value={quoteOwnerName}
+                onChange={(event) => setQuoteOwnerName(event.target.value)}
+                required
+                disabled={saving}
+              >
+                {availableQuoteOwners.map((ownerName) => (
+                  <option key={ownerName} value={ownerName}>
+                    {ownerName}
+                  </option>
+                ))}
+              </select>
+            </label>
+
+            <label className="quoteField">
+              <span>Date prévue d’envoi</span>
+              <input
+                type="date"
+                value={quoteDueDate}
+                onChange={(event) => setQuoteDueDate(event.target.value)}
+                required
+                disabled={saving}
+              />
+            </label>
+
             <label className="quoteField quoteFieldWide">
               <span>Conditions de règlement</span>
               <select
@@ -194,8 +268,9 @@ export function QuoteCreateWorkspace({
             </label>
 
             <div className="quoteCreateFixed quoteFieldWide">
-              <LockKeyhole size={13} aria-hidden="true" /> Validité du devis : 30 jours, appliquée
-              automatiquement.
+              <LockKeyhole size={13} aria-hidden="true" /> Validité du devis : 30 jours. À la
+              création, l’affaire passe automatiquement en « Chiffrage en cours » avec le
+              responsable et la date prévue ci-dessus.
             </div>
 
             {error ? <div className="quoteCreateError quoteFieldWide">{error}</div> : null}
@@ -204,7 +279,12 @@ export function QuoteCreateWorkspace({
               <button
                 className="primaryButton"
                 type="submit"
-                disabled={saving || availablePaymentTerms.length === 0}
+                disabled={
+                  saving ||
+                  availablePaymentTerms.length === 0 ||
+                  !quoteOwnerName.trim() ||
+                  !quoteDueDate
+                }
               >
                 <FilePlus2 size={15} /> {saving ? "Création…" : "Créer et ouvrir Base V1"}
               </button>
