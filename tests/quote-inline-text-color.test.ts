@@ -13,13 +13,7 @@ describe("quote inline text color", () => {
 
   it("recolors an overlapping selection without keeping overlapping marks", () => {
     expect(
-      applyQuoteInlineTextColor(
-        20,
-        [{ start: 2, end: 12, color: "#2563eb" }],
-        6,
-        9,
-        "#b91c1c",
-      ),
+      applyQuoteInlineTextColor(20, [{ start: 2, end: 12, color: "#2563eb" }], 6, 9, "#b91c1c"),
     ).toEqual([
       { start: 2, end: 6, color: "#2563eb" },
       { start: 6, end: 9, color: "#b91c1c" },
@@ -29,13 +23,7 @@ describe("quote inline text color", () => {
 
   it("removes color only from the selected characters", () => {
     expect(
-      applyQuoteInlineTextColor(
-        20,
-        [{ start: 2, end: 12, color: "#2563eb" }],
-        5,
-        8,
-        null,
-      ),
+      applyQuoteInlineTextColor(20, [{ start: 2, end: 12, color: "#2563eb" }], 5, 8, null),
     ).toEqual([
       { start: 2, end: 5, color: "#2563eb" },
       { start: 8, end: 12, color: "#2563eb" },
@@ -50,9 +38,7 @@ describe("quote inline text color", () => {
 
   it("builds colored and uncolored display segments", () => {
     expect(
-      buildQuoteInlineTextSegments("meuble vasque", [
-        { start: 0, end: 6, color: "#6554b5" },
-      ]),
+      buildQuoteInlineTextSegments("meuble vasque", [{ start: 0, end: 6, color: "#6554b5" }]),
     ).toEqual([
       { start: 0, end: 6, text: "meuble", color: "#6554b5" },
       { start: 6, end: 13, text: " vasque", color: null },
