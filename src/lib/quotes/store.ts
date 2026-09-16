@@ -1,6 +1,6 @@
 import { z } from "zod";
 import { quotePricingConfigSchema } from "./adjustments";
-import { quoteStatusSchema, quoteVersionSchema } from "./domain";
+import { QUOTE_DEFAULT_VALIDITY_DAYS, quoteStatusSchema, quoteVersionSchema } from "./domain";
 import { quoteModelSchema } from "./model";
 
 const isoDateTimeSchema = z.string().datetime({ offset: true });
@@ -52,5 +52,14 @@ export function parseNativeQuotesPayload(value: unknown): NativeQuotesPayload {
   if (value == null) return createInitialNativeQuotesPayload();
   const parsed = nativeQuotesPayloadSchema.safeParse(value);
   if (!parsed.success) throw new Error("QUOTES_STORE_INVALID");
-  return parsed.data;
+  return {
+    ...parsed.data,
+    quotes: parsed.data.quotes.map((quote) => ({
+      ...quote,
+      model: {
+        ...quote.model,
+        validityDays: QUOTE_DEFAULT_VALIDITY_DAYS,
+      },
+    })),
+  };
 }
