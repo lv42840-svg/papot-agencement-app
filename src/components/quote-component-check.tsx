@@ -32,11 +32,9 @@ export function QuoteComponentCheck({ quote }: { quote: NativeQuoteRecord }) {
   );
 
   const hasPendingOptions =
-    check.pendingOptionHours.total > 0 ||
-    check.rows.some((row) => row.pendingOptionQuantity > 0);
+    check.pendingOptionHours.total > 0 || check.rows.some((row) => row.pendingOptionQuantity > 0);
   const hasRejectedOptions =
-    check.rejectedOptionHours.total > 0 ||
-    check.rows.some((row) => row.rejectedOptionQuantity > 0);
+    check.rejectedOptionHours.total > 0 || check.rows.some((row) => row.rejectedOptionQuantity > 0);
 
   useEffect(() => {
     if (!open) return;
@@ -71,8 +69,8 @@ export function QuoteComponentCheck({ quote }: { quote: NativeQuoteRecord }) {
               <div>
                 <h2 id="quote-component-check-title">Contrôle du devis</h2>
                 <p>
-                  Cumul des composants de tous les ouvrages, multiplié par la quantité de
-                  chaque ouvrage.
+                  Cumul des composants de tous les ouvrages, multiplié par la quantité de chaque
+                  ouvrage.
                 </p>
               </div>
               <button
@@ -138,9 +136,7 @@ export function QuoteComponentCheck({ quote }: { quote: NativeQuoteRecord }) {
                         <td className="quoteCheckName">{row.name}</td>
                         <td>{row.activity ? productionActivityLabel(row.activity) : "—"}</td>
                         <td>{row.unit || "u"}</td>
-                        <td className="isNumber isStrong">
-                          {formatQuantity(row.plannedQuantity)}
-                        </td>
+                        <td className="isNumber isStrong">{formatQuantity(row.plannedQuantity)}</td>
                         {hasPendingOptions ? (
                           <td className="isNumber">
                             {row.pendingOptionQuantity > 0
@@ -165,12 +161,12 @@ export function QuoteComponentCheck({ quote }: { quote: NativeQuoteRecord }) {
 
             <div className="quoteCheckFootnote">
               <span>
-                Les options retenues sont incluses dans « Prévu chantier ». Les options en
-                attente et refusées restent séparées pour éviter de gonfler les besoins réels.
+                Les options retenues sont incluses dans « Prévu chantier ». Les options en attente
+                et refusées restent séparées pour éviter de gonfler les besoins réels.
               </span>
               <span>
-                Les heures de pose ajoutées dans les ajustements sont incluses dans le total
-                Pose, même si elles ne correspondent pas à une quantité de composant précise.
+                Les heures de pose ajoutées dans les ajustements sont incluses dans le total Pose,
+                même si elles ne correspondent pas à une quantité de composant précise.
               </span>
             </div>
           </section>

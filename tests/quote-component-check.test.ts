@@ -1,11 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { createEmptyQuotePricingConfig } from "../src/lib/quotes/adjustments";
 import { calculateQuoteComponentCheck } from "../src/lib/quotes/component-check";
-import type {
-  QuoteItem,
-  QuoteLine,
-  QuoteOuvrageComponent,
-} from "../src/lib/quotes/model";
+import type { QuoteItem, QuoteLine, QuoteOuvrageComponent } from "../src/lib/quotes/model";
 
 const LIBRARY_COMPONENT_ID = "11111111-1111-4111-8111-111111111111";
 
@@ -121,9 +117,12 @@ describe("quote component check", () => {
       line(retainedLineId, 2, [
         component("eeeeeeee-eeee-4eee-8eee-eeeeeeeeeeee", "Poignée", "u", 2),
       ]),
-      line(pendingLineId, 3, [
-        component("ffffffff-ffff-4fff-8fff-ffffffffffff", "Poignée", "u", 2),
-      ], sectionId),
+      line(
+        pendingLineId,
+        3,
+        [component("ffffffff-ffff-4fff-8fff-ffffffffffff", "Poignée", "u", 2)],
+        sectionId,
+      ),
       line(rejectedLineId, 5, [
         component("12121212-1212-4212-8212-121212121212", "Poignée", "u", 2),
       ]),
@@ -161,13 +160,7 @@ describe("quote component check", () => {
     const items: QuoteItem[] = [
       line("15151515-1515-4515-8515-151515151515", 2, [
         component("16161616-1616-4616-8616-161616161616", "Heure BE", "h", 1.5, "BE"),
-        component(
-          "17171717-1717-4717-8717-171717171717",
-          "Heure atelier",
-          "h",
-          4,
-          "ATELIER",
-        ),
+        component("17171717-1717-4717-8717-171717171717", "Heure atelier", "h", 4, "ATELIER"),
         component("18181818-1818-4818-8818-181818181818", "Heure pose", "h", 2, "POSE"),
       ]),
     ];
