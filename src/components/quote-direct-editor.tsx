@@ -12,21 +12,11 @@ import { QuotePricingAdjustmentsEditor } from "@/components/quote-pricing-adjust
 import { QuoteSendAction } from "@/components/quote-send-action";
 import { QuoteStructuredLinesEditor } from "@/components/quote-structured-lines-editor";
 import { calculateQuoteAdjustedPricing } from "@/lib/quotes/adjustments";
-import type {
-  NativeQuoteRecord,
-  NativeQuotesPayload,
-} from "@/lib/quotes/store";
+import type { NativeQuoteRecord, NativeQuotesPayload } from "@/lib/quotes/store";
 
-function quoteWithAdjustedDisplayPrices(
-  quote: NativeQuoteRecord,
-): NativeQuoteRecord {
-  const pricing = calculateQuoteAdjustedPricing(
-    quote.model.items,
-    quote.pricingConfig,
-  );
-  const adjustedByLineId = new Map(
-    pricing.lines.map((line) => [line.lineId, line]),
-  );
+function quoteWithAdjustedDisplayPrices(quote: NativeQuoteRecord): NativeQuoteRecord {
+  const pricing = calculateQuoteAdjustedPricing(quote.model.items, quote.pricingConfig);
+  const adjustedByLineId = new Map(pricing.lines.map((line) => [line.lineId, line]));
 
   return {
     ...quote,
@@ -83,11 +73,7 @@ export function QuoteDirectEditor({
         onSaved={setPayload}
       />
 
-      <QuoteInternalNotesEditor
-        quote={quote}
-        canWrite={canWrite}
-        onSaved={setPayload}
-      />
+      <QuoteInternalNotesEditor quote={quote} canWrite={canWrite} onSaved={setPayload} />
 
       <QuoteStructuredLinesEditor
         quote={displayQuote}
@@ -99,26 +85,14 @@ export function QuoteDirectEditor({
               <ArrowLeft size={14} /> Tous les devis
             </Link>
             <QuoteComponentCheck quote={quote} />
-            <QuoteSendAction
-              quote={quote}
-              canWrite={canWrite}
-              onSaved={setPayload}
-            />
+            <QuoteSendAction quote={quote} canWrite={canWrite} onSaved={setPayload} />
           </div>
         }
       />
 
-      <QuoteInlineTextColorToolbar
-        quote={displayQuote}
-        canWrite={canWrite}
-        onSaved={setPayload}
-      />
+      <QuoteInlineTextColorToolbar quote={displayQuote} canWrite={canWrite} onSaved={setPayload} />
 
-      <QuotePricingAdjustmentsEditor
-        quote={quote}
-        canWrite={canWrite}
-        onSaved={setPayload}
-      />
+      <QuotePricingAdjustmentsEditor quote={quote} canWrite={canWrite} onSaved={setPayload} />
 
       <div className="quoteDirectSummarySpacer" aria-hidden="true" />
       <QuoteFixedSummary quote={quote} />
