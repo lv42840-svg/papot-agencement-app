@@ -49,7 +49,11 @@ function styleForRun(run: QuoteRichText["runs"][number]): Partial<CSSStyleDeclar
 function paintRichText(target: HTMLElement, item: QuoteItem) {
   const text = itemText(item);
   if (text === null) return;
-  const richText = resolveQuoteRichText(text, item.presentation?.richText, item.presentation?.textStyle);
+  const richText = resolveQuoteRichText(
+    text,
+    item.presentation?.richText,
+    item.presentation?.textStyle,
+  );
   target.replaceChildren();
   for (const run of richText.runs) {
     const span = target.ownerDocument.createElement("span");
@@ -70,6 +74,13 @@ function resolveItemFromTarget(
   const item = itemByNumber.get(number);
   if (!item || !quote.model.items.some((candidate) => candidate.id === item.id)) return null;
   return item;
+}
+
+function mutationAddsQuoteRows(mutation: MutationRecord): boolean {
+  return Array.from(mutation.addedNodes).some((node) => {
+    if (!(node instanceof HTMLElement)) return false;
+    return node.matches(".quoteMainRow") || node.querySelector(".quoteMainRow") !== null;
+  });
 }
 
 export function QuoteRichTextLayer({ quote, canWrite, onSaved }: Props) {
@@ -110,12 +121,7 @@ export function QuoteRichTextLayer({ quote, canWrite, onSaved }: Props) {
 
     decorate();
     const observer = new MutationObserver((mutations) => {
-      const relevant = mutations.some((mutation) =>
-        Array.from(mutation.addedNodes).some(
-          (node) => node instanceof HTMLElement && node.closest(".quoteMainRow"),
-        ),
-      );
-      if (relevant) requestAnimationFrame(decorate);
+      if (mutations.some(mutationAddsQuoteRows)) requestAnimationFrame(decorate);
     });
     observer.observe(document.body, { childList: true, subtree: true });
 
@@ -134,7 +140,11 @@ export function QuoteRichTextLayer({ quote, canWrite, onSaved }: Props) {
       setError("");
       setActive({
         itemId: item.id,
-        richText: resolveQuoteRichText(text, item.presentation?.richText, item.presentation?.textStyle),
+        richText: resolveQuoteRichText(
+          text,
+          item.presentation?.richText,
+          item.presentation?.textStyle,
+        ),
         anchor: target.getBoundingClientRect(),
       });
     };
@@ -189,7 +199,9 @@ export function QuoteRichTextLayer({ quote, canWrite, onSaved }: Props) {
         },
       );
       const data = (await response.json()) as SaveResponse;
-      if (!response.ok || !data.payload) throw new Error(data.error ?? "QUOTE_RICH_TEXT_SAVE_FAILED");
+      if (!response.ok || !data.payload) {
+        throw new Error(data.error ?? "QUOTE_RICH_TEXT_SAVE_FAILED");
+      }
       onSaved(data.payload);
       setActive(null);
     } catch {
@@ -210,7 +222,12 @@ export function QuoteRichTextLayer({ quote, canWrite, onSaved }: Props) {
         <strong>{isHeading ? "Titre" : "Désignation"}</strong>
         <span>Sélectionnez un mot ou une portion de texte, puis appliquez la mise en forme.</span>
         <div className="quoteRichLayerActions">
-          <button type="button" className="secondary" onClick={() => setActive(null)} disabled={saving}>
+          <button
+            type="button"
+            className="secondary"
+            onClick={() => setActive(null)}
+            disabled={saving}
+          >
             <X size={14} aria-hidden="true" />
             Annuler
           </button>
@@ -222,7 +239,9 @@ export function QuoteRichTextLayer({ quote, canWrite, onSaved }: Props) {
       </div>
       <QuoteRichTextEditor
         value={active.richText}
-        onChange={(richText) => setActive((current) => (current ? { ...current, richText } : current))}
+        onChange={(richText) =>
+          setActive((current) => (current ? { ...current, richText } : current))
+        }
         ariaLabel={isHeading ? "Texte du titre" : "Texte de la désignation"}
         maxLength={item.kind === "LINE" ? 4000 : 500}
       />
