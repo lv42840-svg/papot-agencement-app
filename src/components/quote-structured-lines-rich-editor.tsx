@@ -1,6 +1,7 @@
 "use client";
 
 import { type ReactNode, useEffect, useMemo, useRef, useState } from "react";
+import { createPortal } from "react-dom";
 import { QuoteRichTextEditor } from "@/components/quote-rich-text-editor";
 import { QuoteStructuredLinesEditor } from "@/components/quote-structured-lines-editor";
 import type { QuoteItem, QuoteRichText } from "@/lib/quotes/model";
@@ -39,12 +40,6 @@ type PendingRichSave = {
 type RichSaveResponse = {
   payload?: NativeQuotesPayload;
   error?: string;
-};
-
-type Anchor = {
-  left: number;
-  top: number;
-  width: number;
 };
 
 function itemText(item: QuoteItem): string | null {
@@ -95,14 +90,19 @@ function itemMatchesKind(item: QuoteItem, kind: RichEditableKind): boolean {
   return item.kind === kind;
 }
 
-export function QuoteStructuredLinesRichEditor({ quote, canWrite, onSaved, headerActions }: Props) {
+export function QuoteStructuredLinesRichEditor({
+  quote,
+  canWrite,
+  onSaved,
+  headerActions,
+}: Props) {
   const rootRef = useRef<HTMLDivElement>(null);
   const activeInputRef = useRef<HTMLInputElement | null>(null);
+  const activeHostRef = useRef<HTMLDivElement | null>(null);
   const sessionRef = useRef<RichSession | null>(null);
   const pendingSaveRef = useRef<PendingRichSave | null>(null);
-  const overlayRef = useRef<HTMLDivElement>(null);
+  const [activeHost, setActiveHost] = useState<HTMLDivElement | null>(null);
   const [session, setSession] = useState<RichSession | null>(null);
-  const [anchor, setAnchor] = useState<Anchor | null>(null);
   const [richSaveError, setRichSaveError] = useState("");
 
   const itemByNumber = useMemo(() => {
@@ -121,26 +121,16 @@ export function QuoteStructuredLinesRichEditor({ quote, canWrite, onSaved, heade
     setSession(next);
   }
 
-  function measureInput(input: HTMLInputElement) {
-    const rect = input.getBoundingClientRect();
-    const maxWidth = Math.max(300, window.innerWidth - 24);
-    const width = Math.min(Math.max(rect.width, 460), maxWidth);
-    const left = Math.min(Math.max(12, rect.left), Math.max(12, window.innerWidth - width - 12));
-    const top = Math.max(8, rect.top - 40);
-    setAnchor({ left, top, width });
-  }
-
   useEffect(() => {
     const root = rootRef.current;
     if (!root || !quote || !canWrite) return;
 
-    let resizeObserver: ResizeObserver | null = null;
-
     const detachCurrentInput = () => {
-      if (activeInputRef.current) activeInputRef.current.style.visibility = "";
+      if (activeInputRef.current) activeInputRef.current.style.display = "";
       activeInputRef.current = null;
-      resizeObserver?.disconnect();
-      resizeObserver = null;
+      activeHostRef.current?.remove();
+      activeHostRef.current = null;
+      setActiveHost(null);
     };
 
     const findEditingInput = () =>
@@ -154,7 +144,6 @@ export function QuoteStructuredLinesRichEditor({ quote, canWrite, onSaved, heade
         if (activeInputRef.current) {
           detachCurrentInput();
           updateSession(null);
-          setAnchor(null);
         }
         return;
       }
@@ -169,13 +158,14 @@ export function QuoteStructuredLinesRichEditor({ quote, canWrite, onSaved, heade
 
       if (input !== activeInputRef.current) {
         detachCurrentInput();
+        const host = input.ownerDocument.createElement("div");
+        host.className = "quoteRichInlineHost";
+        input.insertAdjacentElement("beforebegin", host);
+        input.style.display = "none";
         activeInputRef.current = input;
-        input.style.visibility = "hidden";
-        resizeObserver = new ResizeObserver(() => measureInput(input));
-        resizeObserver.observe(input);
+        activeHostRef.current = host;
+        setActiveHost(host);
       }
-
-      measureInput(input);
 
       const current = sessionRef.current;
       if (current?.key === key) return;
@@ -191,12 +181,6 @@ export function QuoteStructuredLinesRichEditor({ quote, canWrite, onSaved, heade
     connect();
     const observer = new MutationObserver(connect);
     observer.observe(root, { childList: true, subtree: true });
-
-    const reposition = () => {
-      if (activeInputRef.current) measureInput(activeInputRef.current);
-    };
-    window.addEventListener("resize", reposition);
-    window.addEventListener("scroll", reposition, true);
 
     const rememberPendingSave = (event: Event) => {
       const form = event.target;
@@ -216,8 +200,6 @@ export function QuoteStructuredLinesRichEditor({ quote, canWrite, onSaved, heade
     return () => {
       observer.disconnect();
       root.removeEventListener("submit", rememberPendingSave, true);
-      window.removeEventListener("resize", reposition);
-      window.removeEventListener("scroll", reposition, true);
       detachCurrentInput();
     };
   }, [canWrite, itemByNumber, quote]);
@@ -227,7 +209,7 @@ export function QuoteStructuredLinesRichEditor({ quote, canWrite, onSaved, heade
   useEffect(() => {
     if (!sessionKey) return;
     const frame = window.requestAnimationFrame(() => {
-      overlayRef.current?.querySelector<HTMLElement>("[contenteditable='true']")?.focus();
+      activeHostRef.current?.querySelector<HTMLElement>("[contenteditable='true']")?.focus();
     });
     return () => window.cancelAnimationFrame(frame);
   }, [sessionKey]);
@@ -294,7 +276,6 @@ export function QuoteStructuredLinesRichEditor({ quote, canWrite, onSaved, heade
     const updated = { ...current, richText: next };
     updateSession(updated);
     setNativeInputValue(input, quoteRichTextToPlainText(next));
-    measureInput(input);
   }
 
   return (
@@ -306,20 +287,19 @@ export function QuoteStructuredLinesRichEditor({ quote, canWrite, onSaved, heade
         headerActions={headerActions}
       />
 
-      {session && anchor ? (
-        <div
-          ref={overlayRef}
-          className="quoteRichInlineOverlay"
-          style={{ left: anchor.left, top: anchor.top, width: anchor.width }}
-        >
-          <QuoteRichTextEditor
-            value={session.richText}
-            onChange={changeRichText}
-            ariaLabel={session.kind === "LINE" ? "Désignation de l’ouvrage" : "Texte du titre"}
-            maxLength={session.kind === "LINE" ? 4000 : 500}
-          />
-        </div>
-      ) : null}
+      {session && activeHost
+        ? createPortal(
+            <QuoteRichTextEditor
+              value={session.richText}
+              onChange={changeRichText}
+              ariaLabel={
+                session.kind === "LINE" ? "Désignation de l’ouvrage" : "Texte du titre"
+              }
+              maxLength={session.kind === "LINE" ? 4000 : 500}
+            />,
+            activeHost,
+          )
+        : null}
 
       {richSaveError ? <div className="quoteRichInlineError">{richSaveError}</div> : null}
 
@@ -327,24 +307,26 @@ export function QuoteStructuredLinesRichEditor({ quote, canWrite, onSaved, heade
         .quoteStructuredRichEditor .quoteRowActions button[title="Mise en forme client"] {
           display: none !important;
         }
-        .quoteRichInlineOverlay {
-          position: fixed;
-          z-index: 1600;
+        .quoteRichInlineHost {
+          min-width: 0;
+          width: 100%;
+          align-self: stretch;
         }
-        .quoteRichInlineOverlay .quoteRichEditorShell {
-          box-shadow: 0 12px 34px rgba(44, 34, 81, 0.2);
+        .quoteRichInlineHost .quoteRichEditorShell {
+          height: 100%;
+          box-shadow: none;
         }
-        .quoteRichInlineOverlay .quoteRichToolbar {
+        .quoteRichInlineHost .quoteRichToolbar {
+          min-height: 32px;
+          padding: 3px 5px;
+          flex-wrap: wrap;
+        }
+        .quoteRichInlineHost .quoteRichEditable {
           min-height: 34px;
-          padding-top: 3px;
-          padding-bottom: 3px;
-        }
-        .quoteRichInlineOverlay .quoteRichEditable {
-          min-height: 34px;
-          padding: 7px 10px;
+          padding: 7px 9px;
         }
         .quoteRichInlineError {
-          margin-top: -6px;
+          margin: 8px 18px;
           padding: 8px 10px;
           border: 1px solid #f0b8b8;
           border-radius: 8px;
