@@ -4,6 +4,7 @@ import { createClientsRepository } from "@/lib/clients/create-repository";
 import { clientDisplayName } from "@/lib/clients/domain";
 import { createCommercialRepository } from "@/lib/commercial/create-repository";
 import { commercialParisDateKey, isCommercialClosed } from "@/lib/commercial/domain";
+import { listCommercialAssignableUsers } from "@/lib/commercial/people";
 import { requireDesktopRequestContext } from "@/lib/desktop/request-context";
 
 export const dynamic = "force-dynamic";
@@ -17,9 +18,10 @@ export default async function NewQuotePage({
   const context = await requireDesktopRequestContext("quotes", "READ");
   const commercialRepository = createCommercialRepository(context);
   const clientsRepository = await createClientsRepository(context);
-  const [commercial, clients] = await Promise.all([
+  const [commercial, clients, quoteOwners] = await Promise.all([
     commercialRepository.load(),
     clientsRepository.load(),
+    listCommercialAssignableUsers(),
   ]);
   const clientsById = new Map(clients.clients.map((client) => [client.id, client]));
   const affairs = commercial.cases.flatMap((affair) => {
@@ -33,6 +35,8 @@ export default async function NewQuotePage({
         siteLabel: affair.siteLabel ?? "",
         clientName: clientDisplayName(client),
         paymentTerms: client.paymentTerms,
+        quoteOwnerName: affair.quoteOwnerName ?? "",
+        quoteDueDate: affair.quoteDueDate ?? "",
       },
     ];
   });
@@ -55,6 +59,8 @@ export default async function NewQuotePage({
         today={commercialParisDateKey()}
         initialAffairId={initialAffairId}
         paymentTermOptions={paymentTermOptions}
+        quoteOwners={quoteOwners}
+        defaultQuoteOwnerName={context.user.displayName}
       />
     </DesktopAppShell>
   );
