@@ -37,6 +37,15 @@ export const quoteItemTextStyleSchema = z
   })
   .strict();
 
+export const quoteItemTextColorMarkSchema = z
+  .object({
+    start: z.number().int().min(0).max(4000),
+    end: z.number().int().min(1).max(4000),
+    color: quoteHexColorSchema,
+  })
+  .strict()
+  .refine((mark) => mark.end > mark.start, "QUOTE_TEXT_COLOR_MARK_INVALID");
+
 export const quoteItemPhotoSchema = z
   .object({
     id: z.string().uuid(),
@@ -58,6 +67,7 @@ export const quoteItemPhotoSchema = z
 export const quoteItemPresentationSchema = z
   .object({
     textStyle: quoteItemTextStyleSchema.optional(),
+    textColorMarks: z.array(quoteItemTextColorMarkSchema).max(500).optional(),
     photos: z.array(quoteItemPhotoSchema).max(20).optional().default([]),
   })
   .strict();
@@ -186,6 +196,7 @@ export type QuoteLibraryOuvrageSource = z.infer<typeof quoteLibraryOuvrageSource
 export type QuoteLibrarySource = z.infer<typeof quoteLibrarySourceSchema>;
 export type QuoteItemFontFamily = z.infer<typeof quoteItemFontFamilySchema>;
 export type QuoteItemTextStyle = z.infer<typeof quoteItemTextStyleSchema>;
+export type QuoteItemTextColorMark = z.infer<typeof quoteItemTextColorMarkSchema>;
 export type QuoteItemPhoto = z.infer<typeof quoteItemPhotoSchema>;
 export type QuoteItemPresentation = z.infer<typeof quoteItemPresentationSchema>;
 export type QuoteSection = z.infer<typeof quoteSectionSchema>;
