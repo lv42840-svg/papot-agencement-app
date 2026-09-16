@@ -1,9 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { createInitialCommercialPayload } from "../src/lib/commercial/domain";
-import {
-  applyCommercialMutation,
-  commercialMutationSchema,
-} from "../src/lib/commercial/mutations";
+import { applyCommercialMutation, commercialMutationSchema } from "../src/lib/commercial/mutations";
 import { startQuoteCommercialWorkflow } from "../src/lib/quotes/commercial-bridge";
 
 const actor = {
