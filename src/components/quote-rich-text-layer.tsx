@@ -35,6 +35,8 @@ function paintRichText(target: HTMLElement, item: QuoteItem) {
     item.presentation?.richText,
     item.presentation?.textStyle,
   );
+  target.style.whiteSpace = "pre-wrap";
+  target.style.overflowWrap = "anywhere";
   target.replaceChildren();
   for (const run of richText.runs) {
     const span = target.ownerDocument.createElement("span");
