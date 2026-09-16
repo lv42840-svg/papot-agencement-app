@@ -92,8 +92,15 @@ export async function DELETE(_request: Request, context: RouteContext) {
     const mutation = await repository.mutate((payload) =>
       removeQuoteItemPhoto(payload, quoteId, itemId, photoId, actor),
     );
-    const store = getServerFileStore();
-    await store.deleteFile(photo.storagePath).catch(() => false);
+    const stillReferenced = mutation.payload.quotes.some((quote) =>
+      quote.model.items.some((item) =>
+        item.presentation?.photos.some((candidate) => candidate.storagePath === photo.storagePath),
+      ),
+    );
+    if (!stillReferenced) {
+      const store = getServerFileStore();
+      await store.deleteFile(photo.storagePath).catch(() => false);
+    }
     return NextResponse.json(
       { payload: mutation.payload },
       { headers: { "Cache-Control": "no-store" } },
