@@ -306,9 +306,7 @@ export function QuoteRichTextEditor({ value, onChange, ariaLabel, maxLength }: P
           aria-pressed={highlightActive}
           title="Surlignage jaune"
           onMouseDown={(event) => event.preventDefault()}
-          onClick={() =>
-            applyPatch({ highlightColor: highlightActive ? null : HIGHLIGHT_COLOR })
-          }
+          onClick={() => applyPatch({ highlightColor: highlightActive ? null : HIGHLIGHT_COLOR })}
         >
           <Highlighter size={14} aria-hidden="true" />
         </button>
