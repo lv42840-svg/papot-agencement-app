@@ -4,7 +4,6 @@ import { Plus, Trash2 } from "lucide-react";
 import { useMemo, useState } from "react";
 import {
   calculateQuoteAdjustedPricing,
-  type QuoteOption,
   type QuotePricingAdjustment,
 } from "@/lib/quotes/adjustments";
 import type { NativeQuoteRecord, NativeQuotesPayload } from "@/lib/quotes/store";
@@ -13,8 +12,6 @@ type PricingApiResponse = {
   payload?: NativeQuotesPayload;
   error?: string;
 };
-
-type OptionTarget = Exclude<NativeQuoteRecord["model"]["items"][number], { kind: "COMMENT" }>;
 
 const moneyFormatter = new Intl.NumberFormat("fr-FR", {
   style: "currency",
@@ -32,12 +29,6 @@ function parseNumber(value: string, allowZero = false): number {
     throw new Error("NUMBER_INVALID");
   }
   return parsed;
-}
-
-function itemLabel(item: OptionTarget): string {
-  if (item.kind === "SECTION") return `Groupe · ${item.title}`;
-  if (item.kind === "SUBSECTION") return `Sous-groupe · ${item.title}`;
-  return `Ligne · ${item.description}`;
 }
 
 function pricingErrorLabel(code: string): string {
@@ -92,19 +83,9 @@ export function QuotePricingAdjustmentsEditor({
   const [value, setValue] = useState("5");
   const [marginTreatment, setMarginTreatment] = useState<"MARGED" | "PASS_THROUGH">("PASS_THROUGH");
   const [applyToOptions, setApplyToOptions] = useState(true);
-  const [optionTargetId, setOptionTargetId] = useState("");
-  const [optionLabel, setOptionLabel] = useState("Option");
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
 
-  const optionTargets = useMemo(
-    () => quote.model.items.filter((item): item is OptionTarget => item.kind !== "COMMENT"),
-    [quote.model.items],
-  );
-  const optionTargetIds = useMemo(
-    () => new Set(quote.pricingConfig.options.map((option) => option.targetItemId)),
-    [quote.pricingConfig.options],
-  );
   const pricing = useMemo(
     () => calculateQuoteAdjustedPricing(quote.model.items, quote.pricingConfig),
     [quote.model.items, quote.pricingConfig],
@@ -193,62 +174,12 @@ export function QuotePricingAdjustmentsEditor({
     }
   }
 
-  async function addOption() {
-    if (!editable || saving || !optionTargetId) return;
-    const target = optionTargets.find((item) => item.id === optionTargetId);
-    if (!target) return;
-    setError("");
-    setSaving(true);
-    try {
-      const option: QuoteOption = {
-        id: globalThis.crypto.randomUUID(),
-        targetItemId: target.id,
-        targetKind: target.kind,
-        label: optionLabel.trim() || itemLabel(target),
-        status: "PENDING",
-      };
-      onSaved(await postPricing({ action: "upsertOption", quoteId: quote.id, option }));
-      setOptionTargetId("");
-      setOptionLabel("Option");
-    } catch (caught) {
-      setError(pricingErrorLabel(caught instanceof Error ? caught.message : ""));
-    } finally {
-      setSaving(false);
-    }
-  }
-
-  async function setOptionStatus(option: QuoteOption, status: QuoteOption["status"]) {
-    if (!editable) return;
-    setError("");
-    try {
-      onSaved(
-        await postPricing({
-          action: "upsertOption",
-          quoteId: quote.id,
-          option: { ...option, status },
-        }),
-      );
-    } catch (caught) {
-      setError(pricingErrorLabel(caught instanceof Error ? caught.message : ""));
-    }
-  }
-
-  async function removeOption(optionId: string) {
-    if (!editable) return;
-    setError("");
-    try {
-      onSaved(await postPricing({ action: "removeOption", quoteId: quote.id, optionId }));
-    } catch (caught) {
-      setError(pricingErrorLabel(caught instanceof Error ? caught.message : ""));
-    }
-  }
-
   return (
     <section className="pricingCard">
       <header>
         <div>
           <p>Chiffrage interne</p>
-          <h2>Ajustements, pose et options</h2>
+          <h2>Ajustements et pose</h2>
         </div>
         <div className="totals">
           <span>
@@ -379,88 +310,6 @@ export function QuotePricingAdjustmentsEditor({
         </div>
       </div>
 
-      <div className="panel">
-        <h3>Options client hors total</h3>
-        <p className="hint">
-          Une ligne, un groupe ou un sous-groupe peut être chiffré et affiché au client sans entrer
-          dans le total principal tant que l’option n’est pas retenue.
-        </p>
-        <div className="formRow optionForm">
-          <select
-            disabled={!editable}
-            value={optionTargetId}
-            onChange={(event) => setOptionTargetId(event.target.value)}
-          >
-            <option value="">Choisir une ligne ou un groupe…</option>
-            {optionTargets
-              .filter((item) => !optionTargetIds.has(item.id))
-              .map((item) => (
-                <option key={item.id} value={item.id}>
-                  {itemLabel(item)}
-                </option>
-              ))}
-          </select>
-          <input
-            disabled={!editable}
-            placeholder="Nom de l’option"
-            value={optionLabel}
-            onChange={(event) => setOptionLabel(event.target.value)}
-          />
-          <button
-            className="secondaryButton compact"
-            disabled={!editable || saving || !optionTargetId}
-            type="button"
-            onClick={() => void addOption()}
-          >
-            <Plus size={14} /> Mettre en option
-          </button>
-        </div>
-
-        <div className="list">
-          {quote.pricingConfig.options.length === 0 ? (
-            <p className="empty">Aucune option.</p>
-          ) : null}
-          {quote.pricingConfig.options.map((option) => {
-            const summary = pricing.options.find((entry) => entry.id === option.id);
-            const target = optionTargets.find((item) => item.id === option.targetItemId);
-            return (
-              <div className="optionRow" key={option.id}>
-                <div>
-                  <strong>{option.label}</strong>
-                  <small>
-                    {target ? itemLabel(target) : "Élément introuvable"} ·{" "}
-                    {formatMoney(summary?.saleCents ?? 0)}
-                    {summary && summary.poseHours > 0
-                      ? ` · ${summary.poseHours.toLocaleString("fr-FR")} h pose`
-                      : ""}
-                  </small>
-                </div>
-                <select
-                  disabled={!editable}
-                  value={option.status}
-                  onChange={(event) =>
-                    void setOptionStatus(option, event.target.value as QuoteOption["status"])
-                  }
-                >
-                  <option value="PENDING">En attente</option>
-                  <option value="RETAINED">Retenue</option>
-                  <option value="REJECTED">Non retenue</option>
-                </select>
-                <button
-                  aria-label={`Supprimer ${option.label}`}
-                  className="iconButton"
-                  disabled={!editable}
-                  type="button"
-                  onClick={() => void removeOption(option.id)}
-                >
-                  <Trash2 size={14} />
-                </button>
-              </div>
-            );
-          })}
-        </div>
-      </div>
-
       {warningLabels.map((warning) => (
         <p className="warning" key={warning}>
           {warning}
@@ -540,8 +389,7 @@ export function QuotePricingAdjustmentsEditor({
           align-items: center;
         }
         .formRow input,
-        .formRow select,
-        .optionRow select {
+        .formRow select {
           min-height: 34px;
           box-sizing: border-box;
           padding: 6px 8px;
@@ -558,14 +406,6 @@ export function QuotePricingAdjustmentsEditor({
         }
         .formRow > input:not(:first-of-type) {
           width: 92px;
-        }
-        .optionForm select {
-          min-width: 260px;
-          flex: 1 1 320px;
-        }
-        .optionForm input {
-          min-width: 180px;
-          flex: 0 1 250px;
         }
         .checkbox {
           display: inline-flex;
@@ -590,17 +430,13 @@ export function QuotePricingAdjustmentsEditor({
           display: grid;
           gap: 6px;
         }
-        .listRow,
-        .optionRow {
+        .listRow {
           display: grid;
           grid-template-columns: auto minmax(0, 1fr) auto;
           gap: 8px;
           align-items: center;
           padding-top: 7px;
           border-top: 1px solid #f0edf5;
-        }
-        .optionRow {
-          grid-template-columns: minmax(0, 1fr) auto auto;
         }
         .poseRow {
           display: grid;

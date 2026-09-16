@@ -137,12 +137,7 @@ export function publishQuoteComponentToLibrary(
   if (mode === "OVERWRITE_LINKED" && linked) {
     payload = upsertLibraryComponent(
       payload,
-      libraryComponentFromQuoteComponent(
-        component,
-        linked.id,
-        costPriceCents,
-        linked.description,
-      ),
+      libraryComponentFromQuoteComponent(component, linked.id, costPriceCents, linked.description),
     );
     return { payload, componentId: linked.id, created: false, updated: true };
   }

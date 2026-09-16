@@ -136,12 +136,7 @@ describe("publish quote component to Library", () => {
     });
     const edited = { ...component, unitPriceCents: 6_000 };
 
-    const result = publishQuoteComponentToLibrary(
-      payload,
-      edited,
-      ids(),
-      "OVERWRITE_LINKED",
-    );
+    const result = publishQuoteComponentToLibrary(payload, edited, ids(), "OVERWRITE_LINKED");
 
     expect(result.created).toBe(false);
     expect(result.updated).toBe(true);

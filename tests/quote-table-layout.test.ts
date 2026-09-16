@@ -7,13 +7,22 @@ const source = readFileSync(
 );
 
 describe("quote table layout", () => {
-  it("keeps inline quote editing styled as a table", () => {
+  it("keeps inline quote editing styled as a table without hiding Total HT", () => {
     expect(source).toContain("<style jsx global>");
     expect(source).toContain(
-      "grid-template-columns: 52px minmax(300px, 1fr) 82px 72px 120px 120px 120px 82px;",
+      "grid-template-columns: 44px minmax(250px, 1fr) 64px 56px 104px 100px 110px 170px;",
     );
     expect(source).toContain("<span>Total HT</span>");
     expect(source).toContain("quoteLineTotal");
+    expect(source).toContain(".miniOptionButton");
+  });
+
+  it("uses drag-and-drop instead of arrow movement controls", () => {
+    expect(source).not.toContain("ArrowUp");
+    expect(source).not.toContain("ArrowDown");
+    expect(source).not.toContain("Remonter l’ouvrage");
+    expect(source).not.toContain("Descendre l’ouvrage");
+    expect(source).toContain("Glisser-déposer pour déplacer le composant");
   });
 
   it("uses the requested hierarchy font sizes", () => {
