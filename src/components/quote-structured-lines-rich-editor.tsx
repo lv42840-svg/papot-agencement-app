@@ -90,12 +90,7 @@ function itemMatchesKind(item: QuoteItem, kind: RichEditableKind): boolean {
   return item.kind === kind;
 }
 
-export function QuoteStructuredLinesRichEditor({
-  quote,
-  canWrite,
-  onSaved,
-  headerActions,
-}: Props) {
+export function QuoteStructuredLinesRichEditor({ quote, canWrite, onSaved, headerActions }: Props) {
   const rootRef = useRef<HTMLDivElement>(null);
   const activeInputRef = useRef<HTMLInputElement | null>(null);
   const activeHostRef = useRef<HTMLDivElement | null>(null);
@@ -292,9 +287,7 @@ export function QuoteStructuredLinesRichEditor({
             <QuoteRichTextEditor
               value={session.richText}
               onChange={changeRichText}
-              ariaLabel={
-                session.kind === "LINE" ? "Désignation de l’ouvrage" : "Texte du titre"
-              }
+              ariaLabel={session.kind === "LINE" ? "Désignation de l’ouvrage" : "Texte du titre"}
               maxLength={session.kind === "LINE" ? 4000 : 500}
             />,
             activeHost,
