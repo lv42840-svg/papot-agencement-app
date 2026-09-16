@@ -10,7 +10,7 @@ import { QuoteInternalNotesEditor } from "@/components/quote-internal-notes-edit
 import { QuotePricingAdjustmentsEditor } from "@/components/quote-pricing-adjustments-editor";
 import { QuoteRichTextLayer } from "@/components/quote-rich-text-layer";
 import { QuoteSendAction } from "@/components/quote-send-action";
-import { QuoteStructuredLinesEditor } from "@/components/quote-structured-lines-editor";
+import { QuoteStructuredLinesRichEditor } from "@/components/quote-structured-lines-rich-editor";
 import { calculateQuoteAdjustedPricing } from "@/lib/quotes/adjustments";
 import type { NativeQuoteRecord, NativeQuotesPayload } from "@/lib/quotes/store";
 
@@ -78,7 +78,7 @@ export function QuoteDirectEditor({
 
       <QuoteInternalNotesEditor quote={quote} canWrite={canWrite} onSaved={setPayload} />
 
-      <QuoteStructuredLinesEditor
+      <QuoteStructuredLinesRichEditor
         quote={displayQuote}
         canWrite={canWrite}
         onSaved={setPayload}
@@ -93,7 +93,7 @@ export function QuoteDirectEditor({
         }
       />
 
-      <QuoteRichTextLayer quote={displayQuote} canWrite={canWrite} onSaved={setPayload} />
+      <QuoteRichTextLayer quote={displayQuote} />
 
       <QuotePricingAdjustmentsEditor quote={quote} canWrite={canWrite} onSaved={setPayload} />
 
