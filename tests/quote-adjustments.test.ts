@@ -96,6 +96,7 @@ describe("quote global adjustments", () => {
 
     const result = calculateQuoteAdjustedPricing(items, config);
 
+    expect(result.lines[0].saleCents).toBe(10_526_316);
     expect(result.totalSaleCents).toBe(10_526_316);
     expect(result.totalCostCents).toBe(6_526_316);
     expect(result.marginAmountCents).toBe(4_000_000);
@@ -147,6 +148,7 @@ describe("quote global adjustments", () => {
 
     expect(result.lines.map((entry) => entry.basePoseHours)).toEqual([20, 10, 10]);
     expect(result.lines.map((entry) => entry.poseHours)).toEqual([24, 12, 12]);
+    expect(result.lines.map((entry) => entry.saleCents)).toEqual([1_028_000, 514_000, 514_000]);
     expect(result.totalPoseHours).toBe(48);
     expect(result.totalCostCents).toBe(240_000);
     expect(result.totalSaleCents).toBe(2_056_000);

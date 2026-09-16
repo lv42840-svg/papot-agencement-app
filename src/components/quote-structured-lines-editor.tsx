@@ -17,6 +17,7 @@ import {
 } from "@/lib/library/storage";
 import { ensureRequiredLaborComponents } from "@/lib/library/required-labor-components";
 import { productionActivityLabel, type ProductionActivity } from "@/lib/production-activity";
+import { calculateQuoteAdjustedPricing } from "@/lib/quotes/adjustments";
 import { duplicateQuoteComponent } from "@/lib/quotes/component-order";
 import { parseQuoteQuantityInput } from "@/lib/quotes/domain";
 import {
@@ -424,6 +425,11 @@ export function QuoteStructuredLinesEditor({
     () => items.filter((item): item is QuoteLine => item.kind === "LINE"),
     [items],
   );
+  const adjustedLinesById = useMemo(() => {
+    if (!quote) return new Map();
+    const adjusted = calculateQuoteAdjustedPricing(quote.model.items, quote.pricingConfig);
+    return new Map(adjusted.lines.map((line) => [line.lineId, line]));
+  }, [quote]);
   const numbers = useMemo(() => buildQuoteItemNumbers(items), [items]);
   const lastSection = useMemo(() => latestSection(items), [items]);
   const editable = canWrite && quote?.status === "DRAFT";
@@ -1423,7 +1429,10 @@ export function QuoteStructuredLinesEditor({
     const marginPercent = calculateQuoteOuvrageMarginPercent(salePriceCents, costPriceCents);
     const libraryAlreadyLinked = line.librarySource?.kind === "OUVRAGE";
     const publishedNow = publishedLineIds.has(line.id);
-    const lineTotalCents = Math.round(line.quantity * salePriceCents);
+    const baseLineTotalCents = Math.round(line.quantity * salePriceCents);
+    const adjustedLine = adjustedLinesById.get(line.id);
+    const lineTotalCents = adjustedLine?.saleCents ?? baseLineTotalCents;
+    const adjustmentDeltaCents = lineTotalCents - baseLineTotalCents;
     const directOption = directOptionForItem(line.id);
 
     return (
@@ -1467,7 +1476,12 @@ export function QuoteStructuredLinesEditor({
               </>
             )}
           </div>
-          <strong className="quoteLineTotal">{formatMoney(lineTotalCents)}</strong>
+          <div className="quoteLineTotalCell">
+            <strong className="quoteLineTotal">{formatMoney(lineTotalCents)}</strong>
+            {adjustmentDeltaCents !== 0 ? (
+              <small>incl. {formatMoney(adjustmentDeltaCents)} d’ajustements</small>
+            ) : null}
+          </div>
           <div className="quoteRowActions">
             {editable ? (
               <>
@@ -2232,6 +2246,18 @@ export function QuoteStructuredLinesEditor({
         .quoteRowActions {
           justify-content: flex-end;
           gap: 5px;
+        }
+        .quoteLineTotalCell {
+          min-width: 0;
+          display: grid;
+          gap: 2px;
+          justify-items: start;
+        }
+        .quoteLineTotalCell small {
+          color: #7867bb;
+          font-size: 9px;
+          font-weight: 800;
+          white-space: nowrap;
         }
         .quoteLineTotal {
           white-space: nowrap;
