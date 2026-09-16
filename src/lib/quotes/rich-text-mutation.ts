@@ -24,6 +24,19 @@ function itemText(item: QuoteItem): string | null {
   return null;
 }
 
+function normalizeLineEndings(value: string): string {
+  return value.replace(/\r\n?/g, "\n");
+}
+
+function normalizeRichTextLineEndings(richText: QuoteRichText): QuoteRichText {
+  return {
+    runs: richText.runs.map((run) => ({
+      ...run,
+      text: normalizeLineEndings(run.text),
+    })),
+  };
+}
+
 function withUpdatedText(item: QuoteItem, text: string, richText: QuoteRichText): QuoteItem {
   const presentation = {
     ...(item.presentation ?? {}),
@@ -60,13 +73,13 @@ export function applyQuoteRichTextUpdate(
     throw new Error("QUOTE_RICH_TEXT_ITEM_UNSUPPORTED");
   }
 
-  const text = input.text.trim();
+  const text = normalizeLineEndings(input.text).trim();
   const maxLength = item.kind === "LINE" ? 4000 : 500;
   if (!text || text.length > maxLength) {
     throw new Error("QUOTE_RICH_TEXT_INVALID");
   }
 
-  const richText = quoteRichTextSchema.parse(input.richText);
+  const richText = normalizeRichTextLineEndings(quoteRichTextSchema.parse(input.richText));
   if (quoteRichTextToPlainText(richText).trim() !== text) {
     throw new Error("QUOTE_RICH_TEXT_TEXT_MISMATCH");
   }
