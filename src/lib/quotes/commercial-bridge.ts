@@ -1,9 +1,9 @@
+import type { CommercialPayload } from "../commercial/domain";
 import {
   applyCommercialMutation,
   commercialMutationSchema,
   type CommercialActor,
-} from "@/lib/commercial/mutations";
-import type { CommercialPayload } from "@/lib/commercial/domain";
+} from "../commercial/mutations";
 
 export function startQuoteCommercialWorkflow(
   source: CommercialPayload,
