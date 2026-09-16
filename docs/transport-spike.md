@@ -1,14 +1,20 @@
 # Spike transport Nextcloud
 
-Status: **NEXTCLOUD WEBDAV REEL VALIDE**. L'installation PWA sur iPhone reel est **VALIDEE**, mais le transport WebDAV direct depuis la PWA Safari iPhone est **ECARTE** a cause du CORS constate en conditions reelles. Le transport mobile de production reste a valider de bout en bout avec le relais HTTPS minimal retenu par l'architecture V1, le worker PostgreSQL, les ACK et les essais de reprise/destruction.
+> **Statut depuis le 16 septembre 2026 : note technique historique sur le transport mobile.**
+>
+> Ce document conserve les essais et constats réalisés autour de Nextcloud, WebDAV, PWA iPhone, relais HTTPS, signatures, ACK et idempotence. Il **ne définit plus l'architecture desktop principale de PAPOT AGENCEMENT**.
+>
+> La source technique active du dépôt est désormais `docs/desktop-local-architecture.md` : PAPOT fonctionne principalement en local ; le serveur PAPOT et PostgreSQL constituent la cible métier partagée ; les documents sont destinés aux dossiers du serveur local ; Nextcloud est conservé seulement comme sas de transport pour les échanges avec le téléphone extérieur lorsque nécessaire.
 
-## Porte d'architecture
+Status historique du spike : **NEXTCLOUD WEBDAV REEL VALIDE**. L'installation PWA sur iPhone reel est **VALIDEE**, mais le transport WebDAV direct depuis la PWA Safari iPhone est **ECARTE** a cause du CORS constate en conditions reelles. Le transport mobile de production reste a valider de bout en bout avec le relais HTTPS minimal, le worker PAPOT local, les ACK et les essais de reprise/destruction.
+
+## Porte d'architecture du spike
 
 Le serveur PAPOT et PostgreSQL restent locaux. PostgreSQL ne doit jamais etre publie vers Internet.
 
 Le transport mobile V1 peut utiliser un **relais HTTPS minimal** accessible depuis Internet. Ce relais est uniquement une frontiere de transport authentifiee et limitee: il ne doit pas exposer PostgreSQL ni devenir une API generale du back-office PAPOT. Les postes/worker PAPOT et le relais n'echangent que les paquets necessaires au protocole de synchronisation.
 
-Nextcloud reste utilise pour les documents, les zones de synchronisation et les mecanismes de fichiers partages valides. Le Nextcloud du prototype est `https://cloud.ideo-solutions.com` et l'espace logique est `PAPOT_SYNC`.
+Nextcloud est conserve pour le **transport mobile**. Les mecanismes de documents et ressources partages decrits dans les anciennes versions de ce spike ne doivent plus etre extrapoles au stockage principal du desktop. Le Nextcloud du prototype est `https://cloud.ideo-solutions.com` et l'espace logique est `PAPOT_SYNC`.
 
 ## Verification WebDAV reelle, avant protocole complet
 
@@ -100,7 +106,7 @@ La recherche documentaire a montre que:
 
 Conclusion: **il n'existe pas de contournement navigateur-only propre permettant a la PWA PAPOT actuelle de lire et deposer automatiquement les paquets dans Nextcloud sans support CORS cote Nextcloud**.
 
-Cette conclusion ne ferme pas le mobile. L'architecture V1 retient desormais un relais HTTPS minimal et limite pour le transport mobile exterieur. Le transport final doit etre valide par un vrai aller-retour iPhone -> relais/transport -> worker PAPOT -> PostgreSQL -> ACK -> iPhone.
+Cette conclusion ne ferme pas le mobile. La cible conserve un relais HTTPS minimal et limite pour le transport mobile exterieur. Le transport final doit etre valide par un vrai aller-retour iPhone -> relais/transport -> Nextcloud -> worker PAPOT local -> PostgreSQL -> ACK -> iPhone.
 
 ## Android
 
@@ -120,11 +126,12 @@ Le socle suivant est implemente sur la branche du spike mais n'est pas encore va
 - staging compatible Nextcloud avec suffixe `.staging-<UUID>`, puis `MOVE` vers le fichier final;
 - validation de l'appareil, de l'identite, de la permission Capture WRITE et de la signature avant ecriture metier;
 - transaction PostgreSQL reutilisant la logique Capture existante;
-- archivage des pieces jointes sous `PAPOT_SYNC/documents/captures/<capture_id>/...`;
 - ACK ecrit seulement apres validation et ecriture metier completes;
 - reprise idempotente prevue si le paquet a ete applique en base mais que l'ACK n'a pas encore pu etre depose;
 - erreurs permanentes explicites et erreurs transitoires conservees pour nouvelle tentative;
 - journaux techniques sans secret ni payload metier complet.
+
+Les anciens chemins qui archivaient durablement les documents de bureau dans Nextcloud doivent etre revus lors du raccordement final : le stockage durable vise maintenant les dossiers locaux PAPOT, tandis que Nextcloud reste un sas temporaire pour le mobile.
 
 Commandes prevues une fois la base locale configuree:
 
