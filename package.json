@@ -56,6 +56,15 @@
     "appId": "fr.papot.agencement",
     "productName": "PAPOT AGENCEMENT",
     "asar": true,
+    "ignoredProductionDependencies": [
+      "lucide-react",
+      "next",
+      "pg",
+      "react",
+      "react-dom",
+      "server-only",
+      "zod"
+    ],
     "directories": {
       "output": "release"
     },
