@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { ArrowLeft, FilePlus2 } from "lucide-react";
+import { ArrowLeft, FilePlus2, LockKeyhole } from "lucide-react";
 import { type FormEvent, useMemo, useState } from "react";
 import type { QuoteAffairOption } from "@/components/quotes-workspace";
 import { quoteHref } from "@/lib/quotes/navigation";
@@ -28,30 +28,44 @@ export function QuoteCreateWorkspace({
   affairs,
   canWrite,
   today,
+  initialAffairId,
+  paymentTermOptions,
 }: {
   affairs: QuoteAffairOption[];
   canWrite: boolean;
   today: string;
+  initialAffairId?: string;
+  paymentTermOptions: string[];
 }) {
   const router = useRouter();
   const affairsById = useMemo(
     () => new Map(affairs.map((affair) => [affair.id, affair])),
     [affairs],
   );
-  const firstAffair = affairs[0];
+  const firstAffair = affairs.find((affair) => affair.id === initialAffairId) ?? affairs[0];
   const [selectedAffairId, setSelectedAffairId] = useState(firstAffair?.id ?? "");
   const [subject, setSubject] = useState(firstAffair?.name ?? "");
-  const [variantName, setVariantName] = useState("Base");
   const [issueDate, setIssueDate] = useState(today);
   const [paymentTerms, setPaymentTerms] = useState(firstAffair?.paymentTerms ?? "");
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
+  const availablePaymentTerms = useMemo(
+    () =>
+      Array.from(
+        new Set(
+          [affairsById.get(selectedAffairId)?.paymentTerms ?? "", ...paymentTermOptions]
+            .map((value) => value.trim())
+            .filter((value) => value.length > 0),
+        ),
+      ),
+    [affairsById, paymentTermOptions, selectedAffairId],
+  );
 
   function selectAffair(affairId: string) {
     setSelectedAffairId(affairId);
     const affair = affairsById.get(affairId);
     setSubject(affair?.name ?? "");
-    setPaymentTerms(affair?.paymentTerms ?? "");
+    setPaymentTerms(affair?.paymentTerms ?? availablePaymentTerms[0] ?? "");
   }
 
   async function createDraft(event: FormEvent<HTMLFormElement>) {
@@ -68,7 +82,7 @@ export function QuoteCreateWorkspace({
           commercialCaseId: selectedAffairId,
           subject,
           issueDate,
-          variantName,
+          variantName: "Base",
           paymentTerms,
         }),
       });
@@ -97,13 +111,13 @@ export function QuoteCreateWorkspace({
         <div className="quoteCreateHeader">
           <div>
             <p className="eyebrow">Nouveau devis</p>
-            <h2>Créer le brouillon</h2>
+            <h2>Créer Base V1</h2>
             <p className="muted">
-              Choisis l’affaire et les informations de départ. Le devis s’ouvrira ensuite dans sa
-              page complète.
+              Le premier devis d’une affaire démarre automatiquement en Base V1. Les variantes et
+              versions suivantes se créeront ensuite depuis le devis existant.
             </p>
           </div>
-          <span className="quoteCreatePill">Pas encore numéroté</span>
+          <span className="quoteCreatePill">Base · V1</span>
         </div>
 
         {!canWrite ? (
@@ -142,16 +156,15 @@ export function QuoteCreateWorkspace({
               />
             </label>
 
-            <label className="quoteField">
-              <span>Variante</span>
-              <input
-                value={variantName}
-                onChange={(event) => setVariantName(event.target.value)}
-                maxLength={120}
-                required
-                disabled={saving}
-              />
-            </label>
+            <div className="quoteField">
+              <span>Variante / version</span>
+              <div className="quoteStructuredValue">
+                <strong>Base · V1</strong>
+                <small>
+                  <LockKeyhole size={12} aria-hidden="true" /> Créé automatiquement
+                </small>
+              </div>
+            </div>
 
             <label className="quoteField">
               <span>Date du devis</span>
@@ -166,19 +179,34 @@ export function QuoteCreateWorkspace({
 
             <label className="quoteField quoteFieldWide">
               <span>Conditions de règlement</span>
-              <textarea
+              <select
                 value={paymentTerms}
                 onChange={(event) => setPaymentTerms(event.target.value)}
-                rows={3}
-                disabled={saving}
-              />
+                required
+                disabled={saving || availablePaymentTerms.length === 0}
+              >
+                {availablePaymentTerms.map((terms) => (
+                  <option key={terms} value={terms}>
+                    {terms}
+                  </option>
+                ))}
+              </select>
             </label>
+
+            <div className="quoteCreateFixed quoteFieldWide">
+              <LockKeyhole size={13} aria-hidden="true" /> Validité du devis : 30 jours, appliquée
+              automatiquement.
+            </div>
 
             {error ? <div className="quoteCreateError quoteFieldWide">{error}</div> : null}
 
             <div className="quoteCreateActions quoteFieldWide">
-              <button className="primaryButton" type="submit" disabled={saving}>
-                <FilePlus2 size={15} /> {saving ? "Création…" : "Créer et ouvrir le devis"}
+              <button
+                className="primaryButton"
+                type="submit"
+                disabled={saving || availablePaymentTerms.length === 0}
+              >
+                <FilePlus2 size={15} /> {saving ? "Création…" : "Créer et ouvrir Base V1"}
               </button>
               <Link href="/devis" className="secondaryButton quoteCancelLink">
                 Annuler
@@ -253,8 +281,9 @@ export function QuoteCreateWorkspace({
         }
         .quoteField input,
         .quoteField select,
-        .quoteField textarea {
+        .quoteStructuredValue {
           width: 100%;
+          min-height: 40px;
           border: 1px solid var(--border);
           border-radius: 8px;
           background: #fff;
@@ -263,18 +292,35 @@ export function QuoteCreateWorkspace({
         }
         .quoteField input,
         .quoteField select {
-          min-height: 40px;
           padding: 0 11px;
         }
-        .quoteField textarea {
-          padding: 10px 11px;
-          resize: vertical;
+        .quoteStructuredValue {
+          display: flex;
+          align-items: center;
+          justify-content: space-between;
+          gap: 8px;
+          padding: 0 11px;
+          background: #faf8ff;
+          border-color: #e4def2;
+        }
+        .quoteStructuredValue small,
+        .quoteCreateFixed {
+          display: inline-flex;
+          align-items: center;
+          gap: 5px;
+          color: var(--muted);
+          font-size: 10px;
         }
         .quoteField input:focus,
-        .quoteField select:focus,
-        .quoteField textarea:focus {
+        .quoteField select:focus {
           outline: 2px solid color-mix(in srgb, var(--accent) 25%, transparent);
           border-color: var(--accent);
+        }
+        .quoteCreateFixed {
+          padding: 9px 11px;
+          border: 1px solid #e4def2;
+          border-radius: 8px;
+          background: #faf8ff;
         }
         .quoteCreateActions {
           display: flex;
@@ -314,6 +360,12 @@ export function QuoteCreateWorkspace({
           }
           .quoteFieldWide {
             grid-column: auto;
+          }
+          .quoteStructuredValue {
+            align-items: flex-start;
+            flex-direction: column;
+            padding-top: 9px;
+            padding-bottom: 9px;
           }
         }
       `}</style>

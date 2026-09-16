@@ -8,7 +8,12 @@ import { requireDesktopRequestContext } from "@/lib/desktop/request-context";
 
 export const dynamic = "force-dynamic";
 
-export default async function NewQuotePage() {
+export default async function NewQuotePage({
+  searchParams,
+}: {
+  searchParams: Promise<{ affaire?: string }>;
+}) {
+  const { affaire: requestedAffairId } = await searchParams;
   const context = await requireDesktopRequestContext("quotes", "READ");
   const commercialRepository = createCommercialRepository(context);
   const clientsRepository = await createClientsRepository(context);
@@ -31,6 +36,16 @@ export default async function NewQuotePage() {
       },
     ];
   });
+  const initialAffairId = affairs.some((affair) => affair.id === requestedAffairId)
+    ? requestedAffairId
+    : undefined;
+  const paymentTermOptions = Array.from(
+    new Set(
+      clients.clients
+        .map((client) => client.paymentTerms.trim())
+        .filter((paymentTerms) => paymentTerms.length > 0),
+    ),
+  );
 
   return (
     <DesktopAppShell>
@@ -38,6 +53,8 @@ export default async function NewQuotePage() {
         affairs={affairs}
         canWrite={context.moduleAccess.canWrite}
         today={commercialParisDateKey()}
+        initialAffairId={initialAffairId}
+        paymentTermOptions={paymentTermOptions}
       />
     </DesktopAppShell>
   );
