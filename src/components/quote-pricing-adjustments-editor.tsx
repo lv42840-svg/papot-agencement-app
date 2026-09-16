@@ -31,6 +31,27 @@ function parseNumber(value: string, allowZero = false): number {
   return parsed;
 }
 
+function parsePositiveInteger(value: string): number {
+  const parsed = parseNumber(value);
+  if (!Number.isInteger(parsed)) throw new Error("NUMBER_INVALID");
+  return parsed;
+}
+
+function parseMoneyCents(value: string): number {
+  return Math.round(parseNumber(value) * 100);
+}
+
+function adjustmentValueLabel(adjustment: QuotePricingAdjustment): string {
+  if (adjustment.kind === "PERCENTAGE") {
+    return `${adjustment.percent.toLocaleString("fr-FR")} %`;
+  }
+  if (adjustment.kind === "POSE_HOURS") {
+    return `${adjustment.hours.toLocaleString("fr-FR")} h pose`;
+  }
+  const nightsLabel = adjustment.nights > 1 ? "nuits" : "nuit";
+  return `${adjustment.nights.toLocaleString("fr-FR")} ${nightsLabel} × ${formatMoney(adjustment.pricePerNightCents)} = ${formatMoney(adjustment.nights * adjustment.pricePerNightCents)}`;
+}
+
 function pricingErrorLabel(code: string): string {
   if (code === "QUOTE_NOT_EDITABLE") return "Seul un brouillon peut être modifié.";
   if (code === "QUOTE_OPTION_TARGET_DUPLICATE") return "Cet élément est déjà une option.";
@@ -51,6 +72,12 @@ function pricingWarningLabel(code: string): string {
   }
   if (code.startsWith("QUOTE_POSE_HOURS_ZERO_RATE:")) {
     return "Un tarif « Heure pose » vaut 0 €. Les heures sont bien ajoutées, mais leur prix n’augmente pas.";
+  }
+  if (code.startsWith("QUOTE_HOTEL_NO_POSE_HOURS:")) {
+    return "L’hôtel ne peut pas être réparti : aucune ligne du devis principal ne contient d’heures de pose.";
+  }
+  if (code.startsWith("QUOTE_HOTEL_MARGIN_RATE_MISSING:")) {
+    return "Une part d’hôtel a été répercutée sans marge car le coefficient coût / vente de l’« Heure pose » ne peut pas être calculé.";
   }
   return "Un ajustement de chiffrage nécessite une vérification.";
 }
@@ -78,10 +105,14 @@ export function QuotePricingAdjustmentsEditor({
   onSaved: (payload: NativeQuotesPayload) => void;
 }) {
   const editable = canWrite && quote.status === "DRAFT";
-  const [kind, setKind] = useState<"PERCENTAGE" | "POSE_HOURS">("PERCENTAGE");
+  const [kind, setKind] = useState<"PERCENTAGE" | "POSE_HOURS" | "HOTEL">("PERCENTAGE");
   const [label, setLabel] = useState("Commission architecte");
   const [value, setValue] = useState("5");
-  const [marginTreatment, setMarginTreatment] = useState<"MARGED" | "PASS_THROUGH">("PASS_THROUGH");
+  const [hotelNights, setHotelNights] = useState("1");
+  const [hotelPricePerNight, setHotelPricePerNight] = useState("120");
+  const [marginTreatment, setMarginTreatment] = useState<"MARGED" | "PASS_THROUGH">(
+    "PASS_THROUGH",
+  );
   const [applyToOptions, setApplyToOptions] = useState(true);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
@@ -99,12 +130,20 @@ export function QuotePricingAdjustmentsEditor({
     [pricing.warnings],
   );
 
-  function changeKind(nextKind: "PERCENTAGE" | "POSE_HOURS") {
+  function changeKind(nextKind: "PERCENTAGE" | "POSE_HOURS" | "HOTEL") {
     setKind(nextKind);
     if (nextKind === "POSE_HOURS") {
       setLabel("Déplacement chantier");
       setValue("8");
       setMarginTreatment("MARGED");
+      setApplyToOptions(false);
+      return;
+    }
+    if (nextKind === "HOTEL") {
+      setLabel("Hôtel chantier");
+      setHotelNights("1");
+      setHotelPricePerNight("120");
+      setMarginTreatment("PASS_THROUGH");
       setApplyToOptions(false);
       return;
     }
@@ -129,9 +168,25 @@ export function QuotePricingAdjustmentsEditor({
     setError("");
     setSaving(true);
     try {
+      const id = globalThis.crypto.randomUUID();
+      const cleanLabel = label.trim();
+      if (kind === "HOTEL") {
+        await saveAdjustment({
+          id,
+          kind: "HOTEL",
+          label: cleanLabel,
+          active: true,
+          applyToOptions: false,
+          marginTreatment,
+          nights: parsePositiveInteger(hotelNights),
+          pricePerNightCents: parseMoneyCents(hotelPricePerNight),
+        });
+        return;
+      }
+
       const common = {
-        id: globalThis.crypto.randomUUID(),
-        label: label.trim(),
+        id,
+        label: cleanLabel,
         active: true,
         applyToOptions,
         marginTreatment,
@@ -179,7 +234,7 @@ export function QuotePricingAdjustmentsEditor({
       <header>
         <div>
           <p>Chiffrage interne</p>
-          <h2>Ajustements et pose</h2>
+          <h2>Ajustements, pose et hôtel</h2>
         </div>
         <div className="totals">
           <span>
@@ -210,6 +265,7 @@ export function QuotePricingAdjustmentsEditor({
             >
               <option value="PERCENTAGE">Pourcentage</option>
               <option value="POSE_HOURS">Heures de pose / trajet</option>
+              <option value="HOTEL">Hôtel</option>
             </select>
             <input
               disabled={!editable}
@@ -217,13 +273,32 @@ export function QuotePricingAdjustmentsEditor({
               value={label}
               onChange={(event) => setLabel(event.target.value)}
             />
-            <input
-              disabled={!editable}
-              inputMode="decimal"
-              placeholder={kind === "PERCENTAGE" ? "%" : "Heures"}
-              value={value}
-              onChange={(event) => setValue(event.target.value)}
-            />
+            {kind === "HOTEL" ? (
+              <>
+                <input
+                  disabled={!editable}
+                  inputMode="numeric"
+                  placeholder="Nuits"
+                  value={hotelNights}
+                  onChange={(event) => setHotelNights(event.target.value)}
+                />
+                <input
+                  disabled={!editable}
+                  inputMode="decimal"
+                  placeholder="€/nuit"
+                  value={hotelPricePerNight}
+                  onChange={(event) => setHotelPricePerNight(event.target.value)}
+                />
+              </>
+            ) : (
+              <input
+                disabled={!editable}
+                inputMode="decimal"
+                placeholder={kind === "PERCENTAGE" ? "%" : "Heures"}
+                value={value}
+                onChange={(event) => setValue(event.target.value)}
+              />
+            )}
             <select
               disabled={!editable}
               value={marginTreatment}
@@ -232,15 +307,19 @@ export function QuotePricingAdjustmentsEditor({
               <option value="PASS_THROUGH">Répercuté sans marge</option>
               <option value="MARGED">Margé</option>
             </select>
-            <label className="checkbox">
-              <input
-                checked={applyToOptions}
-                disabled={!editable}
-                type="checkbox"
-                onChange={(event) => setApplyToOptions(event.target.checked)}
-              />
-              Appliquer aux options
-            </label>
+            {kind === "HOTEL" ? (
+              <span className="scopeNote">Devis principal</span>
+            ) : (
+              <label className="checkbox">
+                <input
+                  checked={applyToOptions}
+                  disabled={!editable}
+                  type="checkbox"
+                  onChange={(event) => setApplyToOptions(event.target.checked)}
+                />
+                Appliquer aux options
+              </label>
+            )}
             <button
               className="primaryButton compact"
               disabled={!editable || saving || !label.trim()}
@@ -250,6 +329,12 @@ export function QuotePricingAdjustmentsEditor({
               <Plus size={14} /> Ajouter
             </button>
           </div>
+          {kind === "HOTEL" ? (
+            <p className="hint">
+              Le total nuits × prix est réparti au prorata des heures de pose. En mode « Margé »,
+              chaque part reprend le coefficient coût / vente de l’« Heure pose » de sa ligne.
+            </p>
+          ) : null}
 
           <div className="list">
             {quote.pricingConfig.adjustments.length === 0 ? (
@@ -268,9 +353,7 @@ export function QuotePricingAdjustmentsEditor({
                 <div>
                   <strong>{adjustment.label}</strong>
                   <small>
-                    {adjustment.kind === "PERCENTAGE"
-                      ? `${adjustment.percent.toLocaleString("fr-FR")} %`
-                      : `${adjustment.hours.toLocaleString("fr-FR")} h pose`}
+                    {adjustmentValueLabel(adjustment)}
                     {" · "}
                     {adjustment.marginTreatment === "MARGED" ? "margé" : "sans marge"}
                     {adjustment.applyToOptions ? " · options incluses" : ""}
@@ -293,8 +376,8 @@ export function QuotePricingAdjustmentsEditor({
         <div className="panel">
           <h3>Heures de pose détectées</h3>
           <p className="hint">
-            Elles viennent automatiquement des composants « Heure pose ». Les trajets sont répartis
-            au prorata, sans ressaisie.
+            Elles viennent automatiquement des composants « Heure pose ». Les trajets et l’hôtel
+            sont répartis au prorata, sans ressaisie.
           </p>
           <div className="poseList">
             {poseLines.length === 0 ? (
@@ -407,7 +490,8 @@ export function QuotePricingAdjustmentsEditor({
         .formRow > input:not(:first-of-type) {
           width: 92px;
         }
-        .checkbox {
+        .checkbox,
+        .scopeNote {
           display: inline-flex;
           align-items: center;
           gap: 5px;
