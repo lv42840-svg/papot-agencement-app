@@ -18,6 +18,15 @@ export const quoteDateSchema = z
 const nullableUuidSchema = z.string().uuid().nullable();
 
 const quoteHexColorSchema = z.string().regex(/^#[0-9a-fA-F]{6}$/);
+export const quoteItemTextColorMarkSchema = z
+  .object({
+    start: z.number().int().min(0).max(4000),
+    end: z.number().int().min(1).max(4000),
+    color: quoteHexColorSchema,
+  })
+  .strict()
+  .refine((mark) => mark.end > mark.start, "QUOTE_TEXT_COLOR_MARK_INVALID");
+
 export const quoteItemFontFamilySchema = z.enum([
   "DEFAULT",
   "ARIAL",
@@ -34,17 +43,9 @@ export const quoteItemTextStyleSchema = z
     highlightColor: quoteHexColorSchema.nullable(),
     bold: z.boolean(),
     italic: z.boolean(),
+    textColorMarks: z.array(quoteItemTextColorMarkSchema).max(500).optional(),
   })
   .strict();
-
-export const quoteItemTextColorMarkSchema = z
-  .object({
-    start: z.number().int().min(0).max(4000),
-    end: z.number().int().min(1).max(4000),
-    color: quoteHexColorSchema,
-  })
-  .strict()
-  .refine((mark) => mark.end > mark.start, "QUOTE_TEXT_COLOR_MARK_INVALID");
 
 export const quoteItemPhotoSchema = z
   .object({
@@ -67,7 +68,6 @@ export const quoteItemPhotoSchema = z
 export const quoteItemPresentationSchema = z
   .object({
     textStyle: quoteItemTextStyleSchema.optional(),
-    textColorMarks: z.array(quoteItemTextColorMarkSchema).max(500).optional(),
     photos: z.array(quoteItemPhotoSchema).max(20).optional().default([]),
   })
   .strict();
