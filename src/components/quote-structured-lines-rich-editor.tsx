@@ -95,12 +95,7 @@ function itemMatchesKind(item: QuoteItem, kind: RichEditableKind): boolean {
   return item.kind === kind;
 }
 
-export function QuoteStructuredLinesRichEditor({
-  quote,
-  canWrite,
-  onSaved,
-  headerActions,
-}: Props) {
+export function QuoteStructuredLinesRichEditor({ quote, canWrite, onSaved, headerActions }: Props) {
   const rootRef = useRef<HTMLDivElement>(null);
   const activeInputRef = useRef<HTMLInputElement | null>(null);
   const sessionRef = useRef<RichSession | null>(null);
@@ -130,10 +125,7 @@ export function QuoteStructuredLinesRichEditor({
     const rect = input.getBoundingClientRect();
     const maxWidth = Math.max(300, window.innerWidth - 24);
     const width = Math.min(Math.max(rect.width, 460), maxWidth);
-    const left = Math.min(
-      Math.max(12, rect.left),
-      Math.max(12, window.innerWidth - width - 12),
-    );
+    const left = Math.min(Math.max(12, rect.left), Math.max(12, window.innerWidth - width - 12));
     const top = Math.max(8, rect.top - 40);
     setAnchor({ left, top, width });
   }
@@ -188,7 +180,7 @@ export function QuoteStructuredLinesRichEditor({
       const current = sessionRef.current;
       if (current?.key === key) return;
 
-      const text = item ? itemText(item) ?? input.value : input.value;
+      const text = item ? (itemText(item) ?? input.value) : input.value;
       const richText = item
         ? resolveQuoteRichText(text, item.presentation?.richText, item.presentation?.textStyle)
         : quoteRichTextFromPlainText(text);
@@ -323,9 +315,7 @@ export function QuoteStructuredLinesRichEditor({
           <QuoteRichTextEditor
             value={session.richText}
             onChange={changeRichText}
-            ariaLabel={
-              session.kind === "LINE" ? "Désignation de l’ouvrage" : "Texte du titre"
-            }
+            ariaLabel={session.kind === "LINE" ? "Désignation de l’ouvrage" : "Texte du titre"}
             maxLength={session.kind === "LINE" ? 4000 : 500}
           />
         </div>
