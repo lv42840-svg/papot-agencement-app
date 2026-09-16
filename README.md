@@ -4,56 +4,93 @@ Application interne PAPOT AGENCEMENT, V1 en développement.
 
 Le cahier des charges officiel Google Drive reste la source de vérité fonctionnelle. Le dépôt Git contient le code correspondant à l'état réellement développé ainsi que des notes techniques datées. En cas de contradiction, les décisions AGE les plus récentes du cahier des charges priment.
 
+La source technique active du dépôt pour l'architecture est désormais :
+
+`docs/desktop-local-architecture.md`
+
+## Architecture actuelle
+
+PAPOT est désormais conçu comme une application **principalement locale**.
+
+La cible d'exploitation est :
+
+- application PAPOT sur le réseau local de l'entreprise ;
+- serveur local appartenant à PAPOT AGENCEMENT ;
+- PostgreSQL local comme source de vérité métier partagée ;
+- dossiers du serveur PAPOT pour les documents et fichiers conservés ;
+- aucun accès Internet entrant vers PostgreSQL ou le serveur PAPOT ;
+- Nextcloud limité au rôle de sas de transport pour les échanges avec le téléphone extérieur ;
+- fonctionnement du bureau indépendant d'Internet et de Nextcloud.
+
+Pendant la phase actuelle de développement, l'application doit également pouvoir fonctionner localement **sans serveur PostgreSQL définitif et sans Nextcloud obligatoire**, afin de terminer la base métier avant l'installation de l'infrastructure SQL par l'informaticien.
+
+Ce mode local actuel est transitoire. Une fois le serveur opérationnel, les modules seront migrés progressivement vers leurs repositories PostgreSQL partagés.
+
 ## État actuel du socle
 
-Le projet comprend désormais :
+Le projet comprend notamment :
 
-- application Next.js / React / TypeScript ;
+- Next.js / React / TypeScript ;
 - application Windows Electron avec installeur NSIS ;
-- Nextcloud comme stockage partagé de l'application et des documents ;
-- ressources JSON versionnées avec ETag, verrous et reprise de conflit pour les données partagées ;
-- SQLite local uniquement pour cache, configuration, état appareil et travaux locaux de synchronisation ;
+- stockage local utilisé pendant la phase de développement ;
+- socle PostgreSQL et repositories serveur déjà présents pour plusieurs modules ;
 - authentification PAPOT par session serveur ;
-- utilisateurs, droits READ / WRITE, droits spéciaux et sessions stockés dans l'état partagé Nextcloud ;
+- utilisateurs et droits READ / WRITE avec contrôles côté serveur ;
 - shell desktop lavande avec navigation latérale ;
-- premiers modules Entrées, Commercial, Chantiers et Planning en phase de reprise/audit métier.
+- modules Entrées, Commercial, Clients, Chantiers, Bibliothèque et Devis en cours de construction/reprise ;
+- tests unitaires et intégrations PostgreSQL dans la CI.
 
-## Architecture retenue
+Le code contient encore des mécanismes historiques Nextcloud et de ressources partagées. Ils ne doivent plus être étendus comme architecture principale du desktop. Leur rôle futur est limité au transport mobile lorsque nécessaire.
 
-PAPOT AGENCEMENT ne dépend pas de PostgreSQL.
+## Données métier
 
-Nextcloud est l'autorité partagée pour les données de l'application et les documents. Les ressources métier sont stockées sous forme d'états versionnés ; les écritures utilisent les mécanismes WebDAV, ETag, verrouillage et détection de conflits du socle de synchronisation.
+En exploitation, PostgreSQL sur le serveur PAPOT sera l'autorité des données métier partagées : utilisateurs, clients, captures, affaires, devis, chantiers, planning, heures, facturation, historique, etc.
 
-Chaque poste Windows possède un `device_id` stable. L'identité métier vient du **vrai utilisateur PAPOT connecté**, jamais d'un utilisateur codé dans la configuration du poste.
+SQLite et les stockages locaux restent possibles pour la configuration du poste, cache, état appareil, brouillons ou files d'attente techniques. Ils ne doivent pas créer une seconde vérité métier une fois le serveur en place.
 
-Le premier lancement demande uniquement les informations nécessaires au poste, au dossier partagé et au compte technique Nextcloud. Le premier administrateur PAPOT est ensuite créé dans l'application. Les utilisateurs suivants sont créés par un administrateur.
+PostgreSQL n'est jamais synchronisé par Nextcloud et n'est jamais exposé directement à Internet.
 
-## Modules actuellement raccordés
+## Documents
 
-- **Entrées** : stockage partagé Nextcloud, capture rapide, qualification, affectation, historique et pièces jointes ;
-- **Commercial** : clients/affaires dans l'état partagé Nextcloud, documents dans Nextcloud ;
-- **Chantiers** : ressources partagées Nextcloud et lancement depuis une affaire ;
-- **Utilisateurs et droits** : comptes PAPOT, sessions, READ / WRITE et droits spéciaux dans Nextcloud ;
-- **Planning** : socle de ressource partagée déjà présent, reprise fonctionnelle encore en cours.
+Les documents, photos, plans, PDF et autres fichiers conservés doivent à terme être stockés dans les dossiers du serveur PAPOT.
 
-L'ancienne route `/capture` redirige vers le module Entrées afin de conserver une seule entrée canonique.
+Un document provenant du téléphone peut transiter par Nextcloud avant d'être importé dans le stockage local PAPOT. Nextcloud n'est plus l'autorité documentaire générale des postes de bureau.
+
+## Téléphone / Nextcloud
+
+Le téléphone extérieur ne se connecte jamais directement au serveur PAPOT ni à PostgreSQL.
+
+Le chemin cible reste asynchrone :
+
+`Téléphone -> relais HTTPS minimal si nécessaire -> Nextcloud -> worker PAPOT local -> PostgreSQL / dossiers PAPOT`
+
+Le retour utilise le chemin inverse.
+
+Les essais WebDAV, PWA iPhone, CORS, relais HTTPS, signatures, ACK et idempotence restent documentés dans `docs/transport-spike.md`. Ce fichier est désormais une **note historique et technique sur le transport mobile**, pas la définition de l'architecture desktop.
+
+## Multi-postes
+
+La concurrence entre postes doit être gérée par la couche serveur et PostgreSQL : transactions, contrôle de version et verrouillage SQL lorsque le besoin métier l'exige.
+
+Les anciens verrous Nextcloud ne doivent plus être utilisés comme mécanisme général de coordination des postes de bureau.
 
 ## Devis / facturation natifs
 
-Le flux cible est désormais :
+Le flux cible est :
 
 `Capture -> Client -> Affaire -> Chiffrage -> Devis -> Confirmation -> Chantier -> Production -> TS -> Facture -> Paiement`
 
 OBAT n'est plus une dépendance centrale pour les nouveaux devis/factures PAPOT. Les anciens documents OBAT restent historiques.
 
-Le moteur documentaire Word -> données -> PDF a été validé en preuve de concept avec de vrais devis/factures. Son intégration production sera faite au moment où la reprise des modules arrivera naturellement au module Devis.
+Le module Devis est actuellement développé en mode local. Son repository PostgreSQL serveur sera réalisé lors de la migration vers l'infrastructure PAPOT définitive.
 
 ## Stack technique
 
 - Next.js App Router + React + TypeScript strict
 - Electron + electron-builder / NSIS
-- Nextcloud WebDAV / OCS pour données partagées, fichiers et synchronisation
-- SQLite local pour état non métier partagé
+- PostgreSQL pour la cible métier partagée
+- SQLite / stockage local pour l'état local et la phase transitoire de développement
+- Nextcloud WebDAV / transport mobile uniquement lorsque nécessaire
 - authentification par mot de passe `scrypt` et session en cookie HttpOnly
 - Zod pour les validations d'entrée
 - Vitest pour les tests
@@ -93,15 +130,16 @@ npm test
 npm run build
 ```
 
-Le workflow `.github/workflows/ci.yml` rejoue ces contrôles sur les Pull Requests.
+Le workflow `.github/workflows/ci.yml` rejoue ces contrôles sur les Pull Requests, avec les tests d'intégration PostgreSQL.
 
 ## Sécurité
 
 - aucun secret dans le dépôt ;
+- PostgreSQL jamais exposé à Internet ;
+- aucun port entrant Internet vers le serveur PAPOT pour l'usage mobile ;
 - mots de passe hachés avec `scrypt` et sel aléatoire ;
 - cookies de session HttpOnly, SameSite=Lax et Secure en production ;
-- sessions stockées sous forme de hash de jeton dans l'état partagé ;
 - validation des entrées API ;
 - contrôles de droits côté serveur obligatoires ;
-- secret technique Nextcloud stocké localement via le coffre sécurisé Windows ;
-- ressource `AUTH` réservée au serveur et non modifiable via l'API générique de ressources partagées.
+- secrets techniques stockés localement de manière sécurisée ;
+- les données et fichiers provenant du transport mobile sont validés avant import.
