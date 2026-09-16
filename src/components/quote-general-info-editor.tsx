@@ -15,9 +15,6 @@ function formatDate(value: string): string {
 
 function errorLabel(code: string): string {
   if (code === "QUOTE_NOT_EDITABLE") return "Seul un devis brouillon peut être modifié.";
-  if (code === "QUOTE_VARIANT_VERSION_CONFLICT") {
-    return "Cette variante possède déjà cette version pour la même affaire.";
-  }
   if (code === "QUOTE_DETAILS_INVALID") return "Vérifie les informations du devis.";
   if (code === "MODULE_FORBIDDEN") return "Ton profil n’autorise pas la modification des devis.";
   return "Les informations du devis n’ont pas pu être enregistrées.";
@@ -27,30 +24,35 @@ export function QuoteGeneralInfoEditor({
   quote,
   clientName,
   affairName,
+  paymentTermOptions,
   canWrite,
   onSaved,
 }: {
   quote: NativeQuoteRecord;
   clientName: string;
   affairName: string;
+  paymentTermOptions: string[];
   canWrite: boolean;
   onSaved: (payload: NativeQuotesPayload) => void;
 }) {
   const editable = canWrite && quote.status === "DRAFT";
   const [editing, setEditing] = useState(false);
   const [subject, setSubject] = useState(quote.model.subject);
-  const [variantName, setVariantName] = useState(quote.variantName);
   const [issueDate, setIssueDate] = useState(quote.model.issueDate);
-  const [validityDays, setValidityDays] = useState(String(quote.model.validityDays));
   const [paymentTerms, setPaymentTerms] = useState(quote.model.paymentTerms);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
+  const availablePaymentTerms = Array.from(
+    new Set(
+      [quote.model.paymentTerms, ...paymentTermOptions]
+        .map((value) => value.trim())
+        .filter((value) => value.length > 0),
+    ),
+  );
 
   function openEditor() {
     setSubject(quote.model.subject);
-    setVariantName(quote.variantName);
     setIssueDate(quote.model.issueDate);
-    setValidityDays(String(quote.model.validityDays));
     setPaymentTerms(quote.model.paymentTerms);
     setError("");
     setEditing(true);
@@ -65,7 +67,6 @@ export function QuoteGeneralInfoEditor({
     event.preventDefault();
     if (!editable || saving) return;
 
-    const parsedValidityDays = Number.parseInt(validityDays, 10);
     setSaving(true);
     setError("");
     try {
@@ -74,9 +75,7 @@ export function QuoteGeneralInfoEditor({
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           subject,
-          variantName,
           issueDate,
-          validityDays: parsedValidityDays,
           paymentTerms,
         }),
       });
@@ -136,16 +135,12 @@ export function QuoteGeneralInfoEditor({
             />
           </label>
 
-          <label className="quoteGeneralField">
+          <div className="quoteGeneralField">
             <span>Variante</span>
-            <input
-              value={variantName}
-              onChange={(event) => setVariantName(event.target.value)}
-              maxLength={120}
-              required
-              disabled={saving}
-            />
-          </label>
+            <div className="quoteGeneralStructuredValue">
+              <strong>{quote.variantName}</strong>
+            </div>
+          </div>
 
           <label className="quoteGeneralField">
             <span>Date du devis</span>
@@ -159,31 +154,19 @@ export function QuoteGeneralInfoEditor({
           </label>
 
           <label className="quoteGeneralField">
-            <span>Validité</span>
-            <div className="quoteGeneralValidity">
-              <input
-                type="number"
-                min={1}
-                max={365}
-                value={validityDays}
-                onChange={(event) => setValidityDays(event.target.value)}
-                required
-                disabled={saving}
-              />
-              <span>jours</span>
-            </div>
-          </label>
-
-          <label className="quoteGeneralField quoteGeneralWide">
             <span>Conditions de règlement</span>
-            <textarea
+            <select
               value={paymentTerms}
               onChange={(event) => setPaymentTerms(event.target.value)}
-              rows={2}
-              maxLength={1000}
               required
               disabled={saving}
-            />
+            >
+              {availablePaymentTerms.map((terms) => (
+                <option key={terms} value={terms}>
+                  {terms}
+                </option>
+              ))}
+            </select>
           </label>
 
           {error ? <div className="quoteGeneralError quoteGeneralWide">{error}</div> : null}
@@ -225,10 +208,6 @@ export function QuoteGeneralInfoEditor({
             <strong>{formatDate(quote.model.issueDate)}</strong>
           </div>
           <div className="quoteGeneralValue">
-            <span>Validité</span>
-            <strong>{quote.model.validityDays} jours</strong>
-          </div>
-          <div className="quoteGeneralValue quoteGeneralWide">
             <span>Conditions de règlement</span>
             <strong>{quote.model.paymentTerms}</strong>
           </div>
@@ -241,7 +220,6 @@ export function QuoteGeneralInfoEditor({
         }
         .quoteGeneralHeader,
         .quoteGeneralActions,
-        .quoteGeneralValidity,
         .quoteGeneralReadonly small {
           display: flex;
           align-items: center;
@@ -288,47 +266,46 @@ export function QuoteGeneralInfoEditor({
           letter-spacing: 0.035em;
         }
         .quoteGeneralValue strong,
-        .quoteGeneralReadonly strong {
+        .quoteGeneralReadonly strong,
+        .quoteGeneralStructuredValue strong {
           min-width: 0;
           font-size: 13px;
           overflow-wrap: anywhere;
+        }
+        .quoteGeneralValue strong,
+        .quoteGeneralReadonly strong {
           white-space: pre-line;
         }
         .quoteGeneralWide {
           grid-column: 1 / -1;
         }
         .quoteGeneralField input,
-        .quoteGeneralField textarea {
+        .quoteGeneralField select,
+        .quoteGeneralStructuredValue {
           width: 100%;
+          min-height: 36px;
           border: 1px solid var(--border);
           border-radius: 7px;
           background: #fff;
           color: var(--text);
           font: inherit;
         }
-        .quoteGeneralField input {
-          min-height: 36px;
+        .quoteGeneralField input,
+        .quoteGeneralField select {
+          height: 36px;
           padding: 0 9px;
         }
-        .quoteGeneralField textarea {
-          padding: 8px 9px;
-          resize: vertical;
+        .quoteGeneralStructuredValue {
+          display: flex;
+          align-items: center;
+          padding: 0 9px;
+          background: #faf8ff;
+          border-color: #e4def2;
         }
         .quoteGeneralField input:focus,
-        .quoteGeneralField textarea:focus {
+        .quoteGeneralField select:focus {
           outline: 2px solid color-mix(in srgb, var(--accent) 22%, transparent);
           border-color: var(--accent);
-        }
-        .quoteGeneralValidity {
-          gap: 7px;
-        }
-        .quoteGeneralValidity input {
-          max-width: 110px;
-        }
-        .quoteGeneralValidity span {
-          color: var(--muted);
-          font-size: 11px;
-          font-weight: 700;
         }
         .quoteGeneralReadonly {
           grid-column: 1 / -1;

@@ -29,6 +29,13 @@ export default async function QuotePage({ params }: { params: Promise<{ quoteId:
     ? `${affair.name}${affair.siteLabel ? ` · ${affair.siteLabel}` : ""}`
     : "Affaire introuvable";
   const clientName = client ? clientDisplayName(client) : "Client introuvable";
+  const paymentTermOptions = Array.from(
+    new Set(
+      [quote.model.paymentTerms, ...clients.clients.map((candidate) => candidate.paymentTerms)]
+        .map((value) => value.trim())
+        .filter((value) => value.length > 0),
+    ),
+  );
 
   return (
     <DesktopAppShell>
@@ -38,6 +45,7 @@ export default async function QuotePage({ params }: { params: Promise<{ quoteId:
         canWrite={context.moduleAccess.canWrite}
         clientName={clientName}
         affairName={affairName}
+        paymentTermOptions={paymentTermOptions}
       />
     </DesktopAppShell>
   );

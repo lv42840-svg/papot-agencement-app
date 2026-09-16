@@ -44,12 +44,14 @@ export function QuoteDirectEditor({
   canWrite,
   clientName,
   affairName,
+  paymentTermOptions,
 }: {
   initialPayload: NativeQuotesPayload;
   quoteId: string;
   canWrite: boolean;
   clientName: string;
   affairName: string;
+  paymentTermOptions: string[];
 }) {
   const [payload, setPayload] = useState(initialPayload);
   const quote = useMemo(
@@ -69,6 +71,7 @@ export function QuoteDirectEditor({
         quote={quote}
         clientName={clientName}
         affairName={affairName}
+        paymentTermOptions={paymentTermOptions}
         canWrite={canWrite}
         onSaved={setPayload}
       />
