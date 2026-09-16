@@ -21,6 +21,7 @@ jobs:
           node-version: 22
           cache: npm
       - run: npm ci
+      - run: python scripts/fix-quote-inline-patch.py
       - run: python scripts/patch-quote-inline-options-actions.py
       - run: npx prettier --write src/components/quote-structured-lines-editor.tsx src/components/quote-pricing-adjustments-editor.tsx src/lib/quotes/library-publish.ts tests/quote-library-publish.test.ts tests/quote-table-layout.test.ts tests/quote-inline-options-ui.test.ts
       - run: npm run lint
