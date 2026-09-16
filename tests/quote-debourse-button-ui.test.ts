@@ -16,13 +16,12 @@ describe("quote debourse button", () => {
     expect(checkSource).not.toContain("Σ Composants");
   });
 
-  it("places Debourse immediately before Send in the quote header", () => {
+  it("places Debourse after the back action while Send remains hidden", () => {
     const debourseIndex = editorSource.indexOf("<QuoteComponentCheck quote={quote} />");
-    const sendIndex = editorSource.indexOf("<QuoteSendAction quote={quote}");
     const backIndex = editorSource.indexOf("Tous les devis");
 
     expect(backIndex).toBeGreaterThanOrEqual(0);
     expect(debourseIndex).toBeGreaterThan(backIndex);
-    expect(sendIndex).toBeGreaterThan(debourseIndex);
+    expect(editorSource).not.toContain("QuoteSendAction");
   });
 });
