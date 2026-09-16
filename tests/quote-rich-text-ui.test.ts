@@ -27,11 +27,15 @@ describe("quote rich text UI wiring", () => {
     expect(wrapper).toContain("/rich-text");
   });
 
-  it("hides the obsolete palette button from the quote rows", () => {
+  it("renders the rich editor inside the designation grid cell instead of a floating window", () => {
     const wrapper = source("src/components/quote-structured-lines-rich-editor.tsx");
 
-    expect(wrapper).toContain('button[title="Mise en forme client"]');
-    expect(wrapper).toContain("display: none !important");
+    expect(wrapper).toContain("createPortal");
+    expect(wrapper).toContain("quoteRichInlineHost");
+    expect(wrapper).toContain('input.insertAdjacentElement("beforebegin", host)');
+    expect(wrapper).toContain('input.style.display = "none"');
+    expect(wrapper).not.toContain("quoteRichInlineOverlay");
+    expect(wrapper).not.toContain("position: fixed");
   });
 
   it("keeps the display layer passive instead of opening a second editor", () => {
@@ -44,14 +48,25 @@ describe("quote rich text UI wiring", () => {
     expect(layer).not.toContain('role="dialog"');
   });
 
-  it("exposes the requested formatting controls in the inline band", () => {
+  it("offers exactly five predefined text colors and no free color picker", () => {
+    const editor = source("src/components/quote-rich-text-editor.tsx");
+
+    expect(editor).toContain('{ label: "Noir", value: "#111827" }');
+    expect(editor).toContain('{ label: "Violet PAPOT", value: "#6554b5" }');
+    expect(editor).toContain('{ label: "Bleu", value: "#2563eb" }');
+    expect(editor).toContain('{ label: "Vert", value: "#15803d" }');
+    expect(editor).toContain('{ label: "Rouge", value: "#b42318" }');
+    expect(editor).toContain('aria-label="Couleur du texte"');
+    expect(editor).not.toContain('type="color"');
+  });
+
+  it("keeps the useful formatting controls in the inline band", () => {
     const editor = source("src/components/quote-rich-text-editor.tsx");
 
     expect(editor).toContain("Gras");
     expect(editor).toContain("Italique");
     expect(editor).toContain("Souligné");
-    expect(editor).toContain("Couleur du texte");
-    expect(editor).toContain("Surlignage");
+    expect(editor).toContain("Surlignage jaune");
     expect(editor).toContain("Taille du texte");
     expect(editor).toContain("contentEditable");
   });
