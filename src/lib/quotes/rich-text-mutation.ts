@@ -1,9 +1,4 @@
-import {
-  parseQuoteModel,
-  quoteRichTextSchema,
-  type QuoteItem,
-  type QuoteRichText,
-} from "./model";
+import { parseQuoteModel, quoteRichTextSchema, type QuoteItem, type QuoteRichText } from "./model";
 import {
   nativeQuoteRecordSchema,
   parseNativeQuotesPayload,
@@ -29,11 +24,7 @@ function itemText(item: QuoteItem): string | null {
   return null;
 }
 
-function withUpdatedText(
-  item: QuoteItem,
-  text: string,
-  richText: QuoteRichText,
-): QuoteItem {
+function withUpdatedText(item: QuoteItem, text: string, richText: QuoteRichText): QuoteItem {
   const presentation = {
     ...(item.presentation ?? {}),
     richText,
@@ -56,17 +47,13 @@ export function applyQuoteRichTextUpdate(
   now: Date = new Date(),
 ): NativeQuotesPayload {
   const payload = structuredClone(parseNativeQuotesPayload(source));
-  const quoteIndex = payload.quotes.findIndex(
-    (quote) => quote.id === input.quoteId,
-  );
+  const quoteIndex = payload.quotes.findIndex((quote) => quote.id === input.quoteId);
   if (quoteIndex < 0) throw new Error("QUOTE_NOT_FOUND");
 
   const quote = payload.quotes[quoteIndex];
   if (quote.status !== "DRAFT") throw new Error("QUOTE_NOT_EDITABLE");
 
-  const itemIndex = quote.model.items.findIndex(
-    (item) => item.id === input.itemId,
-  );
+  const itemIndex = quote.model.items.findIndex((item) => item.id === input.itemId);
   if (itemIndex < 0) throw new Error("QUOTE_ITEM_NOT_FOUND");
   const item = quote.model.items[itemIndex];
   if (itemText(item) === null) {
