@@ -48,6 +48,13 @@ describe("quote rich text UI wiring", () => {
     expect(layer).not.toContain('role="dialog"');
   });
 
+  it("preserves saved line breaks when rich text is rendered after validation", () => {
+    const layer = source("src/components/quote-rich-text-layer.tsx");
+
+    expect(layer).toContain('target.style.whiteSpace = "pre-wrap"');
+    expect(layer).toContain('target.style.overflowWrap = "anywhere"');
+  });
+
   it("offers exactly five predefined text colors and no free color picker", () => {
     const editor = source("src/components/quote-rich-text-editor.tsx");
 
