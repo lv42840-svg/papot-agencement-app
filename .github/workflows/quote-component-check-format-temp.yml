@@ -1,0 +1,31 @@
+name: Quote component check format temporary
+
+on:
+  push:
+    branches:
+      - feat/quote-component-check
+
+permissions:
+  contents: write
+
+jobs:
+  format:
+    if: github.actor != 'github-actions[bot]'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: feat/quote-component-check
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - run: npx prettier --write src/components/quote-component-check.tsx tests/quote-component-check.test.ts
+      - name: Commit formatting
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add src/components/quote-component-check.tsx tests/quote-component-check.test.ts
+          git diff --cached --quiet || git commit -m "chore: formater controle composants"
+          git push
