@@ -1,6 +1,7 @@
 "use client";
 
-import { FileText, RefreshCw } from "lucide-react";
+import Link from "next/link";
+import { FilePlus2, FileText, RefreshCw } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
 import type { CommercialCase } from "@/lib/commercial/domain";
 import {
@@ -84,7 +85,15 @@ export function CommercialAffairQuotes({ item }: { item: CommercialCase }) {
         <h3>
           <FileText size={15} /> Devis de l’affaire
         </h3>
-        <span>{quotes.length}</span>
+        <div className="commercialAffairQuotesHeadingActions">
+          <span>{quotes.length}</span>
+          <Link
+            className="commercialAffairQuoteCreate"
+            href={`/devis/nouveau?affaire=${encodeURIComponent(item.id)}`}
+          >
+            <FilePlus2 size={13} /> Créer un devis
+          </Link>
+        </div>
       </div>
 
       {loading ? (
@@ -94,7 +103,9 @@ export function CommercialAffairQuotes({ item }: { item: CommercialCase }) {
       ) : error ? (
         <div className="commercialAffairQuotesState error">{error}</div>
       ) : quotes.length === 0 ? (
-        <div className="commercialAffairQuotesState">Aucun devis créé pour cette affaire.</div>
+        <div className="commercialAffairQuotesState">
+          Aucun devis créé pour cette affaire. Le premier sera automatiquement Base V1.
+        </div>
       ) : (
         <div className="commercialAffairQuotesList">
           {quotes.map((quote) => {
@@ -148,7 +159,9 @@ export function CommercialAffairQuotes({ item }: { item: CommercialCase }) {
         .commercialAffairQuotesHeading,
         .commercialAffairQuoteRow,
         .commercialAffairQuoteMain,
-        .commercialAffairQuoteMeta {
+        .commercialAffairQuoteMeta,
+        .commercialAffairQuotesHeadingActions,
+        .commercialAffairQuoteCreate {
           display: flex;
           align-items: center;
         }
@@ -160,13 +173,31 @@ export function CommercialAffairQuotes({ item }: { item: CommercialCase }) {
         .commercialAffairQuotesHeading h3 {
           margin: 0;
         }
-        .commercialAffairQuotesHeading > span {
+        .commercialAffairQuotesHeadingActions {
+          gap: 7px;
+        }
+        .commercialAffairQuotesHeadingActions > span {
           padding: 2px 7px;
           border-radius: 999px;
           background: #eee9ff;
           color: #604dc4;
           font-size: 9px;
           font-weight: 800;
+        }
+        .commercialAffairQuoteCreate {
+          gap: 5px;
+          padding: 5px 8px;
+          border: 1px solid #ddd5f4;
+          border-radius: 7px;
+          background: #fff;
+          color: #604dc4;
+          font-size: 9px;
+          font-weight: 800;
+          text-decoration: none;
+        }
+        .commercialAffairQuoteCreate:hover,
+        .commercialAffairQuoteCreate:focus-visible {
+          background: #f4f0ff;
         }
         .commercialAffairQuotesState {
           min-height: 58px;
@@ -266,12 +297,18 @@ export function CommercialAffairQuotes({ item }: { item: CommercialCase }) {
           margin: 0;
         }
         @media (max-width: 700px) {
+          .commercialAffairQuotesHeading,
           .commercialAffairQuoteRow,
           .commercialAffairQuoteMeta {
             align-items: flex-start;
           }
+          .commercialAffairQuotesHeading,
           .commercialAffairQuoteRow {
             flex-direction: column;
+          }
+          .commercialAffairQuotesHeadingActions {
+            width: 100%;
+            justify-content: space-between;
           }
         }
       `}</style>
