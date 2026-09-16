@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { ZodError } from "zod";
+import { z, ZodError } from "zod";
 import { createClientsRepository } from "@/lib/clients/create-repository";
 import { createCommercialRepository } from "@/lib/commercial/create-repository";
 import { isCommercialClosed } from "@/lib/commercial/domain";
@@ -15,6 +15,7 @@ import {
   parseLibraryPayload,
   type LibraryPayload,
 } from "@/lib/library/storage";
+import { startQuoteCommercialWorkflow } from "@/lib/quotes/commercial-bridge";
 import { createQuotesRepository } from "@/lib/quotes/create-repository";
 import { createLibraryComponentFromQuoteLine } from "@/lib/quotes/library-component";
 import { applyQuotesMutation, quotesMutationSchema } from "@/lib/quotes/mutations";
@@ -23,6 +24,12 @@ import type { NativeQuotesPayload } from "@/lib/quotes/store";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
+
+const quoteCommercialWorkflowSchema = z.object({
+  action: z.literal("createDraft"),
+  quoteOwnerName: z.string().trim().min(1).max(120),
+  quoteDueDate: z.string().regex(/^\d{4}-\d{2}-\d{2}$/),
+});
 
 function noStoreJson(body: unknown, init?: ResponseInit) {
   const response = NextResponse.json(body, init);
@@ -42,7 +49,8 @@ function errorStatus(code: string): number {
     code === "QUOTE_CLIENT_NOT_FOUND" ||
     code === "QUOTE_NOT_FOUND" ||
     code === "QUOTE_LINE_NOT_FOUND" ||
-    code === "QUOTE_LIBRARY_COMPONENT_NOT_FOUND"
+    code === "QUOTE_LIBRARY_COMPONENT_NOT_FOUND" ||
+    code === "COMMERCIAL_CASE_NOT_FOUND"
   ) {
     return 404;
   }
@@ -50,7 +58,8 @@ function errorStatus(code: string): number {
     code === "QUOTE_AFFAIR_CLOSED" ||
     code === "QUOTE_CLIENT_ARCHIVED" ||
     code === "QUOTE_NOT_EDITABLE" ||
-    code === "LIBRARY_VERSION_CONFLICT"
+    code === "LIBRARY_VERSION_CONFLICT" ||
+    code === "COMMERCIAL_CASE_CLOSED"
   ) {
     return 409;
   }
@@ -81,12 +90,15 @@ export async function POST(request: Request) {
     | undefined;
 
   try {
-    const input = quotesMutationSchema.parse(await request.json());
+    const rawInput = await request.json();
+    const input = quotesMutationSchema.parse(rawInput);
     const context = await requireDesktopRequestContext("quotes", "WRITE");
     const actor = { userId: context.user.id, displayName: context.user.displayName };
 
     if (input.action === "createDraft") {
-      const commercialRepository = createCommercialRepository(context);
+      const workflow = quoteCommercialWorkflowSchema.parse(rawInput);
+      const commercialContext = await requireDesktopRequestContext("commercial", "WRITE");
+      const commercialRepository = createCommercialRepository(commercialContext);
       const clientsRepository = await createClientsRepository(context);
       const [commercial, clients] = await Promise.all([
         commercialRepository.load(),
@@ -102,9 +114,21 @@ export async function POST(request: Request) {
       if (!client) throw new Error("QUOTE_CLIENT_NOT_FOUND");
       if (client.isArchived) throw new Error("QUOTE_CLIENT_ARCHIVED");
 
+      const now = new Date();
+      await commercialRepository.mutate((payload) =>
+        startQuoteCommercialWorkflow(
+          payload,
+          affair.id,
+          workflow.quoteOwnerName,
+          workflow.quoteDueDate,
+          actor,
+          now,
+        ),
+      );
+
       const repository = createQuotesRepository();
       const mutation = await repository.mutate((payload) =>
-        applyQuotesMutation(payload, input, actor, client.id),
+        applyQuotesMutation(payload, input, actor, client.id, now),
       );
       return noStoreJson(
         publicSnapshot(mutation.payload, context.moduleAccess.canWrite, mutation.focusQuoteId),
