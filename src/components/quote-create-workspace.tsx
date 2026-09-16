@@ -64,11 +64,9 @@ export function QuoteCreateWorkspace({
     [affairs],
   );
   const firstAffair = affairs.find((affair) => affair.id === initialAffairId) ?? affairs[0];
-  const defaultOwnerName = quoteOwners.some(
-    (owner) => owner.displayName === defaultQuoteOwnerName,
-  )
+  const defaultOwnerName = quoteOwners.some((owner) => owner.displayName === defaultQuoteOwnerName)
     ? defaultQuoteOwnerName
-    : quoteOwners[0]?.displayName ?? "";
+    : (quoteOwners[0]?.displayName ?? "");
   const [selectedAffairId, setSelectedAffairId] = useState(firstAffair?.id ?? "");
   const [subject, setSubject] = useState(firstAffair?.name ?? "");
   const [issueDate, setIssueDate] = useState(today);
