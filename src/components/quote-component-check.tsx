@@ -48,7 +48,7 @@ export function QuoteComponentCheck({ quote }: { quote: NativeQuoteRecord }) {
   return (
     <>
       <button type="button" className="secondaryButton" onClick={() => setOpen(true)}>
-        Σ Composants
+        Déboursé
       </button>
 
       {open ? (

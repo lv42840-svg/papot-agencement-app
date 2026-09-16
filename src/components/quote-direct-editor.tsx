@@ -80,10 +80,10 @@ export function QuoteDirectEditor({
         onSaved={setPayload}
         headerActions={
           <div className="quoteDirectActions">
-            <QuoteComponentCheck quote={quote} />
             <Link href="/devis" className="secondaryButton quoteDirectBack">
               <ArrowLeft size={14} /> Tous les devis
             </Link>
+            <QuoteComponentCheck quote={quote} />
             <QuoteSendAction quote={quote} canWrite={canWrite} onSaved={setPayload} />
           </div>
         }
