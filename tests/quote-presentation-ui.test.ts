@@ -5,6 +5,10 @@ const editor = readFileSync(
   new URL("../src/components/quote-structured-lines-editor.tsx", import.meta.url),
   "utf-8",
 );
+const richWrapper = readFileSync(
+  new URL("../src/components/quote-structured-lines-rich-editor.tsx", import.meta.url),
+  "utf-8",
+);
 const panel = readFileSync(
   new URL("../src/components/quote-item-presentation-panel.tsx", import.meta.url),
   "utf-8",
@@ -19,30 +23,30 @@ const richEditor = readFileSync(
 );
 
 describe("quote client presentation UI", () => {
-  it("offers formatting and photo buttons on headings and ouvrages", () => {
-    expect(editor).toContain("Mise en forme client");
+  it("keeps photo actions while the legacy palette is hidden", () => {
     expect(editor).toContain("Photos de la ligne");
     expect(editor).toContain("QuoteItemPresentationPanel");
-    expect(editor).toContain("quoteItemTextStyleToCss");
+    expect(richWrapper).toContain('button[title="Mise en forme client"]');
+    expect(richWrapper).toContain("display: none !important");
   });
 
-  it("keeps whole-item formatting without a whole-item text color picker", () => {
-    for (const label of ["Police", "Taille", "Surligneur", "Visible client"]) {
-      expect(panel).toContain(label);
-    }
-    expect(panel).not.toContain("TEXT_COLOR_PRESETS");
-    expect(panel).not.toContain("quoteColorControl");
-    expect(panel).toContain("HIGHLIGHT_COLOR_PRESETS");
-    expect(panel).toContain('{ label: "Jaune", value: "#fff2a8" }');
-    expect(panel).not.toContain('type="color"');
-    expect(panel).toContain("<Bold");
-    expect(panel).toContain("<Italic");
+  it("keeps the former presentation panel focused on photos only", () => {
+    expect(panel).toContain("Photos de la ligne");
+    expect(panel).toContain("Visible client");
     expect(panel).toContain('accept="image/jpeg,image/png,image/webp"');
+    expect(panel).not.toContain("HIGHLIGHT_COLOR_PRESETS");
+    expect(panel).not.toContain("updateItemPresentation");
+    expect(panel).not.toContain("saveStyle");
+    expect(panel).not.toContain("<Bold");
+    expect(panel).not.toContain("<Italic");
+    expect(panel).not.toContain("Surligneur");
   });
 
-  it("mounts the rich text editor instead of the legacy selection color toolbar", () => {
+  it("mounts the rich editor in the real editing flow", () => {
+    expect(directEditor).toContain("QuoteStructuredLinesRichEditor");
     expect(directEditor).toContain("QuoteRichTextLayer");
     expect(directEditor).not.toContain("QuoteInlineTextColorToolbar");
+    expect(richWrapper).toContain("QuoteRichTextEditor");
     expect(richEditor).toContain('aria-label="Couleur du texte"');
     expect(richEditor).toContain("contentEditable");
     expect(richEditor).toContain("<Bold");
