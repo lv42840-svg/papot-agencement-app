@@ -9,9 +9,15 @@ import {
 import type { QuoteItem, QuoteItemTextStyle } from "@/lib/quotes/model";
 import { buildQuoteItemNumbers } from "@/lib/quotes/numbering";
 import { defaultQuoteItemTextStyle } from "@/lib/quotes/presentation";
-import type { NativeQuoteRecord, NativeQuotesPayload } from "@/lib/quotes/store";
+import type {
+  NativeQuoteRecord,
+  NativeQuotesPayload,
+} from "@/lib/quotes/store";
 
-type SupportedItem = Extract<QuoteItem, { kind: "SECTION" | "SUBSECTION" | "LINE" }>;
+type SupportedItem = Extract<
+  QuoteItem,
+  { kind: "SECTION" | "SUBSECTION" | "LINE" }
+>;
 
 type SelectionState = {
   itemId: string;
@@ -29,7 +35,8 @@ type HighlightRegistryLike = {
 type HighlightConstructor = new (...ranges: Range[]) => unknown;
 
 const HIGHLIGHT_PREFIX = "quote-inline-color-";
-const TEXT_ROOT_SELECTOR = ".quoteLineDescription > strong, .quoteHeadingRow > strong";
+const TEXT_ROOT_SELECTOR =
+  ".quoteLineDescription > strong, .quoteHeadingRow > strong";
 
 function itemText(item: SupportedItem): string {
   return item.kind === "LINE" ? item.description : item.title;
@@ -42,7 +49,11 @@ function textRootFromNode(node: Node | null): HTMLElement | null {
   return root instanceof HTMLElement ? root : null;
 }
 
-function textOffset(root: HTMLElement, node: Node, offset: number): number | null {
+function textOffset(
+  root: HTMLElement,
+  node: Node,
+  offset: number,
+): number | null {
   try {
     const range = root.ownerDocument.createRange();
     range.selectNodeContents(root);
@@ -53,7 +64,11 @@ function textOffset(root: HTMLElement, node: Node, offset: number): number | nul
   }
 }
 
-function domRangeForOffsets(root: HTMLElement, start: number, end: number): Range | null {
+function domRangeForOffsets(
+  root: HTMLElement,
+  start: number,
+  end: number,
+): Range | null {
   if (end <= start) return null;
   const document = root.ownerDocument;
   const walker = document.createTreeWalker(root, 4);
@@ -99,7 +114,9 @@ function highlightRegistry(): {
 } | null {
   if (typeof window === "undefined" || typeof CSS === "undefined") return null;
   const css = CSS as typeof CSS & { highlights?: HighlightRegistryLike };
-  const HighlightClass = (window as typeof window & { Highlight?: HighlightConstructor }).Highlight;
+  const HighlightClass = (
+    window as typeof window & { Highlight?: HighlightConstructor }
+  ).Highlight;
   if (!css.highlights || !HighlightClass) return null;
   return { registry: css.highlights, HighlightClass };
 }
@@ -123,11 +140,19 @@ export function QuoteInlineTextColorToolbar({
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  const numbers = useMemo(() => buildQuoteItemNumbers(quote.model.items), [quote.model.items]);
+  const numbers = useMemo(
+    () => buildQuoteItemNumbers(quote.model.items),
+    [quote.model.items],
+  );
   const itemByNumber = useMemo(() => {
     const result = new Map<string, SupportedItem>();
     for (const item of quote.model.items) {
-      if (item.kind !== "SECTION" && item.kind !== "SUBSECTION" && item.kind !== "LINE") continue;
+      if (
+        item.kind !== "SECTION" &&
+        item.kind !== "SUBSECTION" &&
+        item.kind !== "LINE"
+      )
+        continue;
       const number = numbers.get(item.id);
       if (number) result.set(number, item);
     }
@@ -149,7 +174,9 @@ export function QuoteInlineTextColorToolbar({
     clearQuoteHighlights(support.registry);
 
     const rangesByColor = new Map<string, Range[]>();
-    const rows = Array.from(document.querySelectorAll<HTMLElement>(".quoteLinesTable .quoteMainRow"));
+    const rows = Array.from(
+      document.querySelectorAll<HTMLElement>(".quoteLinesTable .quoteMainRow"),
+    );
 
     for (const row of rows) {
       const number = row.querySelector(".quoteNumber")?.textContent?.trim();
@@ -157,7 +184,9 @@ export function QuoteInlineTextColorToolbar({
       const item = itemByNumber.get(number);
       if (!item) continue;
       const root = row.querySelector<HTMLElement>(
-        item.kind === "LINE" ? ".quoteLineDescription > strong" : ".quoteHeadingRow > strong",
+        item.kind === "LINE"
+          ? ".quoteLineDescription > strong"
+          : ".quoteHeadingRow > strong",
       );
       if (!root || root.textContent !== itemText(item)) continue;
 
@@ -171,7 +200,10 @@ export function QuoteInlineTextColorToolbar({
     }
 
     for (const [color, ranges] of rangesByColor) {
-      support.registry.set(highlightName(color), new support.HighlightClass(...ranges));
+      support.registry.set(
+        highlightName(color),
+        new support.HighlightClass(...ranges),
+      );
     }
 
     return () => clearQuoteHighlights(support.registry);
@@ -182,10 +214,18 @@ export function QuoteInlineTextColorToolbar({
 
     function handleMouseUp(event: MouseEvent) {
       const target = event.target;
-      if (target instanceof Element && target.closest(".quoteInlineTextToolbar")) return;
+      if (
+        target instanceof Element &&
+        target.closest(".quoteInlineTextToolbar")
+      )
+        return;
 
       const browserSelection = window.getSelection();
-      if (!browserSelection || browserSelection.rangeCount === 0 || browserSelection.isCollapsed) {
+      if (
+        !browserSelection ||
+        browserSelection.rangeCount === 0 ||
+        browserSelection.isCollapsed
+      ) {
         setSelection(null);
         return;
       }
@@ -204,7 +244,11 @@ export function QuoteInlineTextColorToolbar({
         return;
       }
 
-      const start = textOffset(startRoot, range.startContainer, range.startOffset);
+      const start = textOffset(
+        startRoot,
+        range.startContainer,
+        range.startOffset,
+      );
       const end = textOffset(startRoot, range.endContainer, range.endOffset);
       if (start === null || end === null || end <= start) {
         setSelection(null);
@@ -217,7 +261,10 @@ export function QuoteInlineTextColorToolbar({
         itemId: item.id,
         start,
         end,
-        left: Math.max(16, Math.min(window.innerWidth - 16, rect.left + rect.width / 2)),
+        left: Math.max(
+          16,
+          Math.min(window.innerWidth - 16, rect.left + rect.width / 2),
+        ),
         top: Math.max(8, rect.top - 42),
       });
     }
@@ -244,8 +291,15 @@ export function QuoteInlineTextColorToolbar({
 
   async function applyColor(color: string | null) {
     if (!selection || saving) return;
-    const item = quote.model.items.find((candidate) => candidate.id === selection.itemId);
-    if (!item || (item.kind !== "SECTION" && item.kind !== "SUBSECTION" && item.kind !== "LINE")) {
+    const item = quote.model.items.find(
+      (candidate) => candidate.id === selection.itemId,
+    );
+    if (
+      !item ||
+      (item.kind !== "SECTION" &&
+        item.kind !== "SUBSECTION" &&
+        item.kind !== "LINE")
+    ) {
       setSelection(null);
       return;
     }
@@ -278,8 +332,12 @@ export function QuoteInlineTextColorToolbar({
           textStyle: nextStyle,
         }),
       });
-      const body = (await response.json()) as { payload?: NativeQuotesPayload; error?: string };
-      if (!response.ok || !body.payload) throw new Error(body.error ?? "QUOTES_REQUEST_FAILED");
+      const body = (await response.json()) as {
+        payload?: NativeQuotesPayload;
+        error?: string;
+      };
+      if (!response.ok || !body.payload)
+        throw new Error(body.error ?? "QUOTES_REQUEST_FAILED");
       onSaved(body.payload);
       setSelection(null);
       window.getSelection()?.removeAllRanges();
