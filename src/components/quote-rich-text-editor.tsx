@@ -140,6 +140,33 @@ function restoreSelection(root: HTMLElement, offsets: SelectionOffsets) {
   selection?.addRange(range);
 }
 
+function insertPlainTextAtSelection(
+  root: HTMLElement,
+  text: string,
+  maxLength: number,
+): QuoteRichText | null {
+  const offsets = selectionOffsets(root);
+  const nativeSelection = root.ownerDocument.defaultView?.getSelection();
+  if (!offsets || !nativeSelection || nativeSelection.rangeCount === 0) return null;
+
+  const currentRichText = readRichText(root);
+  const plain = currentRichText.runs.map((run) => run.text).join("");
+  if (plain.length - (offsets.end - offsets.start) + text.length > maxLength) return null;
+
+  const range = nativeSelection.getRangeAt(0);
+  range.deleteContents();
+  const inserted = root.ownerDocument.createTextNode(text);
+  range.insertNode(inserted);
+
+  const caret = root.ownerDocument.createRange();
+  caret.setStartAfter(inserted);
+  caret.collapse(true);
+  nativeSelection.removeAllRanges();
+  nativeSelection.addRange(caret);
+
+  return readRichText(root);
+}
+
 export function QuoteRichTextEditor({ value, onChange, ariaLabel, maxLength }: Props) {
   const editorRef = useRef<HTMLDivElement>(null);
   const selectionRef = useRef<SelectionOffsets>({ start: 0, end: 0 });
@@ -329,7 +356,7 @@ export function QuoteRichTextEditor({ value, onChange, ariaLabel, maxLength }: P
         suppressContentEditableWarning
         role="textbox"
         aria-label={ariaLabel}
-        aria-multiline="false"
+        aria-multiline="true"
         spellCheck
         onInput={(event) => {
           const root = event.currentTarget;
@@ -339,23 +366,19 @@ export function QuoteRichTextEditor({ value, onChange, ariaLabel, maxLength }: P
           rememberSelection();
         }}
         onKeyDown={(event) => {
-          if (event.key === "Enter") event.preventDefault();
+          if (event.key !== "Enter") return;
+          event.preventDefault();
+          const next = insertPlainTextAtSelection(event.currentTarget, "\n", maxLength);
+          if (!next) return;
+          onChange(next);
+          rememberSelection();
         }}
         onPaste={(event) => {
           event.preventDefault();
-          const text = event.clipboardData.getData("text/plain").replace(/[\r\n]+/g, " ");
-          const selection = rootSelection(editorRef.current);
-          if (!selection || !editorRef.current) return;
-          const currentRichText = readRichText(editorRef.current);
-          const plain = currentRichText.runs.map((run) => run.text).join("");
-          if (plain.length - (selection.end - selection.start) + text.length > maxLength) {
-            return;
-          }
-          const range = editorRef.current.ownerDocument.defaultView?.getSelection()?.getRangeAt(0);
-          if (!range) return;
-          range.deleteContents();
-          range.insertNode(editorRef.current.ownerDocument.createTextNode(text));
-          onChange(readRichText(editorRef.current));
+          const text = event.clipboardData.getData("text/plain").replace(/\r\n?/g, "\n");
+          const next = insertPlainTextAtSelection(event.currentTarget, text, maxLength);
+          if (!next) return;
+          onChange(next);
           rememberSelection();
         }}
       />
