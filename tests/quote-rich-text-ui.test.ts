@@ -70,4 +70,17 @@ describe("quote rich text UI wiring", () => {
     expect(editor).toContain("Taille du texte");
     expect(editor).toContain("contentEditable");
   });
+
+  it("inserts and preserves real line breaks in rich quote text", () => {
+    const editor = source("src/components/quote-rich-text-editor.tsx");
+    const wrapper = source("src/components/quote-structured-lines-rich-editor.tsx");
+
+    expect(editor).toContain('aria-multiline="true"');
+    expect(editor).toContain('insertPlainTextAtSelection(event.currentTarget, "\\n", maxLength)');
+    expect(editor).toContain('.replace(/\\r\\n?/g, "\\n")');
+    expect(editor).not.toContain('if (event.key === "Enter") event.preventDefault()');
+    expect(wrapper).toContain("plainTextForNativeInput");
+    expect(wrapper).toContain('value.replace(/\\r\\n?|\\n/g, " ")');
+    expect(wrapper).not.toContain("itemText(item) === plainText");
+  });
 });

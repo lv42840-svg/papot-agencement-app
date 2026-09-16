@@ -73,10 +73,15 @@ function trimmedRichText(value: QuoteRichText): QuoteRichText {
   return normalizeQuoteRichText({ runs });
 }
 
+function plainTextForNativeInput(value: string): string {
+  return value.replace(/\r\n?|\n/g, " ");
+}
+
 function setNativeInputValue(input: HTMLInputElement, value: string) {
   const setter = Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, "value")?.set;
-  if (setter) setter.call(input, value);
-  else input.value = value;
+  const nativeValue = plainTextForNativeInput(value);
+  if (setter) setter.call(input, nativeValue);
+  else input.value = nativeValue;
   input.dispatchEvent(new Event("input", { bubbles: true }));
 }
 
@@ -229,10 +234,7 @@ export function QuoteStructuredLinesRichEditor({ quote, canWrite, onSaved, heade
           (item) => item.id === pending.itemId && itemMatchesKind(item, pending.kind),
         )
       : updatedQuote.model.items.find(
-          (item) =>
-            !pending.beforeItemIds.has(item.id) &&
-            itemMatchesKind(item, pending.kind) &&
-            itemText(item) === plainText,
+          (item) => !pending.beforeItemIds.has(item.id) && itemMatchesKind(item, pending.kind),
         );
 
     if (!target) {
