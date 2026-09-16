@@ -229,9 +229,7 @@ export function QuoteItemPresentationPanel({ quoteId, item, editable, onSaved, o
             }
             disabled={!editable}
           >
-            {legacyTextColor ? (
-              <option value={legacyTextColor}>Couleur existante</option>
-            ) : null}
+            {legacyTextColor ? <option value={legacyTextColor}>Couleur existante</option> : null}
             {TEXT_COLOR_PRESETS.map((preset) => (
               <option key={preset.value} value={preset.value}>
                 {preset.label}
