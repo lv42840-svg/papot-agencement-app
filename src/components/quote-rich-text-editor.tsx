@@ -479,7 +479,3 @@ export function QuoteRichTextEditor({ value, onChange, ariaLabel, maxLength }: P
     </div>
   );
 }
-
-function rootSelection(root: HTMLElement | null): SelectionOffsets | null {
-  return root ? selectionOffsets(root) : null;
-}
