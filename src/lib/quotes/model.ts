@@ -18,6 +18,15 @@ export const quoteDateSchema = z
 const nullableUuidSchema = z.string().uuid().nullable();
 
 const quoteHexColorSchema = z.string().regex(/^#[0-9a-fA-F]{6}$/);
+export const quoteItemTextColorMarkSchema = z
+  .object({
+    start: z.number().int().min(0).max(4000),
+    end: z.number().int().min(1).max(4000),
+    color: quoteHexColorSchema,
+  })
+  .strict()
+  .refine((mark) => mark.end > mark.start, "QUOTE_TEXT_COLOR_MARK_INVALID");
+
 export const quoteItemFontFamilySchema = z.enum([
   "DEFAULT",
   "ARIAL",
@@ -34,6 +43,7 @@ export const quoteItemTextStyleSchema = z
     highlightColor: quoteHexColorSchema.nullable(),
     bold: z.boolean(),
     italic: z.boolean(),
+    textColorMarks: z.array(quoteItemTextColorMarkSchema).max(500).optional(),
   })
   .strict();
 
@@ -186,6 +196,7 @@ export type QuoteLibraryOuvrageSource = z.infer<typeof quoteLibraryOuvrageSource
 export type QuoteLibrarySource = z.infer<typeof quoteLibrarySourceSchema>;
 export type QuoteItemFontFamily = z.infer<typeof quoteItemFontFamilySchema>;
 export type QuoteItemTextStyle = z.infer<typeof quoteItemTextStyleSchema>;
+export type QuoteItemTextColorMark = z.infer<typeof quoteItemTextColorMarkSchema>;
 export type QuoteItemPhoto = z.infer<typeof quoteItemPhotoSchema>;
 export type QuoteItemPresentation = z.infer<typeof quoteItemPresentationSchema>;
 export type QuoteSection = z.infer<typeof quoteSectionSchema>;
