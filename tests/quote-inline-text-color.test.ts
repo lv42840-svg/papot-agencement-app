@@ -55,7 +55,7 @@ describe("quote inline text color", () => {
       ]),
     ).toEqual([
       { start: 0, end: 6, text: "meuble", color: "#6554b5" },
-      { start: 6, end: 12, text: " vasque", color: null },
+      { start: 6, end: 13, text: " vasque", color: null },
     ]);
   });
 });
