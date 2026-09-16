@@ -18,10 +18,15 @@ describe("quote client presentation UI", () => {
     expect(editor).toContain("quoteItemTextStyleToCss");
   });
 
-  it("offers font, size, colors, highlighter, bold, italic and client photo visibility", () => {
+  it("offers font, size, preset colors, highlighter, bold, italic and client photo visibility", () => {
     for (const label of ["Police", "Taille", "Couleur", "Surligneur", "Visible client"]) {
       expect(panel).toContain(label);
     }
+    expect(panel).toContain("TEXT_COLOR_PRESETS");
+    expect(panel).toContain("HIGHLIGHT_COLOR_PRESETS");
+    expect(panel).toContain('{ label: "Lavande", value: "#6554b5" }');
+    expect(panel).toContain('{ label: "Jaune", value: "#fff2a8" }');
+    expect(panel).not.toContain('type="color"');
     expect(panel).toContain("<Bold");
     expect(panel).toContain("<Italic");
     expect(panel).toContain('accept="image/jpeg,image/png,image/webp"');

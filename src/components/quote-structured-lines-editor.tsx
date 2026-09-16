@@ -1497,7 +1497,10 @@ export function QuoteStructuredLinesEditor({
           <div className="quoteLineTotalCell">
             <strong className="quoteLineTotal">{formatMoney(lineTotalCents)}</strong>
             {adjustmentDeltaCents !== 0 ? (
-              <small>incl. {formatMoney(adjustmentDeltaCents)} d’ajustements</small>
+              <small>
+                <span>incl. {formatMoney(adjustmentDeltaCents)}</span>
+                <span>d’ajustements</span>
+              </small>
             ) : null}
           </div>
           <div className="quoteRowActions">
@@ -2249,7 +2252,7 @@ export function QuoteStructuredLinesEditor({
         }
         .quoteMainRow {
           display: grid;
-          grid-template-columns: 44px minmax(250px, 1fr) 64px 56px 104px 100px 110px 228px;
+          grid-template-columns: 44px minmax(250px, 1fr) 64px 56px 104px 100px 126px 220px;
           gap: 8px;
           align-items: center;
           padding: 9px 14px;
@@ -2333,8 +2336,10 @@ export function QuoteStructuredLinesEditor({
           white-space: nowrap;
         }
         .quoteRowActions {
+          min-width: 0;
           justify-content: flex-end;
           gap: 4px;
+          flex-wrap: nowrap;
         }
         .iconButton.isActive {
           border-color: #8c78c7;
@@ -2365,9 +2370,15 @@ export function QuoteStructuredLinesEditor({
           justify-items: start;
         }
         .quoteLineTotalCell small {
+          display: grid;
+          gap: 0;
+          max-width: 100%;
           color: #7867bb;
           font-size: 9px;
           font-weight: 800;
+          line-height: 1.15;
+        }
+        .quoteLineTotalCell small span {
           white-space: nowrap;
         }
         .quoteLineTotal {
