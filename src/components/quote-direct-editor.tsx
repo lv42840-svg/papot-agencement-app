@@ -6,6 +6,7 @@ import { useMemo, useState } from "react";
 import { QuoteComponentCheck } from "@/components/quote-component-check";
 import { QuoteFixedSummary } from "@/components/quote-fixed-summary";
 import { QuoteGeneralInfoEditor } from "@/components/quote-general-info-editor";
+import { QuoteInlineTextColorToolbar } from "@/components/quote-inline-text-color-toolbar";
 import { QuoteInternalNotesEditor } from "@/components/quote-internal-notes-editor";
 import { QuotePricingAdjustmentsEditor } from "@/components/quote-pricing-adjustments-editor";
 import { QuoteSendAction } from "@/components/quote-send-action";
@@ -87,6 +88,12 @@ export function QuoteDirectEditor({
             <QuoteSendAction quote={quote} canWrite={canWrite} onSaved={setPayload} />
           </div>
         }
+      />
+
+      <QuoteInlineTextColorToolbar
+        quote={displayQuote}
+        canWrite={canWrite}
+        onSaved={setPayload}
       />
 
       <QuotePricingAdjustmentsEditor quote={quote} canWrite={canWrite} onSaved={setPayload} />
