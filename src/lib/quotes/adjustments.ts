@@ -29,9 +29,17 @@ export const quotePoseHoursAdjustmentSchema = adjustmentBaseSchema.extend({
   hours: z.number().finite().gt(0).max(1_000_000),
 });
 
+export const quoteHotelAdjustmentSchema = adjustmentBaseSchema.extend({
+  kind: z.literal("HOTEL"),
+  applyToOptions: z.literal(false),
+  nights: z.number().int().gt(0).max(10_000),
+  pricePerNightCents: z.number().int().gt(0).max(100_000_000),
+});
+
 export const quotePricingAdjustmentSchema = z.discriminatedUnion("kind", [
   quotePercentageAdjustmentSchema,
   quotePoseHoursAdjustmentSchema,
+  quoteHotelAdjustmentSchema,
 ]);
 
 export const quoteOptionSchema = z.object({
@@ -86,6 +94,7 @@ export type QuoteAdjustmentMarginTreatment = z.infer<typeof quoteAdjustmentMargi
 export type QuotePricingAdjustment = z.infer<typeof quotePricingAdjustmentSchema>;
 export type QuotePercentageAdjustment = z.infer<typeof quotePercentageAdjustmentSchema>;
 export type QuotePoseHoursAdjustment = z.infer<typeof quotePoseHoursAdjustmentSchema>;
+export type QuoteHotelAdjustment = z.infer<typeof quoteHotelAdjustmentSchema>;
 export type QuoteOptionStatus = z.infer<typeof quoteOptionStatusSchema>;
 export type QuoteOption = z.infer<typeof quoteOptionSchema>;
 export type QuotePricingConfig = z.infer<typeof quotePricingConfigSchema>;
@@ -346,6 +355,42 @@ function applyPoseHoursAdjustment(
   }
 }
 
+function applyHotelAdjustment(
+  lines: MutableLine[],
+  adjustment: QuoteHotelAdjustment,
+  warnings: string[],
+  scopeLabel: string,
+) {
+  const eligible = lines.filter((line) => line.poseHours > 0);
+  if (eligible.length === 0) {
+    warnings.push(`QUOTE_HOTEL_NO_POSE_HOURS:${adjustment.id}:${scopeLabel}`);
+    return;
+  }
+
+  const hotelCostCents = assertSafeMoney(adjustment.nights * adjustment.pricePerNightCents);
+  const costDistribution = moneyDistribution(hotelCostCents, eligible, (line) => line.poseHours);
+
+  for (const line of eligible) {
+    const costIncrement = costDistribution.get(line.lineId) ?? 0;
+    if (line.costCents !== null) {
+      line.costCents = addMoney(line.costCents, costIncrement);
+    }
+
+    let saleIncrement = costIncrement;
+    if (adjustment.marginTreatment === "MARGED") {
+      const costRate = line.poseCostRateCents;
+      const saleRate = line.poseSaleRateCents;
+      if (costRate === null || saleRate === null || costRate <= 0 || saleRate <= 0) {
+        warnings.push(`QUOTE_HOTEL_MARGIN_RATE_MISSING:${adjustment.id}:${line.lineId}`);
+      } else {
+        saleIncrement = assertSafeMoney(Math.round((costIncrement * saleRate) / costRate));
+      }
+    }
+
+    line.saleCents = addMoney(line.saleCents, saleIncrement);
+  }
+}
+
 function applyScopeAdjustments(
   lines: MutableLine[],
   adjustments: QuotePricingAdjustment[],
@@ -358,11 +403,16 @@ function applyScopeAdjustments(
     (adjustment) => adjustment.active && (!isOption || adjustment.applyToOptions),
   );
 
-  // Règle métier PAPOT : 1) heures de pose / trajet, 2) marge supplémentaire PAPOT,
-  // 3) commissions et autres pourcentages répercutés sans marge.
+  // Règle métier PAPOT : 1) heures de pose / trajet, 2) hôtel pondéré sur la pose,
+  // 3) marge supplémentaire PAPOT, 4) commissions et autres pourcentages sans marge.
   for (const adjustment of applicable) {
     if (adjustment.kind !== "POSE_HOURS") continue;
     applyPoseHoursAdjustment(lines, adjustment, warnings, scopeLabel);
+  }
+
+  for (const adjustment of applicable) {
+    if (adjustment.kind !== "HOTEL") continue;
+    applyHotelAdjustment(lines, adjustment, warnings, scopeLabel);
   }
 
   const margedPercent = applicable.reduce((sum, adjustment) => {
