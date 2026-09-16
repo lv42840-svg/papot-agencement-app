@@ -13,6 +13,10 @@ const createPage = readFileSync(
   new URL("../src/app/devis/nouveau/page.tsx", import.meta.url),
   "utf-8",
 );
+const quotesRoute = readFileSync(
+  new URL("../src/app/api/desktop/quotes/route.ts", import.meta.url),
+  "utf-8",
+);
 
 describe("quote creation flow", () => {
   it("permet de lancer un devis depuis la fiche affaire", () => {
@@ -38,5 +42,15 @@ describe("quote creation flow", () => {
   it("rappelle que la validite est toujours de 30 jours", () => {
     expect(createWorkspace).toContain("Validité du devis : 30 jours");
     expect(createWorkspace).not.toContain("validityDays");
+  });
+
+  it("demande le responsable et la date puis passe l'affaire en chiffrage", () => {
+    expect(createWorkspace).toContain("Responsable du chiffrage");
+    expect(createWorkspace).toContain("Date prévue d’envoi");
+    expect(createWorkspace).toContain("quoteOwnerName");
+    expect(createWorkspace).toContain("quoteDueDate");
+    expect(createPage).toContain("listCommercialAssignableUsers");
+    expect(quotesRoute).toContain("startQuoteCommercialWorkflow");
+    expect(quotesRoute).toContain('requireDesktopRequestContext("commercial", "WRITE")');
   });
 });
