@@ -130,7 +130,10 @@ export function QuoteStructuredLinesRichEditor({
     const rect = input.getBoundingClientRect();
     const maxWidth = Math.max(300, window.innerWidth - 24);
     const width = Math.min(Math.max(rect.width, 460), maxWidth);
-    const left = Math.min(Math.max(12, rect.left), Math.max(12, window.innerWidth - width - 12));
+    const left = Math.min(
+      Math.max(12, rect.left),
+      Math.max(12, window.innerWidth - width - 12),
+    );
     const top = Math.max(8, rect.top - 40);
     setAnchor({ left, top, width });
   }
@@ -227,13 +230,15 @@ export function QuoteStructuredLinesRichEditor({
     };
   }, [canWrite, itemByNumber, quote]);
 
+  const sessionKey = session?.key;
+
   useEffect(() => {
-    if (!session) return;
+    if (!sessionKey) return;
     const frame = window.requestAnimationFrame(() => {
       overlayRef.current?.querySelector<HTMLElement>("[contenteditable='true']")?.focus();
     });
     return () => window.cancelAnimationFrame(frame);
-  }, [session?.key]);
+  }, [sessionKey]);
 
   async function handleStructuredSaved(payload: NativeQuotesPayload) {
     const pending = pendingSaveRef.current;
@@ -283,7 +288,9 @@ export function QuoteStructuredLinesRichEditor({
       setRichSaveError("");
       onSaved(data.payload);
     } catch {
-      setRichSaveError("Le texte est enregistré, mais la mise en forme n’a pas pu être enregistrée.");
+      setRichSaveError(
+        "Le texte est enregistré, mais la mise en forme n’a pas pu être enregistrée.",
+      );
       onSaved(payload);
     }
   }
