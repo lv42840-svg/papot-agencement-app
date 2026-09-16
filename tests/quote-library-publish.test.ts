@@ -58,38 +58,12 @@ function ids() {
   };
 }
 
-describe("publish quote component to Library", () => {
-  it("creates one reusable component from a quote component", () => {
-    const component = quoteLine().components![0];
-    const result = publishQuoteComponentToLibrary(createInitialLibraryPayload(), component, ids());
-
-    expect(result.created).toBe(true);
-    expect(result.payload.components).toHaveLength(1);
-    expect(result.payload.components[0]).toMatchObject({
-      id: result.componentId,
-      name: "Panneau mélaminé blanc",
-      unit: "m²",
-      costPriceCents: 4_000,
-      marginPercent: 30,
-      salePriceCents: 5_200,
-    });
-    expect(result.payload.ouvrages).toHaveLength(0);
-  });
-
-  it("reuses an unchanged component already coming from the Library", () => {
-    const sourceComponentId = "99999999-9999-4999-8999-999999999999";
-    const payload = createInitialLibraryPayload();
-    payload.components.push({
-      id: sourceComponentId,
-      name: "Panneau mélaminé blanc",
-      description: "Panneau décor blanc 19 mm.",
-      unit: "m²",
-      costPriceCents: 4_000,
-      marginPercent: 30,
-      salePriceCents: 5_200,
-    });
-    const sourceComponent = quoteLine().components![0];
-    const component = {
+function linkedComponent() {
+  const sourceComponentId = "99999999-9999-4999-8999-999999999999";
+  const sourceComponent = quoteLine().components![0];
+  return {
+    sourceComponentId,
+    component: {
       ...sourceComponent,
       librarySource: {
         schemaVersion: 1 as const,
@@ -104,13 +78,103 @@ describe("publish quote component to Library", () => {
           salePriceCents: 5_200,
         },
       },
-    };
+    },
+  };
+}
+
+describe("publish quote component to Library", () => {
+  it("creates one reusable component from a quote component", () => {
+    const component = quoteLine().components![0];
+    const result = publishQuoteComponentToLibrary(createInitialLibraryPayload(), component, ids());
+
+    expect(result.created).toBe(true);
+    expect(result.updated).toBe(false);
+    expect(result.payload.components).toHaveLength(1);
+    expect(result.payload.components[0]).toMatchObject({
+      id: result.componentId,
+      name: "Panneau mélaminé blanc",
+      unit: "m²",
+      costPriceCents: 4_000,
+      marginPercent: 30,
+      salePriceCents: 5_200,
+    });
+    expect(result.payload.ouvrages).toHaveLength(0);
+  });
+
+  it("reuses an unchanged component already coming from the Library", () => {
+    const { sourceComponentId, component } = linkedComponent();
+    const payload = createInitialLibraryPayload();
+    payload.components.push({
+      id: sourceComponentId,
+      name: "Panneau mélaminé blanc",
+      description: "Panneau décor blanc 19 mm.",
+      unit: "m²",
+      costPriceCents: 4_000,
+      marginPercent: 30,
+      salePriceCents: 5_200,
+    });
 
     const result = publishQuoteComponentToLibrary(payload, component, ids());
 
     expect(result.created).toBe(false);
+    expect(result.updated).toBe(false);
     expect(result.componentId).toBe(sourceComponentId);
     expect(result.payload.components).toHaveLength(1);
+  });
+
+  it("can overwrite the linked Library component with the edited quote pricing", () => {
+    const { sourceComponentId, component } = linkedComponent();
+    const payload = createInitialLibraryPayload();
+    payload.components.push({
+      id: sourceComponentId,
+      name: "Panneau mélaminé blanc",
+      description: "Description Bibliothèque conservée.",
+      unit: "m²",
+      costPriceCents: 4_000,
+      marginPercent: 30,
+      salePriceCents: 5_200,
+    });
+    const edited = { ...component, unitPriceCents: 6_000 };
+
+    const result = publishQuoteComponentToLibrary(payload, edited, ids(), "OVERWRITE_LINKED");
+
+    expect(result.created).toBe(false);
+    expect(result.updated).toBe(true);
+    expect(result.componentId).toBe(sourceComponentId);
+    expect(result.payload.components).toHaveLength(1);
+    expect(result.payload.components[0]).toMatchObject({
+      id: sourceComponentId,
+      name: "Panneau mélaminé blanc",
+      description: "Description Bibliothèque conservée.",
+      costPriceCents: 4_000,
+      marginPercent: 50,
+      salePriceCents: 6_000,
+    });
+  });
+
+  it("keeps creating a new component when overwrite is not requested", () => {
+    const { sourceComponentId, component } = linkedComponent();
+    const payload = createInitialLibraryPayload();
+    payload.components.push({
+      id: sourceComponentId,
+      name: "Panneau mélaminé blanc",
+      description: "Panneau décor blanc 19 mm.",
+      unit: "m²",
+      costPriceCents: 4_000,
+      marginPercent: 30,
+      salePriceCents: 5_200,
+    });
+
+    const result = publishQuoteComponentToLibrary(
+      payload,
+      { ...component, unitPriceCents: 6_000 },
+      ids(),
+    );
+
+    expect(result.created).toBe(true);
+    expect(result.updated).toBe(false);
+    expect(result.componentId).not.toBe(sourceComponentId);
+    expect(result.payload.components).toHaveLength(2);
   });
 });
 

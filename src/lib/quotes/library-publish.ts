@@ -11,10 +11,13 @@ import {
   type QuoteOuvrageComponent,
 } from "./model";
 
+export type QuoteComponentLibraryPublishMode = "CREATE_NEW" | "OVERWRITE_LINKED";
+
 export type QuoteComponentLibraryPublishResult = {
   payload: LibraryPayload;
   componentId: string;
   created: boolean;
+  updated: boolean;
 };
 
 export type QuoteOuvrageLibraryPublishResult = {
@@ -30,24 +33,39 @@ function sameLibraryPricing(
   candidate: LibraryComponent,
   costPriceCents: number,
 ): boolean {
-  const source = component.librarySource?.component;
-  if (!source || source.sourceComponentId !== candidate.id) return false;
-  const activity = component.activity ?? source.activity;
+  const sourceId = component.librarySource?.component.sourceComponentId;
+  if (!sourceId || sourceId !== candidate.id) return false;
+
+  const unit = component.unit.trim();
+  const name = component.description.trim().slice(0, 240);
+  const activity = component.activity ?? component.librarySource?.component.activity;
+  let marginPercent: number;
+  try {
+    marginPercent = calculateLibraryComponentMarginPercent(
+      costPriceCents,
+      component.unitPriceCents,
+    );
+  } catch {
+    return false;
+  }
 
   return (
-    component.description === source.name &&
-    component.unit === source.unit &&
-    costPriceCents === source.costPriceCents &&
-    component.unitPriceCents === source.salePriceCents &&
-    activity === source.activity &&
-    candidate.name === source.name &&
-    candidate.description === source.description &&
-    candidate.unit === source.unit &&
-    candidate.costPriceCents === source.costPriceCents &&
-    candidate.marginPercent === source.marginPercent &&
-    candidate.salePriceCents === source.salePriceCents &&
-    candidate.activity === source.activity
+    candidate.name === name &&
+    candidate.unit === unit &&
+    candidate.costPriceCents === costPriceCents &&
+    candidate.marginPercent === marginPercent &&
+    candidate.salePriceCents === component.unitPriceCents &&
+    candidate.activity === activity
   );
+}
+
+function linkedLibraryComponent(
+  payload: LibraryPayload,
+  component: QuoteOuvrageComponent,
+): LibraryComponent | null {
+  const sourceId = component.librarySource?.component.sourceComponentId;
+  if (!sourceId) return null;
+  return payload.components.find((item) => item.id === sourceId) ?? null;
 }
 
 function reusableLibraryComponent(
@@ -55,9 +73,7 @@ function reusableLibraryComponent(
   component: QuoteOuvrageComponent,
   costPriceCents: number,
 ): LibraryComponent | null {
-  const sourceId = component.librarySource?.component.sourceComponentId;
-  if (!sourceId) return null;
-  const candidate = payload.components.find((item) => item.id === sourceId);
+  const candidate = linkedLibraryComponent(payload, component);
   if (!candidate) return null;
   return sameLibraryPricing(component, candidate, costPriceCents) ? candidate : null;
 }
@@ -66,6 +82,7 @@ function libraryComponentFromQuoteComponent(
   component: QuoteOuvrageComponent,
   id: string,
   costPriceCents: number,
+  preservedDescription?: string,
 ): LibraryComponent {
   const unit = component.unit.trim();
   if (!unit) throw new Error("QUOTE_LIBRARY_COMPONENT_UNIT_REQUIRED");
@@ -87,7 +104,10 @@ function libraryComponentFromQuoteComponent(
   return {
     id,
     name,
-    description: component.librarySource?.component.description ?? component.description,
+    description:
+      preservedDescription ??
+      component.librarySource?.component.description ??
+      component.description,
     unit,
     costPriceCents,
     marginPercent,
@@ -100,6 +120,7 @@ export function publishQuoteComponentToLibrary(
   source: LibraryPayload,
   component: QuoteOuvrageComponent,
   idFactory: IdFactory = () => globalThis.crypto.randomUUID(),
+  mode: QuoteComponentLibraryPublishMode = "CREATE_NEW",
 ): QuoteComponentLibraryPublishResult {
   let payload = parseLibraryPayload(source);
   const costPriceCents = quoteOuvrageComponentCostPriceCents(component);
@@ -109,7 +130,16 @@ export function publishQuoteComponentToLibrary(
 
   const reusable = reusableLibraryComponent(payload, component, costPriceCents);
   if (reusable) {
-    return { payload, componentId: reusable.id, created: false };
+    return { payload, componentId: reusable.id, created: false, updated: false };
+  }
+
+  const linked = linkedLibraryComponent(payload, component);
+  if (mode === "OVERWRITE_LINKED" && linked) {
+    payload = upsertLibraryComponent(
+      payload,
+      libraryComponentFromQuoteComponent(component, linked.id, costPriceCents, linked.description),
+    );
+    return { payload, componentId: linked.id, created: false, updated: true };
   }
 
   const componentId = idFactory();
@@ -117,7 +147,7 @@ export function publishQuoteComponentToLibrary(
     payload,
     libraryComponentFromQuoteComponent(component, componentId, costPriceCents),
   );
-  return { payload, componentId, created: true };
+  return { payload, componentId, created: true, updated: false };
 }
 
 export function publishQuoteOuvrageToLibrary(

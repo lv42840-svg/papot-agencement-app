@@ -8,19 +8,7 @@ import {
   useMemo,
   useState,
 } from "react";
-import {
-  ArrowDown,
-  ArrowUp,
-  Check,
-  Copy,
-  LockKeyhole,
-  Pencil,
-  Plus,
-  RotateCcw,
-  Search,
-  Trash2,
-  X,
-} from "lucide-react";
+import { Check, Copy, LockKeyhole, Pencil, Plus, RotateCcw, Search, Trash2, X } from "lucide-react";
 import type { LibraryComponent } from "@/lib/library/component";
 import {
   createInitialLibraryPayload,
@@ -29,12 +17,7 @@ import {
 } from "@/lib/library/storage";
 import { ensureRequiredLaborComponents } from "@/lib/library/required-labor-components";
 import { productionActivityLabel, type ProductionActivity } from "@/lib/production-activity";
-import {
-  canMoveQuoteComponent,
-  duplicateQuoteComponent,
-  moveQuoteComponent,
-  type QuoteComponentMoveDirection,
-} from "@/lib/quotes/component-order";
+import { duplicateQuoteComponent } from "@/lib/quotes/component-order";
 import { parseQuoteQuantityInput } from "@/lib/quotes/domain";
 import {
   publishQuoteComponentToLibrary,
@@ -373,6 +356,19 @@ async function postLibrary(body: Record<string, unknown>) {
   return data;
 }
 
+async function postQuotePricing(body: Record<string, unknown>): Promise<NativeQuotesPayload> {
+  const response = await fetch("/api/desktop/quotes/pricing", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(body),
+  });
+  const data = (await response.json()) as QuotesApiResponse;
+  if (!response.ok || !data.payload) {
+    throw new Error(data.error ?? "QUOTES_PRICING_MUTATION_FAILED");
+  }
+  return data.payload;
+}
+
 export function QuoteStructuredLinesEditor({
   quote,
   canWrite,
@@ -399,15 +395,19 @@ export function QuoteStructuredLinesEditor({
   const [headingEditor, setHeadingEditor] = useState<HeadingEditor>(null);
   const [saving, setSaving] = useState(false);
   const [duplicatingLineId, setDuplicatingLineId] = useState<string | null>(null);
-  const [movingLineId, setMovingLineId] = useState<string | null>(null);
-  const [movingHeadingId, setMovingHeadingId] = useState<string | null>(null);
   const [duplicatingHeadingId, setDuplicatingHeadingId] = useState<string | null>(null);
   const [deletingItemId, setDeletingItemId] = useState<string | null>(null);
+  const [togglingOptionItemId, setTogglingOptionItemId] = useState<string | null>(null);
   const [draggingItemId, setDraggingItemId] = useState<string | null>(null);
   const [reorderingItemId, setReorderingItemId] = useState<string | null>(null);
   const [dropTarget, setDropTarget] = useState<{
     itemId: string;
     placement: QuoteItemPlacement;
+  } | null>(null);
+  const [draggingComponentKey, setDraggingComponentKey] = useState<string | null>(null);
+  const [componentDropTarget, setComponentDropTarget] = useState<{
+    key: string;
+    placement: "BEFORE" | "AFTER";
   } | null>(null);
   const [error, setError] = useState("");
   const [notice, setNotice] = useState("");
@@ -418,7 +418,6 @@ export function QuoteStructuredLinesEditor({
   const [librarySavingLineId, setLibrarySavingLineId] = useState<string | null>(null);
   const [librarySavingComponentId, setLibrarySavingComponentId] = useState<string | null>(null);
   const [publishedLineIds, setPublishedLineIds] = useState<Set<string>>(new Set());
-  const [publishedComponentIds, setPublishedComponentIds] = useState<Set<string>>(new Set());
 
   const items = useMemo(() => quote?.model.items ?? [], [quote]);
   const lines = useMemo(
@@ -469,18 +468,18 @@ export function QuoteStructuredLinesEditor({
     setEditingLineId(null);
     setHeadingEditor(null);
     setDuplicatingLineId(null);
-    setMovingLineId(null);
-    setMovingHeadingId(null);
     setDuplicatingHeadingId(null);
     setDeletingItemId(null);
+    setTogglingOptionItemId(null);
     setDraggingItemId(null);
     setReorderingItemId(null);
     setDropTarget(null);
+    setDraggingComponentKey(null);
+    setComponentDropTarget(null);
     setError("");
     setNotice("");
     setLibraryPickerOpen(false);
     setPublishedLineIds(new Set());
-    setPublishedComponentIds(new Set());
   }, [quote?.id]);
 
   useEffect(() => {
@@ -599,93 +598,12 @@ export function QuoteStructuredLinesEditor({
     });
   }
 
-  function canMoveHeading(item: QuoteSection | QuoteSubsection, direction: "UP" | "DOWN") {
-    const currentIndex = items.findIndex((candidate) => candidate.id === item.id);
-    if (currentIndex < 0) return false;
-
-    if (item.kind === "SECTION") {
-      if (direction === "UP") {
-        return items.slice(0, currentIndex).some((candidate) => candidate.kind === "SECTION");
-      }
-      return items.slice(currentIndex + 1).some((candidate) => candidate.kind === "SECTION");
-    }
-
-    if (direction === "UP") {
-      for (let index = currentIndex - 1; index >= 0; index -= 1) {
-        const candidate = items[index];
-        if (candidate.kind === "SECTION") return false;
-        if (candidate.kind === "SUBSECTION" && candidate.parentId === item.parentId) return true;
-      }
-      return false;
-    }
-
-    for (let index = currentIndex + 1; index < items.length; index += 1) {
-      const candidate = items[index];
-      if (candidate.kind === "SECTION") return false;
-      if (candidate.kind === "SUBSECTION" && candidate.parentId === item.parentId) return true;
-    }
-    return false;
-  }
-
-  async function moveHeading(item: QuoteSection | QuoteSubsection, direction: "UP" | "DOWN") {
-    if (
-      !quote ||
-      !editable ||
-      movingHeadingId ||
-      duplicatingHeadingId ||
-      movingLineId ||
-      duplicatingLineId ||
-      formOpen ||
-      headingEditor ||
-      !canMoveHeading(item, direction)
-    ) {
-      return;
-    }
-
-    setMovingHeadingId(item.id);
-    setError("");
-    setNotice("");
-    try {
-      const response = await fetch("/api/desktop/quotes", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          action: "moveHeading",
-          quoteId: quote.id,
-          itemId: item.id,
-          direction,
-        }),
-      });
-      const data = (await response.json()) as QuotesApiResponse;
-      if (!response.ok || !data.payload) {
-        setError(lineErrorLabel(data.error ?? "QUOTES_MUTATION_FAILED"));
-        return;
-      }
-      onSaved(data.payload);
-      setNotice(
-        item.kind === "SECTION"
-          ? direction === "UP"
-            ? "Titre remonté avec son contenu."
-            : "Titre descendu avec son contenu."
-          : direction === "UP"
-            ? "Sous-titre remonté avec son contenu."
-            : "Sous-titre descendu avec son contenu.",
-      );
-    } catch {
-      setError("Le titre n’a pas pu être déplacé.");
-    } finally {
-      setMovingHeadingId(null);
-    }
-  }
-
   async function deleteItem(item: QuoteLine | QuoteSection | QuoteSubsection) {
     if (
       !quote ||
       !editable ||
       deletingItemId ||
-      movingHeadingId ||
       duplicatingHeadingId ||
-      movingLineId ||
       duplicatingLineId ||
       formOpen ||
       headingEditor
@@ -864,13 +782,50 @@ export function QuoteStructuredLinesEditor({
     return classes.length > 0 ? ` ${classes.join(" ")}` : "";
   }
 
+  function directOptionForItem(itemId: string) {
+    return quote?.pricingConfig.options.find((option) => option.targetItemId === itemId) ?? null;
+  }
+
+  async function toggleItemOption(item: QuoteLine | QuoteSection | QuoteSubsection) {
+    if (!quote || !editable || togglingOptionItemId) return;
+    const existing = directOptionForItem(item.id);
+    const label = item.kind === "LINE" ? item.description : item.title;
+    setTogglingOptionItemId(item.id);
+    setError("");
+    setNotice("");
+
+    try {
+      const payload = existing
+        ? await postQuotePricing({
+            action: "removeOption",
+            quoteId: quote.id,
+            optionId: existing.id,
+          })
+        : await postQuotePricing({
+            action: "upsertOption",
+            quoteId: quote.id,
+            option: {
+              id: globalThis.crypto.randomUUID(),
+              targetItemId: item.id,
+              targetKind: item.kind,
+              label,
+              status: "PENDING",
+            },
+          });
+      onSaved(payload);
+      setNotice(existing ? "Option retirée du devis." : "Élément placé en option hors total.");
+    } catch {
+      setError("L’option n’a pas pu être modifiée.");
+    } finally {
+      setTogglingOptionItemId(null);
+    }
+  }
+
   async function duplicateHeading(item: QuoteSection | QuoteSubsection) {
     if (
       !quote ||
       !editable ||
       duplicatingHeadingId ||
-      movingHeadingId ||
-      movingLineId ||
       duplicatingLineId ||
       formOpen ||
       headingEditor
@@ -1083,8 +1038,67 @@ export function QuoteStructuredLinesEditor({
     setLibraryPickerOpen(false);
   }
 
-  function moveComponent(index: number, direction: QuoteComponentMoveDirection) {
-    setComponents((current) => moveQuoteComponent(current, index, direction));
+  function startComponentDrag(event: DragEvent<HTMLDivElement>, key: string) {
+    const origin = event.target as HTMLElement;
+    if (saving || origin.closest("button, input, textarea, select")) {
+      event.preventDefault();
+      return;
+    }
+    setDraggingComponentKey(key);
+    setComponentDropTarget(null);
+    event.dataTransfer.effectAllowed = "move";
+    event.dataTransfer.setData("text/plain", key);
+  }
+
+  function dragComponentOver(event: DragEvent<HTMLDivElement>, key: string) {
+    if (!draggingComponentKey || draggingComponentKey === key) return;
+    event.preventDefault();
+    const bounds = event.currentTarget.getBoundingClientRect();
+    const placement = event.clientY < bounds.top + bounds.height / 2 ? "BEFORE" : "AFTER";
+    event.dataTransfer.dropEffect = "move";
+    setComponentDropTarget((current) =>
+      current?.key === key && current.placement === placement ? current : { key, placement },
+    );
+  }
+
+  function finishComponentDrag() {
+    setDraggingComponentKey(null);
+    setComponentDropTarget(null);
+  }
+
+  function dropComponent(event: DragEvent<HTMLDivElement>, targetKey: string) {
+    if (!draggingComponentKey || draggingComponentKey === targetKey) return;
+    event.preventDefault();
+    const placement =
+      componentDropTarget?.key === targetKey ? componentDropTarget.placement : "BEFORE";
+    setComponents((current) => {
+      const sourceIndex = current.findIndex((component) => component.key === draggingComponentKey);
+      if (sourceIndex < 0) return current;
+      const sourceComponent = current[sourceIndex];
+      const remaining = current.filter((_, index) => index !== sourceIndex);
+      const targetIndex = remaining.findIndex((component) => component.key === targetKey);
+      if (targetIndex < 0) return current;
+      const insertionIndex = placement === "AFTER" ? targetIndex + 1 : targetIndex;
+      return [
+        ...remaining.slice(0, insertionIndex),
+        sourceComponent,
+        ...remaining.slice(insertionIndex),
+      ];
+    });
+    finishComponentDrag();
+  }
+
+  function componentDropClass(key: string): string {
+    const classes: string[] = [];
+    if (draggingComponentKey === key) classes.push("isDragging");
+    if (componentDropTarget?.key === key) {
+      classes.push(
+        componentDropTarget.placement === "BEFORE"
+          ? "quoteComponentDropBefore"
+          : "quoteComponentDropAfter",
+      );
+    }
+    return classes.length > 0 ? ` ${classes.join(" ")}` : "";
   }
 
   function duplicateComponent(index: number) {
@@ -1193,54 +1207,6 @@ export function QuoteStructuredLinesEditor({
     }
   }
 
-  function canMoveOuvrage(line: QuoteLine, direction: "UP" | "DOWN") {
-    const index = items.findIndex((item) => item.id === line.id);
-    if (index < 0) return false;
-    const target = items[direction === "UP" ? index - 1 : index + 1];
-    return target?.kind === "LINE" && target.parentId === line.parentId;
-  }
-
-  async function moveOuvrage(line: QuoteLine, direction: "UP" | "DOWN") {
-    if (
-      !quote ||
-      !editable ||
-      movingLineId ||
-      duplicatingLineId ||
-      formOpen ||
-      headingEditor ||
-      !canMoveOuvrage(line, direction)
-    ) {
-      return;
-    }
-    setMovingLineId(line.id);
-    setError("");
-    setNotice("");
-
-    try {
-      const response = await fetch("/api/desktop/quotes", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          action: "moveLine",
-          quoteId: quote.id,
-          lineId: line.id,
-          direction,
-        }),
-      });
-      const data = (await response.json()) as QuotesApiResponse;
-      if (!response.ok || !data.payload) {
-        setError(lineErrorLabel(data.error ?? "QUOTES_MUTATION_FAILED"));
-        return;
-      }
-      onSaved(data.payload);
-      setNotice(direction === "UP" ? "Ouvrage remonté." : "Ouvrage descendu.");
-    } catch {
-      setError("L’ouvrage n’a pas pu être déplacé.");
-    } finally {
-      setMovingLineId(null);
-    }
-  }
-
   async function duplicateOuvrage(line: QuoteLine) {
     if (!quote || !editable || duplicatingLineId || formOpen || headingEditor) return;
     setDuplicatingLineId(line.id);
@@ -1338,11 +1304,29 @@ export function QuoteStructuredLinesEditor({
           ? parseLibraryPayload(opened.resource.payload)
           : createInitialLibraryPayload(),
       );
-      const published = publishQuoteComponentToLibrary(basePayload, component);
+      let published = publishQuoteComponentToLibrary(basePayload, component);
+      const linkedComponentId = component.librarySource?.component.sourceComponentId;
+      const canOverwriteLinked =
+        published.created &&
+        linkedComponentId !== undefined &&
+        basePayload.components.some((item) => item.id === linkedComponentId);
 
-      if (!published.created) {
+      if (canOverwriteLinked) {
+        const overwrite = window.confirm(
+          "Ce composant vient de la Bibliothèque et a été modifié.\n\nOK : mettre à jour le composant existant\nAnnuler : créer un nouveau composant",
+        );
+        if (overwrite) {
+          published = publishQuoteComponentToLibrary(
+            basePayload,
+            component,
+            () => globalThis.crypto.randomUUID(),
+            "OVERWRITE_LINKED",
+          );
+        }
+      }
+
+      if (!published.created && !published.updated) {
         setLibraryPayload(published.payload);
-        setPublishedComponentIds((current) => new Set(current).add(component.id));
         setNotice("Composant déjà présent dans la Bibliothèque.");
         return;
       }
@@ -1358,8 +1342,11 @@ export function QuoteStructuredLinesEditor({
       if (saved.status === "conflict") throw new Error("LIBRARY_VERSION_CONFLICT");
 
       setLibraryPayload(parseLibraryPayload(saved.resource.payload));
-      setPublishedComponentIds((current) => new Set(current).add(component.id));
-      setNotice("Composant ajouté à la Bibliothèque.");
+      setNotice(
+        published.updated
+          ? "Composant mis à jour dans la Bibliothèque."
+          : "Composant ajouté à la Bibliothèque.",
+      );
     } catch (publishError) {
       const code = publishError instanceof Error ? publishError.message : "LIBRARY_REQUEST_FAILED";
       setError(libraryErrorLabel(code));
@@ -1415,17 +1402,9 @@ export function QuoteStructuredLinesEditor({
                 type="button"
                 className="miniLibraryButton"
                 onClick={() => void addComponentToLibrary(component)}
-                disabled={
-                  librarySavingLineId !== null ||
-                  librarySavingComponentId !== null ||
-                  publishedComponentIds.has(component.id)
-                }
-                aria-label={`Ajouter ${component.description} à la Bibliothèque`}
-                title={
-                  publishedComponentIds.has(component.id)
-                    ? "Composant déjà ajouté à la Bibliothèque"
-                    : "Ajouter le composant à la Bibliothèque"
-                }
+                disabled={librarySavingLineId !== null || librarySavingComponentId !== null}
+                aria-label={`Ajouter ou mettre à jour ${component.description} dans la Bibliothèque`}
+                title="Ajouter à la Bibliothèque ou mettre à jour le composant lié"
               >
                 {librarySavingComponentId === component.id ? "…" : "+B"}
               </button>
@@ -1445,6 +1424,7 @@ export function QuoteStructuredLinesEditor({
     const libraryAlreadyLinked = line.librarySource?.kind === "OUVRAGE";
     const publishedNow = publishedLineIds.has(line.id);
     const lineTotalCents = Math.round(line.quantity * salePriceCents);
+    const directOption = directOptionForItem(line.id);
 
     return (
       <div
@@ -1507,46 +1487,23 @@ export function QuoteStructuredLinesEditor({
                 </button>
                 <button
                   type="button"
-                  className="iconButton"
-                  onClick={() => void moveOuvrage(line, "UP")}
-                  disabled={
-                    formOpen ||
-                    headingEditor !== null ||
-                    duplicatingLineId !== null ||
-                    movingLineId !== null ||
-                    !canMoveOuvrage(line, "UP")
+                  className={`miniOptionButton${directOption ? " isActive" : ""}`}
+                  onClick={() => void toggleItemOption(line)}
+                  disabled={togglingOptionItemId !== null}
+                  aria-label={
+                    directOption
+                      ? `Retirer ${line.description} des options`
+                      : `Mettre ${line.description} en option`
                   }
-                  aria-label={`Remonter ${line.description}`}
-                  title="Remonter l’ouvrage"
+                  title={directOption ? "Retirer l’option" : "Mettre en option hors total"}
                 >
-                  <ArrowUp size={14} aria-hidden="true" />
-                </button>
-                <button
-                  type="button"
-                  className="iconButton"
-                  onClick={() => void moveOuvrage(line, "DOWN")}
-                  disabled={
-                    formOpen ||
-                    headingEditor !== null ||
-                    duplicatingLineId !== null ||
-                    movingLineId !== null ||
-                    !canMoveOuvrage(line, "DOWN")
-                  }
-                  aria-label={`Descendre ${line.description}`}
-                  title="Descendre l’ouvrage"
-                >
-                  <ArrowDown size={14} aria-hidden="true" />
+                  O
                 </button>
                 <button
                   type="button"
                   className="iconButton"
                   onClick={() => void duplicateOuvrage(line)}
-                  disabled={
-                    formOpen ||
-                    headingEditor !== null ||
-                    duplicatingLineId !== null ||
-                    movingLineId !== null
-                  }
+                  disabled={formOpen || headingEditor !== null || duplicatingLineId !== null}
                   aria-label={`Dupliquer ${line.description}`}
                   title="Dupliquer l’ouvrage"
                 >
@@ -1560,7 +1517,6 @@ export function QuoteStructuredLinesEditor({
                     formOpen ||
                     headingEditor !== null ||
                     duplicatingLineId !== null ||
-                    movingLineId !== null ||
                     deletingItemId !== null
                   }
                   aria-label={`Modifier ${line.description}`}
@@ -1576,7 +1532,6 @@ export function QuoteStructuredLinesEditor({
                     formOpen ||
                     headingEditor !== null ||
                     duplicatingLineId !== null ||
-                    movingLineId !== null ||
                     deletingItemId !== null
                   }
                   aria-label={`Supprimer ${line.description}`}
@@ -1729,7 +1684,16 @@ export function QuoteStructuredLinesEditor({
             const total = componentTotalCents(component);
             const marginPercent = componentMarginPercent(component);
             return (
-              <div className="quoteComponentRow quoteComponentRowEditing" key={component.key}>
+              <div
+                className={`quoteComponentRow quoteComponentRowEditing quoteComponentDraggable${componentDropClass(component.key)}`}
+                key={component.key}
+                draggable={!saving}
+                onDragStart={(event) => startComponentDrag(event, component.key)}
+                onDragOver={(event) => dragComponentOver(event, component.key)}
+                onDrop={(event) => dropComponent(event, component.key)}
+                onDragEnd={finishComponentDrag}
+                title="Glisser-déposer pour déplacer le composant"
+              >
                 <div className="quoteComponentNameEdit">
                   <input
                     className="quoteInlineInput"
@@ -1792,26 +1756,6 @@ export function QuoteStructuredLinesEditor({
                 />
                 <strong>{total === null ? "—" : formatMoney(total)}</strong>
                 <div className="quoteComponentActions">
-                  <button
-                    type="button"
-                    className="miniActionButton"
-                    onClick={() => moveComponent(index, "UP")}
-                    disabled={!canMoveQuoteComponent(components.length, index, "UP")}
-                    aria-label={`Remonter le composant ${index + 1}`}
-                    title="Remonter le composant"
-                  >
-                    <ArrowUp size={13} aria-hidden="true" />
-                  </button>
-                  <button
-                    type="button"
-                    className="miniActionButton"
-                    onClick={() => moveComponent(index, "DOWN")}
-                    disabled={!canMoveQuoteComponent(components.length, index, "DOWN")}
-                    aria-label={`Descendre le composant ${index + 1}`}
-                    title="Descendre le composant"
-                  >
-                    <ArrowDown size={13} aria-hidden="true" />
-                  </button>
                   <button
                     type="button"
                     className="miniActionButton"
@@ -1894,6 +1838,7 @@ export function QuoteStructuredLinesEditor({
     const editing = headingEditor?.itemId === item.id;
     if (editing && headingEditor)
       return renderHeadingEditor(headingEditor, numbers.get(item.id) ?? "—");
+    const directOption = directOptionForItem(item.id);
 
     return (
       <div
@@ -1918,37 +1863,17 @@ export function QuoteStructuredLinesEditor({
             <>
               <button
                 type="button"
-                className="iconButton"
-                onClick={() => void moveHeading(item, "UP")}
-                disabled={
-                  formOpen ||
-                  headingEditor !== null ||
-                  movingHeadingId !== null ||
-                  duplicatingHeadingId !== null ||
-                  movingLineId !== null ||
-                  !canMoveHeading(item, "UP")
+                className={`miniOptionButton${directOption ? " isActive" : ""}`}
+                onClick={() => void toggleItemOption(item)}
+                disabled={togglingOptionItemId !== null}
+                aria-label={
+                  directOption
+                    ? `Retirer ${item.title} des options`
+                    : `Mettre ${item.title} en option`
                 }
-                aria-label={`Remonter ${item.title}`}
-                title={item.kind === "SECTION" ? "Remonter le titre" : "Remonter le sous-titre"}
+                title={directOption ? "Retirer l’option" : "Mettre en option hors total"}
               >
-                <ArrowUp size={14} aria-hidden="true" />
-              </button>
-              <button
-                type="button"
-                className="iconButton"
-                onClick={() => void moveHeading(item, "DOWN")}
-                disabled={
-                  formOpen ||
-                  headingEditor !== null ||
-                  movingHeadingId !== null ||
-                  duplicatingHeadingId !== null ||
-                  movingLineId !== null ||
-                  !canMoveHeading(item, "DOWN")
-                }
-                aria-label={`Descendre ${item.title}`}
-                title={item.kind === "SECTION" ? "Descendre le titre" : "Descendre le sous-titre"}
-              >
-                <ArrowDown size={14} aria-hidden="true" />
+                O
               </button>
               <button
                 type="button"
@@ -1957,9 +1882,7 @@ export function QuoteStructuredLinesEditor({
                 disabled={
                   formOpen ||
                   headingEditor !== null ||
-                  movingHeadingId !== null ||
                   duplicatingHeadingId !== null ||
-                  movingLineId !== null ||
                   duplicatingLineId !== null
                 }
                 aria-label={`Dupliquer ${item.title}`}
@@ -1971,13 +1894,7 @@ export function QuoteStructuredLinesEditor({
                 type="button"
                 className="iconButton"
                 onClick={() => openEditHeading(item)}
-                disabled={
-                  formOpen ||
-                  headingEditor !== null ||
-                  movingHeadingId !== null ||
-                  movingLineId !== null ||
-                  deletingItemId !== null
-                }
+                disabled={formOpen || headingEditor !== null || deletingItemId !== null}
                 aria-label={`Modifier ${item.title}`}
                 title="Modifier le titre"
               >
@@ -1990,9 +1907,7 @@ export function QuoteStructuredLinesEditor({
                 disabled={
                   formOpen ||
                   headingEditor !== null ||
-                  movingHeadingId !== null ||
                   duplicatingHeadingId !== null ||
-                  movingLineId !== null ||
                   duplicatingLineId !== null ||
                   deletingItemId !== null
                 }
@@ -2076,7 +1991,7 @@ export function QuoteStructuredLinesEditor({
           </p>
           {editable ? (
             <p className="quoteDragHint">
-              Glisse titres, sous-titres et ouvrages pour les réorganiser.
+              Glisse titres, sous-titres, ouvrages et composants pour les réorganiser.
             </p>
           ) : null}
         </div>
@@ -2231,11 +2146,11 @@ export function QuoteStructuredLinesEditor({
         }
         .quoteMainRow {
           display: grid;
-          grid-template-columns: 52px minmax(300px, 1fr) 82px 72px 120px 120px 120px 82px;
-          gap: 10px;
+          grid-template-columns: 44px minmax(250px, 1fr) 64px 56px 104px 100px 110px 170px;
+          gap: 8px;
           align-items: center;
-          padding: 9px 18px;
-          min-width: 1040px;
+          padding: 9px 14px;
+          min-width: 980px;
         }
         .quoteLinesTableHeader {
           min-height: 38px;
@@ -2252,7 +2167,7 @@ export function QuoteStructuredLinesEditor({
           font-variant-numeric: tabular-nums;
         }
         .quoteOuvrageGroup {
-          min-width: 1040px;
+          min-width: 980px;
           border-top: 1px solid var(--border);
         }
         .quoteOuvrageGroup:first-of-type {
@@ -2323,6 +2238,7 @@ export function QuoteStructuredLinesEditor({
           font-variant-numeric: tabular-nums;
         }
         .miniLibraryButton,
+        .miniOptionButton,
         .miniActionButton,
         .quoteResetPrice,
         .quoteDeleteComponent {
@@ -2334,7 +2250,8 @@ export function QuoteStructuredLinesEditor({
           color: var(--muted);
           cursor: pointer;
         }
-        .miniLibraryButton {
+        .miniLibraryButton,
+        .miniOptionButton {
           min-width: 30px;
           height: 28px;
           padding: 0 6px;
@@ -2344,6 +2261,12 @@ export function QuoteStructuredLinesEditor({
           font-size: 10px;
           font-weight: 900;
         }
+        .miniOptionButton.isActive {
+          border-color: #8c78c7;
+          background: #e9e2fb;
+          color: #4f3c93;
+          box-shadow: inset 0 0 0 1px #cfc2ef;
+        }
         .miniActionButton,
         .quoteResetPrice,
         .quoteDeleteComponent {
@@ -2352,6 +2275,7 @@ export function QuoteStructuredLinesEditor({
           border-radius: 6px;
         }
         .miniLibraryButton:hover:not(:disabled),
+        .miniOptionButton:hover:not(:disabled),
         .miniActionButton:hover:not(:disabled),
         .quoteResetPrice:hover:not(:disabled),
         .quoteDeleteComponent:hover:not(:disabled) {
@@ -2360,6 +2284,7 @@ export function QuoteStructuredLinesEditor({
           background: #faf8ff;
         }
         .miniLibraryButton:disabled,
+        .miniOptionButton:disabled,
         .miniActionButton:disabled,
         .quoteResetPrice:disabled,
         .quoteDeleteComponent:disabled {
@@ -2411,7 +2336,7 @@ export function QuoteStructuredLinesEditor({
         .quoteComponentsHeader,
         .quoteComponentRow {
           display: grid;
-          grid-template-columns: minmax(220px, 1fr) 82px 70px 105px 82px 105px 105px 122px;
+          grid-template-columns: minmax(220px, 1fr) 76px 64px 100px 78px 100px 100px 70px;
           gap: 8px;
           align-items: center;
           padding: 7px 10px;
@@ -2436,6 +2361,18 @@ export function QuoteStructuredLinesEditor({
         .quoteComponentActions {
           justify-content: flex-end;
           gap: 4px;
+        }
+        .quoteComponentDraggable[draggable="true"] {
+          cursor: grab;
+        }
+        .quoteComponentDraggable.isDragging {
+          opacity: 0.45;
+        }
+        .quoteComponentDropBefore {
+          box-shadow: inset 0 3px 0 #7867bb;
+        }
+        .quoteComponentDropAfter {
+          box-shadow: inset 0 -3px 0 #7867bb;
         }
         .quoteComponentNameEdit,
         .quoteComponentLabel {
@@ -2583,7 +2520,7 @@ export function QuoteStructuredLinesEditor({
           }
           .quoteMainRow,
           .quoteOuvrageGroup {
-            min-width: 1040px;
+            min-width: 980px;
           }
           .quoteComponentsTable {
             min-width: 780px;
