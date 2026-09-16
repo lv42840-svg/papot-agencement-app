@@ -1,4 +1,7 @@
-import { readFileSync } from "node:fs";
+import { execFileSync } from "node:child_process";
+import { mkdtempSync, readFileSync, writeFileSync } from "node:fs";
+import { tmpdir } from "node:os";
+import { basename, join } from "node:path";
 import { format } from "prettier";
 import { describe, it } from "vitest";
 
@@ -9,12 +12,21 @@ const files = [
 ];
 
 describe("temporary prettier dump", () => {
-  it("prints exact formatted sources", async () => {
+  it("prints exact formatting diffs", async () => {
+    const tempRoot = mkdtempSync(join(tmpdir(), "papot-prettier-"));
+
     for (const path of files) {
       const source = readFileSync(path, "utf-8");
       const formatted = await format(source, { parser: "typescript" });
-      const encoded = Buffer.from(formatted, "utf-8").toString("base64");
-      console.log(`PRETTIER_BASE64 ${path} ${encoded}`);
+      const formattedPath = join(tempRoot, basename(path));
+      writeFileSync(formattedPath, formatted, "utf-8");
+
+      try {
+        execFileSync("diff", ["-u", path, formattedPath], { encoding: "utf-8" });
+      } catch (diffError) {
+        const output = (diffError as { stdout?: string }).stdout ?? "";
+        console.log(`PRETTIER_DIFF ${path}\n${output}`);
+      }
     }
   });
 });
