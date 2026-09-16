@@ -11,7 +11,8 @@ describe("quote rich text inline bridge", () => {
     expect(bridge).toContain('const key = `${kind}:${itemId ?? "new"}:${number}`');
     expect(bridge).toContain("beforeItemIds");
     expect(bridge).toContain("!pending.beforeItemIds.has(item.id)");
-    expect(bridge).toContain("itemText(item) === plainText");
+    expect(bridge).toContain("itemMatchesKind(item, pending.kind)");
+    expect(bridge).not.toContain("itemText(item) === plainText");
   });
 
   it("keeps the business form synchronized with the rich editor", () => {
