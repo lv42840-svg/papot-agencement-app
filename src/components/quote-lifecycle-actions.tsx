@@ -97,7 +97,12 @@ export function QuoteLifecycleActions({
         <button
           className="secondaryButton"
           type="button"
-          disabled={!canWrite || Boolean(working) || quote.status === "ACCEPTED" || quote.status === "CANCELLED"}
+          disabled={
+            !canWrite ||
+            Boolean(working) ||
+            quote.status === "ACCEPTED" ||
+            quote.status === "CANCELLED"
+          }
           onClick={() => void run("createVersion")}
         >
           <History size={14} /> {working === "createVersion" ? "Création…" : "Nouvelle version"}
