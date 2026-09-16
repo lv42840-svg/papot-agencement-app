@@ -73,10 +73,7 @@ function assertCurrentSource(payload: NativeQuotesPayload, source: NativeQuoteRe
   }
 }
 
-function nextAutomaticVariantName(
-  payload: NativeQuotesPayload,
-  commercialCaseId: string,
-): string {
+function nextAutomaticVariantName(payload: NativeQuotesPayload, commercialCaseId: string): string {
   const existing = payload.quotes
     .filter((quote) => quote.commercialCaseId === commercialCaseId)
     .map((quote) => quote.variantName);
@@ -94,10 +91,7 @@ function nextAutomaticVariantName(
   throw new Error("QUOTE_VARIANT_NAME_UNAVAILABLE");
 }
 
-function nextDuplicateVariantName(
-  payload: NativeQuotesPayload,
-  source: NativeQuoteRecord,
-): string {
+function nextDuplicateVariantName(payload: NativeQuotesPayload, source: NativeQuoteRecord): string {
   const existing = payload.quotes
     .filter((quote) => quote.commercialCaseId === source.commercialCaseId)
     .map((quote) => quote.variantName);
@@ -113,10 +107,7 @@ function nextDuplicateVariantName(
   throw new Error("QUOTE_VARIANT_NAME_UNAVAILABLE");
 }
 
-export function quoteIsCurrentVersion(
-  payload: NativeQuotesPayload,
-  quoteId: string,
-): boolean {
+export function quoteIsCurrentVersion(payload: NativeQuotesPayload, quoteId: string): boolean {
   const parsed = parseNativeQuotesPayload(payload);
   const quote = findQuote(parsed, quoteId);
   return currentVariantQuote(parsed, quote).id === quote.id && quote.status !== "SUPERSEDED";
