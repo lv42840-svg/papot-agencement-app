@@ -6,9 +6,9 @@ import { useMemo, useState } from "react";
 import { QuoteComponentCheck } from "@/components/quote-component-check";
 import { QuoteFixedSummary } from "@/components/quote-fixed-summary";
 import { QuoteGeneralInfoEditor } from "@/components/quote-general-info-editor";
-import { QuoteInlineTextColorToolbar } from "@/components/quote-inline-text-color-toolbar";
 import { QuoteInternalNotesEditor } from "@/components/quote-internal-notes-editor";
 import { QuotePricingAdjustmentsEditor } from "@/components/quote-pricing-adjustments-editor";
+import { QuoteRichTextLayer } from "@/components/quote-rich-text-layer";
 import { QuoteSendAction } from "@/components/quote-send-action";
 import { QuoteStructuredLinesEditor } from "@/components/quote-structured-lines-editor";
 import { calculateQuoteAdjustedPricing } from "@/lib/quotes/adjustments";
@@ -90,7 +90,7 @@ export function QuoteDirectEditor({
         }
       />
 
-      <QuoteInlineTextColorToolbar quote={displayQuote} canWrite={canWrite} onSaved={setPayload} />
+      <QuoteRichTextLayer quote={displayQuote} canWrite={canWrite} onSaved={setPayload} />
 
       <QuotePricingAdjustmentsEditor quote={quote} canWrite={canWrite} onSaved={setPayload} />
 
