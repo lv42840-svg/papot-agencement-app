@@ -20,6 +20,27 @@ type Props = {
 
 type ApiResponse = { payload?: NativeQuotesPayload; error?: string };
 
+const TEXT_COLOR_PRESETS = [
+  { label: "Noir", value: "#111827" },
+  { label: "Gris", value: "#475569" },
+  { label: "Lavande", value: "#6554b5" },
+  { label: "Bleu", value: "#2563eb" },
+  { label: "Vert", value: "#15803d" },
+  { label: "Rouge", value: "#b91c1c" },
+  { label: "Orange", value: "#c2410c" },
+  { label: "Brun", value: "#7c2d12" },
+] as const;
+
+const HIGHLIGHT_COLOR_PRESETS = [
+  { label: "Jaune", value: "#fff2a8" },
+  { label: "Lavande", value: "#ede9fe" },
+  { label: "Bleu", value: "#dbeafe" },
+  { label: "Vert", value: "#dcfce7" },
+  { label: "Rose", value: "#fce7f3" },
+  { label: "Orange", value: "#ffedd5" },
+  { label: "Gris", value: "#e2e8f0" },
+] as const;
+
 function itemLabel(item: QuoteItem): string {
   if (item.kind === "SECTION" || item.kind === "SUBSECTION") return item.title;
   if (item.kind === "LINE") return item.description;
@@ -142,6 +163,14 @@ export function QuoteItemPresentationPanel({ quoteId, item, editable, onSaved, o
 
   const photos = item.presentation?.photos ?? [];
   const label = itemLabel(item);
+  const legacyTextColor = TEXT_COLOR_PRESETS.some((preset) => preset.value === style.textColor)
+    ? null
+    : style.textColor;
+  const legacyHighlightColor =
+    style.highlightColor &&
+    !HIGHLIGHT_COLOR_PRESETS.some((preset) => preset.value === style.highlightColor)
+      ? style.highlightColor
+      : null;
 
   return (
     <div className="quotePresentationPanel">
@@ -193,36 +222,45 @@ export function QuoteItemPresentationPanel({ quoteId, item, editable, onSaved, o
         </label>
         <label className="quoteColorControl">
           Couleur
-          <input
-            type="color"
+          <select
             value={style.textColor}
             onChange={(event) =>
               setStyle((current) => ({ ...current, textColor: event.target.value }))
             }
             disabled={!editable}
-          />
+          >
+            {legacyTextColor ? (
+              <option value={legacyTextColor}>Couleur existante</option>
+            ) : null}
+            {TEXT_COLOR_PRESETS.map((preset) => (
+              <option key={preset.value} value={preset.value}>
+                {preset.label}
+              </option>
+            ))}
+          </select>
         </label>
         <label className="quoteHighlightControl">
           Surligneur
-          <input
-            type="checkbox"
-            checked={style.highlightColor !== null}
+          <select
+            value={style.highlightColor ?? ""}
             onChange={(event) =>
               setStyle((current) => ({
                 ...current,
-                highlightColor: event.target.checked ? (current.highlightColor ?? "#fff2a8") : null,
+                highlightColor: event.target.value || null,
               }))
             }
             disabled={!editable}
-          />
-          <input
-            type="color"
-            value={style.highlightColor ?? "#fff2a8"}
-            onChange={(event) =>
-              setStyle((current) => ({ ...current, highlightColor: event.target.value }))
-            }
-            disabled={!editable || style.highlightColor === null}
-          />
+          >
+            <option value="">Aucun</option>
+            {legacyHighlightColor ? (
+              <option value={legacyHighlightColor}>Couleur existante</option>
+            ) : null}
+            {HIGHLIGHT_COLOR_PRESETS.map((preset) => (
+              <option key={preset.value} value={preset.value}>
+                {preset.label}
+              </option>
+            ))}
+          </select>
         </label>
         <div className="quoteStyleToggles">
           <button
