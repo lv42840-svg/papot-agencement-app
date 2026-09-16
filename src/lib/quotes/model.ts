@@ -27,6 +27,34 @@ export const quoteItemTextColorMarkSchema = z
   .strict()
   .refine((mark) => mark.end > mark.start, "QUOTE_TEXT_COLOR_MARK_INVALID");
 
+export const quoteRichTextRunStyleSchema = z
+  .object({
+    bold: z.boolean(),
+    italic: z.boolean(),
+    underline: z.boolean(),
+    textColor: quoteHexColorSchema.nullable(),
+    highlightColor: quoteHexColorSchema.nullable(),
+    fontSizePx: z.number().int().min(10).max(40).nullable(),
+  })
+  .strict();
+
+export const quoteRichTextRunSchema = z
+  .object({
+    text: z.string().min(1).max(4000),
+    style: quoteRichTextRunStyleSchema,
+  })
+  .strict();
+
+export const quoteRichTextSchema = z
+  .object({
+    runs: z.array(quoteRichTextRunSchema).max(500),
+  })
+  .strict()
+  .refine(
+    (richText) => richText.runs.reduce((length, run) => length + run.text.length, 0) <= 4000,
+    "QUOTE_RICH_TEXT_TOO_LONG",
+  );
+
 export const quoteItemFontFamilySchema = z.enum([
   "DEFAULT",
   "ARIAL",
@@ -68,6 +96,7 @@ export const quoteItemPhotoSchema = z
 export const quoteItemPresentationSchema = z
   .object({
     textStyle: quoteItemTextStyleSchema.optional(),
+    richText: quoteRichTextSchema.optional(),
     photos: z.array(quoteItemPhotoSchema).max(20).optional().default([]),
   })
   .strict();
@@ -197,6 +226,9 @@ export type QuoteLibrarySource = z.infer<typeof quoteLibrarySourceSchema>;
 export type QuoteItemFontFamily = z.infer<typeof quoteItemFontFamilySchema>;
 export type QuoteItemTextStyle = z.infer<typeof quoteItemTextStyleSchema>;
 export type QuoteItemTextColorMark = z.infer<typeof quoteItemTextColorMarkSchema>;
+export type QuoteRichTextRunStyle = z.infer<typeof quoteRichTextRunStyleSchema>;
+export type QuoteRichTextRun = z.infer<typeof quoteRichTextRunSchema>;
+export type QuoteRichText = z.infer<typeof quoteRichTextSchema>;
 export type QuoteItemPhoto = z.infer<typeof quoteItemPhotoSchema>;
 export type QuoteItemPresentation = z.infer<typeof quoteItemPresentationSchema>;
 export type QuoteSection = z.infer<typeof quoteSectionSchema>;
@@ -217,7 +249,6 @@ export function validateQuoteItemHierarchy(items: QuoteItem[]): void {
 
   for (const item of items) {
     if (item.kind === "SECTION") continue;
-
     if (item.kind === "SUBSECTION") {
       const parent = byId.get(item.parentId);
       if (!parent) throw new Error("QUOTE_ITEM_PARENT_NOT_FOUND");

@@ -13,8 +13,8 @@ const directEditor = readFileSync(
   new URL("../src/components/quote-direct-editor.tsx", import.meta.url),
   "utf-8",
 );
-const selectionToolbar = readFileSync(
-  new URL("../src/components/quote-inline-text-color-toolbar.tsx", import.meta.url),
+const richEditor = readFileSync(
+  new URL("../src/components/quote-rich-text-editor.tsx", import.meta.url),
   "utf-8",
 );
 
@@ -40,11 +40,13 @@ describe("quote client presentation UI", () => {
     expect(panel).toContain('accept="image/jpeg,image/png,image/webp"');
   });
 
-  it("mounts a compact selection color toolbar with preset colors", () => {
-    expect(directEditor).toContain("QuoteInlineTextColorToolbar");
-    expect(selectionToolbar).toContain('aria-label="Couleur du texte sélectionné"');
-    expect(selectionToolbar).toContain("QUOTE_INLINE_TEXT_COLOR_PRESETS");
-    expect(selectionToolbar).toContain('action: "updateItemPresentation"');
-    expect(selectionToolbar).toContain("textColorMarks");
+  it("mounts the rich text editor instead of the legacy selection color toolbar", () => {
+    expect(directEditor).toContain("QuoteRichTextLayer");
+    expect(directEditor).not.toContain("QuoteInlineTextColorToolbar");
+    expect(richEditor).toContain('aria-label="Couleur du texte"');
+    expect(richEditor).toContain("contentEditable");
+    expect(richEditor).toContain("<Bold");
+    expect(richEditor).toContain("<Italic");
+    expect(richEditor).toContain("<Underline");
   });
 });
