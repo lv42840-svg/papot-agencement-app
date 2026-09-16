@@ -2,7 +2,7 @@ import { execFileSync } from "node:child_process";
 import { mkdtempSync, readFileSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { basename, join } from "node:path";
-import { format } from "prettier";
+import { format, resolveConfig } from "prettier";
 import { describe, it } from "vitest";
 
 const files = [
@@ -12,12 +12,13 @@ const files = [
 ];
 
 describe("temporary prettier dump", () => {
-  it("prints exact formatting diffs", async () => {
+  it("prints exact formatting diffs with repository config", async () => {
     const tempRoot = mkdtempSync(join(tmpdir(), "papot-prettier-"));
 
     for (const path of files) {
       const source = readFileSync(path, "utf-8");
-      const formatted = await format(source, { parser: "typescript" });
+      const config = (await resolveConfig(path)) ?? {};
+      const formatted = await format(source, { ...config, filepath: path });
       const formattedPath = join(tempRoot, basename(path));
       writeFileSync(formattedPath, formatted, "utf-8");
 
