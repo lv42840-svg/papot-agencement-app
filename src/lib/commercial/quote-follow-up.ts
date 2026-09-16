@@ -10,6 +10,7 @@ export const COMMERCIAL_QUOTE_STATUS_LABELS: Record<CommercialQuoteDisplayStatus
   ACCEPTED: "Accepté",
   REJECTED: "Refusé",
   CANCELLED: "Annulé",
+  SUPERSEDED: "Version précédente",
 };
 
 export function commercialQuoteDisplayStatus(
