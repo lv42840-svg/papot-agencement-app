@@ -1,9 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { createInitialCommercialPayload } from "../src/lib/commercial/domain";
-import {
-  applyCommercialMutation,
-  commercialMutationSchema,
-} from "../src/lib/commercial/mutations";
+import { applyCommercialMutation, commercialMutationSchema } from "../src/lib/commercial/mutations";
 import { startQuoteCommercialWorkflow } from "../src/lib/quotes/commercial-bridge";
 import {
   createQuoteVariant,
@@ -12,10 +9,7 @@ import {
   quoteIsCurrentVersion,
 } from "../src/lib/quotes/lifecycle";
 import { applyQuotesMutation, quotesMutationSchema } from "../src/lib/quotes/mutations";
-import {
-  quoteRichTextFromPlainText,
-  quoteRichTextToPlainText,
-} from "../src/lib/quotes/rich-text";
+import { quoteRichTextFromPlainText, quoteRichTextToPlainText } from "../src/lib/quotes/rich-text";
 import { applyQuoteRichTextUpdate } from "../src/lib/quotes/rich-text-mutation";
 import {
   createInitialNativeQuotesPayload,
@@ -126,12 +120,7 @@ describe("quote global flow", () => {
     const reloaded = parseNativeQuotesPayload(JSON.parse(JSON.stringify(rich)));
     expect(texts(reloaded, v1)).toMatchObject({ plain: expected, rich: expected });
 
-    const versioned = createQuoteVersion(
-      reloaded,
-      v1,
-      actor,
-      new Date("2026-09-16T08:30:00.000Z"),
-    );
+    const versioned = createQuoteVersion(reloaded, v1, actor, new Date("2026-09-16T08:30:00.000Z"));
     const v2 = versioned.focusQuoteId;
     expect(versioned.payload.quotes.find((q) => q.id === v1)?.status).toBe("SUPERSEDED");
     expect(versioned.payload.quotes.find((q) => q.id === v2)).toMatchObject({
@@ -168,12 +157,7 @@ describe("quote global flow", () => {
     });
     expect(texts(variant.payload, variant.focusQuoteId).plain).toBe(expected);
 
-    const copy = duplicateQuote(
-      variant.payload,
-      v2,
-      actor,
-      new Date("2026-09-16T08:50:00.000Z"),
-    );
+    const copy = duplicateQuote(variant.payload, v2, actor, new Date("2026-09-16T08:50:00.000Z"));
     expect(copy.payload.quotes.find((q) => q.id === copy.focusQuoteId)).toMatchObject({
       variantName: "Copie de Base",
       version: 1,
