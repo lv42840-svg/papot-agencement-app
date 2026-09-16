@@ -20,6 +20,7 @@ const STATUS_LABELS = {
   ACCEPTED: "Accepté",
   REJECTED: "Refusé",
   CANCELLED: "Annulé",
+  SUPERSEDED: "Version précédente",
 } as const;
 
 export function QuotesWorkspace({
