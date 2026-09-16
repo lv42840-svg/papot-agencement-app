@@ -110,9 +110,7 @@ export function QuotePricingAdjustmentsEditor({
   const [value, setValue] = useState("5");
   const [hotelNights, setHotelNights] = useState("1");
   const [hotelPricePerNight, setHotelPricePerNight] = useState("120");
-  const [marginTreatment, setMarginTreatment] = useState<"MARGED" | "PASS_THROUGH">(
-    "PASS_THROUGH",
-  );
+  const [marginTreatment, setMarginTreatment] = useState<"MARGED" | "PASS_THROUGH">("PASS_THROUGH");
   const [applyToOptions, setApplyToOptions] = useState(true);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
