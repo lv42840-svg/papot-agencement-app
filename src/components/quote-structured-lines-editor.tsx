@@ -8,7 +8,20 @@ import {
   useMemo,
   useState,
 } from "react";
-import { Check, Copy, LockKeyhole, Pencil, Plus, RotateCcw, Search, Trash2, X } from "lucide-react";
+import {
+  Check,
+  Copy,
+  ImagePlus,
+  LockKeyhole,
+  Palette,
+  Pencil,
+  Plus,
+  RotateCcw,
+  Search,
+  Trash2,
+  X,
+} from "lucide-react";
+import { QuoteItemPresentationPanel } from "@/components/quote-item-presentation-panel";
 import type { LibraryComponent } from "@/lib/library/component";
 import {
   createInitialLibraryPayload,
@@ -35,6 +48,7 @@ import {
   type QuoteSubsection,
 } from "@/lib/quotes/model";
 import { buildQuoteItemNumbers } from "@/lib/quotes/numbering";
+import { quoteItemTextStyleToCss } from "@/lib/quotes/presentation";
 import type { QuoteItemPlacement } from "@/lib/quotes/item-reorder";
 import {
   calculateQuoteMarginFromSalePrice,
@@ -399,6 +413,7 @@ export function QuoteStructuredLinesEditor({
   const [duplicatingHeadingId, setDuplicatingHeadingId] = useState<string | null>(null);
   const [deletingItemId, setDeletingItemId] = useState<string | null>(null);
   const [togglingOptionItemId, setTogglingOptionItemId] = useState<string | null>(null);
+  const [presentationItemId, setPresentationItemId] = useState<string | null>(null);
   const [draggingItemId, setDraggingItemId] = useState<string | null>(null);
   const [reorderingItemId, setReorderingItemId] = useState<string | null>(null);
   const [dropTarget, setDropTarget] = useState<{
@@ -477,6 +492,7 @@ export function QuoteStructuredLinesEditor({
     setDuplicatingHeadingId(null);
     setDeletingItemId(null);
     setTogglingOptionItemId(null);
+    setPresentationItemId(null);
     setDraggingItemId(null);
     setReorderingItemId(null);
     setDropTarget(null);
@@ -1449,7 +1465,9 @@ export function QuoteStructuredLinesEditor({
         <div className="quoteMainRow quoteLineRow">
           <span className="quoteNumber">{numbers.get(line.id) ?? "—"}</span>
           <div className="quoteLineDescription">
-            <strong>{line.description}</strong>
+            <strong style={quoteItemTextStyleToCss(line.presentation?.textStyle)}>
+              {line.description}
+            </strong>
             <small>
               {lineComponents.length} composant{lineComponents.length === 1 ? "" : "s"}
             </small>
@@ -1515,6 +1533,31 @@ export function QuoteStructuredLinesEditor({
                 </button>
                 <button
                   type="button"
+                  className={`iconButton${presentationItemId === line.id ? " isActive" : ""}`}
+                  onClick={() =>
+                    setPresentationItemId((current) => (current === line.id ? null : line.id))
+                  }
+                  aria-label={`Mise en forme de ${line.description}`}
+                  title="Mise en forme client"
+                >
+                  <Palette size={14} aria-hidden="true" />
+                </button>
+                <button
+                  type="button"
+                  className={`iconButton quotePhotoButton${presentationItemId === line.id ? " isActive" : ""}`}
+                  onClick={() =>
+                    setPresentationItemId((current) => (current === line.id ? null : line.id))
+                  }
+                  aria-label={`Photos de ${line.description}`}
+                  title="Photos de la ligne"
+                >
+                  <ImagePlus size={14} aria-hidden="true" />
+                  {(line.presentation?.photos.length ?? 0) > 0 ? (
+                    <span>{line.presentation?.photos.length}</span>
+                  ) : null}
+                </button>
+                <button
+                  type="button"
                   className="iconButton"
                   onClick={() => void duplicateOuvrage(line)}
                   disabled={formOpen || headingEditor !== null || duplicatingLineId !== null}
@@ -1557,6 +1600,15 @@ export function QuoteStructuredLinesEditor({
             ) : null}
           </div>
         </div>
+        {presentationItemId === line.id ? (
+          <QuoteItemPresentationPanel
+            quoteId={quote!.id}
+            item={line}
+            editable={editable}
+            onSaved={onSaved}
+            onClose={() => setPresentationItemId(null)}
+          />
+        ) : null}
         <div className="quoteComponentsTable">
           <div className="quoteComponentsHeader">
             <span>Composant</span>
@@ -1855,88 +1907,125 @@ export function QuoteStructuredLinesEditor({
     const directOption = directOptionForItem(item.id);
 
     return (
-      <div
-        className={`quoteMainRow quoteHeadingRow quoteDraggableItem ${item.kind === "SECTION" ? "isSection" : "isSubsection"}${dropClass(item.id)}`}
-        key={item.id}
-        draggable={editable && !formOpen && headingEditor === null && reorderingItemId === null}
-        onDragStart={(event) => startItemDrag(event, item)}
-        onDragOver={(event) => dragItemOver(event, item)}
-        onDrop={(event) => dropItem(event, item)}
-        onDragEnd={finishItemDrag}
-        title={editable ? "Glisser-déposer pour déplacer ce bloc" : undefined}
-      >
-        <span className="quoteNumber">{numbers.get(item.id) ?? "—"}</span>
-        <strong>{item.title}</strong>
-        <span />
-        <span />
-        <span />
-        <span />
-        <span />
-        <div className="quoteRowActions">
-          {editable ? (
-            <>
-              <button
-                type="button"
-                className={`miniOptionButton${directOption ? " isActive" : ""}`}
-                onClick={() => void toggleItemOption(item)}
-                disabled={togglingOptionItemId !== null}
-                aria-label={
-                  directOption
-                    ? `Retirer ${item.title} des options`
-                    : `Mettre ${item.title} en option`
-                }
-                title={directOption ? "Retirer l’option" : "Mettre en option hors total"}
-              >
-                O
-              </button>
-              <button
-                type="button"
-                className="iconButton"
-                onClick={() => void duplicateHeading(item)}
-                disabled={
-                  formOpen ||
-                  headingEditor !== null ||
-                  duplicatingHeadingId !== null ||
-                  duplicatingLineId !== null
-                }
-                aria-label={`Dupliquer ${item.title}`}
-                title={item.kind === "SECTION" ? "Dupliquer le titre" : "Dupliquer le sous-titre"}
-              >
-                <Copy size={14} aria-hidden="true" />
-              </button>
-              <button
-                type="button"
-                className="iconButton"
-                onClick={() => openEditHeading(item)}
-                disabled={formOpen || headingEditor !== null || deletingItemId !== null}
-                aria-label={`Modifier ${item.title}`}
-                title="Modifier le titre"
-              >
-                <Pencil size={14} aria-hidden="true" />
-              </button>
-              <button
-                type="button"
-                className="iconButton quoteDeleteItemButton"
-                onClick={() => void deleteItem(item)}
-                disabled={
-                  formOpen ||
-                  headingEditor !== null ||
-                  duplicatingHeadingId !== null ||
-                  duplicatingLineId !== null ||
-                  deletingItemId !== null
-                }
-                aria-label={`Supprimer ${item.title}`}
-                title={
-                  item.kind === "SECTION"
-                    ? "Supprimer le titre et son contenu"
-                    : "Supprimer le sous-titre et son contenu"
-                }
-              >
-                <Trash2 size={14} aria-hidden="true" />
-              </button>
-            </>
-          ) : null}
+      <div className="quoteHeadingBlock" key={item.id}>
+        <div
+          className={`quoteMainRow quoteHeadingRow quoteDraggableItem ${item.kind === "SECTION" ? "isSection" : "isSubsection"}${dropClass(item.id)}`}
+          draggable={editable && !formOpen && headingEditor === null && reorderingItemId === null}
+          onDragStart={(event) => startItemDrag(event, item)}
+          onDragOver={(event) => dragItemOver(event, item)}
+          onDrop={(event) => dropItem(event, item)}
+          onDragEnd={finishItemDrag}
+          title={editable ? "Glisser-déposer pour déplacer ce bloc" : undefined}
+        >
+          <span className="quoteNumber">{numbers.get(item.id) ?? "—"}</span>
+          <strong style={quoteItemTextStyleToCss(item.presentation?.textStyle)}>
+            {item.title}
+          </strong>
+          <span />
+          <span />
+          <span />
+          <span />
+          <span />
+          <div className="quoteRowActions">
+            {editable ? (
+              <>
+                <button
+                  type="button"
+                  className={`miniOptionButton${directOption ? " isActive" : ""}`}
+                  onClick={() => void toggleItemOption(item)}
+                  disabled={togglingOptionItemId !== null}
+                  aria-label={
+                    directOption
+                      ? `Retirer ${item.title} des options`
+                      : `Mettre ${item.title} en option`
+                  }
+                  title={directOption ? "Retirer l’option" : "Mettre en option hors total"}
+                >
+                  O
+                </button>
+                <button
+                  type="button"
+                  className={`iconButton${presentationItemId === item.id ? " isActive" : ""}`}
+                  onClick={() =>
+                    setPresentationItemId((current) => (current === item.id ? null : item.id))
+                  }
+                  aria-label={`Mise en forme de ${item.title}`}
+                  title="Mise en forme client"
+                >
+                  <Palette size={14} aria-hidden="true" />
+                </button>
+                <button
+                  type="button"
+                  className={`iconButton quotePhotoButton${presentationItemId === item.id ? " isActive" : ""}`}
+                  onClick={() =>
+                    setPresentationItemId((current) => (current === item.id ? null : item.id))
+                  }
+                  aria-label={`Photos de ${item.title}`}
+                  title="Photos de la ligne"
+                >
+                  <ImagePlus size={14} aria-hidden="true" />
+                  {(item.presentation?.photos.length ?? 0) > 0 ? (
+                    <span>{item.presentation?.photos.length}</span>
+                  ) : null}
+                </button>
+                <button
+                  type="button"
+                  className="iconButton"
+                  onClick={() => void duplicateHeading(item)}
+                  disabled={
+                    formOpen ||
+                    headingEditor !== null ||
+                    duplicatingHeadingId !== null ||
+                    duplicatingLineId !== null
+                  }
+                  aria-label={`Dupliquer ${item.title}`}
+                  title={item.kind === "SECTION" ? "Dupliquer le titre" : "Dupliquer le sous-titre"}
+                >
+                  <Copy size={14} aria-hidden="true" />
+                </button>
+                <button
+                  type="button"
+                  className="iconButton"
+                  onClick={() => openEditHeading(item)}
+                  disabled={formOpen || headingEditor !== null || deletingItemId !== null}
+                  aria-label={`Modifier ${item.title}`}
+                  title="Modifier le titre"
+                >
+                  <Pencil size={14} aria-hidden="true" />
+                </button>
+                <button
+                  type="button"
+                  className="iconButton quoteDeleteItemButton"
+                  onClick={() => void deleteItem(item)}
+                  disabled={
+                    formOpen ||
+                    headingEditor !== null ||
+                    duplicatingHeadingId !== null ||
+                    duplicatingLineId !== null ||
+                    deletingItemId !== null
+                  }
+                  aria-label={`Supprimer ${item.title}`}
+                  title={
+                    item.kind === "SECTION"
+                      ? "Supprimer le titre et son contenu"
+                      : "Supprimer le sous-titre et son contenu"
+                  }
+                >
+                  <Trash2 size={14} aria-hidden="true" />
+                </button>
+              </>
+            ) : null}
+          </div>
         </div>
+        {presentationItemId === item.id ? (
+          <QuoteItemPresentationPanel
+            quoteId={quote!.id}
+            item={item}
+            editable={editable}
+            onSaved={onSaved}
+            onClose={() => setPresentationItemId(null)}
+          />
+        ) : null}
       </div>
     );
   }
@@ -2160,11 +2249,11 @@ export function QuoteStructuredLinesEditor({
         }
         .quoteMainRow {
           display: grid;
-          grid-template-columns: 44px minmax(250px, 1fr) 64px 56px 104px 100px 110px 170px;
+          grid-template-columns: 44px minmax(250px, 1fr) 64px 56px 104px 100px 110px 228px;
           gap: 8px;
           align-items: center;
           padding: 9px 14px;
-          min-width: 980px;
+          min-width: 1040px;
         }
         .quoteLinesTableHeader {
           min-height: 38px;
@@ -2181,7 +2270,7 @@ export function QuoteStructuredLinesEditor({
           font-variant-numeric: tabular-nums;
         }
         .quoteOuvrageGroup {
-          min-width: 980px;
+          min-width: 1040px;
           border-top: 1px solid var(--border);
         }
         .quoteOuvrageGroup:first-of-type {
@@ -2245,7 +2334,29 @@ export function QuoteStructuredLinesEditor({
         }
         .quoteRowActions {
           justify-content: flex-end;
-          gap: 5px;
+          gap: 4px;
+        }
+        .iconButton.isActive {
+          border-color: #8c78c7;
+          background: #e9e2fb;
+          color: #4f3c93;
+        }
+        .quotePhotoButton {
+          position: relative;
+        }
+        .quotePhotoButton span {
+          position: absolute;
+          right: -4px;
+          top: -5px;
+          min-width: 14px;
+          height: 14px;
+          padding: 0 3px;
+          border-radius: 999px;
+          background: #6554b5;
+          color: #fff;
+          font-size: 8px;
+          line-height: 14px;
+          text-align: center;
         }
         .quoteLineTotalCell {
           min-width: 0;
@@ -2504,6 +2615,193 @@ export function QuoteStructuredLinesEditor({
         .quoteHeadingEditing {
           background: #fff;
         }
+        .quotePresentationPanel {
+          margin: 0 18px 12px 70px;
+          padding: 12px;
+          border: 1px solid #d7cfed;
+          border-radius: 9px;
+          background: #fbfaff;
+        }
+        .quotePresentationHeader,
+        .quotePhotosTop,
+        .quoteStyleActions,
+        .quoteStyleToggles,
+        .quoteHighlightControl,
+        .quotePhotoMeta label {
+          display: flex;
+          align-items: center;
+        }
+        .quotePresentationHeader,
+        .quotePhotosTop {
+          justify-content: space-between;
+          gap: 12px;
+        }
+        .quotePresentationHeader > div,
+        .quotePhotosTop > div {
+          display: grid;
+          gap: 2px;
+        }
+        .quotePresentationHeader small,
+        .quotePhotosTop small {
+          color: var(--muted);
+          font-size: 9px;
+        }
+        .quoteStyleEditor {
+          display: grid;
+          grid-template-columns: minmax(130px, 1fr) 90px 90px minmax(150px, 1fr) auto minmax(
+              130px,
+              1fr
+            );
+          gap: 9px;
+          align-items: end;
+          margin-top: 10px;
+        }
+        .quoteStyleEditor > label {
+          display: grid;
+          gap: 4px;
+          color: var(--muted);
+          font-size: 9px;
+          font-weight: 800;
+          text-transform: uppercase;
+        }
+        .quoteStyleEditor select {
+          height: 30px;
+          border: 1px solid #d7cfed;
+          border-radius: 6px;
+          background: #fff;
+          color: var(--text);
+        }
+        .quoteColorControl input[type="color"],
+        .quoteHighlightControl input[type="color"] {
+          width: 38px;
+          height: 30px;
+          padding: 2px;
+          border: 1px solid #d7cfed;
+          border-radius: 6px;
+          background: #fff;
+        }
+        .quoteHighlightControl {
+          gap: 6px;
+          align-self: end;
+          height: 30px;
+        }
+        .quoteStyleToggles {
+          gap: 4px;
+        }
+        .quoteStyleToggles button {
+          width: 30px;
+          height: 30px;
+          display: grid;
+          place-items: center;
+          border: 1px solid #d7cfed;
+          border-radius: 6px;
+          background: #fff;
+          cursor: pointer;
+        }
+        .quoteStyleToggles button.isActive {
+          border-color: #8c78c7;
+          background: #e9e2fb;
+          color: #4f3c93;
+        }
+        .quoteStylePreview {
+          min-height: 30px;
+          display: flex;
+          align-items: center;
+          width: fit-content;
+        }
+        .quoteStyleActions {
+          grid-column: 1 / -1;
+          gap: 6px;
+        }
+        .quoteStyleActions button,
+        .quotePhotoAddButton {
+          display: inline-flex;
+          align-items: center;
+          gap: 5px;
+          min-height: 30px;
+          padding: 0 9px;
+          border: 1px solid #d7cfed;
+          border-radius: 6px;
+          background: #fff;
+          color: #6554b5;
+          font-size: 10px;
+          font-weight: 800;
+          cursor: pointer;
+        }
+        .quotePhotosPanel {
+          margin-top: 12px;
+          padding-top: 12px;
+          border-top: 1px solid #e4def2;
+        }
+        .quotePhotoAddButton input {
+          display: none;
+        }
+        .quotePhotosEmpty {
+          margin-top: 9px;
+          color: var(--muted);
+          font-size: 10px;
+        }
+        .quotePhotoGrid {
+          display: grid;
+          grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
+          gap: 8px;
+          margin-top: 9px;
+        }
+        .quotePhotoCard {
+          position: relative;
+          display: grid;
+          grid-template-columns: 78px 1fr;
+          gap: 8px;
+          align-items: center;
+          padding: 6px;
+          border: 1px solid #e4def2;
+          border-radius: 7px;
+          background: #fff;
+        }
+        .quotePhotoCard img {
+          width: 78px;
+          height: 58px;
+          object-fit: cover;
+          border-radius: 5px;
+          background: #f3f1f8;
+        }
+        .quotePhotoMeta {
+          min-width: 0;
+          display: grid;
+          gap: 7px;
+        }
+        .quotePhotoMeta strong {
+          overflow: hidden;
+          text-overflow: ellipsis;
+          white-space: nowrap;
+          font-size: 10px;
+        }
+        .quotePhotoMeta label {
+          gap: 5px;
+          font-size: 9px;
+          font-weight: 700;
+        }
+        .quotePhotoDelete {
+          position: absolute;
+          right: 4px;
+          top: 4px;
+          width: 24px;
+          height: 24px;
+          display: grid;
+          place-items: center;
+          padding: 0;
+          border: 1px solid #ead0d0;
+          border-radius: 6px;
+          background: #fff;
+          color: #a53d3d;
+          cursor: pointer;
+        }
+        .quotePresentationError {
+          margin-top: 9px;
+          color: #a53d3d;
+          font-size: 10px;
+          font-weight: 700;
+        }
         .quoteCommentRow {
           border-top: 1px solid var(--border);
           font-size: 11px;
@@ -2546,7 +2844,7 @@ export function QuoteStructuredLinesEditor({
           }
           .quoteMainRow,
           .quoteOuvrageGroup {
-            min-width: 980px;
+            min-width: 1040px;
           }
           .quoteComponentsTable {
             min-width: 780px;

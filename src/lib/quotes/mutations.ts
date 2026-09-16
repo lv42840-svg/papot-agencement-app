@@ -10,6 +10,7 @@ import {
   calculateQuoteOuvrageUnitPriceCents,
   parseQuoteModel,
   quoteDateSchema,
+  quoteItemTextStyleSchema,
   type QuoteItem,
   type QuoteLibraryComponentSource,
   type QuoteLine,
@@ -109,6 +110,13 @@ const deleteItemMutationSchema = z.object({
   itemId: z.string().uuid(),
 });
 
+const updateItemPresentationMutationSchema = z.object({
+  action: z.literal("updateItemPresentation"),
+  quoteId: z.string().uuid(),
+  itemId: z.string().uuid(),
+  textStyle: quoteItemTextStyleSchema.nullable(),
+});
+
 const upsertSectionMutationSchema = z.object({
   action: z.literal("upsertSection"),
   quoteId: z.string().uuid(),
@@ -134,6 +142,7 @@ export const quotesMutationSchema = z.discriminatedUnion("action", [
   moveHeadingMutationSchema,
   duplicateHeadingMutationSchema,
   deleteItemMutationSchema,
+  updateItemPresentationMutationSchema,
   upsertSectionMutationSchema,
   upsertSubsectionMutationSchema,
 ]);
@@ -271,6 +280,13 @@ function saveDraftLine(
   return saveDraftItem(payload, quoteIndex, line, existingIndex, actor, now);
 }
 
+function clonePresentationForDuplicate(
+  presentation: QuoteItem["presentation"],
+): QuoteItem["presentation"] {
+  if (!presentation?.textStyle) return undefined;
+  return { textStyle: structuredClone(presentation.textStyle), photos: [] };
+}
+
 function duplicateDraftLine(
   payload: NativeQuotesPayload,
   input: Extract<QuotesMutation, { action: "duplicateLine" }>,
@@ -287,6 +303,7 @@ function duplicateDraftLine(
   const duplicatedLine: QuoteLine = {
     ...structuredClone(existingLine),
     id: globalThis.crypto.randomUUID(),
+    presentation: clonePresentationForDuplicate(existingLine.presentation),
     components: (existingLine.components ?? []).map((component) => ({
       ...structuredClone(component),
       id: globalThis.crypto.randomUUID(),
@@ -446,7 +463,11 @@ function duplicateDraftHeading(
     if (!id) throw new Error("QUOTE_HEADING_DUPLICATION_FAILED");
 
     if (item.kind === "SECTION") {
-      return { ...structuredClone(item), id };
+      return {
+        ...structuredClone(item),
+        id,
+        presentation: clonePresentationForDuplicate(item.presentation),
+      };
     }
 
     if (item.kind === "SUBSECTION") {
@@ -454,6 +475,7 @@ function duplicateDraftHeading(
         ...structuredClone(item),
         id,
         parentId: newIds.get(item.parentId) ?? item.parentId,
+        presentation: clonePresentationForDuplicate(item.presentation),
       };
     }
 
@@ -463,6 +485,7 @@ function duplicateDraftHeading(
         ...structuredClone(item),
         id,
         parentId,
+        presentation: clonePresentationForDuplicate(item.presentation),
         components: item.components?.map((component) => ({
           ...structuredClone(component),
           id: globalThis.crypto.randomUUID(),
@@ -470,7 +493,12 @@ function duplicateDraftHeading(
       };
     }
 
-    return { ...structuredClone(item), id, parentId };
+    return {
+      ...structuredClone(item),
+      id,
+      parentId,
+      presentation: clonePresentationForDuplicate(item.presentation),
+    };
   });
 
   const items = [
@@ -545,6 +573,28 @@ function moveDraftHeading(
   return { payload, focusQuoteId: updated.id };
 }
 
+function updateDraftItemPresentation(
+  payload: NativeQuotesPayload,
+  input: Extract<QuotesMutation, { action: "updateItemPresentation" }>,
+  actor: QuotesActor,
+  now: Date,
+): QuotesMutationResult {
+  const { quoteIndex, quote } = findDraftQuote(payload, input.quoteId);
+  const itemIndex = quote.model.items.findIndex((item) => item.id === input.itemId);
+  if (itemIndex < 0) throw new Error("QUOTE_ITEM_NOT_FOUND");
+
+  const item = structuredClone(quote.model.items[itemIndex]);
+  const photos = item.presentation?.photos ?? [];
+  if (input.textStyle === null) {
+    if (photos.length > 0) item.presentation = { photos };
+    else delete item.presentation;
+  } else {
+    item.presentation = { textStyle: input.textStyle, photos };
+  }
+
+  return saveDraftItem(payload, quoteIndex, item, itemIndex, actor, now);
+}
+
 function upsertDraftHeading(
   payload: NativeQuotesPayload,
   input: Extract<QuotesMutation, { action: "upsertSection" | "upsertSubsection" }>,
@@ -563,6 +613,9 @@ function upsertDraftHeading(
     if (existing.kind !== expectedKind) throw new Error("QUOTE_HEADING_NOT_FOUND");
   }
 
+  const existingPresentation =
+    existingIndex >= 0 ? quote.model.items[existingIndex].presentation : undefined;
+
   if (input.action === "upsertSection") {
     return saveDraftItem(
       payload,
@@ -572,6 +625,7 @@ function upsertDraftHeading(
         kind: "SECTION",
         parentId: null,
         title: input.title,
+        ...(existingPresentation ? { presentation: existingPresentation } : {}),
       },
       existingIndex,
       actor,
@@ -590,6 +644,7 @@ function upsertDraftHeading(
       kind: "SUBSECTION",
       parentId: input.parentId,
       title: input.title,
+      ...(existingPresentation ? { presentation: existingPresentation } : {}),
     },
     existingIndex,
     actor,
@@ -621,6 +676,7 @@ function upsertDraftLine(
     quantityFormula: parsedQuantity.formula,
     unitPriceCents: input.unitPriceCents,
     components: [],
+    ...(existingLine?.presentation ? { presentation: existingLine.presentation } : {}),
     ...(librarySource
       ? { librarySource }
       : existingLine?.librarySource
@@ -702,6 +758,7 @@ function upsertDraftOuvrage(
     unitPriceCents: forcedUnitPriceCents ?? automaticUnitPriceCents,
     ...(forcedUnitPriceCents !== undefined ? { forcedUnitPriceCents } : {}),
     components,
+    ...(existingLine?.presentation ? { presentation: existingLine.presentation } : {}),
     ...(existingLine?.librarySource ? { librarySource: existingLine.librarySource } : {}),
   };
 
@@ -741,6 +798,9 @@ export function applyQuotesMutation(
   }
   if (input.action === "deleteItem") {
     return deleteDraftItem(payload, input, actor, now);
+  }
+  if (input.action === "updateItemPresentation") {
+    return updateDraftItemPresentation(payload, input, actor, now);
   }
   if (input.action === "upsertOuvrage") {
     return upsertDraftOuvrage(payload, input, actor, now, libraryComponentSources);
