@@ -10,7 +10,6 @@ import { QuoteInternalNotesEditor } from "@/components/quote-internal-notes-edit
 import { QuoteLifecycleActions } from "@/components/quote-lifecycle-actions";
 import { QuotePricingAdjustmentsEditor } from "@/components/quote-pricing-adjustments-editor";
 import { QuoteRichTextLayer } from "@/components/quote-rich-text-layer";
-import { QuoteSendAction } from "@/components/quote-send-action";
 import { QuoteStructuredLinesRichEditor } from "@/components/quote-structured-lines-rich-editor";
 import { calculateQuoteAdjustedPricing } from "@/lib/quotes/adjustments";
 import type { NativeQuoteRecord, NativeQuotesPayload } from "@/lib/quotes/store";
@@ -91,7 +90,6 @@ export function QuoteDirectEditor({
               <ArrowLeft size={14} /> Tous les devis
             </Link>
             <QuoteComponentCheck quote={quote} />
-            <QuoteSendAction quote={quote} canWrite={canWrite} onSaved={setPayload} />
           </div>
         }
       />
