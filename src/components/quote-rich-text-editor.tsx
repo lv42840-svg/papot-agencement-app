@@ -8,6 +8,7 @@ import {
   EMPTY_QUOTE_RICH_TEXT_STYLE,
   normalizeQuoteRichText,
   quoteRichTextHasUniformBooleanStyle,
+  quoteRichTextSelectionStyle,
 } from "@/lib/quotes/rich-text";
 
 type SelectionOffsets = { start: number; end: number };
@@ -20,6 +21,14 @@ type Props = {
 };
 
 const FONT_SIZES = [10, 11, 12, 13, 14, 15, 16, 18, 20, 22, 24, 28, 32, 36, 40];
+const HIGHLIGHT_COLOR = "#fff2a8";
+const TEXT_COLORS = [
+  { label: "Noir", value: "#111827" },
+  { label: "Violet PAPOT", value: "#6554b5" },
+  { label: "Bleu", value: "#2563eb" },
+  { label: "Vert", value: "#15803d" },
+  { label: "Rouge", value: "#b42318" },
+] as const;
 
 function styleToCss(style: QuoteRichTextRunStyle) {
   return {
@@ -198,6 +207,9 @@ export function QuoteRichTextEditor({ value, onChange, ariaLabel, maxLength }: P
 
   const hasSelection = selection.end > selection.start;
   const current = value;
+  const selectionStyle = hasSelection
+    ? quoteRichTextSelectionStyle(current, selection.start, selection.end)
+    : null;
   const boldActive =
     hasSelection &&
     quoteRichTextHasUniformBooleanStyle(current, selection.start, selection.end, "bold");
@@ -207,6 +219,7 @@ export function QuoteRichTextEditor({ value, onChange, ariaLabel, maxLength }: P
   const underlineActive =
     hasSelection &&
     quoteRichTextHasUniformBooleanStyle(current, selection.start, selection.end, "underline");
+  const highlightActive = selectionStyle?.highlightColor?.toLowerCase() === HIGHLIGHT_COLOR;
 
   return (
     <div className="quoteRichEditorShell">
@@ -267,29 +280,38 @@ export function QuoteRichTextEditor({ value, onChange, ariaLabel, maxLength }: P
           </select>
         </label>
 
-        <label className="quoteRichColor" title="Couleur du texte">
-          <span>A</span>
-          <input
-            type="color"
-            defaultValue="#111827"
-            disabled={!hasSelection}
-            onPointerDown={rememberSelection}
-            onChange={(event) => applyPatch({ textColor: event.target.value })}
-            aria-label="Couleur du texte"
-          />
-        </label>
+        <span className="quoteRichDivider" aria-hidden="true" />
 
-        <label className="quoteRichColor" title="Surlignage">
+        <div className="quoteRichPalette" role="group" aria-label="Couleur du texte">
+          <span>Couleur</span>
+          {TEXT_COLORS.map((color) => (
+            <button
+              key={color.value}
+              type="button"
+              className="quoteRichSwatch"
+              style={{ backgroundColor: color.value }}
+              disabled={!hasSelection}
+              title={color.label}
+              aria-label={`Couleur ${color.label}`}
+              onMouseDown={(event) => event.preventDefault()}
+              onClick={() => applyPatch({ textColor: color.value })}
+            />
+          ))}
+        </div>
+
+        <button
+          type="button"
+          className={highlightActive ? "isActive" : ""}
+          disabled={!hasSelection}
+          aria-pressed={highlightActive}
+          title="Surlignage jaune"
+          onMouseDown={(event) => event.preventDefault()}
+          onClick={() =>
+            applyPatch({ highlightColor: highlightActive ? null : HIGHLIGHT_COLOR })
+          }
+        >
           <Highlighter size={14} aria-hidden="true" />
-          <input
-            type="color"
-            defaultValue="#fff2a8"
-            disabled={!hasSelection}
-            onPointerDown={rememberSelection}
-            onChange={(event) => applyPatch({ highlightColor: event.target.value })}
-            aria-label="Couleur de surlignage"
-          />
-        </label>
+        </button>
 
         <button
           type="button"
@@ -344,22 +366,22 @@ export function QuoteRichTextEditor({ value, onChange, ariaLabel, maxLength }: P
         .quoteRichEditorShell {
           overflow: hidden;
           border: 1px solid #cfc6eb;
-          border-radius: 9px;
+          border-radius: 7px;
           background: #fff;
-          box-shadow: 0 12px 30px rgba(58, 45, 105, 0.13);
         }
         .quoteRichToolbar {
-          min-height: 38px;
+          min-height: 36px;
           display: flex;
           align-items: center;
+          flex-wrap: wrap;
           gap: 4px;
-          padding: 5px 7px;
+          padding: 4px 6px;
           border-bottom: 1px solid #e7e1f5;
           background: #f8f6fd;
         }
         .quoteRichToolbar button,
         .quoteRichSize,
-        .quoteRichColor {
+        .quoteRichPalette {
           min-height: 28px;
           border: 1px solid transparent;
           border-radius: 6px;
@@ -380,7 +402,6 @@ export function QuoteRichTextEditor({ value, onChange, ariaLabel, maxLength }: P
           color: #604bb5;
         }
         .quoteRichToolbar button:disabled,
-        .quoteRichToolbar label:has(input:disabled),
         .quoteRichToolbar label:has(select:disabled) {
           opacity: 0.42;
         }
@@ -391,7 +412,7 @@ export function QuoteRichTextEditor({ value, onChange, ariaLabel, maxLength }: P
           background: #ddd6ef;
         }
         .quoteRichSize,
-        .quoteRichColor {
+        .quoteRichPalette {
           display: inline-flex;
           align-items: center;
           gap: 5px;
@@ -407,17 +428,22 @@ export function QuoteRichTextEditor({ value, onChange, ariaLabel, maxLength }: P
           font: inherit;
           color: inherit;
         }
-        .quoteRichColor input {
-          width: 23px;
+        .quoteRichPalette .quoteRichSwatch {
+          width: 20px;
+          min-height: 20px;
           height: 20px;
           padding: 0;
-          border: 0;
-          background: transparent;
-          cursor: pointer;
+          border: 2px solid #fff;
+          border-radius: 999px;
+          box-shadow: 0 0 0 1px #bcb4d7;
+        }
+        .quoteRichPalette .quoteRichSwatch:hover:not(:disabled) {
+          border-color: #fff;
+          box-shadow: 0 0 0 2px #7867bb;
         }
         .quoteRichEditable {
-          min-height: 42px;
-          padding: 10px 12px;
+          min-height: 38px;
+          padding: 8px 10px;
           outline: none;
           white-space: pre-wrap;
           overflow-wrap: anywhere;
