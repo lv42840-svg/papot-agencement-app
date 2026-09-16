@@ -20,17 +20,6 @@ type Props = {
 
 type ApiResponse = { payload?: NativeQuotesPayload; error?: string };
 
-const TEXT_COLOR_PRESETS = [
-  { label: "Noir", value: "#111827" },
-  { label: "Gris", value: "#475569" },
-  { label: "Lavande", value: "#6554b5" },
-  { label: "Bleu", value: "#2563eb" },
-  { label: "Vert", value: "#15803d" },
-  { label: "Rouge", value: "#b91c1c" },
-  { label: "Orange", value: "#c2410c" },
-  { label: "Brun", value: "#7c2d12" },
-] as const;
-
 const HIGHLIGHT_COLOR_PRESETS = [
   { label: "Jaune", value: "#fff2a8" },
   { label: "Lavande", value: "#ede9fe" },
@@ -163,9 +152,6 @@ export function QuoteItemPresentationPanel({ quoteId, item, editable, onSaved, o
 
   const photos = item.presentation?.photos ?? [];
   const label = itemLabel(item);
-  const legacyTextColor = TEXT_COLOR_PRESETS.some((preset) => preset.value === style.textColor)
-    ? null
-    : style.textColor;
   const legacyHighlightColor =
     style.highlightColor &&
     !HIGHLIGHT_COLOR_PRESETS.some((preset) => preset.value === style.highlightColor)
@@ -216,23 +202,6 @@ export function QuoteItemPresentationPanel({ quoteId, item, editable, onSaved, o
             {[10, 11, 12, 13, 14, 15, 16, 18, 20, 22, 24, 28, 32, 36, 40].map((size) => (
               <option key={size} value={size}>
                 {size}px
-              </option>
-            ))}
-          </select>
-        </label>
-        <label className="quoteColorControl">
-          Couleur
-          <select
-            value={style.textColor}
-            onChange={(event) =>
-              setStyle((current) => ({ ...current, textColor: event.target.value }))
-            }
-            disabled={!editable}
-          >
-            {legacyTextColor ? <option value={legacyTextColor}>Couleur existante</option> : null}
-            {TEXT_COLOR_PRESETS.map((preset) => (
-              <option key={preset.value} value={preset.value}>
-                {preset.label}
               </option>
             ))}
           </select>
