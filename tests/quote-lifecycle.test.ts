@@ -47,12 +47,7 @@ describe("quote lifecycle", () => {
   it("cree V2 en copie complete et verrouille V1 comme version precedente", () => {
     const source = draft();
     const firstId = source.quotes[0].id;
-    const result = createQuoteVersion(
-      source,
-      firstId,
-      actor,
-      new Date("2026-09-16T13:00:00.000Z"),
-    );
+    const result = createQuoteVersion(source, firstId, actor, new Date("2026-09-16T13:00:00.000Z"));
     const previous = result.payload.quotes.find((quote) => quote.id === firstId);
     const current = result.payload.quotes.find((quote) => quote.id === result.focusQuoteId);
 
@@ -97,11 +92,7 @@ describe("quote lifecycle", () => {
     const result = duplicateQuote(source, source.quotes[0].id, actor);
     const copy = result.payload.quotes.find((quote) => quote.id === result.focusQuoteId);
 
-    expect(copy).toMatchObject({
-      variantName: "Copie de Base",
-      version: 1,
-      status: "DRAFT",
-    });
+    expect(copy).toMatchObject({ variantName: "Copie de Base", version: 1, status: "DRAFT" });
     expect(copy?.pricingConfig).toEqual(source.quotes[0].pricingConfig);
   });
 });
