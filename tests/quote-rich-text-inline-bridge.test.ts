@@ -16,7 +16,7 @@ describe("quote rich text inline bridge", () => {
 
   it("keeps the business form synchronized with the rich editor", () => {
     expect(bridge).toContain(
-      "Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, \"value\")",
+      'Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, "value")',
     );
     expect(bridge).toContain('new Event("input", { bubbles: true })');
     expect(bridge).toContain("quoteRichTextToPlainText(next)");
