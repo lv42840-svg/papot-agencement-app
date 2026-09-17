@@ -9,7 +9,10 @@ import {
   type QuoteDocumentDataMappingInput,
   type QuoteDocumentDataSources,
 } from "./document-data-mapping";
-import { buildQuoteWordV2ScalarData, type QuoteDocumentData } from "./document-data";
+import {
+  buildQuoteWordV2ScalarData,
+  type QuoteDocumentData,
+} from "./document-data";
 import {
   renderQuoteWordV2Photos,
   type QuoteWordV2PhotoLoader,
@@ -32,11 +35,15 @@ export type GeneratedQuoteWordV2Docx = {
 
 function unresolvedTemplateTokens(docx: Uint8Array): string[] {
   const wordXml = readZipArchive(docx)
-    .filter((entry) => entry.name.startsWith("word/") && entry.name.endsWith(".xml"))
+    .filter(
+      (entry) => entry.name.startsWith("word/") && entry.name.endsWith(".xml"),
+    )
     .map((entry) => Buffer.from(entry.data).toString("utf8"))
     .join("\n");
 
-  return Array.from(new Set(wordXml.match(/\{\{[A-Za-z0-9_]+\}\}/g) ?? [])).sort();
+  return Array.from(
+    new Set(wordXml.match(/\{\{[A-Za-z0-9_]+\}\}/g) ?? []),
+  ).sort();
 }
 
 function assertBalancedWordXml(xml: string, partName: string): void {
@@ -45,7 +52,8 @@ function assertBalancedWordXml(xml: string, partName: string): void {
 
   for (const match of xml.matchAll(tagPattern)) {
     const tag = match[0];
-    if (tag.startsWith("<?") || tag.startsWith("<!") || tag.endsWith("/>")) continue;
+    if (tag.startsWith("<?") || tag.startsWith("<!") || tag.endsWith("/>"))
+      continue;
     const closing = tag.startsWith("</");
     const name = tag.match(/^<\/?([A-Za-z_][A-Za-z0-9_.:-]*)/)?.[1];
     if (!name) continue;
@@ -57,7 +65,9 @@ function assertBalancedWordXml(xml: string, partName: string): void {
 
     const open = stack.pop();
     if (open !== name) {
-      throw new Error(`QUOTE_WORD_V2_XML_UNBALANCED:${partName}:${open ?? "NONE"}:${name}`);
+      throw new Error(
+        `QUOTE_WORD_V2_XML_UNBALANCED:${partName}:${open ?? "NONE"}:${name}`,
+      );
     }
   }
 
@@ -74,7 +84,10 @@ function removeStylesRelationship(xml: string): string {
 }
 
 function removeStylesContentType(xml: string): string {
-  return xml.replace(/<Override\b[^>]*\bPartName="\/word\/styles\.xml"[^>]*\/>/g, "");
+  return xml.replace(
+    /<Override\b[^>]*\bPartName="\/word\/styles\.xml"[^>]*\/>/g,
+    "",
+  );
 }
 
 function withoutCorruptLegacyStyles(docx: Uint8Array): Uint8Array {
@@ -87,7 +100,10 @@ function withoutCorruptLegacyStyles(docx: Uint8Array): Uint8Array {
       normalized.push(
         cloneZipEntryWithData(
           entry,
-          Buffer.from(removeStylesRelationship(Buffer.from(entry.data).toString("utf8")), "utf8"),
+          Buffer.from(
+            removeStylesRelationship(Buffer.from(entry.data).toString("utf8")),
+            "utf8",
+          ),
         ),
       );
       continue;
@@ -96,7 +112,10 @@ function withoutCorruptLegacyStyles(docx: Uint8Array): Uint8Array {
       normalized.push(
         cloneZipEntryWithData(
           entry,
-          Buffer.from(removeStylesContentType(Buffer.from(entry.data).toString("utf8")), "utf8"),
+          Buffer.from(
+            removeStylesContentType(Buffer.from(entry.data).toString("utf8")),
+            "utf8",
+          ),
         ),
       );
       continue;
@@ -109,11 +128,14 @@ function withoutCorruptLegacyStyles(docx: Uint8Array): Uint8Array {
 
 export function assertQuoteWordV2FilledDocx(docx: Uint8Array): void {
   const entries = readZipArchive(docx);
-  const document = entries.find((entry) => entry.name === "word/document.xml");
+  const document = entries.find(
+    (entry) => entry.name === "word/document.xml",
+  );
   if (!document) throw new Error("QUOTE_WORD_V2_DOCUMENT_XML_MISSING");
 
   for (const entry of entries) {
-    if (!entry.name.endsWith(".xml") && !entry.name.endsWith(".rels")) continue;
+    if (!entry.name.endsWith(".xml") && !entry.name.endsWith(".rels"))
+      continue;
     assertBalancedWordXml(Buffer.from(entry.data).toString("utf8"), entry.name);
   }
 
@@ -130,7 +152,10 @@ function renderQuoteWordV2Core(
 ): Uint8Array {
   assertQuoteWordV2TemplateContract(template);
 
-  let rendered = renderQuoteWordV2Scalars(template, buildQuoteWordV2ScalarData(document));
+  let rendered = renderQuoteWordV2Scalars(
+    template,
+    buildQuoteWordV2ScalarData(document),
+  );
   rendered = renderQuoteWordV2Body(rendered, document);
   rendered = renderQuoteWordV2Options(rendered, document);
   rendered = renderQuoteWordV2Vat(rendered, document);
@@ -156,7 +181,10 @@ export async function renderQuoteWordV2FilledDocxWithPhotos(
   document: QuoteDocumentData,
   photoLoader: QuoteWordV2PhotoLoader,
 ): Promise<Uint8Array> {
-  const photoCount = document.items.reduce((sum, item) => sum + item.clientPhotos.length, 0);
+  const photoCount = document.items.reduce(
+    (sum, item) => sum + item.clientPhotos.length,
+    0,
+  );
   if (photoCount === 0) return renderQuoteWordV2FilledDocx(template, document);
 
   let rendered = renderQuoteWordV2Core(template, document, true);
