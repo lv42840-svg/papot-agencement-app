@@ -2,10 +2,7 @@ import { readFileSync } from "node:fs";
 import { mkdir, writeFile } from "node:fs/promises";
 import path from "node:path";
 import { describe, expect, it } from "vitest";
-import {
-  comparePdfVisualRenders,
-  renderPdfToPngPages,
-} from "../src/lib/documents/pdf-runtime";
+import { comparePdfVisualRenders, renderPdfToPngPages } from "../src/lib/documents/pdf-runtime";
 import { renderQuoteWordV2FilledDocx } from "../src/lib/quotes/word-v2-filled-docx";
 import { renderQuoteWordV2Pdf } from "../src/lib/quotes/word-v2-pdf";
 import { makeQuoteWordV2TestDocument } from "./fixtures/quote-word-v2-document";
