@@ -25,7 +25,7 @@ function makeDocument(): QuoteDocumentData {
         vatCents: 2000,
       },
     ],
-  } as QuoteDocumentData;
+  } as unknown as QuoteDocumentData;
 }
 
 function templateCell(text = ""): string {
