@@ -409,12 +409,13 @@ export function replaceQuoteBodyAnchor(documentXml: string, document: QuoteDocum
   return `${documentXml.slice(0, rowStart)}${rows}${documentXml.slice(rowEnd)}`;
 }
 
-export function replaceQuoteOptionsAnchor(documentXml: string, document: QuoteDocumentData): string {
+export function replaceQuoteOptionsAnchor(
+  documentXml: string,
+  document: QuoteDocumentData,
+): string {
   const anchorIndex = documentXml.indexOf(QUOTE_OPTIONS_ANCHOR);
   if (anchorIndex < 0) throw new Error("QUOTE_WORD_V2_OPTIONS_ANCHOR_MISSING");
-  if (
-    documentXml.indexOf(QUOTE_OPTIONS_ANCHOR, anchorIndex + QUOTE_OPTIONS_ANCHOR.length) >= 0
-  ) {
+  if (documentXml.indexOf(QUOTE_OPTIONS_ANCHOR, anchorIndex + QUOTE_OPTIONS_ANCHOR.length) >= 0) {
     throw new Error("QUOTE_WORD_V2_OPTIONS_ANCHOR_DUPLICATE");
   }
 
