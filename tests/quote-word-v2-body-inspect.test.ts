@@ -19,28 +19,42 @@ function cellText(cellXml: string): string {
     .join("");
 }
 
+function rowSummary(row: string) {
+  const cells = Array.from(row.matchAll(/<w:tc\b[\s\S]*?<\/w:tc>/g), (match) => match[0]);
+  return {
+    cellCount: cells.length,
+    cells: cells.map((cell, index) => ({
+      index,
+      text: cellText(cell),
+      gridSpan: cell.match(/<w:gridSpan w:val="(\d+)"\s*\/>/)?.[1] ?? null,
+      width: cell.match(/<w:tcW w:w="(\d+)" w:type="([^"]+)"\s*\/>/)?.slice(1) ?? null,
+    })),
+    rowProperties: row.match(/<w:trPr>[\s\S]*?<\/w:trPr>/)?.[0] ?? null,
+  };
+}
+
 describe("inspection temporaire Word V2 body", () => {
-  it("affiche la vraie ligne contenant PAPOT_QUOTE_BODY", () => {
+  it("affiche l’en-tête et la vraie ligne contenant PAPOT_QUOTE_BODY", () => {
     const template = readFileSync(templatePath);
     const documentEntry = readZipArchive(template).find((entry) => entry.name === "word/document.xml");
     expect(documentEntry).toBeDefined();
     const xml = Buffer.from(documentEntry!.data).toString("utf8");
     const anchorIndex = xml.indexOf("PAPOT_QUOTE_BODY");
     expect(anchorIndex).toBeGreaterThanOrEqual(0);
+
     const rowStart = xml.lastIndexOf("<w:tr", anchorIndex);
     const rowEnd = xml.indexOf("</w:tr>", anchorIndex) + "</w:tr>".length;
-    const row = xml.slice(rowStart, rowEnd);
-    const cells = Array.from(row.matchAll(/<w:tc\b[\s\S]*?<\/w:tc>/g), (match) => match[0]);
-    const summary = {
-      cellCount: cells.length,
-      cells: cells.map((cell, index) => ({
-        index,
-        text: cellText(cell),
-        gridSpan: cell.match(/<w:gridSpan w:val="(\d+)"\s*\/>/)?.[1] ?? null,
-        width: cell.match(/<w:tcW w:w="(\d+)" w:type="([^"]+)"\s*\/>/)?.slice(1) ?? null,
-      })),
-      rowProperties: row.match(/<w:trPr>[\s\S]*?<\/w:trPr>/)?.[0] ?? null,
-    };
-    throw new Error(`PAPOT_QUOTE_BODY_ROW:${JSON.stringify(summary)}`);
+    const anchorRow = xml.slice(rowStart, rowEnd);
+
+    const previousRowEnd = xml.lastIndexOf("</w:tr>", rowStart) + "</w:tr>".length;
+    const previousRowStart = xml.lastIndexOf("<w:tr", previousRowEnd - "</w:tr>".length - 1);
+    const previousRow = xml.slice(previousRowStart, previousRowEnd);
+
+    throw new Error(
+      `PAPOT_QUOTE_BODY_LAYOUT:${JSON.stringify({
+        previousRow: rowSummary(previousRow),
+        anchorRow: rowSummary(anchorRow),
+      })}`,
+    );
   });
 });
