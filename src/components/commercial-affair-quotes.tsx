@@ -126,6 +126,7 @@ export function CommercialAffairQuotes({ item }: { item: CommercialCase }) {
                   <div>
                     <strong>{quote.model.subject}</strong>
                     <span>
+                      {quote.finalPdf ? `${quote.finalPdf.quoteNumber} · ` : ""}
                       {quote.variantName} · V{quote.version} · {dateLabel(quote.model.issueDate)}
                     </span>
                   </div>
