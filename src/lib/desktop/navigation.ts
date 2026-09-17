@@ -37,7 +37,7 @@ export const desktopNavigation: DesktopNavigationItem[] = [
   {
     label: "Paramètres",
     icon: "settings",
-    href: "/settings/users",
+    href: "/settings/company",
     moduleKey: "settings",
     adminOnly: true,
   },
