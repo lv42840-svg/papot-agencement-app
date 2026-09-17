@@ -7,6 +7,7 @@ import { QuoteComponentCheck } from "@/components/quote-component-check";
 import { QuoteFixedSummary } from "@/components/quote-fixed-summary";
 import { QuoteGeneralInfoEditor } from "@/components/quote-general-info-editor";
 import { QuoteInternalNotesEditor } from "@/components/quote-internal-notes-editor";
+import { QuoteLegalDetailsEditor } from "@/components/quote-legal-details-editor";
 import { QuoteLifecycleActions } from "@/components/quote-lifecycle-actions";
 import { QuotePricingAdjustmentsEditor } from "@/components/quote-pricing-adjustments-editor";
 import { QuoteRichTextLayer } from "@/components/quote-rich-text-layer";
@@ -77,6 +78,8 @@ export function QuoteDirectEditor({
         canWrite={canWrite}
         onSaved={setPayload}
       />
+
+      <QuoteLegalDetailsEditor quote={quote} canWrite={canWrite} onSaved={setPayload} />
 
       <QuoteInternalNotesEditor quote={quote} canWrite={canWrite} onSaved={setPayload} />
 
