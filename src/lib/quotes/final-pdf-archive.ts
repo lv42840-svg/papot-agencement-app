@@ -78,11 +78,7 @@ export async function archiveFinalQuotePdf(
   assertPdfBuffer(input.pdf);
   const now = input.now ?? new Date();
   const fileName = quoteFinalPdfFileName(input.quote, input.quoteNumber);
-  const storagePath = quoteFinalPdfStoragePath(
-    input.context,
-    input.quote,
-    input.quoteNumber,
-  );
+  const storagePath = quoteFinalPdfStoragePath(input.context, input.quote, input.quoteNumber);
   const expectedSha256 = sha256Bytes(input.pdf);
   let created = true;
   let sizeBytes = input.pdf.byteLength;
