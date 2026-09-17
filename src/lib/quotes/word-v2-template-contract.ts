@@ -185,9 +185,9 @@ function removeUniqueAnchoredContainer(xml: string, token: string): string {
     throw new Error(`QUOTE_WORD_V2_OPTIONAL_ANCHOR_DUPLICATE:${token}`);
   }
 
-  const tableRange = containingRange(xml, first, "w:tbl");
+  const rowRange = containingRange(xml, first, "w:tr");
   const paragraphRange = containingRange(xml, first, "w:p");
-  const range = tableRange ?? paragraphRange;
+  const range = rowRange ?? paragraphRange;
   if (!range) throw new Error(`QUOTE_WORD_V2_OPTIONAL_CONTAINER_MISSING:${token}`);
   return `${xml.slice(0, range.start)}${xml.slice(range.end)}`;
 }
