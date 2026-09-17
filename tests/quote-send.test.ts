@@ -1,9 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { applyQuotesMutation, quotesMutationSchema } from "../src/lib/quotes/mutations";
-import {
-  markNativeQuoteSent,
-  markNativeQuoteSentWithFinalPdf,
-} from "../src/lib/quotes/send";
+import { markNativeQuoteSent, markNativeQuoteSentWithFinalPdf } from "../src/lib/quotes/send";
 import { createInitialNativeQuotesPayload, type QuoteFinalPdf } from "../src/lib/quotes/store";
 
 const actor = {
