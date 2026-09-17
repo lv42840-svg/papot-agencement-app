@@ -2,10 +2,7 @@
 
 import { CheckCircle2, Percent, Save, TriangleAlert } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
-import {
-  quoteHasCompleteWorkSchedule,
-  resolveQuoteLineVatRate,
-} from "@/lib/quotes/legal-details";
+import { quoteHasCompleteWorkSchedule, resolveQuoteLineVatRate } from "@/lib/quotes/legal-details";
 import type { QuoteLine } from "@/lib/quotes/model";
 import type { NativeQuoteRecord, NativeQuotesPayload } from "@/lib/quotes/store";
 
@@ -51,7 +48,9 @@ export function QuoteLegalDetailsEditor({
   const [duration, setDuration] = useState(quote.workSchedule.duration);
   const [endDate, setEndDate] = useState(quote.workSchedule.endDate ?? "");
   const [rates, setRates] = useState<Record<string, string>>(() =>
-    Object.fromEntries(lines.map((line) => [line.id, rateInput(resolveQuoteLineVatRate(quote, line.id))])),
+    Object.fromEntries(
+      lines.map((line) => [line.id, rateInput(resolveQuoteLineVatRate(quote, line.id))]),
+    ),
   );
   const [savingSchedule, setSavingSchedule] = useState(false);
   const [savingLineId, setSavingLineId] = useState<string | null>(null);
@@ -97,7 +96,9 @@ export function QuoteLegalDetailsEditor({
       });
       setNotice("Début, durée et fin des travaux enregistrés.");
     } catch (saveError) {
-      setError(errorLabel(saveError instanceof Error ? saveError.message : "QUOTE_LEGAL_UPDATE_FAILED"));
+      setError(
+        errorLabel(saveError instanceof Error ? saveError.message : "QUOTE_LEGAL_UPDATE_FAILED"),
+      );
     } finally {
       setSavingSchedule(false);
     }
@@ -128,7 +129,9 @@ export function QuoteLegalDetailsEditor({
       }
       setNotice("TVA de la ligne enregistrée.");
     } catch (saveError) {
-      setError(errorLabel(saveError instanceof Error ? saveError.message : "QUOTE_LEGAL_UPDATE_FAILED"));
+      setError(
+        errorLabel(saveError instanceof Error ? saveError.message : "QUOTE_LEGAL_UPDATE_FAILED"),
+      );
     } finally {
       setSavingLineId(null);
     }
@@ -200,7 +203,9 @@ export function QuoteLegalDetailsEditor({
             <Percent size={17} aria-hidden="true" />
             <strong>TVA par ligne</strong>
           </div>
-          <span>Défaut client figé sur ce devis : {rateInput(quote.taxConfig.defaultRatePercent)} %</span>
+          <span>
+            Défaut client figé sur ce devis : {rateInput(quote.taxConfig.defaultRatePercent)} %
+          </span>
         </div>
 
         {lines.length === 0 ? (
