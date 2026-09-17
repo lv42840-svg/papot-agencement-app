@@ -1,9 +1,6 @@
 import { readFileSync } from "node:fs";
 import { describe, expect, it } from "vitest";
-import {
-  assertQuoteWordV2PdfReady,
-  renderQuoteWordV2Pdf,
-} from "../src/lib/quotes/word-v2-pdf";
+import { assertQuoteWordV2PdfReady, renderQuoteWordV2Pdf } from "../src/lib/quotes/word-v2-pdf";
 import { makeQuoteWordV2TestDocument } from "./fixtures/quote-word-v2-document";
 
 const templatePath = new URL("../docs/templates/PAPOT_Template_Devis_V2.docx", import.meta.url);
@@ -34,7 +31,11 @@ describe("quote Word V2 PDF", () => {
     );
 
     expect(convertedDocx).not.toBeNull();
-    expect(Buffer.from(convertedDocx ?? []).subarray(0, 2).toString("ascii")).toBe("PK");
+    expect(
+      Buffer.from(convertedDocx ?? [])
+        .subarray(0, 2)
+        .toString("ascii"),
+    ).toBe("PK");
     expect(Buffer.from(generated.pdf)).toEqual(validPdf);
     expect(generated.document.quote.number).toBe("D-2026-0042");
   });
