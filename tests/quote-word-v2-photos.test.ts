@@ -5,10 +5,7 @@ import { readZipArchive } from "../src/lib/documents/zip-archive";
 import { renderQuoteWordV2FilledDocxWithPhotos } from "../src/lib/quotes/word-v2-filled-docx";
 import { makeQuoteWordV2TestDocument } from "./fixtures/quote-word-v2-document";
 
-const templatePath = new URL(
-  "../docs/templates/PAPOT_Template_Devis_V2.docx",
-  import.meta.url,
-);
+const templatePath = new URL("../docs/templates/PAPOT_Template_Devis_V2.docx", import.meta.url);
 const onePixelPng = Buffer.from(
   "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAusB9Y9ZQmcAAAAASUVORK5CYII=",
   "base64",
@@ -34,29 +31,20 @@ describe("quote Word V2 photos", () => {
     ];
 
     const requestedPaths: string[] = [];
-    const docx = await renderQuoteWordV2FilledDocxWithPhotos(
-      template,
-      document,
-      async (photo) => {
-        requestedPaths.push(photo.storagePath);
-        return onePixelPng;
-      },
-    );
+    const docx = await renderQuoteWordV2FilledDocxWithPhotos(template, document, async (photo) => {
+      requestedPaths.push(photo.storagePath);
+      return onePixelPng;
+    });
     const entries = readZipArchive(docx);
     const xml = Buffer.from(
       entries.find((entry) => entry.name === "word/document.xml")?.data ?? [],
     ).toString("utf8");
     const rels = Buffer.from(
-      entries.find((entry) => entry.name === "word/_rels/document.xml.rels")
-        ?.data ?? [],
+      entries.find((entry) => entry.name === "word/_rels/document.xml.rels")?.data ?? [],
     ).toString("utf8");
 
     expect(requestedPaths).toEqual(["quotes/test/chantier.png"]);
-    expect(
-      entries.some(
-        (entry) => entry.name === "word/media/papot-quote-photo-1.png",
-      ),
-    ).toBe(true);
+    expect(entries.some((entry) => entry.name === "word/media/papot-quote-photo-1.png")).toBe(true);
     expect(xml).toContain("<w:drawing>");
     expect(xml).toContain("PHOTOS CLIENT");
     expect(xml).toContain("Fabrication banque accueil");
@@ -85,11 +73,7 @@ describe("quote Word V2 photos", () => {
     ];
 
     await expect(
-      renderQuoteWordV2FilledDocxWithPhotos(
-        template,
-        document,
-        async () => onePixelPng,
-      ),
+      renderQuoteWordV2FilledDocxWithPhotos(template, document, async () => onePixelPng),
     ).rejects.toThrow("QUOTE_WORD_V2_PHOTO_SHA256_MISMATCH");
   });
 });
