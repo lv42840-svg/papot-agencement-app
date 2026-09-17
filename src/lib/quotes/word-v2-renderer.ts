@@ -6,6 +6,7 @@ const WORD_PARAGRAPH_PATTERN = /<w:p\b[\s\S]*?<\/w:p>/g;
 const WORD_TEXT_PATTERN = /<w:t\b[^>]*>[\s\S]*?<\/w:t>/g;
 const WORD_TABLE_CELL_PATTERN = /<w:tc\b[\s\S]*?<\/w:tc>/g;
 const QUOTE_BODY_ANCHOR = "{{PAPOT_QUOTE_BODY}}";
+const QUOTE_OPTIONS_ANCHOR = "{{PAPOT_OPTIONS_BLOCK}}";
 
 const moneyFormatter = new Intl.NumberFormat("fr-FR", {
   style: "currency",
@@ -253,6 +254,15 @@ function makeCell(templateCell: string, paragraph: string): string {
   return `<w:tc>${cellProperties(templateCell)}${paragraph}</w:tc>`;
 }
 
+function findOpeningTagStart(xml: string, tagName: string, beforeIndex: number): number {
+  const openingTagPattern = new RegExp(`<${tagName}(?:\\s[^>]*)?>`, "g");
+  let lastStart = -1;
+  for (const match of xml.slice(0, beforeIndex + 1).matchAll(openingTagPattern)) {
+    if (match.index !== undefined) lastStart = match.index;
+  }
+  return lastStart;
+}
+
 function visibleBodyItemIds(items: QuoteDocumentItem[]): Set<string> {
   const itemById = new Map(items.map((item) => [item.id, item]));
   const visible = new Set<string>();
@@ -336,6 +346,42 @@ function bodyRowXml(
   return `<w:tr>${rowProperties}${renderedCells.join("")}</w:tr>`;
 }
 
+function simpleSixColumnRowXml(
+  anchorRow: string,
+  templateCells: readonly string[],
+  designation: string,
+  total: string,
+  options: { bold?: boolean; fontSizePx?: number; keepNext?: boolean } = {},
+): string {
+  const rowProperties = anchorRow.match(/<w:trPr>[\s\S]*?<\/w:trPr>/)?.[0] ?? "";
+  const cells = Array.from({ length: 6 }, (_, index) => templateCells[index]);
+  if (cells.some((cell) => !cell)) {
+    throw new Error("QUOTE_WORD_V2_OPTIONS_TEMPLATE_CELL_MISSING");
+  }
+
+  return `<w:tr>${rowProperties}${[
+    makeCell(cells[0], plainParagraphXml("")),
+    makeCell(
+      cells[1],
+      plainParagraphXml(designation, {
+        bold: options.bold,
+        fontSizePx: options.fontSizePx,
+        keepNext: options.keepNext,
+      }),
+    ),
+    makeCell(cells[2], plainParagraphXml("")),
+    makeCell(cells[3], plainParagraphXml("")),
+    makeCell(cells[4], plainParagraphXml("")),
+    makeCell(
+      cells[5],
+      plainParagraphXml(total, {
+        align: "right",
+        bold: options.bold,
+      }),
+    ),
+  ].join("")}</w:tr>`;
+}
+
 export function replaceQuoteBodyAnchor(documentXml: string, document: QuoteDocumentData): string {
   const anchorIndex = documentXml.indexOf(QUOTE_BODY_ANCHOR);
   if (anchorIndex < 0) throw new Error("QUOTE_WORD_V2_BODY_ANCHOR_MISSING");
@@ -343,7 +389,7 @@ export function replaceQuoteBodyAnchor(documentXml: string, document: QuoteDocum
     throw new Error("QUOTE_WORD_V2_BODY_ANCHOR_DUPLICATE");
   }
 
-  const rowStart = documentXml.lastIndexOf("<w:tr", anchorIndex);
+  const rowStart = findOpeningTagStart(documentXml, "w:tr", anchorIndex);
   const rowCloseStart = documentXml.indexOf("</w:tr>", anchorIndex);
   if (rowStart < 0 || rowCloseStart < 0) throw new Error("QUOTE_WORD_V2_BODY_ROW_MISSING");
   const rowEnd = rowCloseStart + "</w:tr>".length;
@@ -363,9 +409,98 @@ export function replaceQuoteBodyAnchor(documentXml: string, document: QuoteDocum
   return `${documentXml.slice(0, rowStart)}${rows}${documentXml.slice(rowEnd)}`;
 }
 
-export function renderQuoteWordV2Body(
+export function replaceQuoteOptionsAnchor(documentXml: string, document: QuoteDocumentData): string {
+  const anchorIndex = documentXml.indexOf(QUOTE_OPTIONS_ANCHOR);
+  if (anchorIndex < 0) throw new Error("QUOTE_WORD_V2_OPTIONS_ANCHOR_MISSING");
+  if (
+    documentXml.indexOf(QUOTE_OPTIONS_ANCHOR, anchorIndex + QUOTE_OPTIONS_ANCHOR.length) >= 0
+  ) {
+    throw new Error("QUOTE_WORD_V2_OPTIONS_ANCHOR_DUPLICATE");
+  }
+
+  const tableStart = findOpeningTagStart(documentXml, "w:tbl", anchorIndex);
+  const tableCloseStart = documentXml.indexOf("</w:tbl>", anchorIndex);
+  if (tableStart < 0 || tableCloseStart < 0) {
+    throw new Error("QUOTE_WORD_V2_OPTIONS_TABLE_MISSING");
+  }
+  const tableEnd = tableCloseStart + "</w:tbl>".length;
+
+  if (document.pendingOptions.length === 0) {
+    return `${documentXml.slice(0, tableStart)}${documentXml.slice(tableEnd)}`;
+  }
+
+  const rowStart = findOpeningTagStart(documentXml, "w:tr", anchorIndex);
+  const rowCloseStart = documentXml.indexOf("</w:tr>", anchorIndex);
+  if (rowStart < tableStart || rowCloseStart < 0 || rowCloseStart > tableCloseStart) {
+    throw new Error("QUOTE_WORD_V2_OPTIONS_ROW_MISSING");
+  }
+  const rowEnd = rowCloseStart + "</w:tr>".length;
+  const anchorRow = documentXml.slice(rowStart, rowEnd);
+  const templateCells = Array.from(
+    anchorRow.matchAll(WORD_TABLE_CELL_PATTERN),
+    (match) => match[0],
+  );
+  if (templateCells.length !== 6) {
+    throw new Error("QUOTE_WORD_V2_OPTIONS_COLUMN_COUNT_INVALID");
+  }
+
+  const rows: string[] = [
+    simpleSixColumnRowXml(
+      anchorRow,
+      templateCells,
+      "OPTIONS NON COMPRISES DANS LE TOTAL DU DEVIS",
+      "",
+      { bold: true, fontSizePx: 14, keepNext: true },
+    ),
+  ];
+
+  for (const option of document.pendingOptions) {
+    rows.push(
+      simpleSixColumnRowXml(anchorRow, templateCells, option.label, "", {
+        bold: true,
+        fontSizePx: 12,
+        keepNext: true,
+      }),
+    );
+
+    const optionItems = document.items.filter(
+      (item) => item.scope === "PENDING_OPTION" && item.optionId === option.id,
+    );
+    for (const item of optionItems) {
+      rows.push(bodyRowXml(anchorRow, templateCells, item));
+    }
+
+    rows.push(
+      simpleSixColumnRowXml(
+        anchorRow,
+        templateCells,
+        "Total option HT",
+        formatMoneyCents(option.totalHtCents),
+        { bold: true },
+      ),
+      simpleSixColumnRowXml(
+        anchorRow,
+        templateCells,
+        "TVA option",
+        formatMoneyCents(option.totalVatCents),
+      ),
+      simpleSixColumnRowXml(
+        anchorRow,
+        templateCells,
+        "Total option TTC",
+        formatMoneyCents(option.totalTtcCents),
+        { bold: true },
+      ),
+    );
+  }
+
+  return `${documentXml.slice(0, rowStart)}${rows.join("")}${documentXml.slice(rowEnd)}`;
+}
+
+function renderDocumentXml(
   template: Uint8Array,
-  document: QuoteDocumentData,
+  transform: (xml: string) => string,
+  missingDocumentError: string,
 ): Uint8Array {
   const entries = readZipArchive(template);
   let documentXmlFound = false;
@@ -374,11 +509,33 @@ export function renderQuoteWordV2Body(
     if (entry.name !== "word/document.xml") return entry;
     documentXmlFound = true;
     const xml = Buffer.from(entry.data).toString("utf8");
-    return cloneZipEntryWithData(entry, Buffer.from(replaceQuoteBodyAnchor(xml, document), "utf8"));
+    return cloneZipEntryWithData(entry, Buffer.from(transform(xml), "utf8"));
   });
 
-  if (!documentXmlFound) throw new Error("QUOTE_WORD_V2_DOCUMENT_XML_MISSING");
+  if (!documentXmlFound) throw new Error(missingDocumentError);
   return writeZipArchive(renderedEntries);
+}
+
+export function renderQuoteWordV2Body(
+  template: Uint8Array,
+  document: QuoteDocumentData,
+): Uint8Array {
+  return renderDocumentXml(
+    template,
+    (xml) => replaceQuoteBodyAnchor(xml, document),
+    "QUOTE_WORD_V2_DOCUMENT_XML_MISSING",
+  );
+}
+
+export function renderQuoteWordV2Options(
+  template: Uint8Array,
+  document: QuoteDocumentData,
+): Uint8Array {
+  return renderDocumentXml(
+    template,
+    (xml) => replaceQuoteOptionsAnchor(xml, document),
+    "QUOTE_WORD_V2_DOCUMENT_XML_MISSING",
+  );
 }
 
 export function renderQuoteWordV2Scalars(
