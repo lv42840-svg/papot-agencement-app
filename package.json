@@ -14,7 +14,7 @@
     "start": "next start",
     "lint": "eslint .",
     "format": "prettier --write .",
-    "format:check": "prettier --check .",
+    "format:check": "prettier src/lib/quotes/document-data-mapping.ts && prettier --check .",
     "typecheck": "tsc --noEmit",
     "test": "vitest run",
     "nextcloud:probe": "tsx scripts/nextcloud-probe.ts"
