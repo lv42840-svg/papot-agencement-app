@@ -1,8 +1,8 @@
 import "server-only";
 
 import type { Pool } from "pg";
-import { getServerDbPool } from "@/lib/server-db/pool";
-import { withServerDbTransaction } from "@/lib/server-db/transaction";
+import { getServerDbPool } from "../server-db/pool";
+import { withServerDbTransaction } from "../server-db/transaction";
 import { parseCompanyProfile, type CompanyProfile } from "./domain";
 import type { CompanyProfileRepository } from "./repository";
 
