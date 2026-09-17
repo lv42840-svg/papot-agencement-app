@@ -11,6 +11,7 @@ import { QuoteLegalDetailsEditor } from "@/components/quote-legal-details-editor
 import { QuoteLifecycleActions } from "@/components/quote-lifecycle-actions";
 import { QuotePricingAdjustmentsEditor } from "@/components/quote-pricing-adjustments-editor";
 import { QuoteRichTextLayer } from "@/components/quote-rich-text-layer";
+import { QuoteSendAction } from "@/components/quote-send-action";
 import { QuoteStructuredLinesRichEditor } from "@/components/quote-structured-lines-rich-editor";
 import { calculateQuoteAdjustedPricing } from "@/lib/quotes/adjustments";
 import type { NativeQuoteRecord, NativeQuotesPayload } from "@/lib/quotes/store";
@@ -69,6 +70,7 @@ export function QuoteDirectEditor({
   return (
     <div className="quoteDirectWorkspace">
       <QuoteLifecycleActions quote={quote} canWrite={canWrite} />
+      <QuoteSendAction quote={quote} canWrite={canWrite} onSaved={setPayload} />
 
       <QuoteGeneralInfoEditor
         quote={quote}
