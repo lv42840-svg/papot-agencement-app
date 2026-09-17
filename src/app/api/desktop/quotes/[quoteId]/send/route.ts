@@ -3,20 +3,14 @@ import { z, ZodError } from "zod";
 import { createClientsRepository } from "@/lib/clients/create-repository";
 import { createCommercialRepository } from "@/lib/commercial/create-repository";
 import { createCommercialDocumentTransport } from "@/lib/commercial/document-file-runtime";
-import {
-  applyCommercialMutation,
-  registerCommercialDocuments,
-} from "@/lib/commercial/mutations";
+import { applyCommercialMutation, registerCommercialDocuments } from "@/lib/commercial/mutations";
 import { createCompanyProfileRepository } from "@/lib/company-profile/create-repository";
 import {
   desktopRequestErrorStatus,
   requireDesktopRequestContext,
 } from "@/lib/desktop/request-context";
 import { buildQuoteDocumentDataFromPayloads } from "@/lib/quotes/document-data-mapping";
-import {
-  archiveFinalQuotePdf,
-  nextFinalQuoteNumber,
-} from "@/lib/quotes/final-pdf-archive";
+import { archiveFinalQuotePdf, nextFinalQuoteNumber } from "@/lib/quotes/final-pdf-archive";
 import { createQuotesRepository } from "@/lib/quotes/create-repository";
 import { normalizeQuotePricingAfterModelMutation } from "@/lib/quotes/pricing-integrity";
 import { markNativeQuoteSentWithFinalPdf } from "@/lib/quotes/send";
@@ -106,10 +100,8 @@ export async function POST(request: Request, { params }: { params: Promise<{ quo
         { quoteId, quoteNumber },
         { quotes: payload, clients, commercial, companyProfile },
       );
-      const generated = await renderQuoteWordV2PdfWithPhotos(
-        template,
-        document,
-        (photo) => transport.store.readBytes(photo.storagePath, photo.sha256),
+      const generated = await renderQuoteWordV2PdfWithPhotos(template, document, (photo) =>
+        transport.store.readBytes(photo.storagePath, photo.sha256),
       );
       const archive = await archiveFinalQuotePdf(transport.store, {
         quote,
