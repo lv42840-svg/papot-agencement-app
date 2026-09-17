@@ -1,11 +1,11 @@
 import { randomUUID } from "node:crypto";
-import type { CommercialDocument } from "@/lib/commercial/domain";
+import type { CommercialDocument } from "../commercial/domain";
 import {
   commercialDocumentFileName,
   commercialDocumentStoragePath,
-} from "@/lib/commercial/document-path";
-import { assertPdfBuffer } from "@/lib/documents/pdf-runtime";
-import { sha256Bytes, type ServerFileStore } from "@/lib/server-files/storage";
+} from "../commercial/document-path";
+import { assertPdfBuffer } from "../documents/pdf-runtime";
+import { sha256Bytes, type ServerFileStore } from "../server-files/storage";
 import { formatQuoteNumber } from "./domain";
 import type { NativeQuoteRecord, NativeQuotesPayload, QuoteFinalPdf } from "./store";
 
