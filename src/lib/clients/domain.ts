@@ -1,5 +1,5 @@
 import { z } from "zod";
-import { DEFAULT_VAT_RATE_PERCENT, vatRatePercentSchema } from "@/lib/vat";
+import { DEFAULT_VAT_RATE_PERCENT, vatRatePercentSchema } from "../vat";
 
 const isoDateTimeSchema = z.string().datetime({ offset: true });
 
