@@ -261,7 +261,12 @@ function vatAmount(baseHtCents: number, ratePercent: number): number {
 function buildTaxLines(lines: QuoteDocumentItem[]): QuoteDocumentTaxLine[] {
   const grouped = new Map<number, { baseHtCents: number; vatCents: number }>();
   for (const line of lines) {
-    if (line.kind !== "LINE" || line.totalHtCents === null || line.vatRatePercent === null) continue;
+    if (
+      line.kind !== "LINE" ||
+      line.totalHtCents === null ||
+      line.vatRatePercent === null
+    )
+      continue;
     const current = grouped.get(line.vatRatePercent) ?? { baseHtCents: 0, vatCents: 0 };
     current.baseHtCents += line.totalHtCents;
     current.vatCents += line.vatCents ?? 0;
@@ -332,7 +337,10 @@ export function buildQuoteDocumentData(input: BuildQuoteDocumentDataInput): Quot
         item.kind === "LINE" && totalHtCents !== null ? totalHtCents / 100 / item.quantity : null,
       totalHtCents,
       vatRatePercent: ratePercent,
-      vatCents: totalHtCents !== null && ratePercent !== null ? vatAmount(totalHtCents, ratePercent) : null,
+      vatCents:
+        totalHtCents !== null && ratePercent !== null
+          ? vatAmount(totalHtCents, ratePercent)
+          : null,
     };
   });
 
@@ -347,10 +355,16 @@ export function buildQuoteDocumentData(input: BuildQuoteDocumentDataInput): Quot
     .filter((option) => option.status === "PENDING")
     .map((option) => {
       const optionLines = items.filter(
-        (item) => item.kind === "LINE" && item.optionId === option.id && item.scope === "PENDING_OPTION",
+        (item) =>
+          item.kind === "LINE" &&
+          item.optionId === option.id &&
+          item.scope === "PENDING_OPTION",
       );
       const totalHtCents = optionLines.reduce((sum, item) => sum + (item.totalHtCents ?? 0), 0);
-      const totalVatCentsForOption = optionLines.reduce((sum, item) => sum + (item.vatCents ?? 0), 0);
+      const totalVatCentsForOption = optionLines.reduce(
+        (sum, item) => sum + (item.vatCents ?? 0),
+        0,
+      );
       return {
         id: option.id,
         label: option.label,
