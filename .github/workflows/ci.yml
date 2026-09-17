@@ -55,3 +55,28 @@ jobs:
       - run: npm test -- tests/commercial-document-files.integration.test.ts
       - run: npm test -- tests/chantiers-postgres.integration.test.ts
       - run: npm test -- tests/library-postgres.integration.test.ts
+
+  pdf-integration:
+    runs-on: ubuntu-latest
+    env:
+      PAPOT_RUN_PDF_INTEGRATION: "1"
+      PAPOT_PDF_ARTIFACT_DIR: tmp/pdf-qa
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - name: Install LibreOffice and Poppler
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y libreoffice-writer poppler-utils
+      - run: npm ci
+      - run: npm test -- tests/quote-word-v2-pdf.integration.test.ts
+      - name: Upload PDF QA artifact
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: quote-word-v2-pdf-qa
+          path: tmp/pdf-qa
+          if-no-files-found: error
