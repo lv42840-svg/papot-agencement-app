@@ -60,22 +60,45 @@ function countOccurrences(value: string, needle: string): number {
   return count;
 }
 
-function findOpeningTagStart(xml: string, tagName: string, beforeIndex: number): number {
-  const pattern = new RegExp(`<${tagName}(?:\\s[^>]*)?>`, "g");
-  let lastStart = -1;
-  for (const match of xml.slice(0, beforeIndex + 1).matchAll(pattern)) {
-    if (match.index !== undefined) lastStart = match.index;
-  }
-  return lastStart;
+function escapeRegExp(value: string): string {
+  return value.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
 }
 
 function containingRange(xml: string, anchorIndex: number, tagName: string): XmlRange | null {
-  const start = findOpeningTagStart(xml, tagName, anchorIndex);
-  if (start < 0) return null;
-  const closingTag = `</${tagName}>`;
-  const closeStart = xml.indexOf(closingTag, anchorIndex);
-  if (closeStart < 0) return null;
-  return { start, end: closeStart + closingTag.length };
+  const pattern = new RegExp(`<(/?)${escapeRegExp(tagName)}\\b[^>]*?(\\/?)>`, "g");
+  const openStarts: number[] = [];
+
+  for (const match of xml.slice(0, anchorIndex + 1).matchAll(pattern)) {
+    const closing = match[1] === "/";
+    const selfClosing = match[2] === "/";
+    if (closing) {
+      openStarts.pop();
+    } else if (!selfClosing && match.index !== undefined) {
+      openStarts.push(match.index);
+    }
+  }
+
+  const start = openStarts.at(-1);
+  if (start === undefined) return null;
+
+  const matchingPattern = new RegExp(`<(/?)${escapeRegExp(tagName)}\\b[^>]*?(\\/?)>`, "g");
+  matchingPattern.lastIndex = start;
+  let depth = 0;
+  let match: RegExpExecArray | null;
+
+  while ((match = matchingPattern.exec(xml)) !== null) {
+    const closing = match[1] === "/";
+    const selfClosing = match[2] === "/";
+    if (!closing && !selfClosing) {
+      depth += 1;
+      continue;
+    }
+    if (!closing) continue;
+    depth -= 1;
+    if (depth === 0) return { start, end: matchingPattern.lastIndex };
+  }
+
+  return null;
 }
 
 function tableColumnCount(rowXml: string): number {
