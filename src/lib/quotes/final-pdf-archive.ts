@@ -1,5 +1,3 @@
-import "server-only";
-
 import { randomUUID } from "node:crypto";
 import type { CommercialDocument } from "@/lib/commercial/domain";
 import {
@@ -39,7 +37,10 @@ export function nextFinalQuoteNumber(payload: NativeQuotesPayload, year: number)
   return formatQuoteNumber(year, highest + 1);
 }
 
-export function quoteFinalPdfFileName(quote: Pick<NativeQuoteRecord, "variantName" | "version">, quoteNumber: string): string {
+export function quoteFinalPdfFileName(
+  quote: Pick<NativeQuoteRecord, "variantName" | "version">,
+  quoteNumber: string,
+): string {
   return commercialDocumentFileName(
     `Devis ${quoteNumber} - ${quote.variantName} - V${quote.version}.pdf`,
   );
