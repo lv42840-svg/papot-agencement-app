@@ -170,11 +170,15 @@ export async function convertDocxToPdfWithLibreOffice(
       outputDir,
       inputPath,
     ];
-    const { command, result } = await runFirstAvailable(libreOfficeCandidates(options.binary), args, {
-      cwd: workDir,
-      timeoutMs: options.timeoutMs ?? DEFAULT_TIMEOUT_MS,
-      commandRunner,
-    });
+    const { command, result } = await runFirstAvailable(
+      libreOfficeCandidates(options.binary),
+      args,
+      {
+        cwd: workDir,
+        timeoutMs: options.timeoutMs ?? DEFAULT_TIMEOUT_MS,
+        commandRunner,
+      },
+    );
 
     if (result.exitCode !== 0) {
       throw new Error(
@@ -237,9 +241,7 @@ export async function renderPdfToPngPages(
     );
 
     if (result.exitCode !== 0) {
-      throw new Error(
-        `PDF_RENDER_FAILED:${command}:${result.exitCode}:${commandMessage(result)}`,
-      );
+      throw new Error(`PDF_RENDER_FAILED:${command}:${result.exitCode}:${commandMessage(result)}`);
     }
 
     const files = (await readdir(outputDir))
