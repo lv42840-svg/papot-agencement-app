@@ -1,6 +1,7 @@
 import type { Pool } from "pg";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 
+import { createPostgresCompanyProfileRepository } from "../src/lib/company-profile/postgres-repository";
 import { runServerDbMigrations } from "../src/lib/server-db/migrations";
 import { closeServerDbPool, getServerDbPool } from "../src/lib/server-db/pool";
 import { withServerDbTransaction } from "../src/lib/server-db/transaction";
@@ -37,6 +38,43 @@ describeWithPostgres("central PostgreSQL foundation", () => {
     );
 
     expect(result.rows[0]?.count).toBe("1");
+  });
+
+  it("persists the global company profile", async () => {
+    await runServerDbMigrations(pool);
+    const repository = createPostgresCompanyProfileRepository(pool);
+
+    const saved = await repository.replace({
+      name: "PAPOT TEST",
+      addressLine1: "1 rue du Test",
+      postalCode: "42100",
+      city: "Roanne",
+      legalForm: "SAS",
+      capital: "2 000 €",
+      siret: "12345678900012",
+      rcs: "123 456 789 RCS Roanne",
+      ape: "4332A",
+      vatNumber: "FR00123456789",
+      phone: "04 00 00 00 00",
+      email: "test@papot.example",
+      insurerName: "Assureur Test",
+      insurerAddress: "Adresse assurance",
+      insuranceCoverage: "Couverture test",
+      bankName: "Banque Test",
+      bankAccountHolder: "PAPOT TEST",
+      iban: "FR7612345678901234567890123",
+      bic: "TESTFRPP",
+      paymentMethods: "Virement, chèque",
+      chequePayee: "PAPOT TEST",
+    });
+
+    expect(saved.name).toBe("PAPOT TEST");
+    await expect(repository.load()).resolves.toEqual(saved);
+
+    const migration = await pool.query<{ count: string }>(
+      "SELECT COUNT(*)::text AS count FROM papot_schema_migrations WHERE version = 8",
+    );
+    expect(migration.rows[0]?.count).toBe("1");
   });
 
   it("commits successful transactions", async () => {
