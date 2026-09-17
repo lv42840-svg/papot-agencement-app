@@ -17,6 +17,7 @@ import {
 } from "@/lib/library/storage";
 import { startQuoteCommercialWorkflow } from "@/lib/quotes/commercial-bridge";
 import { createQuotesRepository } from "@/lib/quotes/create-repository";
+import { initializeQuoteVatFromClient } from "@/lib/quotes/legal-details";
 import { createLibraryComponentFromQuoteLine } from "@/lib/quotes/library-component";
 import { applyQuotesMutation, quotesMutationSchema } from "@/lib/quotes/mutations";
 import type { QuoteLibraryComponentSource } from "@/lib/quotes/model";
@@ -127,9 +128,16 @@ export async function POST(request: Request) {
       );
 
       const repository = createQuotesRepository();
-      const mutation = await repository.mutate((payload) =>
-        applyQuotesMutation(payload, input, actor, client.id, now),
-      );
+      const mutation = await repository.mutate((payload) => {
+        const created = applyQuotesMutation(payload, input, actor, client.id, now);
+        return initializeQuoteVatFromClient(
+          created.payload,
+          created.focusQuoteId,
+          client.defaultVatRatePercent,
+          actor,
+          now,
+        );
+      });
       return noStoreJson(
         publicSnapshot(mutation.payload, context.moduleAccess.canWrite, mutation.focusQuoteId),
       );
