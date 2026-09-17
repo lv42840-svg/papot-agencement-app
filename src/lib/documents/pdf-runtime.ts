@@ -141,6 +141,10 @@ async function runFirstAvailable(
   throw unavailable;
 }
 
+function commandMessage(result: PdfCommandResult): string {
+  return result.stderr.trim() || result.stdout.trim() || "NO_COMMAND_OUTPUT";
+}
+
 export async function convertDocxToPdfWithLibreOffice(
   docx: Uint8Array,
   options: LibreOfficePdfConversionOptions = {},
@@ -174,7 +178,7 @@ export async function convertDocxToPdfWithLibreOffice(
 
     if (result.exitCode !== 0) {
       throw new Error(
-        `PDF_CONVERSION_FAILED:${command}:${result.exitCode}:${result.stderr.trim() || result.stdout.trim()}`,
+        `PDF_CONVERSION_FAILED:${command}:${result.exitCode}:${commandMessage(result)}`,
       );
     }
 
@@ -182,7 +186,10 @@ export async function convertDocxToPdfWithLibreOffice(
     try {
       pdf = await readFile(outputPath);
     } catch {
-      throw new Error(`PDF_CONVERSION_OUTPUT_MISSING:${command}`);
+      const outputFiles = await readdir(outputDir).catch(() => [] as string[]);
+      throw new Error(
+        `PDF_CONVERSION_OUTPUT_MISSING:${command}:${outputFiles.join("|") || "EMPTY_OUTPUT_DIR"}:${commandMessage(result)}`,
+      );
     }
     assertPdfBuffer(pdf);
     return pdf;
@@ -231,7 +238,7 @@ export async function renderPdfToPngPages(
 
     if (result.exitCode !== 0) {
       throw new Error(
-        `PDF_RENDER_FAILED:${command}:${result.exitCode}:${result.stderr.trim() || result.stdout.trim()}`,
+        `PDF_RENDER_FAILED:${command}:${result.exitCode}:${commandMessage(result)}`,
       );
     }
 
