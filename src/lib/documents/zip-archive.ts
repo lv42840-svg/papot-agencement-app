@@ -4,7 +4,6 @@ const LOCAL_FILE_HEADER_SIGNATURE = 0x04034b50;
 const CENTRAL_DIRECTORY_SIGNATURE = 0x02014b50;
 const END_OF_CENTRAL_DIRECTORY_SIGNATURE = 0x06054b50;
 const UTF8_FLAG = 0x0800;
-const DATA_DESCRIPTOR_FLAG = 0x0008;
 const ENCRYPTED_FLAG = 0x0001;
 const METHOD_STORED = 0;
 const METHOD_DEFLATE = 8;
@@ -204,10 +203,7 @@ export function writeZipArchive(entries: readonly ZipArchiveEntry[]): Uint8Array
   return Buffer.concat([...localParts, centralDirectory, end]);
 }
 
-export function cloneZipEntryWithData(
-  entry: ZipArchiveEntry,
-  data: Uint8Array,
-): ZipArchiveEntry {
+export function cloneZipEntryWithData(entry: ZipArchiveEntry, data: Uint8Array): ZipArchiveEntry {
   return {
     ...entry,
     data,
