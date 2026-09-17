@@ -3,8 +3,10 @@ import { z, ZodError } from "zod";
 import { createClientsRepository } from "@/lib/clients/create-repository";
 import { createCommercialRepository } from "@/lib/commercial/create-repository";
 import { createCommercialDocumentTransport } from "@/lib/commercial/document-file-runtime";
-import { registerCommercialDocuments } from "@/lib/commercial/mutations";
-import { applyCommercialMutation } from "@/lib/commercial/mutations";
+import {
+  applyCommercialMutation,
+  registerCommercialDocuments,
+} from "@/lib/commercial/mutations";
 import { createCompanyProfileRepository } from "@/lib/company-profile/create-repository";
 import {
   desktopRequestErrorStatus,
@@ -15,8 +17,8 @@ import {
   archiveFinalQuotePdf,
   nextFinalQuoteNumber,
 } from "@/lib/quotes/final-pdf-archive";
-import { normalizeQuotePricingAfterModelMutation } from "@/lib/quotes/pricing-integrity";
 import { createQuotesRepository } from "@/lib/quotes/create-repository";
+import { normalizeQuotePricingAfterModelMutation } from "@/lib/quotes/pricing-integrity";
 import { markNativeQuoteSentWithFinalPdf } from "@/lib/quotes/send";
 import type { NativeQuotesPayload } from "@/lib/quotes/store";
 import { renderQuoteWordV2PdfWithPhotos } from "@/lib/quotes/word-v2-pdf";
@@ -56,8 +58,13 @@ function errorStatus(code: string): number {
   return 400;
 }
 
+type PendingArchiveCleanup = {
+  storagePath: string;
+  deleteFile: (storagePath: string) => Promise<boolean>;
+};
+
 export async function POST(request: Request, { params }: { params: Promise<{ quoteId: string }> }) {
-  let createdArchive: { storagePath: string; deleteFile: (storagePath: string) => Promise<boolean> } | null = null;
+  const cleanupState: { archive: PendingArchiveCleanup | null } = { archive: null };
   let committed = false;
 
   try {
@@ -117,7 +124,7 @@ export async function POST(request: Request, { params }: { params: Promise<{ quo
         now,
       });
       if (archive.created) {
-        createdArchive = {
+        cleanupState.archive = {
           storagePath: archive.finalPdf.storagePath,
           deleteFile: (storagePath) => transport.store.deleteFile(storagePath),
         };
@@ -163,8 +170,9 @@ export async function POST(request: Request, { params }: { params: Promise<{ quo
       publicSnapshot(mutation.payload, quoteContext.moduleAccess.canWrite, mutation.focusQuoteId),
     );
   } catch (error) {
-    if (!committed && createdArchive) {
-      await createdArchive.deleteFile(createdArchive.storagePath).catch(() => undefined);
+    const pendingArchive = cleanupState.archive;
+    if (!committed && pendingArchive) {
+      await pendingArchive.deleteFile(pendingArchive.storagePath).catch(() => undefined);
     }
     const code =
       error instanceof ZodError
