@@ -1,14 +1,9 @@
 import { cloneZipEntryWithData, readZipArchive, writeZipArchive } from "../documents/zip-archive";
-import type {
-  QuoteDocumentData,
-  QuoteDocumentItem,
-  QuoteWordV2ScalarData,
-} from "./document-data";
+import type { QuoteDocumentData, QuoteDocumentItem, QuoteWordV2ScalarData } from "./document-data";
 import type { QuoteRichTextRunStyle } from "./model";
 
 const WORD_PARAGRAPH_PATTERN = /<w:p\b[\s\S]*?<\/w:p>/g;
 const WORD_TEXT_PATTERN = /<w:t\b[^>]*>[\s\S]*?<\/w:t>/g;
-const WORD_TABLE_ROW_PATTERN = /<w:tr\b[\s\S]*?<\/w:tr>/g;
 const WORD_TABLE_CELL_PATTERN = /<w:tc\b[\s\S]*?<\/w:tc>/g;
 const QUOTE_BODY_ANCHOR = "{{PAPOT_QUOTE_BODY}}";
 
@@ -187,10 +182,7 @@ function hexWithoutHash(value: string): string {
   return value.replace(/^#/, "").toUpperCase();
 }
 
-function runProperties(
-  style: QuoteRichTextRunStyle | null,
-  defaults: ParagraphOptions,
-): string {
+function runProperties(style: QuoteRichTextRunStyle | null, defaults: ParagraphOptions): string {
   const properties: string[] = [];
   const bold = style ? style.bold : (defaults.bold ?? false);
   const italic = style ? style.italic : (defaults.italic ?? false);
@@ -344,10 +336,7 @@ function bodyRowXml(
   return `<w:tr>${rowProperties}${renderedCells.join("")}</w:tr>`;
 }
 
-export function replaceQuoteBodyAnchor(
-  documentXml: string,
-  document: QuoteDocumentData,
-): string {
+export function replaceQuoteBodyAnchor(documentXml: string, document: QuoteDocumentData): string {
   const anchorIndex = documentXml.indexOf(QUOTE_BODY_ANCHOR);
   if (anchorIndex < 0) throw new Error("QUOTE_WORD_V2_BODY_ANCHOR_MISSING");
   if (documentXml.indexOf(QUOTE_BODY_ANCHOR, anchorIndex + QUOTE_BODY_ANCHOR.length) >= 0) {
@@ -359,7 +348,10 @@ export function replaceQuoteBodyAnchor(
   if (rowStart < 0 || rowCloseStart < 0) throw new Error("QUOTE_WORD_V2_BODY_ROW_MISSING");
   const rowEnd = rowCloseStart + "</w:tr>".length;
   const anchorRow = documentXml.slice(rowStart, rowEnd);
-  const templateCells = Array.from(anchorRow.matchAll(WORD_TABLE_CELL_PATTERN), (match) => match[0]);
+  const templateCells = Array.from(
+    anchorRow.matchAll(WORD_TABLE_CELL_PATTERN),
+    (match) => match[0],
+  );
   if (templateCells.length !== 6) throw new Error("QUOTE_WORD_V2_BODY_COLUMN_COUNT_INVALID");
 
   const visibleIds = visibleBodyItemIds(document.items);
@@ -371,7 +363,10 @@ export function replaceQuoteBodyAnchor(
   return `${documentXml.slice(0, rowStart)}${rows}${documentXml.slice(rowEnd)}`;
 }
 
-export function renderQuoteWordV2Body(template: Uint8Array, document: QuoteDocumentData): Uint8Array {
+export function renderQuoteWordV2Body(
+  template: Uint8Array,
+  document: QuoteDocumentData,
+): Uint8Array {
   const entries = readZipArchive(template);
   let documentXmlFound = false;
 
