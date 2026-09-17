@@ -19,7 +19,7 @@ const richTextLayerSource = readFileSync(
 );
 
 describe("quote global UI invariants", () => {
-  it("keeps the validated quote workflow visible without exposing Send", () => {
+  it("keeps the validated quote workflow visible with final PDF freeze action", () => {
     expect(createSource).toContain("Base · V1");
     expect(createSource).toContain("Responsable du chiffrage");
     expect(createSource).toContain("Date prévue d’envoi");
@@ -28,7 +28,7 @@ describe("quote global UI invariants", () => {
     expect(lifecycleSource).toContain("Nouvelle variante");
     expect(lifecycleSource).toContain("Dupliquer");
     expect(lifecycleSource).toContain("Version précédente");
-    expect(editorSource).not.toContain("QuoteSendAction");
+    expect(editorSource).toContain("QuoteSendAction");
   });
 
   it("keeps saved multiline rich text visible after validation", () => {
