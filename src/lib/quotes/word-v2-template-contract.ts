@@ -201,6 +201,14 @@ export function assertQuoteWordV2TemplateContract(template: Uint8Array): void {
   }
 }
 
+function visibleTextOutsideToken(xml: string, token: string): string {
+  return xml
+    .replace(token, "")
+    .replace(/<[^>]+>/g, "")
+    .replace(/&(?:amp|lt|gt|quot|apos);/g, "")
+    .trim();
+}
+
 function removeUniqueAnchoredContainer(xml: string, token: string): string {
   const first = xml.indexOf(token);
   if (first < 0) throw new Error(`QUOTE_WORD_V2_OPTIONAL_ANCHOR_MISSING:${token}`);
@@ -208,9 +216,15 @@ function removeUniqueAnchoredContainer(xml: string, token: string): string {
     throw new Error(`QUOTE_WORD_V2_OPTIONAL_ANCHOR_DUPLICATE:${token}`);
   }
 
-  const rowRange = containingRange(xml, first, "w:tr");
   const paragraphRange = containingRange(xml, first, "w:p");
-  const range = rowRange ?? paragraphRange;
+  const rowRange = containingRange(xml, first, "w:tr");
+  let range = paragraphRange;
+
+  if (rowRange) {
+    const rowXml = xml.slice(rowRange.start, rowRange.end);
+    if (visibleTextOutsideToken(rowXml, token).length === 0) range = rowRange;
+  }
+
   if (!range) throw new Error(`QUOTE_WORD_V2_OPTIONAL_CONTAINER_MISSING:${token}`);
   return `${xml.slice(0, range.start)}${xml.slice(range.end)}`;
 }
