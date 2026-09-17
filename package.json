@@ -14,7 +14,7 @@
     "start": "next start",
     "lint": "eslint .",
     "format": "prettier --write .",
-    "format:check": "prettier tests/quote-word-v2-filled-docx.test.ts && prettier --check .",
+    "format:check": "prettier --check .",
     "typecheck": "tsc --noEmit",
     "test": "vitest run",
     "nextcloud:probe": "tsx scripts/nextcloud-probe.ts"
