@@ -102,7 +102,17 @@ function runProperties(cellXml: string): string {
 
 function cellWithText(templateCell: string, value: string): string {
   const text = escapeXmlText(value);
-  return `<w:tc>${cellProperties(templateCell)}<w:p>${paragraphProperties(templateCell)}<w:r>${runProperties(templateCell)}<w:t xml:space="preserve">${text}</w:t></w:r></w:p></w:tc>`;
+  const tcPr = cellProperties(templateCell);
+  const pPr = paragraphProperties(templateCell);
+  const rPr = runProperties(templateCell);
+
+  return [
+    `<w:tc>${tcPr}`,
+    `<w:p>${pPr}`,
+    `<w:r>${rPr}`,
+    `<w:t xml:space="preserve">${text}</w:t>`,
+    "</w:r></w:p></w:tc>",
+  ].join("");
 }
 
 function rowWithLabelAndAmount(template: AnchoredRow, label: string, amount: string): string {
@@ -160,7 +170,9 @@ export function replaceQuoteVatAnchors(documentXml: string, document: QuoteDocum
 
   next = replaceAnchoredRow(next, VAT_LINES_ANCHOR, (template) =>
     taxLines
-      .map((line) => rowWithLabelAndAmount(template, taxLineLabel(line), formatMoney(line.vatCents)))
+      .map((line) =>
+        rowWithLabelAndAmount(template, taxLineLabel(line), formatMoney(line.vatCents)),
+      )
       .join(""),
   );
 
