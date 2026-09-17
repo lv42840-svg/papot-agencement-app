@@ -45,23 +45,26 @@ describe("quote Word template V2", () => {
     );
   });
 
-  it("prevoit le contenu client dynamique sans exposer les ajustements internes", () => {
-    expect(Object.keys(manifest.dynamicAnchors)).toEqual(
-      expect.arrayContaining([
-        "PAPOT_QUOTE_BODY",
-        "PAPOT_OPTIONS_BLOCK",
-        "PAPOT_VAT_SUMMARY",
-        "PAPOT_VAT_LINES_ANCHOR",
-        "PAPOT_ANNEX_IMAGES",
-      ]),
-    );
-    expect(manifest.layoutRules).toContain(
-      "Internal pricing adjustments are never rendered as separate client rows.",
-    );
-    expect(manifest.layoutRules).toContain(
-      "Options are visually separated and excluded from total_ht/total_ttc/net_a_payer.",
-    );
-  });
+  it(
+    "prevoit le contenu client dynamique sans exposer les ajustements internes",
+    () => {
+      expect(Object.keys(manifest.dynamicAnchors)).toEqual(
+        expect.arrayContaining([
+          "PAPOT_QUOTE_BODY",
+          "PAPOT_OPTIONS_BLOCK",
+          "PAPOT_VAT_SUMMARY",
+          "PAPOT_VAT_LINES_ANCHOR",
+          "PAPOT_ANNEX_IMAGES",
+        ]),
+      );
+      expect(manifest.layoutRules).toContain(
+        "Internal pricing adjustments are never rendered as separate client rows.",
+      );
+      expect(manifest.layoutRules).toContain(
+        "Options are visually separated and excluded from total_ht/total_ttc/net_a_payer.",
+      );
+    },
+  );
 
   it("conserve les donnees de devis utiles au futur generateur", () => {
     expect(manifest.scalarTokens).toEqual(
