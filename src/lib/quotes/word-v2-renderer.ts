@@ -1,8 +1,4 @@
-import {
-  cloneZipEntryWithData,
-  readZipArchive,
-  writeZipArchive,
-} from "../documents/zip-archive";
+import { cloneZipEntryWithData, readZipArchive, writeZipArchive } from "../documents/zip-archive";
 import type { QuoteWordV2ScalarData } from "./document-data";
 
 const WORD_PARAGRAPH_PATTERN = /<w:p\b[\s\S]*?<\/w:p>/g;
@@ -68,10 +64,9 @@ function replaceFirstTokenInParagraph(
   if (tokenStart < 0) return { paragraph, replaced: false };
 
   const tokenEnd = tokenStart + token.length;
-  const escapedReplacement = escapeXmlText(replacement).replaceAll("\r\n", "&#10;").replaceAll(
-    "\n",
-    "&#10;",
-  );
+  const escapedReplacement = escapeXmlText(replacement)
+    .replaceAll("\r\n", "&#10;")
+    .replaceAll("\n", "&#10;");
   let replacementInserted = false;
   const nodeReplacements: Array<{ start: number; end: number; text: string }> = [];
 
