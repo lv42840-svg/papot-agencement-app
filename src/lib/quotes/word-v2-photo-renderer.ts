@@ -28,6 +28,8 @@ type LoadedPhoto = {
   mediaName: string;
 };
 
+type XmlRange = { start: number; end: number };
+
 function escapeXml(value: string): string {
   return value
     .replaceAll("&", "&amp;")
@@ -35,6 +37,47 @@ function escapeXml(value: string): string {
     .replaceAll(">", "&gt;")
     .replaceAll('"', "&quot;")
     .replaceAll("'", "&apos;");
+}
+
+function escapeRegExp(value: string): string {
+  return value.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+}
+
+function containingRange(xml: string, anchorIndex: number, tagName: string): XmlRange | null {
+  const pattern = new RegExp(`<(/?)${escapeRegExp(tagName)}\\b[^>]*?(\\/?)>`, "g");
+  const openStarts: number[] = [];
+
+  for (const match of xml.slice(0, anchorIndex + 1).matchAll(pattern)) {
+    const closing = match[1] === "/";
+    const selfClosing = match[2] === "/";
+    if (closing) {
+      openStarts.pop();
+    } else if (!selfClosing && match.index !== undefined) {
+      openStarts.push(match.index);
+    }
+  }
+
+  const start = openStarts.at(-1);
+  if (start === undefined) return null;
+
+  const matchingPattern = new RegExp(`<(/?)${escapeRegExp(tagName)}\\b[^>]*?(\\/?)>`, "g");
+  matchingPattern.lastIndex = start;
+  let depth = 0;
+  let match: RegExpExecArray | null;
+
+  while ((match = matchingPattern.exec(xml)) !== null) {
+    const closing = match[1] === "/";
+    const selfClosing = match[2] === "/";
+    if (!closing && !selfClosing) {
+      depth += 1;
+      continue;
+    }
+    if (!closing) continue;
+    depth -= 1;
+    if (depth === 0) return { start, end: matchingPattern.lastIndex };
+  }
+
+  return null;
 }
 
 function assertPhotoBytes(photo: QuoteItemPhoto, bytes: Uint8Array): void {
@@ -101,12 +144,9 @@ function webpDimensions(buffer: Buffer): { width: number; height: number } | nul
     return { width, height };
   }
   if (chunk === "VP8L" && buffer.length >= 25 && buffer[20] === 0x2f) {
-    const b0 = buffer[21];
-    const b1 = buffer[22];
-    const b2 = buffer[23];
-    const b3 = buffer[24];
-    const width = 1 + (((b2 & 0x3f) << 8) | b1);
-    const height = 1 + (((b3 & 0x0f) << 10) | (b2 >> 6) | (b3 & 0xf0) << 2 | b0 * 0);
+    const bits = buffer.readUInt32LE(21);
+    const width = 1 + (bits & 0x3fff);
+    const height = 1 + ((bits >>> 14) & 0x3fff);
     if (width > 0 && height > 0) return { width, height };
   }
   if (chunk === "VP8 " && buffer.length >= 30) {
@@ -176,13 +216,9 @@ function replaceAnchorParagraph(documentXml: string, replacement: string): strin
   if (documentXml.indexOf(ANNEX_ANCHOR, anchorIndex + ANNEX_ANCHOR.length) >= 0) {
     throw new Error("QUOTE_WORD_V2_ANNEX_ANCHOR_DUPLICATE");
   }
-  const paragraphStart = documentXml.lastIndexOf("<w:p", anchorIndex);
-  const paragraphEndStart = documentXml.indexOf("</w:p>", anchorIndex);
-  if (paragraphStart < 0 || paragraphEndStart < 0) {
-    throw new Error("QUOTE_WORD_V2_ANNEX_PARAGRAPH_MISSING");
-  }
-  const paragraphEnd = paragraphEndStart + "</w:p>".length;
-  return `${documentXml.slice(0, paragraphStart)}${replacement}${documentXml.slice(paragraphEnd)}`;
+  const paragraphRange = containingRange(documentXml, anchorIndex, "w:p");
+  if (!paragraphRange) throw new Error("QUOTE_WORD_V2_ANNEX_PARAGRAPH_MISSING");
+  return `${documentXml.slice(0, paragraphRange.start)}${replacement}${documentXml.slice(paragraphRange.end)}`;
 }
 
 function nextRelationshipId(relsXml: string): number {
