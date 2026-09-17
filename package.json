@@ -14,7 +14,7 @@
     "start": "next start",
     "lint": "eslint .",
     "format": "prettier --write .",
-    "format:check": "prettier --write src/lib/quotes/word-v2-filled-docx.ts src/lib/quotes/word-v2-photo-renderer.ts tests/quote-word-v2-pdf.integration.test.ts tests/quote-word-v2-photos.test.ts && git diff -- src/lib/quotes/word-v2-filled-docx.ts src/lib/quotes/word-v2-photo-renderer.ts tests/quote-word-v2-pdf.integration.test.ts tests/quote-word-v2-photos.test.ts && false",
+    "format:check": "prettier --check .",
     "typecheck": "tsc --noEmit",
     "test": "vitest run",
     "nextcloud:probe": "tsx scripts/nextcloud-probe.ts"
