@@ -164,7 +164,10 @@ function webpDimensions(buffer: Buffer): { width: number; height: number } | nul
   return null;
 }
 
-function imageDimensions(photo: QuoteItemPhoto, bytes: Uint8Array): { width: number; height: number } {
+function imageDimensions(
+  photo: QuoteItemPhoto,
+  bytes: Uint8Array,
+): { width: number; height: number } {
   const buffer = Buffer.from(bytes);
   const dimensions =
     photo.contentType === "image/png"
