@@ -6,7 +6,8 @@ import {
   quoteIsCurrentVersion,
 } from "../src/lib/quotes/lifecycle";
 import { applyQuotesMutation, quotesMutationSchema } from "../src/lib/quotes/mutations";
-import { createInitialNativeQuotesPayload } from "../src/lib/quotes/store";
+import { markNativeQuoteSentWithFinalPdf } from "../src/lib/quotes/send";
+import { createInitialNativeQuotesPayload, type QuoteFinalPdf } from "../src/lib/quotes/store";
 
 const actor = {
   userId: "11111111-1111-4111-8111-111111111111",
@@ -43,6 +44,21 @@ function draft() {
   return payload;
 }
 
+function finalPdf(): QuoteFinalPdf {
+  return {
+    quoteNumber: "D-2026-0001",
+    variantName: "Base",
+    version: 1,
+    commercialDocumentId: "55555555-5555-4555-8555-555555555555",
+    fileName: "Devis D-2026-0001 - Base - V1.pdf",
+    storagePath: "Commercial/2026/TEST/Devis/Devis D-2026-0001 - Base - V1.pdf",
+    sizeBytes: 1234,
+    sha256: "a".repeat(64),
+    archivedAt: "2026-09-16T12:30:00.000Z",
+    archivedByName: "Lucien",
+  };
+}
+
 describe("quote lifecycle", () => {
   it("cree V2 en copie complete et verrouille V1 comme version precedente", () => {
     const source = draft();
@@ -59,6 +75,7 @@ describe("quote lifecycle", () => {
       internalNotes: "Marge validée avec Nadia",
       sentAt: null,
       followUpDate: null,
+      finalPdf: null,
     });
     expect(current?.pricingConfig).toEqual(source.quotes[0].pricingConfig);
     expect(current?.model.subject).toBe(source.quotes[0].model.subject);
@@ -66,6 +83,31 @@ describe("quote lifecycle", () => {
     expect(current?.model.id).toBe(current?.id);
     expect(quoteIsCurrentVersion(result.payload, firstId)).toBe(false);
     expect(quoteIsCurrentVersion(result.payload, result.focusQuoteId)).toBe(true);
+  });
+
+  it("conserve le PDF fige de V1 mais ne le recopie jamais dans V2", () => {
+    const source = draft();
+    const firstId = source.quotes[0].id;
+    const sent = markNativeQuoteSentWithFinalPdf(
+      source,
+      firstId,
+      "2026-09-30",
+      finalPdf(),
+      actor,
+      new Date("2026-09-16T12:30:00.000Z"),
+    );
+    const result = createQuoteVersion(
+      sent.payload,
+      firstId,
+      actor,
+      new Date("2026-09-16T13:00:00.000Z"),
+    );
+    const previous = result.payload.quotes.find((quote) => quote.id === firstId);
+    const current = result.payload.quotes.find((quote) => quote.id === result.focusQuoteId);
+
+    expect(previous?.status).toBe("SUPERSEDED");
+    expect(previous?.finalPdf?.quoteNumber).toBe("D-2026-0001");
+    expect(current).toMatchObject({ status: "DRAFT", version: 2, finalPdf: null });
   });
 
   it("refuse de repartir d'une ancienne version", () => {
