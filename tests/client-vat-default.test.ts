@@ -56,6 +56,46 @@ describe("client default VAT", () => {
     expect(result.payload.clients[0].updatedAt).toBe("2026-09-17T07:00:00.000Z");
   });
 
+  it("conserve le taux existant quand une autre donnée de la fiche est modifiée", () => {
+    const payload = parseClientsPayload({ schemaVersion: 1, clients: [legacyClient] });
+    const withVat = applyClientsMutation(
+      payload,
+      {
+        action: "updateVat",
+        clientId: legacyClient.id,
+        defaultVatRatePercent: 10,
+      },
+      actor,
+    );
+    const client = withVat.payload.clients[0];
+
+    const updated = applyClientsMutation(
+      withVat.payload,
+      {
+        action: "update",
+        clientId: client.id,
+        type: client.type,
+        companyName: client.companyName,
+        firstName: client.firstName,
+        lastName: client.lastName,
+        addressLine1: "2 rue du Test",
+        addressLine2: client.addressLine2,
+        postalCode: client.postalCode,
+        city: client.city,
+        phone: client.phone,
+        email: client.email,
+        siret: client.siret,
+        paymentTerms: client.paymentTerms,
+        notes: client.notes,
+        contacts: client.contacts,
+      },
+      actor,
+    );
+
+    expect(updated.payload.clients[0].addressLine1).toBe("2 rue du Test");
+    expect(updated.payload.clients[0].defaultVatRatePercent).toBe(10);
+  });
+
   it("refuse un taux hors plage", () => {
     const payload = parseClientsPayload({ schemaVersion: 1, clients: [legacyClient] });
     expect(() =>
