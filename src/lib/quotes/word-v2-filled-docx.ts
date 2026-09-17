@@ -1,4 +1,9 @@
-import { readZipArchive } from "../documents/zip-archive";
+import {
+  cloneZipEntryWithData,
+  readZipArchive,
+  writeZipArchive,
+  type ZipArchiveEntry,
+} from "../documents/zip-archive";
 import {
   loadQuoteDocumentDataFromSources,
   type QuoteDocumentDataMappingInput,
@@ -30,10 +35,82 @@ function unresolvedTemplateTokens(docx: Uint8Array): string[] {
   return Array.from(new Set(wordXml.match(/\{\{[A-Za-z0-9_]+\}\}/g) ?? [])).sort();
 }
 
+function assertBalancedWordXml(xml: string, partName: string): void {
+  const tagPattern = /<\/?[A-Za-z_][A-Za-z0-9_.:-]*(?:\s[^<>]*?)?\s*\/?>/g;
+  const stack: string[] = [];
+
+  for (const match of xml.matchAll(tagPattern)) {
+    const tag = match[0];
+    if (tag.startsWith("<?") || tag.startsWith("<!") || tag.endsWith("/>")) continue;
+    const closing = tag.startsWith("</");
+    const name = tag.match(/^<\/?([A-Za-z_][A-Za-z0-9_.:-]*)/)?.[1];
+    if (!name) continue;
+
+    if (!closing) {
+      stack.push(name);
+      continue;
+    }
+
+    const open = stack.pop();
+    if (open !== name) {
+      throw new Error(`QUOTE_WORD_V2_XML_UNBALANCED:${partName}:${open ?? "NONE"}:${name}`);
+    }
+  }
+
+  if (stack.length > 0) {
+    throw new Error(`QUOTE_WORD_V2_XML_UNCLOSED:${partName}:${stack.at(-1)}`);
+  }
+}
+
+function removeStylesRelationship(xml: string): string {
+  return xml.replace(
+    /<Relationship\b[^>]*\bType="http:\/\/schemas\.openxmlformats\.org\/officeDocument\/2006\/relationships\/styles"[^>]*\/>/g,
+    "",
+  );
+}
+
+function removeStylesContentType(xml: string): string {
+  return xml.replace(/<Override\b[^>]*\bPartName="\/word\/styles\.xml"[^>]*\/>/g, "");
+}
+
+function withoutCorruptLegacyStyles(docx: Uint8Array): Uint8Array {
+  const entries = readZipArchive(docx);
+  const normalized: ZipArchiveEntry[] = [];
+
+  for (const entry of entries) {
+    if (entry.name === "word/styles.xml") continue;
+    if (entry.name === "word/_rels/document.xml.rels") {
+      normalized.push(
+        cloneZipEntryWithData(
+          entry,
+          Buffer.from(removeStylesRelationship(Buffer.from(entry.data).toString("utf8")), "utf8"),
+        ),
+      );
+      continue;
+    }
+    if (entry.name === "[Content_Types].xml") {
+      normalized.push(
+        cloneZipEntryWithData(
+          entry,
+          Buffer.from(removeStylesContentType(Buffer.from(entry.data).toString("utf8")), "utf8"),
+        ),
+      );
+      continue;
+    }
+    normalized.push(entry);
+  }
+
+  return writeZipArchive(normalized);
+}
+
 export function assertQuoteWordV2FilledDocx(docx: Uint8Array): void {
   const entries = readZipArchive(docx);
-  if (!entries.some((entry) => entry.name === "word/document.xml")) {
-    throw new Error("QUOTE_WORD_V2_DOCUMENT_XML_MISSING");
+  const document = entries.find((entry) => entry.name === "word/document.xml");
+  if (!document) throw new Error("QUOTE_WORD_V2_DOCUMENT_XML_MISSING");
+
+  for (const entry of entries) {
+    if (!entry.name.endsWith(".xml") && !entry.name.endsWith(".rels")) continue;
+    assertBalancedWordXml(Buffer.from(entry.data).toString("utf8"), entry.name);
   }
 
   const unresolved = unresolvedTemplateTokens(docx);
@@ -56,6 +133,7 @@ export function renderQuoteWordV2FilledDocx(
     qrActions: false,
     annexImages: false,
   });
+  rendered = withoutCorruptLegacyStyles(rendered);
 
   assertQuoteWordV2FilledDocx(rendered);
   return rendered;
