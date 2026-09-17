@@ -1,5 +1,5 @@
 import { z } from "zod";
-import { DEFAULT_VAT_RATE_PERCENT, vatRatePercentSchema } from "@/lib/vat";
+import { DEFAULT_VAT_RATE_PERCENT, vatRatePercentSchema } from "../vat";
 import { quotePricingConfigSchema } from "./adjustments";
 import { QUOTE_DEFAULT_VALIDITY_DAYS, quoteStatusSchema, quoteVersionSchema } from "./domain";
 import { quoteModelSchema } from "./model";
