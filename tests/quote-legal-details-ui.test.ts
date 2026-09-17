@@ -24,7 +24,9 @@ describe("quote legal details UI", () => {
     expect(legalEditor).toContain("Début des travaux");
     expect(legalEditor).toContain("Durée prévisionnelle");
     expect(legalEditor).toContain("Fin / date limite des travaux");
-    expect(legalEditor).toContain("Début, durée et fin / date limite des travaux sont obligatoires.");
+    expect(legalEditor).toContain(
+      "Début, durée et fin / date limite des travaux sont obligatoires.",
+    );
     expect(directEditor).toContain("<QuoteLegalDetailsEditor");
   });
 
