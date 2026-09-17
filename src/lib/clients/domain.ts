@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { DEFAULT_VAT_RATE_PERCENT, vatRatePercentSchema } from "../vat";
 
 const isoDateTimeSchema = z.string().datetime({ offset: true });
 
@@ -39,6 +40,7 @@ export const clientRecordSchema = z
     email: z.union([z.literal(""), z.string().trim().email().max(240)]),
     siret: z.union([z.literal(""), z.string().regex(/^\d{14}$/)]),
     paymentTerms: z.string().trim().max(1000),
+    defaultVatRatePercent: vatRatePercentSchema.default(DEFAULT_VAT_RATE_PERCENT),
     notes: z.string().trim().max(4000),
     contacts: z.array(clientContactSchema).max(25),
     isArchived: z.boolean(),

@@ -1,5 +1,6 @@
 import { randomUUID } from "node:crypto";
 import { z } from "zod";
+import { DEFAULT_VAT_RATE_PERCENT, vatRatePercentSchema } from "../vat";
 import {
   clientContactSchema,
   clientRecordSchema,
@@ -40,6 +41,7 @@ const writableClientFields = {
   email: optionalEmailSchema.default(""),
   siret: optionalSiretSchema.default(""),
   paymentTerms: z.string().trim().max(1000).default(""),
+  defaultVatRatePercent: vatRatePercentSchema.optional(),
   notes: z.string().trim().max(4000).default(""),
   contacts: z.array(contactInputSchema).max(25).default([]),
 };
@@ -54,6 +56,11 @@ export const clientsMutationSchema = z.discriminatedUnion("action", [
     action: z.literal("update"),
     clientId: z.string().uuid(),
     ...writableClientFields,
+  }),
+  z.object({
+    action: z.literal("updateVat"),
+    clientId: z.string().uuid(),
+    defaultVatRatePercent: vatRatePercentSchema,
   }),
   z.object({ action: z.literal("archive"), clientId: z.string().uuid() }),
   z.object({ action: z.literal("reactivate"), clientId: z.string().uuid() }),
@@ -97,7 +104,7 @@ function ensureUniqueSiret(payload: ClientsPayload, siret: string, exceptClientI
   }
 }
 
-function writableValues(input: WritableMutation) {
+function writableValues(input: WritableMutation, existing?: ClientRecord) {
   return {
     type: input.type,
     companyName: input.companyName,
@@ -111,6 +118,8 @@ function writableValues(input: WritableMutation) {
     email: input.email,
     siret: input.siret,
     paymentTerms: input.paymentTerms,
+    defaultVatRatePercent:
+      input.defaultVatRatePercent ?? existing?.defaultVatRatePercent ?? DEFAULT_VAT_RATE_PERCENT,
     notes: input.notes,
     contacts: normalizeContacts(input.contacts),
   };
@@ -157,7 +166,20 @@ export function applyClientsMutation(
     ensureUniqueSiret(payload, input.siret, client.id);
     const updated = parseBusinessClient({
       ...client,
-      ...writableValues(input),
+      ...writableValues(input, client),
+      updatedAt: now,
+      updatedByName: actor.displayName,
+    });
+    const index = payload.clients.findIndex((candidate) => candidate.id === client.id);
+    payload.clients[index] = updated;
+    return { payload, focusClientId: updated.id };
+  }
+
+  if (input.action === "updateVat") {
+    if (client.isArchived) throw new Error("CLIENT_ARCHIVED");
+    const updated = parseBusinessClient({
+      ...client,
+      defaultVatRatePercent: input.defaultVatRatePercent,
       updatedAt: now,
       updatedByName: actor.displayName,
     });
