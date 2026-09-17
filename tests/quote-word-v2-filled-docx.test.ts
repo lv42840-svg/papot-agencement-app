@@ -237,7 +237,7 @@ describe("quote Word V2 filled DOCX", () => {
       const xml = Buffer.from(entry.data).toString("utf8");
       const injected = xml.replace(
         "</w:body>",
-        '<w:p><w:r><w:t>{{TOKEN_RESTANT}}</w:t></w:r></w:p></w:body>',
+        "<w:p><w:r><w:t>{{TOKEN_RESTANT}}</w:t></w:r></w:p></w:body>",
       );
       return cloneZipEntryWithData(entry, Buffer.from(injected, "utf8"));
     });
