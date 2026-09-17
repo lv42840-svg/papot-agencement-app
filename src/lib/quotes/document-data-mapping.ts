@@ -4,9 +4,12 @@ import type { CommercialPayload } from "@/lib/commercial/domain";
 import type { CommercialRepository } from "@/lib/commercial/repository";
 import type { CompanyProfile } from "@/lib/company-profile/domain";
 import type { CompanyProfileRepository } from "@/lib/company-profile/repository";
+import {
+  buildQuoteDocumentData,
+  type QuoteDocumentData,
+} from "./document-data";
 import type { QuotesRepository } from "./repository";
 import type { NativeQuotesPayload } from "./store";
-import { buildQuoteDocumentData, type QuoteDocumentData } from "./document-data";
 
 export type QuoteDocumentDataMappingInput = {
   quoteId: string;
@@ -32,7 +35,9 @@ export function buildQuoteDocumentDataFromPayloads(
   input: QuoteDocumentDataMappingInput,
   payloads: QuoteDocumentDataPayloads,
 ): QuoteDocumentData {
-  const quote = payloads.quotes.quotes.find((candidate) => candidate.id === input.quoteId);
+  const quote = payloads.quotes.quotes.find(
+    (candidate) => candidate.id === input.quoteId,
+  );
   if (!quote) throw new Error("QUOTE_DOCUMENT_QUOTE_NOT_FOUND");
 
   const commercialCase = payloads.commercial.cases.find(
@@ -40,7 +45,9 @@ export function buildQuoteDocumentDataFromPayloads(
   );
   if (!commercialCase) throw new Error("QUOTE_DOCUMENT_AFFAIR_NOT_FOUND");
 
-  const client = payloads.clients.clients.find((candidate) => candidate.id === quote.model.clientId);
+  const client = payloads.clients.clients.find(
+    (candidate) => candidate.id === quote.model.clientId,
+  );
   if (!client) throw new Error("QUOTE_DOCUMENT_CLIENT_NOT_FOUND");
 
   if (commercialCase.clientId && commercialCase.clientId !== client.id) {
