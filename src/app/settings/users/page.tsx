@@ -1,5 +1,6 @@
 import { redirect } from "next/navigation";
 import { DesktopAppShell } from "@/components/desktop-app-shell";
+import { SettingsSectionNav } from "@/components/settings-section-nav";
 import { UserAdminWorkspace } from "@/components/user-admin-workspace";
 import { requireUser } from "@/lib/auth/session";
 
@@ -11,6 +12,7 @@ export default async function UsersSettingsPage() {
 
   return (
     <DesktopAppShell>
+      <SettingsSectionNav active="users" />
       <UserAdminWorkspace />
     </DesktopAppShell>
   );
