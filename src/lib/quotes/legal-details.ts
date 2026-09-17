@@ -1,5 +1,5 @@
 import { z } from "zod";
-import { vatRatePercentSchema } from "@/lib/vat";
+import { vatRatePercentSchema } from "../vat";
 import { quoteDateSchema } from "./model";
 import {
   nativeQuoteRecordSchema,
