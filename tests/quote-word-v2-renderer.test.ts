@@ -60,8 +60,7 @@ describe("quote Word V2 scalar renderer", () => {
   });
 
   it("remplace un token même si Word l'a découpé entre plusieurs runs", () => {
-    const xml =
-      '<w:p><w:r><w:t>{{devis_</w:t></w:r><w:r><w:t>numero}}</w:t></w:r></w:p>';
+    const xml = "<w:p><w:r><w:t>{{devis_</w:t></w:r><w:r><w:t>numero}}</w:t></w:r></w:p>";
     const result = replaceWordXmlScalarTokens(xml, { devis_numero: "D&<2026>" });
 
     expect(result.xml).toContain("D&amp;&lt;2026&gt;");
