@@ -22,6 +22,7 @@ pdfIntegration("quote Word V2 PDF integration", () => {
 
     if (artifactDir) {
       await mkdir(artifactDir, { recursive: true });
+      await writeFile(path.join(artifactDir, "quote-word-v2-template.docx"), template);
       await writeFile(
         path.join(artifactDir, "quote-word-v2-filled.docx"),
         renderQuoteWordV2FilledDocx(template, referenceDocument),
