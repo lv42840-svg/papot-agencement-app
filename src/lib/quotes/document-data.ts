@@ -261,11 +261,7 @@ function vatAmount(baseHtCents: number, ratePercent: number): number {
 function buildTaxLines(lines: QuoteDocumentItem[]): QuoteDocumentTaxLine[] {
   const grouped = new Map<number, { baseHtCents: number; vatCents: number }>();
   for (const line of lines) {
-    if (
-      line.kind !== "LINE" ||
-      line.totalHtCents === null ||
-      line.vatRatePercent === null
-    )
+    if (line.kind !== "LINE" || line.totalHtCents === null || line.vatRatePercent === null)
       continue;
     const current = grouped.get(line.vatRatePercent) ?? { baseHtCents: 0, vatCents: 0 };
     current.baseHtCents += line.totalHtCents;
@@ -309,10 +305,10 @@ export function buildQuoteDocumentData(input: BuildQuoteDocumentDataInput): Quot
   const itemById = new Map(quote.model.items.map((item) => [item.id, item]));
 
   const items: QuoteDocumentItem[] = quote.model.items.map((item) => {
-    const adjustedLine = item.kind === "LINE" ? adjustedLineById.get(item.id) ?? null : null;
+    const adjustedLine = item.kind === "LINE" ? (adjustedLineById.get(item.id) ?? null) : null;
     const option = adjustedLine
       ? adjustedLine.optionId
-        ? optionById.get(adjustedLine.optionId) ?? null
+        ? (optionById.get(adjustedLine.optionId) ?? null)
         : null
       : resolveHeadingOption(item.id, item.parentId, optionByTarget, itemById);
     const optionStatus = adjustedLine?.optionStatus ?? option?.status ?? null;
@@ -338,15 +334,12 @@ export function buildQuoteDocumentData(input: BuildQuoteDocumentDataInput): Quot
       totalHtCents,
       vatRatePercent: ratePercent,
       vatCents:
-        totalHtCents !== null && ratePercent !== null
-          ? vatAmount(totalHtCents, ratePercent)
-          : null,
+        totalHtCents !== null && ratePercent !== null ? vatAmount(totalHtCents, ratePercent) : null,
     };
   });
 
   const mainLines = items.filter(
-    (item) =>
-      item.kind === "LINE" && (item.scope === "MAIN" || item.scope === "RETAINED_OPTION"),
+    (item) => item.kind === "LINE" && (item.scope === "MAIN" || item.scope === "RETAINED_OPTION"),
   );
   const taxLines = buildTaxLines(mainLines);
   const totalVatCents = taxLines.reduce((sum, line) => sum + line.vatCents, 0);
@@ -356,9 +349,7 @@ export function buildQuoteDocumentData(input: BuildQuoteDocumentDataInput): Quot
     .map((option) => {
       const optionLines = items.filter(
         (item) =>
-          item.kind === "LINE" &&
-          item.optionId === option.id &&
-          item.scope === "PENDING_OPTION",
+          item.kind === "LINE" && item.optionId === option.id && item.scope === "PENDING_OPTION",
       );
       const totalHtCents = optionLines.reduce((sum, item) => sum + (item.totalHtCents ?? 0), 0);
       const totalVatCentsForOption = optionLines.reduce(
