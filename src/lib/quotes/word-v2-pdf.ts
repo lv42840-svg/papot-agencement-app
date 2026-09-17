@@ -3,7 +3,9 @@ import type { QuoteDocumentData } from "./document-data";
 import {
   generateQuoteWordV2FilledDocxFromSources,
   renderQuoteWordV2FilledDocx,
+  renderQuoteWordV2FilledDocxWithPhotos,
 } from "./word-v2-filled-docx";
+import type { QuoteWordV2PhotoLoader } from "./word-v2-photo-renderer";
 import type {
   QuoteDocumentDataMappingInput,
   QuoteDocumentDataSources,
@@ -44,6 +46,19 @@ export async function renderQuoteWordV2Pdf(
 ): Promise<GeneratedQuoteWordV2Pdf> {
   assertQuoteWordV2PdfReady(document);
   const docx = renderQuoteWordV2FilledDocx(template, document);
+  const pdf = await converter(docx);
+  assertPdfBuffer(pdf);
+  return { document, docx, pdf };
+}
+
+export async function renderQuoteWordV2PdfWithPhotos(
+  template: Uint8Array,
+  document: QuoteDocumentData,
+  photoLoader: QuoteWordV2PhotoLoader,
+  converter: QuoteWordV2PdfConverter = convertDocxToPdfWithLibreOffice,
+): Promise<GeneratedQuoteWordV2Pdf> {
+  assertQuoteWordV2PdfReady(document);
+  const docx = await renderQuoteWordV2FilledDocxWithPhotos(template, document, photoLoader);
   const pdf = await converter(docx);
   assertPdfBuffer(pdf);
   return { document, docx, pdf };
