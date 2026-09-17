@@ -95,6 +95,10 @@
       {
         "from": "public",
         "to": "server/public"
+      },
+      {
+        "from": "docs/templates/PAPOT_Template_Devis_V2.docx",
+        "to": "quote-templates/PAPOT_Template_Devis_V2.docx"
       }
     ],
     "win": {
