@@ -3,15 +3,25 @@ import { readFileSync } from "node:fs";
 import { mkdir, writeFile } from "node:fs/promises";
 import path from "node:path";
 import { describe, expect, it } from "vitest";
-import { comparePdfVisualRenders, renderPdfToPngPages } from "../src/lib/documents/pdf-runtime";
+import {
+  comparePdfVisualRenders,
+  renderPdfToPngPages,
+} from "../src/lib/documents/pdf-runtime";
 import { readZipArchive } from "../src/lib/documents/zip-archive";
 import { renderQuoteWordV2FilledDocx } from "../src/lib/quotes/word-v2-filled-docx";
-import { renderQuoteWordV2Pdf, renderQuoteWordV2PdfWithPhotos } from "../src/lib/quotes/word-v2-pdf";
+import {
+  renderQuoteWordV2Pdf,
+  renderQuoteWordV2PdfWithPhotos,
+} from "../src/lib/quotes/word-v2-pdf";
 import type { QuoteDocumentItem } from "../src/lib/quotes/document-data";
 import { makeQuoteWordV2TestDocument } from "./fixtures/quote-word-v2-document";
 
-const templatePath = new URL("../docs/templates/PAPOT_Template_Devis_V2.docx", import.meta.url);
-const pdfIntegration = process.env.PAPOT_RUN_PDF_INTEGRATION === "1" ? describe : describe.skip;
+const templatePath = new URL(
+  "../docs/templates/PAPOT_Template_Devis_V2.docx",
+  import.meta.url,
+);
+const pdfIntegration =
+  process.env.PAPOT_RUN_PDF_INTEGRATION === "1" ? describe : describe.skip;
 const onePixelPng = Buffer.from(
   "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAusB9Y9ZQmcAAAAASUVORK5CYII=",
   "base64",
@@ -129,7 +139,10 @@ pdfIntegration("quote Word V2 PDF integration", () => {
 
     if (artifactDir) {
       await mkdir(artifactDir, { recursive: true });
-      await writeFile(path.join(artifactDir, "quote-word-v2-template.docx"), template);
+      await writeFile(
+        path.join(artifactDir, "quote-word-v2-template.docx"),
+        template,
+      );
       await writeFile(
         path.join(artifactDir, "quote-word-v2-filled.docx"),
         renderQuoteWordV2FilledDocx(template, referenceDocument),
@@ -157,11 +170,20 @@ pdfIntegration("quote Word V2 PDF integration", () => {
     expect(comparison.changedPages).toContain(1);
 
     if (artifactDir) {
-      await writeFile(path.join(artifactDir, "quote-word-v2.pdf"), reference.pdf);
-      await writeFile(path.join(artifactDir, "quote-word-v2-changed.pdf"), changed.pdf);
+      await writeFile(
+        path.join(artifactDir, "quote-word-v2.pdf"),
+        reference.pdf,
+      );
+      await writeFile(
+        path.join(artifactDir, "quote-word-v2-changed.pdf"),
+        changed.pdf,
+      );
       await Promise.all(
         pages.map((page, index) =>
-          writeFile(path.join(artifactDir, `quote-word-v2-page-${index + 1}.png`), page),
+          writeFile(
+            path.join(artifactDir, `quote-word-v2-page-${index + 1}.png`),
+            page,
+          ),
         ),
       );
       await writeFile(
@@ -184,11 +206,19 @@ pdfIntegration("quote Word V2 PDF integration", () => {
     expect(pages.length).toBeGreaterThanOrEqual(5);
 
     const documentXml = Buffer.from(
-      readZipArchive(generated.docx).find((entry) => entry.name === "word/document.xml")?.data ?? [],
+      readZipArchive(generated.docx).find(
+        (entry) => entry.name === "word/document.xml",
+      )?.data ?? [],
     ).toString("utf8");
-    expect(documentXml).toContain("OPTION RETENUE - habillage complémentaire");
-    expect(documentXml).toContain("OPTION NON COMPRISE - éclairage décoratif");
-    expect(documentXml).not.toContain("OPTION REJETEE - NE DOIT PAS APPARAITRE");
+    expect(documentXml).toContain(
+      "OPTION RETENUE - habillage complémentaire",
+    );
+    expect(documentXml).toContain(
+      "OPTION NON COMPRISE - éclairage décoratif",
+    );
+    expect(documentXml).not.toContain(
+      "OPTION REJETEE - NE DOIT PAS APPARAITRE",
+    );
     expect(documentXml).toContain("<w:drawing>");
     expect(documentXml).not.toContain("{{PAPOT_ANNEX_IMAGES}}");
 
@@ -196,11 +226,23 @@ pdfIntegration("quote Word V2 PDF integration", () => {
     if (artifactDirValue) {
       const artifactDir = path.resolve(artifactDirValue);
       await mkdir(artifactDir, { recursive: true });
-      await writeFile(path.join(artifactDir, "quote-word-v2-long.docx"), generated.docx);
-      await writeFile(path.join(artifactDir, "quote-word-v2-long.pdf"), generated.pdf);
+      await writeFile(
+        path.join(artifactDir, "quote-word-v2-long.docx"),
+        generated.docx,
+      );
+      await writeFile(
+        path.join(artifactDir, "quote-word-v2-long.pdf"),
+        generated.pdf,
+      );
       await Promise.all(
         pages.map((page, index) =>
-          writeFile(path.join(artifactDir, `quote-word-v2-long-page-${index + 1}.png`), page),
+          writeFile(
+            path.join(
+              artifactDir,
+              `quote-word-v2-long-page-${index + 1}.png`,
+            ),
+            page,
+          ),
         ),
       );
     }
