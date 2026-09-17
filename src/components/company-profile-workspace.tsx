@@ -12,8 +12,7 @@ type ApiResponse = {
 function errorMessage(code: string) {
   if (code === "ADMIN_FORBIDDEN") return "Administration non autorisée.";
   if (code === "AUTH_REQUIRED") return "Connexion requise.";
-  if (code === "COMPANY_PROFILE_REQUEST_INVALID")
-    return "Certaines informations sont invalides.";
+  if (code === "COMPANY_PROFILE_REQUEST_INVALID") return "Certaines informations sont invalides.";
   if (code === "COMPANY_PROFILE_INVALID") return "La fiche société enregistrée est invalide.";
   return code || "Une erreur est survenue.";
 }
@@ -104,11 +103,7 @@ export function CompanyProfileWorkspace() {
               value={profile.postalCode}
               onChange={(value) => update("postalCode", value)}
             />
-            <Field
-              label="Ville"
-              value={profile.city}
-              onChange={(value) => update("city", value)}
-            />
+            <Field label="Ville" value={profile.city} onChange={(value) => update("city", value)} />
             <Field
               label="Téléphone"
               value={profile.phone}
@@ -138,16 +133,8 @@ export function CompanyProfileWorkspace() {
               value={profile.siret}
               onChange={(value) => update("siret", value)}
             />
-            <Field
-              label="RCS"
-              value={profile.rcs}
-              onChange={(value) => update("rcs", value)}
-            />
-            <Field
-              label="APE"
-              value={profile.ape}
-              onChange={(value) => update("ape", value)}
-            />
+            <Field label="RCS" value={profile.rcs} onChange={(value) => update("rcs", value)} />
+            <Field label="APE" value={profile.ape} onChange={(value) => update("ape", value)} />
             <Field
               label="TVA intracommunautaire"
               value={profile.vatNumber}
@@ -195,16 +182,8 @@ export function CompanyProfileWorkspace() {
               value={profile.bankAccountHolder}
               onChange={(value) => update("bankAccountHolder", value)}
             />
-            <Field
-              label="IBAN"
-              value={profile.iban}
-              onChange={(value) => update("iban", value)}
-            />
-            <Field
-              label="BIC"
-              value={profile.bic}
-              onChange={(value) => update("bic", value)}
-            />
+            <Field label="IBAN" value={profile.iban} onChange={(value) => update("iban", value)} />
+            <Field label="BIC" value={profile.bic} onChange={(value) => update("bic", value)} />
           </CompanySection>
 
           <div className="companyProfileActions">
