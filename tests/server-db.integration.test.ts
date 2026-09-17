@@ -1,5 +1,7 @@
 import type { Pool } from "pg";
-import { afterAll, beforeAll, describe, expect, it } from "vitest";
+import { afterAll, beforeAll, describe, expect, it, vi } from "vitest";
+
+vi.mock("server-only", () => ({}));
 
 import { createPostgresCompanyProfileRepository } from "../src/lib/company-profile/postgres-repository";
 import { runServerDbMigrations } from "../src/lib/server-db/migrations";
