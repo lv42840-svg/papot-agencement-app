@@ -1,10 +1,41 @@
 import { z } from "zod";
+import { DEFAULT_VAT_RATE_PERCENT, vatRatePercentSchema } from "@/lib/vat";
 import { quotePricingConfigSchema } from "./adjustments";
 import { QUOTE_DEFAULT_VALIDITY_DAYS, quoteStatusSchema, quoteVersionSchema } from "./domain";
 import { quoteModelSchema } from "./model";
 
 const isoDateTimeSchema = z.string().datetime({ offset: true });
 const dateOnlySchema = z.string().regex(/^\d{4}-\d{2}-\d{2}$/);
+
+export const quoteWorkScheduleSchema = z.object({
+  startDate: dateOnlySchema.nullable(),
+  duration: z.string().trim().max(240),
+  endDate: dateOnlySchema.nullable(),
+});
+
+export const quoteLineVatOverrideSchema = z.object({
+  lineId: z.string().uuid(),
+  ratePercent: vatRatePercentSchema,
+});
+
+export const quoteTaxConfigSchema = z
+  .object({
+    defaultRatePercent: vatRatePercentSchema,
+    lineOverrides: z.array(quoteLineVatOverrideSchema).max(1000),
+  })
+  .superRefine((config, context) => {
+    const lineIds = new Set<string>();
+    for (const override of config.lineOverrides) {
+      if (lineIds.has(override.lineId)) {
+        context.addIssue({
+          code: z.ZodIssueCode.custom,
+          path: ["lineOverrides"],
+          message: "QUOTE_VAT_LINE_OVERRIDE_DUPLICATE",
+        });
+      }
+      lineIds.add(override.lineId);
+    }
+  });
 
 export const nativeQuoteRecordSchema = z
   .object({
@@ -19,6 +50,15 @@ export const nativeQuoteRecordSchema = z
     pricingConfig: quotePricingConfigSchema.optional().default({
       adjustments: [],
       options: [],
+    }),
+    workSchedule: quoteWorkScheduleSchema.optional().default({
+      startDate: null,
+      duration: "",
+      endDate: null,
+    }),
+    taxConfig: quoteTaxConfigSchema.optional().default({
+      defaultRatePercent: DEFAULT_VAT_RATE_PERCENT,
+      lineOverrides: [],
     }),
     model: quoteModelSchema,
     createdAt: isoDateTimeSchema,
@@ -41,6 +81,9 @@ export const nativeQuotesPayloadSchema = z.object({
   quotes: z.array(nativeQuoteRecordSchema),
 });
 
+export type QuoteWorkSchedule = z.infer<typeof quoteWorkScheduleSchema>;
+export type QuoteLineVatOverride = z.infer<typeof quoteLineVatOverrideSchema>;
+export type QuoteTaxConfig = z.infer<typeof quoteTaxConfigSchema>;
 export type NativeQuoteRecord = z.infer<typeof nativeQuoteRecordSchema>;
 export type NativeQuotesPayload = z.infer<typeof nativeQuotesPayloadSchema>;
 
