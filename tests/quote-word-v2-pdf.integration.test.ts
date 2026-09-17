@@ -6,6 +6,7 @@ import {
   comparePdfVisualRenders,
   renderPdfToPngPages,
 } from "../src/lib/documents/pdf-runtime";
+import { renderQuoteWordV2FilledDocx } from "../src/lib/quotes/word-v2-filled-docx";
 import { renderQuoteWordV2Pdf } from "../src/lib/quotes/word-v2-pdf";
 import { makeQuoteWordV2TestDocument } from "./fixtures/quote-word-v2-document";
 
@@ -15,10 +16,19 @@ const pdfIntegration = process.env.PAPOT_RUN_PDF_INTEGRATION === "1" ? describe 
 pdfIntegration("quote Word V2 PDF integration", () => {
   it("convertit réellement avec LibreOffice et détecte une différence visuelle", async () => {
     const template = readFileSync(templatePath);
-    const reference = await renderQuoteWordV2Pdf(
-      template,
-      makeQuoteWordV2TestDocument("D-2026-0042"),
-    );
+    const referenceDocument = makeQuoteWordV2TestDocument("D-2026-0042");
+    const artifactDirValue = process.env.PAPOT_PDF_ARTIFACT_DIR?.trim();
+    const artifactDir = artifactDirValue ? path.resolve(artifactDirValue) : null;
+
+    if (artifactDir) {
+      await mkdir(artifactDir, { recursive: true });
+      await writeFile(
+        path.join(artifactDir, "quote-word-v2-filled.docx"),
+        renderQuoteWordV2FilledDocx(template, referenceDocument),
+      );
+    }
+
+    const reference = await renderQuoteWordV2Pdf(template, referenceDocument);
     const changed = await renderQuoteWordV2Pdf(
       template,
       makeQuoteWordV2TestDocument("D-2026-0043"),
@@ -38,11 +48,7 @@ pdfIntegration("quote Word V2 PDF integration", () => {
     expect(comparison.matches).toBe(false);
     expect(comparison.changedPages).toContain(1);
 
-    const artifactDirValue = process.env.PAPOT_PDF_ARTIFACT_DIR?.trim();
-    if (artifactDirValue) {
-      const artifactDir = path.resolve(artifactDirValue);
-      await mkdir(artifactDir, { recursive: true });
-      await writeFile(path.join(artifactDir, "quote-word-v2-filled.docx"), reference.docx);
+    if (artifactDir) {
       await writeFile(path.join(artifactDir, "quote-word-v2.pdf"), reference.pdf);
       await writeFile(path.join(artifactDir, "quote-word-v2-changed.pdf"), changed.pdf);
       await Promise.all(
