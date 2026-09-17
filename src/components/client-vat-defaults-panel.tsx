@@ -145,7 +145,12 @@ export function ClientVatDefaultsPanel() {
             />
           </label>
           {snapshot?.canWrite ? (
-            <button className="primaryButton" type="button" onClick={() => void save()} disabled={busy}>
+            <button
+              className="primaryButton"
+              type="button"
+              onClick={() => void save()}
+              disabled={busy}
+            >
               <Save size={14} aria-hidden="true" /> {busy ? "Enregistrement…" : "Enregistrer"}
             </button>
           ) : null}
