@@ -41,7 +41,7 @@ const writableClientFields = {
   email: optionalEmailSchema.default(""),
   siret: optionalSiretSchema.default(""),
   paymentTerms: z.string().trim().max(1000).default(""),
-  defaultVatRatePercent: vatRatePercentSchema.default(DEFAULT_VAT_RATE_PERCENT),
+  defaultVatRatePercent: vatRatePercentSchema.optional(),
   notes: z.string().trim().max(4000).default(""),
   contacts: z.array(contactInputSchema).max(25).default([]),
 };
@@ -104,7 +104,7 @@ function ensureUniqueSiret(payload: ClientsPayload, siret: string, exceptClientI
   }
 }
 
-function writableValues(input: WritableMutation) {
+function writableValues(input: WritableMutation, existing?: ClientRecord) {
   return {
     type: input.type,
     companyName: input.companyName,
@@ -118,7 +118,8 @@ function writableValues(input: WritableMutation) {
     email: input.email,
     siret: input.siret,
     paymentTerms: input.paymentTerms,
-    defaultVatRatePercent: input.defaultVatRatePercent,
+    defaultVatRatePercent:
+      input.defaultVatRatePercent ?? existing?.defaultVatRatePercent ?? DEFAULT_VAT_RATE_PERCENT,
     notes: input.notes,
     contacts: normalizeContacts(input.contacts),
   };
@@ -165,7 +166,7 @@ export function applyClientsMutation(
     ensureUniqueSiret(payload, input.siret, client.id);
     const updated = parseBusinessClient({
       ...client,
-      ...writableValues(input),
+      ...writableValues(input, client),
       updatedAt: now,
       updatedByName: actor.displayName,
     });
