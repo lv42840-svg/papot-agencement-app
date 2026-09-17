@@ -91,7 +91,9 @@ export function resolveQuoteLineVatRate(quote: NativeQuoteRecord, lineId: string
 
 export function quoteHasCompleteWorkSchedule(quote: NativeQuoteRecord): boolean {
   return Boolean(
-    quote.workSchedule.startDate && quote.workSchedule.duration.trim() && quote.workSchedule.endDate,
+    quote.workSchedule.startDate &&
+      quote.workSchedule.duration.trim() &&
+      quote.workSchedule.endDate,
   );
 }
 
@@ -108,27 +110,16 @@ export function applyQuoteLegalDetailsMutation(
 
   if (input.action === "updateWorkSchedule") {
     const schedule = quoteWorkScheduleInputSchema.parse(input.schedule);
-    return saveQuote(
-      payload,
-      quoteIndex,
-      { ...quote, workSchedule: schedule },
-      actor,
-      now,
-    );
+    return saveQuote(payload, quoteIndex, { ...quote, workSchedule: schedule }, actor, now);
   }
 
-  const line = quote.model.items.find(
-    (item) => item.kind === "LINE" && item.id === input.lineId,
-  );
+  const line = quote.model.items.find((item) => item.kind === "LINE" && item.id === input.lineId);
   if (!line) throw new Error("QUOTE_LINE_NOT_FOUND");
 
   const lineOverrides = quote.taxConfig.lineOverrides.filter(
     (override) => override.lineId !== input.lineId,
   );
-  if (
-    input.ratePercent !== null &&
-    input.ratePercent !== quote.taxConfig.defaultRatePercent
-  ) {
+  if (input.ratePercent !== null && input.ratePercent !== quote.taxConfig.defaultRatePercent) {
     lineOverrides.push({ lineId: input.lineId, ratePercent: input.ratePercent });
   }
 
