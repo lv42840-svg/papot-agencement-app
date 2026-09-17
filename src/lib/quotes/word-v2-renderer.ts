@@ -253,6 +253,15 @@ function makeCell(templateCell: string, paragraph: string): string {
   return `<w:tc>${cellProperties(templateCell)}${paragraph}</w:tc>`;
 }
 
+function findOpeningTagStart(xml: string, tagName: string, beforeIndex: number): number {
+  const openingTagPattern = new RegExp(`<${tagName}(?:\\s[^>]*)?>`, "g");
+  let lastStart = -1;
+  for (const match of xml.slice(0, beforeIndex + 1).matchAll(openingTagPattern)) {
+    if (match.index !== undefined) lastStart = match.index;
+  }
+  return lastStart;
+}
+
 function visibleBodyItemIds(items: QuoteDocumentItem[]): Set<string> {
   const itemById = new Map(items.map((item) => [item.id, item]));
   const visible = new Set<string>();
@@ -343,7 +352,7 @@ export function replaceQuoteBodyAnchor(documentXml: string, document: QuoteDocum
     throw new Error("QUOTE_WORD_V2_BODY_ANCHOR_DUPLICATE");
   }
 
-  const rowStart = documentXml.lastIndexOf("<w:tr", anchorIndex);
+  const rowStart = findOpeningTagStart(documentXml, "w:tr", anchorIndex);
   const rowCloseStart = documentXml.indexOf("</w:tr>", anchorIndex);
   if (rowStart < 0 || rowCloseStart < 0) throw new Error("QUOTE_WORD_V2_BODY_ROW_MISSING");
   const rowEnd = rowCloseStart + "</w:tr>".length;
