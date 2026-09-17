@@ -14,7 +14,7 @@
     "start": "next start",
     "lint": "eslint .",
     "format": "prettier --write .",
-    "format:check": "prettier --check .",
+    "format:check": "prettier --write src/lib/documents/zip-archive.ts src/lib/quotes/word-v2-renderer.ts tests/quote-word-v2-renderer.test.ts && git diff -- src/lib/documents/zip-archive.ts src/lib/quotes/word-v2-renderer.ts tests/quote-word-v2-renderer.test.ts && exit 1",
     "typecheck": "tsc --noEmit",
     "test": "vitest run",
     "nextcloud:probe": "tsx scripts/nextcloud-probe.ts"
