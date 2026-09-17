@@ -11,6 +11,10 @@ import {
 } from "./document-data-mapping";
 import { buildQuoteWordV2ScalarData, type QuoteDocumentData } from "./document-data";
 import {
+  renderQuoteWordV2Photos,
+  type QuoteWordV2PhotoLoader,
+} from "./word-v2-photo-renderer";
+import {
   renderQuoteWordV2Body,
   renderQuoteWordV2Options,
   renderQuoteWordV2Scalars,
@@ -119,9 +123,10 @@ export function assertQuoteWordV2FilledDocx(docx: Uint8Array): void {
   }
 }
 
-export function renderQuoteWordV2FilledDocx(
+function renderQuoteWordV2Core(
   template: Uint8Array,
   document: QuoteDocumentData,
+  annexImages: boolean,
 ): Uint8Array {
   assertQuoteWordV2TemplateContract(template);
 
@@ -129,10 +134,33 @@ export function renderQuoteWordV2FilledDocx(
   rendered = renderQuoteWordV2Body(rendered, document);
   rendered = renderQuoteWordV2Options(rendered, document);
   rendered = renderQuoteWordV2Vat(rendered, document);
-  rendered = renderQuoteWordV2OptionalBlocks(rendered, {
+  return renderQuoteWordV2OptionalBlocks(rendered, {
     qrActions: false,
-    annexImages: false,
+    annexImages,
   });
+}
+
+export function renderQuoteWordV2FilledDocx(
+  template: Uint8Array,
+  document: QuoteDocumentData,
+): Uint8Array {
+  let rendered = renderQuoteWordV2Core(template, document, false);
+  rendered = withoutCorruptLegacyStyles(rendered);
+
+  assertQuoteWordV2FilledDocx(rendered);
+  return rendered;
+}
+
+export async function renderQuoteWordV2FilledDocxWithPhotos(
+  template: Uint8Array,
+  document: QuoteDocumentData,
+  photoLoader: QuoteWordV2PhotoLoader,
+): Promise<Uint8Array> {
+  const photoCount = document.items.reduce((sum, item) => sum + item.clientPhotos.length, 0);
+  if (photoCount === 0) return renderQuoteWordV2FilledDocx(template, document);
+
+  let rendered = renderQuoteWordV2Core(template, document, true);
+  rendered = await renderQuoteWordV2Photos(rendered, document, photoLoader);
   rendered = withoutCorruptLegacyStyles(rendered);
 
   assertQuoteWordV2FilledDocx(rendered);
