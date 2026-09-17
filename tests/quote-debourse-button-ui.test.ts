@@ -16,12 +16,12 @@ describe("quote debourse button", () => {
     expect(checkSource).not.toContain("Σ Composants");
   });
 
-  it("places Debourse after the back action while Send remains hidden", () => {
+  it("places Debourse after the back action while final PDF freeze remains available", () => {
     const debourseIndex = editorSource.indexOf("<QuoteComponentCheck quote={quote} />");
     const backIndex = editorSource.indexOf("Tous les devis");
 
     expect(backIndex).toBeGreaterThanOrEqual(0);
     expect(debourseIndex).toBeGreaterThan(backIndex);
-    expect(editorSource).not.toContain("QuoteSendAction");
+    expect(editorSource).toContain("QuoteSendAction");
   });
 });
