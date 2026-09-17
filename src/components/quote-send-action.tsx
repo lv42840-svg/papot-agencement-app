@@ -20,7 +20,10 @@ function sendErrorLabel(code?: string): string {
   if (code === "QUOTE_FINAL_PDF_ARCHIVE_CONFLICT") {
     return "Un PDF différent existe déjà pour ce numéro, cette variante et cette version. Aucun fichier n’a été écrasé.";
   }
-  if (code?.startsWith("QUOTE_WORD_V2_PDF_REQUIRED_FIELDS:") || code?.startsWith("QUOTE_DOCUMENT_WORK_")) {
+  if (
+    code?.startsWith("QUOTE_WORD_V2_PDF_REQUIRED_FIELDS:") ||
+    code?.startsWith("QUOTE_DOCUMENT_WORK_")
+  ) {
     return "Complète les informations nécessaires au PDF, notamment les dates et la durée des travaux.";
   }
   if (code?.startsWith("QUOTE_WORD_V2_TEMPLATE_")) {
@@ -78,7 +81,8 @@ export function QuoteSendAction({
     }
     return (
       <div className="quoteNotice">
-        <FileLock2 size={14} aria-hidden="true" /> {quote.finalPdf.quoteNumber} · PDF figé · {quote.variantName} V{quote.version}
+        <FileLock2 size={14} aria-hidden="true" /> {quote.finalPdf.quoteNumber} · PDF figé ·{" "}
+        {quote.variantName} V{quote.version}
         {quote.followUpDate ? ` · relance prévue le ${quote.followUpDate}` : ""}
       </div>
     );
@@ -96,7 +100,8 @@ export function QuoteSendAction({
   return (
     <form className="quoteDraftForm" onSubmit={submit}>
       <div className="quoteNotice">
-        Le PDF recevra son numéro définitif puis sera archivé sans possibilité d’écraser ce fichier. Pour modifier ensuite le devis, crée une nouvelle version.
+        Le PDF recevra son numéro définitif puis sera archivé sans possibilité d’écraser ce fichier.
+        Pour modifier ensuite le devis, crée une nouvelle version.
       </div>
       <label className="quoteField">
         <span>Date de relance obligatoire</span>
