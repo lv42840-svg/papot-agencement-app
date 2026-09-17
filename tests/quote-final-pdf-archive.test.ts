@@ -22,7 +22,9 @@ const context = {
   caseName: "AGENCEMENT TEST",
 };
 const pdf = Buffer.from("%PDF-1.7\n1 0 obj\n<< /Type /Catalog >>\nendobj\n%%EOF\n");
-const changedPdf = Buffer.from("%PDF-1.7\n1 0 obj\n<< /Type /Catalog /Pages 2 0 R >>\nendobj\n%%EOF\n");
+const changedPdf = Buffer.from(
+  "%PDF-1.7\n1 0 obj\n<< /Type /Catalog /Pages 2 0 R >>\nendobj\n%%EOF\n",
+);
 
 async function createStore() {
   const root = await mkdtemp(path.join(tmpdir(), "papot-final-pdf-"));
