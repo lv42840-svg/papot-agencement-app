@@ -37,6 +37,19 @@ export const quoteTaxConfigSchema = z
     }
   });
 
+export const quoteFinalPdfSchema = z.object({
+  quoteNumber: z.string().regex(/^D-\d{4}-\d{4}$/),
+  variantName: z.string().trim().min(1).max(120),
+  version: quoteVersionSchema,
+  commercialDocumentId: z.string().uuid(),
+  fileName: z.string().trim().min(1).max(255),
+  storagePath: z.string().trim().min(1).max(1200),
+  sizeBytes: z.number().int().positive(),
+  sha256: z.string().regex(/^[a-f0-9]{64}$/),
+  archivedAt: isoDateTimeSchema,
+  archivedByName: z.string().trim().min(1).max(160),
+});
+
 export const nativeQuoteRecordSchema = z
   .object({
     id: z.string().uuid(),
@@ -46,6 +59,7 @@ export const nativeQuoteRecordSchema = z
     status: quoteStatusSchema,
     sentAt: isoDateTimeSchema.nullable().optional().default(null),
     followUpDate: dateOnlySchema.nullable().optional().default(null),
+    finalPdf: quoteFinalPdfSchema.nullable().optional().default(null),
     internalNotes: z.string().trim().max(20_000).optional().default(""),
     pricingConfig: quotePricingConfigSchema.optional().default({
       adjustments: [],
@@ -74,6 +88,29 @@ export const nativeQuoteRecordSchema = z
         message: "QUOTE_RECORD_MODEL_ID_MISMATCH",
       });
     }
+    if (record.finalPdf) {
+      if (record.status === "DRAFT") {
+        context.addIssue({
+          code: z.ZodIssueCode.custom,
+          path: ["finalPdf"],
+          message: "QUOTE_FINAL_PDF_DRAFT_FORBIDDEN",
+        });
+      }
+      if (record.finalPdf.variantName !== record.variantName) {
+        context.addIssue({
+          code: z.ZodIssueCode.custom,
+          path: ["finalPdf", "variantName"],
+          message: "QUOTE_FINAL_PDF_VARIANT_MISMATCH",
+        });
+      }
+      if (record.finalPdf.version !== record.version) {
+        context.addIssue({
+          code: z.ZodIssueCode.custom,
+          path: ["finalPdf", "version"],
+          message: "QUOTE_FINAL_PDF_VERSION_MISMATCH",
+        });
+      }
+    }
   });
 
 export const nativeQuotesPayloadSchema = z.object({
@@ -84,6 +121,7 @@ export const nativeQuotesPayloadSchema = z.object({
 export type QuoteWorkSchedule = z.infer<typeof quoteWorkScheduleSchema>;
 export type QuoteLineVatOverride = z.infer<typeof quoteLineVatOverrideSchema>;
 export type QuoteTaxConfig = z.infer<typeof quoteTaxConfigSchema>;
+export type QuoteFinalPdf = z.infer<typeof quoteFinalPdfSchema>;
 export type NativeQuoteRecord = z.infer<typeof nativeQuoteRecordSchema>;
 export type NativeQuotesPayload = z.infer<typeof nativeQuotesPayloadSchema>;
 
