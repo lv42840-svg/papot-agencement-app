@@ -33,6 +33,8 @@ describe("quote client presentation UI", () => {
   it("keeps the former presentation panel focused on photos only", () => {
     expect(panel).toContain("Photos de la ligne");
     expect(panel).toContain("Visible client");
+    expect(panel).toContain("Voir la photo en grand");
+    expect(panel).toContain("quotePhotoLightbox");
     expect(panel).toContain('accept="image/jpeg,image/png,image/webp"');
     expect(panel).not.toContain("HIGHLIGHT_COLOR_PRESETS");
     expect(panel).not.toContain("updateItemPresentation");
