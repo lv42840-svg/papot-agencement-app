@@ -66,7 +66,7 @@ export const quotePricingConfigSchema = z
   .object({
     adjustments: z.array(quotePricingAdjustmentSchema).max(100),
     options: z.array(quoteOptionSchema).max(500),
-    customerDiscount: quoteCustomerDiscountSchema.optional().default(null),
+    customerDiscount: quoteCustomerDiscountSchema.optional(),
   })
   .superRefine((config, context) => {
     const adjustmentIds = new Set<string>();
@@ -114,7 +114,7 @@ export type QuoteCustomerDiscount = z.infer<typeof quoteCustomerDiscountValueSch
 export type QuotePricingConfig = z.infer<typeof quotePricingConfigSchema>;
 
 export function createEmptyQuotePricingConfig(): QuotePricingConfig {
-  return { adjustments: [], options: [], customerDiscount: null };
+  return { adjustments: [], options: [] };
 }
 
 export type QuoteAdjustedLine = {
