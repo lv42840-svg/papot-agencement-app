@@ -160,8 +160,8 @@ export function CommercialAffairQuotes({ item }: { item: CommercialCase }) {
               <span>variante{variantCount > 1 ? "s" : ""}</span>
             </div>
             <p>
-              Pas de cumul contractuel à ce stade : les variantes et anciennes versions ne sont
-              pas additionnées avant la sélection des devis réellement retenus.
+              Pas de cumul contractuel à ce stade : les variantes et anciennes versions ne sont pas
+              additionnées avant la sélection des devis réellement retenus.
             </p>
           </div>
 
