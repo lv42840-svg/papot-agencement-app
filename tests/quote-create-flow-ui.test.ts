@@ -22,7 +22,7 @@ describe("quote creation flow", () => {
   it("permet de lancer un devis depuis la fiche affaire", () => {
     expect(affairQuotes).toContain("Créer un devis");
     expect(affairQuotes).toContain("/devis/nouveau?affaire=");
-    expect(createPage).toContain('searchParams: Promise<{ affaire?: string; chantier?: string }>');
+    expect(createPage).toContain("searchParams: Promise<{ affaire?: string; chantier?: string }>");
     expect(createPage).toContain("initialAffairId={initialAffairId}");
   });
 
