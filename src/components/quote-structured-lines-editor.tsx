@@ -446,27 +446,48 @@ export function QuoteStructuredLinesEditor({
     return new Map(adjusted.lines.map((line) => [line.lineId, line]));
   }, [quote]);
   const itemById = useMemo(() => new Map(items.map((item) => [item.id, item])), [items]);
+  const optionByTargetId = useMemo(
+    () => new Map((quote?.pricingConfig.options ?? []).map((option) => [option.targetItemId, option])),
+    [quote],
+  );
   const headingTotalsById = useMemo(() => {
     const totals = new Map<string, number>();
+
+    const headingOption = (headingId: string) => {
+      const heading = itemById.get(headingId);
+      if (!heading || (heading.kind !== "SECTION" && heading.kind !== "SUBSECTION")) return null;
+      const direct = optionByTargetId.get(heading.id);
+      if (direct) return direct;
+      return heading.kind === "SUBSECTION" ? (optionByTargetId.get(heading.parentId) ?? null) : null;
+    };
+
+    const belongsToHeading = (
+      headingId: string,
+      adjusted: NonNullable<ReturnType<typeof adjustedLinesById.get>>,
+    ) => {
+      const option = headingOption(headingId);
+      if (option) {
+        return adjusted.optionId === option.id && adjusted.optionStatus !== "REJECTED";
+      }
+      return adjusted.optionStatus !== "PENDING" && adjusted.optionStatus !== "REJECTED";
+    };
+
     for (const line of lines) {
       const adjusted = adjustedLinesById.get(line.id);
-      if (
-        !adjusted ||
-        adjusted.optionStatus === "PENDING" ||
-        adjusted.optionStatus === "REJECTED"
-      ) {
-        continue;
-      }
+      if (!adjusted || !line.parentId) continue;
       const amount = adjusted.saleCents;
-      if (!line.parentId) continue;
-      totals.set(line.parentId, (totals.get(line.parentId) ?? 0) + amount);
+
+      if (belongsToHeading(line.parentId, adjusted)) {
+        totals.set(line.parentId, (totals.get(line.parentId) ?? 0) + amount);
+      }
+
       const parent = itemById.get(line.parentId);
-      if (parent?.kind === "SUBSECTION") {
+      if (parent?.kind === "SUBSECTION" && belongsToHeading(parent.parentId, adjusted)) {
         totals.set(parent.parentId, (totals.get(parent.parentId) ?? 0) + amount);
       }
     }
     return totals;
-  }, [adjustedLinesById, itemById, lines]);
+  }, [adjustedLinesById, itemById, lines, optionByTargetId]);
   const numbers = useMemo(() => buildQuoteItemNumbers(items), [items]);
   const lastSection = useMemo(() => latestSection(items), [items]);
   const editable = canWrite && quote?.status === "DRAFT";
