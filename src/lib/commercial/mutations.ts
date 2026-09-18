@@ -54,6 +54,11 @@ export const commercialMutationSchema = z.discriminatedUnion("action", [
     confirmWithoutQuote: z.boolean().optional(),
   }),
   z.object({
+    action: z.literal("retainAdditionalQuote"),
+    caseId: z.string().uuid(),
+    quoteId: z.string().uuid(),
+  }),
+  z.object({
     action: z.literal("markQuoteSent"),
     caseId: z.string().uuid(),
     followUpDate: dateOnlySchema,
@@ -354,6 +359,23 @@ export function applyCommercialMutation(
   if (input.action === "setStatus") {
     assertOpen(item);
     setActiveStatus(item, input.status, input, actor, now);
+    return { payload, focusCaseId: item.id };
+  }
+
+  if (input.action === "retainAdditionalQuote") {
+    if (item.status !== "CONFIRMED") throw new Error("COMMERCIAL_NOT_CONFIRMED");
+    if (item.retainedQuoteIds.includes(input.quoteId)) {
+      throw new Error("COMMERCIAL_QUOTE_ALREADY_RETAINED");
+    }
+    item.retainedQuoteIds.push(input.quoteId);
+    touch(item, actor, now);
+    history(
+      item,
+      actor.displayName,
+      "QUOTES_RETAINED",
+      `Devis complémentaire accepté et ajouté à la base contractuelle (${item.retainedQuoteIds.length} devis retenus).`,
+      now,
+    );
     return { payload, focusCaseId: item.id };
   }
 
