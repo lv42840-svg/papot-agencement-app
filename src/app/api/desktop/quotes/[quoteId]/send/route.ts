@@ -118,13 +118,7 @@ export async function POST(request: Request, { params }: { params: Promise<{ quo
 
       if (quote.status === "FROZEN") {
         if (input.mode !== "SEND") throw new Error("QUOTE_NOT_EDITABLE");
-        const sent = markFrozenNativeQuoteSent(
-          payload,
-          quoteId,
-          input.followUpDate,
-          actor,
-          now,
-        );
+        const sent = markFrozenNativeQuoteSent(payload, quoteId, input.followUpDate, actor, now);
 
         await commercialRepository.mutate((commercialPayload) => {
           const affair = commercialPayload.cases.find(
@@ -184,13 +178,7 @@ export async function POST(request: Request, { params }: { params: Promise<{ quo
 
       const finalized =
         input.mode === "VALIDATE"
-          ? markNativeQuoteValidatedWithFinalPdf(
-              payload,
-              quoteId,
-              archive.finalPdf,
-              actor,
-              now,
-            )
+          ? markNativeQuoteValidatedWithFinalPdf(payload, quoteId, archive.finalPdf, actor, now)
           : markNativeQuoteSentWithFinalPdf(
               payload,
               quoteId,

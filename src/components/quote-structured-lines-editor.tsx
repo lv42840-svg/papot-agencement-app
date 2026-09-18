@@ -447,7 +447,8 @@ export function QuoteStructuredLinesEditor({
   }, [quote]);
   const itemById = useMemo(() => new Map(items.map((item) => [item.id, item])), [items]);
   const optionByTargetId = useMemo(
-    () => new Map((quote?.pricingConfig.options ?? []).map((option) => [option.targetItemId, option])),
+    () =>
+      new Map((quote?.pricingConfig.options ?? []).map((option) => [option.targetItemId, option])),
     [quote],
   );
   const headingTotalsById = useMemo(() => {
@@ -458,7 +459,9 @@ export function QuoteStructuredLinesEditor({
       if (!heading || (heading.kind !== "SECTION" && heading.kind !== "SUBSECTION")) return null;
       const direct = optionByTargetId.get(heading.id);
       if (direct) return direct;
-      return heading.kind === "SUBSECTION" ? (optionByTargetId.get(heading.parentId) ?? null) : null;
+      return heading.kind === "SUBSECTION"
+        ? (optionByTargetId.get(heading.parentId) ?? null)
+        : null;
     };
 
     const belongsToHeading = (

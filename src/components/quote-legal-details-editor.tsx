@@ -260,8 +260,7 @@ export function QuoteLegalDetailsEditor({
                         .map(rateInput)
                         .filter(
                           (rate, index, all) =>
-                            all.indexOf(rate) === index ||
-                            rate === rates[line.id],
+                            all.indexOf(rate) === index || rate === rates[line.id],
                         )
                         .map((rate) => (
                           <option key={rate} value={rate}>
@@ -271,9 +270,7 @@ export function QuoteLegalDetailsEditor({
                       {!["0", "2,1", "5,5", "10", "20"].includes(
                         rates[line.id] ?? rateInput(quote.taxConfig.defaultRatePercent),
                       ) ? (
-                        <option value={rates[line.id]}>
-                          {rates[line.id]} %
-                        </option>
+                        <option value={rates[line.id]}>{rates[line.id]} %</option>
                       ) : null}
                     </select>
                   </label>

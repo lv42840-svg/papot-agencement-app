@@ -100,9 +100,7 @@ export function QuoteSendAction({
       const response = await fetch(`/api/desktop/quotes/${quote.id}/send`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(
-          mode === "SEND" ? { mode, followUpDate } : { mode },
-        ),
+        body: JSON.stringify(mode === "SEND" ? { mode, followUpDate } : { mode }),
       });
       const data = (await response.json()) as ApiResponse;
       if (!response.ok || !data.payload) {

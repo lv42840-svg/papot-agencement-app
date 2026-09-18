@@ -126,10 +126,7 @@ describe("quote global adjustments", () => {
   });
 
   it("applique une remise client en pourcentage sur le total principal", () => {
-    const items: QuoteItem[] = [
-      line(lineIds.a, 10_000, 6_000),
-      line(lineIds.b, 5_000, 3_000),
-    ];
+    const items: QuoteItem[] = [line(lineIds.a, 10_000, 6_000), line(lineIds.b, 5_000, 3_000)];
     const result = calculateQuoteAdjustedPricing(items, {
       ...createEmptyQuotePricingConfig(),
       customerDiscount: { kind: "PERCENTAGE", percent: 10 },

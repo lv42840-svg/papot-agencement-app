@@ -154,7 +154,6 @@ export function QuotePricingAdjustmentsEditor({
     );
   }, [quote.id, quote.pricingConfig.customerDiscount]);
 
-
   function changeKind(nextKind: "PERCENTAGE" | "POSE_HOURS" | "HOTEL") {
     setKind(nextKind);
     if (nextKind === "POSE_HOURS") {
@@ -330,9 +329,7 @@ export function QuotePricingAdjustmentsEditor({
           <select
             value={discountKind}
             disabled={!editable || savingDiscount}
-            onChange={(event) =>
-              setDiscountKind(event.target.value as "PERCENTAGE" | "AMOUNT")
-            }
+            onChange={(event) => setDiscountKind(event.target.value as "PERCENTAGE" | "AMOUNT")}
             aria-label="Type de remise client"
           >
             <option value="PERCENTAGE">%</option>

@@ -551,10 +551,7 @@ export function calculateQuoteAdjustedPricing(
       (line) => line.saleCents,
     );
     for (const line of mainLines) {
-      line.saleCents = subtractMoney(
-        line.saleCents,
-        discountDistribution.get(line.lineId) ?? 0,
-      );
+      line.saleCents = subtractMoney(line.saleCents, discountDistribution.get(line.lineId) ?? 0);
     }
   }
 

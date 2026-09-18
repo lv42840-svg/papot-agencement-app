@@ -800,10 +800,7 @@ export function replaceQuoteOptionsAnchor(
   return `${documentXml.slice(0, rowStart)}${rows.join("")}${documentXml.slice(rowEnd)}`;
 }
 
-function replaceQuoteCustomerDiscountRow(
-  documentXml: string,
-  document: QuoteDocumentData,
-): string {
+function replaceQuoteCustomerDiscountRow(documentXml: string, document: QuoteDocumentData): string {
   const discountCents = document.totals.customerDiscountCents ?? 0;
   if (discountCents <= 0 || !document.totals.customerDiscountLabel) return documentXml;
 
@@ -834,9 +831,7 @@ function replaceQuoteCustomerDiscountRow(
   });
 
   const nextTable =
-    range.table.slice(0, rowRange.start) +
-    discountRow +
-    range.table.slice(rowRange.start);
+    range.table.slice(0, rowRange.start) + discountRow + range.table.slice(rowRange.start);
   return documentXml.slice(0, range.start) + nextTable + documentXml.slice(range.end);
 }
 
