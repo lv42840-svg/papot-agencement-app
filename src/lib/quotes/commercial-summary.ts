@@ -1,11 +1,15 @@
 import { calculateQuoteAdjustedPricing } from "./adjustments";
-import type { QuoteLine, QuoteOuvrageComponent } from "./model";
+import {
+  quoteOuvrageComponentCostPriceCents,
+  type QuoteLine,
+  type QuoteOuvrageComponent,
+} from "./model";
 import type { NativeQuoteRecord } from "./store";
 
 export type CommercialQuoteSummary = {
   totalHtCents: number;
   soldHours: number;
-  estimatedCostCents: number | null;
+  plannedDisbursementCents: number | null;
 };
 
 function componentActivity(component: QuoteOuvrageComponent): "BE" | "ATELIER" | "POSE" | null {
@@ -22,6 +26,39 @@ function nonPoseLaborHours(line: QuoteLine): number {
   return line.quantity * hoursPerLineUnit;
 }
 
+function lineBaseLaborCostCents(line: QuoteLine): number | null {
+  let unitLaborCostCents = 0;
+
+  for (const component of line.components ?? []) {
+    if (componentActivity(component) === null) continue;
+    const costRateCents = quoteOuvrageComponentCostPriceCents(component);
+    if (costRateCents === null) return null;
+    unitLaborCostCents += Math.round(component.quantity * costRateCents);
+  }
+
+  return Math.round(line.quantity * unitLaborCostCents);
+}
+
+function linePoseCostRateCents(line: QuoteLine): number | null {
+  const poseComponents = (line.components ?? []).filter(
+    (component) => componentActivity(component) === "POSE",
+  );
+  if (poseComponents.length === 0) return null;
+
+  let hoursPerLineUnit = 0;
+  let costPerLineUnitCents = 0;
+
+  for (const component of poseComponents) {
+    const costRateCents = quoteOuvrageComponentCostPriceCents(component);
+    if (costRateCents === null) return null;
+    hoursPerLineUnit += component.quantity;
+    costPerLineUnitCents += component.quantity * costRateCents;
+  }
+
+  if (!Number.isFinite(hoursPerLineUnit) || hoursPerLineUnit <= 0) return null;
+  return costPerLineUnitCents / hoursPerLineUnit;
+}
+
 function roundHours(value: number): number {
   return Math.round(value * 1_000_000) / 1_000_000;
 }
@@ -34,6 +71,9 @@ export function calculateCommercialQuoteSummary(quote: NativeQuoteRecord): Comme
       .map((line) => [line.id, line]),
   );
 
+  let laborCostCents = 0;
+  let laborCostComplete = true;
+
   const soldHours = pricing.lines.reduce((total, adjustedLine) => {
     if (adjustedLine.optionStatus !== null && adjustedLine.optionStatus !== "RETAINED") {
       return total;
@@ -42,12 +82,34 @@ export function calculateCommercialQuoteSummary(quote: NativeQuoteRecord): Comme
     const line = linesById.get(adjustedLine.lineId);
     if (!line) return total;
 
+    const baseLaborCostCents = lineBaseLaborCostCents(line);
+    if (baseLaborCostCents === null) {
+      laborCostComplete = false;
+    } else {
+      laborCostCents += baseLaborCostCents;
+    }
+
+    const addedPoseHours = adjustedLine.poseHours - adjustedLine.basePoseHours;
+    if (addedPoseHours > 0) {
+      const poseCostRateCents = linePoseCostRateCents(line);
+      if (poseCostRateCents === null) {
+        laborCostComplete = false;
+      } else {
+        laborCostCents += Math.round(addedPoseHours * poseCostRateCents);
+      }
+    }
+
     return total + nonPoseLaborHours(line) + adjustedLine.poseHours;
   }, 0);
+
+  const plannedDisbursementCents =
+    pricing.totalCostCents === null || !laborCostComplete
+      ? null
+      : Math.max(0, pricing.totalCostCents - laborCostCents);
 
   return {
     totalHtCents: pricing.totalSaleCents,
     soldHours: roundHours(soldHours),
-    estimatedCostCents: pricing.totalCostCents,
+    plannedDisbursementCents,
   };
 }
