@@ -365,7 +365,9 @@ export function buildQuoteDocumentData(input: BuildQuoteDocumentDataInput): Quot
     if (line.kind !== "LINE" || !line.parentId) continue;
     addHeadingTotal(line.parentId, line);
     const parent = documentItemById.get(line.parentId);
-    if (parent?.kind === "SUBSECTION") addHeadingTotal(parent.parentId, line);
+    if (parent?.kind === "SUBSECTION" && parent.parentId) {
+      addHeadingTotal(parent.parentId, line);
+    }
   }
 
   items = items.map((item) =>
