@@ -14,7 +14,7 @@
     "start": "next start",
     "lint": "eslint .",
     "format": "prettier --write .",
-    "format:check": "prettier src/lib/chantiers/profitability.ts tests/chantier-profitability.test.ts --write && git diff -- src/lib/chantiers/profitability.ts tests/chantier-profitability.test.ts && false",
+    "format:check": "prettier --check .",
     "typecheck": "tsc --noEmit",
     "test": "vitest run",
     "nextcloud:probe": "tsx scripts/nextcloud-probe.ts"
