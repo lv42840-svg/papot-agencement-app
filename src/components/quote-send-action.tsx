@@ -44,6 +44,12 @@ function sendErrorLabel(code?: string): string {
   if (code?.startsWith("QUOTE_WORD_V2_TEMPLATE_")) {
     return "Le modèle Word du devis est indisponible.";
   }
+  if (code === "PDF_CONVERTER_UNAVAILABLE") {
+    return "Aucun moteur PDF n’est disponible sur ce poste. Installe LibreOffice ou Microsoft Word puis relance PAPOT.";
+  }
+  if (code?.startsWith("PDF_WINDOWS_CONVERTER_FAILED:")) {
+    return "LibreOffice est indisponible et Microsoft Word n’a pas réussi à convertir le devis en PDF.";
+  }
   if (code?.startsWith("PDF_") || code === "SERVER_FILE_ROOT_UNAVAILABLE") {
     return "Impossible de générer ou d’archiver le PDF final. Rien n’a été figé.";
   }
