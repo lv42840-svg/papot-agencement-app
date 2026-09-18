@@ -1,6 +1,6 @@
 import { describe, expect, it, vi } from "vitest";
 import type { DesktopRequestContext } from "../src/lib/desktop/request-context";
-import { createNextcloudLibraryRepository } from "../src/lib/library/nextcloud-repository";
+import { createSharedResourceLibraryRepository } from "../src/lib/library/shared-resource-repository";
 import { LIBRARY_RESOURCE_REF } from "../src/lib/library/storage";
 
 const owner = {
@@ -54,7 +54,7 @@ function setup() {
   } as unknown as DesktopRequestContext["desktop"];
 
   return {
-    repository: createNextcloudLibraryRepository({ desktop, owner }),
+    repository: createSharedResourceLibraryRepository({ desktop, owner }),
     statesGet,
     coordinatorOpen,
     coordinatorSave,
