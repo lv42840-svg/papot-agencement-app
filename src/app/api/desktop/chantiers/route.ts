@@ -113,7 +113,9 @@ export async function POST(request: Request) {
       ? await createCommercialRepository(context)
       : null;
     const commercial = commercialRepository ? await commercialRepository.load() : null;
-    const quotes = mutationNeedsCommercialOrigin(input) ? await createQuotesRepository().load() : null;
+    const quotes = mutationNeedsCommercialOrigin(input)
+      ? await createQuotesRepository().load()
+      : null;
 
     stage = "apply-and-save-mutation";
     const mutation = await repository.mutate((payload) => {
