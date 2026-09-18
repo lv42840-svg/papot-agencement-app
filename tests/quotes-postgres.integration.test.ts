@@ -114,8 +114,7 @@ describeWithPostgres("Quotes PostgreSQL cutover", () => {
     await expect(
       ensureQuotesPostgresCutover({
         pool,
-        acquireSource: async () =>
-          appendQuote(createInitialNativeQuotesPayload(), "Source locale"),
+        acquireSource: async () => appendQuote(createInitialNativeQuotesPayload(), "Source locale"),
       }),
     ).rejects.toThrow("QUOTES_CUTOVER_STATE_INVALID");
 
