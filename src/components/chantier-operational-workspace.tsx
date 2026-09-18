@@ -261,6 +261,14 @@ function AdminSpace({
               copie physique.
             </span>
           </div>
+          {commercialCase && canModify ? (
+            <a
+              className="chantierNewQuoteLink"
+              href={`/devis/nouveau?affaire=${encodeURIComponent(commercialCase.id)}&chantier=1`}
+            >
+              <Plus size={14} /> Nouveau devis / TS
+            </a>
+          ) : null}
         </div>
         {quoteGroups.length === 0 ? (
           <OperationalEmpty label="Aucun devis natif retenu pour ce chantier." />
@@ -277,7 +285,16 @@ function AdminSpace({
                     {lines.length} ligne{lines.length > 1 ? "s" : ""} de référence
                   </small>
                 </div>
-                <a href={`/devis/${quote.id}`}>Ouvrir le devis</a>
+                <div className="chantierAdminQuoteActions">
+                  {commercialCase && quote.finalPdf ? (
+                    <a
+                      href={`/api/desktop/commercial/${commercialCase.id}/documents/${quote.finalPdf.commercialDocumentId}`}
+                    >
+                      Voir le PDF
+                    </a>
+                  ) : null}
+                  <a href={`/devis/${quote.id}`}>Ouvrir le devis</a>
+                </div>
               </article>
             ))}
           </div>
@@ -1122,6 +1139,12 @@ function OperationalStyles() {
         border-radius: 9px;
         background: #fcfbfe;
       }
+      .chantierAdminBlockTitle {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 10px;
+      }
       .chantierAdminBlockTitle > div,
       .chantierComplementaryQuotes > div {
         display: grid;
@@ -1170,6 +1193,7 @@ function OperationalStyles() {
         font-size: 11px;
       }
       .chantierAdminQuotes a,
+      .chantierNewQuoteLink,
       .chantierComplementaryQuotes button,
       .chantierTsCreate button,
       .chantierTsLink button {
@@ -1186,6 +1210,12 @@ function OperationalStyles() {
         font-weight: 750;
         text-decoration: none;
         white-space: nowrap;
+      }
+      .chantierAdminQuoteActions {
+        display: flex;
+        gap: 6px;
+        flex-wrap: wrap;
+        justify-content: flex-end;
       }
       .chantierComplementaryQuotes {
         padding-top: 4px;
@@ -1442,11 +1472,15 @@ function OperationalStyles() {
         .chantierInstallRow {
           grid-template-columns: 1fr 160px;
         }
+        .chantierAdminBlockTitle,
         .chantierAdminQuotes article,
         .chantierComplementaryQuotes article,
         .chantierTsRow {
           align-items: stretch;
           flex-direction: column;
+        }
+        .chantierAdminQuoteActions {
+          justify-content: flex-start;
         }
         .chantierTsLink {
           min-width: 0;
