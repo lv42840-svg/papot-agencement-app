@@ -3,8 +3,13 @@ on:
   push:
     branches:
       - fix/recette-client-entrees
+
+permissions:
+  contents: write
+
 jobs:
   format:
+    if: github.event.head_commit.message != 'style: apply prettier client entries'
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -14,4 +19,13 @@ jobs:
           cache: npm
       - run: npm ci
       - run: npx prettier --write src/components/entries-workspace.tsx tests/entries-detail-ui.test.ts
-      - run: git diff -- src/components/entries-workspace.tsx tests/entries-detail-ui.test.ts
+      - name: Commit formatted files
+        run: |
+          if git diff --quiet; then
+            exit 0
+          fi
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add src/components/entries-workspace.tsx tests/entries-detail-ui.test.ts
+          git commit -m "style: apply prettier client entries"
+          git push
