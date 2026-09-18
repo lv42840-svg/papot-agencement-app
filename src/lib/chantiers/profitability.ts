@@ -115,10 +115,7 @@ export function calculateChantierProfitability(
   const plannedCostComplete =
     soldComplete && summaries.every((quote) => quote.plannedCostCents !== null);
   const plannedCostCents = plannedCostComplete
-    ? summaries.reduce(
-        (total, quote) => addSafeMoney(total, quote.plannedCostCents ?? 0),
-        0,
-      )
+    ? summaries.reduce((total, quote) => addSafeMoney(total, quote.plannedCostCents ?? 0), 0)
     : null;
   const plannedMarginCents =
     soldCents === null || plannedCostCents === null ? null : soldCents - plannedCostCents;
