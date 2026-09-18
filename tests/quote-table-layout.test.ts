@@ -15,7 +15,10 @@ describe("quote table layout", () => {
     expect(source).toContain("<span>Total HT</span>");
     expect(source).toContain("quoteLineTotal");
     expect(source).toContain("headingTotalsById");
+    expect(source).toContain("quoteHeadingTitle");
     expect(source).toContain("quoteHeadingTotal");
+    expect(source).toContain("grid-column: 2;");
+    expect(source).toContain("grid-column: 7;");
     expect(source).toContain("d’ajustements");
     expect(source).toContain(".quoteLineTotalCell small span");
     expect(source).toContain(".miniOptionButton");
@@ -30,9 +33,9 @@ describe("quote table layout", () => {
   });
 
   it("uses the requested hierarchy font sizes", () => {
-    expect(source).toContain(".quoteHeadingRow.isSection > strong");
+    expect(source).toContain(".quoteHeadingRow.isSection > .quoteHeadingTitle");
     expect(source).toContain("font-size: 18px;");
-    expect(source).toContain(".quoteHeadingRow.isSubsection > strong");
+    expect(source).toContain(".quoteHeadingRow.isSubsection > .quoteHeadingTitle");
     expect(source).toContain("font-size: 15px;");
     expect(source).toContain(".quoteComponentRow");
     expect(source).toContain("font-size: 13px;");
