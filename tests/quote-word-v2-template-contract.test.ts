@@ -31,6 +31,39 @@ describe("quote Word V2 template contract", () => {
     expect(Object.values(inspection.anchorCounts).every((count) => count === 1)).toBe(true);
   });
 
+  it("verrouille le gabarit PDF contre les déformations observées en recette", () => {
+    const template = readFileSync(templatePath);
+    const xml = documentXml(template);
+
+    expect(xml).not.toContain("OPTIONS NON COMPRISES DANS LE TOTAL PRINCIPAL");
+
+    const bodyTable = xml.match(
+      /<w:tbl[\s\S]*?\{\{PAPOT_QUOTE_BODY\}\}[\s\S]*?<\/w:tbl>/,
+    )?.[0];
+    const optionsTable = xml.match(
+      /<w:tbl[\s\S]*?\{\{PAPOT_OPTIONS_BLOCK\}\}[\s\S]*?<\/w:tbl>/,
+    )?.[0];
+    expect(bodyTable).toBeTruthy();
+    expect(optionsTable).toBeTruthy();
+
+    for (const table of [bodyTable!, optionsTable!]) {
+      expect(table).toContain('<w:tblLayout w:type="fixed"');
+      expect(table).toContain('<w:gridCol w:w="567"');
+      expect(table).toContain('<w:gridCol w:w="5216"');
+      expect(table).toContain('<w:gridCol w:w="1134"');
+      expect(table).toContain('<w:gridCol w:w="1417"');
+      expect(table).toContain('<w:gridCol w:w="1077"');
+      expect(table).toContain('<w:gridCol w:w="1587"');
+    }
+
+    const financialTable = xml.match(
+      /<w:tbl[\s\S]*?\{\{total_ht\}\}[\s\S]*?Pour le client[\s\S]*?<\/w:tbl>/,
+    )?.[0];
+    expect(financialTable).toBeTruthy();
+    expect(financialTable).toContain('<w:gridSpan w:val="2"');
+    expect((financialTable?.match(/<w:tr\b/g) ?? []).length).toBeGreaterThanOrEqual(2);
+  });
+
   it("supprime proprement les blocs optionnels non utilises", () => {
     const template = readFileSync(templatePath);
     const rendered = renderQuoteWordV2OptionalBlocks(template, {
