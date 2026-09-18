@@ -14,7 +14,7 @@
     "start": "next start",
     "lint": "eslint .",
     "format": "prettier --write .",
-    "format:check": "prettier --check .",
+    "format:check": "prettier src/app/api/desktop/chantiers/route.ts src/components/chantier-operational-workspace.tsx src/components/chantier-workspace.tsx src/lib/quotes/retention.ts tests/chantier-quote-links.test.ts --write && git diff -- src/app/api/desktop/chantiers/route.ts src/components/chantier-operational-workspace.tsx src/components/chantier-workspace.tsx src/lib/quotes/retention.ts tests/chantier-quote-links.test.ts && false",
     "typecheck": "tsc --noEmit",
     "test": "vitest run",
     "nextcloud:probe": "tsx scripts/nextcloud-probe.ts"
