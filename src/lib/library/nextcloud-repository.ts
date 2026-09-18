@@ -1,3 +1,1 @@
-export {
-  createSharedResourceLibraryRepository as createNextcloudLibraryRepository,
-} from "./shared-resource-repository";
+export { createSharedResourceLibraryRepository as createNextcloudLibraryRepository } from "./shared-resource-repository";
