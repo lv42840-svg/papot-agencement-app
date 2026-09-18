@@ -75,6 +75,9 @@ export function QuoteCreateWorkspace({
     : (quoteOwners[0]?.displayName ?? "");
   const [selectedAffairId, setSelectedAffairId] = useState(firstAffair?.id ?? "");
   const [subject, setSubject] = useState(firstAffair?.name ?? "");
+  const [quoteKind, setQuoteKind] = useState<"STANDARD" | "TS">(
+    chantierComplement ? "TS" : "STANDARD",
+  );
   const [issueDate, setIssueDate] = useState(today);
   const [paymentTerms, setPaymentTerms] = useState(firstAffair?.paymentTerms ?? "");
   const [quoteOwnerName, setQuoteOwnerName] = useState(
@@ -127,6 +130,7 @@ export function QuoteCreateWorkspace({
         body: JSON.stringify({
           action: "createDraft",
           commercialCaseId: selectedAffairId,
+          quoteKind,
           subject,
           issueDate,
           variantName: initialVariantName,
@@ -169,7 +173,10 @@ export function QuoteCreateWorkspace({
                 : "Le premier devis d’une affaire démarre automatiquement en Base V1. Les variantes et versions suivantes se créeront ensuite depuis le devis existant."}
             </p>
           </div>
-          <span className="quoteCreatePill">{initialVariantName} · V1</span>
+          <span className="quoteCreatePill">
+            {chantierComplement && quoteKind === "TS" ? "TS · " : ""}
+            {initialVariantName} · V1
+          </span>
         </div>
 
         {!canWrite ? (
@@ -201,6 +208,20 @@ export function QuoteCreateWorkspace({
               </select>
             </label>
 
+            {chantierComplement ? (
+              <label className="quoteField">
+                <span>Nature du devis</span>
+                <select
+                  value={quoteKind}
+                  onChange={(event) => setQuoteKind(event.target.value as "STANDARD" | "TS")}
+                  disabled={saving}
+                >
+                  <option value="TS">Travaux supplémentaires (TS)</option>
+                  <option value="STANDARD">Devis complémentaire</option>
+                </select>
+              </label>
+            ) : null}
+
             <label className="quoteField quoteFieldWide">
               <span>Objet</span>
               <input
@@ -215,7 +236,10 @@ export function QuoteCreateWorkspace({
             <div className="quoteField">
               <span>Variante / version</span>
               <div className="quoteStructuredValue">
-                <strong>{initialVariantName} · V1</strong>
+                <strong>
+                  {chantierComplement && quoteKind === "TS" ? "TS · " : ""}
+                  {initialVariantName} · V1
+                </strong>
                 <small>
                   <LockKeyhole size={12} aria-hidden="true" /> Créé automatiquement
                 </small>
