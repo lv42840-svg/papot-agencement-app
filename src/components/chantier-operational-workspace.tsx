@@ -211,10 +211,7 @@ export function ChantierOperationalWorkspace({
             {space === "install" ? (
               <InstallSpace chantier={chantier} busy={busy} canModify={canModify} mutate={mutate} />
             ) : null}
-            {space !== "admin" &&
-            space !== "be" &&
-            space !== "workshop" &&
-            space !== "install" ? (
+            {space !== "admin" && space !== "be" && space !== "workshop" && space !== "install" ? (
               <FutureSpace id={space} />
             ) : null}
           </>
@@ -408,7 +405,9 @@ function TsRow({
     <article className="chantierTsRow">
       <div>
         <strong>{ts.name}</strong>
-        <span>{linked ? `Régularisé · ${chantierQuoteLineDisplay(linked)}` : "TS non chiffré"}</span>
+        <span>
+          {linked ? `Régularisé · ${chantierQuoteLineDisplay(linked)}` : "TS non chiffré"}
+        </span>
       </div>
       {!linked && canModify ? (
         <div className="chantierTsLink">
@@ -459,13 +458,7 @@ type TechnicalSpaceProps = Props & {
   quoteGroups: QuoteGroup[];
 };
 
-function BeSpace({
-  chantier,
-  busy,
-  canModify,
-  mutate,
-  quoteGroups,
-}: TechnicalSpaceProps) {
+function BeSpace({ chantier, busy, canModify, mutate, quoteGroups }: TechnicalSpaceProps) {
   const [creating, setCreating] = useState(false);
   const items = chantier.operational.beItems;
 
@@ -565,13 +558,7 @@ function BeRow({ chantier, item, busy, canModify, mutate }: CoreProps & { item: 
   );
 }
 
-function WorkshopSpace({
-  chantier,
-  busy,
-  canModify,
-  mutate,
-  quoteGroups,
-}: TechnicalSpaceProps) {
+function WorkshopSpace({ chantier, busy, canModify, mutate, quoteGroups }: TechnicalSpaceProps) {
   const [creating, setCreating] = useState(false);
   const items = chantier.operational.workshopItems;
 
@@ -837,8 +824,7 @@ function TechnicalCreateForm({
   );
   const selectedQuote = quoteOptions.find((option) => option.value === selectedQuoteLine)?.line;
   const selectedTs = tsItems.find((ts) => ts.id === selectedTsId);
-  const originReady =
-    originKind === "QUOTE_LINE" ? Boolean(selectedQuote) : Boolean(selectedTs);
+  const originReady = originKind === "QUOTE_LINE" ? Boolean(selectedQuote) : Boolean(selectedTs);
 
   function selectQuoteLine(value: string) {
     setSelectedQuoteLine(value);
@@ -850,9 +836,7 @@ function TechnicalCreateForm({
     <div className="chantierTechnicalCreate">
       <div className="chantierTechnicalCreateTitle">
         <strong>{mode === "be" ? "Nouvel élément BE" : "Nouvel élément direct Atelier"}</strong>
-        <span>
-          Le lien conserve maintenant l’identifiant réel de la ligne de devis ou du TS.
-        </span>
+        <span>Le lien conserve maintenant l’identifiant réel de la ligne de devis ou du TS.</span>
       </div>
 
       <label>
@@ -973,12 +957,12 @@ function TechnicalCreateForm({
               originLabel:
                 originKind === "QUOTE_LINE" && selectedQuote
                   ? chantierQuoteLineDisplay(selectedQuote)
-                  : selectedTs?.name ?? "",
+                  : (selectedTs?.name ?? ""),
               installedByUs,
-              sourceQuoteId: originKind === "QUOTE_LINE" ? selectedQuote?.quoteId ?? null : null,
+              sourceQuoteId: originKind === "QUOTE_LINE" ? (selectedQuote?.quoteId ?? null) : null,
               sourceQuoteLineId:
-                originKind === "QUOTE_LINE" ? selectedQuote?.quoteLineId ?? null : null,
-              sourceTsId: originKind === "TS" ? selectedTs?.id ?? null : null,
+                originKind === "QUOTE_LINE" ? (selectedQuote?.quoteLineId ?? null) : null,
+              sourceTsId: originKind === "TS" ? (selectedTs?.id ?? null) : null,
             })
           }
         >
