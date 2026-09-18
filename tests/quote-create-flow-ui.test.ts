@@ -35,8 +35,9 @@ describe("quote creation flow", () => {
   });
 
   it("cree le premier devis automatiquement en Base V1", () => {
-    expect(createWorkspace).toContain('variantName: "Base"');
-    expect(createWorkspace).toContain("Base · V1");
+    expect(createWorkspace).toContain("variantName: initialVariantName");
+    expect(createPage).toContain(': "Base"');
+    expect(createWorkspace).toContain("{initialVariantName} · V1");
     expect(createWorkspace).not.toContain("setVariantName");
     expect(createWorkspace).not.toMatch(/<span>Variante<\/span>\s*<input/);
   });
