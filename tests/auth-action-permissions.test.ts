@@ -28,6 +28,12 @@ describe("commercial special permissions", () => {
     ).toBe("commercial.confirm_launch");
   });
 
+  it("requires confirmation permission for a complementary accepted quote", () => {
+    expect(commercialSpecialPermissionForMutation({ action: "retainAdditionalQuote" })).toBe(
+      "commercial.confirm_launch",
+    );
+  });
+
   it("does not add a special permission to ordinary commercial modifications", () => {
     expect(
       commercialSpecialPermissionForMutation({ action: "setStatus", status: "WAITING" }),
