@@ -194,7 +194,7 @@ export function ChantierProfitabilityPanel({
                     Vendu <b>{money(quote.saleCents)}</b>
                   </span>
                   <span>
-                    Déboursé <b>{money(quote.plannedCostCents)}</b>
+                    Déboursé <b>{money(quote.plannedDisbursementCents)}</b>
                   </span>
                 </div>
                 <Link href={"/devis/" + quote.quoteId}>Ouvrir</Link>
