@@ -62,6 +62,24 @@ describe("PDF runtime", () => {
     expect(Buffer.from(pdf)).toEqual(validPdf);
   });
 
+  it("signale clairement quand aucun convertisseur PDF n'est disponible sous Windows", async () => {
+    const missingRunner: PdfCommandRunner = async () => {
+      const error = new Error("missing command") as Error & { code?: string };
+      error.code = "ENOENT";
+      throw error;
+    };
+
+    await expect(
+      convertDocxToPdf(Buffer.from("PK-test-docx"), {
+        binary: "missing-soffice",
+        platform: "win32",
+        commandRunner: missingRunner,
+        wordBinary: "missing-powershell",
+        wordCommandRunner: missingRunner,
+      }),
+    ).rejects.toThrow("PDF_CONVERTER_UNAVAILABLE");
+  });
+
   it("rend les pages PDF en PNG dans leur ordre naturel", async () => {
     const runner: PdfCommandRunner = async (command, args) => {
       expect(command).toBe("fake-pdftoppm");
