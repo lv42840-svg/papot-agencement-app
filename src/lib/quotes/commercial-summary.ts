@@ -10,6 +10,15 @@ export type CommercialQuoteSummary = {
   totalHtCents: number;
   soldHours: number;
   plannedDisbursementCents: number | null;
+  plannedMarginCents: number | null;
+};
+
+export type CommercialContractSummary = {
+  quoteCount: number;
+  totalHtCents: number;
+  soldHours: number;
+  plannedDisbursementCents: number | null;
+  plannedMarginCents: number | null;
 };
 
 function componentActivity(component: QuoteOuvrageComponent): "BE" | "ATELIER" | "POSE" | null {
@@ -111,5 +120,44 @@ export function calculateCommercialQuoteSummary(quote: NativeQuoteRecord): Comme
     totalHtCents: pricing.totalSaleCents,
     soldHours: roundHours(soldHours),
     plannedDisbursementCents,
+    plannedMarginCents: pricing.marginAmountCents,
+  };
+}
+
+export function calculateCommercialContractSummary(
+  quotes: NativeQuoteRecord[],
+  retainedQuoteIds: readonly string[],
+): CommercialContractSummary {
+  const retained = new Set(retainedQuoteIds);
+  const selected = quotes.filter((quote) => retained.has(quote.id));
+  let totalHtCents = 0;
+  let soldHours = 0;
+  let plannedDisbursementCents = 0;
+  let plannedMarginCents = 0;
+  let disbursementComplete = true;
+  let marginComplete = true;
+
+  for (const quote of selected) {
+    const summary = calculateCommercialQuoteSummary(quote);
+    totalHtCents += summary.totalHtCents;
+    soldHours += summary.soldHours;
+    if (summary.plannedDisbursementCents === null) {
+      disbursementComplete = false;
+    } else {
+      plannedDisbursementCents += summary.plannedDisbursementCents;
+    }
+    if (summary.plannedMarginCents === null) {
+      marginComplete = false;
+    } else {
+      plannedMarginCents += summary.plannedMarginCents;
+    }
+  }
+
+  return {
+    quoteCount: selected.length,
+    totalHtCents,
+    soldHours: roundHours(soldHours),
+    plannedDisbursementCents: disbursementComplete ? plannedDisbursementCents : null,
+    plannedMarginCents: marginComplete ? plannedMarginCents : null,
   };
 }
