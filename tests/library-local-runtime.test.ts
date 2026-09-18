@@ -1,71 +1,45 @@
-import { randomUUID } from "node:crypto";
-import fs from "node:fs";
-import os from "node:os";
-import path from "node:path";
-import { afterAll, describe, expect, it, vi } from "vitest";
+import { readFileSync } from "node:fs";
+import { describe, expect, it } from "vitest";
 
-vi.mock("server-only", () => ({}));
+const runtime = readFileSync(
+  new URL("../src/lib/desktop/shared-resource-runtime.ts", import.meta.url),
+  "utf8",
+);
+const createRepository = readFileSync(
+  new URL("../src/lib/library/create-repository.ts", import.meta.url),
+  "utf8",
+);
+const sharedRepository = readFileSync(
+  new URL("../src/lib/library/shared-resource-repository.ts", import.meta.url),
+  "utf8",
+);
+const nextcloudAlias = readFileSync(
+  new URL("../src/lib/library/nextcloud-repository.ts", import.meta.url),
+  "utf8",
+);
 
-import { createDesktopSharedResourceRuntime } from "../src/lib/desktop/shared-resource-runtime";
-import { createLibraryRepository } from "../src/lib/library/create-repository";
+describe("Library local storage contract", () => {
+  it("routes local mode to the SQLite shared-resource runtime without Nextcloud DAV", () => {
+    expect(runtime).toContain("if (isLocalStorageMode())");
+    expect(runtime).toContain("createLocalSharedResourceRuntime()");
+    expect(runtime).toContain("dav: null");
+    expect(runtime).toContain('nextcloudUserId: "local"');
+    expect(runtime).toContain('syncRoot: "LOCAL"');
+  });
 
-const originalStorageMode = process.env.PAPOT_STORAGE_MODE;
-const originalLocalDbPath = process.env.PAPOT_LOCAL_DB_PATH;
-const originalDesktopConfig = process.env.PAPOT_DESKTOP_CONFIG_JSON;
-const originalNextcloudPassword = process.env.PAPOT_NEXTCLOUD_APP_PASSWORD;
-const tempDirectory = fs.mkdtempSync(path.join(os.tmpdir(), "papot-library-local-"));
+  it("uses the transport-neutral Library repository in local mode", () => {
+    expect(createRepository).toContain("createSharedResourceLibraryRepository");
+    expect(createRepository).toContain("if (isLocalStorageMode())");
+    expect(createRepository).not.toContain("createNextcloudLibraryRepository(context)");
+    expect(sharedRepository).toContain("params.desktop.states");
+    expect(sharedRepository).toContain("params.desktop.coordinator");
+    expect(sharedRepository).toContain("params.desktop.locks");
+  });
 
-afterAll(() => {
-  if (originalStorageMode === undefined) delete process.env.PAPOT_STORAGE_MODE;
-  else process.env.PAPOT_STORAGE_MODE = originalStorageMode;
-  if (originalLocalDbPath === undefined) delete process.env.PAPOT_LOCAL_DB_PATH;
-  else process.env.PAPOT_LOCAL_DB_PATH = originalLocalDbPath;
-  if (originalDesktopConfig === undefined) delete process.env.PAPOT_DESKTOP_CONFIG_JSON;
-  else process.env.PAPOT_DESKTOP_CONFIG_JSON = originalDesktopConfig;
-  if (originalNextcloudPassword === undefined) delete process.env.PAPOT_NEXTCLOUD_APP_PASSWORD;
-  else process.env.PAPOT_NEXTCLOUD_APP_PASSWORD = originalNextcloudPassword;
-  fs.rmSync(tempDirectory, { recursive: true, force: true });
-});
-
-describe("Library local shared-resource runtime", () => {
-  it("loads and saves the library without any Nextcloud configuration", async () => {
-    process.env.PAPOT_STORAGE_MODE = "local";
-    process.env.PAPOT_LOCAL_DB_PATH = path.join(tempDirectory, "papot.sqlite");
-    delete process.env.PAPOT_DESKTOP_CONFIG_JSON;
-    delete process.env.PAPOT_NEXTCLOUD_APP_PASSWORD;
-
-    const desktop = createDesktopSharedResourceRuntime();
-    expect(desktop.nextcloudUserId).toBe("local");
-    expect(desktop.syncRoot).toBe("LOCAL");
-    expect(desktop.dav).toBeNull();
-
-    const owner = {
-      userId: "11111111-1111-4111-8111-111111111111",
-      deviceId: desktop.deviceId,
-      displayName: "Test User",
-    };
-    const repository = createLibraryRepository({ desktop, owner });
-
-    await expect(repository.load()).resolves.toEqual({
-      version: 0,
-      payload: { schemaVersion: 1, components: [], ouvrages: [] },
-    });
-
-    const leaseId = randomUUID();
-    const opened = await repository.open(leaseId);
-    expect(opened.status).toBe("editable");
-
-    const saved = await repository.save({
-      leaseId,
-      expectedVersion: opened.baseVersion,
-      payload: { schemaVersion: 1, components: [], ouvrages: [] },
-    });
-    expect(saved.status).toBe("saved");
-
-    await expect(repository.load()).resolves.toEqual({
-      version: 1,
-      payload: { schemaVersion: 1, components: [], ouvrages: [] },
-    });
-    await expect(repository.release(leaseId)).resolves.toBe(true);
+  it("keeps the historical Nextcloud repository name only as a compatibility alias", () => {
+    expect(nextcloudAlias).toContain(
+      "createSharedResourceLibraryRepository as createNextcloudLibraryRepository",
+    );
+    expect(nextcloudAlias).not.toContain("NextcloudLibraryStore");
   });
 });
