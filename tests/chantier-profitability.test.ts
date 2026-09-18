@@ -150,7 +150,7 @@ function chantier(commercialCase: CommercialCase) {
     commercialCase,
     {
       commercialCaseId: commercialCase.id,
-      quoteMissingDeclared: false,
+      quoteMissingDeclared: commercialCase.retainedQuoteIds.length === 0,
       signedQuoteMissingDeclared: true,
       costingMissingDeclared: true,
       be: 10,
