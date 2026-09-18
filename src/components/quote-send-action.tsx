@@ -50,8 +50,14 @@ function sendErrorLabel(code?: string): string {
   if (code?.startsWith("PDF_WINDOWS_CONVERTER_FAILED:")) {
     return "LibreOffice est indisponible et Microsoft Word n’a pas réussi à convertir le devis en PDF.";
   }
-  if (code?.startsWith("PDF_") || code === "SERVER_FILE_ROOT_UNAVAILABLE") {
-    return "Impossible de générer ou d’archiver le PDF final. Rien n’a été figé.";
+  if (code?.startsWith("PDF_CONVERSION_FAILED:") || code?.startsWith("PDF_CONVERSION_OUTPUT_MISSING:")) {
+    return "LibreOffice a été trouvé mais n’a pas réussi à convertir le devis en PDF.";
+  }
+  if (code === "SERVER_FILE_ROOT_UNAVAILABLE") {
+    return "Le dossier d’archivage PAPOT est inaccessible ou non modifiable sur ce poste.";
+  }
+  if (code?.startsWith("PDF_")) {
+    return "La génération du PDF a échoué avant l’archivage. Rien n’a été figé.";
   }
   return code
     ? `La génération du PDF a échoué (${code}). La date de relance n’est pas forcément en cause.`
