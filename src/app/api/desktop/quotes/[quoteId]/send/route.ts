@@ -9,6 +9,7 @@ import {
   desktopRequestErrorStatus,
   requireDesktopRequestContext,
 } from "@/lib/desktop/request-context";
+import { quoteWorkflowMayChangeCommercialStatus } from "@/lib/quotes/chantier";
 import { buildQuoteDocumentDataFromPayloads } from "@/lib/quotes/document-data-mapping";
 import { archiveFinalQuotePdf, nextFinalQuoteNumber } from "@/lib/quotes/final-pdf-archive";
 import { createQuotesRepository } from "@/lib/quotes/create-repository";
@@ -143,7 +144,7 @@ export async function POST(request: Request, { params }: { params: Promise<{ quo
           (candidate) => candidate.id === sent.commercialCaseId,
         );
         if (!affair) throw new Error("COMMERCIAL_CASE_NOT_FOUND");
-        if (affair.status === "CONFIRMED") return registered;
+        if (!quoteWorkflowMayChangeCommercialStatus(affair.status)) return registered;
         return applyCommercialMutation(
           registered.payload,
           {
