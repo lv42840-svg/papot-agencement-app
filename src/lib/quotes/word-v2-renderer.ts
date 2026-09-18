@@ -464,18 +464,18 @@ function splitFinancialSignature(table: string): string {
 
   const cells = cellRanges.map((range) => row.slice(range.start, range.end));
   const right = cells[1]!;
-  const rightParagraphs = Array.from(right.matchAll(WORD_PARAGRAPH_PATTERN));
-  const signatureParagraph = rightParagraphs.find(
-    (match) => paragraphVisibleText(match[0]) === "Pour le client",
-  );
-  if (!signatureParagraph || signatureParagraph.index === undefined) {
+  const signatureTextIndex = right.indexOf("Pour le client");
+  if (signatureTextIndex < 0) {
     throw new Error("QUOTE_WORD_V2_LAYOUT_SIGNATURE_MISSING");
+  }
+  const signatureStart = findOpeningTagStart(right, "w:p", signatureTextIndex);
+  if (signatureStart < 0) {
+    throw new Error("QUOTE_WORD_V2_LAYOUT_SIGNATURE_PARAGRAPH_MISSING");
   }
 
   const rightTcPr = cellProperties(right);
   const contentStart = right.indexOf(rightTcPr) + rightTcPr.length;
   const contentEnd = right.lastIndexOf("</w:tc>");
-  const signatureStart = signatureParagraph.index;
   const beforeSignature = right.slice(contentStart, signatureStart);
   const signatureContent = right.slice(signatureStart, contentEnd);
 
