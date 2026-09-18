@@ -12,7 +12,6 @@ import {
   Download,
   Eye,
   FileText,
-  Image as ImageIcon,
   Paperclip,
   Plus,
   RefreshCw,
@@ -22,6 +21,7 @@ import {
   UserRound,
   X,
 } from "lucide-react";
+import { TaskCommercialBridge } from "@/components/task-commercial-bridge";
 import {
   isAssignedOverdue,
   isQualificationAttentionDue,
@@ -43,6 +43,7 @@ type EntriesApiSnapshot = {
 };
 
 type EntriesTab = "TO_QUALIFY" | "ASSIGNED" | "DONE";
+type EntryDetailTab = "INFO" | "AFFAIR" | "ATTACHMENTS" | "HISTORY";
 type MutationBody = Record<string, unknown> & { action: string };
 type MutationFn = (
   body: MutationBody,
@@ -626,6 +627,7 @@ function EntryDetail({
   const [newAssignee, setNewAssignee] = useState("");
   const [reassignReason, setReassignReason] = useState("");
   const [derivedText, setDerivedText] = useState("");
+  const [detailTab, setDetailTab] = useState<EntryDetailTab>("INFO");
 
   const canActAssigned =
     entry.status === "ASSIGNED" &&
@@ -651,420 +653,470 @@ function EntryDetail({
           Créée par {entry.createdByName} le {formatDateTime(entry.createdAt)}
         </p>
       </div>
-      <div className="entriesRawText">
-        <span>Texte d'origine</span>
-        <p>{entry.rawText}</p>
-      </div>
 
-      {entry.parentEntryId ? (
+      <div className="entriesDetailTabs" role="tablist" aria-label="Fiche entrée">
         <button
           type="button"
-          className="entriesLinkedButton"
-          onClick={() => onOpenEntry(entry.parentEntryId!)}
+          className={detailTab === "INFO" ? "isActive" : ""}
+          onClick={() => setDetailTab("INFO")}
         >
-          Entrée d'origine
+          Informations
         </button>
-      ) : null}
-      {entry.derivedEntryIds.length > 0 ? (
-        <div className="entriesLinkedGroup">
-          <span>
-            Entrée{entry.derivedEntryIds.length > 1 ? "s" : ""} dérivée
-            {entry.derivedEntryIds.length > 1 ? "s" : ""}
-          </span>
-          {entry.derivedEntryIds.map((id, index) => (
-            <button type="button" key={id} onClick={() => onOpenEntry(id)}>
-              Ouvrir #{index + 1}
-            </button>
-          ))}
-        </div>
-      ) : null}
+        <button
+          type="button"
+          className={detailTab === "AFFAIR" ? "isActive" : ""}
+          onClick={() => setDetailTab("AFFAIR")}
+        >
+          Affaire
+        </button>
+        <button
+          type="button"
+          className={detailTab === "ATTACHMENTS" ? "isActive" : ""}
+          onClick={() => setDetailTab("ATTACHMENTS")}
+        >
+          Pièces jointes
+          {entry.attachments.length > 0 ? <span>{entry.attachments.length}</span> : null}
+        </button>
+        <button
+          type="button"
+          className={detailTab === "HISTORY" ? "isActive" : ""}
+          onClick={() => setDetailTab("HISTORY")}
+        >
+          Historique
+        </button>
+      </div>
 
-      <EntryAttachments entry={entry} busy={busy} uploadAttachments={uploadAttachments} />
-
-      {entry.status === "TO_QUALIFY" ? (
+      {detailTab === "INFO" ? (
         <>
-          <section className="entriesDetailSection">
-            <div className="entriesSectionTitle">
-              <Tag size={15} /> Qualification
+          <div className="entriesRawText">
+            <span>Texte d'origine</span>
+            <p>{entry.rawText}</p>
+          </div>
+
+          {entry.parentEntryId ? (
+            <button
+              type="button"
+              className="entriesLinkedButton"
+              onClick={() => onOpenEntry(entry.parentEntryId!)}
+            >
+              Entrée d'origine
+            </button>
+          ) : null}
+          {entry.derivedEntryIds.length > 0 ? (
+            <div className="entriesLinkedGroup">
+              <span>
+                Entrée{entry.derivedEntryIds.length > 1 ? "s" : ""} dérivée
+                {entry.derivedEntryIds.length > 1 ? "s" : ""}
+              </span>
+              {entry.derivedEntryIds.map((id, index) => (
+                <button type="button" key={id} onClick={() => onOpenEntry(id)}>
+                  Ouvrir #{index + 1}
+                </button>
+              ))}
             </div>
-            {capabilities.canQualify ? (
-              <>
-                <div className="entriesDetailTags">
-                  {visibleTags.map((tag) => (
+          ) : null}
+
+          {entry.status === "TO_QUALIFY" ? (
+            <>
+              <section className="entriesDetailSection">
+                <div className="entriesSectionTitle">
+                  <Tag size={15} /> Qualification
+                </div>
+                {capabilities.canQualify ? (
+                  <>
+                    <div className="entriesDetailTags">
+                      {visibleTags.map((tag) => (
+                        <button
+                          key={tag.id}
+                          type="button"
+                          className={`entriesTagChoice${tagIds.includes(tag.id) ? " isSelected" : ""}`}
+                          onClick={() =>
+                            setTagIds((current) =>
+                              current.includes(tag.id)
+                                ? current.filter((id) => id !== tag.id)
+                                : [...current, tag.id],
+                            )
+                          }
+                        >
+                          {tag.label}
+                          {!tag.active ? " (désactivé)" : ""}
+                        </button>
+                      ))}
+                    </div>
+                    <label className="entriesField">
+                      <span>C'est quoi ?</span>
+                      <textarea
+                        rows={3}
+                        value={description}
+                        onChange={(event) => setDescription(event.target.value)}
+                      />
+                    </label>
+                    <label className="entriesField">
+                      <span>J'en fais quoi ?</span>
+                      <textarea
+                        rows={2}
+                        value={nextAction}
+                        onChange={(event) => setNextAction(event.target.value)}
+                        placeholder="Action attendue ou prochaine étape"
+                      />
+                    </label>
                     <button
-                      key={tag.id}
                       type="button"
-                      className={`entriesTagChoice${tagIds.includes(tag.id) ? " isSelected" : ""}`}
+                      className="secondaryButton entriesSaveDraft"
+                      disabled={busy}
                       onClick={() =>
-                        setTagIds((current) =>
-                          current.includes(tag.id)
-                            ? current.filter((id) => id !== tag.id)
-                            : [...current, tag.id],
+                        void mutate(
+                          {
+                            action: "qualifyDraft",
+                            entryId: entry.id,
+                            description,
+                            nextAction,
+                            tagIds,
+                          },
+                          "Qualification enregistrée. L'entrée reste dans À qualifier.",
                         )
                       }
                     >
-                      {tag.label}
-                      {!tag.active ? " (désactivé)" : ""}
+                      <Save size={15} /> Enregistrer sans sortir
                     </button>
-                  ))}
-                </div>
-                <label className="entriesField">
-                  <span>C'est quoi ?</span>
-                  <textarea
-                    rows={3}
-                    value={description}
-                    onChange={(event) => setDescription(event.target.value)}
-                  />
-                </label>
-                <label className="entriesField">
-                  <span>J'en fais quoi ?</span>
+                  </>
+                ) : (
+                  <p className="entriesReadOnlyNote">Qualification réservée à Nadia et Lucien.</p>
+                )}
+              </section>
+
+              {capabilities.canQualify ? (
+                <section className="entriesDetailSection entriesActionSection">
+                  <div className="entriesSectionTitle">
+                    <UserRound size={15} /> Prendre en charge
+                  </div>
+                  <div className="entriesTwoFields">
+                    <label className="entriesField">
+                      <span>Responsable</span>
+                      <input
+                        list={`entry-assignees-${entry.id}`}
+                        value={assigneeName}
+                        onChange={(event) => setAssigneeName(event.target.value)}
+                        placeholder="Nadia, Lucien…"
+                      />
+                      <datalist id={`entry-assignees-${entry.id}`}>
+                        {suggestedAssignees.map((name) => (
+                          <option value={name} key={name} />
+                        ))}
+                      </datalist>
+                    </label>
+                    <label className="entriesField">
+                      <span>Date limite</span>
+                      <input
+                        type="date"
+                        value={dueDate}
+                        onChange={(event) => setDueDate(event.target.value)}
+                      />
+                    </label>
+                  </div>
+                  <button
+                    type="button"
+                    className="primaryButton"
+                    disabled={
+                      busy ||
+                      !description.trim() ||
+                      !nextAction.trim() ||
+                      !assigneeName.trim() ||
+                      !dueDate
+                    }
+                    onClick={() =>
+                      void mutate(
+                        {
+                          action: "qualifyAssign",
+                          entryId: entry.id,
+                          description,
+                          nextAction,
+                          assigneeName,
+                          dueDate,
+                          tagIds,
+                        },
+                        "Entrée qualifiée et affectée.",
+                      )
+                    }
+                  >
+                    Affecter avec échéance
+                  </button>
+                  <div className="entriesDivider" />
+                  <label className="entriesField">
+                    <span>Résultat facultatif</span>
+                    <textarea
+                      rows={2}
+                      value={result}
+                      onChange={(event) => setResult(event.target.value)}
+                    />
+                  </label>
+                  <button
+                    type="button"
+                    className="secondaryButton"
+                    disabled={busy}
+                    onClick={() =>
+                      void mutate(
+                        { action: "qualifyDone", entryId: entry.id, result, tagIds },
+                        "Entrée traitée et terminée.",
+                      )
+                    }
+                  >
+                    <Check size={15} /> Traité / terminé
+                  </button>
+                </section>
+              ) : null}
+
+              {capabilities.canQualify && attentionDue ? (
+                <section className="entriesDetailSection entriesWarningSection">
+                  <div className="entriesSectionTitle">
+                    <AlertTriangle size={15} /> Remontée obligatoire
+                  </div>
+                  <p>
+                    Cette entrée a atteint son seuil de traitement. Elle doit être traitée ou
+                    reportée explicitement.
+                  </p>
+                  <div className="entriesTwoFields">
+                    <label className="entriesField">
+                      <span>Voir plus tard, au plus tard le</span>
+                      <input
+                        type="date"
+                        value={snoozeDate}
+                        onChange={(event) => setSnoozeDate(event.target.value)}
+                      />
+                    </label>
+                    <label className="entriesField">
+                      <span>Motif obligatoire</span>
+                      <input
+                        value={snoozeReason}
+                        onChange={(event) => setSnoozeReason(event.target.value)}
+                      />
+                    </label>
+                  </div>
+                  <button
+                    type="button"
+                    className="secondaryButton"
+                    disabled={busy || !snoozeDate || !snoozeReason.trim()}
+                    onClick={() =>
+                      void mutate(
+                        {
+                          action: "snooze",
+                          entryId: entry.id,
+                          untilDate: snoozeDate,
+                          reason: snoozeReason,
+                        },
+                        "Entrée reportée avec motif.",
+                      )
+                    }
+                  >
+                    <Clock3 size={15} /> Voir plus tard
+                  </button>
+                </section>
+              ) : null}
+
+              {capabilities.canQualify ? (
+                <details className="entriesDerivedBox">
+                  <summary>Créer une deuxième entrée liée</summary>
+                  <p>
+                    À utiliser uniquement si la capture contient réellement deux sujets distincts.
+                  </p>
                   <textarea
                     rows={2}
-                    value={nextAction}
-                    onChange={(event) => setNextAction(event.target.value)}
-                    placeholder="Action attendue ou prochaine étape"
+                    value={derivedText}
+                    onChange={(event) => setDerivedText(event.target.value)}
                   />
-                </label>
-                <button
-                  type="button"
-                  className="secondaryButton entriesSaveDraft"
-                  disabled={busy}
-                  onClick={() =>
-                    void mutate(
-                      {
-                        action: "qualifyDraft",
-                        entryId: entry.id,
-                        description,
-                        nextAction,
-                        tagIds,
-                      },
-                      "Qualification enregistrée. L'entrée reste dans À qualifier.",
-                    )
-                  }
-                >
-                  <Save size={15} /> Enregistrer sans sortir
-                </button>
-              </>
-            ) : (
-              <p className="entriesReadOnlyNote">Qualification réservée à Nadia et Lucien.</p>
-            )}
-          </section>
+                  <button
+                    type="button"
+                    className="secondaryButton"
+                    disabled={busy || !derivedText.trim()}
+                    onClick={() =>
+                      void mutate(
+                        { action: "derive", entryId: entry.id, rawText: derivedText },
+                        "Entrée liée créée.",
+                      )
+                    }
+                  >
+                    Créer l'entrée liée
+                  </button>
+                </details>
+              ) : null}
+            </>
+          ) : null}
 
-          {capabilities.canQualify ? (
-            <section className="entriesDetailSection entriesActionSection">
-              <div className="entriesSectionTitle">
-                <UserRound size={15} /> Prendre en charge
-              </div>
-              <div className="entriesTwoFields">
-                <label className="entriesField">
+          {entry.status === "ASSIGNED" ? (
+            <>
+              <section className={`entriesAssignmentSummary${overdue ? " isOverdue" : ""}`}>
+                <div>
                   <span>Responsable</span>
-                  <input
-                    list={`entry-assignees-${entry.id}`}
-                    value={assigneeName}
-                    onChange={(event) => setAssigneeName(event.target.value)}
-                    placeholder="Nadia, Lucien…"
-                  />
-                  <datalist id={`entry-assignees-${entry.id}`}>
-                    {suggestedAssignees.map((name) => (
-                      <option value={name} key={name} />
-                    ))}
-                  </datalist>
-                </label>
-                <label className="entriesField">
-                  <span>Date limite</span>
-                  <input
-                    type="date"
-                    value={dueDate}
-                    onChange={(event) => setDueDate(event.target.value)}
-                  />
-                </label>
-              </div>
-              <button
-                type="button"
-                className="primaryButton"
-                disabled={
-                  busy ||
-                  !description.trim() ||
-                  !nextAction.trim() ||
-                  !assigneeName.trim() ||
-                  !dueDate
-                }
-                onClick={() =>
-                  void mutate(
-                    {
-                      action: "qualifyAssign",
-                      entryId: entry.id,
-                      description,
-                      nextAction,
-                      assigneeName,
-                      dueDate,
-                      tagIds,
-                    },
-                    "Entrée qualifiée et affectée.",
-                  )
-                }
-              >
-                Affecter avec échéance
-              </button>
-              <div className="entriesDivider" />
-              <label className="entriesField">
-                <span>Résultat facultatif</span>
-                <textarea
-                  rows={2}
-                  value={result}
-                  onChange={(event) => setResult(event.target.value)}
-                />
-              </label>
-              <button
-                type="button"
-                className="secondaryButton"
-                disabled={busy}
-                onClick={() =>
-                  void mutate(
-                    { action: "qualifyDone", entryId: entry.id, result, tagIds },
-                    "Entrée traitée et terminée.",
-                  )
-                }
-              >
-                <Check size={15} /> Traité / terminé
-              </button>
-            </section>
+                  <strong>{entry.assigneeName}</strong>
+                </div>
+                <div>
+                  <span>Échéance</span>
+                  <strong>{formatDateOnly(entry.dueDate)}</strong>
+                </div>
+                {overdue ? (
+                  <div className="entriesOverdueLabel">
+                    <AlertTriangle size={14} /> En retard
+                  </div>
+                ) : null}
+              </section>
+              {entry.structuredDescription ? (
+                <section className="entriesDetailSection entriesCompactSection">
+                  <strong>C'est quoi ?</strong>
+                  <p>{entry.structuredDescription}</p>
+                  <strong>J'en fais quoi ?</strong>
+                  <p>{entry.nextAction || "Non renseigné"}</p>
+                </section>
+              ) : null}
+              {canActAssigned ? (
+                <section className="entriesDetailSection entriesActionSection">
+                  <div className="entriesSectionTitle">
+                    <Clock3 size={15} /> Mes actions
+                  </div>
+                  <label className="entriesField">
+                    <span>Résultat facultatif</span>
+                    <textarea
+                      rows={2}
+                      value={result}
+                      onChange={(event) => setResult(event.target.value)}
+                    />
+                  </label>
+                  <button
+                    type="button"
+                    className="primaryButton"
+                    disabled={busy}
+                    onClick={() =>
+                      void mutate(
+                        { action: "complete", entryId: entry.id, result },
+                        "Action terminée.",
+                      )
+                    }
+                  >
+                    <Check size={15} /> Terminé
+                  </button>
+                  <div className="entriesDivider" />
+                  <div className="entriesTwoFields">
+                    <label className="entriesField">
+                      <span>Nouvelle échéance</span>
+                      <input
+                        type="date"
+                        value={postponeDate}
+                        onChange={(event) => setPostponeDate(event.target.value)}
+                      />
+                    </label>
+                    <label className="entriesField">
+                      <span>Motif obligatoire</span>
+                      <input
+                        value={postponeReason}
+                        onChange={(event) => setPostponeReason(event.target.value)}
+                      />
+                    </label>
+                  </div>
+                  <button
+                    type="button"
+                    className="secondaryButton"
+                    disabled={busy || !postponeDate || !postponeReason.trim()}
+                    onClick={() =>
+                      void mutate(
+                        {
+                          action: "postpone",
+                          entryId: entry.id,
+                          dueDate: postponeDate,
+                          reason: postponeReason,
+                        },
+                        "Échéance reportée. Nadia et Lucien sont informés dans PAPOT.",
+                      )
+                    }
+                  >
+                    Reporter l'échéance
+                  </button>
+                  <div className="entriesDivider" />
+                  <div className="entriesTwoFields">
+                    <label className="entriesField">
+                      <span>Nouveau responsable</span>
+                      <input
+                        list={`reassign-${entry.id}`}
+                        value={newAssignee}
+                        onChange={(event) => setNewAssignee(event.target.value)}
+                      />
+                      <datalist id={`reassign-${entry.id}`}>
+                        {suggestedAssignees.map((name) => (
+                          <option value={name} key={name} />
+                        ))}
+                      </datalist>
+                    </label>
+                    <label className="entriesField">
+                      <span>Motif obligatoire</span>
+                      <input
+                        value={reassignReason}
+                        onChange={(event) => setReassignReason(event.target.value)}
+                      />
+                    </label>
+                  </div>
+                  <button
+                    type="button"
+                    className="secondaryButton"
+                    disabled={busy || !newAssignee.trim() || !reassignReason.trim()}
+                    onClick={() =>
+                      void mutate(
+                        {
+                          action: "reassign",
+                          entryId: entry.id,
+                          assigneeName: newAssignee,
+                          reason: reassignReason,
+                        },
+                        "Action réaffectée. L'échéance est restée inchangée.",
+                      )
+                    }
+                  >
+                    Réaffecter
+                  </button>
+                </section>
+              ) : (
+                <p className="entriesReadOnlyNote">
+                  Seule la personne actuellement affectée peut terminer, reporter ou réaffecter
+                  cette action.
+                </p>
+              )}
+            </>
           ) : null}
 
-          {capabilities.canQualify && attentionDue ? (
-            <section className="entriesDetailSection entriesWarningSection">
-              <div className="entriesSectionTitle">
-                <AlertTriangle size={15} /> Remontée obligatoire
+          {entry.status === "DONE" ? (
+            <section className="entriesDoneSummary">
+              <CheckCircle2 size={22} />
+              <div>
+                <strong>Terminée</strong>
+                <span>{entry.completedAt ? formatDateTime(entry.completedAt) : ""}</span>
+                {entry.result ? <p>{entry.result}</p> : null}
               </div>
-              <p>
-                Cette entrée a atteint son seuil de traitement. Elle doit être traitée ou reportée
-                explicitement.
-              </p>
-              <div className="entriesTwoFields">
-                <label className="entriesField">
-                  <span>Voir plus tard, au plus tard le</span>
-                  <input
-                    type="date"
-                    value={snoozeDate}
-                    onChange={(event) => setSnoozeDate(event.target.value)}
-                  />
-                </label>
-                <label className="entriesField">
-                  <span>Motif obligatoire</span>
-                  <input
-                    value={snoozeReason}
-                    onChange={(event) => setSnoozeReason(event.target.value)}
-                  />
-                </label>
-              </div>
-              <button
-                type="button"
-                className="secondaryButton"
-                disabled={busy || !snoozeDate || !snoozeReason.trim()}
-                onClick={() =>
-                  void mutate(
-                    {
-                      action: "snooze",
-                      entryId: entry.id,
-                      untilDate: snoozeDate,
-                      reason: snoozeReason,
-                    },
-                    "Entrée reportée avec motif.",
-                  )
-                }
-              >
-                <Clock3 size={15} /> Voir plus tard
-              </button>
             </section>
-          ) : null}
-
-          {capabilities.canQualify ? (
-            <details className="entriesDerivedBox">
-              <summary>Créer une deuxième entrée liée</summary>
-              <p>À utiliser uniquement si la capture contient réellement deux sujets distincts.</p>
-              <textarea
-                rows={2}
-                value={derivedText}
-                onChange={(event) => setDerivedText(event.target.value)}
-              />
-              <button
-                type="button"
-                className="secondaryButton"
-                disabled={busy || !derivedText.trim()}
-                onClick={() =>
-                  void mutate(
-                    { action: "derive", entryId: entry.id, rawText: derivedText },
-                    "Entrée liée créée.",
-                  )
-                }
-              >
-                Créer l'entrée liée
-              </button>
-            </details>
           ) : null}
         </>
       ) : null}
 
-      {entry.status === "ASSIGNED" ? (
-        <>
-          <section className={`entriesAssignmentSummary${overdue ? " isOverdue" : ""}`}>
-            <div>
-              <span>Responsable</span>
-              <strong>{entry.assigneeName}</strong>
-            </div>
-            <div>
-              <span>Échéance</span>
-              <strong>{formatDateOnly(entry.dueDate)}</strong>
-            </div>
-            {overdue ? (
-              <div className="entriesOverdueLabel">
-                <AlertTriangle size={14} /> En retard
-              </div>
-            ) : null}
-          </section>
-          {entry.structuredDescription ? (
-            <section className="entriesDetailSection entriesCompactSection">
-              <strong>C'est quoi ?</strong>
-              <p>{entry.structuredDescription}</p>
-              <strong>J'en fais quoi ?</strong>
-              <p>{entry.nextAction || "Non renseigné"}</p>
-            </section>
-          ) : null}
-          {canActAssigned ? (
-            <section className="entriesDetailSection entriesActionSection">
-              <div className="entriesSectionTitle">
-                <Clock3 size={15} /> Mes actions
-              </div>
-              <label className="entriesField">
-                <span>Résultat facultatif</span>
-                <textarea
-                  rows={2}
-                  value={result}
-                  onChange={(event) => setResult(event.target.value)}
-                />
-              </label>
-              <button
-                type="button"
-                className="primaryButton"
-                disabled={busy}
-                onClick={() =>
-                  void mutate({ action: "complete", entryId: entry.id, result }, "Action terminée.")
-                }
-              >
-                <Check size={15} /> Terminé
-              </button>
-              <div className="entriesDivider" />
-              <div className="entriesTwoFields">
-                <label className="entriesField">
-                  <span>Nouvelle échéance</span>
-                  <input
-                    type="date"
-                    value={postponeDate}
-                    onChange={(event) => setPostponeDate(event.target.value)}
-                  />
-                </label>
-                <label className="entriesField">
-                  <span>Motif obligatoire</span>
-                  <input
-                    value={postponeReason}
-                    onChange={(event) => setPostponeReason(event.target.value)}
-                  />
-                </label>
-              </div>
-              <button
-                type="button"
-                className="secondaryButton"
-                disabled={busy || !postponeDate || !postponeReason.trim()}
-                onClick={() =>
-                  void mutate(
-                    {
-                      action: "postpone",
-                      entryId: entry.id,
-                      dueDate: postponeDate,
-                      reason: postponeReason,
-                    },
-                    "Échéance reportée. Nadia et Lucien sont informés dans PAPOT.",
-                  )
-                }
-              >
-                Reporter l'échéance
-              </button>
-              <div className="entriesDivider" />
-              <div className="entriesTwoFields">
-                <label className="entriesField">
-                  <span>Nouveau responsable</span>
-                  <input
-                    list={`reassign-${entry.id}`}
-                    value={newAssignee}
-                    onChange={(event) => setNewAssignee(event.target.value)}
-                  />
-                  <datalist id={`reassign-${entry.id}`}>
-                    {suggestedAssignees.map((name) => (
-                      <option value={name} key={name} />
-                    ))}
-                  </datalist>
-                </label>
-                <label className="entriesField">
-                  <span>Motif obligatoire</span>
-                  <input
-                    value={reassignReason}
-                    onChange={(event) => setReassignReason(event.target.value)}
-                  />
-                </label>
-              </div>
-              <button
-                type="button"
-                className="secondaryButton"
-                disabled={busy || !newAssignee.trim() || !reassignReason.trim()}
-                onClick={() =>
-                  void mutate(
-                    {
-                      action: "reassign",
-                      entryId: entry.id,
-                      assigneeName: newAssignee,
-                      reason: reassignReason,
-                    },
-                    "Action réaffectée. L'échéance est restée inchangée.",
-                  )
-                }
-              >
-                Réaffecter
-              </button>
-            </section>
-          ) : (
-            <p className="entriesReadOnlyNote">
-              Seule la personne actuellement affectée peut terminer, reporter ou réaffecter cette
-              action.
-            </p>
-          )}
-        </>
+      {detailTab === "AFFAIR" ? (
+        <TaskCommercialBridge task={entry} description={description} nextAction={nextAction} />
       ) : null}
 
-      {entry.status === "DONE" ? (
-        <section className="entriesDoneSummary">
-          <CheckCircle2 size={22} />
-          <div>
-            <strong>Terminée</strong>
-            <span>{entry.completedAt ? formatDateTime(entry.completedAt) : ""}</span>
-            {entry.result ? <p>{entry.result}</p> : null}
-          </div>
+      {detailTab === "ATTACHMENTS" ? (
+        <EntryAttachments entry={entry} busy={busy} uploadAttachments={uploadAttachments} />
+      ) : null}
+
+      {detailTab === "HISTORY" ? (
+        <section className="entriesHistory">
+          <h3>Historique</h3>
+          {[...entry.history].reverse().map((event) => (
+            <div className="entriesHistoryRow" key={event.id}>
+              <span className="entriesHistoryDot" />
+              <div>
+                <strong>{event.summary}</strong>
+                <span>
+                  {event.actorName} · {formatDateTime(event.at)}
+                </span>
+              </div>
+            </div>
+          ))}
         </section>
       ) : null}
-
-      <section className="entriesHistory">
-        <h3>Historique</h3>
-        {[...entry.history].reverse().map((event) => (
-          <div className="entriesHistoryRow" key={event.id}>
-            <span className="entriesHistoryDot" />
-            <div>
-              <strong>{event.summary}</strong>
-              <span>
-                {event.actorName} · {formatDateTime(event.at)}
-              </span>
-            </div>
-          </div>
-        ))}
-      </section>
     </div>
   );
 }
@@ -1148,9 +1200,21 @@ function AttachmentRow({
   const isPdf = attachment.contentType === "application/pdf";
   return (
     <div className="entriesAttachmentRow">
-      <div className="entriesAttachmentIcon">
-        {isImage ? <ImageIcon size={18} /> : <FileText size={18} />}
-      </div>
+      {isImage ? (
+        <button
+          type="button"
+          className="entriesAttachmentThumbnail"
+          onClick={onPreview}
+          title="Voir l’image en grand"
+          aria-label={`Voir ${attachment.fileName} en grand`}
+        >
+          <img src={url} alt="" />
+        </button>
+      ) : (
+        <div className="entriesAttachmentIcon">
+          <FileText size={18} />
+        </div>
+      )}
       <div className="entriesAttachmentMeta">
         <strong title={attachment.fileName}>{attachment.fileName}</strong>
         <span>
@@ -1158,8 +1222,17 @@ function AttachmentRow({
           {formatDateTime(attachment.uploadedAt)}
         </span>
       </div>
-      {isImage || isPdf ? (
-        <button type="button" className="entriesIconButton" title="Aperçu" onClick={onPreview}>
+      {isPdf ? (
+        <button type="button" className="entriesIconButton" title="Aperçu PDF" onClick={onPreview}>
+          <Eye size={16} />
+        </button>
+      ) : isImage ? (
+        <button
+          type="button"
+          className="entriesIconButton"
+          title="Voir en grand"
+          onClick={onPreview}
+        >
           <Eye size={16} />
         </button>
       ) : null}
@@ -1171,13 +1244,32 @@ function AttachmentRow({
       >
         <Download size={16} />
       </a>
-      {preview ? (
-        <div className="entriesAttachmentPreview">
-          {isImage ? (
+      {preview && isImage ? (
+        <div
+          className="entriesImageLightbox"
+          role="dialog"
+          aria-modal="true"
+          aria-label={`Aperçu de ${attachment.fileName}`}
+          onClick={onPreview}
+        >
+          <div className="entriesImageLightboxContent" onClick={(event) => event.stopPropagation()}>
+            <div className="entriesImageLightboxHeader">
+              <strong>{attachment.fileName}</strong>
+              <button
+                type="button"
+                className="entriesIconButton"
+                onClick={onPreview}
+                aria-label="Fermer"
+              >
+                <X size={16} />
+              </button>
+            </div>
             <img src={url} alt={attachment.fileName} />
-          ) : isPdf ? (
-            <iframe title={attachment.fileName} src={url} />
-          ) : null}
+          </div>
+        </div>
+      ) : preview && isPdf ? (
+        <div className="entriesAttachmentPreview">
+          <iframe title={attachment.fileName} src={url} />
         </div>
       ) : null}
     </div>
@@ -1893,6 +1985,44 @@ function EntriesStyles() {
         display: flex;
         gap: 6px;
       }
+      .entriesDetailTabs {
+        display: flex;
+        align-items: center;
+        gap: 5px;
+        padding-bottom: 2px;
+        border-bottom: 1px solid #e8e2f2;
+        overflow-x: auto;
+      }
+      .entriesDetailTabs button {
+        min-height: 31px;
+        padding: 0 10px;
+        display: inline-flex;
+        align-items: center;
+        gap: 6px;
+        border: 1px solid transparent;
+        border-radius: 8px 8px 0 0;
+        background: transparent;
+        color: #77717f;
+        font-size: 10px;
+        font-weight: 800;
+        white-space: nowrap;
+        cursor: pointer;
+      }
+      .entriesDetailTabs button.isActive {
+        border-color: #dcd2f3;
+        border-bottom-color: #fff;
+        background: #f7f3ff;
+        color: #5d4ca8;
+      }
+      .entriesDetailTabs button span {
+        min-width: 18px;
+        padding: 1px 5px;
+        border-radius: 999px;
+        background: #e9e2fb;
+        color: #6554b5;
+        font-size: 8px;
+        text-align: center;
+      }
       .entriesRawText {
         padding: 12px 13px;
         border: 1px solid #e8e2f2;
@@ -2039,6 +2169,22 @@ function EntriesStyles() {
         border-radius: 8px;
         background: #fff;
       }
+      .entriesAttachmentThumbnail {
+        width: 34px;
+        height: 34px;
+        padding: 0;
+        overflow: hidden;
+        border: 1px solid #ddd5ef;
+        border-radius: 7px;
+        background: #f2eefc;
+        cursor: zoom-in;
+      }
+      .entriesAttachmentThumbnail img {
+        width: 100%;
+        height: 100%;
+        display: block;
+        object-fit: cover;
+      }
       .entriesAttachmentIcon {
         width: 34px;
         height: 34px;
@@ -2073,6 +2219,38 @@ function EntriesStyles() {
         border-radius: 7px;
         background: #fff;
         color: #706a79;
+      }
+      .entriesImageLightbox {
+        position: fixed;
+        inset: 0;
+        z-index: 1100;
+        display: grid;
+        place-items: center;
+        padding: 24px;
+        background: rgba(23, 19, 30, 0.78);
+      }
+      .entriesImageLightboxContent {
+        width: min(1100px, 95vw);
+        max-height: 92vh;
+        display: grid;
+        gap: 10px;
+        padding: 12px;
+        border-radius: 14px;
+        background: #fff;
+        box-shadow: 0 24px 70px rgba(0, 0, 0, 0.3);
+      }
+      .entriesImageLightboxHeader {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 10px;
+      }
+      .entriesImageLightboxContent > img {
+        display: block;
+        max-width: 100%;
+        max-height: calc(92vh - 68px);
+        margin: auto;
+        object-fit: contain;
       }
       .entriesAttachmentPreview {
         grid-column: 1/-1;

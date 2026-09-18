@@ -9,8 +9,8 @@ const directEditor = readFileSync(
   new URL("../src/components/quote-direct-editor.tsx", import.meta.url),
   "utf-8",
 );
-const clientVatPanel = readFileSync(
-  new URL("../src/components/client-vat-defaults-panel.tsx", import.meta.url),
+const clientsWorkspace = readFileSync(
+  new URL("../src/components/clients-workspace.tsx", import.meta.url),
   "utf-8",
 );
 const clientsPage = readFileSync(new URL("../src/app/clients/page.tsx", import.meta.url), "utf-8");
@@ -40,10 +40,11 @@ describe("quote legal details UI", () => {
     expect(legalEditor).toContain("Défaut");
   });
 
-  it("expose le taux par défaut dans l'espace clients", () => {
-    expect(clientVatPanel).toContain("TVA par défaut");
-    expect(clientVatPanel).toContain('action: "updateVat"');
-    expect(clientsPage).toContain("<ClientVatDefaultsPanel />");
+  it("intègre le taux par défaut directement dans la fiche client", () => {
+    expect(clientsWorkspace).toContain("TVA par défaut");
+    expect(clientsWorkspace).toContain("defaultVatRatePercent");
+    expect(clientsWorkspace).toContain('aria-label="TVA par défaut du client"');
+    expect(clientsPage).not.toContain("ClientVatDefaultsPanel");
   });
 
   it("fige côté serveur le taux de la fiche client sur le nouveau devis", () => {

@@ -1,4 +1,3 @@
-import { ClientVatDefaultsPanel } from "@/components/client-vat-defaults-panel";
 import { ClientsWorkspace } from "@/components/clients-workspace";
 import { DesktopAppShell } from "@/components/desktop-app-shell";
 
@@ -8,7 +7,6 @@ export default function ClientsPage() {
   return (
     <DesktopAppShell>
       <ClientsWorkspace />
-      <ClientVatDefaultsPanel />
     </DesktopAppShell>
   );
 }

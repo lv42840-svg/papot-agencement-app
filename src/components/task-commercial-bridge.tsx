@@ -31,6 +31,7 @@ const errorMessages: Record<string, string> = {
   COMMERCIAL_SOURCE_TASK_ALREADY_LINKED: "Cette entrée est déjà rattachée à une affaire.",
   COMMERCIAL_REVIEW_DATE_REQUIRED: "La date de prochaine revue est obligatoire.",
   COMMERCIAL_CASE_NOT_FOUND: "Cette affaire n’existe plus.",
+  COMMERCIAL_CASE_SOURCE_ALREADY_LINKED: "Cette affaire est déjà rattachée à une autre entrée.",
 };
 
 function defaultCaseName(task: EntryRecord): string {
