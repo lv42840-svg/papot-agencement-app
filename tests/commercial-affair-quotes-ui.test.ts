@@ -14,7 +14,7 @@ describe("commercial affair quotes UI", () => {
     expect(source).toContain("quote.version");
     expect(source).toContain("Total HT");
     expect(source).toContain("Heures vendues");
-    expect(source).toContain("Coût prévu");
+    expect(source).toContain("Déboursé prévu");
     expect(source).toContain("calculateCommercialQuoteSummary");
   });
 
@@ -24,8 +24,8 @@ describe("commercial affair quotes UI", () => {
     expect(source).not.toContain("CA contractuel");
   });
 
-  it("does not mislabel the current complete cost as an external disbursement", () => {
-    expect(source).toContain("ne sépare pas encore un « déboursé");
-    expect(source).toContain("aucun faux déboursé n’est affiché");
+  it("explains the PAPOT disbursement rule", () => {
+    expect(source).toContain("Déboursé prévu = coûts prévus du devis hors heures PAPOT");
+    expect(source).toContain("BE, Atelier et Pose");
   });
 });
