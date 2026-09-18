@@ -26,15 +26,22 @@ import { loadQuoteWordV2Template } from "@/lib/quotes/word-v2-template-runtime";
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
-const sendQuoteSchema = z.discriminatedUnion("mode", [
-  z.object({
-    mode: z.literal("VALIDATE"),
-  }),
-  z.object({
-    mode: z.literal("SEND"),
-    followUpDate: z.string().regex(/^\d{4}-\d{2}-\d{2}$/),
-  }),
-]);
+const sendQuoteSchema = z
+  .union([
+    z.object({
+      mode: z.literal("VALIDATE"),
+    }),
+    z.object({
+      mode: z.literal("SEND"),
+      followUpDate: z.string().regex(/^\d{4}-\d{2}-\d{2}$/),
+    }),
+    z.object({
+      followUpDate: z.string().regex(/^\d{4}-\d{2}-\d{2}$/),
+    }),
+  ])
+  .transform((input) =>
+    "mode" in input ? input : { mode: "SEND" as const, followUpDate: input.followUpDate },
+  );
 
 function noStoreJson(body: unknown, init?: ResponseInit) {
   const response = NextResponse.json(body, init);
