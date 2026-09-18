@@ -68,7 +68,8 @@ const errorMessages: Record<string, string> = {
   CHANTIER_QUOTE_LINE_INVALID: "Cette ligne n'appartient pas aux devis acceptés du chantier.",
   COMMERCIAL_RETAINED_QUOTE_INVALID: "Ce devis complémentaire ne peut pas être retenu.",
   COMMERCIAL_QUOTE_ALREADY_RETAINED: "Ce devis est déjà retenu pour le chantier.",
-  COMMERCIAL_NOT_CONFIRMED: "L'affaire doit être confirmée avant d'ajouter un devis complémentaire.",
+  COMMERCIAL_NOT_CONFIRMED:
+    "L'affaire doit être confirmée avant d'ajouter un devis complémentaire.",
 };
 
 function formatDateOnly(value: string): string {
