@@ -1,4 +1,4 @@
-import { assertPdfBuffer, convertDocxToPdfWithLibreOffice } from "../documents/pdf-runtime";
+import { assertPdfBuffer, convertDocxToPdf } from "../documents/pdf-runtime";
 import type { QuoteDocumentData } from "./document-data";
 import {
   generateQuoteWordV2FilledDocxFromSources,
@@ -42,7 +42,7 @@ export function assertQuoteWordV2PdfReady(document: QuoteDocumentData): void {
 export async function renderQuoteWordV2Pdf(
   template: Uint8Array,
   document: QuoteDocumentData,
-  converter: QuoteWordV2PdfConverter = convertDocxToPdfWithLibreOffice,
+  converter: QuoteWordV2PdfConverter = convertDocxToPdf,
 ): Promise<GeneratedQuoteWordV2Pdf> {
   assertQuoteWordV2PdfReady(document);
   const docx = renderQuoteWordV2FilledDocx(template, document);
@@ -55,7 +55,7 @@ export async function renderQuoteWordV2PdfWithPhotos(
   template: Uint8Array,
   document: QuoteDocumentData,
   photoLoader: QuoteWordV2PhotoLoader,
-  converter: QuoteWordV2PdfConverter = convertDocxToPdfWithLibreOffice,
+  converter: QuoteWordV2PdfConverter = convertDocxToPdf,
 ): Promise<GeneratedQuoteWordV2Pdf> {
   assertQuoteWordV2PdfReady(document);
   const docx = await renderQuoteWordV2FilledDocxWithPhotos(template, document, photoLoader);
@@ -68,7 +68,7 @@ export async function generateQuoteWordV2PdfFromSources(
   template: Uint8Array,
   input: QuoteDocumentDataMappingInput,
   sources: QuoteDocumentDataSources,
-  converter: QuoteWordV2PdfConverter = convertDocxToPdfWithLibreOffice,
+  converter: QuoteWordV2PdfConverter = convertDocxToPdf,
 ): Promise<GeneratedQuoteWordV2Pdf> {
   const generated = await generateQuoteWordV2FilledDocxFromSources(template, input, sources);
   assertQuoteWordV2PdfReady(generated.document);
