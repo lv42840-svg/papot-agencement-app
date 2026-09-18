@@ -44,13 +44,16 @@ type Mutate = (body: MutationBody, message: string) => Promise<boolean>;
 type SpaceId = (typeof CHANTIER_OPERATIONAL_SPACES)[number]["id"];
 type QuoteGroup = ChantierRetainedQuote;
 
-type Props = {
+type CoreProps = {
   chantier: ChantierRecord;
-  commercialCase: CommercialCase | null;
-  quotes: NativeQuotesPayload;
   busy: boolean;
   canModify: boolean;
   mutate: Mutate;
+};
+
+type Props = CoreProps & {
+  commercialCase: CommercialCase | null;
+  quotes: NativeQuotesPayload;
   mutateCommercial: Mutate;
 };
 
@@ -206,15 +209,7 @@ export function ChantierOperationalWorkspace({
               />
             ) : null}
             {space === "install" ? (
-              <InstallSpace
-                chantier={chantier}
-                commercialCase={commercialCase}
-                quotes={quotes}
-                busy={busy}
-                canModify={canModify}
-                mutate={mutate}
-                mutateCommercial={mutateCommercial}
-              />
+              <InstallSpace chantier={chantier} busy={busy} canModify={canModify} mutate={mutate} />
             ) : null}
             {space !== "admin" &&
             space !== "be" &&
@@ -227,6 +222,236 @@ export function ChantierOperationalWorkspace({
       </div>
       <OperationalStyles />
     </section>
+  );
+}
+
+function AdminSpace({
+  chantier,
+  commercialCase,
+  quotes,
+  quoteGroups,
+  quoteLines,
+  busy,
+  canModify,
+  mutate,
+  mutateCommercial,
+}: CoreProps & {
+  commercialCase: CommercialCase | null;
+  quotes: NativeQuotesPayload;
+  quoteGroups: QuoteGroup[];
+  quoteLines: ChantierQuoteLineReference[];
+  mutateCommercial: Mutate;
+}) {
+  const [tsName, setTsName] = useState("");
+  const retainedIds = new Set(commercialCase?.retainedQuoteIds ?? []);
+  const complementaryQuotes = commercialCase
+    ? quotes.quotes.filter(
+        (quote) =>
+          quote.commercialCaseId === commercialCase.id &&
+          !retainedIds.has(quote.id) &&
+          quoteCanBeRetained(quote),
+      )
+    : [];
+
+  return (
+    <div className="chantierOpSpace">
+      <div className="chantierAdminBlock">
+        <div className="chantierAdminBlockTitle">
+          <div>
+            <strong>Devis acceptés</strong>
+            <span>
+              {quoteGroups.length} devis lié{quoteGroups.length > 1 ? "s" : ""} au chantier, sans
+              copie physique.
+            </span>
+          </div>
+        </div>
+        {quoteGroups.length === 0 ? (
+          <OperationalEmpty label="Aucun devis natif retenu pour ce chantier." />
+        ) : (
+          <div className="chantierAdminQuotes">
+            {quoteGroups.map(({ quote, lines }) => (
+              <article key={quote.id}>
+                <div>
+                  <strong>{quote.finalPdf?.quoteNumber ?? quote.model.subject}</strong>
+                  <span>
+                    {quote.model.subject} · {quote.variantName} · V{quote.version}
+                  </span>
+                  <small>
+                    {lines.length} ligne{lines.length > 1 ? "s" : ""} de référence
+                  </small>
+                </div>
+                <a href={`/devis/${quote.id}`}>Ouvrir le devis</a>
+              </article>
+            ))}
+          </div>
+        )}
+
+        {commercialCase && complementaryQuotes.length > 0 && canModify ? (
+          <div className="chantierComplementaryQuotes">
+            <div>
+              <strong>Devis complémentaires disponibles</strong>
+              <span>
+                Un devis figé peut être accepté ici. Ses lignes rejoindront immédiatement le
+                chantier.
+              </span>
+            </div>
+            {complementaryQuotes.map((quote) => (
+              <article key={quote.id}>
+                <span>
+                  <strong>{quote.finalPdf?.quoteNumber ?? quote.model.subject}</strong>
+                  <small>
+                    {quote.model.subject} · {quote.variantName} · V{quote.version}
+                  </small>
+                </span>
+                <button
+                  type="button"
+                  disabled={busy}
+                  onClick={() =>
+                    void mutateCommercial(
+                      {
+                        action: "retainAdditionalQuote",
+                        caseId: commercialCase.id,
+                        quoteId: quote.id,
+                      },
+                      "Devis complémentaire ajouté au chantier.",
+                    )
+                  }
+                >
+                  Accepter comme complément
+                </button>
+              </article>
+            ))}
+          </div>
+        ) : null}
+      </div>
+
+      <div className="chantierAdminBlock">
+        <div className="chantierAdminBlockTitle">
+          <div>
+            <strong>TS non chiffrés / régularisés</strong>
+            <span>
+              Un TS existe sans montant de vente tant qu’aucun devis complémentaire accepté ne le
+              régularise.
+            </span>
+          </div>
+        </div>
+
+        {canModify ? (
+          <div className="chantierTsCreate">
+            <input
+              value={tsName}
+              onChange={(event) => setTsName(event.target.value)}
+              placeholder="Désignation du TS, ex. ajout tablette demandé en réunion"
+            />
+            <button
+              type="button"
+              disabled={busy || !tsName.trim()}
+              onClick={async () => {
+                const ok = await mutate(
+                  { action: "createTs", chantierId: chantier.id, name: tsName },
+                  "TS créé.",
+                );
+                if (ok) setTsName("");
+              }}
+            >
+              <Plus size={14} /> Créer le TS
+            </button>
+          </div>
+        ) : null}
+
+        {chantier.operational.tsItems.length === 0 ? (
+          <OperationalEmpty label="Aucun TS enregistré sur ce chantier." />
+        ) : (
+          <div className="chantierTsRows">
+            {chantier.operational.tsItems.map((ts) => (
+              <TsRow
+                key={ts.id}
+                chantier={chantier}
+                ts={ts}
+                quoteLines={quoteLines}
+                busy={busy}
+                canModify={canModify}
+                mutate={mutate}
+              />
+            ))}
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
+
+function TsRow({
+  chantier,
+  ts,
+  quoteLines,
+  busy,
+  canModify,
+  mutate,
+}: CoreProps & { ts: ChantierTs; quoteLines: ChantierQuoteLineReference[] }) {
+  const [search, setSearch] = useState("");
+  const [selected, setSelected] = useState("");
+  const linked = quoteLines.find(
+    (line) => line.quoteId === ts.linkedQuoteId && line.quoteLineId === ts.linkedQuoteLineId,
+  );
+  const normalized = search.trim().toLocaleLowerCase("fr-FR");
+  const visible = normalized
+    ? quoteLines.filter((line) =>
+        `${line.quoteNumber} ${line.description}`.toLocaleLowerCase("fr-FR").includes(normalized),
+      )
+    : quoteLines;
+  const selectedLine = quoteLines.find(
+    (line) => `${line.quoteId}:${line.quoteLineId}` === selected,
+  );
+
+  return (
+    <article className="chantierTsRow">
+      <div>
+        <strong>{ts.name}</strong>
+        <span>{linked ? `Régularisé · ${chantierQuoteLineDisplay(linked)}` : "TS non chiffré"}</span>
+      </div>
+      {!linked && canModify ? (
+        <div className="chantierTsLink">
+          <input
+            value={search}
+            onChange={(event) => setSearch(event.target.value)}
+            placeholder="Rechercher dans les lignes des devis acceptés"
+          />
+          <select value={selected} onChange={(event) => setSelected(event.target.value)}>
+            <option value="">Choisir une ligne de devis…</option>
+            {visible.map((line) => (
+              <option
+                key={`${line.quoteId}:${line.quoteLineId}`}
+                value={`${line.quoteId}:${line.quoteLineId}`}
+              >
+                {line.quoteNumber} · {line.description}
+              </option>
+            ))}
+          </select>
+          <button
+            type="button"
+            disabled={busy || !selectedLine}
+            onClick={() =>
+              selectedLine
+                ? void mutate(
+                    {
+                      action: "linkTsToQuoteLine",
+                      chantierId: chantier.id,
+                      tsId: ts.id,
+                      quoteId: selectedLine.quoteId,
+                      quoteLineId: selectedLine.quoteLineId,
+                      quoteLabel: chantierQuoteLineDisplay(selectedLine),
+                    },
+                    "TS rattaché au devis complémentaire.",
+                  )
+                : undefined
+            }
+          >
+            Rattacher
+          </button>
+        </div>
+      ) : null}
+    </article>
   );
 }
 
@@ -302,7 +527,7 @@ function BeSpace({
   );
 }
 
-function BeRow({ chantier, item, busy, canModify, mutate }: Props & { item: BeItem }) {
+function BeRow({ chantier, item, busy, canModify, mutate }: CoreProps & { item: BeItem }) {
   return (
     <div className="chantierOpRow">
       <div className="chantierOpRowMain">
@@ -408,7 +633,13 @@ function WorkshopSpace({
   );
 }
 
-function WorkshopRow({ chantier, item, busy, canModify, mutate }: Props & { item: WorkshopItem }) {
+function WorkshopRow({
+  chantier,
+  item,
+  busy,
+  canModify,
+  mutate,
+}: CoreProps & { item: WorkshopItem }) {
   return (
     <div className="chantierOpRow">
       <div className="chantierOpRowMain">
@@ -445,7 +676,7 @@ function WorkshopRow({ chantier, item, busy, canModify, mutate }: Props & { item
   );
 }
 
-function InstallSpace({ chantier, busy, canModify, mutate }: Props) {
+function InstallSpace({ chantier, busy, canModify, mutate }: CoreProps) {
   const items = chantier.operational.installItems;
   return (
     <div className="chantierOpSpace">
@@ -485,7 +716,13 @@ function InstallSpace({ chantier, busy, canModify, mutate }: Props) {
   );
 }
 
-function InstallRow({ chantier, item, busy, canModify, mutate }: Props & { item: InstallItem }) {
+function InstallRow({
+  chantier,
+  item,
+  busy,
+  canModify,
+  mutate,
+}: CoreProps & { item: InstallItem }) {
   const [status, setStatus] = useState<InstallItemStatus>(item.status);
   const [note, setNote] = useState(item.note ?? "");
 
