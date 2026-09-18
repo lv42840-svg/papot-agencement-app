@@ -1,6 +1,11 @@
 import { describe, expect, it } from "vitest";
 import { applyQuotesMutation, quotesMutationSchema } from "../src/lib/quotes/mutations";
-import { markNativeQuoteSent, markNativeQuoteSentWithFinalPdf } from "../src/lib/quotes/send";
+import {
+  markFrozenNativeQuoteSent,
+  markNativeQuoteSent,
+  markNativeQuoteSentWithFinalPdf,
+  markNativeQuoteValidatedWithFinalPdf,
+} from "../src/lib/quotes/send";
 import { createInitialNativeQuotesPayload, type QuoteFinalPdf } from "../src/lib/quotes/store";
 
 const actor = {
@@ -81,6 +86,42 @@ describe("native quote send", () => {
 
     expect(result.payload.quotes[0]).toMatchObject({
       status: "SENT",
+      finalPdf: frozen,
+    });
+  });
+
+  it("valide un PDF sans déclarer le devis envoyé, puis l'envoie sans régénérer le PDF", () => {
+    const source = draft();
+    const quoteId = source.quotes[0].id;
+    const frozen = finalPdf();
+
+    const validated = markNativeQuoteValidatedWithFinalPdf(
+      source,
+      quoteId,
+      frozen,
+      actor,
+      new Date("2026-09-14T16:00:00.000Z"),
+    );
+
+    expect(validated.payload.quotes[0]).toMatchObject({
+      status: "FROZEN",
+      sentAt: null,
+      followUpDate: null,
+      finalPdf: frozen,
+    });
+
+    const sent = markFrozenNativeQuoteSent(
+      validated.payload,
+      quoteId,
+      "2026-09-25",
+      actor,
+      new Date("2026-09-14T17:00:00.000Z"),
+    );
+
+    expect(sent.payload.quotes[0]).toMatchObject({
+      status: "SENT",
+      sentAt: "2026-09-14T17:00:00.000Z",
+      followUpDate: "2026-09-25",
       finalPdf: frozen,
     });
   });
