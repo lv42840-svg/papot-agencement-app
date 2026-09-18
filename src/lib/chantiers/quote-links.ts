@@ -10,6 +10,7 @@ export type ChantierQuoteLineReference = {
   quoteId: string;
   quoteLineId: string;
   quoteNumber: string;
+  quoteKind: NativeQuoteRecord["quoteKind"];
   variantName: string;
   version: number;
   subject: string;
@@ -32,6 +33,7 @@ function lineReference(quote: NativeQuoteRecord, line: QuoteLine): ChantierQuote
     quoteId: quote.id,
     quoteLineId: line.id,
     quoteNumber: quoteNumber(quote),
+    quoteKind: quote.quoteKind,
     variantName: quote.variantName,
     version: quote.version,
     subject: quote.model.subject,
