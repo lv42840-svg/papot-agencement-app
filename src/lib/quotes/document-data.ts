@@ -109,9 +109,9 @@ export type QuoteDocumentData = {
   };
   items: QuoteDocumentItem[];
   totals: {
-    grossTotalHtCents: number;
-    customerDiscountCents: number;
-    customerDiscountLabel: string | null;
+    grossTotalHtCents?: number;
+    customerDiscountCents?: number;
+    customerDiscountLabel?: string | null;
     totalHtCents: number;
     totalVatCents: number;
     totalTtcCents: number;
