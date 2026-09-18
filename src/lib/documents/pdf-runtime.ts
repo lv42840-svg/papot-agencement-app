@@ -23,6 +23,18 @@ export type LibreOfficePdfConversionOptions = {
   commandRunner?: PdfCommandRunner;
 };
 
+export type MicrosoftWordPdfConversionOptions = {
+  binary?: string;
+  timeoutMs?: number;
+  commandRunner?: PdfCommandRunner;
+};
+
+export type DocxPdfConversionOptions = LibreOfficePdfConversionOptions & {
+  platform?: NodeJS.Platform;
+  wordBinary?: string;
+  wordCommandRunner?: PdfCommandRunner;
+};
+
 export type PdfRenderOptions = {
   binary?: string;
   dpi?: number;
@@ -117,6 +129,46 @@ function libreOfficeCandidates(explicitBinary?: string): string[] {
   return candidates;
 }
 
+function microsoftWordPowerShellCandidates(explicitBinary?: string): string[] {
+  if (explicitBinary?.trim()) return [explicitBinary.trim()];
+  if (process.env.PAPOT_POWERSHELL_BIN?.trim()) {
+    return [process.env.PAPOT_POWERSHELL_BIN.trim()];
+  }
+  return [
+    "C:\\Windows\\System32\\WindowsPowerShell\\v1.0\\powershell.exe",
+    "powershell.exe",
+    "pwsh.exe",
+  ];
+}
+
+function isCommandUnavailable(error: unknown): boolean {
+  return error instanceof Error && error.message.startsWith("PDF_COMMAND_NOT_FOUND:");
+}
+
+const WORD_PDF_EXPORT_SCRIPT = `
+$ErrorActionPreference = "Stop"
+$inputPath = $args[0]
+$outputPath = $args[1]
+$word = $null
+$document = $null
+try {
+  $word = New-Object -ComObject Word.Application
+  $word.Visible = $false
+  $word.DisplayAlerts = 0
+  $document = $word.Documents.Open($inputPath)
+  $document.ExportAsFixedFormat($outputPath, 17)
+} finally {
+  if ($null -ne $document) {
+    $document.Close($false)
+    [void][System.Runtime.InteropServices.Marshal]::FinalReleaseComObject($document)
+  }
+  if ($null -ne $word) {
+    $word.Quit()
+    [void][System.Runtime.InteropServices.Marshal]::FinalReleaseComObject($word)
+  }
+}
+`;
+
 async function runFirstAvailable(
   candidates: string[],
   args: string[],
@@ -199,6 +251,83 @@ export async function convertDocxToPdfWithLibreOffice(
     return pdf;
   } finally {
     await rm(workDir, { recursive: true, force: true });
+  }
+}
+
+export async function convertDocxToPdfWithMicrosoftWord(
+  docx: Uint8Array,
+  options: MicrosoftWordPdfConversionOptions = {},
+): Promise<Uint8Array> {
+  const workDir = await mkdtemp(path.join(tmpdir(), "papot-docx-word-pdf-"));
+  const inputPath = path.join(workDir, "quote.docx");
+  const outputPath = path.join(workDir, "quote.pdf");
+  const scriptPath = path.join(workDir, "convert-word-pdf.ps1");
+  const commandRunner = options.commandRunner ?? runPdfCommand;
+
+  try {
+    await writeFile(inputPath, docx);
+    await writeFile(scriptPath, WORD_PDF_EXPORT_SCRIPT, "utf8");
+
+    const { command, result } = await runFirstAvailable(
+      microsoftWordPowerShellCandidates(options.binary),
+      ["-NoProfile", "-NonInteractive", "-ExecutionPolicy", "Bypass", "-File", scriptPath, inputPath, outputPath],
+      {
+        cwd: workDir,
+        timeoutMs: options.timeoutMs ?? DEFAULT_TIMEOUT_MS,
+        commandRunner,
+      },
+    );
+
+    if (result.exitCode !== 0) {
+      throw new Error(
+        `PDF_WORD_CONVERSION_FAILED:${command}:${result.exitCode}:${commandMessage(result)}`,
+      );
+    }
+
+    let pdf: Uint8Array;
+    try {
+      pdf = await readFile(outputPath);
+    } catch {
+      throw new Error(
+        `PDF_WORD_CONVERSION_OUTPUT_MISSING:${command}:${commandMessage(result)}`,
+      );
+    }
+    assertPdfBuffer(pdf);
+    return pdf;
+  } finally {
+    await rm(workDir, { recursive: true, force: true });
+  }
+}
+
+export async function convertDocxToPdf(
+  docx: Uint8Array,
+  options: DocxPdfConversionOptions = {},
+): Promise<Uint8Array> {
+  try {
+    return await convertDocxToPdfWithLibreOffice(docx, options);
+  } catch (libreOfficeError) {
+    const platform = options.platform ?? process.platform;
+    if (platform !== "win32" || !isCommandUnavailable(libreOfficeError)) {
+      throw libreOfficeError;
+    }
+
+    try {
+      return await convertDocxToPdfWithMicrosoftWord(docx, {
+        binary: options.wordBinary,
+        timeoutMs: options.timeoutMs,
+        commandRunner: options.wordCommandRunner ?? options.commandRunner,
+      });
+    } catch (wordError) {
+      if (isCommandUnavailable(wordError)) {
+        const unavailable = new Error("PDF_CONVERTER_UNAVAILABLE");
+        (unavailable as Error & { cause?: unknown }).cause = {
+          libreOfficeError,
+          wordError,
+        };
+        throw unavailable;
+      }
+      throw wordError;
+    }
   }
 }
 
