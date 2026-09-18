@@ -445,6 +445,28 @@ export function QuoteStructuredLinesEditor({
     const adjusted = calculateQuoteAdjustedPricing(quote.model.items, quote.pricingConfig);
     return new Map(adjusted.lines.map((line) => [line.lineId, line]));
   }, [quote]);
+  const itemById = useMemo(() => new Map(items.map((item) => [item.id, item])), [items]);
+  const headingTotalsById = useMemo(() => {
+    const totals = new Map<string, number>();
+    for (const line of lines) {
+      const adjusted = adjustedLinesById.get(line.id);
+      if (
+        !adjusted ||
+        adjusted.optionStatus === "PENDING" ||
+        adjusted.optionStatus === "REJECTED"
+      ) {
+        continue;
+      }
+      const amount = adjusted.saleCents;
+      if (!line.parentId) continue;
+      totals.set(line.parentId, (totals.get(line.parentId) ?? 0) + amount);
+      const parent = itemById.get(line.parentId);
+      if (parent?.kind === "SUBSECTION") {
+        totals.set(parent.parentId, (totals.get(parent.parentId) ?? 0) + amount);
+      }
+    }
+    return totals;
+  }, [adjustedLinesById, itemById, lines]);
   const numbers = useMemo(() => buildQuoteItemNumbers(items), [items]);
   const lastSection = useMemo(() => latestSection(items), [items]);
   const editable = canWrite && quote?.status === "DRAFT";
@@ -1908,6 +1930,7 @@ export function QuoteStructuredLinesEditor({
     if (editing && headingEditor)
       return renderHeadingEditor(headingEditor, numbers.get(item.id) ?? "—");
     const directOption = directOptionForItem(item.id);
+    const headingTotalCents = headingTotalsById.get(item.id) ?? 0;
 
     return (
       <div className="quoteHeadingBlock" key={item.id}>
@@ -1928,7 +1951,7 @@ export function QuoteStructuredLinesEditor({
           <span />
           <span />
           <span />
-          <span />
+          <strong className="quoteHeadingTotal">{formatMoney(headingTotalCents)}</strong>
           <div className="quoteRowActions">
             {editable ? (
               <>
@@ -2384,6 +2407,12 @@ export function QuoteStructuredLinesEditor({
         .quoteLineTotal {
           white-space: nowrap;
           font-variant-numeric: tabular-nums;
+        }
+        .quoteHeadingTotal {
+          white-space: nowrap;
+          font-variant-numeric: tabular-nums;
+          color: #4f3c93;
+          justify-self: start;
         }
         .miniLibraryButton,
         .miniOptionButton,

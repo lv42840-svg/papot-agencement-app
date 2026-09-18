@@ -24,6 +24,7 @@ function itemLabel(item: QuoteItem): string {
 export function QuoteItemPresentationPanel({ quoteId, item, editable, onSaved, onClose }: Props) {
   const [uploading, setUploading] = useState(false);
   const [busyPhotoId, setBusyPhotoId] = useState<string | null>(null);
+  const [previewPhotoId, setPreviewPhotoId] = useState<string | null>(null);
   const [error, setError] = useState("");
 
   useEffect(() => {
@@ -105,6 +106,7 @@ export function QuoteItemPresentationPanel({ quoteId, item, editable, onSaved, o
   }
 
   const photos = item.presentation?.photos ?? [];
+  const previewPhoto = photos.find((photo) => photo.id === previewPhotoId) ?? null;
   const label = itemLabel(item);
 
   return (
@@ -146,10 +148,18 @@ export function QuoteItemPresentationPanel({ quoteId, item, editable, onSaved, o
           <div className="quotePhotoGrid">
             {photos.map((photo) => (
               <div className="quotePhotoCard" key={photo.id}>
-                <img
-                  src={`/api/desktop/quotes/${quoteId}/items/${item.id}/photos/${photo.id}`}
-                  alt={photo.fileName}
-                />
+                <button
+                  type="button"
+                  className="quotePhotoPreviewButton"
+                  onClick={() => setPreviewPhotoId(photo.id)}
+                  title="Voir la photo en grand"
+                  aria-label={`Voir ${photo.fileName} en grand`}
+                >
+                  <img
+                    src={`/api/desktop/quotes/${quoteId}/items/${item.id}/photos/${photo.id}`}
+                    alt={photo.fileName}
+                  />
+                </button>
                 <div className="quotePhotoMeta">
                   <strong title={photo.fileName}>{photo.fileName}</strong>
                   <label>
@@ -180,6 +190,81 @@ export function QuoteItemPresentationPanel({ quoteId, item, editable, onSaved, o
         )}
       </div>
       {error ? <div className="quotePresentationError">{error}</div> : null}
+
+      {previewPhoto ? (
+        <div
+          className="quotePhotoLightbox"
+          role="dialog"
+          aria-modal="true"
+          aria-label={`Aperçu de ${previewPhoto.fileName}`}
+          onClick={() => setPreviewPhotoId(null)}
+        >
+          <div className="quotePhotoLightboxContent" onClick={(event) => event.stopPropagation()}>
+            <div className="quotePhotoLightboxHeader">
+              <strong>{previewPhoto.fileName}</strong>
+              <button
+                type="button"
+                className="iconButton"
+                onClick={() => setPreviewPhotoId(null)}
+                aria-label="Fermer l’aperçu"
+              >
+                <X size={16} aria-hidden="true" />
+              </button>
+            </div>
+            <img
+              src={`/api/desktop/quotes/${quoteId}/items/${item.id}/photos/${previewPhoto.id}`}
+              alt={previewPhoto.fileName}
+            />
+          </div>
+        </div>
+      ) : null}
+
+      <style jsx>{`
+        .quotePhotoPreviewButton {
+          display: block;
+          width: 100%;
+          padding: 0;
+          border: 0;
+          background: transparent;
+          cursor: zoom-in;
+        }
+        .quotePhotoPreviewButton img {
+          display: block;
+          width: 100%;
+        }
+        .quotePhotoLightbox {
+          position: fixed;
+          inset: 0;
+          z-index: 1000;
+          display: grid;
+          place-items: center;
+          padding: 28px;
+          background: rgba(24, 20, 30, 0.78);
+        }
+        .quotePhotoLightboxContent {
+          width: min(1100px, 94vw);
+          max-height: 92vh;
+          display: grid;
+          gap: 10px;
+          padding: 12px;
+          border-radius: 14px;
+          background: #fff;
+          box-shadow: 0 24px 70px rgba(0, 0, 0, 0.3);
+        }
+        .quotePhotoLightboxHeader {
+          display: flex;
+          align-items: center;
+          justify-content: space-between;
+          gap: 12px;
+        }
+        .quotePhotoLightboxContent > img {
+          display: block;
+          max-width: 100%;
+          max-height: calc(92vh - 70px);
+          margin: auto;
+          object-fit: contain;
+        }
+      `}</style>
     </div>
   );
 }

@@ -54,6 +54,7 @@ export function QuoteLegalDetailsEditor({
   );
   const [savingSchedule, setSavingSchedule] = useState(false);
   const [savingLineId, setSavingLineId] = useState<string | null>(null);
+  const [manageLineVat, setManageLineVat] = useState(false);
   const [error, setError] = useState("");
   const [notice, setNotice] = useState("");
 
@@ -67,6 +68,10 @@ export function QuoteLegalDetailsEditor({
       ),
     );
   }, [lines, quote]);
+
+  useEffect(() => {
+    setManageLineVat(false);
+  }, [quote.id]);
 
   async function patch(body: Record<string, unknown>) {
     const response = await fetch(`/api/desktop/quotes/${quote.id}/legal`, {
@@ -201,14 +206,31 @@ export function QuoteLegalDetailsEditor({
         <div className="quoteVatTitle">
           <div>
             <Percent size={17} aria-hidden="true" />
-            <strong>TVA par ligne</strong>
+            <strong>TVA</strong>
           </div>
-          <span>
-            Défaut client figé sur ce devis : {rateInput(quote.taxConfig.defaultRatePercent)} %
-          </span>
+          <span>Taux client par défaut : {rateInput(quote.taxConfig.defaultRatePercent)} %</span>
         </div>
 
-        {lines.length === 0 ? (
+        <label className="quoteVatToggle">
+          <input
+            type="checkbox"
+            checked={manageLineVat}
+            onChange={(event) => setManageLineVat(event.target.checked)}
+            disabled={lines.length === 0}
+          />
+          <span>
+            <strong>Gérer la TVA à la ligne</strong>
+            <small>À activer seulement quand une ligne doit utiliser un taux différent.</small>
+          </span>
+        </label>
+
+        {!manageLineVat ? (
+          <p className="muted quoteVatCollapsed">
+            {quote.taxConfig.lineOverrides.length > 0
+              ? `${quote.taxConfig.lineOverrides.length} taux spécifique${quote.taxConfig.lineOverrides.length > 1 ? "s" : ""} enregistré${quote.taxConfig.lineOverrides.length > 1 ? "s" : ""}.`
+              : "Toutes les lignes utilisent le taux client par défaut."}
+          </p>
+        ) : lines.length === 0 ? (
           <p className="muted quoteVatEmpty">Ajoute un ouvrage pour régler sa TVA.</p>
         ) : (
           <div className="quoteVatRows">
@@ -352,6 +374,31 @@ export function QuoteLegalDetailsEditor({
         }
         .quoteVatTitle > span {
           color: var(--muted);
+          font-size: 11px;
+        }
+        .quoteVatToggle {
+          display: flex;
+          align-items: flex-start;
+          gap: 9px;
+          padding: 10px 11px;
+          border: 1px solid #e3ddea;
+          border-radius: 10px;
+          background: #faf9fb;
+          cursor: pointer;
+        }
+        .quoteVatToggle input {
+          margin-top: 2px;
+        }
+        .quoteVatToggle span {
+          display: grid;
+          gap: 2px;
+        }
+        .quoteVatToggle small {
+          color: #7a7280;
+          font-size: 11px;
+        }
+        .quoteVatCollapsed {
+          margin: 0;
           font-size: 11px;
         }
         .quoteVatRows {
