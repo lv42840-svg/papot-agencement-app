@@ -1,9 +1,6 @@
 import { z } from "zod";
 import type { SharedResourceEnvelope } from "../sync/resource-lock";
-import type {
-  SaveSharedResourceResult,
-  SharedResourceActor,
-} from "../sync/resource-state-store";
+import type { SaveSharedResourceResult, SharedResourceActor } from "../sync/resource-state-store";
 import { libraryComponentSchema, parseLibraryComponent, type LibraryComponent } from "./component";
 import { libraryOuvrageSchema, parseLibraryOuvrage, type LibraryOuvrage } from "./ouvrage";
 
