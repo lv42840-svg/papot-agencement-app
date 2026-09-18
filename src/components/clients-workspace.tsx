@@ -21,6 +21,7 @@ import {
   type ClientType,
 } from "@/lib/clients/domain";
 import { resolveClientWorkspaceSelection } from "@/lib/clients/navigation";
+import { DEFAULT_VAT_RATE_PERCENT } from "@/lib/vat";
 
 type ClientsSnapshot = {
   payload: ClientsPayload;
@@ -51,6 +52,7 @@ type ClientDraft = {
   email: string;
   siret: string;
   paymentTerms: string;
+  defaultVatRatePercent: string;
   notes: string;
   contacts: DraftContact[];
 };
@@ -109,6 +111,7 @@ function emptyDraft(): ClientDraft {
     email: "",
     siret: "",
     paymentTerms: "",
+    defaultVatRatePercent: String(DEFAULT_VAT_RATE_PERCENT),
     notes: "",
     contacts: [],
   };
@@ -128,6 +131,7 @@ function clientToDraft(client: ClientRecord): ClientDraft {
     email: client.email,
     siret: client.siret,
     paymentTerms: client.paymentTerms,
+    defaultVatRatePercent: String(client.defaultVatRatePercent).replace(".", ","),
     notes: client.notes,
     contacts: client.contacts.map((contact) => ({ ...contact })),
   };
@@ -322,7 +326,16 @@ export function ClientsWorkspace() {
   async function submit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     const contacts = draft.contacts.filter(hasContactContent).map((contact) => ({ ...contact }));
-    const fields = { ...draft, contacts };
+    const defaultVatRatePercent = Number(draft.defaultVatRatePercent.trim().replace(",", "."));
+    if (
+      !Number.isFinite(defaultVatRatePercent) ||
+      defaultVatRatePercent < 0 ||
+      defaultVatRatePercent > 100
+    ) {
+      setError("La TVA par défaut doit être comprise entre 0 et 100 %.");
+      return;
+    }
+    const fields = { ...draft, contacts, defaultVatRatePercent };
 
     if (mode === "new") {
       await mutate({ action: "create", ...fields }, "Client créé.");
@@ -627,24 +640,41 @@ export function ClientsWorkspace() {
                 <p className="muted">
                   Cette valeur servira de référence pour les futurs devis et factures du client.
                 </p>
-                <label className="clientsField">
-                  Conditions applicables à ce client
-                  <select
-                    value={draft.paymentTerms}
-                    onChange={(event) => updateDraft("paymentTerms", event.target.value)}
-                    disabled={!editable}
-                  >
-                    <option value="">À définir</option>
-                    {paymentTermsOptions.map((option) => (
-                      <option key={option} value={option}>
-                        {option}
-                      </option>
-                    ))}
-                    {draft.paymentTerms && !isPresetPaymentTerm(draft.paymentTerms) ? (
-                      <option value={draft.paymentTerms}>{draft.paymentTerms}</option>
-                    ) : null}
-                  </select>
-                </label>
+                <div className="clientsFormGrid">
+                  <label className="clientsField">
+                    Conditions applicables à ce client
+                    <select
+                      value={draft.paymentTerms}
+                      onChange={(event) => updateDraft("paymentTerms", event.target.value)}
+                      disabled={!editable}
+                    >
+                      <option value="">À définir</option>
+                      {paymentTermsOptions.map((option) => (
+                        <option key={option} value={option}>
+                          {option}
+                        </option>
+                      ))}
+                      {draft.paymentTerms && !isPresetPaymentTerm(draft.paymentTerms) ? (
+                        <option value={draft.paymentTerms}>{draft.paymentTerms}</option>
+                      ) : null}
+                    </select>
+                  </label>
+                  <label className="clientsField">
+                    TVA par défaut
+                    <span className="clientsVatInput">
+                      <input
+                        value={draft.defaultVatRatePercent}
+                        onChange={(event) =>
+                          updateDraft("defaultVatRatePercent", event.target.value)
+                        }
+                        disabled={!editable}
+                        inputMode="decimal"
+                        aria-label="TVA par défaut du client"
+                      />
+                      <b>%</b>
+                    </span>
+                  </label>
+                </div>
               </div>
 
               <div className="clientsSection">
@@ -776,6 +806,19 @@ export function ClientsWorkspace() {
           align-items: flex-start;
           justify-content: space-between;
           gap: 16px;
+        }
+        .clientsVatInput {
+          display: flex;
+          align-items: center;
+          gap: 7px;
+        }
+        .clientsVatInput input {
+          min-width: 0;
+          flex: 1 1 auto;
+        }
+        .clientsVatInput b {
+          color: var(--muted);
+          font-size: 12px;
         }
         .clientsPageHeader h1,
         .clientsDetailHeader h2,
