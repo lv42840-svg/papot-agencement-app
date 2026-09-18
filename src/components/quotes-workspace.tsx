@@ -115,7 +115,9 @@ export function QuotesWorkspace({
                     <span>{quote.model.issueDate}</span>
                     <strong>{quoteDocumentStatusLabel(quote.status)}</strong>
                     {contractState ? (
-                      <em className={contractState === "RETAINED" ? "isRetained" : "isClassed"}>
+                      <em
+                        className={contractState === "RETAINED" ? "isRetained" : "isClassed"}
+                      >
                         {quoteContractSelectionLabel(contractState)}
                       </em>
                     ) : null}
