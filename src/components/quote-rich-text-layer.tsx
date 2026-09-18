@@ -88,7 +88,7 @@ export function QuoteRichTextLayer({ quote }: Props) {
 
     const decorate = () => {
       const targets = document.querySelectorAll<HTMLElement>(
-        ".quoteHeadingRow > strong, .quoteLineDescription > strong",
+        ".quoteHeadingTitle, .quoteLineDescription > strong",
       );
       for (const target of targets) {
         const item = resolveItemFromTarget(target, quote, itemByNumber);
