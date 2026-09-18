@@ -8,9 +8,7 @@ export type CommercialQuoteSummary = {
   estimatedCostCents: number | null;
 };
 
-function componentActivity(
-  component: QuoteOuvrageComponent,
-): "BE" | "ATELIER" | "POSE" | null {
+function componentActivity(component: QuoteOuvrageComponent): "BE" | "ATELIER" | "POSE" | null {
   return component.activity ?? component.librarySource?.component.activity ?? null;
 }
 
@@ -28,9 +26,7 @@ function roundHours(value: number): number {
   return Math.round(value * 1_000_000) / 1_000_000;
 }
 
-export function calculateCommercialQuoteSummary(
-  quote: NativeQuoteRecord,
-): CommercialQuoteSummary {
+export function calculateCommercialQuoteSummary(quote: NativeQuoteRecord): CommercialQuoteSummary {
   const pricing = calculateQuoteAdjustedPricing(quote.model.items, quote.pricingConfig);
   const linesById = new Map(
     quote.model.items
