@@ -21,7 +21,6 @@ import {
   type BeItem,
   type BeItemStatus,
   type ChantierRecord,
-  type ChantierTs,
   type InstallItem,
   type InstallItemStatus,
   type TechnicalOrigin,
@@ -31,9 +30,7 @@ import {
 import type { CommercialCase } from "@/lib/commercial/domain";
 import {
   chantierQuoteLineDisplay,
-  retainedChantierQuoteLines,
   retainedChantierQuotes,
-  type ChantierQuoteLineReference,
   type ChantierRetainedQuote,
 } from "@/lib/chantiers/quote-links";
 import { quoteCanBeRetained } from "@/lib/quotes/retention";
@@ -101,10 +98,6 @@ export function ChantierOperationalWorkspace({
   const [space, setSpace] = useState<SpaceId>("admin");
   const quoteGroups = useMemo<QuoteGroup[]>(
     () => (commercialCase ? retainedChantierQuotes(commercialCase, quotes) : []),
-    [commercialCase, quotes],
-  );
-  const quoteLines = useMemo(
-    () => (commercialCase ? retainedChantierQuoteLines(commercialCase, quotes) : []),
     [commercialCase, quotes],
   );
   const spaceState = chantier.operational.spaces[space];
@@ -177,7 +170,6 @@ export function ChantierOperationalWorkspace({
                 commercialCase={commercialCase}
                 quotes={quotes}
                 quoteGroups={quoteGroups}
-                quoteLines={quoteLines}
                 busy={busy}
                 canModify={canModify}
                 mutate={mutate}
@@ -227,19 +219,15 @@ function AdminSpace({
   commercialCase,
   quotes,
   quoteGroups,
-  quoteLines,
   busy,
   canModify,
-  mutate,
   mutateCommercial,
 }: CoreProps & {
   commercialCase: CommercialCase | null;
   quotes: NativeQuotesPayload;
   quoteGroups: QuoteGroup[];
-  quoteLines: ChantierQuoteLineReference[];
   mutateCommercial: Mutate;
 }) {
-  const [tsName, setTsName] = useState("");
   const retainedIds = new Set(commercialCase?.retainedQuoteIds ?? []);
   const complementaryQuotes = commercialCase
     ? quotes.quotes.filter(
@@ -339,135 +327,7 @@ function AdminSpace({
         ) : null}
       </div>
 
-      <div className="chantierAdminBlock">
-        <div className="chantierAdminBlockTitle">
-          <div>
-            <strong>TS non chiffrés / régularisés</strong>
-            <span>
-              Un TS existe sans montant de vente tant qu’aucun devis complémentaire accepté ne le
-              régularise.
-            </span>
-          </div>
-        </div>
-
-        {canModify ? (
-          <div className="chantierTsCreate">
-            <input
-              value={tsName}
-              onChange={(event) => setTsName(event.target.value)}
-              placeholder="Désignation du TS, ex. ajout tablette demandé en réunion"
-            />
-            <button
-              type="button"
-              disabled={busy || !tsName.trim()}
-              onClick={async () => {
-                const ok = await mutate(
-                  { action: "createTs", chantierId: chantier.id, name: tsName },
-                  "TS créé.",
-                );
-                if (ok) setTsName("");
-              }}
-            >
-              <Plus size={14} /> Créer le TS
-            </button>
-          </div>
-        ) : null}
-
-        {chantier.operational.tsItems.length === 0 ? (
-          <OperationalEmpty label="Aucun TS enregistré sur ce chantier." />
-        ) : (
-          <div className="chantierTsRows">
-            {chantier.operational.tsItems.map((ts) => (
-              <TsRow
-                key={ts.id}
-                chantier={chantier}
-                ts={ts}
-                quoteLines={quoteLines}
-                busy={busy}
-                canModify={canModify}
-                mutate={mutate}
-              />
-            ))}
-          </div>
-        )}
-      </div>
     </div>
-  );
-}
-
-function TsRow({
-  chantier,
-  ts,
-  quoteLines,
-  busy,
-  canModify,
-  mutate,
-}: CoreProps & { ts: ChantierTs; quoteLines: ChantierQuoteLineReference[] }) {
-  const [search, setSearch] = useState("");
-  const [selected, setSelected] = useState("");
-  const linked = quoteLines.find(
-    (line) => line.quoteId === ts.linkedQuoteId && line.quoteLineId === ts.linkedQuoteLineId,
-  );
-  const normalized = search.trim().toLocaleLowerCase("fr-FR");
-  const visible = normalized
-    ? quoteLines.filter((line) =>
-        `${line.quoteNumber} ${line.description}`.toLocaleLowerCase("fr-FR").includes(normalized),
-      )
-    : quoteLines;
-  const selectedLine = quoteLines.find(
-    (line) => `${line.quoteId}:${line.quoteLineId}` === selected,
-  );
-
-  return (
-    <article className="chantierTsRow">
-      <div>
-        <strong>{ts.name}</strong>
-        <span>
-          {linked ? `Régularisé · ${chantierQuoteLineDisplay(linked)}` : "TS non chiffré"}
-        </span>
-      </div>
-      {!linked && canModify ? (
-        <div className="chantierTsLink">
-          <input
-            value={search}
-            onChange={(event) => setSearch(event.target.value)}
-            placeholder="Rechercher dans les lignes des devis acceptés"
-          />
-          <select value={selected} onChange={(event) => setSelected(event.target.value)}>
-            <option value="">Choisir une ligne de devis…</option>
-            {visible.map((line) => (
-              <option
-                key={`${line.quoteId}:${line.quoteLineId}`}
-                value={`${line.quoteId}:${line.quoteLineId}`}
-              >
-                {line.quoteNumber} · {line.description}
-              </option>
-            ))}
-          </select>
-          <button
-            type="button"
-            disabled={busy || !selectedLine}
-            onClick={() =>
-              selectedLine
-                ? void mutate(
-                    {
-                      action: "linkTsToQuoteLine",
-                      chantierId: chantier.id,
-                      tsId: ts.id,
-                      quoteId: selectedLine.quoteId,
-                      quoteLineId: selectedLine.quoteLineId,
-                      quoteLabel: chantierQuoteLineDisplay(selectedLine),
-                    },
-                    "TS rattaché au devis complémentaire.",
-                  )
-                : undefined
-            }
-          >
-            Rattacher
-          </button>
-        </div>
-      ) : null}
-    </article>
   );
 }
 
@@ -506,7 +366,6 @@ function BeSpace({ chantier, busy, canModify, mutate, quoteGroups }: TechnicalSp
           mode="be"
           busy={busy}
           quoteGroups={quoteGroups}
-          tsItems={chantier.operational.tsItems}
           onCancel={() => setCreating(false)}
           onCreate={async (value) => {
             const ok = await mutate(
@@ -606,7 +465,6 @@ function WorkshopSpace({ chantier, busy, canModify, mutate, quoteGroups }: Techn
           mode="workshop"
           busy={busy}
           quoteGroups={quoteGroups}
-          tsItems={chantier.operational.tsItems}
           onCancel={() => setCreating(false)}
           onCreate={async (value) => {
             const ok = await mutate(
@@ -786,29 +644,24 @@ function TechnicalCreateForm({
   mode,
   busy,
   quoteGroups,
-  tsItems,
   onCancel,
   onCreate,
 }: {
   mode: "be" | "workshop";
   busy: boolean;
   quoteGroups: QuoteGroup[];
-  tsItems: ChantierTs[];
   onCancel: () => void;
   onCreate: (value: {
     name: string;
     originKind: TechnicalOrigin;
     originLabel: string;
     installedByUs: boolean;
-    sourceQuoteId: string | null;
-    sourceQuoteLineId: string | null;
-    sourceTsId: string | null;
+    sourceQuoteId: string;
+    sourceQuoteLineId: string;
   }) => Promise<void>;
 }) {
   const [name, setName] = useState("");
-  const [originKind, setOriginKind] = useState<TechnicalOrigin>("QUOTE_LINE");
   const [selectedQuoteLine, setSelectedQuoteLine] = useState("");
-  const [selectedTsId, setSelectedTsId] = useState("");
   const [quoteSearch, setQuoteSearch] = useState("");
   const [installedByUs, setInstalledByUs] = useState(true);
 
@@ -840,8 +693,6 @@ function TechnicalCreateForm({
     [quoteGroups, normalizedSearch],
   );
   const selectedQuote = quoteOptions.find((option) => option.value === selectedQuoteLine)?.line;
-  const selectedTs = tsItems.find((ts) => ts.id === selectedTsId);
-  const originReady = originKind === "QUOTE_LINE" ? Boolean(selectedQuote) : Boolean(selectedTs);
 
   function selectQuoteLine(value: string) {
     setSelectedQuoteLine(value);
@@ -853,7 +704,10 @@ function TechnicalCreateForm({
     <div className="chantierTechnicalCreate">
       <div className="chantierTechnicalCreateTitle">
         <strong>{mode === "be" ? "Nouvel élément BE" : "Nouvel élément direct Atelier"}</strong>
-        <span>Le lien conserve maintenant l’identifiant réel de la ligne de devis ou du TS.</span>
+        <span>
+          Chaque élément pointe vers une vraie ligne d’un devis accepté. Un TS accepté reste un
+          devis PAPOT normal, identifié comme TS.
+        </span>
       </div>
 
       <label>
@@ -865,90 +719,58 @@ function TechnicalCreateForm({
           placeholder="Ex. Banque accueil, meuble arrière-bar…"
         />
       </label>
-      <label>
-        <span>Origine *</span>
-        <select
-          value={originKind}
-          onChange={(event) => {
-            setOriginKind(event.target.value as TechnicalOrigin);
-            setSelectedQuoteLine("");
-            setSelectedTsId("");
-            setQuoteSearch("");
-          }}
-        >
-          <option value="QUOTE_LINE">Ligne de devis acceptée</option>
-          <option value="TS">Travaux supplémentaires (TS)</option>
-        </select>
-      </label>
 
-      {originKind === "QUOTE_LINE" ? (
-        <div className="chantierQuotePicker isWide">
-          <label>
-            <span>Rechercher une ligne</span>
-            <input
-              value={quoteSearch}
-              onChange={(event) => setQuoteSearch(event.target.value)}
-              placeholder="N° de devis ou texte, ex. banque accueil"
-              disabled={quoteGroups.length === 0}
-            />
-          </label>
-          <label>
-            <span>Ligne du devis *</span>
-            <select
-              value={selectedQuoteLine}
-              onChange={(event) => selectQuoteLine(event.target.value)}
-              disabled={quoteGroups.length === 0}
-            >
-              <option value="">
-                {quoteGroups.length === 0
-                  ? "Aucun devis accepté avec ligne disponible"
-                  : "Choisir une ligne…"}
-              </option>
-              {visibleGroups.map((group) => (
-                <optgroup
-                  key={group.quote.id}
-                  label={`${group.quote.finalPdf?.quoteNumber ?? group.quote.model.subject} · ${group.quote.variantName} · V${group.quote.version}`}
-                >
-                  {group.lines.map((line) => (
-                    <option
-                      key={`${line.quoteId}:${line.quoteLineId}`}
-                      value={`${line.quoteId}:${line.quoteLineId}`}
-                    >
-                      {line.description}
-                    </option>
-                  ))}
-                </optgroup>
-              ))}
-            </select>
-          </label>
-          {quoteGroups.length > 0 ? (
-            <p>
-              {quoteOptions.length} ligne{quoteOptions.length > 1 ? "s" : ""} issue
-              {quoteOptions.length > 1 ? "s" : ""} des seuls devis acceptés.
-            </p>
-          ) : (
-            <p className="isWarning">
-              Aucun devis natif accepté n’est disponible. Ajoute d’abord un devis accepté depuis
-              l’espace Admin, ou utilise un TS.
-            </p>
-          )}
-        </div>
-      ) : (
-        <label className="isWide">
-          <span>TS existant *</span>
-          <select value={selectedTsId} onChange={(event) => setSelectedTsId(event.target.value)}>
+      <div className="chantierQuotePicker isWide">
+        <label>
+          <span>Rechercher une ligne</span>
+          <input
+            value={quoteSearch}
+            onChange={(event) => setQuoteSearch(event.target.value)}
+            placeholder="N° de devis ou texte, ex. banque accueil"
+            disabled={quoteGroups.length === 0}
+          />
+        </label>
+        <label>
+          <span>Ligne du devis accepté *</span>
+          <select
+            value={selectedQuoteLine}
+            onChange={(event) => selectQuoteLine(event.target.value)}
+            disabled={quoteGroups.length === 0}
+          >
             <option value="">
-              {tsItems.length === 0 ? "Crée d’abord un TS dans Admin" : "Choisir un TS…"}
+              {quoteGroups.length === 0
+                ? "Aucun devis accepté avec ligne disponible"
+                : "Choisir une ligne…"}
             </option>
-            {tsItems.map((ts) => (
-              <option key={ts.id} value={ts.id}>
-                {ts.name}
-                {ts.linkedQuoteId ? " · régularisé" : " · non chiffré"}
-              </option>
+            {visibleGroups.map((group) => (
+              <optgroup
+                key={group.quote.id}
+                label={`${group.quote.quoteKind === "TS" ? "TS · " : ""}${group.quote.finalPdf?.quoteNumber ?? group.quote.model.subject} · ${group.quote.variantName} · V${group.quote.version}`}
+              >
+                {group.lines.map((line) => (
+                  <option
+                    key={`${line.quoteId}:${line.quoteLineId}`}
+                    value={`${line.quoteId}:${line.quoteLineId}`}
+                  >
+                    {line.description}
+                  </option>
+                ))}
+              </optgroup>
             ))}
           </select>
         </label>
-      )}
+        {quoteGroups.length > 0 ? (
+          <p>
+            {quoteOptions.length} ligne{quoteOptions.length > 1 ? "s" : ""} issue
+            {quoteOptions.length > 1 ? "s" : ""} des seuls devis / TS acceptés.
+          </p>
+        ) : (
+          <p className="isWarning">
+            Aucun devis natif accepté n’est disponible. Crée puis fais accepter le devis / TS
+            depuis l’espace Admin.
+          </p>
+        )}
+      </div>
 
       <label className="chantierTechnicalCheck">
         <input
@@ -966,21 +788,18 @@ function TechnicalCreateForm({
         <button
           type="button"
           className="isPrimary"
-          disabled={busy || !name.trim() || !originReady}
+          disabled={busy || !name.trim() || !selectedQuote}
           onClick={() =>
-            void onCreate({
-              name,
-              originKind,
-              originLabel:
-                originKind === "QUOTE_LINE" && selectedQuote
-                  ? chantierQuoteLineDisplay(selectedQuote)
-                  : (selectedTs?.name ?? ""),
-              installedByUs,
-              sourceQuoteId: originKind === "QUOTE_LINE" ? (selectedQuote?.quoteId ?? null) : null,
-              sourceQuoteLineId:
-                originKind === "QUOTE_LINE" ? (selectedQuote?.quoteLineId ?? null) : null,
-              sourceTsId: originKind === "TS" ? (selectedTs?.id ?? null) : null,
-            })
+            selectedQuote
+              ? void onCreate({
+                  name,
+                  originKind: selectedQuote.quoteKind === "TS" ? "TS" : "QUOTE_LINE",
+                  originLabel: chantierQuoteLineDisplay(selectedQuote),
+                  installedByUs,
+                  sourceQuoteId: selectedQuote.quoteId,
+                  sourceQuoteLineId: selectedQuote.quoteLineId,
+                })
+              : undefined
           }
         >
           <Plus size={14} /> Créer
