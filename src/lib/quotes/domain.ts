@@ -20,6 +20,19 @@ export const quotePercentSchema = z.number().finite().min(0).max(100);
 
 export type QuoteStatus = z.infer<typeof quoteStatusSchema>;
 
+export const QUOTE_DOCUMENT_STATUS_LABELS: Record<QuoteStatus, string> = {
+  DRAFT: "Brouillon",
+  SENT: "Envoyé",
+  ACCEPTED: "Envoyé (ancien statut)",
+  REJECTED: "Envoyé (ancien statut)",
+  CANCELLED: "Annulé",
+  SUPERSEDED: "Version précédente",
+};
+
+export function quoteDocumentStatusLabel(status: QuoteStatus): string {
+  return QUOTE_DOCUMENT_STATUS_LABELS[status];
+}
+
 export type QuoteQuantity = {
   quantity: number;
   formula: string | null;

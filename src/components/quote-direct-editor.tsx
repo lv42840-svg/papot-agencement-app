@@ -14,6 +14,10 @@ import { QuoteRichTextLayer } from "@/components/quote-rich-text-layer";
 import { QuoteSendAction } from "@/components/quote-send-action";
 import { QuoteStructuredLinesRichEditor } from "@/components/quote-structured-lines-rich-editor";
 import { calculateQuoteAdjustedPricing } from "@/lib/quotes/adjustments";
+import {
+  quoteContractSelectionLabel,
+  type QuoteContractSelectionState,
+} from "@/lib/quotes/retention";
 import type { NativeQuoteRecord, NativeQuotesPayload } from "@/lib/quotes/store";
 
 function quoteWithAdjustedDisplayPrices(quote: NativeQuoteRecord): NativeQuoteRecord {
@@ -47,6 +51,7 @@ export function QuoteDirectEditor({
   clientName,
   affairName,
   paymentTermOptions,
+  contractState,
 }: {
   initialPayload: NativeQuotesPayload;
   quoteId: string;
@@ -54,6 +59,7 @@ export function QuoteDirectEditor({
   clientName: string;
   affairName: string;
   paymentTermOptions: string[];
+  contractState: QuoteContractSelectionState;
 }) {
   const [payload, setPayload] = useState(initialPayload);
   const quote = useMemo(
@@ -69,6 +75,20 @@ export function QuoteDirectEditor({
 
   return (
     <div className="quoteDirectWorkspace">
+      {contractState ? (
+        <div
+          className={`quoteContractState ${
+            contractState === "RETAINED" ? "isRetained" : "isClassed"
+          }`}
+        >
+          <strong>{quoteContractSelectionLabel(contractState)}</strong>
+          <span>
+            {contractState === "RETAINED"
+              ? "Ce devis entre dans le contrat de l’affaire."
+              : "Ce devis reste dans l’historique mais n’entre pas dans le contrat."}
+          </span>
+        </div>
+      ) : null}
       <QuoteLifecycleActions quote={quote} canWrite={canWrite} />
       <QuoteSendAction quote={quote} canWrite={canWrite} onSaved={setPayload} />
 
@@ -110,6 +130,28 @@ export function QuoteDirectEditor({
         .quoteDirectWorkspace {
           display: grid;
           gap: 14px;
+        }
+        .quoteContractState {
+          padding: 9px 11px;
+          display: flex;
+          align-items: center;
+          gap: 8px;
+          border: 1px solid #ddd8e4;
+          border-radius: 9px;
+          background: #f7f5f8;
+          color: #6f6875;
+          font-size: 11px;
+        }
+        .quoteContractState.isRetained {
+          border-color: #cfe6d8;
+          background: #edf8f1;
+          color: #347850;
+        }
+        .quoteContractState strong {
+          flex: 0 0 auto;
+        }
+        .quoteContractState span {
+          color: inherit;
         }
         .quoteDirectActions {
           display: flex;

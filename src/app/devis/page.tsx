@@ -32,6 +32,8 @@ export default async function QuotesPage() {
         siteLabel: affair.siteLabel ?? "",
         clientName: clientDisplayName(client),
         paymentTerms: client.paymentTerms,
+        commercialStatus: affair.status,
+        retainedQuoteIds: [...affair.retainedQuoteIds],
       },
     ];
   });

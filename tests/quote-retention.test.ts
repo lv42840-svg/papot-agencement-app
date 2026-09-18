@@ -1,6 +1,11 @@
 import { describe, expect, it } from "vitest";
 import { calculateCommercialContractSummary } from "../src/lib/quotes/commercial-summary";
-import { quoteCanBeRetained, validateRetainedQuoteSelection } from "../src/lib/quotes/retention";
+import { quoteDocumentStatusLabel } from "../src/lib/quotes/domain";
+import {
+  quoteCanBeRetained,
+  quoteContractSelectionState,
+  validateRetainedQuoteSelection,
+} from "../src/lib/quotes/retention";
 import {
   createInitialNativeQuotesPayload,
   nativeQuoteRecordSchema,
@@ -128,6 +133,79 @@ describe("commercial retained quotes", () => {
     expect(contract.totalHtCents).toBe(3_300_000);
     expect(contract.soldHours).toBe(350);
     expect(contract.plannedDisbursementCents).toBe(1_820_000);
+  });
+
+  it("derives contract state from retained ids without overwriting the document lifecycle", () => {
+    const previous = quote({
+      id: "88888888-8888-4888-8888-888888888888",
+      status: "SUPERSEDED",
+      variantName: "Base",
+      version: 1,
+      saleCents: 100_000,
+      materialCostCents: 50_000,
+      laborHours: 5,
+      laborCostRateCents: 2_000,
+    });
+    const notRetained = quote({
+      id: "99999999-9999-4999-8999-999999999999",
+      status: "SENT",
+      variantName: "Variante A",
+      version: 1,
+      saleCents: 120_000,
+      materialCostCents: 60_000,
+      laborHours: 6,
+      laborCostRateCents: 2_000,
+    });
+    const confirmed = {
+      id: affairId,
+      status: "CONFIRMED" as const,
+      retainedQuoteIds: [previous.id],
+    };
+
+    expect(quoteDocumentStatusLabel(previous.status)).toBe("Version précédente");
+    expect(quoteContractSelectionState(previous, confirmed)).toBe("RETAINED");
+    expect(quoteContractSelectionState(notRetained, confirmed)).toBe("NOT_RETAINED");
+  });
+
+  it("does not invent a contract state before confirmation or for a draft", () => {
+    const draft = quote({
+      id: "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa",
+      status: "DRAFT",
+      variantName: "Base",
+      version: 1,
+      saleCents: 100_000,
+      materialCostCents: 50_000,
+      laborHours: 5,
+      laborCostRateCents: 2_000,
+    });
+
+    expect(
+      quoteContractSelectionState(draft, {
+        id: affairId,
+        status: "CONFIRMED",
+        retainedQuoteIds: [],
+      }),
+    ).toBeNull();
+    expect(
+      quoteContractSelectionState(
+        quote({
+          id: "bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb",
+          status: "SENT",
+          variantName: "Base",
+          version: 1,
+          saleCents: 100_000,
+          materialCostCents: 50_000,
+          laborHours: 5,
+          laborCostRateCents: 2_000,
+        }),
+        { id: affairId, status: "WAITING", retainedQuoteIds: [] },
+      ),
+    ).toBeNull();
+  });
+
+  it("labels legacy accepted/rejected statuses as historical document states", () => {
+    expect(quoteDocumentStatusLabel("ACCEPTED")).toBe("Envoyé (ancien statut)");
+    expect(quoteDocumentStatusLabel("REJECTED")).toBe("Envoyé (ancien statut)");
   });
 
   it("refuses a draft or foreign quote as retained", () => {

@@ -6,6 +6,7 @@ import { clientDisplayName } from "@/lib/clients/domain";
 import { createCommercialRepository } from "@/lib/commercial/create-repository";
 import { requireDesktopRequestContext } from "@/lib/desktop/request-context";
 import { createQuotesRepository } from "@/lib/quotes/create-repository";
+import { quoteContractSelectionState } from "@/lib/quotes/retention";
 
 export const dynamic = "force-dynamic";
 
@@ -29,6 +30,7 @@ export default async function QuotePage({ params }: { params: Promise<{ quoteId:
     ? `${affair.name}${affair.siteLabel ? ` · ${affair.siteLabel}` : ""}`
     : "Affaire introuvable";
   const clientName = client ? clientDisplayName(client) : "Client introuvable";
+  const contractState = quoteContractSelectionState(quote, affair);
   const paymentTermOptions = Array.from(
     new Set(
       [quote.model.paymentTerms, ...clients.clients.map((candidate) => candidate.paymentTerms)]
@@ -46,6 +48,7 @@ export default async function QuotePage({ params }: { params: Promise<{ quoteId:
         clientName={clientName}
         affairName={affairName}
         paymentTermOptions={paymentTermOptions}
+        contractState={contractState}
       />
     </DesktopAppShell>
   );
