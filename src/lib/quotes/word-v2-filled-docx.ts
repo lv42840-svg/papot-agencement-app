@@ -13,6 +13,7 @@ import { buildQuoteWordV2ScalarData, type QuoteDocumentData } from "./document-d
 import { renderQuoteWordV2Photos, type QuoteWordV2PhotoLoader } from "./word-v2-photo-renderer";
 import {
   renderQuoteWordV2Body,
+  renderQuoteWordV2Layout,
   renderQuoteWordV2Options,
   renderQuoteWordV2Scalars,
 } from "./word-v2-renderer";
@@ -127,7 +128,8 @@ function renderQuoteWordV2Core(
 ): Uint8Array {
   assertQuoteWordV2TemplateContract(template);
 
-  let rendered = renderQuoteWordV2Scalars(template, buildQuoteWordV2ScalarData(document));
+  let rendered = renderQuoteWordV2Layout(template);
+  rendered = renderQuoteWordV2Scalars(rendered, buildQuoteWordV2ScalarData(document));
   rendered = renderQuoteWordV2Body(rendered, document);
   rendered = renderQuoteWordV2Options(rendered, document);
   rendered = renderQuoteWordV2Vat(rendered, document);
