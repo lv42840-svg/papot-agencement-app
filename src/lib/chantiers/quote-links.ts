@@ -1,6 +1,10 @@
-import type { CommercialCase } from "@/lib/commercial/domain";
-import type { QuoteLine } from "@/lib/quotes/model";
-import { parseNativeQuotesPayload, type NativeQuoteRecord, type NativeQuotesPayload } from "@/lib/quotes/store";
+import type { CommercialCase } from "../commercial/domain";
+import type { QuoteLine } from "../quotes/model";
+import {
+  parseNativeQuotesPayload,
+  type NativeQuoteRecord,
+  type NativeQuotesPayload,
+} from "../quotes/store";
 
 export type ChantierQuoteLineReference = {
   quoteId: string;
