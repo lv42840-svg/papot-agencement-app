@@ -3,6 +3,7 @@
 import Link from "next/link";
 import {
   Archive,
+  BadgeEuro,
   BriefcaseBusiness,
   CalendarClock,
   CheckCircle2,
@@ -20,6 +21,7 @@ import {
 } from "lucide-react";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { ChantierOperationalWorkspace } from "@/components/chantier-operational-workspace";
+import { ChantierProfitabilityPanel } from "@/components/chantier-profitability-panel";
 import {
   CHANTIER_STATUS_LABELS,
   chantierRemainingHours,
@@ -45,7 +47,14 @@ type ChantiersSnapshot = {
 type CommercialSnapshot = { payload: CommercialPayload };
 type QuotesSnapshot = { payload: NativeQuotesPayload; canWrite: boolean };
 type MutationBody = Record<string, unknown> & { action: string };
-type ChantierTab = "client" | "lifecycle" | "follow" | "documents" | "capacity" | "history";
+type ChantierTab =
+  | "client"
+  | "lifecycle"
+  | "follow"
+  | "documents"
+  | "capacity"
+  | "profitability"
+  | "history";
 
 const errorMessages: Record<string, string> = {
   DESKTOP_RUNTIME_NOT_CONFIGURED: "Le poste PAPOT n'est pas configuré.",
@@ -247,6 +256,7 @@ export function ChantierWorkspace({ chantierId }: { chantierId: string }) {
       badge: commercialCase?.documents.length ?? 0,
     },
     { id: "capacity", label: "Charge", icon: CalendarClock },
+    { id: "profitability", label: "Rentabilité", icon: BadgeEuro },
     { id: "history", label: "Historique", icon: History, badge: chantier.history.length },
   ];
 
@@ -342,6 +352,13 @@ export function ChantierWorkspace({ chantierId }: { chantierId: string }) {
             busy={busy}
             canModify={chantiersSnapshot.capabilities.canModify && chantier.status !== "ARCHIVED"}
             mutate={mutate}
+          />
+        ) : null}
+        {activeTab === "profitability" ? (
+          <ChantierProfitabilityPanel
+            chantier={chantier}
+            commercialCase={commercialCase}
+            quotes={quotesSnapshot?.payload ?? { schemaVersion: 1, quotes: [] }}
           />
         ) : null}
         {activeTab === "history" ? <HistoryTab chantier={chantier} /> : null}
