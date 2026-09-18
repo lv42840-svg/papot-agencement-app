@@ -70,6 +70,68 @@ describe("Commercial created from tasks", () => {
     ).toThrow("COMMERCIAL_SOURCE_TASK_ALREADY_LINKED");
   });
 
+  it("rattache une entrée à une affaire existante et historise le lien", () => {
+    const sourceEntryId = "cccccccc-cccc-4ccc-8ccc-cccccccccccc";
+    const created = applyCommercialMutation(
+      createInitialCommercialPayload(),
+      {
+        action: "create",
+        name: "Banque accueil",
+        clientName: "",
+        siteLabel: "",
+        reviewDate: "2026-09-21",
+        description: "",
+        nextAction: "",
+      },
+      actor,
+    ).payload;
+    const caseId = created.cases[0].id;
+
+    const linked = applyCommercialMutation(
+      created,
+      { action: "linkSourceEntry", caseId, sourceEntryId },
+      actor,
+      new Date("2026-09-18T13:00:00.000Z"),
+    ).payload.cases[0];
+
+    expect(linked.sourceEntryId).toBe(sourceEntryId);
+    expect(linked.history.at(-1)).toMatchObject({
+      type: "SOURCE_ENTRY_LINKED",
+      summary: "Entrée PAPOT rattachée à l’affaire.",
+    });
+  });
+
+  it("refuse qu'une affaire déjà liée soit réaffectée à une autre entrée", () => {
+    const firstEntryId = "dddddddd-dddd-4ddd-8ddd-dddddddddddd";
+    const secondEntryId = "eeeeeeee-eeee-4eee-8eee-eeeeeeeeeeee";
+    const created = applyCommercialMutation(
+      createInitialCommercialPayload(),
+      {
+        action: "create",
+        sourceEntryId: firstEntryId,
+        name: "Affaire déjà liée",
+        clientName: "",
+        siteLabel: "",
+        reviewDate: "2026-09-21",
+        description: "",
+        nextAction: "",
+      },
+      actor,
+    ).payload;
+
+    expect(() =>
+      applyCommercialMutation(
+        created,
+        {
+          action: "linkSourceEntry",
+          caseId: created.cases[0].id,
+          sourceEntryId: secondEntryId,
+        },
+        actor,
+      ),
+    ).toThrow("COMMERCIAL_CASE_SOURCE_ALREADY_LINKED");
+  });
+
   it("parses older commercial cases without a source task link", () => {
     const source = applyCommercialMutation(
       createInitialCommercialPayload(),
