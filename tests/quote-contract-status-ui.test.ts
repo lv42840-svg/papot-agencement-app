@@ -9,10 +9,7 @@ const detail = readFileSync(
   new URL("../src/components/quote-direct-editor.tsx", import.meta.url),
   "utf8",
 );
-const page = readFileSync(
-  new URL("../src/app/devis/page.tsx", import.meta.url),
-  "utf8",
-);
+const page = readFileSync(new URL("../src/app/devis/page.tsx", import.meta.url), "utf8");
 const retention = readFileSync(
   new URL("../src/lib/quotes/retention.ts", import.meta.url),
   "utf8",
