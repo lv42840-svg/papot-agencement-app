@@ -13,13 +13,18 @@ const page = readFileSync(
   new URL("../src/app/devis/page.tsx", import.meta.url),
   "utf8",
 );
+const retention = readFileSync(
+  new URL("../src/lib/quotes/retention.ts", import.meta.url),
+  "utf8",
+);
 
 describe("quote contract status UI", () => {
   it("shows document lifecycle and contract selection as two separate concepts", () => {
     expect(list).toContain("quoteDocumentStatusLabel(quote.status)");
     expect(list).toContain("quoteContractSelectionState");
-    expect(list).toContain("Retenu / contrat");
-    expect(list).toContain("Non retenu / classé");
+    expect(list).toContain("quoteContractSelectionLabel");
+    expect(retention).toContain("Retenu / contrat");
+    expect(retention).toContain("Non retenu / classé");
   });
 
   it("feeds the retained quote ids from Commercial into the Devis workspace", () => {
