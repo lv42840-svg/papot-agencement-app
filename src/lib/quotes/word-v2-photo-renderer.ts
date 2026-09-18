@@ -12,8 +12,8 @@ const ANNEX_ANCHOR = "{{PAPOT_ANNEX_IMAGES}}";
 const IMAGE_RELATIONSHIP_TYPE =
   "http://schemas.openxmlformats.org/officeDocument/2006/relationships/image";
 const EMU_PER_INCH = 914400;
-const MAX_IMAGE_WIDTH_EMU = Math.round(5.8 * EMU_PER_INCH);
-const MAX_IMAGE_HEIGHT_EMU = Math.round(3.25 * EMU_PER_INCH);
+const MAX_IMAGE_WIDTH_EMU = Math.round(4.6 * EMU_PER_INCH);
+const MAX_IMAGE_HEIGHT_EMU = Math.round(2.6 * EMU_PER_INCH);
 
 export type QuoteWordV2PhotoLoader = (photo: QuoteItemPhoto) => Promise<Uint8Array>;
 

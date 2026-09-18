@@ -263,6 +263,255 @@ function findOpeningTagStart(xml: string, tagName: string, beforeIndex: number):
   return lastStart;
 }
 
+const QUOTE_TABLE_WIDTHS = [567, 5216, 1134, 1417, 1077, 1587] as const;
+const QUOTE_TABLE_TOTAL_WIDTH = QUOTE_TABLE_WIDTHS.reduce((sum, width) => sum + width, 0);
+const FINANCIAL_TABLE_WIDTHS = [6314, 4572] as const;
+const FINANCIAL_TABLE_TOTAL_WIDTH = FINANCIAL_TABLE_WIDTHS.reduce((sum, width) => sum + width, 0);
+
+function paragraphVisibleText(paragraph: string): string {
+  return wordTextNodes(paragraph)
+    .map((node) => node.text)
+    .join("")
+    .replaceAll("&amp;", "&")
+    .replaceAll("&lt;", "<")
+    .replaceAll("&gt;", ">")
+    .replaceAll("&quot;", '"')
+    .replaceAll("&apos;", "'")
+    .trim();
+}
+
+function tableRangeAroundAnchor(
+  xml: string,
+  anchor: string,
+): { start: number; end: number; table: string } {
+  const anchorIndex = xml.indexOf(anchor);
+  if (anchorIndex < 0) throw new Error(`QUOTE_WORD_V2_LAYOUT_ANCHOR_MISSING:${anchor}`);
+  const start = findOpeningTagStart(xml, "w:tbl", anchorIndex);
+  const closeStart = xml.indexOf("</w:tbl>", anchorIndex);
+  if (start < 0 || closeStart < 0) {
+    throw new Error(`QUOTE_WORD_V2_LAYOUT_TABLE_MISSING:${anchor}`);
+  }
+  const end = closeStart + "</w:tbl>".length;
+  return { start, end, table: xml.slice(start, end) };
+}
+
+function fixedTableGrid(widths: readonly number[]): string {
+  return `<w:tblGrid>${widths.map((width) => `<w:gridCol w:w="${width}"/>`).join("")}</w:tblGrid>`;
+}
+
+function normalizeTableProperties(
+  table: string,
+  widths: readonly number[],
+  options: { removeRepeatingHeader?: boolean } = {},
+): string {
+  const totalWidth = widths.reduce((sum, width) => sum + width, 0);
+  let next = table.replace(/<w:tblGrid>[\s\S]*?<\/w:tblGrid>/, fixedTableGrid(widths));
+
+  next = next.replace(/<w:tblPr>([\s\S]*?)<\/w:tblPr>/, (_match, body: string) => {
+    let properties = body;
+    if (/<w:tblW\b[^>]*\/>/.test(properties)) {
+      properties = properties.replace(
+        /<w:tblW\b[^>]*\/>/,
+        `<w:tblW w:w="${totalWidth}" w:type="dxa"/>`,
+      );
+    } else {
+      properties = `<w:tblW w:w="${totalWidth}" w:type="dxa"/>${properties}`;
+    }
+    if (/<w:tblLayout\b[^>]*\/>/.test(properties)) {
+      properties = properties.replace(/<w:tblLayout\b[^>]*\/>/, '<w:tblLayout w:type="fixed"/>');
+    } else {
+      properties += '<w:tblLayout w:type="fixed"/>';
+    }
+    return `<w:tblPr>${properties}</w:tblPr>`;
+  });
+
+  if (options.removeRepeatingHeader) {
+    next = next.replace(/<w:tblHeader\b[^>]*\/?\s*>/g, "");
+  }
+  return next;
+}
+
+function replaceTableAroundAnchor(
+  xml: string,
+  anchor: string,
+  transform: (table: string) => string,
+): string {
+  const range = tableRangeAroundAnchor(xml, anchor);
+  return `${xml.slice(0, range.start)}${transform(range.table)}${xml.slice(range.end)}`;
+}
+
+function matchingTagRangeFromStart(
+  xml: string,
+  tagName: string,
+  start: number,
+): { start: number; end: number; xml: string } | null {
+  const pattern = new RegExp(`<(/?)${tagName}\\b[^>]*?(\\/?)>`, "g");
+  pattern.lastIndex = start;
+  let depth = 0;
+  let match: RegExpExecArray | null;
+
+  while ((match = pattern.exec(xml)) !== null) {
+    const closing = match[1] === "/";
+    const selfClosing = match[2] === "/";
+    if (!closing && !selfClosing) {
+      depth += 1;
+      continue;
+    }
+    if (!closing) continue;
+    depth -= 1;
+    if (depth === 0) {
+      return { start, end: pattern.lastIndex, xml: xml.slice(start, pattern.lastIndex) };
+    }
+  }
+  return null;
+}
+
+function containingTableWithTexts(
+  xml: string,
+  anchor: string,
+  requiredTexts: readonly string[],
+): { start: number; end: number; table: string } {
+  const anchorIndex = xml.indexOf(anchor);
+  if (anchorIndex < 0) throw new Error(`QUOTE_WORD_V2_LAYOUT_ANCHOR_MISSING:${anchor}`);
+
+  const openingPattern = /<w:tbl(?:\s[^>]*)?>/g;
+  const starts = Array.from(xml.slice(0, anchorIndex + 1).matchAll(openingPattern))
+    .map((match) => match.index)
+    .filter((index): index is number => index !== undefined)
+    .reverse();
+
+  for (const start of starts) {
+    const range = matchingTagRangeFromStart(xml, "w:tbl", start);
+    if (!range || range.end <= anchorIndex) continue;
+    if (requiredTexts.every((text) => range.xml.includes(text))) {
+      return { start: range.start, end: range.end, table: range.xml };
+    }
+  }
+
+  throw new Error("QUOTE_WORD_V2_LAYOUT_PARENT_TABLE_MISSING");
+}
+
+function replaceFinancialTable(documentXml: string): string {
+  const range = containingTableWithTexts(documentXml, "{{total_ht}}", ["Pour le client"]);
+  return `${documentXml.slice(0, range.start)}${splitFinancialSignature(range.table)}${documentXml.slice(range.end)}`;
+}
+
+function setCellWidth(cell: string, width: number): string {
+  return cell.replace(/<w:tcPr>([\s\S]*?)<\/w:tcPr>/, (_match, body: string) => {
+    let properties = body;
+    if (/<w:tcW\b[^>]*\/>/.test(properties)) {
+      properties = properties.replace(/<w:tcW\b[^>]*\/>/, `<w:tcW w:w="${width}" w:type="dxa"/>`);
+    } else {
+      properties = `<w:tcW w:w="${width}" w:type="dxa"/>${properties}`;
+    }
+    return `<w:tcPr>${properties}</w:tcPr>`;
+  });
+}
+
+type DirectTagRange = { start: number; end: number };
+
+function directTagRanges(xml: string, tagName: string): DirectTagRange[] {
+  const pattern = new RegExp(`<(/?)${tagName}\\b[^>]*?(\\/?)>`, "g");
+  const ranges: DirectTagRange[] = [];
+  let depth = 0;
+  let directStart = -1;
+  let match: RegExpExecArray | null;
+
+  while ((match = pattern.exec(xml)) !== null) {
+    const closing = match[1] === "/";
+    const selfClosing = match[2] === "/";
+
+    if (!closing && !selfClosing) {
+      depth += 1;
+      if (depth === 1) directStart = match.index;
+      continue;
+    }
+
+    if (closing) {
+      if (depth === 1 && directStart >= 0) {
+        ranges.push({ start: directStart, end: pattern.lastIndex });
+        directStart = -1;
+      }
+      depth -= 1;
+    }
+  }
+
+  return ranges;
+}
+
+function splitFinancialSignature(table: string): string {
+  const rowRange = directTagRanges(table, "w:tr").find((range) =>
+    table.slice(range.start, range.end).includes("{{total_ht}}"),
+  );
+  if (!rowRange) {
+    throw new Error("QUOTE_WORD_V2_LAYOUT_FINANCIAL_ROW_MISSING");
+  }
+
+  const row = table.slice(rowRange.start, rowRange.end);
+  const cellRanges = directTagRanges(row, "w:tc");
+  if (cellRanges.length !== 2) {
+    throw new Error("QUOTE_WORD_V2_LAYOUT_FINANCIAL_CELL_COUNT_INVALID");
+  }
+
+  const cells = cellRanges.map((range) => row.slice(range.start, range.end));
+  const right = cells[1]!;
+  const signatureTextIndex = right.indexOf("Pour le client");
+  if (signatureTextIndex < 0) {
+    throw new Error("QUOTE_WORD_V2_LAYOUT_SIGNATURE_MISSING");
+  }
+  const signatureStart = findOpeningTagStart(right, "w:p", signatureTextIndex);
+  if (signatureStart < 0) {
+    throw new Error("QUOTE_WORD_V2_LAYOUT_SIGNATURE_PARAGRAPH_MISSING");
+  }
+
+  const rightTcPr = cellProperties(right);
+  const contentStart = right.indexOf(rightTcPr) + rightTcPr.length;
+  const contentEnd = right.lastIndexOf("</w:tc>");
+  const beforeSignature = right.slice(contentStart, signatureStart);
+  const signatureContent = right.slice(signatureStart, contentEnd);
+
+  const leftCell = setCellWidth(cells[0]!, FINANCIAL_TABLE_WIDTHS[0]);
+  const rightCell = setCellWidth(
+    `<w:tc>${rightTcPr}${beforeSignature}</w:tc>`,
+    FINANCIAL_TABLE_WIDTHS[1],
+  );
+  const rowProperties = row.match(/<w:trPr>[\s\S]*?<\/w:trPr>/)?.[0] ?? "";
+  const financialRow = `<w:tr>${rowProperties}${leftCell}${rightCell}</w:tr>`;
+  const signatureRow =
+    `<w:tr><w:tc><w:tcPr><w:tcW w:w="${FINANCIAL_TABLE_TOTAL_WIDTH}" w:type="dxa"/>` +
+    '<w:gridSpan w:val="2"/></w:tcPr>' +
+    `${signatureContent}</w:tc></w:tr>`;
+
+  let next = `${table.slice(0, rowRange.start)}${financialRow}${signatureRow}${table.slice(rowRange.end)}`;
+  next = normalizeTableProperties(next, FINANCIAL_TABLE_WIDTHS);
+  return next;
+}
+
+export function replaceQuoteWordV2Layout(documentXml: string): string {
+  let next = documentXml.replace(WORD_PARAGRAPH_PATTERN, (paragraph) =>
+    paragraphVisibleText(paragraph) === "OPTIONS NON COMPRISES DANS LE TOTAL PRINCIPAL"
+      ? ""
+      : paragraph,
+  );
+
+  next = replaceTableAroundAnchor(next, QUOTE_BODY_ANCHOR, (table) =>
+    normalizeTableProperties(table, QUOTE_TABLE_WIDTHS),
+  );
+  next = replaceTableAroundAnchor(next, QUOTE_OPTIONS_ANCHOR, (table) =>
+    normalizeTableProperties(table, QUOTE_TABLE_WIDTHS, { removeRepeatingHeader: true }),
+  );
+  next = replaceFinancialTable(next);
+  return next;
+}
+
+export function renderQuoteWordV2Layout(template: Uint8Array): Uint8Array {
+  return renderDocumentXml(
+    template,
+    replaceQuoteWordV2Layout,
+    "QUOTE_WORD_V2_DOCUMENT_XML_MISSING",
+  );
+}
+
 function visibleBodyItemIds(items: QuoteDocumentItem[]): Set<string> {
   const itemById = new Map(items.map((item) => [item.id, item]));
   const visible = new Set<string>();
