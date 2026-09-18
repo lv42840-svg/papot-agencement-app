@@ -28,11 +28,7 @@ type Owner = { userId: string; deviceId: string; displayName: string };
 type PermissionUser = { id: string };
 
 function mutationNeedsCommercialOrigin(input: { action: string }): boolean {
-  return (
-    input.action === "createBeItem" ||
-    input.action === "createWorkshopItem" ||
-    input.action === "linkTsToQuoteLine"
-  );
+  return input.action === "createBeItem" || input.action === "createWorkshopItem";
 }
 
 function noStoreJson(body: unknown, init?: ResponseInit) {
@@ -131,51 +127,21 @@ export async function POST(request: Request) {
         if (!quotes) throw new Error("CHANTIER_QUOTES_UNAVAILABLE");
 
         if (input.action === "createBeItem" || input.action === "createWorkshopItem") {
-          if (input.originKind === "QUOTE_LINE") {
-            if (!input.sourceQuoteId || !input.sourceQuoteLineId) {
-              throw new Error("CHANTIER_QUOTE_LINE_REQUIRED");
-            }
-            const reference = resolveRetainedChantierQuoteLine(
-              affair,
-              quotes,
-              input.sourceQuoteId,
-              input.sourceQuoteLineId,
-            );
-            normalizedInput = {
-              ...input,
-              originLabel: chantierQuoteLineDisplay(reference),
-              sourceQuoteId: reference.quoteId,
-              sourceQuoteLineId: reference.quoteLineId,
-              sourceTsId: null,
-            };
-          } else {
-            if (!input.sourceTsId) throw new Error("CHANTIER_TS_REQUIRED");
-            const ts = chantier.operational.tsItems.find(
-              (candidate) => candidate.id === input.sourceTsId,
-            );
-            if (!ts) throw new Error("CHANTIER_TS_NOT_FOUND");
-            normalizedInput = {
-              ...input,
-              originLabel: ts.name,
-              sourceQuoteId: null,
-              sourceQuoteLineId: null,
-              sourceTsId: ts.id,
-            };
+          if (!input.sourceQuoteId || !input.sourceQuoteLineId) {
+            throw new Error("CHANTIER_QUOTE_LINE_REQUIRED");
           }
-        } else if (input.action === "linkTsToQuoteLine") {
-          const ts = chantier.operational.tsItems.find((candidate) => candidate.id === input.tsId);
-          if (!ts) throw new Error("CHANTIER_TS_NOT_FOUND");
           const reference = resolveRetainedChantierQuoteLine(
             affair,
             quotes,
-            input.quoteId,
-            input.quoteLineId,
+            input.sourceQuoteId,
+            input.sourceQuoteLineId,
           );
           normalizedInput = {
             ...input,
-            quoteId: reference.quoteId,
-            quoteLineId: reference.quoteLineId,
-            quoteLabel: chantierQuoteLineDisplay(reference),
+            originKind: reference.quoteKind === "TS" ? "TS" : "QUOTE_LINE",
+            originLabel: chantierQuoteLineDisplay(reference),
+            sourceQuoteId: reference.quoteId,
+            sourceQuoteLineId: reference.quoteLineId,
           };
         }
       }
