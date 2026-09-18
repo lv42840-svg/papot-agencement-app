@@ -4,10 +4,7 @@ import {
   quoteWorkflowMayChangeCommercialStatus,
 } from "../src/lib/quotes/chantier";
 import { applyQuotesMutation, quotesMutationSchema } from "../src/lib/quotes/mutations";
-import {
-  createInitialNativeQuotesPayload,
-  nativeQuoteRecordSchema,
-} from "../src/lib/quotes/store";
+import { createInitialNativeQuotesPayload, nativeQuoteRecordSchema } from "../src/lib/quotes/store";
 
 const actor = {
   userId: "11111111-1111-4111-8111-111111111111",
