@@ -230,6 +230,20 @@ describe("quote Word V2 filled DOCX", () => {
     expect(xml).toContain("NUMPAGES");
   });
 
+  it("affiche la remise client avant le total net HT", () => {
+    const document = makeDocument();
+    document.totals.grossTotalHtCents = 160000;
+    document.totals.customerDiscountCents = 10000;
+    document.totals.customerDiscountLabel = "Remise client 6,25 %";
+
+    const rendered = renderQuoteWordV2FilledDocx(readFileSync(templatePath), document);
+    const text = xmlText(allWordXml(rendered));
+
+    expect(text).toContain("Remise client 6,25 %");
+    expect(text).toContain("−100,00");
+    expect(text.indexOf("Remise client 6,25 %")).toBeLessThan(text.indexOf("Total net HT"));
+  });
+
   it("refuse un DOCX qui conserve encore un token de template", () => {
     const rendered = renderQuoteWordV2FilledDocx(readFileSync(templatePath), makeDocument());
     const entries = readZipArchive(rendered).map((entry) => {
