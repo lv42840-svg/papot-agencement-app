@@ -197,7 +197,7 @@ export function QuoteCreateWorkspace({
                 value={selectedAffairId}
                 onChange={(event) => selectAffair(event.target.value)}
                 required
-                disabled={saving}
+                disabled={saving || chantierComplement}
               >
                 {affairs.map((affair) => (
                   <option key={affair.id} value={affair.id}>
