@@ -12,7 +12,7 @@ import {
   Users,
   Wrench,
 } from "lucide-react";
-import { useEffect, useMemo, useState } from "react";
+import { useMemo, useState } from "react";
 import {
   BE_STATUS_LABELS,
   CHANTIER_OPERATIONAL_SPACES,
@@ -21,33 +21,38 @@ import {
   type BeItem,
   type BeItemStatus,
   type ChantierRecord,
+  type ChantierTs,
   type InstallItem,
   type InstallItemStatus,
   type TechnicalOrigin,
   type WorkshopItem,
   type WorkshopItemStatus,
 } from "@/lib/chantiers/domain";
-import type {
-  CommercialCase,
-  CommercialDocument,
-  CommercialPayload,
-} from "@/lib/commercial/domain";
-import { requestObatAnalysis } from "@/lib/obat/client";
-import type { ObatQuoteLine } from "@/lib/obat/domain";
+import type { CommercialCase } from "@/lib/commercial/domain";
+import {
+  chantierQuoteLineDisplay,
+  retainedChantierQuoteLines,
+  retainedChantierQuotes,
+  type ChantierQuoteLineReference,
+  type ChantierRetainedQuote,
+} from "@/lib/chantiers/quote-links";
+import { quoteCanBeRetained } from "@/lib/quotes/retention";
+import type { NativeQuotesPayload } from "@/lib/quotes/store";
 
 type MutationBody = Record<string, unknown> & { action: string };
 type Mutate = (body: MutationBody, message: string) => Promise<boolean>;
 type SpaceId = (typeof CHANTIER_OPERATIONAL_SPACES)[number]["id"];
-type QuoteGroup = { quoteNumber: string; lines: ObatQuoteLine[] };
+type QuoteGroup = ChantierRetainedQuote;
 
 type Props = {
   chantier: ChantierRecord;
+  commercialCase: CommercialCase | null;
+  quotes: NativeQuotesPayload;
   busy: boolean;
   canModify: boolean;
   mutate: Mutate;
+  mutateCommercial: Mutate;
 };
-
-type CommercialSnapshot = { payload: CommercialPayload };
 
 const spaceDescriptions: Record<SpaceId, string> = {
   admin: "Devis, factures, PPSPS et documents administratifs déjà liés au chantier.",
@@ -81,130 +86,26 @@ function originLabel(originKind: TechnicalOrigin, originLabelValue: string | nul
   return originLabelValue ? `Devis · ${originLabelValue}` : "Ligne de devis à préciser";
 }
 
-function quoteDocumentHref(caseId: string, documentId: string): string {
-  return `/api/desktop/commercial/${caseId}/documents/${documentId}`;
-}
-
-function latestQuoteDocuments(item: CommercialCase): CommercialDocument[] {
-  const selected = new Map<string, CommercialDocument>();
-  const candidates = item.documents.filter(
-    (document) =>
-      document.category === "QUOTE" &&
-      (document.contentType === "application/pdf" ||
-        document.fileName.toLowerCase().endsWith(".pdf")),
-  );
-
-  for (const document of candidates) {
-    const key = document.versionLabel?.trim() || document.id;
-    const current = selected.get(key);
-    if (!current) {
-      selected.set(key, document);
-      continue;
-    }
-    if (current.isSignedQuote && !document.isSignedQuote) {
-      selected.set(key, document);
-      continue;
-    }
-    if (
-      current.isSignedQuote === document.isSignedQuote &&
-      document.uploadedAt > current.uploadedAt
-    ) {
-      selected.set(key, document);
-    }
-  }
-
-  return [...selected.values()];
-}
-
-export function ChantierOperationalWorkspace({ chantier, busy, canModify, mutate }: Props) {
+export function ChantierOperationalWorkspace({
+  chantier,
+  commercialCase,
+  quotes,
+  busy,
+  canModify,
+  mutate,
+  mutateCommercial,
+}: Props) {
   const [space, setSpace] = useState<SpaceId>("admin");
-  const [quoteGroups, setQuoteGroups] = useState<QuoteGroup[]>([]);
-  const [quoteLinesLoading, setQuoteLinesLoading] = useState(true);
-  const [quoteLinesError, setQuoteLinesError] = useState<string | null>(null);
+  const quoteGroups = useMemo<QuoteGroup[]>(
+    () => (commercialCase ? retainedChantierQuotes(commercialCase, quotes) : []),
+    [commercialCase, quotes],
+  );
+  const quoteLines = useMemo(
+    () => (commercialCase ? retainedChantierQuoteLines(commercialCase, quotes) : []),
+    [commercialCase, quotes],
+  );
   const spaceState = chantier.operational.spaces[space];
   const spaceLabel = CHANTIER_OPERATIONAL_SPACES.find((item) => item.id === space)?.label ?? space;
-
-  useEffect(() => {
-    let cancelled = false;
-
-    async function loadQuoteLines() {
-      setQuoteLinesLoading(true);
-      setQuoteLinesError(null);
-      try {
-        const commercialResponse = await fetch("/api/desktop/commercial", { cache: "no-store" });
-        const commercial = (await commercialResponse.json()) as CommercialSnapshot & {
-          error?: string;
-        };
-        if (!commercialResponse.ok) throw new Error(commercial.error ?? "COMMERCIAL_LOAD_FAILED");
-
-        const item = commercial.payload.cases.find(
-          (candidate) => candidate.id === chantier.sourceCommercialCaseId,
-        );
-        if (!item) {
-          if (!cancelled) setQuoteGroups([]);
-          return;
-        }
-
-        const documents = latestQuoteDocuments(item);
-        const detected = new Map<
-          string,
-          { quoteNumber: string; lines: ObatQuoteLine[]; uploadedAt: string }
-        >();
-        let failedDocuments = 0;
-
-        await Promise.all(
-          documents.map(async (document) => {
-            try {
-              const response = await fetch(quoteDocumentHref(item.id, document.id), {
-                cache: "no-store",
-              });
-              if (!response.ok) throw new Error("QUOTE_DOCUMENT_READ_FAILED");
-              const blob = await response.blob();
-              const file = new File([blob], document.fileName, {
-                type: document.contentType || blob.type || "application/pdf",
-                lastModified: new Date(document.uploadedAt).getTime(),
-              });
-              const analysis = await requestObatAnalysis([file]);
-              if (!analysis.quoteNumber || analysis.quoteLines.length === 0) return;
-              const previous = detected.get(analysis.quoteNumber);
-              if (!previous || document.uploadedAt > previous.uploadedAt) {
-                detected.set(analysis.quoteNumber, {
-                  quoteNumber: analysis.quoteNumber,
-                  lines: analysis.quoteLines,
-                  uploadedAt: document.uploadedAt,
-                });
-              }
-            } catch {
-              failedDocuments += 1;
-            }
-          }),
-        );
-
-        if (cancelled) return;
-        const groups = [...detected.values()]
-          .map(({ quoteNumber, lines }) => ({ quoteNumber, lines }))
-          .sort((left, right) => left.quoteNumber.localeCompare(right.quoteNumber, "fr"));
-        setQuoteGroups(groups);
-        if (groups.length === 0 && documents.length > 0 && failedDocuments > 0) {
-          setQuoteLinesError(
-            "Les devis sont présents, mais PAPOT n'a pas réussi à relire leurs lignes.",
-          );
-        }
-      } catch {
-        if (!cancelled) {
-          setQuoteGroups([]);
-          setQuoteLinesError("Impossible de charger les lignes des devis pour le moment.");
-        }
-      } finally {
-        if (!cancelled) setQuoteLinesLoading(false);
-      }
-    }
-
-    void loadQuoteLines();
-    return () => {
-      cancelled = true;
-    };
-  }, [chantier.sourceCommercialCaseId]);
 
   return (
     <section className="chantierOperationalWorkspace">
@@ -267,32 +168,58 @@ export function ChantierOperationalWorkspace({ chantier, busy, canModify, mutate
           <OperationalEmpty label="Cet espace est déclaré Non concerné pour ce chantier." />
         ) : (
           <>
-            {space === "be" ? (
-              <BeSpace
+            {space === "admin" ? (
+              <AdminSpace
                 chantier={chantier}
+                commercialCase={commercialCase}
+                quotes={quotes}
+                quoteGroups={quoteGroups}
+                quoteLines={quoteLines}
                 busy={busy}
                 canModify={canModify}
                 mutate={mutate}
+                mutateCommercial={mutateCommercial}
+              />
+            ) : null}
+            {space === "be" ? (
+              <BeSpace
+                chantier={chantier}
+                commercialCase={commercialCase}
+                quotes={quotes}
+                busy={busy}
+                canModify={canModify}
+                mutate={mutate}
+                mutateCommercial={mutateCommercial}
                 quoteGroups={quoteGroups}
-                quoteLinesLoading={quoteLinesLoading}
-                quoteLinesError={quoteLinesError}
               />
             ) : null}
             {space === "workshop" ? (
               <WorkshopSpace
                 chantier={chantier}
+                commercialCase={commercialCase}
+                quotes={quotes}
                 busy={busy}
                 canModify={canModify}
                 mutate={mutate}
+                mutateCommercial={mutateCommercial}
                 quoteGroups={quoteGroups}
-                quoteLinesLoading={quoteLinesLoading}
-                quoteLinesError={quoteLinesError}
               />
             ) : null}
             {space === "install" ? (
-              <InstallSpace chantier={chantier} busy={busy} canModify={canModify} mutate={mutate} />
+              <InstallSpace
+                chantier={chantier}
+                commercialCase={commercialCase}
+                quotes={quotes}
+                busy={busy}
+                canModify={canModify}
+                mutate={mutate}
+                mutateCommercial={mutateCommercial}
+              />
             ) : null}
-            {space !== "be" && space !== "workshop" && space !== "install" ? (
+            {space !== "admin" &&
+            space !== "be" &&
+            space !== "workshop" &&
+            space !== "install" ? (
               <FutureSpace id={space} />
             ) : null}
           </>
@@ -305,8 +232,6 @@ export function ChantierOperationalWorkspace({ chantier, busy, canModify, mutate
 
 type TechnicalSpaceProps = Props & {
   quoteGroups: QuoteGroup[];
-  quoteLinesLoading: boolean;
-  quoteLinesError: string | null;
 };
 
 function BeSpace({
@@ -315,8 +240,6 @@ function BeSpace({
   canModify,
   mutate,
   quoteGroups,
-  quoteLinesLoading,
-  quoteLinesError,
 }: TechnicalSpaceProps) {
   const [creating, setCreating] = useState(false);
   const items = chantier.operational.beItems;
@@ -348,8 +271,7 @@ function BeSpace({
           mode="be"
           busy={busy}
           quoteGroups={quoteGroups}
-          quoteLinesLoading={quoteLinesLoading}
-          quoteLinesError={quoteLinesError}
+          tsItems={chantier.operational.tsItems}
           onCancel={() => setCreating(false)}
           onCreate={async (value) => {
             const ok = await mutate(
@@ -424,8 +346,6 @@ function WorkshopSpace({
   canModify,
   mutate,
   quoteGroups,
-  quoteLinesLoading,
-  quoteLinesError,
 }: TechnicalSpaceProps) {
   const [creating, setCreating] = useState(false);
   const items = chantier.operational.workshopItems;
@@ -457,8 +377,7 @@ function WorkshopSpace({
           mode="workshop"
           busy={busy}
           quoteGroups={quoteGroups}
-          quoteLinesLoading={quoteLinesLoading}
-          quoteLinesError={quoteLinesError}
+          tsItems={chantier.operational.tsItems}
           onCancel={() => setCreating(false)}
           onCreate={async (value) => {
             const ok = await mutate(
