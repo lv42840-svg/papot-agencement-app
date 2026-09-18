@@ -203,11 +203,11 @@ export function CommercialAffairQuotes({ item }: { item: CommercialCase }) {
                       <strong>{hoursLabel(summary.soldHours)}</strong>
                     </div>
                     <div>
-                      <span>Coût prévu</span>
+                      <span>Déboursé prévu</span>
                       <strong>
-                        {summary.estimatedCostCents === null
+                        {summary.plannedDisbursementCents === null
                           ? "À compléter"
-                          : moneyLabel(summary.estimatedCostCents)}
+                          : moneyLabel(summary.plannedDisbursementCents)}
                       </strong>
                     </div>
                   </div>
@@ -226,8 +226,7 @@ export function CommercialAffairQuotes({ item }: { item: CommercialCase }) {
           </div>
 
           <p className="commercialAffairQuotesCostNote">
-            Le modèle actuel calcule un coût prévu global. Il ne sépare pas encore un « déboursé
-            externe » autonome du coût de main-d’œuvre, donc aucun faux déboursé n’est affiché.
+            Déboursé prévu = coûts prévus du devis hors heures PAPOT BE, Atelier et Pose.
           </p>
         </>
       )}
