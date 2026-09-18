@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { applyQuotesMutation, quotesMutationSchema } from "../src/lib/quotes/mutations";
-import { markNativeQuoteSent } from "../src/lib/quotes/send";
-import { createInitialNativeQuotesPayload } from "../src/lib/quotes/store";
+import { markNativeQuoteSent, markNativeQuoteSentWithFinalPdf } from "../src/lib/quotes/send";
+import { createInitialNativeQuotesPayload, type QuoteFinalPdf } from "../src/lib/quotes/store";
 
 const actor = {
   userId: "11111111-1111-4111-8111-111111111111",
@@ -27,6 +27,22 @@ function draft() {
   ).payload;
 }
 
+function finalPdf(overrides: Partial<QuoteFinalPdf> = {}): QuoteFinalPdf {
+  return {
+    quoteNumber: "D-2026-0001",
+    variantName: "Base",
+    version: 1,
+    commercialDocumentId: "44444444-4444-4444-8444-444444444444",
+    fileName: "Devis D-2026-0001 - Base - V1.pdf",
+    storagePath: "Commercial/2026/TEST/Devis/Devis D-2026-0001 - Base - V1.pdf",
+    sizeBytes: 1234,
+    sha256: "a".repeat(64),
+    archivedAt: "2026-09-14T16:00:00.000Z",
+    archivedByName: "Lucien",
+    ...overrides,
+  };
+}
+
 describe("native quote send", () => {
   it("marks a draft sent and stores its own mandatory follow-up date", () => {
     const source = draft();
@@ -45,8 +61,52 @@ describe("native quote send", () => {
       status: "SENT",
       sentAt: "2026-09-14T16:00:00.000Z",
       followUpDate: "2026-09-25",
+      finalPdf: null,
       updatedByName: "Lucien",
     });
+  });
+
+  it("freezes final PDF metadata with number, variant and version when sent", () => {
+    const source = draft();
+    const quoteId = source.quotes[0].id;
+    const frozen = finalPdf();
+    const result = markNativeQuoteSentWithFinalPdf(
+      source,
+      quoteId,
+      "2026-09-25",
+      frozen,
+      actor,
+      new Date("2026-09-14T16:00:00.000Z"),
+    );
+
+    expect(result.payload.quotes[0]).toMatchObject({
+      status: "SENT",
+      finalPdf: frozen,
+    });
+  });
+
+  it("rejects final PDF metadata from another variant or version", () => {
+    const source = draft();
+    const quoteId = source.quotes[0].id;
+
+    expect(() =>
+      markNativeQuoteSentWithFinalPdf(
+        source,
+        quoteId,
+        "2026-09-25",
+        finalPdf({ variantName: "Variante A" }),
+        actor,
+      ),
+    ).toThrow("QUOTE_FINAL_PDF_VARIANT_MISMATCH");
+    expect(() =>
+      markNativeQuoteSentWithFinalPdf(
+        source,
+        quoteId,
+        "2026-09-25",
+        finalPdf({ version: 2 }),
+        actor,
+      ),
+    ).toThrow("QUOTE_FINAL_PDF_VERSION_MISMATCH");
   });
 
   it("refuses to send a quote twice", () => {

@@ -55,6 +55,7 @@ function cloneAsDraft(
     status: "DRAFT",
     sentAt: null,
     followUpDate: null,
+    finalPdf: null,
     model: {
       ...structuredClone(source.model),
       id,

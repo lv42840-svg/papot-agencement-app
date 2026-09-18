@@ -39,6 +39,7 @@ describe("native quote draft store", () => {
       variantName: "Base",
       version: 1,
       status: "DRAFT",
+      finalPdf: null,
       createdByName: "Lucien",
       updatedByName: "Lucien",
       model: {
@@ -79,6 +80,21 @@ describe("native quote draft store", () => {
     expect(second.payload.quotes[1]).toMatchObject({ variantName: "Variante A", version: 1 });
   });
 
+  it("still reads a stored legacy quote that has no final PDF field", () => {
+    const created = applyQuotesMutation(
+      createInitialNativeQuotesPayload(),
+      draftInput(),
+      actor,
+      clientId,
+    ).payload;
+    const legacy = structuredClone(created) as unknown as {
+      quotes: Array<Record<string, unknown>>;
+    };
+    delete legacy.quotes[0].finalPdf;
+
+    expect(parseNativeQuotesPayload(legacy).quotes[0].finalPdf).toBeNull();
+  });
+
   it("still reads a stored legacy line that has no components field", () => {
     const created = applyQuotesMutation(
       createInitialNativeQuotesPayload(),
@@ -111,6 +127,32 @@ describe("native quote draft store", () => {
       unitPriceCents: 10_000,
     });
     expect("components" in parsed.quotes[0].model.items[0]).toBe(false);
+  });
+
+  it("refuses final PDF metadata on a draft or from another variant", () => {
+    const created = applyQuotesMutation(
+      createInitialNativeQuotesPayload(),
+      draftInput(),
+      actor,
+      clientId,
+    ).payload;
+    const broken = structuredClone(created) as unknown as {
+      quotes: Array<Record<string, unknown>>;
+    };
+    broken.quotes[0].finalPdf = {
+      quoteNumber: "D-2026-0001",
+      variantName: "Variante A",
+      version: 1,
+      commercialDocumentId: "44444444-4444-4444-8444-444444444444",
+      fileName: "Devis D-2026-0001 - Variante A - V1.pdf",
+      storagePath: "Commercial/2026/TEST/Devis/test.pdf",
+      sizeBytes: 100,
+      sha256: "a".repeat(64),
+      archivedAt: "2026-09-17T20:00:00.000Z",
+      archivedByName: "TEST",
+    };
+
+    expect(() => parseNativeQuotesPayload(broken)).toThrow("QUOTES_STORE_INVALID");
   });
 
   it("refuses a stored record whose wrapper and quote model ids diverge", () => {

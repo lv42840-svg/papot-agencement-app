@@ -6,9 +6,9 @@ const directEditor = readFileSync(
   "utf-8",
 );
 
-describe("quote send action visibility", () => {
-  it("n'expose pas l'action d'envoi dans l'interface active du devis", () => {
-    expect(directEditor).not.toContain("QuoteSendAction");
+describe("quote final PDF action visibility", () => {
+  it("expose l'action de génération et gel dans l'interface active du devis", () => {
+    expect(directEditor).toContain("QuoteSendAction");
     expect(directEditor).toContain("QuoteComponentCheck");
     expect(directEditor).toContain("QuoteLifecycleActions");
   });

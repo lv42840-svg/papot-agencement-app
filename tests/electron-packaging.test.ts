@@ -10,4 +10,11 @@ describe("Electron packaging", () => {
 
     expect(ignoredProductionDependencies).toEqual(productionDependencies);
   });
+
+  it("bundles the Word V2 quote template as an external runtime resource", () => {
+    expect(packageJson.build.extraResources).toContainEqual({
+      from: "docs/templates/PAPOT_Template_Devis_V2.docx",
+      to: "quote-templates/PAPOT_Template_Devis_V2.docx",
+    });
+  });
 });

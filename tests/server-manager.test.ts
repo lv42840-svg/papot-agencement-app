@@ -16,6 +16,7 @@ const serverManager = require("../desktop/server-manager.cjs") as {
 const servers: net.Server[] = [];
 
 afterEach(async () => {
+  delete process.env.PAPOT_QUOTE_WORD_V2_TEMPLATE;
   await Promise.all(
     servers
       .splice(0)
@@ -57,6 +58,9 @@ describe("packaged desktop server", () => {
     expect(process.env.NODE_ENV).toBe("production");
     expect(process.env.NODE_PATH).toBe(
       "C:\\Program Files\\PAPOT\\resources/server/vendor_node_modules",
+    );
+    expect(process.env.PAPOT_QUOTE_WORD_V2_TEMPLATE).toBe(
+      "C:\\Program Files\\PAPOT\\resources/quote-templates/PAPOT_Template_Devis_V2.docx",
     );
   });
 });

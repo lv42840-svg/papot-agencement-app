@@ -83,6 +83,9 @@ async function startPackagedServer({ resourcesPath, host, port, loadServer = req
   process.env.HOSTNAME = host;
   process.env.NODE_ENV = "production";
   process.env.NODE_PATH = path.join(resourcesPath, "server", "vendor_node_modules");
+  process.env.PAPOT_QUOTE_WORD_V2_TEMPLATE =
+    process.env.PAPOT_QUOTE_WORD_V2_TEMPLATE ||
+    path.join(resourcesPath, "quote-templates", "PAPOT_Template_Devis_V2.docx");
   process.env.PORT = String(port);
   Module._initPaths();
   loadServer(serverPath);
