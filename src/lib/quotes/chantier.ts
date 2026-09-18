@@ -24,7 +24,6 @@ export function nextChantierComplementVariantName(
   throw new Error("QUOTE_COMPLEMENT_NAME_UNAVAILABLE");
 }
 
-
 export function quoteWorkflowMayChangeCommercialStatus(status: CommercialStatus): boolean {
   return status !== "CONFIRMED";
 }
