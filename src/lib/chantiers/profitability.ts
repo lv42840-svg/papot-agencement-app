@@ -1,6 +1,6 @@
 import type { ChantierHours, ChantierRecord } from "./domain";
 import type { CommercialCase } from "../commercial/domain";
-import { calculateQuoteAdjustedPricing } from "../quotes/adjustments";
+import { calculateCommercialQuoteSummary } from "../quotes/commercial-summary";
 import type { NativeQuoteRecord, NativeQuotesPayload } from "../quotes/store";
 
 export type ChantierActualCostSnapshot = {
@@ -16,12 +16,14 @@ export type ChantierProfitabilityQuote = {
   variantName: string;
   version: number;
   saleCents: number;
-  plannedCostCents: number | null;
+  soldHours: ChantierHours & { total: number };
+  plannedDisbursementCents: number | null;
+  plannedMarginCents: number | null;
 };
 
 export type ChantierProfitability = {
   soldCents: number | null;
-  plannedCostCents: number | null;
+  plannedDisbursementCents: number | null;
   plannedMarginCents: number | null;
   plannedMarginPercent: number | null;
   plannedHours: ChantierHours & { total: number };
@@ -91,7 +93,7 @@ export function calculateChantierProfitability(
 ): ChantierProfitability {
   const retained = retainedQuotes(commercialCase, quotes);
   const summaries = retained.records.map((quote) => {
-    const pricing = calculateQuoteAdjustedPricing(quote.model.items, quote.pricingConfig);
+    const summary = calculateCommercialQuoteSummary(quote);
     return {
       quoteId: quote.id,
       quoteKind: quote.quoteKind,
@@ -99,8 +101,10 @@ export function calculateChantierProfitability(
       subject: quote.model.subject,
       variantName: quote.variantName,
       version: quote.version,
-      saleCents: pricing.totalSaleCents,
-      plannedCostCents: pricing.totalCostCents,
+      saleCents: summary.totalHtCents,
+      soldHours: summary.soldHoursByActivity,
+      plannedDisbursementCents: summary.plannedDisbursementCents,
+      plannedMarginCents: summary.plannedMarginCents,
     } satisfies ChantierProfitabilityQuote;
   });
 
@@ -112,17 +116,25 @@ export function calculateChantierProfitability(
     ? summaries.reduce((total, quote) => addSafeMoney(total, quote.saleCents), 0)
     : null;
 
-  const plannedCostComplete =
-    soldComplete && summaries.every((quote) => quote.plannedCostCents !== null);
-  const plannedCostCents = plannedCostComplete
-    ? summaries.reduce((total, quote) => addSafeMoney(total, quote.plannedCostCents ?? 0), 0)
+  const plannedDisbursementComplete =
+    soldComplete && summaries.every((quote) => quote.plannedDisbursementCents !== null);
+  const plannedDisbursementCents = plannedDisbursementComplete
+    ? summaries.reduce(
+        (total, quote) => addSafeMoney(total, quote.plannedDisbursementCents ?? 0),
+        0,
+      )
     : null;
-  const plannedMarginCents =
-    soldCents === null || plannedCostCents === null ? null : soldCents - plannedCostCents;
+  const plannedMarginComplete =
+    soldComplete && summaries.every((quote) => quote.plannedMarginCents !== null);
+  const plannedMarginCents = plannedMarginComplete
+    ? summaries.reduce((total, quote) => total + (quote.plannedMarginCents ?? 0), 0)
+    : null;
+  const plannedTotalCostCents =
+    soldCents === null || plannedMarginCents === null ? null : soldCents - plannedMarginCents;
   const plannedMarginPercent =
-    soldCents === null || plannedCostCents === null
+    soldCents === null || plannedTotalCostCents === null
       ? null
-      : marginPercent(soldCents, plannedCostCents);
+      : marginPercent(soldCents, plannedTotalCostCents);
 
   const actualCostsComplete =
     actualCosts.laborCostCents !== null && actualCosts.purchaseCostCents !== null;
@@ -136,12 +148,25 @@ export function calculateChantierProfitability(
       ? null
       : marginPercent(soldCents, actualTotalCostCents);
 
+  const plannedHours =
+    soldComplete
+      ? summaries.reduce(
+          (total, quote) => ({
+            be: total.be + quote.soldHours.be,
+            workshop: total.workshop + quote.soldHours.workshop,
+            install: total.install + quote.soldHours.install,
+            total: total.total + quote.soldHours.total,
+          }),
+          { be: 0, workshop: 0, install: 0, total: 0 },
+        )
+      : { be: 0, workshop: 0, install: 0, total: 0 };
+
   return {
     soldCents,
-    plannedCostCents,
+    plannedDisbursementCents,
     plannedMarginCents,
     plannedMarginPercent,
-    plannedHours: totalHours(chantier.plannedHours),
+    plannedHours,
     actualHours: totalHours(chantier.actualHours),
     actualLaborCostCents: actualCosts.laborCostCents,
     actualPurchaseCostCents: actualCosts.purchaseCostCents,
