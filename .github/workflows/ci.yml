@@ -55,6 +55,7 @@ jobs:
       - run: npm test -- tests/commercial-document-files.integration.test.ts
       - run: npm test -- tests/chantiers-postgres.integration.test.ts
       - run: npm test -- tests/library-postgres.integration.test.ts
+      - run: npm test -- tests/quotes-postgres.integration.test.ts
 
   pdf-integration:
     runs-on: ubuntu-latest
