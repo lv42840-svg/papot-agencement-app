@@ -1,10 +1,11 @@
 "use client";
 
-import { FileLock2, Send } from "lucide-react";
+import { CheckCircle2, FileLock2, Send } from "lucide-react";
 import { type FormEvent, useState } from "react";
 import type { NativeQuoteRecord, NativeQuotesPayload } from "@/lib/quotes/store";
 
 type ApiResponse = { payload?: NativeQuotesPayload; error?: string };
+type FinalizeMode = "VALIDATE" | "SEND";
 
 function sendErrorLabel(code?: string): string {
   if (code === "MODULE_FORBIDDEN") {
@@ -13,6 +14,9 @@ function sendErrorLabel(code?: string): string {
   if (code === "QUOTE_FOLLOW_UP_DATE_REQUIRED") {
     return "Choisis une date de relance valide.";
   }
+  if (code === "QUOTE_SEND_REQUEST_INVALID") {
+    return "Vérifie l’action demandée et la date de relance.";
+  }
   if (code === "QUOTE_PRICING_REVIEW_REQUIRED" || code === "QUOTE_DOCUMENT_PRICING_WARNING") {
     return "Vérifie les ajustements de chiffrage signalés avant de figer le devis.";
   }
@@ -20,6 +24,7 @@ function sendErrorLabel(code?: string): string {
     return "Vérifie les options du devis avant le gel du PDF.";
   }
   if (code === "QUOTE_NOT_EDITABLE") return "Ce devis n’est plus modifiable.";
+  if (code === "QUOTE_NOT_FROZEN") return "Ce devis n’est pas encore validé.";
   if (code === "QUOTE_FINAL_PDF_ARCHIVE_CONFLICT") {
     return "Un PDF différent existe déjà pour ce numéro, cette variante et cette version. Aucun fichier n’a été écrasé.";
   }
@@ -76,24 +81,28 @@ export function QuoteSendAction({
   canWrite: boolean;
   onSaved: (payload: NativeQuotesPayload) => void;
 }) {
-  const [open, setOpen] = useState(false);
+  const [mode, setMode] = useState<FinalizeMode | null>(null);
   const [followUpDate, setFollowUpDate] = useState("");
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
 
   async function submit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
-    if (!/^\d{4}-\d{2}-\d{2}$/.test(followUpDate)) {
+    if (!mode) return;
+    if (mode === "SEND" && !/^\d{4}-\d{2}-\d{2}$/.test(followUpDate)) {
       setError("Choisis une date de relance valide.");
       return;
     }
+
     setSaving(true);
     setError("");
     try {
       const response = await fetch(`/api/desktop/quotes/${quote.id}/send`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ followUpDate }),
+        body: JSON.stringify(
+          mode === "SEND" ? { mode, followUpDate } : { mode },
+        ),
       });
       const data = (await response.json()) as ApiResponse;
       if (!response.ok || !data.payload) {
@@ -101,7 +110,7 @@ export function QuoteSendAction({
         return;
       }
       onSaved(data.payload);
-      setOpen(false);
+      setMode(null);
     } catch {
       setError("Impossible de générer et figer le PDF du devis.");
     } finally {
@@ -109,7 +118,7 @@ export function QuoteSendAction({
     }
   }
 
-  if (quote.status !== "DRAFT") {
+  if (quote.status === "SENT" || quote.status === "ACCEPTED" || quote.status === "REJECTED") {
     if (!quote.finalPdf) {
       return quote.followUpDate ? (
         <div className="quoteNotice">Envoyé · relance prévue le {quote.followUpDate}</div>
@@ -123,40 +132,91 @@ export function QuoteSendAction({
       </div>
     );
   }
-  if (!canWrite) return null;
 
-  if (!open) {
+  if (quote.status === "FROZEN" && !mode) {
     return (
-      <button type="button" className="primaryButton" onClick={() => setOpen(true)}>
-        <Send size={15} aria-hidden="true" /> Générer et figer le PDF
-      </button>
+      <div className="quoteFinalizeRow">
+        <div className="quoteNotice">
+          <CheckCircle2 size={14} aria-hidden="true" /> {quote.finalPdf?.quoteNumber} · PDF validé,
+          pas encore envoyé
+        </div>
+        {canWrite ? (
+          <button type="button" className="primaryButton" onClick={() => setMode("SEND")}>
+            <Send size={15} aria-hidden="true" /> Envoyer
+          </button>
+        ) : null}
+      </div>
     );
   }
+
+  if (quote.status !== "DRAFT" && quote.status !== "FROZEN") return null;
+  if (!canWrite) return null;
+
+  if (!mode) {
+    return (
+      <div className="quoteFinalizeRow">
+        <button type="button" className="secondaryButton" onClick={() => setMode("VALIDATE")}>
+          <FileLock2 size={15} aria-hidden="true" /> Valider
+        </button>
+        <button type="button" className="primaryButton" onClick={() => setMode("SEND")}>
+          <Send size={15} aria-hidden="true" /> Valider et envoyer
+        </button>
+      </div>
+    );
+  }
+
+  const alreadyValidated = quote.status === "FROZEN";
 
   return (
     <form className="quoteDraftForm" onSubmit={submit}>
       <div className="quoteNotice">
-        Le PDF recevra son numéro définitif puis sera archivé sans possibilité d’écraser ce fichier.
-        Pour modifier ensuite le devis, crée une nouvelle version.
+        {mode === "VALIDATE"
+          ? "Le PDF recevra son numéro définitif et sera figé. Le devis restera non envoyé."
+          : alreadyValidated
+            ? "Le PDF est déjà figé. Le devis va maintenant passer en Envoyé."
+            : "Le PDF recevra son numéro définitif, sera figé puis le devis passera en Envoyé."}
       </div>
-      <label className="quoteField">
-        <span>Date de relance obligatoire</span>
-        <input
-          type="date"
-          value={followUpDate}
-          onChange={(event) => setFollowUpDate(event.target.value)}
-          required
-        />
-      </label>
+      {mode === "SEND" ? (
+        <label className="quoteField">
+          <span>Date de relance obligatoire</span>
+          <input
+            type="date"
+            value={followUpDate}
+            onChange={(event) => setFollowUpDate(event.target.value)}
+            required
+          />
+        </label>
+      ) : null}
       {error ? <div className="quoteFormError">{error}</div> : null}
       <div className="quoteDraftActions">
-        <button type="button" className="secondaryButton" onClick={() => setOpen(false)}>
+        <button type="button" className="secondaryButton" onClick={() => setMode(null)}>
           Annuler
         </button>
         <button type="submit" className="primaryButton" disabled={saving}>
-          {saving ? "Génération du PDF…" : "Confirmer et figer"}
+          {saving
+            ? mode === "VALIDATE"
+              ? "Validation du PDF…"
+              : "Validation et envoi…"
+            : mode === "VALIDATE"
+              ? "Confirmer la validation"
+              : alreadyValidated
+                ? "Confirmer l’envoi"
+                : "Valider et envoyer"}
         </button>
       </div>
+      <style jsx>{`
+        .quoteFinalizeRow {
+          display: flex;
+          align-items: center;
+          gap: 8px;
+          flex-wrap: wrap;
+        }
+        .quoteFinalizeRow :global(button) {
+          display: inline-flex;
+          align-items: center;
+          gap: 6px;
+        }
+      `}</style>
     </form>
   );
 }
