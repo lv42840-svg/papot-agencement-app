@@ -46,6 +46,9 @@ export function QuoteCreateWorkspace({
   canWrite,
   today,
   initialAffairId,
+  initialVariantName,
+  chantierComplement,
+  backHref,
   paymentTermOptions,
   quoteOwners,
   defaultQuoteOwnerName,
@@ -54,6 +57,9 @@ export function QuoteCreateWorkspace({
   canWrite: boolean;
   today: string;
   initialAffairId?: string;
+  initialVariantName: string;
+  chantierComplement: boolean;
+  backHref: string;
   paymentTermOptions: string[];
   quoteOwners: QuoteOwnerOption[];
   defaultQuoteOwnerName: string;
@@ -123,7 +129,7 @@ export function QuoteCreateWorkspace({
           commercialCaseId: selectedAffairId,
           subject,
           issueDate,
-          variantName: "Base",
+          variantName: initialVariantName,
           paymentTerms,
           quoteOwnerName,
           quoteDueDate,
@@ -145,22 +151,25 @@ export function QuoteCreateWorkspace({
   return (
     <div className="quoteCreateWorkspace">
       <div className="quoteCreateTop">
-        <Link href="/devis" className="secondaryButton quoteCreateBack">
-          <ArrowLeft size={14} /> Tous les devis
+        <Link href={backHref} className="secondaryButton quoteCreateBack">
+          <ArrowLeft size={14} /> {chantierComplement ? "Retour au chantier" : "Tous les devis"}
         </Link>
       </div>
 
       <section className="panel quoteCreatePanel">
         <div className="quoteCreateHeader">
           <div>
-            <p className="eyebrow">Nouveau devis</p>
-            <h2>Créer Base V1</h2>
+            <p className="eyebrow">
+              {chantierComplement ? "Nouveau devis chantier" : "Nouveau devis"}
+            </p>
+            <h2>Créer {initialVariantName} V1</h2>
             <p className="muted">
-              Le premier devis d’une affaire démarre automatiquement en Base V1. Les variantes et
-              versions suivantes se créeront ensuite depuis le devis existant.
+              {chantierComplement
+                ? "Ce devis complémentaire utilise le moteur Devis PAPOT existant. Il n’entre dans le contrat du chantier qu’après acceptation explicite."
+                : "Le premier devis d’une affaire démarre automatiquement en Base V1. Les variantes et versions suivantes se créeront ensuite depuis le devis existant."}
             </p>
           </div>
-          <span className="quoteCreatePill">Base · V1</span>
+          <span className="quoteCreatePill">{initialVariantName} · V1</span>
         </div>
 
         {!canWrite ? (
@@ -206,7 +215,7 @@ export function QuoteCreateWorkspace({
             <div className="quoteField">
               <span>Variante / version</span>
               <div className="quoteStructuredValue">
-                <strong>Base · V1</strong>
+                <strong>{initialVariantName} · V1</strong>
                 <small>
                   <LockKeyhole size={12} aria-hidden="true" /> Créé automatiquement
                 </small>
@@ -268,9 +277,10 @@ export function QuoteCreateWorkspace({
             </label>
 
             <div className="quoteCreateFixed quoteFieldWide">
-              <LockKeyhole size={13} aria-hidden="true" /> Validité du devis : 30 jours. À la
-              création, l’affaire passe automatiquement en « Chiffrage en cours » avec le
-              responsable et la date prévue ci-dessus.
+              <LockKeyhole size={13} aria-hidden="true" /> Validité du devis : 30 jours.{" "}
+              {chantierComplement
+                ? "L’affaire reste Confirmée : ce complément est suivi dans le chantier sans revenir en Chiffrage."
+                : "À la création, l’affaire passe automatiquement en « Chiffrage en cours » avec le responsable et la date prévue ci-dessus."}
             </div>
 
             {error ? <div className="quoteCreateError quoteFieldWide">{error}</div> : null}
@@ -286,9 +296,10 @@ export function QuoteCreateWorkspace({
                   !quoteDueDate
                 }
               >
-                <FilePlus2 size={15} /> {saving ? "Création…" : "Créer et ouvrir Base V1"}
+                <FilePlus2 size={15} />{" "}
+                {saving ? "Création…" : `Créer et ouvrir ${initialVariantName} V1`}
               </button>
-              <Link href="/devis" className="secondaryButton quoteCancelLink">
+              <Link href={backHref} className="secondaryButton quoteCancelLink">
                 Annuler
               </Link>
             </div>
