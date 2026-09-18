@@ -195,21 +195,21 @@ describe("Commercial V1", () => {
     expect(confirmed.history.some((event) => event.type === "QUOTES_RETAINED")).toBe(true);
   });
 
-  it("requires an explicit quote selection payload when confirming", () => {
+  it("keeps direct legacy confirmation compatible with an empty retained quote relation", () => {
     const source = createPiste();
     const caseId = source.cases[0].id;
-    expect(() =>
-      applyCommercialMutation(
-        source,
-        {
-          action: "setStatus",
-          caseId,
-          status: "CONFIRMED",
-          plannedInstallDate: "2026-11-10",
-        },
-        actor,
-      ),
-    ).toThrow("COMMERCIAL_QUOTE_SELECTION_REQUIRED");
+    const confirmed = applyCommercialMutation(
+      source,
+      {
+        action: "setStatus",
+        caseId,
+        status: "CONFIRMED",
+        plannedInstallDate: "2026-11-10",
+      },
+      actor,
+    ).payload.cases[0];
+
+    expect(confirmed.retainedQuoteIds).toEqual([]);
   });
 
   it("loads older affairs without retained quote ids as an empty selection", () => {
