@@ -1,7 +1,7 @@
 import { z } from "zod";
 import type { SharedResourceEnvelope } from "../sync/resource-lock";
 import type {
-  NextcloudSharedResourceStore,
+  SaveSharedResourceResult,
   SharedResourceActor,
 } from "../sync/resource-state-store";
 import { libraryComponentSchema, parseLibraryComponent, type LibraryComponent } from "./component";
@@ -32,7 +32,16 @@ export type SaveLibraryResult =
   | { status: "saved"; library: LibrarySnapshot }
   | { status: "conflict"; current: LibrarySnapshot | null };
 
-type LibraryResourceStore = Pick<NextcloudSharedResourceStore, "get" | "save">;
+type LibraryResourceStore = {
+  get(resource: typeof LIBRARY_RESOURCE_REF): Promise<SharedResourceEnvelope | null>;
+  save(params: {
+    resource: typeof LIBRARY_RESOURCE_REF;
+    expectedVersion: number;
+    payload: unknown;
+    actor: SharedResourceActor;
+    now?: Date;
+  }): Promise<SaveSharedResourceResult>;
+};
 
 export function createInitialLibraryPayload(): LibraryPayload {
   return {
@@ -94,7 +103,7 @@ function snapshotFromEnvelope(envelope: SharedResourceEnvelope): LibrarySnapshot
   };
 }
 
-export class NextcloudLibraryStore {
+export class SharedResourceLibraryStore {
   constructor(private readonly resources: LibraryResourceStore) {}
 
   async get(): Promise<LibrarySnapshot> {
@@ -136,3 +145,5 @@ export class NextcloudLibraryStore {
     };
   }
 }
+
+export { SharedResourceLibraryStore as NextcloudLibraryStore };
