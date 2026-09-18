@@ -6,10 +6,7 @@ import { useMemo } from "react";
 import type { CommercialStatus } from "@/lib/commercial/domain";
 import { quoteDocumentStatusLabel } from "@/lib/quotes/domain";
 import { newQuoteHref, quoteHref } from "@/lib/quotes/navigation";
-import {
-  quoteContractSelectionLabel,
-  quoteContractSelectionState,
-} from "@/lib/quotes/retention";
+import { quoteContractSelectionLabel, quoteContractSelectionState } from "@/lib/quotes/retention";
 import type { NativeQuotesPayload } from "@/lib/quotes/store";
 
 export type QuoteAffairOption = {
