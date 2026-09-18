@@ -354,7 +354,6 @@ function AdminSpace({
           </div>
         ) : null}
       </div>
-
     </div>
   );
 }
@@ -794,8 +793,8 @@ function TechnicalCreateForm({
           </p>
         ) : (
           <p className="isWarning">
-            Aucun devis natif accepté n’est disponible. Crée puis fais accepter le devis / TS
-            depuis l’espace Admin.
+            Aucun devis natif accepté n’est disponible. Crée puis fais accepter le devis / TS depuis
+            l’espace Admin.
           </p>
         )}
       </div>
