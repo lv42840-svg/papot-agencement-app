@@ -326,7 +326,13 @@ export async function convertDocxToPdf(
         };
         throw unavailable;
       }
-      throw wordError;
+      const detail = wordError instanceof Error ? wordError.message : "UNKNOWN";
+      const failed = new Error(`PDF_WINDOWS_CONVERTER_FAILED:${detail}`);
+      (failed as Error & { cause?: unknown }).cause = {
+        libreOfficeError,
+        wordError,
+      };
+      throw failed;
     }
   }
 }
