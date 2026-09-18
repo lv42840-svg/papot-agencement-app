@@ -37,9 +37,10 @@ export function launchChantierFromAffair(
   }
 
   // A quote is deliberately NOT required to start a chantier in PAPOT V1.
-  // Until the native Devis module is connected, historical OBAT documents are
-  // displayed only as context and never block the operational launch.
+  // Native retained quotes are now the primary commercial source. Historical
+  // documents remain valid context for older affairs.
   const historicalQuote = hasHistoricalDocument(affair, "QUOTE");
+  const nativeQuote = affair.retainedQuoteIds.length > 0;
   const historicalCosting = hasHistoricalDocument(affair, "COSTING");
   const timestamp = now.toISOString();
 
@@ -62,7 +63,7 @@ export function launchChantierFromAffair(
     plannedInstallDate: affair.plannedInstallDate,
     launchYear: now.getFullYear(),
     launchDocuments: {
-      quote: historicalQuote ? "PRESENT" : "MISSING_DECLARED",
+      quote: nativeQuote || historicalQuote ? "PRESENT" : "MISSING_DECLARED",
       signedQuote: "MISSING_DECLARED",
       costing: historicalCosting ? "PRESENT" : "MISSING_DECLARED",
     },
@@ -82,6 +83,7 @@ export function launchChantierFromAffair(
       beItems: [],
       workshopItems: [],
       installItems: [],
+      tsItems: [],
     },
     launchedAt: timestamp,
     launchedByName: actor.displayName,
@@ -96,7 +98,7 @@ export function launchChantierFromAffair(
         type: "LAUNCHED",
         at: timestamp,
         actorName: actor.displayName,
-        summary: `Chantier lancé depuis l’affaire. Charge initiale : BE ${input.be} h · Atelier ${input.workshop} h · Pose ${input.install} h. Aucun devis n’est requis pour lancer le chantier.`,
+        summary: `Chantier lancé depuis l’affaire. Charge initiale : BE ${input.be} h · Atelier ${input.workshop} h · Pose ${input.install} h. ${affair.retainedQuoteIds.length} devis natif${affair.retainedQuoteIds.length > 1 ? "s" : ""} retenu${affair.retainedQuoteIds.length > 1 ? "s" : ""} lié${affair.retainedQuoteIds.length > 1 ? "s" : ""} au chantier.`,
       },
     ],
   };
