@@ -131,6 +131,7 @@ describe("commercial quote summary", () => {
       totalHtCents: 74_000,
       soldHours: 14,
       plannedDisbursementCents: 8_000,
+      plannedMarginCents: 34_000,
     });
   });
 
@@ -171,6 +172,7 @@ describe("commercial quote summary", () => {
       totalHtCents: 10_000,
       soldHours: 0,
       plannedDisbursementCents: null,
+      plannedMarginCents: null,
     });
   });
 });

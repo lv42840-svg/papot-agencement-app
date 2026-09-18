@@ -50,6 +50,8 @@ export const commercialMutationSchema = z.discriminatedUnion("action", [
     quoteDueDate: dateOnlySchema.optional(),
     quoteOwnerName: z.string().trim().max(120).optional(),
     plannedInstallDate: dateOnlySchema.optional(),
+    retainedQuoteIds: z.array(z.string().uuid()).max(1000).optional(),
+    confirmWithoutQuote: z.boolean().optional(),
   }),
   z.object({
     action: z.literal("markQuoteSent"),
@@ -65,6 +67,8 @@ export const commercialMutationSchema = z.discriminatedUnion("action", [
     quoteDueDate: dateOnlySchema.optional(),
     quoteOwnerName: z.string().trim().max(120).optional(),
     plannedInstallDate: dateOnlySchema.optional(),
+    retainedQuoteIds: z.array(z.string().uuid()).max(1000).optional(),
+    confirmWithoutQuote: z.boolean().optional(),
     closingReason: z.string().trim().max(2000).optional(),
   }),
   z.object({
@@ -155,6 +159,7 @@ function setActiveStatus(
     quoteDueDate?: string;
     quoteOwnerName?: string;
     plannedInstallDate?: string;
+    retainedQuoteIds?: string[];
   },
   actor: CommercialActor,
   now: Date,
@@ -171,7 +176,6 @@ function setActiveStatus(
   if (status === "CONFIRMED" && !params.plannedInstallDate) {
     throw new Error("COMMERCIAL_INSTALL_DATE_REQUIRED");
   }
-
   const previous = item.status;
   item.status = status;
   item.closedAt = null;
@@ -191,8 +195,18 @@ function setActiveStatus(
   } else if (status === "CONFIRMED") {
     item.plannedInstallDate = params.plannedInstallDate ?? null;
     item.confirmedAt = now.toISOString();
+    item.retainedQuoteIds = [...new Set(params.retainedQuoteIds ?? [])];
     item.reviewDate = null;
     item.expectedConfirmationDate = null;
+    history(
+      item,
+      actor.displayName,
+      "QUOTES_RETAINED",
+      item.retainedQuoteIds.length > 0
+        ? `${item.retainedQuoteIds.length} devis retenu${item.retainedQuoteIds.length > 1 ? "s" : ""} pour la base contractuelle.`
+        : "Affaire confirmée sans devis retenu.",
+      now,
+    );
   } else if (status === "FOLLOW_UP") {
     item.reviewDate = null;
     item.expectedConfirmationDate = null;
@@ -286,6 +300,7 @@ export function applyCommercialMutation(
       plannedInstallDate: null,
       quoteSentAt: null,
       confirmedAt: null,
+      retainedQuoteIds: [],
       closedAt: null,
       closingReason: null,
       quoteNotes: "",
@@ -404,7 +419,10 @@ export function applyCommercialMutation(
       setActiveStatus(
         item,
         "CONFIRMED",
-        { plannedInstallDate: input.plannedInstallDate },
+        {
+          plannedInstallDate: input.plannedInstallDate,
+          retainedQuoteIds: input.retainedQuoteIds,
+        },
         actor,
         now,
       );
