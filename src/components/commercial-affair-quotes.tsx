@@ -10,7 +10,10 @@ import {
   quoteEditorHref,
   type CommercialQuoteDisplayStatus,
 } from "@/lib/commercial/quote-follow-up";
-import { calculateCommercialQuoteSummary } from "@/lib/quotes/commercial-summary";
+import {
+  calculateCommercialContractSummary,
+  calculateCommercialQuoteSummary,
+} from "@/lib/quotes/commercial-summary";
 import type { NativeQuotesPayload } from "@/lib/quotes/store";
 
 type QuotesApiResponse = {
@@ -108,6 +111,11 @@ export function CommercialAffairQuotes({ item }: { item: CommercialCase }) {
     () => new Set(quotes.map((quote) => quote.variantName.trim().toLocaleLowerCase("fr-FR"))).size,
     [quotes],
   );
+  const retainedIds = useMemo(() => new Set(item.retainedQuoteIds), [item.retainedQuoteIds]);
+  const contract = useMemo(
+    () => calculateCommercialContractSummary(quotes, item.retainedQuoteIds),
+    [item.retainedQuoteIds, quotes],
+  );
 
   return (
     <section className="commercialAffairQuotes commercialV2Section">
@@ -138,32 +146,74 @@ export function CommercialAffairQuotes({ item }: { item: CommercialCase }) {
         </div>
       ) : (
         <>
-          <div
-            className="commercialAffairQuotesOverview"
-            aria-label="Synthèse des devis de l’affaire"
-          >
-            <div>
-              <strong>{currentQuoteCount}</strong>
-              <span>
-                proposition{currentQuoteCount > 1 ? "s" : ""} courante
-                {currentQuoteCount > 1 ? "s" : ""}
-              </span>
+          {item.status === "CONFIRMED" ? (
+            item.retainedQuoteIds.length > 0 ? (
+              <div
+                className="commercialAffairContractOverview"
+                aria-label="Cumul contractuel des devis retenus"
+              >
+                <div>
+                  <span>Devis retenus</span>
+                  <strong>{contract.quoteCount}</strong>
+                </div>
+                <div>
+                  <span>CA HT vendu</span>
+                  <strong>{moneyLabel(contract.totalHtCents)}</strong>
+                </div>
+                <div>
+                  <span>Heures vendues</span>
+                  <strong>{hoursLabel(contract.soldHours)}</strong>
+                </div>
+                <div>
+                  <span>Déboursé prévu</span>
+                  <strong>
+                    {contract.plannedDisbursementCents === null
+                      ? "À compléter"
+                      : moneyLabel(contract.plannedDisbursementCents)}
+                  </strong>
+                </div>
+                <div>
+                  <span>Marge prévue</span>
+                  <strong>
+                    {contract.plannedMarginCents === null
+                      ? "À compléter"
+                      : moneyLabel(contract.plannedMarginCents)}
+                  </strong>
+                </div>
+              </div>
+            ) : (
+              <div className="commercialAffairContractEmpty">
+                Affaire confirmée sans devis retenu. Aucun cumul contractuel n’est inventé.
+              </div>
+            )
+          ) : (
+            <div
+              className="commercialAffairQuotesOverview"
+              aria-label="Synthèse des devis de l’affaire"
+            >
+              <div>
+                <strong>{currentQuoteCount}</strong>
+                <span>
+                  proposition{currentQuoteCount > 1 ? "s" : ""} courante
+                  {currentQuoteCount > 1 ? "s" : ""}
+                </span>
+              </div>
+              <div>
+                <strong>{quotes.length}</strong>
+                <span>
+                  version{quotes.length > 1 ? "s" : ""} conservée{quotes.length > 1 ? "s" : ""}
+                </span>
+              </div>
+              <div>
+                <strong>{variantCount}</strong>
+                <span>variante{variantCount > 1 ? "s" : ""}</span>
+              </div>
+              <p>
+                Pas de cumul contractuel à ce stade : les variantes et anciennes versions ne sont
+                pas additionnées avant la sélection des devis réellement retenus.
+              </p>
             </div>
-            <div>
-              <strong>{quotes.length}</strong>
-              <span>
-                version{quotes.length > 1 ? "s" : ""} conservée{quotes.length > 1 ? "s" : ""}
-              </span>
-            </div>
-            <div>
-              <strong>{variantCount}</strong>
-              <span>variante{variantCount > 1 ? "s" : ""}</span>
-            </div>
-            <p>
-              Pas de cumul contractuel à ce stade : les variantes et anciennes versions ne sont pas
-              additionnées avant la sélection des devis réellement retenus.
-            </p>
-          </div>
+          )}
 
           <div className="commercialAffairQuotesList">
             {quotes.map((quote) => {
@@ -213,6 +263,15 @@ export function CommercialAffairQuotes({ item }: { item: CommercialCase }) {
                   </div>
 
                   <div className="commercialAffairQuoteMeta">
+                    {item.status === "CONFIRMED" ? (
+                      <span
+                        className={`commercialAffairQuoteRetention ${
+                          retainedIds.has(quote.id) ? "retained" : "notRetained"
+                        }`}
+                      >
+                        {retainedIds.has(quote.id) ? "Retenu" : "Non retenu"}
+                      </span>
+                    ) : null}
                     {quote.followUpDate ? (
                       <small>Relance {dateLabel(quote.followUpDate)}</small>
                     ) : null}
@@ -332,6 +391,39 @@ export function CommercialAffairQuotes({ item }: { item: CommercialCase }) {
           align-items: center;
           line-height: 1.4;
         }
+        .commercialAffairContractOverview {
+          display: grid;
+          grid-template-columns: repeat(5, minmax(110px, 1fr));
+          gap: 7px;
+          margin: 8px 0;
+        }
+        .commercialAffairContractOverview > div {
+          display: grid;
+          gap: 3px;
+          padding: 8px 9px;
+          border: 1px solid #d9d0ee;
+          border-radius: 8px;
+          background: #f8f5ff;
+        }
+        .commercialAffairContractOverview span {
+          color: #756b82;
+          font-size: 7px;
+          font-weight: 800;
+          text-transform: uppercase;
+        }
+        .commercialAffairContractOverview strong {
+          font-size: 12px;
+          font-variant-numeric: tabular-nums;
+        }
+        .commercialAffairContractEmpty {
+          margin: 8px 0;
+          padding: 9px;
+          border: 1px solid #e5dfeb;
+          border-radius: 8px;
+          background: #fbfafc;
+          color: #756b82;
+          font-size: 9px;
+        }
         .commercialAffairQuotesList {
           display: grid;
           border: 1px solid #ebe6f0;
@@ -416,8 +508,22 @@ export function CommercialAffairQuotes({ item }: { item: CommercialCase }) {
         .commercialAffairQuoteMeta {
           flex: 0 0 auto;
         }
+        .commercialAffairQuoteRetention,
         .commercialAffairQuoteStatus {
           padding: 3px 7px;
+          border-radius: 999px;
+          font-size: 8px;
+          font-weight: 800;
+        }
+        .commercialAffairQuoteRetention.retained {
+          background: #e9f8ef;
+          color: #34714c;
+        }
+        .commercialAffairQuoteRetention.notRetained {
+          background: #f1eff2;
+          color: #77717c;
+        }
+        .commercialAffairQuoteStatus {
           border-radius: 999px;
           font-size: 8px;
           font-weight: 800;
@@ -460,6 +566,9 @@ export function CommercialAffairQuotes({ item }: { item: CommercialCase }) {
           }
           .commercialAffairQuotesOverview {
             grid-template-columns: repeat(3, 1fr);
+          }
+          .commercialAffairContractOverview {
+            grid-template-columns: repeat(2, 1fr);
           }
           .commercialAffairQuotesOverview > p {
             grid-column: 1 / -1;
