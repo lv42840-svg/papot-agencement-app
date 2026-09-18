@@ -41,6 +41,15 @@ type Mutate = (body: MutationBody, message: string) => Promise<boolean>;
 type SpaceId = (typeof CHANTIER_OPERATIONAL_SPACES)[number]["id"];
 type QuoteGroup = ChantierRetainedQuote;
 
+const QUOTE_STATUS_LABELS = {
+  DRAFT: "Brouillon",
+  SENT: "Envoyé",
+  ACCEPTED: "Accepté",
+  REJECTED: "Refusé",
+  CANCELLED: "Annulé",
+  SUPERSEDED: "Version précédente",
+} as const;
+
 type CoreProps = {
   chantier: ChantierRecord;
   busy: boolean;
@@ -229,13 +238,12 @@ function AdminSpace({
   mutateCommercial: Mutate;
 }) {
   const retainedIds = new Set(commercialCase?.retainedQuoteIds ?? []);
-  const complementaryQuotes = commercialCase
-    ? quotes.quotes.filter(
-        (quote) =>
-          quote.commercialCaseId === commercialCase.id &&
-          !retainedIds.has(quote.id) &&
-          quoteCanBeRetained(quote),
-      )
+  const otherQuotes = commercialCase
+    ? quotes.quotes
+        .filter(
+          (quote) => quote.commercialCaseId === commercialCase.id && !retainedIds.has(quote.id),
+        )
+        .sort((left, right) => right.updatedAt.localeCompare(left.updatedAt))
     : [];
 
   return (
@@ -270,7 +278,12 @@ function AdminSpace({
                     {quote.model.subject} · {quote.variantName} · V{quote.version}
                   </span>
                   <small>
-                    {lines.length} ligne{lines.length > 1 ? "s" : ""} de référence
+                    {quote.quoteKind === "TS"
+                      ? "TS"
+                      : chantier.initialRetainedQuoteIds.includes(quote.id)
+                        ? "Contrat initial"
+                        : "Complément"}{" "}
+                    · {lines.length} ligne{lines.length > 1 ? "s" : ""} de référence
                   </small>
                 </div>
                 <div className="chantierAdminQuoteActions">
@@ -288,39 +301,54 @@ function AdminSpace({
           </div>
         )}
 
-        {commercialCase && complementaryQuotes.length > 0 && canModify ? (
+        {commercialCase && otherQuotes.length > 0 ? (
           <div className="chantierComplementaryQuotes">
             <div>
-              <strong>Devis complémentaires disponibles</strong>
+              <strong>Autres devis / historique</strong>
               <span>
-                Un devis figé peut être accepté ici. Ses lignes rejoindront immédiatement le
-                chantier.
+                Brouillons, compléments, TS refusés et anciennes versions restent consultables.
+                Seuls les devis figés éligibles peuvent rejoindre le contrat.
               </span>
             </div>
-            {complementaryQuotes.map((quote) => (
+            {otherQuotes.map((quote) => (
               <article key={quote.id}>
                 <span>
                   <strong>{quote.finalPdf?.quoteNumber ?? quote.model.subject}</strong>
                   <small>
-                    {quote.model.subject} · {quote.variantName} · V{quote.version}
+                    {quote.quoteKind === "TS" ? "TS" : "Devis"} · {quote.model.subject} ·{" "}
+                    {quote.variantName} · V{quote.version} · {QUOTE_STATUS_LABELS[quote.status]}
                   </small>
                 </span>
-                <button
-                  type="button"
-                  disabled={busy}
-                  onClick={() =>
-                    void mutateCommercial(
-                      {
-                        action: "retainAdditionalQuote",
-                        caseId: commercialCase.id,
-                        quoteId: quote.id,
-                      },
-                      "Devis complémentaire ajouté au chantier.",
-                    )
-                  }
-                >
-                  Accepter comme complément
-                </button>
+                <div className="chantierAdminQuoteActions">
+                  {quote.finalPdf ? (
+                    <a
+                      href={`/api/desktop/commercial/${commercialCase.id}/documents/${quote.finalPdf.commercialDocumentId}`}
+                    >
+                      Voir le PDF
+                    </a>
+                  ) : null}
+                  <a href={`/devis/${quote.id}`}>Ouvrir le devis</a>
+                  {canModify && quoteCanBeRetained(quote) ? (
+                    <button
+                      type="button"
+                      disabled={busy}
+                      onClick={() =>
+                        void mutateCommercial(
+                          {
+                            action: "retainAdditionalQuote",
+                            caseId: commercialCase.id,
+                            quoteId: quote.id,
+                          },
+                          quote.quoteKind === "TS"
+                            ? "TS accepté et ajouté au chantier."
+                            : "Devis complémentaire ajouté au chantier.",
+                        )
+                      }
+                    >
+                      {quote.quoteKind === "TS" ? "Accepter le TS" : "Accepter comme complément"}
+                    </button>
+                  ) : null}
+                </div>
               </article>
             ))}
           </div>
