@@ -270,7 +270,16 @@ export async function convertDocxToPdfWithMicrosoftWord(
 
     const { command, result } = await runFirstAvailable(
       microsoftWordPowerShellCandidates(options.binary),
-      ["-NoProfile", "-NonInteractive", "-ExecutionPolicy", "Bypass", "-File", scriptPath, inputPath, outputPath],
+      [
+        "-NoProfile",
+        "-NonInteractive",
+        "-ExecutionPolicy",
+        "Bypass",
+        "-File",
+        scriptPath,
+        inputPath,
+        outputPath,
+      ],
       {
         cwd: workDir,
         timeoutMs: options.timeoutMs ?? DEFAULT_TIMEOUT_MS,
@@ -288,9 +297,7 @@ export async function convertDocxToPdfWithMicrosoftWord(
     try {
       pdf = await readFile(outputPath);
     } catch {
-      throw new Error(
-        `PDF_WORD_CONVERSION_OUTPUT_MISSING:${command}:${commandMessage(result)}`,
-      );
+      throw new Error(`PDF_WORD_CONVERSION_OUTPUT_MISSING:${command}:${commandMessage(result)}`);
     }
     assertPdfBuffer(pdf);
     return pdf;

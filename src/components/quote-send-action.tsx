@@ -50,7 +50,10 @@ function sendErrorLabel(code?: string): string {
   if (code?.startsWith("PDF_WINDOWS_CONVERTER_FAILED:")) {
     return "LibreOffice est indisponible et Microsoft Word n’a pas réussi à convertir le devis en PDF.";
   }
-  if (code?.startsWith("PDF_CONVERSION_FAILED:") || code?.startsWith("PDF_CONVERSION_OUTPUT_MISSING:")) {
+  if (
+    code?.startsWith("PDF_CONVERSION_FAILED:") ||
+    code?.startsWith("PDF_CONVERSION_OUTPUT_MISSING:")
+  ) {
     return "LibreOffice a été trouvé mais n’a pas réussi à convertir le devis en PDF.";
   }
   if (code === "SERVER_FILE_ROOT_UNAVAILABLE") {
