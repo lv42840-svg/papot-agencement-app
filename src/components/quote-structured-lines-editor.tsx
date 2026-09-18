@@ -1944,7 +1944,10 @@ export function QuoteStructuredLinesEditor({
           title={editable ? "Glisser-déposer pour déplacer ce bloc" : undefined}
         >
           <span className="quoteNumber">{numbers.get(item.id) ?? "—"}</span>
-          <strong style={quoteItemTextStyleToCss(item.presentation?.textStyle)}>
+          <strong
+            className="quoteHeadingTitle"
+            style={quoteItemTextStyleToCss(item.presentation?.textStyle)}
+          >
             {item.title}
           </strong>
           <span />
@@ -2408,7 +2411,12 @@ export function QuoteStructuredLinesEditor({
           white-space: nowrap;
           font-variant-numeric: tabular-nums;
         }
+        .quoteHeadingTitle {
+          grid-column: 2;
+          min-width: 0;
+        }
         .quoteHeadingTotal {
+          grid-column: 7;
           white-space: nowrap;
           font-variant-numeric: tabular-nums;
           color: #4f3c93;
@@ -2641,14 +2649,14 @@ export function QuoteStructuredLinesEditor({
           min-height: 56px;
           background: #f1edfb;
         }
-        .quoteHeadingRow.isSection > strong {
+        .quoteHeadingRow.isSection > .quoteHeadingTitle {
           font-size: 18px;
         }
         .quoteHeadingRow.isSubsection {
           min-height: 48px;
           background: #faf8ff;
         }
-        .quoteHeadingRow.isSubsection > strong {
+        .quoteHeadingRow.isSubsection > .quoteHeadingTitle {
           padding-left: 14px;
           font-size: 15px;
         }

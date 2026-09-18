@@ -60,6 +60,8 @@ describe("quote Word V2 template contract", () => {
     )?.[0];
     expect(financialTable).toBeTruthy();
     expect(financialTable).toContain('<w:gridSpan w:val="2"');
+    expect(financialTable).toContain('<w:gridCol w:w="2900"');
+    expect(financialTable).toContain('<w:gridCol w:w="1672"');
     expect((financialTable?.match(/<w:tr\b/g) ?? []).length).toBeGreaterThanOrEqual(2);
   });
 

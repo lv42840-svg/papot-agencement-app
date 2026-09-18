@@ -250,8 +250,26 @@ function cellProperties(cellXml: string): string {
   return cellXml.match(/<w:tcPr>[\s\S]*?<\/w:tcPr>/)?.[0] ?? "";
 }
 
-function makeCell(templateCell: string, paragraph: string): string {
-  return `<w:tc>${cellProperties(templateCell)}${paragraph}</w:tc>`;
+function addBottomBorderToCellProperties(properties: string): string {
+  const bottom = '<w:bottom w:val="single" w:sz="4" w:space="0" w:color="D9D9D9"/>';
+  if (/<w:tcBorders>[\s\S]*?<\/w:tcBorders>/.test(properties)) {
+    return properties.replace(
+      /<w:tcBorders>([\s\S]*?)<\/w:tcBorders>/,
+      (_match, body: string) =>
+        `<w:tcBorders>${body.replace(/<w:bottom\b[^>]*\/>/, "")}${bottom}</w:tcBorders>`,
+    );
+  }
+  return properties.replace("</w:tcPr>", `<w:tcBorders>${bottom}</w:tcBorders></w:tcPr>`);
+}
+
+function makeCell(
+  templateCell: string,
+  paragraph: string,
+  options: { bottomBorder?: boolean } = {},
+): string {
+  let properties = cellProperties(templateCell);
+  if (options.bottomBorder) properties = addBottomBorderToCellProperties(properties);
+  return `<w:tc>${properties}${paragraph}</w:tc>`;
 }
 
 function findOpeningTagStart(xml: string, tagName: string, beforeIndex: number): number {
@@ -267,6 +285,7 @@ const QUOTE_TABLE_WIDTHS = [567, 5216, 1134, 1417, 1077, 1587] as const;
 const QUOTE_TABLE_TOTAL_WIDTH = QUOTE_TABLE_WIDTHS.reduce((sum, width) => sum + width, 0);
 const FINANCIAL_TABLE_WIDTHS = [6314, 4572] as const;
 const FINANCIAL_TABLE_TOTAL_WIDTH = FINANCIAL_TABLE_WIDTHS.reduce((sum, width) => sum + width, 0);
+const FINANCIAL_TOTALS_WIDTHS = [2900, 1672] as const;
 
 function paragraphVisibleText(paragraph: string): string {
   return wordTextNodes(paragraph)
@@ -439,6 +458,36 @@ function directTagRanges(xml: string, tagName: string): DirectTagRange[] {
   return ranges;
 }
 
+function normalizeTwoColumnTable(table: string, widths: readonly [number, number]): string {
+  let next = normalizeTableProperties(table, widths).replace(/<w:tblInd\b[^>]*\/>/g, "");
+  const rows = directTagRanges(next, "w:tr").reverse();
+
+  for (const rowRange of rows) {
+    let row = next.slice(rowRange.start, rowRange.end);
+    const cells = directTagRanges(row, "w:tc");
+    if (cells.length !== 2) continue;
+
+    for (let index = cells.length - 1; index >= 0; index -= 1) {
+      const cellRange = cells[index]!;
+      const cell = row.slice(cellRange.start, cellRange.end);
+      row =
+        row.slice(0, cellRange.start) +
+        setCellWidth(cell, widths[index]!) +
+        row.slice(cellRange.end);
+    }
+
+    next = next.slice(0, rowRange.start) + row + next.slice(rowRange.end);
+  }
+
+  return next;
+}
+
+function normalizeFinancialTotalsContent(content: string): string {
+  const range = tableRangeAroundAnchor(content, "{{total_ht}}");
+  const normalized = normalizeTwoColumnTable(range.table, FINANCIAL_TOTALS_WIDTHS);
+  return `${content.slice(0, range.start)}${normalized}${content.slice(range.end)}`;
+}
+
 function splitFinancialSignature(table: string): string {
   const rowRange = directTagRanges(table, "w:tr").find((range) =>
     table.slice(range.start, range.end).includes("{{total_ht}}"),
@@ -467,7 +516,9 @@ function splitFinancialSignature(table: string): string {
   const rightTcPr = cellProperties(right);
   const contentStart = right.indexOf(rightTcPr) + rightTcPr.length;
   const contentEnd = right.lastIndexOf("</w:tc>");
-  const beforeSignature = right.slice(contentStart, signatureStart);
+  const beforeSignature = normalizeFinancialTotalsContent(
+    right.slice(contentStart, signatureStart),
+  );
   const signatureContent = right.slice(signatureStart, contentEnd);
 
   const leftCell = setCellWidth(cells[0]!, FINANCIAL_TABLE_WIDTHS[0]);
@@ -541,6 +592,7 @@ function bodyRowXml(
   anchorRow: string,
   templateCells: readonly string[],
   item: QuoteDocumentItem,
+  options: { bottomBorder?: boolean } = {},
 ): string {
   const rowProperties = anchorRow.match(/<w:trPr>[\s\S]*?<\/w:trPr>/)?.[0] ?? "";
   const cells = Array.from({ length: 6 }, (_, index) => templateCells[index]);
@@ -564,31 +616,35 @@ function bodyRowXml(
   );
 
   const renderedCells = [
-    makeCell(cells[0], numberParagraph),
-    makeCell(cells[1], descriptionParagraph),
+    makeCell(cells[0], numberParagraph, options),
+    makeCell(cells[1], descriptionParagraph, options),
     makeCell(
       cells[2],
       item.kind === "LINE"
         ? plainParagraphXml(formatQuantity(item.quantity ?? 0), { align: "right" })
         : plainParagraphXml(""),
+      options,
     ),
     makeCell(
       cells[3],
       item.kind === "LINE" && item.unitPriceHt !== null
         ? plainParagraphXml(formatMoneyEuros(item.unitPriceHt), { align: "right" })
         : plainParagraphXml(""),
+      options,
     ),
     makeCell(
       cells[4],
       item.kind === "LINE" && item.vatRatePercent !== null
         ? plainParagraphXml(formatVat(item.vatRatePercent), { align: "center" })
         : plainParagraphXml(""),
+      options,
     ),
     makeCell(
       cells[5],
       item.kind === "LINE" && item.totalHtCents !== null
         ? plainParagraphXml(formatMoneyCents(item.totalHtCents), { align: "right" })
         : plainParagraphXml(""),
+      options,
     ),
   ];
 
@@ -717,31 +773,8 @@ export function replaceQuoteOptionsAnchor(
       (item) => item.scope === "PENDING_OPTION" && item.optionId === option.id,
     );
     for (const item of optionItems) {
-      rows.push(bodyRowXml(anchorRow, templateCells, item));
+      rows.push(bodyRowXml(anchorRow, templateCells, item, { bottomBorder: true }));
     }
-
-    rows.push(
-      simpleSixColumnRowXml(
-        anchorRow,
-        templateCells,
-        "Total option HT",
-        formatMoneyCents(option.totalHtCents),
-        { bold: true },
-      ),
-      simpleSixColumnRowXml(
-        anchorRow,
-        templateCells,
-        "TVA option",
-        formatMoneyCents(option.totalVatCents),
-      ),
-      simpleSixColumnRowXml(
-        anchorRow,
-        templateCells,
-        "Total option TTC",
-        formatMoneyCents(option.totalTtcCents),
-        { bold: true },
-      ),
-    );
   }
 
   return `${documentXml.slice(0, rowStart)}${rows.join("")}${documentXml.slice(rowEnd)}`;
