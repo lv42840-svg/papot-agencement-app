@@ -1,3 +1,4 @@
+import type { CommercialStatus } from "@/lib/commercial/domain";
 import { parseNativeQuotesPayload, type NativeQuotesPayload } from "./store";
 
 function sameVariant(left: string, right: string): boolean {
@@ -21,4 +22,9 @@ export function nextChantierComplementVariantName(
   }
 
   throw new Error("QUOTE_COMPLEMENT_NAME_UNAVAILABLE");
+}
+
+
+export function quoteWorkflowMayChangeCommercialStatus(status: CommercialStatus): boolean {
+  return status !== "CONFIRMED";
 }
