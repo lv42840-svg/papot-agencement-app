@@ -31,7 +31,10 @@ import {
 } from "@/lib/desktop/request-context";
 import { isLocalStorageMode } from "@/lib/local-db/runtime";
 import { createQuotesRepository } from "@/lib/quotes/create-repository";
-import { validateRetainedQuoteSelection } from "@/lib/quotes/retention";
+import {
+  validateAdditionalRetainedQuote,
+  validateRetainedQuoteSelection,
+} from "@/lib/quotes/retention";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -60,6 +63,13 @@ function confirmationRequested(input: CommercialMutation): boolean {
 function caseIdForMutation(input: CommercialMutation): string | null {
   if (input.action === "create") return null;
   return "caseId" in input ? input.caseId : null;
+}
+
+async function validateAdditionalQuoteRetention(input: CommercialMutation): Promise<void> {
+  if (input.action !== "retainAdditionalQuote") return;
+  if (!isLocalStorageMode()) throw new Error("QUOTES_SERVER_REPOSITORY_NOT_IMPLEMENTED");
+  const quotes = await createQuotesRepository().load();
+  validateAdditionalRetainedQuote(quotes, input.caseId, input.quoteId);
 }
 
 async function validateConfirmationQuoteSelection(input: CommercialMutation): Promise<void> {
@@ -227,6 +237,12 @@ export async function POST(request: Request) {
         if (!item) throw new Error("COMMERCIAL_CASE_NOT_FOUND");
         await assertCommercialClientReadyForConfirmation(clients, item.clientId);
         await validateConfirmationQuoteSelection(input);
+      }
+      if (input.action === "retainAdditionalQuote") {
+        const item = source.cases.find((candidate) => candidate.id === input.caseId);
+        if (!item) throw new Error("COMMERCIAL_CASE_NOT_FOUND");
+        if (item.status !== "CONFIRMED") throw new Error("COMMERCIAL_NOT_CONFIRMED");
+        await validateAdditionalQuoteRetention(input);
       }
 
       const result = applyCommercialMutation(source, input, actor);
