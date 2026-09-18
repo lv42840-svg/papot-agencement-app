@@ -285,6 +285,7 @@ const QUOTE_TABLE_WIDTHS = [567, 5216, 1134, 1417, 1077, 1587] as const;
 const QUOTE_TABLE_TOTAL_WIDTH = QUOTE_TABLE_WIDTHS.reduce((sum, width) => sum + width, 0);
 const FINANCIAL_TABLE_WIDTHS = [6314, 4572] as const;
 const FINANCIAL_TABLE_TOTAL_WIDTH = FINANCIAL_TABLE_WIDTHS.reduce((sum, width) => sum + width, 0);
+const FINANCIAL_TOTALS_WIDTHS = [2900, 1672] as const;
 
 function paragraphVisibleText(paragraph: string): string {
   return wordTextNodes(paragraph)
@@ -457,6 +458,39 @@ function directTagRanges(xml: string, tagName: string): DirectTagRange[] {
   return ranges;
 }
 
+function normalizeTwoColumnTable(
+  table: string,
+  widths: readonly [number, number],
+): string {
+  let next = normalizeTableProperties(table, widths).replace(/<w:tblInd\b[^>]*\/>/g, "");
+  const rows = directTagRanges(next, "w:tr").reverse();
+
+  for (const rowRange of rows) {
+    let row = next.slice(rowRange.start, rowRange.end);
+    const cells = directTagRanges(row, "w:tc");
+    if (cells.length !== 2) continue;
+
+    for (let index = cells.length - 1; index >= 0; index -= 1) {
+      const cellRange = cells[index]!;
+      const cell = row.slice(cellRange.start, cellRange.end);
+      row =
+        row.slice(0, cellRange.start) +
+        setCellWidth(cell, widths[index]!) +
+        row.slice(cellRange.end);
+    }
+
+    next = next.slice(0, rowRange.start) + row + next.slice(rowRange.end);
+  }
+
+  return next;
+}
+
+function normalizeFinancialTotalsContent(content: string): string {
+  const range = tableRangeAroundAnchor(content, "{{total_ht}}");
+  const normalized = normalizeTwoColumnTable(range.table, FINANCIAL_TOTALS_WIDTHS);
+  return `${content.slice(0, range.start)}${normalized}${content.slice(range.end)}`;
+}
+
 function splitFinancialSignature(table: string): string {
   const rowRange = directTagRanges(table, "w:tr").find((range) =>
     table.slice(range.start, range.end).includes("{{total_ht}}"),
@@ -485,7 +519,9 @@ function splitFinancialSignature(table: string): string {
   const rightTcPr = cellProperties(right);
   const contentStart = right.indexOf(rightTcPr) + rightTcPr.length;
   const contentEnd = right.lastIndexOf("</w:tc>");
-  const beforeSignature = right.slice(contentStart, signatureStart);
+  const beforeSignature = normalizeFinancialTotalsContent(
+    right.slice(contentStart, signatureStart),
+  );
   const signatureContent = right.slice(signatureStart, contentEnd);
 
   const leftCell = setCellWidth(cells[0]!, FINANCIAL_TABLE_WIDTHS[0]);
