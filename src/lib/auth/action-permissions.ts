@@ -7,6 +7,7 @@ export function commercialSpecialPermissionForMutation(input: {
 }): SpecialPermissionKey | null {
   if (input.action === "create") return "commercial.create";
   if (input.action === "updateProvision") return "commercial.provision";
+  if (input.action === "retainAdditionalQuote") return "commercial.confirm_launch";
   if (input.action === "setStatus" && input.status === "CONFIRMED") {
     return "commercial.confirm_launch";
   }
