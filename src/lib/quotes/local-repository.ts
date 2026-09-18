@@ -2,14 +2,18 @@ import "server-only";
 
 import { mutateLocalSnapshot, readLocalSnapshot } from "@/lib/local-db/runtime";
 import type { QuotesRepository } from "./repository";
-import { parseNativeQuotesPayload } from "./store";
+import { parseNativeQuotesPayload, type NativeQuotesPayload } from "./store";
 
 const RESOURCE_KEY = "quotes";
+
+export function loadLocalQuotesPayload(): NativeQuotesPayload {
+  return readLocalSnapshot(RESOURCE_KEY, parseNativeQuotesPayload).payload;
+}
 
 export function createLocalQuotesRepository(): QuotesRepository {
   return {
     async load() {
-      return readLocalSnapshot(RESOURCE_KEY, parseNativeQuotesPayload).payload;
+      return loadLocalQuotesPayload();
     },
 
     async mutate(transform) {
