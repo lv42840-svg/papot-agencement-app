@@ -361,17 +361,52 @@ function setCellWidth(cell: string, width: number): string {
   });
 }
 
+type DirectTagRange = { start: number; end: number };
+
+function directTagRanges(xml: string, tagName: string): DirectTagRange[] {
+  const pattern = new RegExp(`<(/?)${tagName}\\b[^>]*?(\\/?)>`, "g");
+  const ranges: DirectTagRange[] = [];
+  let depth = 0;
+  let directStart = -1;
+  let match: RegExpExecArray | null;
+
+  while ((match = pattern.exec(xml)) !== null) {
+    const closing = match[1] === "/";
+    const selfClosing = match[2] === "/";
+
+    if (!closing && !selfClosing) {
+      depth += 1;
+      if (depth === 1) directStart = match.index;
+      continue;
+    }
+
+    if (closing) {
+      if (depth === 1 && directStart >= 0) {
+        ranges.push({ start: directStart, end: pattern.lastIndex });
+        directStart = -1;
+      }
+      depth -= 1;
+    }
+  }
+
+  return ranges;
+}
+
 function splitFinancialSignature(table: string): string {
-  const rowMatches = Array.from(table.matchAll(/<w:tr\b[\s\S]*?<\/w:tr>/g));
-  const target = rowMatches.find((match) => match[0].includes("{{total_ht}}"));
-  if (!target || target.index === undefined) {
+  const rowRange = directTagRanges(table, "w:tr").find((range) =>
+    table.slice(range.start, range.end).includes("{{total_ht}}"),
+  );
+  if (!rowRange) {
     throw new Error("QUOTE_WORD_V2_LAYOUT_FINANCIAL_ROW_MISSING");
   }
 
-  const row = target[0];
-  const cells = Array.from(row.matchAll(WORD_TABLE_CELL_PATTERN), (match) => match[0]);
-  if (cells.length !== 2) throw new Error("QUOTE_WORD_V2_LAYOUT_FINANCIAL_CELL_COUNT_INVALID");
+  const row = table.slice(rowRange.start, rowRange.end);
+  const cellRanges = directTagRanges(row, "w:tc");
+  if (cellRanges.length !== 2) {
+    throw new Error("QUOTE_WORD_V2_LAYOUT_FINANCIAL_CELL_COUNT_INVALID");
+  }
 
+  const cells = cellRanges.map((range) => row.slice(range.start, range.end));
   const right = cells[1]!;
   const rightParagraphs = Array.from(right.matchAll(WORD_PARAGRAPH_PATTERN));
   const signatureParagraph = rightParagraphs.find(
@@ -400,9 +435,8 @@ function splitFinancialSignature(table: string): string {
     '<w:gridSpan w:val="2"/></w:tcPr>' +
     `${signatureContent}</w:tc></w:tr>`;
 
-  const rowStart = target.index;
-  const rowEnd = rowStart + row.length;
-  let next = `${table.slice(0, rowStart)}${financialRow}${signatureRow}${table.slice(rowEnd)}`;
+  let next =
+    `${table.slice(0, rowRange.start)}${financialRow}${signatureRow}${table.slice(rowRange.end)}`;
   next = normalizeTableProperties(next, FINANCIAL_TABLE_WIDTHS);
   return next;
 }
