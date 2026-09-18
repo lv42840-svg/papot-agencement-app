@@ -1,10 +1,7 @@
 import { readFileSync } from "node:fs";
 import { describe, expect, it } from "vitest";
 
-const list = readFileSync(
-  new URL("../src/components/quotes-workspace.tsx", import.meta.url),
-  "utf8",
-);
+const list = readFileSync(new URL("../src/components/quotes-workspace.tsx", import.meta.url), "utf8");
 const detail = readFileSync(
   new URL("../src/components/quote-direct-editor.tsx", import.meta.url),
   "utf8",
