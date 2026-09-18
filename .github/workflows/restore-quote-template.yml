@@ -1,0 +1,26 @@
+name: Temp restore quote template
+on:
+  push:
+    branches:
+      - fix/devis-pdf-layout-v2
+
+permissions:
+  contents: write
+
+jobs:
+  restore:
+    if: github.actor != 'github-actions[bot]'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - name: Restore original binary template
+        run: |
+          git fetch origin spike/nextcloud-transport
+          git checkout origin/spike/nextcloud-transport -- docs/templates/PAPOT_Template_Devis_V2.docx
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add docs/templates/PAPOT_Template_Devis_V2.docx
+          git commit -m "Devis: restaurer le gabarit binaire d origine"
+          git push
