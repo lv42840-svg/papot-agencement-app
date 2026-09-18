@@ -5,6 +5,10 @@ const createSource = readFileSync(
   new URL("../src/components/quote-create-workspace.tsx", import.meta.url),
   "utf-8",
 );
+const createPageSource = readFileSync(
+  new URL("../src/app/devis/nouveau/page.tsx", import.meta.url),
+  "utf-8",
+);
 const editorSource = readFileSync(
   new URL("../src/components/quote-direct-editor.tsx", import.meta.url),
   "utf-8",
@@ -20,7 +24,8 @@ const richTextLayerSource = readFileSync(
 
 describe("quote global UI invariants", () => {
   it("keeps the validated quote workflow visible with final PDF freeze action", () => {
-    expect(createSource).toContain("Base · V1");
+    expect(createPageSource).toContain(': "Base"');
+    expect(createSource).toContain("{initialVariantName} · V1");
     expect(createSource).toContain("Responsable du chiffrage");
     expect(createSource).toContain("Date prévue d’envoi");
     expect(createSource).toContain("Validité du devis : 30 jours");
