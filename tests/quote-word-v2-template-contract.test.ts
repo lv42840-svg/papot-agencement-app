@@ -6,6 +6,7 @@ import {
   inspectQuoteWordV2Template,
   renderQuoteWordV2OptionalBlocks,
 } from "../src/lib/quotes/word-v2-template-contract";
+import { renderQuoteWordV2Layout } from "../src/lib/quotes/word-v2-renderer";
 
 const templatePath = new URL("../docs/templates/PAPOT_Template_Devis_V2.docx", import.meta.url);
 
@@ -33,7 +34,7 @@ describe("quote Word V2 template contract", () => {
 
   it("verrouille le gabarit PDF contre les déformations observées en recette", () => {
     const template = readFileSync(templatePath);
-    const xml = documentXml(template);
+    const xml = documentXml(renderQuoteWordV2Layout(template));
 
     expect(xml).not.toContain("OPTIONS NON COMPRISES DANS LE TOTAL PRINCIPAL");
 
