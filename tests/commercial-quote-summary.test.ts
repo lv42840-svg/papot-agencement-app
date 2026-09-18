@@ -32,8 +32,17 @@ describe("commercial quote summary", () => {
             unit: "u",
             quantity: 2,
             quantityFormula: null,
-            unitPriceCents: 26_000,
+            unitPriceCents: 31_000,
             components: [
+              {
+                id: "12121212-1212-4212-8212-121212121212",
+                description: "Matière",
+                unit: "u",
+                quantity: 1,
+                quantityFormula: null,
+                costPriceCents: 4_000,
+                unitPriceCents: 5_000,
+              },
               {
                 id: "66666666-6666-4666-8666-666666666666",
                 description: "Heure BE",
@@ -119,9 +128,9 @@ describe("commercial quote summary", () => {
     });
 
     expect(calculateCommercialQuoteSummary(quote)).toEqual({
-      totalHtCents: 64_000,
+      totalHtCents: 74_000,
       soldHours: 14,
-      estimatedCostCents: 32_000,
+      plannedDisbursementCents: 8_000,
     });
   });
 
@@ -161,7 +170,7 @@ describe("commercial quote summary", () => {
     expect(calculateCommercialQuoteSummary(quote)).toEqual({
       totalHtCents: 10_000,
       soldHours: 0,
-      estimatedCostCents: null,
+      plannedDisbursementCents: null,
     });
   });
 });
