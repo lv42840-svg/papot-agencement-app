@@ -1,9 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { calculateCommercialContractSummary } from "../src/lib/quotes/commercial-summary";
-import {
-  quoteCanBeRetained,
-  validateRetainedQuoteSelection,
-} from "../src/lib/quotes/retention";
+import { quoteCanBeRetained, validateRetainedQuoteSelection } from "../src/lib/quotes/retention";
 import {
   createInitialNativeQuotesPayload,
   nativeQuoteRecordSchema,
@@ -147,9 +144,9 @@ describe("commercial retained quotes", () => {
     const payload = { schemaVersion: 1 as const, quotes: [draft] };
 
     expect(quoteCanBeRetained(draft)).toBe(false);
-    expect(() =>
-      validateRetainedQuoteSelection(payload, affairId, [draft.id], false),
-    ).toThrow("COMMERCIAL_RETAINED_QUOTE_INVALID");
+    expect(() => validateRetainedQuoteSelection(payload, affairId, [draft.id], false)).toThrow(
+      "COMMERCIAL_RETAINED_QUOTE_INVALID",
+    );
   });
 
   it("blocks an ambiguous confirmation when a selectable quote exists but none is selected", () => {
@@ -165,21 +162,16 @@ describe("commercial retained quotes", () => {
     });
 
     expect(() =>
-      validateRetainedQuoteSelection(
-        { schemaVersion: 1, quotes: [sent] },
-        affairId,
-        [],
-        false,
-      ),
+      validateRetainedQuoteSelection({ schemaVersion: 1, quotes: [sent] }, affairId, [], false),
     ).toThrow("COMMERCIAL_QUOTE_SELECTION_REQUIRED");
   });
 
   it("allows confirmation without quote only when explicitly declared and no frozen quote exists", () => {
     const empty = createInitialNativeQuotesPayload();
 
-    expect(() =>
-      validateRetainedQuoteSelection(empty, affairId, [], false),
-    ).toThrow("COMMERCIAL_CONFIRM_WITHOUT_QUOTE_REQUIRED");
+    expect(() => validateRetainedQuoteSelection(empty, affairId, [], false)).toThrow(
+      "COMMERCIAL_CONFIRM_WITHOUT_QUOTE_REQUIRED",
+    );
     expect(validateRetainedQuoteSelection(empty, affairId, [], true)).toEqual([]);
   });
 
