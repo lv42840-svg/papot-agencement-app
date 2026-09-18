@@ -137,12 +137,7 @@ describe("chantier native quote links", () => {
 
   it("rejects a line from a non-retained quote", () => {
     expect(() =>
-      resolveRetainedChantierQuoteLine(
-        affair(),
-        payload,
-        otherQuoteId,
-        other.model.items[0].id,
-      ),
+      resolveRetainedChantierQuoteLine(affair(), payload, otherQuoteId, other.model.items[0].id),
     ).toThrow("CHANTIER_QUOTE_LINE_INVALID");
   });
 });
