@@ -13,31 +13,44 @@ const launchWorkspace = readFileSync(
   new URL("../src/components/chantiers-workspace.tsx", import.meta.url),
   "utf-8",
 );
+const createQuote = readFileSync(
+  new URL("../src/components/quote-create-workspace.tsx", import.meta.url),
+  "utf-8",
+);
 
-describe("chantier quote and TS UI bridge", () => {
+describe("chantier native quote and TS bridge", () => {
   it("uses native quote structures instead of reparsing Obat PDFs", () => {
     expect(operational).toContain("retainedChantierQuotes");
-    expect(operational).toContain("retainedChantierQuoteLines");
     expect(operational).not.toContain("requestObatAnalysis");
     expect(operational).not.toContain("ObatQuoteLine");
     expect(operational).not.toContain("Lecture automatique des lignes des devis OBAT");
   });
 
-  it("persists durable quote-line and TS identifiers", () => {
+  it("persists durable quote-line identifiers and validates retained sources", () => {
     expect(operational).toContain("sourceQuoteId");
     expect(operational).toContain("sourceQuoteLineId");
-    expect(operational).toContain("sourceTsId");
     expect(chantierRoute).toContain("resolveRetainedChantierQuoteLine");
     expect(chantierRoute).toContain("CHANTIER_QUOTE_LINE_REQUIRED");
-    expect(chantierRoute).toContain("CHANTIER_TS_REQUIRED");
+    expect(operational).not.toContain("sourceTsId");
+    expect(chantierRoute).not.toContain("createTs");
   });
 
-  it("provides the complementary quote and unpriced TS workflow in Admin", () => {
-    expect(operational).toContain("Devis complémentaires disponibles");
+  it("creates TS through the existing native quote engine only", () => {
+    expect(operational).toContain("Nouveau devis / TS");
+    expect(operational).toContain("&chantier=1");
+    expect(createQuote).toContain("Travaux supplémentaires (TS)");
+    expect(createQuote).toContain('quoteKind === "TS"');
+    expect(operational).not.toContain("TS non chiffrés / régularisés");
+    expect(operational).not.toContain('action: "createTs"');
+    expect(operational).not.toContain('action: "linkTsToQuoteLine"');
+  });
+
+  it("keeps full quote history and direct PDF access in chantier Admin", () => {
+    expect(operational).toContain("Autres devis / historique");
+    expect(operational).toContain("TS refusés");
+    expect(operational).toContain("Voir le PDF");
     expect(operational).toContain('action: "retainAdditionalQuote"');
-    expect(operational).toContain("TS non chiffrés / régularisés");
-    expect(operational).toContain('action: "createTs"');
-    expect(operational).toContain('action: "linkTsToQuoteLine"');
+    expect(operational).toContain("Contrat initial");
   });
 
   it("recognizes retained native quotes on the launch sheet", () => {
