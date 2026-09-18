@@ -10,7 +10,6 @@ import {
   type BeItem,
   type ChantierRecord,
   type ChantiersPayload,
-  type ChantierTs,
   type InstallItem,
   type WorkshopItem,
 } from "./domain";
@@ -23,7 +22,6 @@ const technicalOriginInput = z.object({
   installedByUs: z.boolean(),
   sourceQuoteId: z.string().uuid().nullable().optional(),
   sourceQuoteLineId: z.string().uuid().nullable().optional(),
-  sourceTsId: z.string().uuid().nullable().optional(),
 });
 
 export const launchChantierSchema = z.object({
@@ -63,19 +61,6 @@ export const chantierMutationSchema = z.discriminatedUnion("action", [
   technicalOriginInput.extend({
     action: z.literal("createBeItem"),
     chantierId: z.string().uuid(),
-  }),
-  z.object({
-    action: z.literal("createTs"),
-    chantierId: z.string().uuid(),
-    name: z.string().trim().min(1).max(500),
-  }),
-  z.object({
-    action: z.literal("linkTsToQuoteLine"),
-    chantierId: z.string().uuid(),
-    tsId: z.string().uuid(),
-    quoteId: z.string().uuid(),
-    quoteLineId: z.string().uuid(),
-    quoteLabel: z.string().trim().min(1).max(500),
   }),
   z.object({
     action: z.literal("setBeStatus"),
@@ -195,12 +180,6 @@ function findInstallItem(item: ChantierRecord, id: string): InstallItem {
   return result;
 }
 
-function findTs(item: ChantierRecord, id: string): ChantierTs {
-  const result = item.operational.tsItems.find((candidate) => candidate.id === id);
-  if (!result) throw new Error("CHANTIER_TS_NOT_FOUND");
-  return result;
-}
-
 function createWorkshopFromBe(item: ChantierRecord, beItem: BeItem, now: Date): WorkshopItem {
   const existing = item.operational.workshopItems.find(
     (candidate) => candidate.sourceBeItemId === beItem.id,
@@ -216,7 +195,6 @@ function createWorkshopFromBe(item: ChantierRecord, beItem: BeItem, now: Date): 
     installedByUs: beItem.installedByUs,
     sourceQuoteId: beItem.sourceQuoteId,
     sourceQuoteLineId: beItem.sourceQuoteLineId,
-    sourceTsId: beItem.sourceTsId,
     status: "PREPARE",
     createdAt: timestamp,
     updatedAt: timestamp,
@@ -235,7 +213,6 @@ function createInstallFromTechnical(
     originLabel: string | null;
     sourceQuoteId: string | null;
     sourceQuoteLineId: string | null;
-    sourceTsId: string | null;
   },
   now: Date,
 ): InstallItem {
@@ -256,7 +233,6 @@ function createInstallFromTechnical(
     originLabel: source.originLabel,
     sourceQuoteId: source.sourceQuoteId,
     sourceQuoteLineId: source.sourceQuoteLineId,
-    sourceTsId: source.sourceTsId,
     status: "TODO",
     note: null,
     createdAt: timestamp,
@@ -302,6 +278,7 @@ export function launchChantierFromCommercial(
     id: commercialCase.id,
     sourceCommercialCaseId: commercialCase.id,
     sourceEntryId: commercialCase.sourceEntryId,
+    initialRetainedQuoteIds: [...commercialCase.retainedQuoteIds],
     number: null,
     reference: null,
     name: commercialCase.name,
@@ -337,7 +314,6 @@ export function launchChantierFromCommercial(
       beItems: [],
       workshopItems: [],
       installItems: [],
-      tsItems: [],
     },
     launchedAt: timestamp,
     launchedByName: actor.displayName,
@@ -433,7 +409,6 @@ export function applyChantierMutation(
       installedByUs: input.installedByUs,
       sourceQuoteId: input.sourceQuoteId ?? null,
       sourceQuoteLineId: input.sourceQuoteLineId ?? null,
-      sourceTsId: input.sourceTsId ?? null,
       status: "TODO",
       createdAt: timestamp,
       updatedAt: timestamp,
@@ -445,50 +420,6 @@ export function applyChantierMutation(
       actor.displayName,
       "OPERATIONAL_ITEM_CREATED",
       `BE : ${created.name} créé (${created.originKind === "TS" ? "TS" : "ligne devis"}${created.installedByUs ? " · posé par PAPOT" : ""}).`,
-      now,
-    );
-    return { payload, focusChantierId: item.id };
-  }
-
-  if (input.action === "createTs") {
-    ensureOperationalEditable(item);
-    const timestamp = now.toISOString();
-    const created: ChantierTs = {
-      id: randomUUID(),
-      name: input.name,
-      linkedQuoteId: null,
-      linkedQuoteLineId: null,
-      createdAt: timestamp,
-      createdByName: actor.displayName,
-      updatedAt: timestamp,
-      updatedByName: actor.displayName,
-    };
-    item.operational.tsItems.push(created);
-    touch(item, actor, now);
-    history(
-      item,
-      actor.displayName,
-      "TS_CREATED",
-      `TS créé : ${created.name}. Aucun montant de vente n'est inventé.`,
-      now,
-    );
-    return { payload, focusChantierId: item.id };
-  }
-
-  if (input.action === "linkTsToQuoteLine") {
-    ensureOperationalEditable(item);
-    const ts = findTs(item, input.tsId);
-    if (ts.linkedQuoteId || ts.linkedQuoteLineId) throw new Error("CHANTIER_TS_ALREADY_LINKED");
-    ts.linkedQuoteId = input.quoteId;
-    ts.linkedQuoteLineId = input.quoteLineId;
-    ts.updatedAt = now.toISOString();
-    ts.updatedByName = actor.displayName;
-    touch(item, actor, now);
-    history(
-      item,
-      actor.displayName,
-      "TS_LINKED_TO_QUOTE",
-      `TS « ${ts.name} » régularisé par ${input.quoteLabel}. Son origine TS est conservée.`,
       now,
     );
     return { payload, focusChantierId: item.id };
@@ -513,7 +444,6 @@ export function applyChantierMutation(
             originLabel: beItem.originLabel,
             sourceQuoteId: beItem.sourceQuoteId,
             sourceQuoteLineId: beItem.sourceQuoteLineId,
-            sourceTsId: beItem.sourceTsId,
           },
           now,
         );
@@ -542,7 +472,6 @@ export function applyChantierMutation(
       installedByUs: input.installedByUs,
       sourceQuoteId: input.sourceQuoteId ?? null,
       sourceQuoteLineId: input.sourceQuoteLineId ?? null,
-      sourceTsId: input.sourceTsId ?? null,
       status: "PREPARE",
       createdAt: timestamp,
       updatedAt: timestamp,
@@ -559,7 +488,6 @@ export function applyChantierMutation(
           originLabel: created.originLabel,
           sourceQuoteId: created.sourceQuoteId,
           sourceQuoteLineId: created.sourceQuoteLineId,
-          sourceTsId: created.sourceTsId,
         },
         now,
       );
