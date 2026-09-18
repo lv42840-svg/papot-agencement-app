@@ -6,9 +6,17 @@ import {
 } from "./model";
 import type { NativeQuoteRecord } from "./store";
 
+export type CommercialSoldHours = {
+  be: number;
+  workshop: number;
+  install: number;
+  total: number;
+};
+
 export type CommercialQuoteSummary = {
   totalHtCents: number;
   soldHours: number;
+  soldHoursByActivity: CommercialSoldHours;
   plannedDisbursementCents: number | null;
   plannedMarginCents: number | null;
 };
@@ -17,6 +25,7 @@ export type CommercialContractSummary = {
   quoteCount: number;
   totalHtCents: number;
   soldHours: number;
+  soldHoursByActivity: CommercialSoldHours;
   plannedDisbursementCents: number | null;
   plannedMarginCents: number | null;
 };
@@ -25,14 +34,20 @@ function componentActivity(component: QuoteOuvrageComponent): "BE" | "ATELIER" |
   return component.activity ?? component.librarySource?.component.activity ?? null;
 }
 
-function nonPoseLaborHours(line: QuoteLine): number {
-  const hoursPerLineUnit = (line.components ?? []).reduce((total, component) => {
-    const activity = componentActivity(component);
-    if (activity !== "BE" && activity !== "ATELIER") return total;
-    return total + component.quantity;
-  }, 0);
+function nonPoseLaborHours(line: QuoteLine): { be: number; workshop: number } {
+  let bePerLineUnit = 0;
+  let workshopPerLineUnit = 0;
 
-  return line.quantity * hoursPerLineUnit;
+  for (const component of line.components ?? []) {
+    const activity = componentActivity(component);
+    if (activity === "BE") bePerLineUnit += component.quantity;
+    if (activity === "ATELIER") workshopPerLineUnit += component.quantity;
+  }
+
+  return {
+    be: line.quantity * bePerLineUnit,
+    workshop: line.quantity * workshopPerLineUnit,
+  };
 }
 
 function lineBaseLaborCostCents(line: QuoteLine): number | null {
@@ -82,6 +97,9 @@ export function calculateCommercialQuoteSummary(quote: NativeQuoteRecord): Comme
 
   let laborCostCents = 0;
   let laborCostComplete = true;
+  let soldBeHours = 0;
+  let soldWorkshopHours = 0;
+  let soldInstallHours = 0;
 
   const soldHours = pricing.lines.reduce((total, adjustedLine) => {
     if (adjustedLine.optionStatus !== null && adjustedLine.optionStatus !== "RETAINED") {
@@ -108,7 +126,12 @@ export function calculateCommercialQuoteSummary(quote: NativeQuoteRecord): Comme
       }
     }
 
-    return total + nonPoseLaborHours(line) + adjustedLine.poseHours;
+    const nonPoseHours = nonPoseLaborHours(line);
+    soldBeHours += nonPoseHours.be;
+    soldWorkshopHours += nonPoseHours.workshop;
+    soldInstallHours += adjustedLine.poseHours;
+
+    return total + nonPoseHours.be + nonPoseHours.workshop + adjustedLine.poseHours;
   }, 0);
 
   const plannedDisbursementCents =
@@ -119,6 +142,12 @@ export function calculateCommercialQuoteSummary(quote: NativeQuoteRecord): Comme
   return {
     totalHtCents: pricing.totalSaleCents,
     soldHours: roundHours(soldHours),
+    soldHoursByActivity: {
+      be: roundHours(soldBeHours),
+      workshop: roundHours(soldWorkshopHours),
+      install: roundHours(soldInstallHours),
+      total: roundHours(soldHours),
+    },
     plannedDisbursementCents,
     plannedMarginCents: pricing.marginAmountCents,
   };
@@ -132,6 +161,9 @@ export function calculateCommercialContractSummary(
   const selected = quotes.filter((quote) => retained.has(quote.id));
   let totalHtCents = 0;
   let soldHours = 0;
+  let soldBeHours = 0;
+  let soldWorkshopHours = 0;
+  let soldInstallHours = 0;
   let plannedDisbursementCents = 0;
   let plannedMarginCents = 0;
   let disbursementComplete = true;
@@ -141,6 +173,9 @@ export function calculateCommercialContractSummary(
     const summary = calculateCommercialQuoteSummary(quote);
     totalHtCents += summary.totalHtCents;
     soldHours += summary.soldHours;
+    soldBeHours += summary.soldHoursByActivity.be;
+    soldWorkshopHours += summary.soldHoursByActivity.workshop;
+    soldInstallHours += summary.soldHoursByActivity.install;
     if (summary.plannedDisbursementCents === null) {
       disbursementComplete = false;
     } else {
@@ -157,6 +192,12 @@ export function calculateCommercialContractSummary(
     quoteCount: selected.length,
     totalHtCents,
     soldHours: roundHours(soldHours),
+    soldHoursByActivity: {
+      be: roundHours(soldBeHours),
+      workshop: roundHours(soldWorkshopHours),
+      install: roundHours(soldInstallHours),
+      total: roundHours(soldHours),
+    },
     plannedDisbursementCents: disbursementComplete ? plannedDisbursementCents : null,
     plannedMarginCents: marginComplete ? plannedMarginCents : null,
   };
