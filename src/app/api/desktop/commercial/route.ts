@@ -63,12 +63,21 @@ function caseIdForMutation(input: CommercialMutation): string | null {
 }
 
 async function validateConfirmationQuoteSelection(input: CommercialMutation): Promise<void> {
-  if (!confirmationRequested(input)) return;
-  const caseId = caseIdForMutation(input);
-  if (!caseId) throw new Error("COMMERCIAL_CASE_NOT_FOUND");
+  let caseId: string;
+  let retainedQuoteIds: string[];
+  let confirmWithoutQuote: boolean;
 
-  const retainedQuoteIds = input.retainedQuoteIds ?? [];
-  const confirmWithoutQuote = input.confirmWithoutQuote === true;
+  if (input.action === "setStatus" && input.status === "CONFIRMED") {
+    caseId = input.caseId;
+    retainedQuoteIds = input.retainedQuoteIds ?? [];
+    confirmWithoutQuote = input.confirmWithoutQuote === true;
+  } else if (input.action === "recordFollowUp" && input.nextStatus === "CONFIRMED") {
+    caseId = input.caseId;
+    retainedQuoteIds = input.retainedQuoteIds ?? [];
+    confirmWithoutQuote = input.confirmWithoutQuote === true;
+  } else {
+    return;
+  }
 
   if (!isLocalStorageMode()) {
     if (retainedQuoteIds.length > 0) throw new Error("QUOTES_SERVER_REPOSITORY_NOT_IMPLEMENTED");
