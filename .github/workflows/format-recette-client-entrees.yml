@@ -1,0 +1,17 @@
+name: Temp format recette client entrees
+on:
+  push:
+    branches:
+      - fix/recette-client-entrees
+jobs:
+  format:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - run: npx prettier --write src/components/entries-workspace.tsx tests/entries-detail-ui.test.ts
+      - run: git diff -- src/components/entries-workspace.tsx tests/entries-detail-ui.test.ts
