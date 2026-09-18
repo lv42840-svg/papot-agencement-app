@@ -7,6 +7,7 @@ export const QUOTE_MAX_QUANTITY_EXPRESSION_LENGTH = 120;
 
 export const quoteStatusSchema = z.enum([
   "DRAFT",
+  "FROZEN",
   "SENT",
   "ACCEPTED",
   "REJECTED",
@@ -22,6 +23,7 @@ export type QuoteStatus = z.infer<typeof quoteStatusSchema>;
 
 export const QUOTE_DOCUMENT_STATUS_LABELS: Record<QuoteStatus, string> = {
   DRAFT: "Brouillon",
+  FROZEN: "Validé",
   SENT: "Envoyé",
   ACCEPTED: "Envoyé (ancien statut)",
   REJECTED: "Envoyé (ancien statut)",
