@@ -171,22 +171,18 @@ describe("chantier global profitability", () => {
   it("sums only retained native quotes and includes accepted TS in sold and planned margin", () => {
     const commercialCase = affair();
     const item = chantier(commercialCase);
-    const result = calculateChantierProfitability(
-      item,
-      commercialCase,
-      {
-        schemaVersion: 1,
-        quotes: [
-          quote({ id: quoteAId, saleCents: 100_000, costCents: 60_000, adjustmentPercent: 10 }),
-          quote({ id: quoteBId, saleCents: 50_000, costCents: 30_000, quoteKind: "TS" }),
-          quote({
-            id: "66666666-6666-4666-8666-666666666666",
-            saleCents: 999_999,
-            costCents: 1,
-          }),
-        ],
-      },
-    );
+    const result = calculateChantierProfitability(item, commercialCase, {
+      schemaVersion: 1,
+      quotes: [
+        quote({ id: quoteAId, saleCents: 100_000, costCents: 60_000, adjustmentPercent: 10 }),
+        quote({ id: quoteBId, saleCents: 50_000, costCents: 30_000, quoteKind: "TS" }),
+        quote({
+          id: "66666666-6666-4666-8666-666666666666",
+          saleCents: 999_999,
+          costCents: 1,
+        }),
+      ],
+    });
 
     expect(result.soldCents).toBe(160_000);
     expect(result.plannedCostCents).toBe(90_000);
@@ -200,17 +196,13 @@ describe("chantier global profitability", () => {
 
   it("leaves planned cost and margin empty when one retained quote has incomplete costing", () => {
     const commercialCase = affair();
-    const result = calculateChantierProfitability(
-      chantier(commercialCase),
-      commercialCase,
-      {
-        schemaVersion: 1,
-        quotes: [
-          quote({ id: quoteAId, saleCents: 100_000, costCents: 60_000 }),
-          quote({ id: quoteBId, saleCents: 50_000, costCents: null, quoteKind: "TS" }),
-        ],
-      },
-    );
+    const result = calculateChantierProfitability(chantier(commercialCase), commercialCase, {
+      schemaVersion: 1,
+      quotes: [
+        quote({ id: quoteAId, saleCents: 100_000, costCents: 60_000 }),
+        quote({ id: quoteBId, saleCents: 50_000, costCents: null, quoteKind: "TS" }),
+      ],
+    });
 
     expect(result.soldCents).toBe(150_000);
     expect(result.plannedCostCents).toBeNull();
@@ -220,11 +212,10 @@ describe("chantier global profitability", () => {
 
   it("does not invent zero sold when the chantier has no retained quote", () => {
     const commercialCase = affair([]);
-    const result = calculateChantierProfitability(
-      chantier(commercialCase),
-      commercialCase,
-      { schemaVersion: 1, quotes: [] },
-    );
+    const result = calculateChantierProfitability(chantier(commercialCase), commercialCase, {
+      schemaVersion: 1,
+      quotes: [],
+    });
 
     expect(result.soldCents).toBeNull();
     expect(result.plannedCostCents).toBeNull();
@@ -233,14 +224,10 @@ describe("chantier global profitability", () => {
 
   it("invalidates sold when a retained quote id cannot be resolved", () => {
     const commercialCase = affair();
-    const result = calculateChantierProfitability(
-      chantier(commercialCase),
-      commercialCase,
-      {
-        schemaVersion: 1,
-        quotes: [quote({ id: quoteAId, saleCents: 100_000, costCents: 60_000 })],
-      },
-    );
+    const result = calculateChantierProfitability(chantier(commercialCase), commercialCase, {
+      schemaVersion: 1,
+      quotes: [quote({ id: quoteAId, saleCents: 100_000, costCents: 60_000 })],
+    });
 
     expect(result.soldCents).toBeNull();
     expect(result.missingRetainedQuoteIds).toEqual([quoteBId]);
