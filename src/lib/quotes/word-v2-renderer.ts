@@ -263,6 +263,175 @@ function findOpeningTagStart(xml: string, tagName: string, beforeIndex: number):
   return lastStart;
 }
 
+const QUOTE_TABLE_WIDTHS = [567, 5216, 1134, 1417, 1077, 1587] as const;
+const QUOTE_TABLE_TOTAL_WIDTH = QUOTE_TABLE_WIDTHS.reduce((sum, width) => sum + width, 0);
+const FINANCIAL_TABLE_WIDTHS = [6314, 4572] as const;
+const FINANCIAL_TABLE_TOTAL_WIDTH = FINANCIAL_TABLE_WIDTHS.reduce(
+  (sum, width) => sum + width,
+  0,
+);
+
+function paragraphVisibleText(paragraph: string): string {
+  return wordTextNodes(paragraph)
+    .map((node) => node.text)
+    .join("")
+    .replaceAll("&amp;", "&")
+    .replaceAll("&lt;", "<")
+    .replaceAll("&gt;", ">")
+    .replaceAll("&quot;", '"')
+    .replaceAll("&apos;", "'")
+    .trim();
+}
+
+function tableRangeAroundAnchor(
+  xml: string,
+  anchor: string,
+): { start: number; end: number; table: string } {
+  const anchorIndex = xml.indexOf(anchor);
+  if (anchorIndex < 0) throw new Error(`QUOTE_WORD_V2_LAYOUT_ANCHOR_MISSING:${anchor}`);
+  const start = findOpeningTagStart(xml, "w:tbl", anchorIndex);
+  const closeStart = xml.indexOf("</w:tbl>", anchorIndex);
+  if (start < 0 || closeStart < 0) {
+    throw new Error(`QUOTE_WORD_V2_LAYOUT_TABLE_MISSING:${anchor}`);
+  }
+  const end = closeStart + "</w:tbl>".length;
+  return { start, end, table: xml.slice(start, end) };
+}
+
+function fixedTableGrid(widths: readonly number[]): string {
+  return `<w:tblGrid>${widths.map((width) => `<w:gridCol w:w="${width}"/>`).join("")}</w:tblGrid>`;
+}
+
+function normalizeTableProperties(
+  table: string,
+  widths: readonly number[],
+  options: { removeRepeatingHeader?: boolean } = {},
+): string {
+  const totalWidth = widths.reduce((sum, width) => sum + width, 0);
+  let next = table.replace(/<w:tblGrid>[\s\S]*?<\/w:tblGrid>/, fixedTableGrid(widths));
+
+  next = next.replace(/<w:tblPr>([\s\S]*?)<\/w:tblPr>/, (_match, body: string) => {
+    let properties = body;
+    if (/<w:tblW\b[^>]*\/>/.test(properties)) {
+      properties = properties.replace(
+        /<w:tblW\b[^>]*\/>/,
+        `<w:tblW w:w="${totalWidth}" w:type="dxa"/>`,
+      );
+    } else {
+      properties = `<w:tblW w:w="${totalWidth}" w:type="dxa"/>${properties}`;
+    }
+    if (/<w:tblLayout\b[^>]*\/>/.test(properties)) {
+      properties = properties.replace(
+        /<w:tblLayout\b[^>]*\/>/,
+        '<w:tblLayout w:type="fixed"/>',
+      );
+    } else {
+      properties += '<w:tblLayout w:type="fixed"/>';
+    }
+    return `<w:tblPr>${properties}</w:tblPr>`;
+  });
+
+  if (options.removeRepeatingHeader) {
+    next = next.replace(/<w:tblHeader\b[^>]*\/?\s*>/g, "");
+  }
+  return next;
+}
+
+function replaceTableAroundAnchor(
+  xml: string,
+  anchor: string,
+  transform: (table: string) => string,
+): string {
+  const range = tableRangeAroundAnchor(xml, anchor);
+  return `${xml.slice(0, range.start)}${transform(range.table)}${xml.slice(range.end)}`;
+}
+
+function setCellWidth(cell: string, width: number): string {
+  return cell.replace(/<w:tcPr>([\s\S]*?)<\/w:tcPr>/, (_match, body: string) => {
+    let properties = body;
+    if (/<w:tcW\b[^>]*\/>/.test(properties)) {
+      properties = properties.replace(
+        /<w:tcW\b[^>]*\/>/,
+        `<w:tcW w:w="${width}" w:type="dxa"/>`,
+      );
+    } else {
+      properties = `<w:tcW w:w="${width}" w:type="dxa"/>${properties}`;
+    }
+    return `<w:tcPr>${properties}</w:tcPr>`;
+  });
+}
+
+function splitFinancialSignature(table: string): string {
+  const rowMatches = Array.from(table.matchAll(/<w:tr\b[\s\S]*?<\/w:tr>/g));
+  const target = rowMatches.find((match) => match[0].includes("{{total_ht}}"));
+  if (!target || target.index === undefined) {
+    throw new Error("QUOTE_WORD_V2_LAYOUT_FINANCIAL_ROW_MISSING");
+  }
+
+  const row = target[0];
+  const cells = Array.from(row.matchAll(WORD_TABLE_CELL_PATTERN), (match) => match[0]);
+  if (cells.length !== 2) throw new Error("QUOTE_WORD_V2_LAYOUT_FINANCIAL_CELL_COUNT_INVALID");
+
+  const right = cells[1]!;
+  const rightParagraphs = Array.from(right.matchAll(WORD_PARAGRAPH_PATTERN));
+  const signatureParagraph = rightParagraphs.find(
+    (match) => paragraphVisibleText(match[0]) === "Pour le client",
+  );
+  if (!signatureParagraph || signatureParagraph.index === undefined) {
+    throw new Error("QUOTE_WORD_V2_LAYOUT_SIGNATURE_MISSING");
+  }
+
+  const rightTcPr = cellProperties(right);
+  const contentStart = right.indexOf(rightTcPr) + rightTcPr.length;
+  const contentEnd = right.lastIndexOf("</w:tc>");
+  const signatureStart = signatureParagraph.index;
+  const beforeSignature = right.slice(contentStart, signatureStart);
+  const signatureContent = right.slice(signatureStart, contentEnd);
+
+  const leftCell = setCellWidth(cells[0]!, FINANCIAL_TABLE_WIDTHS[0]);
+  const rightCell = setCellWidth(
+    `<w:tc>${rightTcPr}${beforeSignature}</w:tc>`,
+    FINANCIAL_TABLE_WIDTHS[1],
+  );
+  const rowProperties = row.match(/<w:trPr>[\s\S]*?<\/w:trPr>/)?.[0] ?? "";
+  const financialRow = `<w:tr>${rowProperties}${leftCell}${rightCell}</w:tr>`;
+  const signatureRow =
+    `<w:tr><w:tc><w:tcPr><w:tcW w:w="${FINANCIAL_TABLE_TOTAL_WIDTH}" w:type="dxa"/>` +
+    '<w:gridSpan w:val="2"/></w:tcPr>' +
+    `${signatureContent}</w:tc></w:tr>`;
+
+  const rowStart = target.index;
+  const rowEnd = rowStart + row.length;
+  let next = `${table.slice(0, rowStart)}${financialRow}${signatureRow}${table.slice(rowEnd)}`;
+  next = normalizeTableProperties(next, FINANCIAL_TABLE_WIDTHS);
+  return next;
+}
+
+export function replaceQuoteWordV2Layout(documentXml: string): string {
+  let next = documentXml.replace(WORD_PARAGRAPH_PATTERN, (paragraph) =>
+    paragraphVisibleText(paragraph) === "OPTIONS NON COMPRISES DANS LE TOTAL PRINCIPAL"
+      ? ""
+      : paragraph,
+  );
+
+  next = replaceTableAroundAnchor(next, QUOTE_BODY_ANCHOR, (table) =>
+    normalizeTableProperties(table, QUOTE_TABLE_WIDTHS),
+  );
+  next = replaceTableAroundAnchor(next, QUOTE_OPTIONS_ANCHOR, (table) =>
+    normalizeTableProperties(table, QUOTE_TABLE_WIDTHS, { removeRepeatingHeader: true }),
+  );
+  next = replaceTableAroundAnchor(next, "{{total_ht}}", splitFinancialSignature);
+  return next;
+}
+
+export function renderQuoteWordV2Layout(template: Uint8Array): Uint8Array {
+  return renderDocumentXml(
+    template,
+    replaceQuoteWordV2Layout,
+    "QUOTE_WORD_V2_DOCUMENT_XML_MISSING",
+  );
+}
+
 function visibleBodyItemIds(items: QuoteDocumentItem[]): Set<string> {
   const itemById = new Map(items.map((item) => [item.id, item]));
   const visible = new Set<string>();
