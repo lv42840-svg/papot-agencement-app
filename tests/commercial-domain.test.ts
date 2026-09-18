@@ -4,6 +4,7 @@ import {
   applyCommercialAutomaticTransitions,
   commercialHasSignedQuote,
   createInitialCommercialPayload,
+  parseCommercialPayload,
 } from "../src/lib/commercial/domain";
 import {
   applyCommercialMutation,
@@ -179,11 +180,46 @@ describe("Commercial V1", () => {
 
     const confirmed = applyCommercialMutation(
       source,
-      { action: "setStatus", caseId, status: "CONFIRMED", plannedInstallDate: "2026-11-10" },
+      {
+        action: "setStatus",
+        caseId,
+        status: "CONFIRMED",
+        plannedInstallDate: "2026-11-10",
+        retainedQuoteIds: [],
+      },
       actor,
     ).payload.cases[0];
     expect(confirmed.status).toBe("CONFIRMED");
     expect(confirmed.plannedInstallDate).toBe("2026-11-10");
+    expect(confirmed.retainedQuoteIds).toEqual([]);
+    expect(confirmed.history.some((event) => event.type === "QUOTES_RETAINED")).toBe(true);
+  });
+
+  it("requires an explicit quote selection payload when confirming", () => {
+    const source = createPiste();
+    const caseId = source.cases[0].id;
+    expect(() =>
+      applyCommercialMutation(
+        source,
+        {
+          action: "setStatus",
+          caseId,
+          status: "CONFIRMED",
+          plannedInstallDate: "2026-11-10",
+        },
+        actor,
+      ),
+    ).toThrow("COMMERCIAL_QUOTE_SELECTION_REQUIRED");
+  });
+
+  it("loads older affairs without retained quote ids as an empty selection", () => {
+    const source = createPiste();
+    const legacy = structuredClone(source) as unknown as Record<string, unknown>;
+    const cases = legacy.cases as Array<Record<string, unknown>>;
+    delete cases[0].retainedQuoteIds;
+
+    const parsed = parseCommercialPayload(legacy);
+    expect(parsed.cases[0].retainedQuoteIds).toEqual([]);
   });
 
   it("tracks signed quote documents and current versions", () => {
