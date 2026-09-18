@@ -1130,6 +1130,107 @@ function OperationalStyles() {
         font-size: 13px;
         line-height: 1.5;
       }
+      .chantierAdminBlock {
+        display: grid;
+        gap: 10px;
+        padding: 12px;
+        border: 1px solid #e6e0ee;
+        border-radius: 9px;
+        background: #fcfbfe;
+      }
+      .chantierAdminBlockTitle > div,
+      .chantierComplementaryQuotes > div {
+        display: grid;
+        gap: 3px;
+      }
+      .chantierAdminBlockTitle strong,
+      .chantierComplementaryQuotes > div > strong {
+        font-size: 14px;
+        color: #4f4956;
+      }
+      .chantierAdminBlockTitle span,
+      .chantierComplementaryQuotes > div > span {
+        color: #7c7582;
+        font-size: 12px;
+      }
+      .chantierAdminQuotes,
+      .chantierComplementaryQuotes,
+      .chantierTsRows {
+        display: grid;
+        gap: 7px;
+      }
+      .chantierAdminQuotes article,
+      .chantierComplementaryQuotes article,
+      .chantierTsRow {
+        padding: 10px;
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 10px;
+        border: 1px solid #e8e3ed;
+        border-radius: 8px;
+        background: white;
+      }
+      .chantierAdminQuotes article > div,
+      .chantierComplementaryQuotes article > span,
+      .chantierTsRow > div:first-child {
+        min-width: 0;
+        display: grid;
+        gap: 2px;
+      }
+      .chantierAdminQuotes span,
+      .chantierAdminQuotes small,
+      .chantierComplementaryQuotes small,
+      .chantierTsRow span {
+        color: #7f7885;
+        font-size: 11px;
+      }
+      .chantierAdminQuotes a,
+      .chantierComplementaryQuotes button,
+      .chantierTsCreate button,
+      .chantierTsLink button {
+        min-height: 34px;
+        padding: 0 9px;
+        display: inline-flex;
+        align-items: center;
+        gap: 5px;
+        border: 1px solid #a998e4;
+        border-radius: 7px;
+        background: #f7f3ff;
+        color: #6351bf;
+        font-size: 12px;
+        font-weight: 750;
+        text-decoration: none;
+        white-space: nowrap;
+      }
+      .chantierComplementaryQuotes {
+        padding-top: 4px;
+        border-top: 1px solid #eeeaf2;
+      }
+      .chantierTsCreate {
+        display: grid;
+        grid-template-columns: minmax(0, 1fr) auto;
+        gap: 7px;
+      }
+      .chantierTsCreate input,
+      .chantierTsLink input,
+      .chantierTsLink select {
+        width: 100%;
+        min-height: 35px;
+        padding: 7px 9px;
+        border: 1px solid #ddd8e5;
+        border-radius: 7px;
+        background: white;
+        color: #57515e;
+        font: inherit;
+        font-size: 12px;
+      }
+      .chantierTsLink {
+        min-width: min(520px, 60vw);
+        display: grid !important;
+        grid-template-columns: minmax(120px, 0.7fr) minmax(180px, 1.3fr) auto;
+        gap: 6px !important;
+      }
       .chantierOpRows,
       .chantierInstallRows {
         display: grid;
@@ -1356,6 +1457,19 @@ function OperationalStyles() {
         }
         .chantierInstallRow {
           grid-template-columns: 1fr 160px;
+        }
+        .chantierAdminQuotes article,
+        .chantierComplementaryQuotes article,
+        .chantierTsRow {
+          align-items: stretch;
+          flex-direction: column;
+        }
+        .chantierTsLink {
+          min-width: 0;
+          grid-template-columns: 1fr;
+        }
+        .chantierTsCreate {
+          grid-template-columns: 1fr;
         }
         .chantierInstallRow textarea,
         .chantierInstallRow > button,
