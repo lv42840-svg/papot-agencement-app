@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { createInitialCommercialPayload, type CommercialCase } from "../src/lib/commercial/domain";
+import type { CommercialCase } from "../src/lib/commercial/domain";
 import {
   chantierQuoteLineDisplay,
   resolveRetainedChantierQuoteLine,
@@ -18,10 +18,16 @@ const retainedQuoteId = "33333333-3333-4333-8333-333333333333";
 const otherQuoteId = "44444444-4444-4444-8444-444444444444";
 const retainedLineId = "55555555-5555-4555-8555-555555555555";
 
-function quote(id: string, lineId: string, number: string): NativeQuoteRecord {
+function quote(
+  id: string,
+  lineId: string,
+  number: string,
+  quoteKind: "STANDARD" | "TS" = "STANDARD",
+): NativeQuoteRecord {
   return nativeQuoteRecordSchema.parse({
     id,
     commercialCaseId: affairId,
+    quoteKind,
     variantName: "Base",
     version: 1,
     status: "SENT",
@@ -69,7 +75,6 @@ function quote(id: string, lineId: string, number: string): NativeQuoteRecord {
 function affair(): CommercialCase {
   const now = "2026-09-18T05:00:00.000Z";
   return {
-    ...createInitialCommercialPayload().cases[0],
     id: affairId,
     sourceEntryId: null,
     clientId,
@@ -106,7 +111,7 @@ function affair(): CommercialCase {
 }
 
 describe("chantier native quote links", () => {
-  const retained = quote(retainedQuoteId, retainedLineId, "D-2026-0001");
+  const retained = quote(retainedQuoteId, retainedLineId, "D-2026-0001", "TS");
   const other = quote(otherQuoteId, crypto.randomUUID(), "D-2026-0002");
   const payload: NativeQuotesPayload = { schemaVersion: 1, quotes: [retained, other] };
 
@@ -121,6 +126,7 @@ describe("chantier native quote links", () => {
       quoteId: retainedQuoteId,
       quoteLineId: retainedLineId,
       quoteNumber: "D-2026-0001",
+      quoteKind: "TS",
       description: "Banque accueil",
     });
   });
