@@ -208,9 +208,7 @@ export function QuoteLegalDetailsEditor({
             <Percent size={17} aria-hidden="true" />
             <strong>TVA</strong>
           </div>
-          <span>
-            Taux client par défaut : {rateInput(quote.taxConfig.defaultRatePercent)} %
-          </span>
+          <span>Taux client par défaut : {rateInput(quote.taxConfig.defaultRatePercent)} %</span>
         </div>
 
         <label className="quoteVatToggle">
