@@ -30,7 +30,28 @@ jobs:
               return "".join(t.text or "" for t in el.findall(".//w:t",ns))
 
           with zipfile.ZipFile(path,"r") as zin:
-              files={n:zin.read(n) for n in zin.namelist()}
+              files={}
+              for n in zin.namelist():
+                  if n=="word/styles.xml":
+                      continue
+                  files[n]=zin.read(n)
+
+          # Nettoyage définitif de l'ancien styles.xml corrompu et de ses références.
+          rels=files.get("word/_rels/document.xml.rels",b"").decode("utf-8")
+          rels=rels.replace(
+              '<Relationship Id="rIdStyles" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/styles" Target="styles.xml"/>',
+              ""
+          )
+          import re
+          rels=re.sub(
+              r'<Relationship\b[^>]*Type="http://schemas\.openxmlformats\.org/officeDocument/2006/relationships/styles"[^>]*/>',
+              "",
+              rels,
+          )
+          files["word/_rels/document.xml.rels"]=rels.encode("utf-8")
+          ctype=files.get("[Content_Types].xml",b"").decode("utf-8")
+          ctype=re.sub(r'<Override\b[^>]*PartName="/word/styles\.xml"[^>]*/>',"",ctype)
+          files["[Content_Types].xml"]=ctype.encode("utf-8")
 
           root=ET.fromstring(files["word/document.xml"])
           body=root.find("w:body",ns)
