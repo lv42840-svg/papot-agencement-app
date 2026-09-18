@@ -1,4 +1,8 @@
-import { parseNativeQuotesPayload, type NativeQuoteRecord, type NativeQuotesPayload } from "./store";
+import {
+  parseNativeQuotesPayload,
+  type NativeQuoteRecord,
+  type NativeQuotesPayload,
+} from "./store";
 
 export function quoteCanBeRetained(quote: NativeQuoteRecord): boolean {
   if (!quote.finalPdf) return false;
