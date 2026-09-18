@@ -458,10 +458,7 @@ function directTagRanges(xml: string, tagName: string): DirectTagRange[] {
   return ranges;
 }
 
-function normalizeTwoColumnTable(
-  table: string,
-  widths: readonly [number, number],
-): string {
+function normalizeTwoColumnTable(table: string, widths: readonly [number, number]): string {
   let next = normalizeTableProperties(table, widths).replace(/<w:tblInd\b[^>]*\/>/g, "");
   const rows = directTagRanges(next, "w:tr").reverse();
 
