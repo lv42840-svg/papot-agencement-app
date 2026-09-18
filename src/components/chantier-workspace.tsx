@@ -61,6 +61,14 @@ const errorMessages: Record<string, string> = {
   CHANTIER_BE_ITEM_NOT_FOUND: "L'élément BE n'existe plus.",
   CHANTIER_WORKSHOP_ITEM_NOT_FOUND: "L'élément Atelier n'existe plus.",
   CHANTIER_INSTALL_ITEM_NOT_FOUND: "L'élément Pose n'existe plus.",
+  CHANTIER_TS_NOT_FOUND: "Ce TS n'existe plus.",
+  CHANTIER_TS_REQUIRED: "Choisis un TS existant.",
+  CHANTIER_TS_ALREADY_LINKED: "Ce TS est déjà rattaché à un devis.",
+  CHANTIER_QUOTE_LINE_REQUIRED: "Choisis une vraie ligne d'un devis accepté.",
+  CHANTIER_QUOTE_LINE_INVALID: "Cette ligne n'appartient pas aux devis acceptés du chantier.",
+  COMMERCIAL_RETAINED_QUOTE_INVALID: "Ce devis complémentaire ne peut pas être retenu.",
+  COMMERCIAL_QUOTE_ALREADY_RETAINED: "Ce devis est déjà retenu pour le chantier.",
+  COMMERCIAL_NOT_CONFIRMED: "L'affaire doit être confirmée avant d'ajouter un devis complémentaire.",
 };
 
 function formatDateOnly(value: string): string {
