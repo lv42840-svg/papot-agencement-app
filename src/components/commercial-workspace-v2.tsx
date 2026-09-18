@@ -930,11 +930,7 @@ function FollowForm({
             disabled={!canModify}
           >
             {COMMERCIAL_FOLLOW_STATUS_OPTIONS.map((value) => (
-              <option
-                key={value}
-                value={value}
-                disabled={value === "CONFIRMED" && !canConfirm}
-              >
+              <option key={value} value={value} disabled={value === "CONFIRMED" && !canConfirm}>
                 {COMMERCIAL_STATUS_LABELS[value]}
               </option>
             ))}
@@ -1053,11 +1049,7 @@ function FollowUp({
           disabled={!canModify}
         >
           {COMMERCIAL_FOLLOW_STATUS_OPTIONS.map((value) => (
-            <option
-              key={value}
-              value={value}
-              disabled={value === "CONFIRMED" && !canConfirm}
-            >
+            <option key={value} value={value} disabled={value === "CONFIRMED" && !canConfirm}>
               {COMMERCIAL_STATUS_LABELS[value]}
             </option>
           ))}
