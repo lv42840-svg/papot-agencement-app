@@ -116,16 +116,18 @@ export async function POST(request: Request) {
       if (client.isArchived) throw new Error("QUOTE_CLIENT_ARCHIVED");
 
       const now = new Date();
-      await commercialRepository.mutate((payload) =>
-        startQuoteCommercialWorkflow(
-          payload,
-          affair.id,
-          workflow.quoteOwnerName,
-          workflow.quoteDueDate,
-          actor,
-          now,
-        ),
-      );
+      if (affair.status !== "CONFIRMED") {
+        await commercialRepository.mutate((payload) =>
+          startQuoteCommercialWorkflow(
+            payload,
+            affair.id,
+            workflow.quoteOwnerName,
+            workflow.quoteDueDate,
+            actor,
+            now,
+          ),
+        );
+      }
 
       const repository = createQuotesRepository();
       const mutation = await repository.mutate((payload) => {
