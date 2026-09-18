@@ -70,7 +70,9 @@ export default async function NewQuotePage({
         initialAffairId={initialAffairId}
         initialVariantName={initialVariantName}
         chantierComplement={chantierComplement}
-        backHref={chantierComplement && initialAffairId ? `/chantiers/${initialAffairId}` : "/devis"}
+        backHref={
+          chantierComplement && initialAffairId ? `/chantiers/${initialAffairId}` : "/devis"
+        }
         paymentTermOptions={paymentTermOptions}
         quoteOwners={quoteOwners}
         defaultQuoteOwnerName={context.user.displayName}
