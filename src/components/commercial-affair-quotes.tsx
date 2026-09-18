@@ -269,7 +269,7 @@ export function CommercialAffairQuotes({ item }: { item: CommercialCase }) {
                           retainedIds.has(quote.id) ? "retained" : "notRetained"
                         }`}
                       >
-                        {retainedIds.has(quote.id) ? "Retenu" : "Non retenu"}
+                        {retainedIds.has(quote.id) ? "Retenu / accepté" : "Non retenu / classé"}
                       </span>
                     ) : null}
                     {quote.followUpDate ? (
@@ -522,11 +522,6 @@ export function CommercialAffairQuotes({ item }: { item: CommercialCase }) {
         .commercialAffairQuoteRetention.notRetained {
           background: #f1eff2;
           color: #77717c;
-        }
-        .commercialAffairQuoteStatus {
-          border-radius: 999px;
-          font-size: 8px;
-          font-weight: 800;
         }
         .commercialAffairQuoteStatus.draft {
           background: #eee9fb;
