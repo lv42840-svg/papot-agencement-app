@@ -12,7 +12,6 @@ import {
   Download,
   Eye,
   FileText,
-  Image as ImageIcon,
   Paperclip,
   Plus,
   RefreshCw,
