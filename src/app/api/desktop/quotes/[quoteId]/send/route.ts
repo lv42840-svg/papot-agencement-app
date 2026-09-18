@@ -139,6 +139,11 @@ export async function POST(request: Request, { params }: { params: Promise<{ quo
           actor,
           now,
         );
+        const affair = registered.payload.cases.find(
+          (candidate) => candidate.id === sent.commercialCaseId,
+        );
+        if (!affair) throw new Error("COMMERCIAL_CASE_NOT_FOUND");
+        if (affair.status === "CONFIRMED") return registered;
         return applyCommercialMutation(
           registered.payload,
           {
