@@ -262,13 +262,27 @@ function addBottomBorderToCellProperties(properties: string): string {
   return properties.replace("</w:tcPr>", `<w:tcBorders>${bottom}</w:tcBorders></w:tcPr>`);
 }
 
+function addCellShadingToProperties(properties: string, fill: string): string {
+  const shading = `<w:shd w:val="clear" w:color="auto" w:fill="${fill}"/>`;
+  if (/<w:shd\b[^>]*\/>/.test(properties)) {
+    return properties.replace(/<w:shd\b[^>]*\/>/, shading);
+  }
+  return properties.replace("</w:tcPr>", `${shading}</w:tcPr>`);
+}
+
+type CellRenderOptions = {
+  bottomBorder?: boolean;
+  fill?: string;
+};
+
 function makeCell(
   templateCell: string,
   paragraph: string,
-  options: { bottomBorder?: boolean } = {},
+  options: CellRenderOptions = {},
 ): string {
   let properties = cellProperties(templateCell);
   if (options.bottomBorder) properties = addBottomBorderToCellProperties(properties);
+  if (options.fill) properties = addCellShadingToProperties(properties, options.fill);
   return `<w:tc>${properties}${paragraph}</w:tc>`;
 }
 
@@ -600,6 +614,9 @@ function bodyRowXml(
 
   const isHeading = item.kind === "SECTION" || item.kind === "SUBSECTION";
   const headingFontSize = item.kind === "SECTION" ? 16 : 13;
+  const headingFill =
+    item.kind === "SECTION" ? "E9E2F7" : item.kind === "SUBSECTION" ? "F5F1FB" : undefined;
+  const cellOptions: CellRenderOptions = { ...options, fill: headingFill };
   const numberParagraph = plainParagraphXml(item.number, {
     align: isHeading ? "left" : "center",
     bold: isHeading,
@@ -616,35 +633,38 @@ function bodyRowXml(
   );
 
   const renderedCells = [
-    makeCell(cells[0], numberParagraph, options),
-    makeCell(cells[1], descriptionParagraph, options),
+    makeCell(cells[0], numberParagraph, cellOptions),
+    makeCell(cells[1], descriptionParagraph, cellOptions),
     makeCell(
       cells[2],
       item.kind === "LINE"
         ? plainParagraphXml(formatQuantity(item.quantity ?? 0), { align: "right" })
         : plainParagraphXml(""),
-      options,
+      cellOptions,
     ),
     makeCell(
       cells[3],
       item.kind === "LINE" && item.unitPriceHt !== null
         ? plainParagraphXml(formatMoneyEuros(item.unitPriceHt), { align: "right" })
         : plainParagraphXml(""),
-      options,
+      cellOptions,
     ),
     makeCell(
       cells[4],
       item.kind === "LINE" && item.vatRatePercent !== null
         ? plainParagraphXml(formatVat(item.vatRatePercent), { align: "center" })
         : plainParagraphXml(""),
-      options,
+      cellOptions,
     ),
     makeCell(
       cells[5],
-      item.kind === "LINE" && item.totalHtCents !== null
-        ? plainParagraphXml(formatMoneyCents(item.totalHtCents), { align: "right" })
+      item.totalHtCents !== null
+        ? plainParagraphXml(formatMoneyCents(item.totalHtCents), {
+            align: "right",
+            bold: isHeading,
+          })
         : plainParagraphXml(""),
-      options,
+      cellOptions,
     ),
   ];
 
@@ -778,6 +798,61 @@ export function replaceQuoteOptionsAnchor(
   }
 
   return `${documentXml.slice(0, rowStart)}${rows.join("")}${documentXml.slice(rowEnd)}`;
+}
+
+function replaceQuoteCustomerDiscountRow(
+  documentXml: string,
+  document: QuoteDocumentData,
+): string {
+  if (
+    document.totals.customerDiscountCents <= 0 ||
+    !document.totals.customerDiscountLabel
+  ) {
+    return documentXml;
+  }
+
+  const range = tableRangeAroundAnchor(documentXml, "{{total_ht}}");
+  const rowRange = directTagRanges(range.table, "w:tr").find((candidate) =>
+    range.table.slice(candidate.start, candidate.end).includes("{{total_ht}}"),
+  );
+  if (!rowRange) throw new Error("QUOTE_WORD_V2_DISCOUNT_TOTAL_ROW_MISSING");
+
+  const totalRow = range.table.slice(rowRange.start, rowRange.end);
+  const discountRow = totalRow.replace(WORD_PARAGRAPH_PATTERN, (paragraph) => {
+    const text = paragraphVisibleText(paragraph);
+    if (text.includes("Total net HT")) {
+      return replaceFirstTokenInParagraph(
+        paragraph,
+        "Total net HT",
+        document.totals.customerDiscountLabel ?? "Remise client",
+      ).paragraph;
+    }
+    if (text.includes("{{total_ht}}")) {
+      return replaceFirstTokenInParagraph(
+        paragraph,
+        "{{total_ht}}",
+        `−${formatMoneyCents(document.totals.customerDiscountCents)}`,
+      ).paragraph;
+    }
+    return paragraph;
+  });
+
+  const nextTable =
+    range.table.slice(0, rowRange.start) +
+    discountRow +
+    range.table.slice(rowRange.start);
+  return documentXml.slice(0, range.start) + nextTable + documentXml.slice(range.end);
+}
+
+export function renderQuoteWordV2CustomerDiscount(
+  template: Uint8Array,
+  document: QuoteDocumentData,
+): Uint8Array {
+  return renderDocumentXml(
+    template,
+    (xml) => replaceQuoteCustomerDiscountRow(xml, document),
+    "QUOTE_WORD_V2_DOCUMENT_XML_MISSING",
+  );
 }
 
 function renderDocumentXml(
