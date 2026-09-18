@@ -57,7 +57,6 @@ const technicalBaseSchema = z.object({
   installedByUs: z.boolean(),
   sourceQuoteId: z.string().uuid().nullable().default(null),
   sourceQuoteLineId: z.string().uuid().nullable().default(null),
-  sourceTsId: z.string().uuid().nullable().default(null),
   createdAt: isoDateTimeSchema,
   updatedAt: isoDateTimeSchema,
 });
@@ -80,22 +79,10 @@ export const installItemSchema = z.object({
   originLabel: nullableText(500),
   sourceQuoteId: z.string().uuid().nullable().default(null),
   sourceQuoteLineId: z.string().uuid().nullable().default(null),
-  sourceTsId: z.string().uuid().nullable().default(null),
   status: installItemStatusSchema,
   note: nullableText(2000),
   createdAt: isoDateTimeSchema,
   updatedAt: isoDateTimeSchema,
-});
-
-export const chantierTsSchema = z.object({
-  id: z.string().uuid(),
-  name: z.string().trim().min(1).max(500),
-  linkedQuoteId: z.string().uuid().nullable().default(null),
-  linkedQuoteLineId: z.string().uuid().nullable().default(null),
-  createdAt: isoDateTimeSchema,
-  createdByName: z.string().trim().min(1).max(120),
-  updatedAt: isoDateTimeSchema,
-  updatedByName: z.string().trim().min(1).max(120),
 });
 
 export const chantierOperationalSchema = z
@@ -104,14 +91,12 @@ export const chantierOperationalSchema = z
     beItems: z.array(beItemSchema).default([]),
     workshopItems: z.array(workshopItemSchema).default([]),
     installItems: z.array(installItemSchema).default([]),
-    tsItems: z.array(chantierTsSchema).default([]),
   })
   .default({
     spaces: defaultOperationalSpaceStates,
     beItems: [],
     workshopItems: [],
     installItems: [],
-    tsItems: [],
   });
 
 export const chantierHistoryEventSchema = z.object({
@@ -123,8 +108,6 @@ export const chantierHistoryEventSchema = z.object({
     "OPERATIONAL_ITEM_CREATED",
     "OPERATIONAL_STATUS_UPDATED",
     "OPERATIONAL_SPACE_STATE_UPDATED",
-    "TS_CREATED",
-    "TS_LINKED_TO_QUOTE",
     "MARKED_DONE",
     "REACTIVATED",
     "ARCHIVED",
@@ -139,6 +122,7 @@ export const chantierRecordSchema = z.object({
   id: z.string().uuid(),
   sourceCommercialCaseId: z.string().uuid(),
   sourceEntryId: z.string().uuid().nullable(),
+  initialRetainedQuoteIds: z.array(z.string().uuid()).max(1000).default([]),
   number: nullableText(80),
   reference: nullableText(160),
   name: z.string().trim().min(1).max(240),
@@ -188,7 +172,6 @@ export type OperationalSpaceState = z.infer<typeof operationalSpaceStateSchema>;
 export type BeItem = z.infer<typeof beItemSchema>;
 export type WorkshopItem = z.infer<typeof workshopItemSchema>;
 export type InstallItem = z.infer<typeof installItemSchema>;
-export type ChantierTs = z.infer<typeof chantierTsSchema>;
 export type ChantierOperational = z.infer<typeof chantierOperationalSchema>;
 export type ChantierHistoryEvent = z.infer<typeof chantierHistoryEventSchema>;
 export type ChantierRecord = z.infer<typeof chantierRecordSchema>;
