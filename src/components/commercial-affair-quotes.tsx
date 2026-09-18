@@ -10,12 +10,33 @@ import {
   quoteEditorHref,
   type CommercialQuoteDisplayStatus,
 } from "@/lib/commercial/quote-follow-up";
+import { calculateCommercialQuoteSummary } from "@/lib/quotes/commercial-summary";
 import type { NativeQuotesPayload } from "@/lib/quotes/store";
 
 type QuotesApiResponse = {
   payload?: NativeQuotesPayload;
   error?: string;
 };
+
+const moneyFormatter = new Intl.NumberFormat("fr-FR", {
+  style: "currency",
+  currency: "EUR",
+  minimumFractionDigits: 0,
+  maximumFractionDigits: 2,
+});
+
+const hoursFormatter = new Intl.NumberFormat("fr-FR", {
+  minimumFractionDigits: 0,
+  maximumFractionDigits: 2,
+});
+
+function moneyLabel(cents: number): string {
+  return moneyFormatter.format(cents / 100);
+}
+
+function hoursLabel(hours: number): string {
+  return `${hoursFormatter.format(hours)} h`;
+}
 
 function dateLabel(value: string | null): string {
   if (!value) return "";
@@ -79,6 +100,15 @@ export function CommercialAffairQuotes({ item }: { item: CommercialCase }) {
     [item.id, payload?.quotes],
   );
 
+  const currentQuoteCount = useMemo(
+    () => quotes.filter((quote) => quote.status !== "SUPERSEDED").length,
+    [quotes],
+  );
+  const variantCount = useMemo(
+    () => new Set(quotes.map((quote) => quote.variantName.trim().toLocaleLowerCase("fr-FR"))).size,
+    [quotes],
+  );
+
   return (
     <section className="commercialAffairQuotes commercialV2Section">
       <div className="commercialAffairQuotesHeading">
@@ -107,42 +137,98 @@ export function CommercialAffairQuotes({ item }: { item: CommercialCase }) {
           Aucun devis créé pour cette affaire. Le premier sera automatiquement Base V1.
         </div>
       ) : (
-        <div className="commercialAffairQuotesList">
-          {quotes.map((quote) => {
-            const displayStatus = commercialQuoteDisplayStatus(quote.status, quote.followUpDate);
-            return (
-              <button
-                type="button"
-                key={quote.id}
-                className="commercialAffairQuoteRow"
-                onDoubleClick={() => window.location.assign(quoteEditorHref(quote.id))}
-                onKeyDown={(event) => {
-                  if (event.key === "Enter") window.location.assign(quoteEditorHref(quote.id));
-                }}
-                title="Double-clique pour ouvrir ce devis dans le module Devis"
-              >
-                <div className="commercialAffairQuoteMain">
-                  <FileText size={16} />
-                  <div>
-                    <strong>{quote.model.subject}</strong>
-                    <span>
-                      {quote.finalPdf ? `${quote.finalPdf.quoteNumber} · ` : ""}
-                      {quote.variantName} · V{quote.version} · {dateLabel(quote.model.issueDate)}
+        <>
+          <div
+            className="commercialAffairQuotesOverview"
+            aria-label="Synthèse des devis de l’affaire"
+          >
+            <div>
+              <strong>{currentQuoteCount}</strong>
+              <span>
+                proposition{currentQuoteCount > 1 ? "s" : ""} courante
+                {currentQuoteCount > 1 ? "s" : ""}
+              </span>
+            </div>
+            <div>
+              <strong>{quotes.length}</strong>
+              <span>
+                version{quotes.length > 1 ? "s" : ""} conservée{quotes.length > 1 ? "s" : ""}
+              </span>
+            </div>
+            <div>
+              <strong>{variantCount}</strong>
+              <span>variante{variantCount > 1 ? "s" : ""}</span>
+            </div>
+            <p>
+              Pas de cumul contractuel à ce stade : les variantes et anciennes versions ne sont pas
+              additionnées avant la sélection des devis réellement retenus.
+            </p>
+          </div>
+
+          <div className="commercialAffairQuotesList">
+            {quotes.map((quote) => {
+              const displayStatus = commercialQuoteDisplayStatus(quote.status, quote.followUpDate);
+              const summary = calculateCommercialQuoteSummary(quote);
+              return (
+                <button
+                  type="button"
+                  key={quote.id}
+                  className="commercialAffairQuoteRow"
+                  onDoubleClick={() => window.location.assign(quoteEditorHref(quote.id))}
+                  onKeyDown={(event) => {
+                    if (event.key === "Enter") window.location.assign(quoteEditorHref(quote.id));
+                  }}
+                  title="Double-clique pour ouvrir ce devis dans le module Devis"
+                >
+                  <div className="commercialAffairQuoteMain">
+                    <FileText size={16} />
+                    <div>
+                      <strong>{quote.model.subject}</strong>
+                      <span>
+                        {quote.finalPdf
+                          ? `${quote.finalPdf.quoteNumber} · `
+                          : "Numéro à attribuer · "}
+                        {quote.variantName} · V{quote.version} · {dateLabel(quote.model.issueDate)}
+                      </span>
+                    </div>
+                  </div>
+
+                  <div className="commercialAffairQuoteFigures" aria-label="Chiffres du devis">
+                    <div>
+                      <span>Total HT</span>
+                      <strong>{moneyLabel(summary.totalHtCents)}</strong>
+                    </div>
+                    <div>
+                      <span>Heures vendues</span>
+                      <strong>{hoursLabel(summary.soldHours)}</strong>
+                    </div>
+                    <div>
+                      <span>Déboursé prévu</span>
+                      <strong>
+                        {summary.plannedDisbursementCents === null
+                          ? "À compléter"
+                          : moneyLabel(summary.plannedDisbursementCents)}
+                      </strong>
+                    </div>
+                  </div>
+
+                  <div className="commercialAffairQuoteMeta">
+                    {quote.followUpDate ? (
+                      <small>Relance {dateLabel(quote.followUpDate)}</small>
+                    ) : null}
+                    <span className={`commercialAffairQuoteStatus ${statusTone(displayStatus)}`}>
+                      {COMMERCIAL_QUOTE_STATUS_LABELS[displayStatus]}
                     </span>
                   </div>
-                </div>
-                <div className="commercialAffairQuoteMeta">
-                  {quote.followUpDate ? (
-                    <small>Relance {dateLabel(quote.followUpDate)}</small>
-                  ) : null}
-                  <span className={`commercialAffairQuoteStatus ${statusTone(displayStatus)}`}>
-                    {COMMERCIAL_QUOTE_STATUS_LABELS[displayStatus]}
-                  </span>
-                </div>
-              </button>
-            );
-          })}
-        </div>
+                </button>
+              );
+            })}
+          </div>
+
+          <p className="commercialAffairQuotesCostNote">
+            Déboursé prévu = coûts prévus du devis hors heures PAPOT BE, Atelier et Pose.
+          </p>
+        </>
       )}
 
       <p className="commercialAffairQuotesHint">
@@ -212,6 +298,40 @@ export function CommercialAffairQuotes({ item }: { item: CommercialCase }) {
         .commercialAffairQuotesState.error {
           color: #9d4438;
         }
+        .commercialAffairQuotesOverview {
+          display: grid;
+          grid-template-columns: repeat(3, minmax(90px, 1fr)) minmax(240px, 2fr);
+          gap: 7px;
+          margin: 8px 0;
+        }
+        .commercialAffairQuotesOverview > div,
+        .commercialAffairQuotesOverview > p {
+          margin: 0;
+          padding: 8px 9px;
+          border: 1px solid #ebe6f0;
+          border-radius: 8px;
+          background: #fff;
+        }
+        .commercialAffairQuotesOverview > div {
+          display: grid;
+          gap: 2px;
+        }
+        .commercialAffairQuotesOverview strong {
+          font-size: 15px;
+          color: #51449d;
+          font-variant-numeric: tabular-nums;
+        }
+        .commercialAffairQuotesOverview span,
+        .commercialAffairQuotesOverview p,
+        .commercialAffairQuotesCostNote {
+          color: #81798b;
+          font-size: 8px;
+        }
+        .commercialAffairQuotesOverview p {
+          display: flex;
+          align-items: center;
+          line-height: 1.4;
+        }
         .commercialAffairQuotesList {
           display: grid;
           border: 1px solid #ebe6f0;
@@ -240,6 +360,34 @@ export function CommercialAffairQuotes({ item }: { item: CommercialCase }) {
         .commercialAffairQuoteMain,
         .commercialAffairQuoteMeta {
           gap: 8px;
+        }
+        .commercialAffairQuoteRow {
+          display: grid;
+          grid-template-columns: minmax(220px, 1.4fr) minmax(270px, 1fr) auto;
+        }
+        .commercialAffairQuoteFigures {
+          display: grid;
+          grid-template-columns: repeat(3, minmax(78px, 1fr));
+          gap: 6px;
+        }
+        .commercialAffairQuoteFigures > div {
+          display: grid;
+          gap: 2px;
+          padding: 5px 7px;
+          border-radius: 6px;
+          background: #faf8fd;
+        }
+        .commercialAffairQuoteFigures span {
+          color: #8b8490;
+          font-size: 7px;
+          font-weight: 750;
+          text-transform: uppercase;
+          letter-spacing: 0.03em;
+        }
+        .commercialAffairQuoteFigures strong {
+          font-size: 9px;
+          font-variant-numeric: tabular-nums;
+          white-space: nowrap;
         }
         .commercialAffairQuoteMain {
           min-width: 0;
@@ -297,15 +445,30 @@ export function CommercialAffairQuotes({ item }: { item: CommercialCase }) {
         .commercialAffairQuotesHint {
           margin: 0;
         }
+        .commercialAffairQuotesCostNote {
+          margin: 6px 0 0;
+          line-height: 1.4;
+        }
         @media (max-width: 700px) {
           .commercialAffairQuotesHeading,
           .commercialAffairQuoteRow,
           .commercialAffairQuoteMeta {
             align-items: flex-start;
           }
-          .commercialAffairQuotesHeading,
-          .commercialAffairQuoteRow {
+          .commercialAffairQuotesHeading {
             flex-direction: column;
+          }
+          .commercialAffairQuotesOverview {
+            grid-template-columns: repeat(3, 1fr);
+          }
+          .commercialAffairQuotesOverview > p {
+            grid-column: 1 / -1;
+          }
+          .commercialAffairQuoteRow {
+            grid-template-columns: 1fr;
+          }
+          .commercialAffairQuoteFigures {
+            width: 100%;
           }
           .commercialAffairQuotesHeadingActions {
             width: 100%;
