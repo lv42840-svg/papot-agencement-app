@@ -346,6 +346,62 @@ function replaceTableAroundAnchor(
   return `${xml.slice(0, range.start)}${transform(range.table)}${xml.slice(range.end)}`;
 }
 
+function matchingTagRangeFromStart(
+  xml: string,
+  tagName: string,
+  start: number,
+): { start: number; end: number; xml: string } | null {
+  const pattern = new RegExp(`<(/?)${tagName}\\b[^>]*?(\\/?)>`, "g");
+  pattern.lastIndex = start;
+  let depth = 0;
+  let match: RegExpExecArray | null;
+
+  while ((match = pattern.exec(xml)) !== null) {
+    const closing = match[1] === "/";
+    const selfClosing = match[2] === "/";
+    if (!closing && !selfClosing) {
+      depth += 1;
+      continue;
+    }
+    if (!closing) continue;
+    depth -= 1;
+    if (depth === 0) {
+      return { start, end: pattern.lastIndex, xml: xml.slice(start, pattern.lastIndex) };
+    }
+  }
+  return null;
+}
+
+function containingTableWithTexts(
+  xml: string,
+  anchor: string,
+  requiredTexts: readonly string[],
+): { start: number; end: number; table: string } {
+  const anchorIndex = xml.indexOf(anchor);
+  if (anchorIndex < 0) throw new Error(`QUOTE_WORD_V2_LAYOUT_ANCHOR_MISSING:${anchor}`);
+
+  const openingPattern = /<w:tbl(?:\s[^>]*)?>/g;
+  const starts = Array.from(xml.slice(0, anchorIndex + 1).matchAll(openingPattern))
+    .map((match) => match.index)
+    .filter((index): index is number => index !== undefined)
+    .reverse();
+
+  for (const start of starts) {
+    const range = matchingTagRangeFromStart(xml, "w:tbl", start);
+    if (!range || range.end <= anchorIndex) continue;
+    if (requiredTexts.every((text) => range.xml.includes(text))) {
+      return { start: range.start, end: range.end, table: range.xml };
+    }
+  }
+
+  throw new Error("QUOTE_WORD_V2_LAYOUT_PARENT_TABLE_MISSING");
+}
+
+function replaceFinancialTable(documentXml: string): string {
+  const range = containingTableWithTexts(documentXml, "{{total_ht}}", ["Pour le client"]);
+  return `${documentXml.slice(0, range.start)}${splitFinancialSignature(range.table)}${documentXml.slice(range.end)}`;
+}
+
 function setCellWidth(cell: string, width: number): string {
   return cell.replace(/<w:tcPr>([\s\S]*?)<\/w:tcPr>/, (_match, body: string) => {
     let properties = body;
@@ -454,7 +510,7 @@ export function replaceQuoteWordV2Layout(documentXml: string): string {
   next = replaceTableAroundAnchor(next, QUOTE_OPTIONS_ANCHOR, (table) =>
     normalizeTableProperties(table, QUOTE_TABLE_WIDTHS, { removeRepeatingHeader: true }),
   );
-  next = replaceTableAroundAnchor(next, "{{total_ht}}", splitFinancialSignature);
+  next = replaceFinancialTable(next);
   return next;
 }
 
