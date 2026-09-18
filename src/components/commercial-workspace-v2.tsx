@@ -22,6 +22,7 @@ import {
 import { useRouter, useSearchParams } from "next/navigation";
 import { FormEvent, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { CommercialAffairQuotes } from "@/components/commercial-affair-quotes";
+import { CommercialConfirmationDialog } from "@/components/commercial-confirmation-dialog";
 import {
   CommercialDocumentActions,
   CommercialOpenFolderButton,
@@ -75,6 +76,13 @@ const errors: Record<string, string> = {
   COMMERCIAL_REVIEW_DATE_REQUIRED: "Une date de prochaine revue est obligatoire.",
   COMMERCIAL_CONFIRMATION_DATE_REQUIRED: "La date prévisionnelle de confirmation est obligatoire.",
   COMMERCIAL_INSTALL_DATE_REQUIRED: "La date prévisionnelle de pose est obligatoire.",
+  COMMERCIAL_QUOTE_SELECTION_REQUIRED:
+    "Sélectionne au moins un devis retenu avant de confirmer l’affaire.",
+  COMMERCIAL_CONFIRM_WITHOUT_QUOTE_REQUIRED:
+    "Confirme explicitement que cette affaire démarre sans devis retenu.",
+  COMMERCIAL_RETAINED_QUOTE_INVALID:
+    "Un devis sélectionné n’est pas un devis figé valide de cette affaire.",
+  COMMERCIAL_RETAINED_QUOTE_DUPLICATE: "Un même devis a été sélectionné plusieurs fois.",
   COMMERCIAL_SOURCE_TASK_ALREADY_LINKED: "Cette entrée est déjà rattachée à une affaire.",
   COMMERCIAL_DOCUMENTS_REQUIRED: "Aucun fichier à ajouter.",
   COMMERCIAL_DOCUMENTS_TOO_MANY: "Tu peux ajouter jusqu’à 12 documents à la fois.",
@@ -307,6 +315,7 @@ export function CommercialWorkspaceV2({ affairId }: { affairId?: string }) {
               clients={clients}
               busy={busy}
               canModify={snapshot.capabilities.canModify}
+              canConfirm={snapshot.capabilities.canConfirm}
               mutate={mutate}
               upload={upload}
             />
@@ -664,6 +673,7 @@ function AffairDetail({
   clients,
   busy,
   canModify,
+  canConfirm,
   mutate,
   upload,
 }: {
@@ -671,6 +681,7 @@ function AffairDetail({
   clients: CommercialClient[];
   busy: boolean;
   canModify: boolean;
+  canConfirm: boolean;
   mutate: (body: Mutation, success: string) => Promise<Snapshot | null>;
   upload: (
     caseId: string,
@@ -727,7 +738,13 @@ function AffairDetail({
           />
         ) : null}
         {tab === "follow" ? (
-          <FollowForm item={item} busy={busy} canModify={canModify} mutate={mutate} />
+          <FollowForm
+            item={item}
+            busy={busy}
+            canModify={canModify}
+            canConfirm={canConfirm}
+            mutate={mutate}
+          />
         ) : null}
         {tab === "documents" ? (
           <Documents item={item} busy={busy} canModify={canModify} upload={upload} />
@@ -830,14 +847,17 @@ function FollowForm({
   item,
   busy,
   canModify,
+  canConfirm,
   mutate,
 }: {
   item: CommercialCase;
   busy: boolean;
   canModify: boolean;
+  canConfirm: boolean;
   mutate: (body: Mutation, success: string) => Promise<Snapshot | null>;
 }) {
   const [status, setStatus] = useState<CommercialStatus>(followStatusForUi(item.status));
+  const [confirmOpen, setConfirmOpen] = useState(false);
   const [date, setDate] = useState(nextCommercialDeadline(item) ?? item.plannedInstallDate ?? "");
   const open = !isCommercialClosed(item);
   const dateTitle =
@@ -854,13 +874,16 @@ function FollowForm({
       await mutate({ action: "close", caseId: item.id, status, reason: "" }, "Affaire clôturée.");
       return;
     }
+    if (status === "CONFIRMED") {
+      setConfirmOpen(true);
+      return;
+    }
     await mutate(
       {
         action: "setStatus",
         caseId: item.id,
         status,
         reviewDate: ["PISTE", "SENT", "WAITING"].includes(status) ? date : undefined,
-        plannedInstallDate: status === "CONFIRMED" ? date : undefined,
       },
       "Suivi commercial mis à jour.",
     );
@@ -907,7 +930,11 @@ function FollowForm({
             disabled={!canModify}
           >
             {COMMERCIAL_FOLLOW_STATUS_OPTIONS.map((value) => (
-              <option key={value} value={value}>
+              <option
+                key={value}
+                value={value}
+                disabled={value === "CONFIRMED" && !canConfirm}
+              >
                 {COMMERCIAL_STATUS_LABELS[value]}
               </option>
             ))}
@@ -935,7 +962,36 @@ function FollowForm({
           </button>
         ) : null}
       </section>
-      <FollowUp item={item} busy={busy} canModify={canModify} mutate={mutate} />
+      <FollowUp
+        item={item}
+        busy={busy}
+        canModify={canModify}
+        canConfirm={canConfirm}
+        mutate={mutate}
+      />
+      {confirmOpen ? (
+        <CommercialConfirmationDialog
+          item={item}
+          plannedInstallDate={date}
+          busy={busy}
+          onCancel={() => setConfirmOpen(false)}
+          onConfirm={async (retainedQuoteIds, confirmWithoutQuote) => {
+            const result = await mutate(
+              {
+                action: "setStatus",
+                caseId: item.id,
+                status: "CONFIRMED",
+                plannedInstallDate: date,
+                retainedQuoteIds,
+                confirmWithoutQuote,
+              },
+              "Affaire confirmée avec les devis retenus.",
+            );
+            if (result) setConfirmOpen(false);
+            return !!result;
+          }}
+        />
+      ) : null}
     </div>
   );
 }
@@ -944,16 +1000,37 @@ function FollowUp({
   item,
   busy,
   canModify,
+  canConfirm,
   mutate,
 }: {
   item: CommercialCase;
   busy: boolean;
   canModify: boolean;
+  canConfirm: boolean;
   mutate: (body: Mutation, success: string) => Promise<Snapshot | null>;
 }) {
   const [summary, setSummary] = useState("");
   const [nextStatus, setNextStatus] = useState<CommercialStatus>("WAITING");
   const [nextDate, setNextDate] = useState("");
+  const [confirmOpen, setConfirmOpen] = useState(false);
+
+  async function saveFollowUp() {
+    if (nextStatus === "CONFIRMED") {
+      setConfirmOpen(true);
+      return;
+    }
+    await mutate(
+      {
+        action: "recordFollowUp",
+        caseId: item.id,
+        summary,
+        nextStatus,
+        nextDate: nextDate || undefined,
+      },
+      "Relance enregistrée.",
+    );
+  }
+
   return (
     <section className="commercialV2Section">
       <h3>
@@ -976,7 +1053,11 @@ function FollowUp({
           disabled={!canModify}
         >
           {COMMERCIAL_FOLLOW_STATUS_OPTIONS.map((value) => (
-            <option key={value} value={value}>
+            <option
+              key={value}
+              value={value}
+              disabled={value === "CONFIRMED" && !canConfirm}
+            >
               {COMMERCIAL_STATUS_LABELS[value]}
             </option>
           ))}
@@ -997,22 +1078,34 @@ function FollowUp({
         <button
           className="secondaryButton fit"
           disabled={busy || !summary.trim()}
-          onClick={() =>
-            void mutate(
+          onClick={() => void saveFollowUp()}
+        >
+          <Clock3 size={14} /> Enregistrer la relance
+        </button>
+      ) : null}
+      {confirmOpen ? (
+        <CommercialConfirmationDialog
+          item={item}
+          plannedInstallDate={nextDate}
+          busy={busy}
+          onCancel={() => setConfirmOpen(false)}
+          onConfirm={async (retainedQuoteIds, confirmWithoutQuote) => {
+            const result = await mutate(
               {
                 action: "recordFollowUp",
                 caseId: item.id,
                 summary,
-                nextStatus,
-                nextDate: nextDate || undefined,
-                plannedInstallDate: nextStatus === "CONFIRMED" ? nextDate || undefined : undefined,
+                nextStatus: "CONFIRMED",
+                plannedInstallDate: nextDate,
+                retainedQuoteIds,
+                confirmWithoutQuote,
               },
-              "Relance enregistrée.",
-            )
-          }
-        >
-          <Clock3 size={14} /> Enregistrer la relance
-        </button>
+              "Relance enregistrée et affaire confirmée.",
+            );
+            if (result) setConfirmOpen(false);
+            return !!result;
+          }}
+        />
       ) : null}
     </section>
   );
