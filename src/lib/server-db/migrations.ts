@@ -19,6 +19,8 @@ const LIBRARY_STORAGE_VERSION = 7;
 const LIBRARY_STORAGE_NAME = "library_postgres_storage";
 const COMPANY_PROFILE_STORAGE_VERSION = 8;
 const COMPANY_PROFILE_STORAGE_NAME = "company_profile_postgres_storage";
+const QUOTES_STORAGE_VERSION = 9;
+const QUOTES_STORAGE_NAME = "quotes_postgres_storage";
 
 async function ensureMigrationRegistry(client: PoolClient): Promise<void> {
   await client.query(`
@@ -158,6 +160,17 @@ async function ensureLibraryStorage(client: PoolClient): Promise<void> {
   `);
 }
 
+async function ensureQuotesStorage(client: PoolClient): Promise<void> {
+  await client.query(`
+    CREATE TABLE IF NOT EXISTS papot_quotes_state (
+      scope TEXT PRIMARY KEY CHECK (scope = 'global'),
+      version INTEGER NOT NULL DEFAULT 1 CHECK (version > 0),
+      payload JSONB NOT NULL CHECK (jsonb_typeof(payload) = 'object'),
+      updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+    )
+  `);
+}
+
 async function ensureCompanyProfileStorage(client: PoolClient): Promise<void> {
   await client.query(`
     CREATE TABLE IF NOT EXISTS papot_company_profile (
@@ -259,6 +272,16 @@ export async function runServerDbMigrations(pool: Pool = getServerDbPool()): Pro
         ON CONFLICT (version) DO NOTHING
       `,
       [COMPANY_PROFILE_STORAGE_VERSION, COMPANY_PROFILE_STORAGE_NAME],
+    );
+
+    await ensureQuotesStorage(client);
+    await client.query(
+      `
+        INSERT INTO papot_schema_migrations (version, name)
+        VALUES ($1, $2)
+        ON CONFLICT (version) DO NOTHING
+      `,
+      [QUOTES_STORAGE_VERSION, QUOTES_STORAGE_NAME],
     );
 
     await client.query("COMMIT");

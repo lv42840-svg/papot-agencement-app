@@ -29,7 +29,6 @@ import {
   desktopRequestErrorStatus,
   requireDesktopRequestContext,
 } from "@/lib/desktop/request-context";
-import { isLocalStorageMode } from "@/lib/local-db/runtime";
 import { createQuotesRepository } from "@/lib/quotes/create-repository";
 import {
   validateAdditionalRetainedQuote,
@@ -67,7 +66,6 @@ function caseIdForMutation(input: CommercialMutation): string | null {
 
 async function validateAdditionalQuoteRetention(input: CommercialMutation): Promise<void> {
   if (input.action !== "retainAdditionalQuote") return;
-  if (!isLocalStorageMode()) throw new Error("QUOTES_SERVER_REPOSITORY_NOT_IMPLEMENTED");
   const quotes = await createQuotesRepository().load();
   validateAdditionalRetainedQuote(quotes, input.caseId, input.quoteId);
 }
@@ -86,12 +84,6 @@ async function validateConfirmationQuoteSelection(input: CommercialMutation): Pr
     retainedQuoteIds = input.retainedQuoteIds ?? [];
     confirmWithoutQuote = input.confirmWithoutQuote === true;
   } else {
-    return;
-  }
-
-  if (!isLocalStorageMode()) {
-    if (retainedQuoteIds.length > 0) throw new Error("QUOTES_SERVER_REPOSITORY_NOT_IMPLEMENTED");
-    if (!confirmWithoutQuote) throw new Error("COMMERCIAL_CONFIRM_WITHOUT_QUOTE_REQUIRED");
     return;
   }
 
