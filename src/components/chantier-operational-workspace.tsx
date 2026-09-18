@@ -782,27 +782,29 @@ function TechnicalCreateForm({
   mode,
   busy,
   quoteGroups,
-  quoteLinesLoading,
-  quoteLinesError,
+  tsItems,
   onCancel,
   onCreate,
 }: {
   mode: "be" | "workshop";
   busy: boolean;
   quoteGroups: QuoteGroup[];
-  quoteLinesLoading: boolean;
-  quoteLinesError: string | null;
+  tsItems: ChantierTs[];
   onCancel: () => void;
   onCreate: (value: {
     name: string;
     originKind: TechnicalOrigin;
     originLabel: string;
     installedByUs: boolean;
+    sourceQuoteId: string | null;
+    sourceQuoteLineId: string | null;
+    sourceTsId: string | null;
   }) => Promise<void>;
 }) {
   const [name, setName] = useState("");
   const [originKind, setOriginKind] = useState<TechnicalOrigin>("QUOTE_LINE");
-  const [originLabelValue, setOriginLabelValue] = useState("");
+  const [selectedQuoteLine, setSelectedQuoteLine] = useState("");
+  const [selectedTsId, setSelectedTsId] = useState("");
   const [quoteSearch, setQuoteSearch] = useState("");
   const [installedByUs, setInstalledByUs] = useState(true);
 
@@ -810,14 +812,13 @@ function TechnicalCreateForm({
     () =>
       quoteGroups.flatMap((group) =>
         group.lines.map((line) => ({
-          quoteNumber: group.quoteNumber,
           line,
-          value: `${group.quoteNumber} · ${line.ref} · ${line.designation}`,
+          value: `${line.quoteId}:${line.quoteLineId}`,
         })),
       ),
     [quoteGroups],
   );
-  const normalizedSearch = quoteSearch.trim().toLocaleLowerCase("fr");
+  const normalizedSearch = quoteSearch.trim().toLocaleLowerCase("fr-FR");
   const visibleGroups = useMemo(
     () =>
       quoteGroups
@@ -825,8 +826,8 @@ function TechnicalCreateForm({
           ...group,
           lines: normalizedSearch
             ? group.lines.filter((line) =>
-                `${line.ref} ${line.designation}`
-                  .toLocaleLowerCase("fr")
+                `${line.quoteNumber} ${line.description}`
+                  .toLocaleLowerCase("fr-FR")
                   .includes(normalizedSearch),
               )
             : group.lines,
@@ -834,14 +835,15 @@ function TechnicalCreateForm({
         .filter((group) => group.lines.length > 0),
     [quoteGroups, normalizedSearch],
   );
-
-  const originReady = originKind === "TS" || Boolean(originLabelValue.trim());
+  const selectedQuote = quoteOptions.find((option) => option.value === selectedQuoteLine)?.line;
+  const selectedTs = tsItems.find((ts) => ts.id === selectedTsId);
+  const originReady =
+    originKind === "QUOTE_LINE" ? Boolean(selectedQuote) : Boolean(selectedTs);
 
   function selectQuoteLine(value: string) {
-    setOriginLabelValue(value);
-    if (!value || name.trim()) return;
-    const selected = quoteOptions.find((option) => option.value === value);
-    if (selected) setName(selected.line.designation);
+    setSelectedQuoteLine(value);
+    const selected = quoteOptions.find((option) => option.value === value)?.line;
+    if (selected && !name.trim()) setName(selected.description);
   }
 
   return (
@@ -849,7 +851,7 @@ function TechnicalCreateForm({
       <div className="chantierTechnicalCreateTitle">
         <strong>{mode === "be" ? "Nouvel élément BE" : "Nouvel élément direct Atelier"}</strong>
         <span>
-          Chaque élément reste relié à une vraie ligne de devis, ou est identifié comme TS.
+          Le lien conserve maintenant l’identifiant réel de la ligne de devis ou du TS.
         </span>
       </div>
 
@@ -867,13 +869,13 @@ function TechnicalCreateForm({
         <select
           value={originKind}
           onChange={(event) => {
-            const next = event.target.value as TechnicalOrigin;
-            setOriginKind(next);
-            setOriginLabelValue("");
+            setOriginKind(event.target.value as TechnicalOrigin);
+            setSelectedQuoteLine("");
+            setSelectedTsId("");
             setQuoteSearch("");
           }}
         >
-          <option value="QUOTE_LINE">Ligne de devis</option>
+          <option value="QUOTE_LINE">Ligne de devis acceptée</option>
           <option value="TS">Travaux supplémentaires (TS)</option>
         </select>
       </label>
@@ -885,63 +887,65 @@ function TechnicalCreateForm({
             <input
               value={quoteSearch}
               onChange={(event) => setQuoteSearch(event.target.value)}
-              placeholder="N° ou texte, ex. 2.3 ou moulures"
-              disabled={quoteLinesLoading || quoteGroups.length === 0}
+              placeholder="N° de devis ou texte, ex. banque accueil"
+              disabled={quoteGroups.length === 0}
             />
           </label>
           <label>
             <span>Ligne du devis *</span>
             <select
-              value={originLabelValue}
+              value={selectedQuoteLine}
               onChange={(event) => selectQuoteLine(event.target.value)}
-              disabled={quoteLinesLoading || quoteGroups.length === 0}
+              disabled={quoteGroups.length === 0}
             >
               <option value="">
-                {quoteLinesLoading
-                  ? "Lecture des devis…"
-                  : quoteGroups.length === 0
-                    ? "Aucune ligne de devis disponible"
-                    : "Choisir une ligne…"}
+                {quoteGroups.length === 0
+                  ? "Aucun devis accepté avec ligne disponible"
+                  : "Choisir une ligne…"}
               </option>
               {visibleGroups.map((group) => (
-                <optgroup key={group.quoteNumber} label={`Devis ${group.quoteNumber}`}>
-                  {group.lines.map((line) => {
-                    const value = `${group.quoteNumber} · ${line.ref} · ${line.designation}`;
-                    return (
-                      <option
-                        key={`${group.quoteNumber}-${line.ref}-${line.designation}`}
-                        value={value}
-                      >
-                        {line.ref} · {line.designation}
-                      </option>
-                    );
-                  })}
+                <optgroup
+                  key={group.quote.id}
+                  label={`${group.quote.finalPdf?.quoteNumber ?? group.quote.model.subject} · ${group.quote.variantName} · V${group.quote.version}`}
+                >
+                  {group.lines.map((line) => (
+                    <option
+                      key={`${line.quoteId}:${line.quoteLineId}`}
+                      value={`${line.quoteId}:${line.quoteLineId}`}
+                    >
+                      {line.description}
+                    </option>
+                  ))}
                 </optgroup>
               ))}
             </select>
           </label>
-          {quoteLinesLoading ? <p>Lecture automatique des lignes des devis OBAT…</p> : null}
-          {!quoteLinesLoading && quoteGroups.length > 0 ? (
+          {quoteGroups.length > 0 ? (
             <p>
-              {quoteOptions.length} ligne{quoteOptions.length > 1 ? "s" : ""} trouvée
-              {quoteOptions.length > 1 ? "s" : ""} dans {quoteGroups.length} devis.
+              {quoteOptions.length} ligne{quoteOptions.length > 1 ? "s" : ""} issue
+              {quoteOptions.length > 1 ? "s" : ""} des seuls devis acceptés.
             </p>
-          ) : null}
-          {!quoteLinesLoading && quoteGroups.length === 0 ? (
+          ) : (
             <p className="isWarning">
-              {quoteLinesError ??
-                "Aucune ligne lisible trouvée. Importe le PDF du devis OBAT dans l'affaire commerciale."}
+              Aucun devis natif accepté n’est disponible. Ajoute d’abord un devis accepté depuis
+              l’espace Admin, ou utilise un TS.
             </p>
-          ) : null}
+          )}
         </div>
       ) : (
         <label className="isWide">
-          <span>Description TS</span>
-          <input
-            value={originLabelValue}
-            onChange={(event) => setOriginLabelValue(event.target.value)}
-            placeholder="Ex. ajout tablette demandé en réunion"
-          />
+          <span>TS existant *</span>
+          <select value={selectedTsId} onChange={(event) => setSelectedTsId(event.target.value)}>
+            <option value="">
+              {tsItems.length === 0 ? "Crée d’abord un TS dans Admin" : "Choisir un TS…"}
+            </option>
+            {tsItems.map((ts) => (
+              <option key={ts.id} value={ts.id}>
+                {ts.name}
+                {ts.linkedQuoteId ? " · régularisé" : " · non chiffré"}
+              </option>
+            ))}
+          </select>
         </label>
       )}
 
@@ -966,8 +970,15 @@ function TechnicalCreateForm({
             void onCreate({
               name,
               originKind,
-              originLabel: originLabelValue,
+              originLabel:
+                originKind === "QUOTE_LINE" && selectedQuote
+                  ? chantierQuoteLineDisplay(selectedQuote)
+                  : selectedTs?.name ?? "",
               installedByUs,
+              sourceQuoteId: originKind === "QUOTE_LINE" ? selectedQuote?.quoteId ?? null : null,
+              sourceQuoteLineId:
+                originKind === "QUOTE_LINE" ? selectedQuote?.quoteLineId ?? null : null,
+              sourceTsId: originKind === "TS" ? selectedTs?.id ?? null : null,
             })
           }
         >
