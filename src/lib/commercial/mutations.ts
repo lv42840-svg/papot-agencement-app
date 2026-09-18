@@ -176,10 +176,6 @@ function setActiveStatus(
   if (status === "CONFIRMED" && !params.plannedInstallDate) {
     throw new Error("COMMERCIAL_INSTALL_DATE_REQUIRED");
   }
-  if (status === "CONFIRMED" && params.retainedQuoteIds === undefined) {
-    throw new Error("COMMERCIAL_QUOTE_SELECTION_REQUIRED");
-  }
-
   const previous = item.status;
   item.status = status;
   item.closedAt = null;
