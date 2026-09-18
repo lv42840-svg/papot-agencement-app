@@ -130,6 +130,12 @@ describe("commercial quote summary", () => {
     expect(calculateCommercialQuoteSummary(quote)).toEqual({
       totalHtCents: 74_000,
       soldHours: 14,
+      soldHoursByActivity: {
+        be: 2,
+        workshop: 6,
+        install: 6,
+        total: 14,
+      },
       plannedDisbursementCents: 8_000,
       plannedMarginCents: 34_000,
     });
@@ -171,6 +177,12 @@ describe("commercial quote summary", () => {
     expect(calculateCommercialQuoteSummary(quote)).toEqual({
       totalHtCents: 10_000,
       soldHours: 0,
+      soldHoursByActivity: {
+        be: 0,
+        workshop: 0,
+        install: 0,
+        total: 0,
+      },
       plannedDisbursementCents: null,
       plannedMarginCents: null,
     });

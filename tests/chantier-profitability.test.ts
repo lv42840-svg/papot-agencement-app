@@ -185,13 +185,115 @@ describe("chantier global profitability", () => {
     });
 
     expect(result.soldCents).toBe(160_000);
-    expect(result.plannedCostCents).toBe(90_000);
+    expect(result.plannedDisbursementCents).toBe(90_000);
     expect(result.plannedMarginCents).toBe(70_000);
     expect(result.plannedMarginPercent).toBeCloseTo(77.777777, 5);
     expect(result.retainedQuotes).toHaveLength(2);
     expect(result.retainedQuotes[1].quoteKind).toBe("TS");
-    expect(result.plannedHours).toEqual({ be: 10, workshop: 20, install: 30, total: 60 });
+    expect(result.plannedHours).toEqual({ be: 0, workshop: 0, install: 0, total: 0 });
     expect(result.actualHours).toEqual({ be: 4, workshop: 12, install: 18, total: 34 });
+  });
+
+  it("derives sold hours and disbursement from retained quotes instead of chantier launch hours", () => {
+    const commercialCase = affair([quoteAId]);
+    const item = chantier(commercialCase);
+    const laborQuote = nativeQuoteRecordSchema.parse({
+      id: quoteAId,
+      commercialCaseId: affairId,
+      quoteKind: "STANDARD",
+      variantName: "Base",
+      version: 1,
+      status: "ACCEPTED",
+      sentAt: "2026-09-18T08:00:00.000Z",
+      followUpDate: null,
+      finalPdf: {
+        quoteNumber: "D-2026-0001",
+        variantName: "Base",
+        version: 1,
+        commercialDocumentId: crypto.randomUUID(),
+        fileName: "devis.pdf",
+        storagePath: "Commercial/devis.pdf",
+        sizeBytes: 100,
+        sha256: "a".repeat(64),
+        archivedAt: "2026-09-18T08:00:00.000Z",
+        archivedByName: "Lucien",
+      },
+      model: {
+        id: quoteAId,
+        clientId,
+        subject: "Agencement",
+        issueDate: "2026-09-18",
+        validityDays: 30,
+        paymentTerms: "45 jours fin de mois",
+        items: [
+          {
+            id: crypto.randomUUID(),
+            kind: "LINE",
+            parentId: null,
+            description: "Ouvrage",
+            unit: "u",
+            quantity: 1,
+            quantityFormula: null,
+            unitPriceCents: 100_000,
+            components: [
+              {
+                id: crypto.randomUUID(),
+                description: "Matière",
+                unit: "u",
+                quantity: 1,
+                quantityFormula: null,
+                costPriceCents: 40_000,
+                unitPriceCents: 70_000,
+              },
+              {
+                id: crypto.randomUUID(),
+                description: "Heure BE",
+                unit: "h",
+                quantity: 2,
+                quantityFormula: null,
+                activity: "BE",
+                costPriceCents: 2_000,
+                unitPriceCents: 4_000,
+              },
+              {
+                id: crypto.randomUUID(),
+                description: "Heure atelier",
+                unit: "h",
+                quantity: 3,
+                quantityFormula: null,
+                activity: "ATELIER",
+                costPriceCents: 3_000,
+                unitPriceCents: 5_000,
+              },
+              {
+                id: crypto.randomUUID(),
+                description: "Heure pose",
+                unit: "h",
+                quantity: 1,
+                quantityFormula: null,
+                activity: "POSE",
+                costPriceCents: 4_000,
+                unitPriceCents: 7_000,
+              },
+            ],
+          },
+        ],
+      },
+      createdAt: "2026-09-18T07:00:00.000Z",
+      createdByName: "Lucien",
+      updatedAt: "2026-09-18T08:00:00.000Z",
+      updatedByName: "Lucien",
+    });
+
+    const result = calculateChantierProfitability(item, commercialCase, {
+      schemaVersion: 1,
+      quotes: [laborQuote],
+    });
+
+    expect(item.plannedHours).toEqual({ be: 10, workshop: 20, install: 30 });
+    expect(result.plannedHours).toEqual({ be: 2, workshop: 3, install: 1, total: 6 });
+    expect(result.plannedDisbursementCents).toBe(40_000);
+    expect(result.plannedMarginCents).toBe(43_000);
   });
 
   it("leaves planned cost and margin empty when one retained quote has incomplete costing", () => {
@@ -205,7 +307,7 @@ describe("chantier global profitability", () => {
     });
 
     expect(result.soldCents).toBe(150_000);
-    expect(result.plannedCostCents).toBeNull();
+    expect(result.plannedDisbursementCents).toBeNull();
     expect(result.plannedMarginCents).toBeNull();
     expect(result.plannedMarginPercent).toBeNull();
   });
@@ -218,7 +320,7 @@ describe("chantier global profitability", () => {
     });
 
     expect(result.soldCents).toBeNull();
-    expect(result.plannedCostCents).toBeNull();
+    expect(result.plannedDisbursementCents).toBeNull();
     expect(result.plannedMarginCents).toBeNull();
   });
 

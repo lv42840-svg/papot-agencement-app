@@ -80,9 +80,9 @@ export function ChantierProfitabilityPanel({
         />
         <Metric
           label="Déboursé prévu"
-          value={money(result.plannedCostCents)}
+          value={money(result.plannedDisbursementCents)}
           detail={
-            result.plannedCostCents === null
+            result.plannedDisbursementCents === null
               ? "Coûts prévus incomplets, aucune estimation inventée"
               : "Calculé depuis les devis retenus"
           }
@@ -114,7 +114,7 @@ export function ChantierProfitabilityPanel({
           <BlockTitle
             icon={<Clock3 size={16} />}
             title="Heures chantier"
-            subtitle="Prévision opérationnelle et réalisé actuellement enregistré."
+            subtitle="Heures vendues des devis / TS retenus et réalisé actuellement enregistré."
           />
           <div className="chantierProfitabilityRows">
             <HoursRow label="BE" planned={result.plannedHours.be} actual={result.actualHours.be} />
@@ -194,7 +194,7 @@ export function ChantierProfitabilityPanel({
                     Vendu <b>{money(quote.saleCents)}</b>
                   </span>
                   <span>
-                    Déboursé <b>{money(quote.plannedCostCents)}</b>
+                    Déboursé <b>{money(quote.plannedDisbursementCents)}</b>
                   </span>
                 </div>
                 <Link href={"/devis/" + quote.quoteId}>Ouvrir</Link>
@@ -468,7 +468,7 @@ function HoursRow({
     <div className={"chantierProfitabilityHoursRow" + (total ? " isTotal" : "")}>
       <strong>{label}</strong>
       <span>
-        Prévu <b>{hours(planned)}</b>
+        Vendu <b>{hours(planned)}</b>
       </span>
       <span>
         Réel <b>{hours(actual)}</b>
