@@ -32,6 +32,7 @@ import type {
   CommercialDocument,
   CommercialPayload,
 } from "@/lib/commercial/domain";
+import type { NativeQuotesPayload } from "@/lib/quotes/store";
 
 type ChantiersSnapshot = {
   payload: ChantiersPayload;
@@ -42,6 +43,7 @@ type ChantiersSnapshot = {
 };
 
 type CommercialSnapshot = { payload: CommercialPayload };
+type QuotesSnapshot = { payload: NativeQuotesPayload; canWrite: boolean };
 type MutationBody = Record<string, unknown> & { action: string };
 type ChantierTab = "client" | "lifecycle" | "follow" | "documents" | "capacity" | "history";
 
@@ -99,6 +101,7 @@ function statusTone(item: ChantierRecord): string {
 export function ChantierWorkspace({ chantierId }: { chantierId: string }) {
   const [chantiersSnapshot, setChantiersSnapshot] = useState<ChantiersSnapshot | null>(null);
   const [commercialSnapshot, setCommercialSnapshot] = useState<CommercialSnapshot | null>(null);
+  const [quotesSnapshot, setQuotesSnapshot] = useState<QuotesSnapshot | null>(null);
   const [loading, setLoading] = useState(true);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -109,9 +112,10 @@ export function ChantierWorkspace({ chantierId }: { chantierId: string }) {
     setLoading(true);
     setError(null);
     try {
-      const [chantiersResponse, commercialResponse] = await Promise.all([
+      const [chantiersResponse, commercialResponse, quotesResponse] = await Promise.all([
         fetch("/api/desktop/chantiers", { cache: "no-store" }),
         fetch("/api/desktop/commercial", { cache: "no-store" }),
+        fetch("/api/desktop/quotes", { cache: "no-store" }),
       ]);
       const chantiersBody = (await chantiersResponse.json()) as ChantiersSnapshot & {
         error?: string;
@@ -119,10 +123,13 @@ export function ChantierWorkspace({ chantierId }: { chantierId: string }) {
       const commercialBody = (await commercialResponse.json()) as CommercialSnapshot & {
         error?: string;
       };
+      const quotesBody = (await quotesResponse.json()) as QuotesSnapshot & { error?: string };
       if (!chantiersResponse.ok) throw new Error(chantiersBody.error ?? "CHANTIERS_LOAD_FAILED");
       if (!commercialResponse.ok) throw new Error(commercialBody.error ?? "COMMERCIAL_LOAD_FAILED");
+      if (!quotesResponse.ok) throw new Error(quotesBody.error ?? "QUOTES_LOAD_FAILED");
       setChantiersSnapshot(chantiersBody);
       setCommercialSnapshot(commercialBody);
+      setQuotesSnapshot(quotesBody);
     } catch (loadError) {
       const code = loadError instanceof Error ? loadError.message : "CHANTIERS_LOAD_FAILED";
       setError(errorMessages[code] ?? "Impossible de charger le chantier.");
@@ -146,6 +153,31 @@ export function ChantierWorkspace({ chantierId }: { chantierId: string }) {
       ) ?? null,
     [commercialSnapshot, chantier?.sourceCommercialCaseId],
   );
+
+  const mutateCommercial = useCallback(async (body: MutationBody, successMessage: string) => {
+    setBusy(true);
+    setError(null);
+    setNotice(null);
+    try {
+      const response = await fetch("/api/desktop/commercial", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(body),
+      });
+      const result = (await response.json()) as CommercialSnapshot & { error?: string };
+      if (!response.ok) throw new Error(result.error ?? "COMMERCIAL_MUTATION_FAILED");
+      setCommercialSnapshot(result);
+      setNotice(successMessage);
+      return true;
+    } catch (mutationError) {
+      const code =
+        mutationError instanceof Error ? mutationError.message : "COMMERCIAL_MUTATION_FAILED";
+      setError(errorMessages[code] ?? "La modification commerciale a échoué.");
+      return false;
+    } finally {
+      setBusy(false);
+    }
+  }, []);
 
   const mutate = useCallback(async (body: MutationBody, successMessage: string) => {
     setBusy(true);
@@ -284,9 +316,12 @@ export function ChantierWorkspace({ chantierId }: { chantierId: string }) {
         {activeTab === "follow" ? (
           <FollowTab
             chantier={chantier}
+            commercialCase={commercialCase}
+            quotes={quotesSnapshot?.payload ?? { schemaVersion: 1, quotes: [] }}
             busy={busy}
             capabilities={chantiersSnapshot.capabilities}
             mutate={mutate}
+            mutateCommercial={mutateCommercial}
           />
         ) : null}
         {activeTab === "documents" ? (
@@ -605,21 +640,30 @@ function LifecycleTab({
 
 function FollowTab({
   chantier,
+  commercialCase,
+  quotes,
   busy,
   capabilities,
   mutate,
+  mutateCommercial,
 }: {
   chantier: ChantierRecord;
+  commercialCase: CommercialCase | null;
+  quotes: NativeQuotesPayload;
   busy: boolean;
   capabilities: ChantierCapabilities;
   mutate: (body: MutationBody, message: string) => Promise<boolean>;
+  mutateCommercial: (body: MutationBody, message: string) => Promise<boolean>;
 }) {
   return (
     <ChantierOperationalWorkspace
       chantier={chantier}
+      commercialCase={commercialCase}
+      quotes={quotes}
       busy={busy}
       canModify={capabilities.canModify && chantier.status !== "ARCHIVED"}
       mutate={mutate}
+      mutateCommercial={mutateCommercial}
     />
   );
 }
