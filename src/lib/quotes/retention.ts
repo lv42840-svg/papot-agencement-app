@@ -36,7 +36,6 @@ export function validateRetainedQuoteSelection(
   return retainedQuoteIds.map((quoteId) => selectable.find((quote) => quote.id === quoteId)!);
 }
 
-
 export function validateAdditionalRetainedQuote(
   source: NativeQuotesPayload,
   commercialCaseId: string,
