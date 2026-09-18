@@ -14,6 +14,8 @@ describe("quote table layout", () => {
     );
     expect(source).toContain("<span>Total HT</span>");
     expect(source).toContain("quoteLineTotal");
+    expect(source).toContain("headingTotalsById");
+    expect(source).toContain("quoteHeadingTotal");
     expect(source).toContain("d’ajustements");
     expect(source).toContain(".quoteLineTotalCell small span");
     expect(source).toContain(".miniOptionButton");
