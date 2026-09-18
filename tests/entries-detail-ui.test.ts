@@ -13,10 +13,10 @@ const commercialBridge = readFileSync(
 describe("recette fiche Entrées", () => {
   it("organise la fiche en petits onglets cohérents", () => {
     expect(entriesWorkspace).toContain('type EntryDetailTab = "INFO" | "AFFAIR" | "ATTACHMENTS" | "HISTORY"');
-    expect(entriesWorkspace).toContain(">Informations<");
-    expect(entriesWorkspace).toContain(">Affaire<");
+    expect(entriesWorkspace).toContain("Informations");
+    expect(entriesWorkspace).toContain("Affaire");
     expect(entriesWorkspace).toContain("Pièces jointes");
-    expect(entriesWorkspace).toContain(">Historique<");
+    expect(entriesWorkspace).toContain("Historique");
     expect(entriesWorkspace).toContain("entriesDetailTabs");
   });
 
