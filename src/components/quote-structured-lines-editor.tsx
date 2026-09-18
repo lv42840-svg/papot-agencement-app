@@ -450,7 +450,11 @@ export function QuoteStructuredLinesEditor({
     const totals = new Map<string, number>();
     for (const line of lines) {
       const adjusted = adjustedLinesById.get(line.id);
-      if (!adjusted || adjusted.optionStatus === "PENDING" || adjusted.optionStatus === "REJECTED") {
+      if (
+        !adjusted ||
+        adjusted.optionStatus === "PENDING" ||
+        adjusted.optionStatus === "REJECTED"
+      ) {
         continue;
       }
       const amount = adjusted.saleCents;
