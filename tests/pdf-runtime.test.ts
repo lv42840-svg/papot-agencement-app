@@ -3,6 +3,7 @@ import { describe, expect, it } from "vitest";
 import {
   assertPdfBuffer,
   compareRenderedPdfPages,
+  convertDocxToPdf,
   convertDocxToPdfWithLibreOffice,
   renderPdfToPngPages,
   type PdfCommandRunner,
@@ -33,6 +34,50 @@ describe("PDF runtime", () => {
 
     expect(Buffer.from(pdf)).toEqual(validPdf);
     expect(() => assertPdfBuffer(pdf)).not.toThrow();
+  });
+
+  it("bascule sur Microsoft Word sous Windows quand LibreOffice est absent", async () => {
+    const missingLibreOffice: PdfCommandRunner = async () => {
+      const error = new Error("missing LibreOffice") as Error & { code?: string };
+      error.code = "ENOENT";
+      throw error;
+    };
+    const wordRunner: PdfCommandRunner = async (command, args) => {
+      expect(command).toBe("fake-powershell");
+      expect(args).toContain("-ExecutionPolicy");
+      const outputPath = args.at(-1);
+      if (!outputPath) throw new Error("TEST_OUTPUT_PATH_MISSING");
+      await writeFile(outputPath, validPdf);
+      return { exitCode: 0, stdout: "", stderr: "" };
+    };
+
+    const pdf = await convertDocxToPdf(Buffer.from("PK-test-docx"), {
+      binary: "missing-soffice",
+      platform: "win32",
+      commandRunner: missingLibreOffice,
+      wordBinary: "fake-powershell",
+      wordCommandRunner: wordRunner,
+    });
+
+    expect(Buffer.from(pdf)).toEqual(validPdf);
+  });
+
+  it("signale clairement quand aucun convertisseur PDF n'est disponible sous Windows", async () => {
+    const missingRunner: PdfCommandRunner = async () => {
+      const error = new Error("missing command") as Error & { code?: string };
+      error.code = "ENOENT";
+      throw error;
+    };
+
+    await expect(
+      convertDocxToPdf(Buffer.from("PK-test-docx"), {
+        binary: "missing-soffice",
+        platform: "win32",
+        commandRunner: missingRunner,
+        wordBinary: "missing-powershell",
+        wordCommandRunner: missingRunner,
+      }),
+    ).rejects.toThrow("PDF_CONVERTER_UNAVAILABLE");
   });
 
   it("rend les pages PDF en PNG dans leur ordre naturel", async () => {

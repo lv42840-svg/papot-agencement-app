@@ -22,5 +22,9 @@ describe("quote final PDF action visibility", () => {
     expect(sendAction).toContain('code === "QUOTE_FOLLOW_UP_DATE_REQUIRED"');
     expect(sendAction).toContain("La date de relance n’est pas forcément en cause.");
     expect(sendAction).toContain("QUOTE_DOCUMENT_PRICING_WARNING");
+    expect(sendAction).toContain("PDF_CONVERTER_UNAVAILABLE");
+    expect(sendAction).toContain("Installe LibreOffice ou Microsoft Word");
+    expect(sendAction).toContain("PDF_WINDOWS_CONVERTER_FAILED");
+    expect(sendAction).toContain("dossier d’archivage PAPOT");
   });
 });
