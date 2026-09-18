@@ -804,12 +804,8 @@ function replaceQuoteCustomerDiscountRow(
   documentXml: string,
   document: QuoteDocumentData,
 ): string {
-  if (
-    document.totals.customerDiscountCents <= 0 ||
-    !document.totals.customerDiscountLabel
-  ) {
-    return documentXml;
-  }
+  const discountCents = document.totals.customerDiscountCents ?? 0;
+  if (discountCents <= 0 || !document.totals.customerDiscountLabel) return documentXml;
 
   const range = tableRangeAroundAnchor(documentXml, "{{total_ht}}");
   const rowRange = directTagRanges(range.table, "w:tr").find((candidate) =>
@@ -831,7 +827,7 @@ function replaceQuoteCustomerDiscountRow(
       return replaceFirstTokenInParagraph(
         paragraph,
         "{{total_ht}}",
-        `−${formatMoneyCents(document.totals.customerDiscountCents)}`,
+        `−${formatMoneyCents(discountCents)}`,
       ).paragraph;
     }
     return paragraph;
