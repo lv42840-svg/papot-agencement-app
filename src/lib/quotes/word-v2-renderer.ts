@@ -250,8 +250,26 @@ function cellProperties(cellXml: string): string {
   return cellXml.match(/<w:tcPr>[\s\S]*?<\/w:tcPr>/)?.[0] ?? "";
 }
 
-function makeCell(templateCell: string, paragraph: string): string {
-  return `<w:tc>${cellProperties(templateCell)}${paragraph}</w:tc>`;
+function addBottomBorderToCellProperties(properties: string): string {
+  const bottom = '<w:bottom w:val="single" w:sz="4" w:space="0" w:color="D9D9D9"/>';
+  if (/<w:tcBorders>[\s\S]*?<\/w:tcBorders>/.test(properties)) {
+    return properties.replace(
+      /<w:tcBorders>([\s\S]*?)<\/w:tcBorders>/,
+      (_match, body: string) =>
+        `<w:tcBorders>${body.replace(/<w:bottom\b[^>]*\/>/, "")}${bottom}</w:tcBorders>`,
+    );
+  }
+  return properties.replace("</w:tcPr>", `<w:tcBorders>${bottom}</w:tcBorders></w:tcPr>`);
+}
+
+function makeCell(
+  templateCell: string,
+  paragraph: string,
+  options: { bottomBorder?: boolean } = {},
+): string {
+  let properties = cellProperties(templateCell);
+  if (options.bottomBorder) properties = addBottomBorderToCellProperties(properties);
+  return `<w:tc>${properties}${paragraph}</w:tc>`;
 }
 
 function findOpeningTagStart(xml: string, tagName: string, beforeIndex: number): number {
@@ -541,6 +559,7 @@ function bodyRowXml(
   anchorRow: string,
   templateCells: readonly string[],
   item: QuoteDocumentItem,
+  options: { bottomBorder?: boolean } = {},
 ): string {
   const rowProperties = anchorRow.match(/<w:trPr>[\s\S]*?<\/w:trPr>/)?.[0] ?? "";
   const cells = Array.from({ length: 6 }, (_, index) => templateCells[index]);
@@ -564,31 +583,35 @@ function bodyRowXml(
   );
 
   const renderedCells = [
-    makeCell(cells[0], numberParagraph),
-    makeCell(cells[1], descriptionParagraph),
+    makeCell(cells[0], numberParagraph, options),
+    makeCell(cells[1], descriptionParagraph, options),
     makeCell(
       cells[2],
       item.kind === "LINE"
         ? plainParagraphXml(formatQuantity(item.quantity ?? 0), { align: "right" })
         : plainParagraphXml(""),
+      options,
     ),
     makeCell(
       cells[3],
       item.kind === "LINE" && item.unitPriceHt !== null
         ? plainParagraphXml(formatMoneyEuros(item.unitPriceHt), { align: "right" })
         : plainParagraphXml(""),
+      options,
     ),
     makeCell(
       cells[4],
       item.kind === "LINE" && item.vatRatePercent !== null
         ? plainParagraphXml(formatVat(item.vatRatePercent), { align: "center" })
         : plainParagraphXml(""),
+      options,
     ),
     makeCell(
       cells[5],
       item.kind === "LINE" && item.totalHtCents !== null
         ? plainParagraphXml(formatMoneyCents(item.totalHtCents), { align: "right" })
         : plainParagraphXml(""),
+      options,
     ),
   ];
 
@@ -717,31 +740,8 @@ export function replaceQuoteOptionsAnchor(
       (item) => item.scope === "PENDING_OPTION" && item.optionId === option.id,
     );
     for (const item of optionItems) {
-      rows.push(bodyRowXml(anchorRow, templateCells, item));
+      rows.push(bodyRowXml(anchorRow, templateCells, item, { bottomBorder: true }));
     }
-
-    rows.push(
-      simpleSixColumnRowXml(
-        anchorRow,
-        templateCells,
-        "Total option HT",
-        formatMoneyCents(option.totalHtCents),
-        { bold: true },
-      ),
-      simpleSixColumnRowXml(
-        anchorRow,
-        templateCells,
-        "TVA option",
-        formatMoneyCents(option.totalVatCents),
-      ),
-      simpleSixColumnRowXml(
-        anchorRow,
-        templateCells,
-        "Total option TTC",
-        formatMoneyCents(option.totalTtcCents),
-        { bold: true },
-      ),
-    );
   }
 
   return `${documentXml.slice(0, rowStart)}${rows.join("")}${documentXml.slice(rowEnd)}`;
