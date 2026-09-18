@@ -153,7 +153,6 @@ describe("Chantiers V1 foundation", () => {
       beItems: [],
       workshopItems: [],
       installItems: [],
-      tsItems: [],
     });
     expect(item.launchDocuments).toEqual({
       quote: "MISSING_DECLARED",
@@ -376,76 +375,28 @@ describe("Chantiers V1 foundation", () => {
     expect(restored.operational.beItems).toHaveLength(1);
   });
 
-  it("creates a persistent TS without inventing a sale amount", () => {
-    const source = launch().payload;
-    const chantierId = source.chantiers[0].id;
-    const created = applyChantierMutation(
-      source,
-      { action: "createTs", chantierId, name: "Ajout tablette demandé en réunion" },
-      actor,
-      new Date("2026-09-14T12:00:00.000Z"),
-    ).payload.chantiers[0];
+  it("snapshots the retained quotes present when the chantier is launched", () => {
+    const commercialCase = confirmedCommercialCase();
+    const retainedQuoteId = "88888888-8888-4888-8888-888888888888";
+    commercialCase.retainedQuoteIds = [retainedQuoteId];
 
-    expect(created.operational.tsItems).toHaveLength(1);
-    expect(created.operational.tsItems[0].name).toBe("Ajout tablette demandé en réunion");
-    expect(created.operational.tsItems[0].linkedQuoteId).toBeNull();
-    expect(created.operational.tsItems[0].linkedQuoteLineId).toBeNull();
-    expect(created.history.at(-1)?.type).toBe("TS_CREATED");
-  });
-
-  it("keeps a technical item's TS origin when the TS is later linked to a quote line", () => {
-    let source = launch().payload;
-    const chantierId = source.chantiers[0].id;
-    source = applyChantierMutation(
-      source,
-      { action: "createTs", chantierId, name: "Habillage complémentaire" },
-      actor,
-      new Date("2026-09-14T12:00:00.000Z"),
-    ).payload;
-    const tsId = source.chantiers[0].operational.tsItems[0].id;
-
-    source = applyChantierMutation(
-      source,
+    const result = launchChantierFromCommercial(
+      createInitialChantiersPayload(),
+      commercialCase,
       {
-        action: "createWorkshopItem",
-        chantierId,
-        name: "Habillage complémentaire",
-        originKind: "TS",
-        originLabel: "Habillage complémentaire",
-        sourceTsId: tsId,
-        installedByUs: true,
+        commercialCaseId: commercialCase.id,
+        quoteMissingDeclared: false,
+        signedQuoteMissingDeclared: true,
+        costingMissingDeclared: true,
+        be: 0,
+        workshop: 0,
+        install: 0,
       },
       actor,
-      new Date("2026-09-14T12:10:00.000Z"),
-    ).payload;
-
-    const beforeWorkshopId = source.chantiers[0].operational.workshopItems[0].id;
-    const beforeInstallId = source.chantiers[0].operational.installItems[0].id;
-    const linked = applyChantierMutation(
-      source,
-      {
-        action: "linkTsToQuoteLine",
-        chantierId,
-        tsId,
-        quoteId: "88888888-8888-4888-8888-888888888888",
-        quoteLineId: "99999999-9999-4999-8999-999999999999",
-        quoteLabel: "D-2026-0012 · Habillage complémentaire",
-      },
-      actor,
-      new Date("2026-09-14T13:00:00.000Z"),
     ).payload.chantiers[0];
 
-    expect(linked.operational.tsItems[0].linkedQuoteId).toBe(
-      "88888888-8888-4888-8888-888888888888",
-    );
-    expect(linked.operational.workshopItems).toHaveLength(1);
-    expect(linked.operational.installItems).toHaveLength(1);
-    expect(linked.operational.workshopItems[0].id).toBe(beforeWorkshopId);
-    expect(linked.operational.installItems[0].id).toBe(beforeInstallId);
-    expect(linked.operational.workshopItems[0].originKind).toBe("TS");
-    expect(linked.operational.workshopItems[0].sourceTsId).toBe(tsId);
-    expect(linked.history.at(-1)?.type).toBe("TS_LINKED_TO_QUOTE");
-    expect(linked.history.at(-1)?.summary).toContain("origine TS est conservée");
+    expect(result.initialRetainedQuoteIds).toEqual([retainedQuoteId]);
+    expect(result.launchDocuments.quote).toBe("PRESENT");
   });
 
   it("propagates durable quote ids from BE to Atelier and Pose", () => {
@@ -467,7 +418,6 @@ describe("Chantiers V1 foundation", () => {
         installedByUs: true,
       },
       actor,
-      new Date("2026-09-14T14:00:00.000Z"),
     ).payload;
 
     const be = source.chantiers[0].operational.beItems[0];
@@ -475,7 +425,6 @@ describe("Chantiers V1 foundation", () => {
       source,
       { action: "setBeStatus", chantierId, beItemId: be.id, status: "VALIDATED" },
       actor,
-      new Date("2026-09-14T15:00:00.000Z"),
     ).payload.chantiers[0];
 
     expect(be.sourceQuoteId).toBe(quoteId);
@@ -486,20 +435,18 @@ describe("Chantiers V1 foundation", () => {
     expect(validated.operational.installItems[0].sourceQuoteLineId).toBe(quoteLineId);
   });
 
-  it("defaults legacy TS and quote link fields without destructive migration", () => {
+  it("defaults legacy chantier quote links without destructive migration", () => {
     const source = launch().payload;
     const legacy = JSON.parse(JSON.stringify(source)) as {
       chantiers: Array<{
-        operational: {
-          tsItems?: unknown;
-          beItems: Array<Record<string, unknown>>;
-        };
+        initialRetainedQuoteIds?: unknown;
+        operational: { beItems: Array<Record<string, unknown>> };
       }>;
     };
-    delete legacy.chantiers[0].operational.tsItems;
+    delete legacy.chantiers[0].initialRetainedQuoteIds;
 
     const parsed = parseChantiersPayload(legacy);
-    expect(parsed.chantiers[0].operational.tsItems).toEqual([]);
+    expect(parsed.chantiers[0].initialRetainedQuoteIds).toEqual([]);
   });
 
   it("supports Active → Terminé → Active without recreating the chantier", () => {
