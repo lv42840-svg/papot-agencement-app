@@ -1,8 +1,32 @@
+import type { CommercialStatus } from "../commercial/domain";
 import {
   parseNativeQuotesPayload,
   type NativeQuoteRecord,
   type NativeQuotesPayload,
 } from "./store";
+
+export type QuoteContractSelectionState = "RETAINED" | "NOT_RETAINED" | null;
+
+export type QuoteContractContext = {
+  id: string;
+  status: CommercialStatus;
+  retainedQuoteIds: readonly string[];
+};
+
+export function quoteContractSelectionState(
+  quote: NativeQuoteRecord,
+  commercialCase: QuoteContractContext | null | undefined,
+): QuoteContractSelectionState {
+  if (!commercialCase || commercialCase.id !== quote.commercialCaseId) return null;
+  if (commercialCase.status !== "CONFIRMED" || !quote.finalPdf) return null;
+  return commercialCase.retainedQuoteIds.includes(quote.id) ? "RETAINED" : "NOT_RETAINED";
+}
+
+export function quoteContractSelectionLabel(
+  state: Exclude<QuoteContractSelectionState, null>,
+): string {
+  return state === "RETAINED" ? "Retenu / contrat" : "Non retenu / classé";
+}
 
 export function quoteCanBeRetained(quote: NativeQuoteRecord): boolean {
   if (!quote.finalPdf) return false;
