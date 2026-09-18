@@ -5,7 +5,7 @@ import type { NativeQuoteRecord } from "./store";
 export type CommercialQuoteSummary = {
   totalHtCents: number;
   soldHours: number;
-  plannedCostCents: number | null;
+  estimatedCostCents: number | null;
 };
 
 function componentActivity(
@@ -52,6 +52,6 @@ export function calculateCommercialQuoteSummary(
   return {
     totalHtCents: pricing.totalSaleCents,
     soldHours: roundHours(soldHours),
-    plannedCostCents: pricing.totalCostCents,
+    estimatedCostCents: pricing.totalCostCents,
   };
 }
