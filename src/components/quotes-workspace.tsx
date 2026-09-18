@@ -3,7 +3,13 @@
 import Link from "next/link";
 import { FilePlus2, FileText } from "lucide-react";
 import { useMemo } from "react";
+import type { CommercialStatus } from "@/lib/commercial/domain";
+import { quoteDocumentStatusLabel } from "@/lib/quotes/domain";
 import { newQuoteHref, quoteHref } from "@/lib/quotes/navigation";
+import {
+  quoteContractSelectionLabel,
+  quoteContractSelectionState,
+} from "@/lib/quotes/retention";
 import type { NativeQuotesPayload } from "@/lib/quotes/store";
 
 export type QuoteAffairOption = {
@@ -14,14 +20,10 @@ export type QuoteAffairOption = {
   paymentTerms: string;
 };
 
-const STATUS_LABELS = {
-  DRAFT: "Brouillon",
-  SENT: "Envoyé",
-  ACCEPTED: "Accepté",
-  REJECTED: "Refusé",
-  CANCELLED: "Annulé",
-  SUPERSEDED: "Version précédente",
-} as const;
+export type QuoteWorkspaceAffair = QuoteAffairOption & {
+  commercialStatus: CommercialStatus;
+  retainedQuoteIds: string[];
+};
 
 export function QuotesWorkspace({
   initialPayload,
@@ -29,7 +31,7 @@ export function QuotesWorkspace({
   canWrite,
 }: {
   initialPayload: NativeQuotesPayload;
-  affairs: QuoteAffairOption[];
+  affairs: QuoteWorkspaceAffair[];
   canWrite: boolean;
 }) {
   const affairsById = useMemo(
@@ -86,6 +88,16 @@ export function QuotesWorkspace({
           <div className="quoteDraftList">
             {sortedQuotes.map((quote) => {
               const affair = affairsById.get(quote.commercialCaseId);
+              const contractState = quoteContractSelectionState(
+                quote,
+                affair
+                  ? {
+                      id: affair.id,
+                      status: affair.commercialStatus,
+                      retainedQuoteIds: affair.retainedQuoteIds,
+                    }
+                  : null,
+              );
               return (
                 <Link className="quoteDraftRow" key={quote.id} href={quoteHref(quote.id)}>
                   <div className="quoteDraftMain">
@@ -101,7 +113,12 @@ export function QuotesWorkspace({
                     <span>{quote.variantName}</span>
                     <span>V{quote.version}</span>
                     <span>{quote.model.issueDate}</span>
-                    <strong>{STATUS_LABELS[quote.status]}</strong>
+                    <strong>{quoteDocumentStatusLabel(quote.status)}</strong>
+                    {contractState ? (
+                      <em className={contractState === "RETAINED" ? "isRetained" : "isClassed"}>
+                        {quoteContractSelectionLabel(contractState)}
+                      </em>
+                    ) : null}
                   </div>
                 </Link>
               );
@@ -206,11 +223,24 @@ export function QuotesWorkspace({
           color: var(--muted);
           font-size: 11px;
         }
-        .quoteDraftMeta strong {
+        .quoteDraftMeta strong,
+        .quoteDraftMeta em {
           padding: 4px 7px;
           border-radius: 999px;
+          font-style: normal;
+          font-weight: 800;
+        }
+        .quoteDraftMeta strong {
           background: #eee9fb;
           color: #6654be;
+        }
+        .quoteDraftMeta em.isRetained {
+          background: #eaf7ef;
+          color: #347850;
+        }
+        .quoteDraftMeta em.isClassed {
+          background: #f3f1f4;
+          color: #756e79;
         }
         .quoteEmptyState {
           min-height: 180px;
