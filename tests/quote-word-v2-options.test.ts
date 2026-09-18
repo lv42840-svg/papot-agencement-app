@@ -124,11 +124,10 @@ describe("quote Word V2 options", () => {
     expect(xml).toContain("complémentaire");
     expect(xml).toContain("10 %");
     expect(xml).toContain("50,00");
-    expect(xml).toContain("5,00");
-    expect(xml).toContain("55,00");
-    expect(xml).toContain("Total option HT");
-    expect(xml).toContain("TVA option");
-    expect(xml).toContain("Total option TTC");
+    expect(xml).not.toContain("Total option HT");
+    expect(xml).not.toContain("TVA option");
+    expect(xml).not.toContain("Total option TTC");
+    expect(xml).toContain('<w:bottom w:val="single" w:sz="4" w:space="0" w:color="D9D9D9"/>');
     expect(xml).toContain("<w:br/>");
     expect(xml).toContain("<w:b/>");
     expect(xml).toContain('<w:color w:val="2563EB"/>');
