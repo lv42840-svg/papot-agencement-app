@@ -1,7 +1,7 @@
 "use client";
 
 import { Plus, Trash2 } from "lucide-react";
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import {
   calculateQuoteAdjustedPricing,
   type QuotePricingAdjustment,
@@ -60,6 +60,9 @@ function pricingErrorLabel(code: string): string {
   }
   if (code === "QUOTE_OPTION_TARGET_NOT_FOUND") return "L’élément ciblé n’existe plus.";
   if (code === "NUMBER_INVALID") return "La valeur saisie n’est pas valide.";
+  if (code === "QUOTE_CUSTOMER_DISCOUNT_TOO_HIGH") {
+    return "La remise client ne peut pas dépasser le total du devis.";
+  }
   return "La modification du chiffrage n’a pas pu être enregistrée.";
 }
 
@@ -112,6 +115,17 @@ export function QuotePricingAdjustmentsEditor({
   const [hotelPricePerNight, setHotelPricePerNight] = useState("120");
   const [marginTreatment, setMarginTreatment] = useState<"MARGED" | "PASS_THROUGH">("PASS_THROUGH");
   const [applyToOptions, setApplyToOptions] = useState(true);
+  const [discountKind, setDiscountKind] = useState<"PERCENTAGE" | "AMOUNT">(
+    quote.pricingConfig.customerDiscount?.kind ?? "PERCENTAGE",
+  );
+  const [discountValue, setDiscountValue] = useState(() => {
+    const discount = quote.pricingConfig.customerDiscount;
+    if (!discount) return "";
+    return discount.kind === "PERCENTAGE"
+      ? String(discount.percent).replace(".", ",")
+      : String(discount.amountCents / 100).replace(".", ",");
+  });
+  const [savingDiscount, setSavingDiscount] = useState(false);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
 
@@ -127,6 +141,18 @@ export function QuotePricingAdjustmentsEditor({
     () => Array.from(new Set(pricing.warnings.map(pricingWarningLabel))),
     [pricing.warnings],
   );
+
+  useEffect(() => {
+    const discount = quote.pricingConfig.customerDiscount;
+    setDiscountKind(discount?.kind ?? "PERCENTAGE");
+    setDiscountValue(
+      !discount
+        ? ""
+        : discount.kind === "PERCENTAGE"
+          ? String(discount.percent).replace(".", ",")
+          : String(discount.amountCents / 100).replace(".", ","),
+    );
+  }, [quote.id, quote.pricingConfig.customerDiscount]);
 
   function changeKind(nextKind: "PERCENTAGE" | "POSE_HOURS" | "HOTEL") {
     setKind(nextKind);
@@ -201,6 +227,47 @@ export function QuotePricingAdjustmentsEditor({
     }
   }
 
+  async function saveCustomerDiscount() {
+    if (!editable || savingDiscount || !discountValue.trim()) return;
+    setError("");
+    setSavingDiscount(true);
+    try {
+      const discount =
+        discountKind === "PERCENTAGE"
+          ? { kind: "PERCENTAGE" as const, percent: parseNumber(discountValue) }
+          : { kind: "AMOUNT" as const, amountCents: parseMoneyCents(discountValue) };
+      onSaved(
+        await postPricing({
+          action: "setCustomerDiscount",
+          quoteId: quote.id,
+          discount,
+        }),
+      );
+    } catch (caught) {
+      setError(pricingErrorLabel(caught instanceof Error ? caught.message : ""));
+    } finally {
+      setSavingDiscount(false);
+    }
+  }
+
+  async function clearCustomerDiscount() {
+    if (!editable || savingDiscount) return;
+    setError("");
+    setSavingDiscount(true);
+    try {
+      onSaved(
+        await postPricing({
+          action: "clearCustomerDiscount",
+          quoteId: quote.id,
+        }),
+      );
+    } catch (caught) {
+      setError(pricingErrorLabel(caught instanceof Error ? caught.message : ""));
+    } finally {
+      setSavingDiscount(false);
+    }
+  }
+
   async function toggleAdjustment(adjustment: QuotePricingAdjustment) {
     if (!editable) return;
     setError("");
@@ -248,6 +315,54 @@ export function QuotePricingAdjustmentsEditor({
       </header>
 
       {error ? <div className="error">{error}</div> : null}
+
+      <div className="customerDiscount">
+        <div>
+          <strong>Remise client</strong>
+          <span>
+            {pricing.customerDiscountCents > 0
+              ? `−${formatMoney(pricing.customerDiscountCents)} sur ${formatMoney(pricing.grossSaleCents)}`
+              : "Aucune remise appliquée"}
+          </span>
+        </div>
+        <div className="customerDiscountControls">
+          <select
+            value={discountKind}
+            disabled={!editable || savingDiscount}
+            onChange={(event) => setDiscountKind(event.target.value as "PERCENTAGE" | "AMOUNT")}
+            aria-label="Type de remise client"
+          >
+            <option value="PERCENTAGE">%</option>
+            <option value="AMOUNT">€</option>
+          </select>
+          <input
+            value={discountValue}
+            disabled={!editable || savingDiscount}
+            onChange={(event) => setDiscountValue(event.target.value)}
+            inputMode="decimal"
+            placeholder={discountKind === "PERCENTAGE" ? "Ex. 5" : "Ex. 100"}
+            aria-label="Valeur de la remise client"
+          />
+          <button
+            type="button"
+            className="primaryButton compact"
+            disabled={!editable || savingDiscount || !discountValue.trim()}
+            onClick={() => void saveCustomerDiscount()}
+          >
+            {savingDiscount ? "…" : "Appliquer"}
+          </button>
+          {quote.pricingConfig.customerDiscount ? (
+            <button
+              type="button"
+              className="secondaryButton compact"
+              disabled={!editable || savingDiscount}
+              onClick={() => void clearCustomerDiscount()}
+            >
+              Retirer
+            </button>
+          ) : null}
+        </div>
+      </div>
 
       <div className="columns">
         <div className="panel">
@@ -450,6 +565,53 @@ export function QuotePricingAdjustmentsEditor({
           margin-left: 4px;
           color: var(--text);
         }
+        .customerDiscount {
+          display: flex;
+          align-items: center;
+          justify-content: space-between;
+          gap: 12px;
+          padding: 10px 11px;
+          border: 1px solid #d9cfeb;
+          border-radius: 10px;
+          background: #f7f3ff;
+        }
+        .customerDiscount > div:first-child {
+          display: grid;
+          gap: 2px;
+        }
+        .customerDiscount strong {
+          font-size: 12px;
+          color: #4f3c93;
+        }
+        .customerDiscount span {
+          color: var(--muted);
+          font-size: 10px;
+        }
+        .customerDiscountControls {
+          display: flex;
+          align-items: center;
+          gap: 6px;
+          flex-wrap: wrap;
+        }
+        .customerDiscountControls select,
+        .customerDiscountControls input {
+          min-height: 34px;
+          box-sizing: border-box;
+          border: 1px solid #d9d2e8;
+          border-radius: 7px;
+          background: #fff;
+          color: var(--text);
+          font: inherit;
+          font-size: 12px;
+        }
+        .customerDiscountControls select {
+          width: 58px;
+          padding: 6px 8px;
+        }
+        .customerDiscountControls input {
+          width: 110px;
+          padding: 6px 8px;
+        }
         .columns {
           display: grid;
           grid-template-columns: minmax(0, 1.35fr) minmax(280px, 0.65fr);
@@ -598,6 +760,10 @@ export function QuotePricingAdjustmentsEditor({
           }
           .totals {
             justify-content: flex-start;
+          }
+          .customerDiscount {
+            align-items: flex-start;
+            flex-direction: column;
           }
         }
       `}</style>

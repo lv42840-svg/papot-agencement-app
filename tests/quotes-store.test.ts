@@ -129,6 +129,37 @@ describe("native quote draft store", () => {
     expect("components" in parsed.quotes[0].model.items[0]).toBe(false);
   });
 
+  it("accepte un devis valide avec son PDF final sans le déclarer envoyé", () => {
+    const created = applyQuotesMutation(
+      createInitialNativeQuotesPayload(),
+      draftInput(),
+      actor,
+      clientId,
+    ).payload;
+    const validated = structuredClone(created) as unknown as {
+      quotes: Array<Record<string, unknown>>;
+    };
+    validated.quotes[0].status = "FROZEN";
+    validated.quotes[0].finalPdf = {
+      quoteNumber: "D-2026-0001",
+      variantName: "Base",
+      version: 1,
+      commercialDocumentId: "44444444-4444-4444-8444-444444444444",
+      fileName: "Devis D-2026-0001 - Base - V1.pdf",
+      storagePath: "Commercial/2026/TEST/Devis/test.pdf",
+      sizeBytes: 100,
+      sha256: "a".repeat(64),
+      archivedAt: "2026-09-17T20:00:00.000Z",
+      archivedByName: "TEST",
+    };
+
+    expect(parseNativeQuotesPayload(validated).quotes[0]).toMatchObject({
+      status: "FROZEN",
+      sentAt: null,
+      followUpDate: null,
+    });
+  });
+
   it("refuses final PDF metadata on a draft or from another variant", () => {
     const created = applyQuotesMutation(
       createInitialNativeQuotesPayload(),

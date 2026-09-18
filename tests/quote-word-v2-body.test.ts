@@ -82,7 +82,7 @@ function makeDocument(): QuoteDocumentData {
         quantity: null,
         unit: null,
         unitPriceHt: null,
-        totalHtCents: null,
+        totalHtCents: 338625,
         vatRatePercent: null,
         vatCents: null,
       },
@@ -101,7 +101,7 @@ function makeDocument(): QuoteDocumentData {
         quantity: null,
         unit: null,
         unitPriceHt: null,
-        totalHtCents: null,
+        totalHtCents: 308625,
         vatRatePercent: null,
         vatCents: null,
       },
@@ -264,6 +264,18 @@ describe("quote Word V2 dynamic body", () => {
     expect(xmlText(xml)).toContain("Pose comprise dans notre prestation");
     expect(xmlText(xml)).toContain("Option déjà retenue");
     expect(xmlText(xml)).not.toContain("OPTION À NE PAS AFFICHER DANS LE CORPS");
+
+    const sectionRow = rowContaining(xml, "Mobilier accueil");
+    const sectionCells = rowCells(sectionRow);
+    expect(sectionCells[5]).toContain("3");
+    expect(sectionCells[5]).toContain("386,25");
+    expect(sectionRow).toContain('w:fill="E9E2F7"');
+
+    const subsectionRow = rowContaining(xml, "Banque principale");
+    const subsectionCells = rowCells(subsectionRow);
+    expect(subsectionCells[5]).toContain("3");
+    expect(subsectionCells[5]).toContain("086,25");
+    expect(subsectionRow).toContain('w:fill="F5F1FB"');
 
     const lineRow = rowContaining(xml, "Banque d'accueil");
     const cells = rowCells(lineRow);

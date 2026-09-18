@@ -296,7 +296,11 @@ describe("quote document data", () => {
       vatCents: 500,
     });
 
+    expect(document.items.find((item) => item.id === sectionId)?.totalHtCents).toBe(11000);
     expect(document.totals).toEqual({
+      grossTotalHtCents: 11000,
+      customerDiscountCents: 0,
+      customerDiscountLabel: null,
       totalHtCents: 11000,
       totalVatCents: 2200,
       totalTtcCents: 13200,
@@ -311,6 +315,31 @@ describe("quote document data", () => {
         totalTtcCents: 5500,
       },
     ]);
+  });
+
+  it("répercute la remise client dans les lignes, les sous-totaux et les totaux PDF", () => {
+    const quote = makeQuote();
+    quote.pricingConfig.customerDiscount = { kind: "PERCENTAGE", percent: 10 };
+    const document = buildQuoteDocumentData({
+      quote,
+      client: makeClient(),
+      commercialCase: makeAffair(),
+      company,
+      quoteNumber: "D202600123",
+      clientCountry: "France",
+    });
+
+    expect(document.items.find((item) => item.id === mainLineId)?.totalHtCents).toBe(9900);
+    expect(document.items.find((item) => item.id === sectionId)?.totalHtCents).toBe(9900);
+    expect(document.items.find((item) => item.id === optionLineId)?.totalHtCents).toBe(5000);
+    expect(document.totals).toMatchObject({
+      grossTotalHtCents: 11000,
+      customerDiscountCents: 1100,
+      customerDiscountLabel: "Remise client 10 %",
+      totalHtCents: 9900,
+      totalVatCents: 1980,
+      totalTtcCents: 11880,
+    });
   });
 
   it("alimente exactement tous les tokens scalaires du modèle Word V2", () => {

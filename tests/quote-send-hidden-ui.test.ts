@@ -16,6 +16,10 @@ describe("quote final PDF action visibility", () => {
     expect(directEditor).toContain("QuoteSendAction");
     expect(directEditor).toContain("QuoteComponentCheck");
     expect(directEditor).toContain("QuoteLifecycleActions");
+    expect(sendAction).toContain("> Valider");
+    expect(sendAction).toContain("Valider et envoyer");
+    expect(sendAction).toContain('quote.status === "FROZEN"');
+    expect(sendAction).toContain("PDF validé");
   });
 
   it("n'attribue pas une erreur PDF inconnue a la date de relance", () => {

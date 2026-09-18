@@ -14,7 +14,11 @@ import { buildQuoteDocumentDataFromPayloads } from "@/lib/quotes/document-data-m
 import { archiveFinalQuotePdf, nextFinalQuoteNumber } from "@/lib/quotes/final-pdf-archive";
 import { createQuotesRepository } from "@/lib/quotes/create-repository";
 import { normalizeQuotePricingAfterModelMutation } from "@/lib/quotes/pricing-integrity";
-import { markNativeQuoteSentWithFinalPdf } from "@/lib/quotes/send";
+import {
+  markFrozenNativeQuoteSent,
+  markNativeQuoteSentWithFinalPdf,
+  markNativeQuoteValidatedWithFinalPdf,
+} from "@/lib/quotes/send";
 import type { NativeQuotesPayload } from "@/lib/quotes/store";
 import { renderQuoteWordV2PdfWithPhotos } from "@/lib/quotes/word-v2-pdf";
 import { loadQuoteWordV2Template } from "@/lib/quotes/word-v2-template-runtime";
@@ -22,9 +26,22 @@ import { loadQuoteWordV2Template } from "@/lib/quotes/word-v2-template-runtime";
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
-const sendQuoteSchema = z.object({
-  followUpDate: z.string().regex(/^\d{4}-\d{2}-\d{2}$/),
-});
+const sendQuoteSchema = z
+  .union([
+    z.object({
+      mode: z.literal("VALIDATE"),
+    }),
+    z.object({
+      mode: z.literal("SEND"),
+      followUpDate: z.string().regex(/^\d{4}-\d{2}-\d{2}$/),
+    }),
+    z.object({
+      followUpDate: z.string().regex(/^\d{4}-\d{2}-\d{2}$/),
+    }),
+  ])
+  .transform((input) =>
+    "mode" in input ? input : { mode: "SEND" as const, followUpDate: input.followUpDate },
+  );
 
 function noStoreJson(body: unknown, init?: ResponseInit) {
   const response = NextResponse.json(body, init);
@@ -40,7 +57,12 @@ function errorStatus(code: string): number {
   const requestStatus = desktopRequestErrorStatus(code);
   if (requestStatus) return requestStatus;
   if (code === "QUOTE_NOT_FOUND" || code === "COMMERCIAL_CASE_NOT_FOUND") return 404;
-  if (code === "QUOTE_NOT_EDITABLE" || code === "COMMERCIAL_CASE_CLOSED") return 409;
+  if (
+    code === "QUOTE_NOT_EDITABLE" ||
+    code === "QUOTE_NOT_FROZEN" ||
+    code === "COMMERCIAL_CASE_CLOSED"
+  )
+    return 409;
   if (code === "QUOTE_FINAL_PDF_ARCHIVE_CONFLICT") return 409;
   if (code === "SERVER_FILE_ROOT_UNAVAILABLE") return 503;
   if (
@@ -87,16 +109,47 @@ export async function POST(request: Request, { params }: { params: Promise<{ quo
       normalizeQuotePricingAfterModelMutation(payload, quoteId);
       const quote = payload.quotes.find((candidate) => candidate.id === quoteId);
       if (!quote) throw new Error("QUOTE_NOT_FOUND");
-      if (quote.status !== "DRAFT") throw new Error("QUOTE_NOT_EDITABLE");
 
-      const issueYear = Number(quote.model.issueDate.slice(0, 4));
-      const quoteNumber = nextFinalQuoteNumber(payload, issueYear);
       const commercial = await commercialRepository.load();
       const commercialCase = commercial.cases.find(
         (candidate) => candidate.id === quote.commercialCaseId,
       );
       if (!commercialCase) throw new Error("COMMERCIAL_CASE_NOT_FOUND");
 
+      if (quote.status === "FROZEN") {
+        if (input.mode !== "SEND") throw new Error("QUOTE_NOT_EDITABLE");
+        const sent = markFrozenNativeQuoteSent(payload, quoteId, input.followUpDate, actor, now);
+
+        await commercialRepository.mutate((commercialPayload) => {
+          const affair = commercialPayload.cases.find(
+            (candidate) => candidate.id === sent.commercialCaseId,
+          );
+          if (!affair) throw new Error("COMMERCIAL_CASE_NOT_FOUND");
+          if (!quoteWorkflowMayChangeCommercialStatus(affair.status)) {
+            return { payload: commercialPayload, focusCaseId: affair.id };
+          }
+          return applyCommercialMutation(
+            commercialPayload,
+            {
+              action: "markQuoteSent",
+              caseId: sent.commercialCaseId,
+              followUpDate: input.followUpDate,
+            },
+            actor,
+            now,
+          );
+        });
+
+        return {
+          payload: sent.payload,
+          focusQuoteId: sent.focusQuoteId,
+        };
+      }
+
+      if (quote.status !== "DRAFT") throw new Error("QUOTE_NOT_EDITABLE");
+
+      const issueYear = Number(quote.model.issueDate.slice(0, 4));
+      const quoteNumber = nextFinalQuoteNumber(payload, issueYear);
       const document = buildQuoteDocumentDataFromPayloads(
         { quoteId, quoteNumber },
         { quotes: payload, clients, commercial, companyProfile },
@@ -123,25 +176,30 @@ export async function POST(request: Request, { params }: { params: Promise<{ quo
         };
       }
 
-      const sent = markNativeQuoteSentWithFinalPdf(
-        payload,
-        quoteId,
-        input.followUpDate,
-        archive.finalPdf,
-        actor,
-        now,
-      );
+      const finalized =
+        input.mode === "VALIDATE"
+          ? markNativeQuoteValidatedWithFinalPdf(payload, quoteId, archive.finalPdf, actor, now)
+          : markNativeQuoteSentWithFinalPdf(
+              payload,
+              quoteId,
+              input.followUpDate,
+              archive.finalPdf,
+              actor,
+              now,
+            );
 
       await commercialRepository.mutate((commercialPayload) => {
         const registered = registerCommercialDocuments(
           commercialPayload,
-          sent.commercialCaseId,
+          finalized.commercialCaseId,
           [archive.commercialDocument],
           actor,
           now,
         );
+        if (input.mode === "VALIDATE") return registered;
+
         const affair = registered.payload.cases.find(
-          (candidate) => candidate.id === sent.commercialCaseId,
+          (candidate) => candidate.id === finalized.commercialCaseId,
         );
         if (!affair) throw new Error("COMMERCIAL_CASE_NOT_FOUND");
         if (!quoteWorkflowMayChangeCommercialStatus(affair.status)) return registered;
@@ -149,7 +207,7 @@ export async function POST(request: Request, { params }: { params: Promise<{ quo
           registered.payload,
           {
             action: "markQuoteSent",
-            caseId: sent.commercialCaseId,
+            caseId: finalized.commercialCaseId,
             followUpDate: input.followUpDate,
           },
           actor,
@@ -158,8 +216,8 @@ export async function POST(request: Request, { params }: { params: Promise<{ quo
       });
 
       return {
-        payload: sent.payload,
-        focusQuoteId: sent.focusQuoteId,
+        payload: finalized.payload,
+        focusQuoteId: finalized.focusQuoteId,
       };
     });
 
@@ -174,7 +232,7 @@ export async function POST(request: Request, { params }: { params: Promise<{ quo
     }
     const code =
       error instanceof ZodError
-        ? "QUOTE_FOLLOW_UP_DATE_REQUIRED"
+        ? "QUOTE_SEND_REQUEST_INVALID"
         : error instanceof Error
           ? error.message
           : "QUOTE_SEND_FAILED";

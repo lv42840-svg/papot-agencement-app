@@ -1,6 +1,7 @@
 import { z } from "zod";
 import {
   calculateQuoteAdjustedPricing,
+  quoteCustomerDiscountValueSchema,
   quoteOptionSchema,
   quotePricingAdjustmentSchema,
   quotePricingConfigSchema,
@@ -37,11 +38,24 @@ const removeOptionSchema = z.object({
   optionId: z.string().uuid(),
 });
 
+const setCustomerDiscountSchema = z.object({
+  action: z.literal("setCustomerDiscount"),
+  quoteId: z.string().uuid(),
+  discount: quoteCustomerDiscountValueSchema,
+});
+
+const clearCustomerDiscountSchema = z.object({
+  action: z.literal("clearCustomerDiscount"),
+  quoteId: z.string().uuid(),
+});
+
 export const quotePricingMutationSchema = z.discriminatedUnion("action", [
   upsertAdjustmentSchema,
   removeAdjustmentSchema,
   upsertOptionSchema,
   removeOptionSchema,
+  setCustomerDiscountSchema,
+  clearCustomerDiscountSchema,
 ]);
 
 export type QuotePricingMutation = z.infer<typeof quotePricingMutationSchema>;
@@ -73,6 +87,20 @@ function nextConfig(
     return quotePricingConfigSchema.parse({
       ...config,
       adjustments: config.adjustments.filter((item) => item.id !== mutation.adjustmentId),
+    });
+  }
+
+  if (mutation.action === "setCustomerDiscount") {
+    return quotePricingConfigSchema.parse({
+      ...config,
+      customerDiscount: mutation.discount,
+    });
+  }
+
+  if (mutation.action === "clearCustomerDiscount") {
+    return quotePricingConfigSchema.parse({
+      ...config,
+      customerDiscount: null,
     });
   }
 

@@ -41,8 +41,7 @@ describe("quote global UI invariants", () => {
     expect(richTextLayerSource).toContain('overflowWrap: "anywhere"');
     expect(richTextLayerSource).toContain('overflow: "visible"');
     expect(richTextLayerSource).toContain('textOverflow: "clip"');
-    expect(richTextLayerSource).toContain(
-      '".quoteHeadingRow > strong, .quoteLineDescription > strong"',
-    );
+    expect(richTextLayerSource).toContain('".quoteHeadingTitle, .quoteLineDescription > strong"');
+    expect(richTextLayerSource).not.toContain(".quoteHeadingRow > strong");
   });
 });

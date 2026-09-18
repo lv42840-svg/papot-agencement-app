@@ -5,6 +5,7 @@ export type CommercialQuoteDisplayStatus = QuoteStatus | "FOLLOW_UP";
 
 export const COMMERCIAL_QUOTE_STATUS_LABELS: Record<CommercialQuoteDisplayStatus, string> = {
   DRAFT: "Brouillon",
+  FROZEN: "Validé",
   SENT: "Envoyé",
   FOLLOW_UP: "À relancer",
   ACCEPTED: "Accepté",

@@ -109,9 +109,11 @@ export function QuoteLegalDetailsEditor({
     }
   }
 
-  async function saveLineRate(lineId: string, reset = false) {
+  async function saveLineRate(lineId: string, reset = false, nextValue?: string) {
     if (!editable || savingLineId) return;
-    const parsed = reset ? quote.taxConfig.defaultRatePercent : parseRate(rates[lineId] ?? "");
+    const parsed = reset
+      ? quote.taxConfig.defaultRatePercent
+      : parseRate(nextValue ?? rates[lineId] ?? "");
     if (parsed === null) {
       setError("Le taux de TVA doit être compris entre 0 et 100 %.");
       return;
@@ -205,24 +207,22 @@ export function QuoteLegalDetailsEditor({
       <div className="quoteVatSection">
         <div className="quoteVatTitle">
           <div>
-            <Percent size={17} aria-hidden="true" />
+            <Percent size={16} aria-hidden="true" />
             <strong>TVA</strong>
+            <span className="quoteVatDefault">
+              {rateInput(quote.taxConfig.defaultRatePercent)} % par défaut
+            </span>
           </div>
-          <span>Taux client par défaut : {rateInput(quote.taxConfig.defaultRatePercent)} %</span>
+          <label className="quoteVatToggle">
+            <input
+              type="checkbox"
+              checked={manageLineVat}
+              onChange={(event) => setManageLineVat(event.target.checked)}
+              disabled={lines.length === 0}
+            />
+            <span>TVA différente par ligne</span>
+          </label>
         </div>
-
-        <label className="quoteVatToggle">
-          <input
-            type="checkbox"
-            checked={manageLineVat}
-            onChange={(event) => setManageLineVat(event.target.checked)}
-            disabled={lines.length === 0}
-          />
-          <span>
-            <strong>Gérer la TVA à la ligne</strong>
-            <small>À activer seulement quand une ligne doit utiliser un taux différent.</small>
-          </span>
-        </label>
 
         {!manageLineVat ? (
           <p className="muted quoteVatCollapsed">
@@ -246,37 +246,44 @@ export function QuoteLegalDetailsEditor({
                   </div>
                   <label>
                     <span className="srOnly">TVA de {line.description}</span>
-                    <input
+                    <select
                       value={rates[line.id] ?? rateInput(quote.taxConfig.defaultRatePercent)}
-                      onChange={(event) =>
-                        setRates((current) => ({ ...current, [line.id]: event.target.value }))
-                      }
-                      inputMode="decimal"
+                      onChange={(event) => {
+                        const next = event.target.value;
+                        setRates((current) => ({ ...current, [line.id]: next }));
+                        void saveLineRate(line.id, false, next);
+                      }}
                       disabled={!editable || savingLineId !== null}
                       aria-label={`TVA de ${line.description}`}
-                    />
-                    <b>%</b>
+                    >
+                      {[0, 2.1, 5.5, 10, 20]
+                        .map(rateInput)
+                        .filter(
+                          (rate, index, all) =>
+                            all.indexOf(rate) === index || rate === rates[line.id],
+                        )
+                        .map((rate) => (
+                          <option key={rate} value={rate}>
+                            {rate} %
+                          </option>
+                        ))}
+                      {!["0", "2,1", "5,5", "10", "20"].includes(
+                        rates[line.id] ?? rateInput(quote.taxConfig.defaultRatePercent),
+                      ) ? (
+                        <option value={rates[line.id]}>{rates[line.id]} %</option>
+                      ) : null}
+                    </select>
                   </label>
-                  {editable ? (
+                  {editable && overridden ? (
                     <div className="quoteVatActions">
                       <button
                         className="secondaryButton"
                         type="button"
-                        onClick={() => void saveLineRate(line.id)}
+                        onClick={() => void saveLineRate(line.id, true)}
                         disabled={savingLineId !== null}
                       >
-                        {savingLineId === line.id ? "…" : "Enregistrer"}
+                        Défaut
                       </button>
-                      {overridden ? (
-                        <button
-                          className="secondaryButton"
-                          type="button"
-                          onClick={() => void saveLineRate(line.id, true)}
-                          disabled={savingLineId !== null}
-                        >
-                          Défaut
-                        </button>
-                      ) : null}
                     </div>
                   ) : null}
                 </div>

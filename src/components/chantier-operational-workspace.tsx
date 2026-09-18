@@ -43,6 +43,7 @@ type QuoteGroup = ChantierRetainedQuote;
 
 const QUOTE_STATUS_LABELS = {
   DRAFT: "Brouillon",
+  FROZEN: "Validé",
   SENT: "Envoyé",
   ACCEPTED: "Accepté",
   REJECTED: "Refusé",

@@ -91,6 +91,7 @@ describe("quote rich text UI wiring", () => {
     expect(layer).toContain('overflowWrap: "anywhere"');
     expect(layer).toContain('overflow: "visible"');
     expect(layer).toContain('textOverflow: "clip"');
-    expect(layer).toContain('".quoteHeadingRow > strong, .quoteLineDescription > strong"');
+    expect(layer).toContain('".quoteHeadingTitle, .quoteLineDescription > strong"');
+    expect(layer).not.toContain(".quoteHeadingRow > strong");
   });
 });

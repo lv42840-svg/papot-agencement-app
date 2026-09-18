@@ -22,10 +22,19 @@ function formatPercent(value: number | null): string {
   return value === null ? "n/c" : `${percentFormatter.format(value)} %`;
 }
 
+function discountLabel(quote: NativeQuoteRecord): string | null {
+  const discount = quote.pricingConfig.customerDiscount;
+  if (!discount) return null;
+  return discount.kind === "PERCENTAGE"
+    ? `Remise client ${discount.percent.toLocaleString("fr-FR")} %`
+    : "Remise client";
+}
+
 export function QuoteFixedSummary({ quote }: { quote: NativeQuoteRecord }) {
   const summary = calculateQuoteAdjustedPricing(quote.model.items, quote.pricingConfig);
   const marginMissing = summary.marginAmountCents === null;
   const marginNegative = summary.marginAmountCents !== null && summary.marginAmountCents < 0;
+  const customerDiscountLabel = discountLabel(quote);
 
   return (
     <aside
@@ -41,6 +50,12 @@ export function QuoteFixedSummary({ quote }: { quote: NativeQuoteRecord }) {
         <div className="quoteSummaryMetric optionMetric">
           <span>Options hors total</span>
           <strong>{formatMoney(summary.pendingOptionsSaleCents)}</strong>
+        </div>
+      ) : null}
+      {customerDiscountLabel && summary.customerDiscountCents > 0 ? (
+        <div className="quoteSummaryMetric discountMetric">
+          <span>{customerDiscountLabel}</span>
+          <strong>−{formatMoney(summary.customerDiscountCents)}</strong>
         </div>
       ) : null}
       <div
@@ -85,6 +100,9 @@ export function QuoteFixedSummary({ quote }: { quote: NativeQuoteRecord }) {
         }
         .quoteSummaryMetric.optionMetric {
           background: #fff9ec;
+        }
+        .quoteSummaryMetric.discountMetric {
+          background: #f7f3ff;
         }
         .quoteSummaryMetric > span {
           color: var(--muted);

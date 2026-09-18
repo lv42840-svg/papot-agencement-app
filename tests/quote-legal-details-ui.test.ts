@@ -31,13 +31,15 @@ describe("quote legal details UI", () => {
   });
 
   it("permet un taux de TVA spécifique pour chaque ligne avec retour au défaut client", () => {
-    expect(legalEditor).toContain("Gérer la TVA à la ligne");
+    expect(legalEditor).toContain("TVA différente par ligne");
     expect(legalEditor).toContain("manageLineVat");
     expect(legalEditor).toContain("Toutes les lignes utilisent le taux client par défaut.");
     expect(legalEditor).toContain("Taux spécifique");
     expect(legalEditor).toContain("Taux client par défaut");
     expect(legalEditor).toContain("setLineVatRate");
     expect(legalEditor).toContain("Défaut");
+    expect(legalEditor).toContain("[0, 2.1, 5.5, 10, 20]");
+    expect(legalEditor).toContain("<select");
   });
 
   it("intègre le taux par défaut directement dans la fiche client", () => {

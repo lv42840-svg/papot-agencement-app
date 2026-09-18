@@ -109,6 +109,9 @@ export type QuoteDocumentData = {
   };
   items: QuoteDocumentItem[];
   totals: {
+    grossTotalHtCents?: number;
+    customerDiscountCents?: number;
+    customerDiscountLabel?: string | null;
     totalHtCents: number;
     totalVatCents: number;
     totalTtcCents: number;
@@ -304,7 +307,7 @@ export function buildQuoteDocumentData(input: BuildQuoteDocumentDataInput): Quot
   const optionById = new Map(quote.pricingConfig.options.map((option) => [option.id, option]));
   const itemById = new Map(quote.model.items.map((item) => [item.id, item]));
 
-  const items: QuoteDocumentItem[] = quote.model.items.map((item) => {
+  let items: QuoteDocumentItem[] = quote.model.items.map((item) => {
     const adjustedLine = item.kind === "LINE" ? (adjustedLineById.get(item.id) ?? null) : null;
     const option = adjustedLine
       ? adjustedLine.optionId
@@ -337,6 +340,41 @@ export function buildQuoteDocumentData(input: BuildQuoteDocumentDataInput): Quot
         totalHtCents !== null && ratePercent !== null ? vatAmount(totalHtCents, ratePercent) : null,
     };
   });
+
+  const documentItemById = new Map(items.map((item) => [item.id, item]));
+  const headingTotals = new Map<string, number>();
+
+  const addHeadingTotal = (headingId: string, line: QuoteDocumentItem) => {
+    const heading = documentItemById.get(headingId);
+    if (!heading || (heading.kind !== "SECTION" && heading.kind !== "SUBSECTION")) return;
+
+    const sameScope =
+      heading.scope === "PENDING_OPTION"
+        ? line.scope === "PENDING_OPTION" && line.optionId === heading.optionId
+        : heading.scope === "REJECTED_OPTION"
+          ? false
+          : heading.scope === "RETAINED_OPTION"
+            ? line.scope === "RETAINED_OPTION" && line.optionId === heading.optionId
+            : line.scope === "MAIN" || line.scope === "RETAINED_OPTION";
+
+    if (!sameScope || line.totalHtCents === null) return;
+    headingTotals.set(headingId, (headingTotals.get(headingId) ?? 0) + line.totalHtCents);
+  };
+
+  for (const line of items) {
+    if (line.kind !== "LINE" || !line.parentId) continue;
+    addHeadingTotal(line.parentId, line);
+    const parent = documentItemById.get(line.parentId);
+    if (parent?.kind === "SUBSECTION" && parent.parentId) {
+      addHeadingTotal(parent.parentId, line);
+    }
+  }
+
+  items = items.map((item) =>
+    item.kind === "SECTION" || item.kind === "SUBSECTION"
+      ? { ...item, totalHtCents: headingTotals.get(item.id) ?? null }
+      : item,
+  );
 
   const mainLines = items.filter(
     (item) => item.kind === "LINE" && (item.scope === "MAIN" || item.scope === "RETAINED_OPTION"),
@@ -407,6 +445,13 @@ export function buildQuoteDocumentData(input: BuildQuoteDocumentDataInput): Quot
     },
     items,
     totals: {
+      grossTotalHtCents: adjusted.grossSaleCents,
+      customerDiscountCents: adjusted.customerDiscountCents,
+      customerDiscountLabel: quote.pricingConfig.customerDiscount
+        ? quote.pricingConfig.customerDiscount.kind === "PERCENTAGE"
+          ? `Remise client ${quote.pricingConfig.customerDiscount.percent.toLocaleString("fr-FR")} %`
+          : "Remise client"
+        : null,
       totalHtCents: adjusted.totalSaleCents,
       totalVatCents,
       totalTtcCents: adjusted.totalSaleCents + totalVatCents,

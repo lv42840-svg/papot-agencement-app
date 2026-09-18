@@ -125,6 +125,41 @@ describe("quote global adjustments", () => {
     expect(result.marginAmountCents).toBe(4_500_000);
   });
 
+  it("applique une remise client en pourcentage sur le total principal", () => {
+    const items: QuoteItem[] = [line(lineIds.a, 10_000, 6_000), line(lineIds.b, 5_000, 3_000)];
+    const result = calculateQuoteAdjustedPricing(items, {
+      ...createEmptyQuotePricingConfig(),
+      customerDiscount: { kind: "PERCENTAGE", percent: 10 },
+    });
+
+    expect(result.grossSaleCents).toBe(15_000);
+    expect(result.customerDiscountCents).toBe(1_500);
+    expect(result.totalSaleCents).toBe(13_500);
+    expect(result.lines.map((entry) => entry.saleCents)).toEqual([9_000, 4_500]);
+  });
+
+  it("applique une remise client en euros sans toucher aux options en attente", () => {
+    const items: QuoteItem[] = [line(lineIds.a, 10_000, 6_000), line(lineIds.b, 5_000, 3_000)];
+    const result = calculateQuoteAdjustedPricing(items, {
+      adjustments: [],
+      options: [
+        {
+          id: "45454545-4545-4454-8454-454545454545",
+          targetItemId: lineIds.b,
+          targetKind: "LINE",
+          label: "Option",
+          status: "PENDING",
+        },
+      ],
+      customerDiscount: { kind: "AMOUNT", amountCents: 2_000 },
+    });
+
+    expect(result.grossSaleCents).toBe(10_000);
+    expect(result.customerDiscountCents).toBe(2_000);
+    expect(result.totalSaleCents).toBe(8_000);
+    expect(result.pendingOptionsSaleCents).toBe(5_000);
+  });
+
   it("derives pose hours from components and distributes travel pro rata", () => {
     const items: QuoteItem[] = [
       lineWithPose(lineIds.a, 1_000_000, 20),

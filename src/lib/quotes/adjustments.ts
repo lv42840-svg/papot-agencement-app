@@ -11,6 +11,18 @@ export const quoteAdjustmentMarginTreatmentSchema = z.enum(["MARGED", "PASS_THRO
 export const quoteOptionStatusSchema = z.enum(["PENDING", "RETAINED", "REJECTED"]);
 export const quoteOptionTargetKindSchema = z.enum(["LINE", "SECTION", "SUBSECTION"]);
 
+export const quoteCustomerDiscountValueSchema = z.discriminatedUnion("kind", [
+  z.object({
+    kind: z.literal("PERCENTAGE"),
+    percent: z.number().finite().gt(0).lt(100),
+  }),
+  z.object({
+    kind: z.literal("AMOUNT"),
+    amountCents: z.number().int().safe().gt(0).max(1_000_000_000),
+  }),
+]);
+export const quoteCustomerDiscountSchema = quoteCustomerDiscountValueSchema.nullable();
+
 const adjustmentBaseSchema = z.object({
   id: z.string().uuid(),
   label: z.string().trim().min(1).max(240),
@@ -54,6 +66,7 @@ export const quotePricingConfigSchema = z
   .object({
     adjustments: z.array(quotePricingAdjustmentSchema).max(100),
     options: z.array(quoteOptionSchema).max(500),
+    customerDiscount: quoteCustomerDiscountSchema.optional(),
   })
   .superRefine((config, context) => {
     const adjustmentIds = new Set<string>();
@@ -97,6 +110,7 @@ export type QuotePoseHoursAdjustment = z.infer<typeof quotePoseHoursAdjustmentSc
 export type QuoteHotelAdjustment = z.infer<typeof quoteHotelAdjustmentSchema>;
 export type QuoteOptionStatus = z.infer<typeof quoteOptionStatusSchema>;
 export type QuoteOption = z.infer<typeof quoteOptionSchema>;
+export type QuoteCustomerDiscount = z.infer<typeof quoteCustomerDiscountValueSchema>;
 export type QuotePricingConfig = z.infer<typeof quotePricingConfigSchema>;
 
 export function createEmptyQuotePricingConfig(): QuotePricingConfig {
@@ -126,6 +140,8 @@ export type QuoteOptionPricingSummary = {
 
 export type QuoteAdjustedPricing = {
   lines: QuoteAdjustedLine[];
+  grossSaleCents: number;
+  customerDiscountCents: number;
   totalSaleCents: number;
   totalCostCents: number | null;
   marginAmountCents: number | null;
@@ -156,6 +172,10 @@ function lineAmountCents(quantity: number, unitAmountCents: number): number {
 
 function addMoney(left: number, right: number): number {
   return assertSafeMoney(left + right);
+}
+
+function subtractMoney(left: number, right: number): number {
+  return assertSafeMoney(left - right);
 }
 
 function componentActivity(component: QuoteOuvrageComponent): "BE" | "ATELIER" | "POSE" | null {
@@ -514,6 +534,27 @@ export function calculateQuoteAdjustedPricing(
     (line) => !line.resolvedOption || retainedOptionIds.has(line.resolvedOption.id),
   );
 
+  const grossSaleCents = scopeSale(mainLines);
+  let customerDiscountCents = 0;
+  const customerDiscount = parsedConfig.customerDiscount;
+  if (customerDiscount) {
+    customerDiscountCents =
+      customerDiscount.kind === "PERCENTAGE"
+        ? Math.round((grossSaleCents * customerDiscount.percent) / 100)
+        : customerDiscount.amountCents;
+    if (customerDiscountCents > grossSaleCents) {
+      throw new Error("QUOTE_CUSTOMER_DISCOUNT_TOO_HIGH");
+    }
+    const discountDistribution = moneyDistribution(
+      customerDiscountCents,
+      mainLines,
+      (line) => line.saleCents,
+    );
+    for (const line of mainLines) {
+      line.saleCents = subtractMoney(line.saleCents, discountDistribution.get(line.lineId) ?? 0);
+    }
+  }
+
   const totalSaleCents = scopeSale(mainLines);
   const costComplete = mainLines.every((line) => line.costCents !== null);
   const totalCostCents = costComplete
@@ -536,6 +577,8 @@ export function calculateQuoteAdjustedPricing(
     .reduce((total, option) => addMoney(total, option.saleCents), 0);
 
   return {
+    grossSaleCents,
+    customerDiscountCents,
     lines: lines.map(
       ({
         line: _line,
