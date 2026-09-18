@@ -1,0 +1,46 @@
+name: Temp inspect quote template
+on:
+  push:
+    branches:
+      - fix/devis-pdf-layout-v2
+
+jobs:
+  inspect:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Inspect DOCX layout
+        run: |
+          python - <<'PY'
+          import zipfile, xml.etree.ElementTree as ET, json
+          path="docs/templates/PAPOT_Template_Devis_V2.docx"
+          ns={"w":"http://schemas.openxmlformats.org/wordprocessingml/2006/main"}
+          W="{http://schemas.openxmlformats.org/wordprocessingml/2006/main}"
+          with zipfile.ZipFile(path) as z:
+              root=ET.fromstring(z.read("word/document.xml"))
+          body=root.find("w:body",ns)
+          def text(el):
+              return "".join(t.text or "" for t in el.findall(".//w:t",ns))
+          children=list(body)
+          tokens=["PAPOT_QUOTE_BODY","PAPOT_OPTIONS_BLOCK","PAPOT_VAT_SUMMARY","PAPOT_VAT_LINES_ANCHOR","PAPOT_ANNEX_IMAGES","total_ht","total_ttc","net_a_payer","conditions_paiement","methodes_paiement"]
+          for idx,child in enumerate(children):
+              tag=child.tag.split("}")[-1]
+              tx=text(child)
+              if any(tok in tx for tok in tokens) or "OPTIONS NON COMPRISES" in tx or "Conditions de paiement" in tx or "Coordonnées bancaires" in tx or "Pour le client" in tx:
+                  print("\nBODY",idx,tag,repr(tx))
+                  if tag=="tbl":
+                      grid=[c.get(W+"w") for c in child.findall("./w:tblGrid/w:gridCol",ns)]
+                      tblw=child.find("./w:tblPr/w:tblW",ns)
+                      print(" grid",grid,"tblW",None if tblw is None else dict(tblw.attrib))
+                      for ri,row in enumerate(child.findall("./w:tr",ns)):
+                          cells=row.findall("./w:tc",ns)
+                          vals=[text(c) for c in cells]
+                          widths=[]
+                          for c in cells:
+                              tcw=c.find("./w:tcPr/w:tcW",ns)
+                              widths.append(None if tcw is None else dict(tcw.attrib))
+                          print(" row",ri,vals,"widths",widths)
+                  else:
+                      ppr=child.find("./w:pPr",ns)
+                      print(" pPr", ET.tostring(ppr,encoding="unicode") if ppr is not None else "")
+          PY
