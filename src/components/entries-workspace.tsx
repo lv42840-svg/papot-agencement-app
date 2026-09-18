@@ -22,6 +22,7 @@ import {
   UserRound,
   X,
 } from "lucide-react";
+import { TaskCommercialBridge } from "@/components/task-commercial-bridge";
 import {
   isAssignedOverdue,
   isQualificationAttentionDue,
@@ -43,6 +44,7 @@ type EntriesApiSnapshot = {
 };
 
 type EntriesTab = "TO_QUALIFY" | "ASSIGNED" | "DONE";
+type EntryDetailTab = "INFO" | "AFFAIR" | "ATTACHMENTS" | "HISTORY";
 type MutationBody = Record<string, unknown> & { action: string };
 type MutationFn = (
   body: MutationBody,
@@ -626,6 +628,7 @@ function EntryDetail({
   const [newAssignee, setNewAssignee] = useState("");
   const [reassignReason, setReassignReason] = useState("");
   const [derivedText, setDerivedText] = useState("");
+  const [detailTab, setDetailTab] = useState<EntryDetailTab>("INFO");
 
   const canActAssigned =
     entry.status === "ASSIGNED" &&
@@ -651,6 +654,41 @@ function EntryDetail({
           Créée par {entry.createdByName} le {formatDateTime(entry.createdAt)}
         </p>
       </div>
+
+      <div className="entriesDetailTabs" role="tablist" aria-label="Fiche entrée">
+        <button
+          type="button"
+          className={detailTab === "INFO" ? "isActive" : ""}
+          onClick={() => setDetailTab("INFO")}
+        >
+          Informations
+        </button>
+        <button
+          type="button"
+          className={detailTab === "AFFAIR" ? "isActive" : ""}
+          onClick={() => setDetailTab("AFFAIR")}
+        >
+          Affaire
+        </button>
+        <button
+          type="button"
+          className={detailTab === "ATTACHMENTS" ? "isActive" : ""}
+          onClick={() => setDetailTab("ATTACHMENTS")}
+        >
+          Pièces jointes
+          {entry.attachments.length > 0 ? <span>{entry.attachments.length}</span> : null}
+        </button>
+        <button
+          type="button"
+          className={detailTab === "HISTORY" ? "isActive" : ""}
+          onClick={() => setDetailTab("HISTORY")}
+        >
+          Historique
+        </button>
+      </div>
+
+      {detailTab === "INFO" ? (
+        <>
       <div className="entriesRawText">
         <span>Texte d'origine</span>
         <p>{entry.rawText}</p>
@@ -678,8 +716,6 @@ function EntryDetail({
           ))}
         </div>
       ) : null}
-
-      <EntryAttachments entry={entry} busy={busy} uploadAttachments={uploadAttachments} />
 
       {entry.status === "TO_QUALIFY" ? (
         <>
@@ -1050,21 +1086,33 @@ function EntryDetail({
           </div>
         </section>
       ) : null}
+        </>
+      ) : null}
 
-      <section className="entriesHistory">
-        <h3>Historique</h3>
-        {[...entry.history].reverse().map((event) => (
-          <div className="entriesHistoryRow" key={event.id}>
-            <span className="entriesHistoryDot" />
-            <div>
-              <strong>{event.summary}</strong>
-              <span>
-                {event.actorName} · {formatDateTime(event.at)}
-              </span>
+      {detailTab === "AFFAIR" ? (
+        <TaskCommercialBridge task={entry} description={description} nextAction={nextAction} />
+      ) : null}
+
+      {detailTab === "ATTACHMENTS" ? (
+        <EntryAttachments entry={entry} busy={busy} uploadAttachments={uploadAttachments} />
+      ) : null}
+
+      {detailTab === "HISTORY" ? (
+        <section className="entriesHistory">
+          <h3>Historique</h3>
+          {[...entry.history].reverse().map((event) => (
+            <div className="entriesHistoryRow" key={event.id}>
+              <span className="entriesHistoryDot" />
+              <div>
+                <strong>{event.summary}</strong>
+                <span>
+                  {event.actorName} · {formatDateTime(event.at)}
+                </span>
+              </div>
             </div>
-          </div>
-        ))}
-      </section>
+          ))}
+        </section>
+      ) : null}
     </div>
   );
 }
@@ -1148,9 +1196,21 @@ function AttachmentRow({
   const isPdf = attachment.contentType === "application/pdf";
   return (
     <div className="entriesAttachmentRow">
-      <div className="entriesAttachmentIcon">
-        {isImage ? <ImageIcon size={18} /> : <FileText size={18} />}
-      </div>
+      {isImage ? (
+        <button
+          type="button"
+          className="entriesAttachmentThumbnail"
+          onClick={onPreview}
+          title="Voir l’image en grand"
+          aria-label={`Voir ${attachment.fileName} en grand`}
+        >
+          <img src={url} alt="" />
+        </button>
+      ) : (
+        <div className="entriesAttachmentIcon">
+          <FileText size={18} />
+        </div>
+      )}
       <div className="entriesAttachmentMeta">
         <strong title={attachment.fileName}>{attachment.fileName}</strong>
         <span>
@@ -1158,8 +1218,12 @@ function AttachmentRow({
           {formatDateTime(attachment.uploadedAt)}
         </span>
       </div>
-      {isImage || isPdf ? (
-        <button type="button" className="entriesIconButton" title="Aperçu" onClick={onPreview}>
+      {isPdf ? (
+        <button type="button" className="entriesIconButton" title="Aperçu PDF" onClick={onPreview}>
+          <Eye size={16} />
+        </button>
+      ) : isImage ? (
+        <button type="button" className="entriesIconButton" title="Voir en grand" onClick={onPreview}>
           <Eye size={16} />
         </button>
       ) : null}
@@ -1171,13 +1235,27 @@ function AttachmentRow({
       >
         <Download size={16} />
       </a>
-      {preview ? (
-        <div className="entriesAttachmentPreview">
-          {isImage ? (
+      {preview && isImage ? (
+        <div
+          className="entriesImageLightbox"
+          role="dialog"
+          aria-modal="true"
+          aria-label={`Aperçu de ${attachment.fileName}`}
+          onClick={onPreview}
+        >
+          <div className="entriesImageLightboxContent" onClick={(event) => event.stopPropagation()}>
+            <div className="entriesImageLightboxHeader">
+              <strong>{attachment.fileName}</strong>
+              <button type="button" className="entriesIconButton" onClick={onPreview} aria-label="Fermer">
+                <X size={16} />
+              </button>
+            </div>
             <img src={url} alt={attachment.fileName} />
-          ) : isPdf ? (
-            <iframe title={attachment.fileName} src={url} />
-          ) : null}
+          </div>
+        </div>
+      ) : preview && isPdf ? (
+        <div className="entriesAttachmentPreview">
+          <iframe title={attachment.fileName} src={url} />
         </div>
       ) : null}
     </div>
@@ -1893,6 +1971,44 @@ function EntriesStyles() {
         display: flex;
         gap: 6px;
       }
+      .entriesDetailTabs {
+        display: flex;
+        align-items: center;
+        gap: 5px;
+        padding-bottom: 2px;
+        border-bottom: 1px solid #e8e2f2;
+        overflow-x: auto;
+      }
+      .entriesDetailTabs button {
+        min-height: 31px;
+        padding: 0 10px;
+        display: inline-flex;
+        align-items: center;
+        gap: 6px;
+        border: 1px solid transparent;
+        border-radius: 8px 8px 0 0;
+        background: transparent;
+        color: #77717f;
+        font-size: 10px;
+        font-weight: 800;
+        white-space: nowrap;
+        cursor: pointer;
+      }
+      .entriesDetailTabs button.isActive {
+        border-color: #dcd2f3;
+        border-bottom-color: #fff;
+        background: #f7f3ff;
+        color: #5d4ca8;
+      }
+      .entriesDetailTabs button span {
+        min-width: 18px;
+        padding: 1px 5px;
+        border-radius: 999px;
+        background: #e9e2fb;
+        color: #6554b5;
+        font-size: 8px;
+        text-align: center;
+      }
       .entriesRawText {
         padding: 12px 13px;
         border: 1px solid #e8e2f2;
@@ -2039,6 +2155,22 @@ function EntriesStyles() {
         border-radius: 8px;
         background: #fff;
       }
+      .entriesAttachmentThumbnail {
+        width: 34px;
+        height: 34px;
+        padding: 0;
+        overflow: hidden;
+        border: 1px solid #ddd5ef;
+        border-radius: 7px;
+        background: #f2eefc;
+        cursor: zoom-in;
+      }
+      .entriesAttachmentThumbnail img {
+        width: 100%;
+        height: 100%;
+        display: block;
+        object-fit: cover;
+      }
       .entriesAttachmentIcon {
         width: 34px;
         height: 34px;
@@ -2073,6 +2205,38 @@ function EntriesStyles() {
         border-radius: 7px;
         background: #fff;
         color: #706a79;
+      }
+      .entriesImageLightbox {
+        position: fixed;
+        inset: 0;
+        z-index: 1100;
+        display: grid;
+        place-items: center;
+        padding: 24px;
+        background: rgba(23, 19, 30, 0.78);
+      }
+      .entriesImageLightboxContent {
+        width: min(1100px, 95vw);
+        max-height: 92vh;
+        display: grid;
+        gap: 10px;
+        padding: 12px;
+        border-radius: 14px;
+        background: #fff;
+        box-shadow: 0 24px 70px rgba(0, 0, 0, 0.3);
+      }
+      .entriesImageLightboxHeader {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 10px;
+      }
+      .entriesImageLightboxContent > img {
+        display: block;
+        max-width: 100%;
+        max-height: calc(92vh - 68px);
+        margin: auto;
+        object-fit: contain;
       }
       .entriesAttachmentPreview {
         grid-column: 1/-1;
