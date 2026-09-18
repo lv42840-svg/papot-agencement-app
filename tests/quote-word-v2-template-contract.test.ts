@@ -38,9 +38,7 @@ describe("quote Word V2 template contract", () => {
 
     expect(xml).not.toContain("OPTIONS NON COMPRISES DANS LE TOTAL PRINCIPAL");
 
-    const bodyTable = xml.match(
-      /<w:tbl[\s\S]*?\{\{PAPOT_QUOTE_BODY\}\}[\s\S]*?<\/w:tbl>/,
-    )?.[0];
+    const bodyTable = xml.match(/<w:tbl[\s\S]*?\{\{PAPOT_QUOTE_BODY\}\}[\s\S]*?<\/w:tbl>/)?.[0];
     const optionsTable = xml.match(
       /<w:tbl[\s\S]*?\{\{PAPOT_OPTIONS_BLOCK\}\}[\s\S]*?<\/w:tbl>/,
     )?.[0];

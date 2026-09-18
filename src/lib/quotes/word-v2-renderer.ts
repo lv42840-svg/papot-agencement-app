@@ -266,10 +266,7 @@ function findOpeningTagStart(xml: string, tagName: string, beforeIndex: number):
 const QUOTE_TABLE_WIDTHS = [567, 5216, 1134, 1417, 1077, 1587] as const;
 const QUOTE_TABLE_TOTAL_WIDTH = QUOTE_TABLE_WIDTHS.reduce((sum, width) => sum + width, 0);
 const FINANCIAL_TABLE_WIDTHS = [6314, 4572] as const;
-const FINANCIAL_TABLE_TOTAL_WIDTH = FINANCIAL_TABLE_WIDTHS.reduce(
-  (sum, width) => sum + width,
-  0,
-);
+const FINANCIAL_TABLE_TOTAL_WIDTH = FINANCIAL_TABLE_WIDTHS.reduce((sum, width) => sum + width, 0);
 
 function paragraphVisibleText(paragraph: string): string {
   return wordTextNodes(paragraph)
@@ -321,10 +318,7 @@ function normalizeTableProperties(
       properties = `<w:tblW w:w="${totalWidth}" w:type="dxa"/>${properties}`;
     }
     if (/<w:tblLayout\b[^>]*\/>/.test(properties)) {
-      properties = properties.replace(
-        /<w:tblLayout\b[^>]*\/>/,
-        '<w:tblLayout w:type="fixed"/>',
-      );
+      properties = properties.replace(/<w:tblLayout\b[^>]*\/>/, '<w:tblLayout w:type="fixed"/>');
     } else {
       properties += '<w:tblLayout w:type="fixed"/>';
     }
@@ -406,10 +400,7 @@ function setCellWidth(cell: string, width: number): string {
   return cell.replace(/<w:tcPr>([\s\S]*?)<\/w:tcPr>/, (_match, body: string) => {
     let properties = body;
     if (/<w:tcW\b[^>]*\/>/.test(properties)) {
-      properties = properties.replace(
-        /<w:tcW\b[^>]*\/>/,
-        `<w:tcW w:w="${width}" w:type="dxa"/>`,
-      );
+      properties = properties.replace(/<w:tcW\b[^>]*\/>/, `<w:tcW w:w="${width}" w:type="dxa"/>`);
     } else {
       properties = `<w:tcW w:w="${width}" w:type="dxa"/>${properties}`;
     }
@@ -491,8 +482,7 @@ function splitFinancialSignature(table: string): string {
     '<w:gridSpan w:val="2"/></w:tcPr>' +
     `${signatureContent}</w:tc></w:tr>`;
 
-  let next =
-    `${table.slice(0, rowRange.start)}${financialRow}${signatureRow}${table.slice(rowRange.end)}`;
+  let next = `${table.slice(0, rowRange.start)}${financialRow}${signatureRow}${table.slice(rowRange.end)}`;
   next = normalizeTableProperties(next, FINANCIAL_TABLE_WIDTHS);
   return next;
 }
