@@ -22,8 +22,16 @@ describe("quote creation flow", () => {
   it("permet de lancer un devis depuis la fiche affaire", () => {
     expect(affairQuotes).toContain("Créer un devis");
     expect(affairQuotes).toContain("/devis/nouveau?affaire=");
-    expect(createPage).toContain("searchParams: Promise<{ affaire?: string }>");
+    expect(createPage).toContain('searchParams: Promise<{ affaire?: string; chantier?: string }>');
     expect(createPage).toContain("initialAffairId={initialAffairId}");
+  });
+
+  it("cree un TS chantier avec le meme moteur de devis sans repasser l'affaire en chiffrage", () => {
+    expect(createPage).toContain("nextChantierComplementVariantName");
+    expect(createPage).toContain('chantier === "1"');
+    expect(createWorkspace).toContain("Travaux supplémentaires (TS)");
+    expect(createWorkspace).toContain("quoteKind");
+    expect(quotesRoute).toContain("quoteWorkflowMayChangeCommercialStatus");
   });
 
   it("cree le premier devis automatiquement en Base V1", () => {
