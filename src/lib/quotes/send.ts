@@ -16,17 +16,13 @@ export type QuoteSendActor = {
   displayName: string;
 };
 
-type PreparedQuoteSend = {
+type PreparedQuote = {
   payload: NativeQuotesPayload;
   quoteIndex: number;
   quote: NativeQuoteRecord;
 };
 
-function prepareQuoteSend(
-  source: NativeQuotesPayload,
-  quoteId: string,
-  followUpDate: string,
-): PreparedQuoteSend {
+function prepareDraftQuote(source: NativeQuotesPayload, quoteId: string): PreparedQuote {
   const payload = structuredClone(parseNativeQuotesPayload(source));
   normalizeQuotePricingAfterModelMutation(payload, quoteId);
 
@@ -35,7 +31,6 @@ function prepareQuoteSend(
 
   const quote = payload.quotes[quoteIndex];
   if (quote.status !== "DRAFT") throw new Error("QUOTE_NOT_EDITABLE");
-  if (!/^\d{4}-\d{2}-\d{2}$/.test(followUpDate)) throw new Error("QUOTE_FOLLOW_UP_DATE_REQUIRED");
 
   assertQuotePricingIntegrity(quote.model.items, quote.pricingConfig);
   const pricing = calculateQuoteAdjustedPricing(quote.model.items, quote.pricingConfig);
@@ -44,30 +39,61 @@ function prepareQuoteSend(
   return { payload, quoteIndex, quote };
 }
 
-function commitSentQuote(
-  prepared: PreparedQuoteSend,
-  followUpDate: string,
-  actor: QuoteSendActor,
-  now: Date,
-  finalPdf: QuoteFinalPdf | null,
-): { payload: NativeQuotesPayload; focusQuoteId: string; commercialCaseId: string } {
-  const timestamp = now.toISOString();
-  const updated = nativeQuoteRecordSchema.parse({
-    ...prepared.quote,
-    status: "SENT",
-    sentAt: timestamp,
-    followUpDate,
-    finalPdf,
-    updatedAt: timestamp,
-    updatedByName: actor.displayName,
-  });
-  prepared.payload.quotes[prepared.quoteIndex] = updated;
+function prepareFrozenQuote(source: NativeQuotesPayload, quoteId: string): PreparedQuote {
+  const payload = structuredClone(parseNativeQuotesPayload(source));
+  const quoteIndex = payload.quotes.findIndex((quote) => quote.id === quoteId);
+  if (quoteIndex < 0) throw new Error("QUOTE_NOT_FOUND");
+  const quote = payload.quotes[quoteIndex];
+  if (quote.status !== "FROZEN" || !quote.finalPdf) {
+    throw new Error("QUOTE_NOT_FROZEN");
+  }
+  return { payload, quoteIndex, quote };
+}
 
+function assertFollowUpDate(followUpDate: string) {
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(followUpDate)) {
+    throw new Error("QUOTE_FOLLOW_UP_DATE_REQUIRED");
+  }
+}
+
+function assertFinalPdfMatchesQuote(quote: NativeQuoteRecord, finalPdf: QuoteFinalPdf) {
+  if (finalPdf.variantName !== quote.variantName) {
+    throw new Error("QUOTE_FINAL_PDF_VARIANT_MISMATCH");
+  }
+  if (finalPdf.version !== quote.version) {
+    throw new Error("QUOTE_FINAL_PDF_VERSION_MISMATCH");
+  }
+}
+
+function result(prepared: PreparedQuote, updated: NativeQuoteRecord) {
+  prepared.payload.quotes[prepared.quoteIndex] = updated;
   return {
     payload: prepared.payload,
     focusQuoteId: updated.id,
     commercialCaseId: updated.commercialCaseId,
   };
+}
+
+export function markNativeQuoteValidatedWithFinalPdf(
+  source: NativeQuotesPayload,
+  quoteId: string,
+  finalPdf: QuoteFinalPdf,
+  actor: QuoteSendActor,
+  now: Date = new Date(),
+): { payload: NativeQuotesPayload; focusQuoteId: string; commercialCaseId: string } {
+  const prepared = prepareDraftQuote(source, quoteId);
+  assertFinalPdfMatchesQuote(prepared.quote, finalPdf);
+  const timestamp = now.toISOString();
+  const updated = nativeQuoteRecordSchema.parse({
+    ...prepared.quote,
+    status: "FROZEN",
+    sentAt: null,
+    followUpDate: null,
+    finalPdf,
+    updatedAt: timestamp,
+    updatedByName: actor.displayName,
+  });
+  return result(prepared, updated);
 }
 
 export function markNativeQuoteSent(
@@ -77,8 +103,19 @@ export function markNativeQuoteSent(
   actor: QuoteSendActor,
   now: Date = new Date(),
 ): { payload: NativeQuotesPayload; focusQuoteId: string; commercialCaseId: string } {
-  const prepared = prepareQuoteSend(source, quoteId, followUpDate);
-  return commitSentQuote(prepared, followUpDate, actor, now, null);
+  assertFollowUpDate(followUpDate);
+  const prepared = prepareDraftQuote(source, quoteId);
+  const timestamp = now.toISOString();
+  const updated = nativeQuoteRecordSchema.parse({
+    ...prepared.quote,
+    status: "SENT",
+    sentAt: timestamp,
+    followUpDate,
+    finalPdf: null,
+    updatedAt: timestamp,
+    updatedByName: actor.displayName,
+  });
+  return result(prepared, updated);
 }
 
 export function markNativeQuoteSentWithFinalPdf(
@@ -89,12 +126,39 @@ export function markNativeQuoteSentWithFinalPdf(
   actor: QuoteSendActor,
   now: Date = new Date(),
 ): { payload: NativeQuotesPayload; focusQuoteId: string; commercialCaseId: string } {
-  const prepared = prepareQuoteSend(source, quoteId, followUpDate);
-  if (finalPdf.variantName !== prepared.quote.variantName) {
-    throw new Error("QUOTE_FINAL_PDF_VARIANT_MISMATCH");
-  }
-  if (finalPdf.version !== prepared.quote.version) {
-    throw new Error("QUOTE_FINAL_PDF_VERSION_MISMATCH");
-  }
-  return commitSentQuote(prepared, followUpDate, actor, now, finalPdf);
+  assertFollowUpDate(followUpDate);
+  const prepared = prepareDraftQuote(source, quoteId);
+  assertFinalPdfMatchesQuote(prepared.quote, finalPdf);
+  const timestamp = now.toISOString();
+  const updated = nativeQuoteRecordSchema.parse({
+    ...prepared.quote,
+    status: "SENT",
+    sentAt: timestamp,
+    followUpDate,
+    finalPdf,
+    updatedAt: timestamp,
+    updatedByName: actor.displayName,
+  });
+  return result(prepared, updated);
+}
+
+export function markFrozenNativeQuoteSent(
+  source: NativeQuotesPayload,
+  quoteId: string,
+  followUpDate: string,
+  actor: QuoteSendActor,
+  now: Date = new Date(),
+): { payload: NativeQuotesPayload; focusQuoteId: string; commercialCaseId: string } {
+  assertFollowUpDate(followUpDate);
+  const prepared = prepareFrozenQuote(source, quoteId);
+  const timestamp = now.toISOString();
+  const updated = nativeQuoteRecordSchema.parse({
+    ...prepared.quote,
+    status: "SENT",
+    sentAt: timestamp,
+    followUpDate,
+    updatedAt: timestamp,
+    updatedByName: actor.displayName,
+  });
+  return result(prepared, updated);
 }
