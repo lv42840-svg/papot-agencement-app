@@ -216,8 +216,8 @@ export function CommercialConfirmationDialog({
               disabled={submitting}
             />
             <span>
-              Confirmer explicitement l’affaire sans devis retenu. Le cahier des charges autorise
-              ce cas lorsqu’un chantier démarre sans devis.
+              Confirmer explicitement l’affaire sans devis retenu. Le cahier des charges autorise ce
+              cas lorsqu’un chantier démarre sans devis.
             </span>
           </label>
         ) : null}
@@ -254,7 +254,12 @@ export function CommercialConfirmationDialog({
         <footer>
           <span>Pose prévue : {plannedInstallDate || "date manquante"}</span>
           <div>
-            <button type="button" className="secondaryButton" onClick={onCancel} disabled={submitting}>
+            <button
+              type="button"
+              className="secondaryButton"
+              onClick={onCancel}
+              disabled={submitting}
+            >
               Annuler
             </button>
             <button
