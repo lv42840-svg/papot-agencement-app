@@ -1,46 +1,179 @@
-name: Temp inspect quote template
+name: Temp repair quote template
 on:
   push:
     branches:
       - fix/devis-pdf-layout-v2
 
+permissions:
+  contents: write
+
 jobs:
-  inspect:
+  repair:
+    if: github.actor != 'github-actions[bot]'
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-      - name: Inspect DOCX layout
+      - name: Repair DOCX layout
         run: |
           python - <<'PY'
-          import zipfile, xml.etree.ElementTree as ET, json
+          import zipfile, tempfile, shutil, os
+          import xml.etree.ElementTree as ET
+
           path="docs/templates/PAPOT_Template_Devis_V2.docx"
-          ns={"w":"http://schemas.openxmlformats.org/wordprocessingml/2006/main"}
-          W="{http://schemas.openxmlformats.org/wordprocessingml/2006/main}"
-          with zipfile.ZipFile(path) as z:
-              root=ET.fromstring(z.read("word/document.xml"))
-          body=root.find("w:body",ns)
+          WNS="http://schemas.openxmlformats.org/wordprocessingml/2006/main"
+          W="{"+WNS+"}"
+          ns={"w":WNS}
+          ET.register_namespace("w", WNS)
+          widths=[567,5216,1134,1417,1077,1587]
+
           def text(el):
               return "".join(t.text or "" for t in el.findall(".//w:t",ns))
+
+          with zipfile.ZipFile(path,"r") as zin:
+              files={n:zin.read(n) for n in zin.namelist()}
+
+          root=ET.fromstring(files["word/document.xml"])
+          body=root.find("w:body",ns)
           children=list(body)
-          tokens=["PAPOT_QUOTE_BODY","PAPOT_OPTIONS_BLOCK","PAPOT_VAT_SUMMARY","PAPOT_VAT_LINES_ANCHOR","PAPOT_ANNEX_IMAGES","total_ht","total_ttc","net_a_payer","conditions_paiement","methodes_paiement"]
-          for idx,child in enumerate(children):
-              tag=child.tag.split("}")[-1]
+
+          # 1) Corriger la grille réelle des tableaux Devis et Options.
+          for child in children:
+              if child.tag != W+"tbl":
+                  continue
               tx=text(child)
-              if any(tok in tx for tok in tokens) or "OPTIONS NON COMPRISES" in tx or "Conditions de paiement" in tx or "Coordonnées bancaires" in tx or "Pour le client" in tx:
-                  print("\nBODY",idx,tag,repr(tx))
-                  if tag=="tbl":
-                      grid=[c.get(W+"w") for c in child.findall("./w:tblGrid/w:gridCol",ns)]
-                      tblw=child.find("./w:tblPr/w:tblW",ns)
-                      print(" grid",grid,"tblW",None if tblw is None else dict(tblw.attrib))
-                      for ri,row in enumerate(child.findall("./w:tr",ns)):
-                          cells=row.findall("./w:tc",ns)
-                          vals=[text(c) for c in cells]
-                          widths=[]
-                          for c in cells:
-                              tcw=c.find("./w:tcPr/w:tcW",ns)
-                              widths.append(None if tcw is None else dict(tcw.attrib))
-                          print(" row",ri,vals,"widths",widths)
-                  else:
-                      ppr=child.find("./w:pPr",ns)
-                      print(" pPr", ET.tostring(ppr,encoding="unicode") if ppr is not None else "")
+              if "{{PAPOT_QUOTE_BODY}}" not in tx and "{{PAPOT_OPTIONS_BLOCK}}" not in tx:
+                  continue
+              tblPr=child.find("w:tblPr",ns)
+              if tblPr is None:
+                  tblPr=ET.Element(W+"tblPr")
+                  child.insert(0,tblPr)
+              layout=tblPr.find("w:tblLayout",ns)
+              if layout is None:
+                  layout=ET.SubElement(tblPr,W+"tblLayout")
+              layout.set(W+"type","fixed")
+              tblW=tblPr.find("w:tblW",ns)
+              if tblW is None:
+                  tblW=ET.SubElement(tblPr,W+"tblW")
+              tblW.set(W+"type","dxa")
+              tblW.set(W+"w",str(sum(widths)))
+              grid=child.find("w:tblGrid",ns)
+              if grid is None:
+                  grid=ET.Element(W+"tblGrid")
+                  child.insert(1,grid)
+              for old in list(grid):
+                  grid.remove(old)
+              for value in widths:
+                  col=ET.SubElement(grid,W+"gridCol")
+                  col.set(W+"w",str(value))
+
+          # 2) Supprimer le titre Options statique, car le moteur l'insère déjà.
+          for child in list(body):
+              if child.tag == W+"p" and text(child).strip() == "OPTIONS NON COMPRISES DANS LE TOTAL PRINCIPAL":
+                  body.remove(child)
+
+          # 3) Séparer signature du bloc Totaux/Conditions.
+          financial=None
+          for child in list(body):
+              if child.tag == W+"tbl" and "{{total_ht}}" in text(child) and "Pour le client" in text(child):
+                  financial=child
+                  break
+
+          if financial is None:
+              raise SystemExit("financial table not found")
+
+          rows=financial.findall("w:tr",ns)
+          if len(rows)!=1:
+              raise SystemExit(f"unexpected financial rows: {len(rows)}")
+          cells=rows[0].findall("w:tc",ns)
+          if len(cells)!=2:
+              raise SystemExit(f"unexpected financial cells: {len(cells)}")
+
+          right=cells[1]
+          right_children=list(right)
+          split_idx=None
+          for i,el in enumerate(right_children):
+              if el.tag==W+"p" and text(el).strip()=="Pour le client":
+                  split_idx=i
+                  break
+          if split_idx is None:
+              raise SystemExit("signature marker not found")
+
+          signature_nodes=right_children[split_idx:]
+          for el in signature_nodes:
+              right.remove(el)
+
+          # Set main financial row to 58/42 instead of 50/50.
+          total_width=10886
+          left_w=6314
+          right_w=4572
+          for cell,w in zip(cells,[left_w,right_w]):
+              tcPr=cell.find("w:tcPr",ns)
+              if tcPr is None:
+                  tcPr=ET.Element(W+"tcPr")
+                  cell.insert(0,tcPr)
+              tcW=tcPr.find("w:tcW",ns)
+              if tcW is None:
+                  tcW=ET.SubElement(tcPr,W+"tcW")
+              tcW.set(W+"type","dxa")
+              tcW.set(W+"w",str(w))
+
+          grid=financial.find("w:tblGrid",ns)
+          if grid is None:
+              grid=ET.Element(W+"tblGrid")
+              financial.insert(1,grid)
+          for old in list(grid):
+              grid.remove(old)
+          for w in [left_w,right_w]:
+              col=ET.SubElement(grid,W+"gridCol")
+              col.set(W+"w",str(w))
+
+          tblPr=financial.find("w:tblPr",ns)
+          if tblPr is None:
+              tblPr=ET.Element(W+"tblPr")
+              financial.insert(0,tblPr)
+          layout=tblPr.find("w:tblLayout",ns)
+          if layout is None:
+              layout=ET.SubElement(tblPr,W+"tblLayout")
+          layout.set(W+"type","fixed")
+          tblW=tblPr.find("w:tblW",ns)
+          if tblW is None:
+              tblW=ET.SubElement(tblPr,W+"tblW")
+          tblW.set(W+"type","dxa")
+          tblW.set(W+"w",str(total_width))
+
+          # Signature = seconde ligne pleine largeur fusionnée.
+          sig_row=ET.Element(W+"tr")
+          sig_cell=ET.SubElement(sig_row,W+"tc")
+          sigPr=ET.SubElement(sig_cell,W+"tcPr")
+          sigW=ET.SubElement(sigPr,W+"tcW")
+          sigW.set(W+"type","dxa")
+          sigW.set(W+"w",str(total_width))
+          span=ET.SubElement(sigPr,W+"gridSpan")
+          span.set(W+"val","2")
+          for el in signature_nodes:
+              sig_cell.append(el)
+          rows[0].addnext if False else None
+          financial.append(sig_row)
+
+          files["word/document.xml"]=ET.tostring(root,encoding="utf-8",xml_declaration=True)
+          fd,tmp=tempfile.mkstemp(suffix=".docx")
+          os.close(fd)
+          try:
+              with zipfile.ZipFile(tmp,"w",zipfile.ZIP_DEFLATED) as zout:
+                  for n,data in files.items():
+                      zout.writestr(n,data)
+              shutil.move(tmp,path)
+          finally:
+              if os.path.exists(tmp):
+                  os.unlink(tmp)
           PY
+      - name: Commit repaired template
+        run: |
+          if git diff --quiet; then
+            exit 0
+          fi
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add docs/templates/PAPOT_Template_Devis_V2.docx
+          git commit -m "Devis: corriger le gabarit PDF V2"
+          git push
