@@ -148,18 +148,17 @@ export function calculateChantierProfitability(
       ? null
       : marginPercent(soldCents, actualTotalCostCents);
 
-  const plannedHours =
-    soldComplete
-      ? summaries.reduce(
-          (total, quote) => ({
-            be: total.be + quote.soldHours.be,
-            workshop: total.workshop + quote.soldHours.workshop,
-            install: total.install + quote.soldHours.install,
-            total: total.total + quote.soldHours.total,
-          }),
-          { be: 0, workshop: 0, install: 0, total: 0 },
-        )
-      : { be: 0, workshop: 0, install: 0, total: 0 };
+  const plannedHours = soldComplete
+    ? summaries.reduce(
+        (total, quote) => ({
+          be: total.be + quote.soldHours.be,
+          workshop: total.workshop + quote.soldHours.workshop,
+          install: total.install + quote.soldHours.install,
+          total: total.total + quote.soldHours.total,
+        }),
+        { be: 0, workshop: 0, install: 0, total: 0 },
+      )
+    : { be: 0, workshop: 0, install: 0, total: 0 };
 
   return {
     soldCents,
