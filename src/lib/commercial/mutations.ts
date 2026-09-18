@@ -54,6 +54,11 @@ export const commercialMutationSchema = z.discriminatedUnion("action", [
     confirmWithoutQuote: z.boolean().optional(),
   }),
   z.object({
+    action: z.literal("linkSourceEntry"),
+    caseId: z.string().uuid(),
+    sourceEntryId: z.string().uuid(),
+  }),
+  z.object({
     action: z.literal("retainAdditionalQuote"),
     caseId: z.string().uuid(),
     quoteId: z.string().uuid(),
@@ -359,6 +364,27 @@ export function applyCommercialMutation(
   if (input.action === "setStatus") {
     assertOpen(item);
     setActiveStatus(item, input.status, input, actor, now);
+    return { payload, focusCaseId: item.id };
+  }
+
+  if (input.action === "linkSourceEntry") {
+    assertOpen(item);
+    const alreadyLinked = payload.cases.find(
+      (candidate) => candidate.id !== item.id && candidate.sourceEntryId === input.sourceEntryId,
+    );
+    if (alreadyLinked) throw new Error("COMMERCIAL_SOURCE_TASK_ALREADY_LINKED");
+    if (item.sourceEntryId && item.sourceEntryId !== input.sourceEntryId) {
+      throw new Error("COMMERCIAL_CASE_SOURCE_ALREADY_LINKED");
+    }
+    item.sourceEntryId = input.sourceEntryId;
+    touch(item, actor, now);
+    history(
+      item,
+      actor.displayName,
+      "SOURCE_ENTRY_LINKED",
+      "Entrée PAPOT rattachée à l’affaire.",
+      now,
+    );
     return { payload, focusCaseId: item.id };
   }
 
