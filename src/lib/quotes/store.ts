@@ -54,6 +54,7 @@ export const nativeQuoteRecordSchema = z
   .object({
     id: z.string().uuid(),
     commercialCaseId: z.string().uuid(),
+    quoteKind: z.enum(["STANDARD", "TS"]).default("STANDARD"),
     variantName: z.string().trim().min(1).max(120),
     version: quoteVersionSchema,
     status: quoteStatusSchema,

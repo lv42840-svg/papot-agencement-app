@@ -12,7 +12,7 @@ import {
   Users,
   Wrench,
 } from "lucide-react";
-import { useEffect, useMemo, useState } from "react";
+import { useMemo, useState } from "react";
 import {
   BE_STATUS_LABELS,
   CHANTIER_OPERATIONAL_SPACES,
@@ -27,27 +27,41 @@ import {
   type WorkshopItem,
   type WorkshopItemStatus,
 } from "@/lib/chantiers/domain";
-import type {
-  CommercialCase,
-  CommercialDocument,
-  CommercialPayload,
-} from "@/lib/commercial/domain";
-import { requestObatAnalysis } from "@/lib/obat/client";
-import type { ObatQuoteLine } from "@/lib/obat/domain";
+import type { CommercialCase } from "@/lib/commercial/domain";
+import {
+  chantierQuoteLineDisplay,
+  retainedChantierQuotes,
+  type ChantierRetainedQuote,
+} from "@/lib/chantiers/quote-links";
+import { quoteCanBeRetained } from "@/lib/quotes/retention";
+import type { NativeQuotesPayload } from "@/lib/quotes/store";
 
 type MutationBody = Record<string, unknown> & { action: string };
 type Mutate = (body: MutationBody, message: string) => Promise<boolean>;
 type SpaceId = (typeof CHANTIER_OPERATIONAL_SPACES)[number]["id"];
-type QuoteGroup = { quoteNumber: string; lines: ObatQuoteLine[] };
+type QuoteGroup = ChantierRetainedQuote;
 
-type Props = {
+const QUOTE_STATUS_LABELS = {
+  DRAFT: "Brouillon",
+  SENT: "Envoyé",
+  ACCEPTED: "Accepté",
+  REJECTED: "Refusé",
+  CANCELLED: "Annulé",
+  SUPERSEDED: "Version précédente",
+} as const;
+
+type CoreProps = {
   chantier: ChantierRecord;
   busy: boolean;
   canModify: boolean;
   mutate: Mutate;
 };
 
-type CommercialSnapshot = { payload: CommercialPayload };
+type Props = CoreProps & {
+  commercialCase: CommercialCase | null;
+  quotes: NativeQuotesPayload;
+  mutateCommercial: Mutate;
+};
 
 const spaceDescriptions: Record<SpaceId, string> = {
   admin: "Devis, factures, PPSPS et documents administratifs déjà liés au chantier.",
@@ -81,130 +95,22 @@ function originLabel(originKind: TechnicalOrigin, originLabelValue: string | nul
   return originLabelValue ? `Devis · ${originLabelValue}` : "Ligne de devis à préciser";
 }
 
-function quoteDocumentHref(caseId: string, documentId: string): string {
-  return `/api/desktop/commercial/${caseId}/documents/${documentId}`;
-}
-
-function latestQuoteDocuments(item: CommercialCase): CommercialDocument[] {
-  const selected = new Map<string, CommercialDocument>();
-  const candidates = item.documents.filter(
-    (document) =>
-      document.category === "QUOTE" &&
-      (document.contentType === "application/pdf" ||
-        document.fileName.toLowerCase().endsWith(".pdf")),
-  );
-
-  for (const document of candidates) {
-    const key = document.versionLabel?.trim() || document.id;
-    const current = selected.get(key);
-    if (!current) {
-      selected.set(key, document);
-      continue;
-    }
-    if (current.isSignedQuote && !document.isSignedQuote) {
-      selected.set(key, document);
-      continue;
-    }
-    if (
-      current.isSignedQuote === document.isSignedQuote &&
-      document.uploadedAt > current.uploadedAt
-    ) {
-      selected.set(key, document);
-    }
-  }
-
-  return [...selected.values()];
-}
-
-export function ChantierOperationalWorkspace({ chantier, busy, canModify, mutate }: Props) {
+export function ChantierOperationalWorkspace({
+  chantier,
+  commercialCase,
+  quotes,
+  busy,
+  canModify,
+  mutate,
+  mutateCommercial,
+}: Props) {
   const [space, setSpace] = useState<SpaceId>("admin");
-  const [quoteGroups, setQuoteGroups] = useState<QuoteGroup[]>([]);
-  const [quoteLinesLoading, setQuoteLinesLoading] = useState(true);
-  const [quoteLinesError, setQuoteLinesError] = useState<string | null>(null);
+  const quoteGroups = useMemo<QuoteGroup[]>(
+    () => (commercialCase ? retainedChantierQuotes(commercialCase, quotes) : []),
+    [commercialCase, quotes],
+  );
   const spaceState = chantier.operational.spaces[space];
   const spaceLabel = CHANTIER_OPERATIONAL_SPACES.find((item) => item.id === space)?.label ?? space;
-
-  useEffect(() => {
-    let cancelled = false;
-
-    async function loadQuoteLines() {
-      setQuoteLinesLoading(true);
-      setQuoteLinesError(null);
-      try {
-        const commercialResponse = await fetch("/api/desktop/commercial", { cache: "no-store" });
-        const commercial = (await commercialResponse.json()) as CommercialSnapshot & {
-          error?: string;
-        };
-        if (!commercialResponse.ok) throw new Error(commercial.error ?? "COMMERCIAL_LOAD_FAILED");
-
-        const item = commercial.payload.cases.find(
-          (candidate) => candidate.id === chantier.sourceCommercialCaseId,
-        );
-        if (!item) {
-          if (!cancelled) setQuoteGroups([]);
-          return;
-        }
-
-        const documents = latestQuoteDocuments(item);
-        const detected = new Map<
-          string,
-          { quoteNumber: string; lines: ObatQuoteLine[]; uploadedAt: string }
-        >();
-        let failedDocuments = 0;
-
-        await Promise.all(
-          documents.map(async (document) => {
-            try {
-              const response = await fetch(quoteDocumentHref(item.id, document.id), {
-                cache: "no-store",
-              });
-              if (!response.ok) throw new Error("QUOTE_DOCUMENT_READ_FAILED");
-              const blob = await response.blob();
-              const file = new File([blob], document.fileName, {
-                type: document.contentType || blob.type || "application/pdf",
-                lastModified: new Date(document.uploadedAt).getTime(),
-              });
-              const analysis = await requestObatAnalysis([file]);
-              if (!analysis.quoteNumber || analysis.quoteLines.length === 0) return;
-              const previous = detected.get(analysis.quoteNumber);
-              if (!previous || document.uploadedAt > previous.uploadedAt) {
-                detected.set(analysis.quoteNumber, {
-                  quoteNumber: analysis.quoteNumber,
-                  lines: analysis.quoteLines,
-                  uploadedAt: document.uploadedAt,
-                });
-              }
-            } catch {
-              failedDocuments += 1;
-            }
-          }),
-        );
-
-        if (cancelled) return;
-        const groups = [...detected.values()]
-          .map(({ quoteNumber, lines }) => ({ quoteNumber, lines }))
-          .sort((left, right) => left.quoteNumber.localeCompare(right.quoteNumber, "fr"));
-        setQuoteGroups(groups);
-        if (groups.length === 0 && documents.length > 0 && failedDocuments > 0) {
-          setQuoteLinesError(
-            "Les devis sont présents, mais PAPOT n'a pas réussi à relire leurs lignes.",
-          );
-        }
-      } catch {
-        if (!cancelled) {
-          setQuoteGroups([]);
-          setQuoteLinesError("Impossible de charger les lignes des devis pour le moment.");
-        }
-      } finally {
-        if (!cancelled) setQuoteLinesLoading(false);
-      }
-    }
-
-    void loadQuoteLines();
-    return () => {
-      cancelled = true;
-    };
-  }, [chantier.sourceCommercialCaseId]);
 
   return (
     <section className="chantierOperationalWorkspace">
@@ -267,32 +173,46 @@ export function ChantierOperationalWorkspace({ chantier, busy, canModify, mutate
           <OperationalEmpty label="Cet espace est déclaré Non concerné pour ce chantier." />
         ) : (
           <>
-            {space === "be" ? (
-              <BeSpace
+            {space === "admin" ? (
+              <AdminSpace
                 chantier={chantier}
+                commercialCase={commercialCase}
+                quotes={quotes}
+                quoteGroups={quoteGroups}
                 busy={busy}
                 canModify={canModify}
                 mutate={mutate}
+                mutateCommercial={mutateCommercial}
+              />
+            ) : null}
+            {space === "be" ? (
+              <BeSpace
+                chantier={chantier}
+                commercialCase={commercialCase}
+                quotes={quotes}
+                busy={busy}
+                canModify={canModify}
+                mutate={mutate}
+                mutateCommercial={mutateCommercial}
                 quoteGroups={quoteGroups}
-                quoteLinesLoading={quoteLinesLoading}
-                quoteLinesError={quoteLinesError}
               />
             ) : null}
             {space === "workshop" ? (
               <WorkshopSpace
                 chantier={chantier}
+                commercialCase={commercialCase}
+                quotes={quotes}
                 busy={busy}
                 canModify={canModify}
                 mutate={mutate}
+                mutateCommercial={mutateCommercial}
                 quoteGroups={quoteGroups}
-                quoteLinesLoading={quoteLinesLoading}
-                quoteLinesError={quoteLinesError}
               />
             ) : null}
             {space === "install" ? (
               <InstallSpace chantier={chantier} busy={busy} canModify={canModify} mutate={mutate} />
             ) : null}
-            {space !== "be" && space !== "workshop" && space !== "install" ? (
+            {space !== "admin" && space !== "be" && space !== "workshop" && space !== "install" ? (
               <FutureSpace id={space} />
             ) : null}
           </>
@@ -303,21 +223,146 @@ export function ChantierOperationalWorkspace({ chantier, busy, canModify, mutate
   );
 }
 
-type TechnicalSpaceProps = Props & {
-  quoteGroups: QuoteGroup[];
-  quoteLinesLoading: boolean;
-  quoteLinesError: string | null;
-};
-
-function BeSpace({
+function AdminSpace({
   chantier,
+  commercialCase,
+  quotes,
+  quoteGroups,
   busy,
   canModify,
-  mutate,
-  quoteGroups,
-  quoteLinesLoading,
-  quoteLinesError,
-}: TechnicalSpaceProps) {
+  mutateCommercial,
+}: CoreProps & {
+  commercialCase: CommercialCase | null;
+  quotes: NativeQuotesPayload;
+  quoteGroups: QuoteGroup[];
+  mutateCommercial: Mutate;
+}) {
+  const retainedIds = new Set(commercialCase?.retainedQuoteIds ?? []);
+  const otherQuotes = commercialCase
+    ? quotes.quotes
+        .filter(
+          (quote) => quote.commercialCaseId === commercialCase.id && !retainedIds.has(quote.id),
+        )
+        .sort((left, right) => right.updatedAt.localeCompare(left.updatedAt))
+    : [];
+
+  return (
+    <div className="chantierOpSpace">
+      <div className="chantierAdminBlock">
+        <div className="chantierAdminBlockTitle">
+          <div>
+            <strong>Devis acceptés</strong>
+            <span>
+              {quoteGroups.length} devis lié{quoteGroups.length > 1 ? "s" : ""} au chantier, sans
+              copie physique.
+            </span>
+          </div>
+          {commercialCase && canModify ? (
+            <a
+              className="chantierNewQuoteLink"
+              href={`/devis/nouveau?affaire=${encodeURIComponent(commercialCase.id)}&chantier=1`}
+            >
+              <Plus size={14} /> Nouveau devis / TS
+            </a>
+          ) : null}
+        </div>
+        {quoteGroups.length === 0 ? (
+          <OperationalEmpty label="Aucun devis natif retenu pour ce chantier." />
+        ) : (
+          <div className="chantierAdminQuotes">
+            {quoteGroups.map(({ quote, lines }) => (
+              <article key={quote.id}>
+                <div>
+                  <strong>{quote.finalPdf?.quoteNumber ?? quote.model.subject}</strong>
+                  <span>
+                    {quote.model.subject} · {quote.variantName} · V{quote.version}
+                  </span>
+                  <small>
+                    {quote.quoteKind === "TS"
+                      ? "TS"
+                      : chantier.initialRetainedQuoteIds.includes(quote.id)
+                        ? "Contrat initial"
+                        : "Complément"}{" "}
+                    · {lines.length} ligne{lines.length > 1 ? "s" : ""} de référence
+                  </small>
+                </div>
+                <div className="chantierAdminQuoteActions">
+                  {commercialCase && quote.finalPdf ? (
+                    <a
+                      href={`/api/desktop/commercial/${commercialCase.id}/documents/${quote.finalPdf.commercialDocumentId}`}
+                    >
+                      Voir le PDF
+                    </a>
+                  ) : null}
+                  <a href={`/devis/${quote.id}`}>Ouvrir le devis</a>
+                </div>
+              </article>
+            ))}
+          </div>
+        )}
+
+        {commercialCase && otherQuotes.length > 0 ? (
+          <div className="chantierComplementaryQuotes">
+            <div>
+              <strong>Autres devis / historique</strong>
+              <span>
+                Brouillons, compléments, TS refusés et anciennes versions restent consultables.
+                Seuls les devis figés éligibles peuvent rejoindre le contrat.
+              </span>
+            </div>
+            {otherQuotes.map((quote) => (
+              <article key={quote.id}>
+                <span>
+                  <strong>{quote.finalPdf?.quoteNumber ?? quote.model.subject}</strong>
+                  <small>
+                    {quote.quoteKind === "TS" ? "TS" : "Devis"} · {quote.model.subject} ·{" "}
+                    {quote.variantName} · V{quote.version} · {QUOTE_STATUS_LABELS[quote.status]}
+                  </small>
+                </span>
+                <div className="chantierAdminQuoteActions">
+                  {quote.finalPdf ? (
+                    <a
+                      href={`/api/desktop/commercial/${commercialCase.id}/documents/${quote.finalPdf.commercialDocumentId}`}
+                    >
+                      Voir le PDF
+                    </a>
+                  ) : null}
+                  <a href={`/devis/${quote.id}`}>Ouvrir le devis</a>
+                  {canModify && quoteCanBeRetained(quote) ? (
+                    <button
+                      type="button"
+                      disabled={busy}
+                      onClick={() =>
+                        void mutateCommercial(
+                          {
+                            action: "retainAdditionalQuote",
+                            caseId: commercialCase.id,
+                            quoteId: quote.id,
+                          },
+                          quote.quoteKind === "TS"
+                            ? "TS accepté et ajouté au chantier."
+                            : "Devis complémentaire ajouté au chantier.",
+                        )
+                      }
+                    >
+                      {quote.quoteKind === "TS" ? "Accepter le TS" : "Accepter comme complément"}
+                    </button>
+                  ) : null}
+                </div>
+              </article>
+            ))}
+          </div>
+        ) : null}
+      </div>
+    </div>
+  );
+}
+
+type TechnicalSpaceProps = Props & {
+  quoteGroups: QuoteGroup[];
+};
+
+function BeSpace({ chantier, busy, canModify, mutate, quoteGroups }: TechnicalSpaceProps) {
   const [creating, setCreating] = useState(false);
   const items = chantier.operational.beItems;
 
@@ -348,8 +393,6 @@ function BeSpace({
           mode="be"
           busy={busy}
           quoteGroups={quoteGroups}
-          quoteLinesLoading={quoteLinesLoading}
-          quoteLinesError={quoteLinesError}
           onCancel={() => setCreating(false)}
           onCreate={async (value) => {
             const ok = await mutate(
@@ -380,7 +423,7 @@ function BeSpace({
   );
 }
 
-function BeRow({ chantier, item, busy, canModify, mutate }: Props & { item: BeItem }) {
+function BeRow({ chantier, item, busy, canModify, mutate }: CoreProps & { item: BeItem }) {
   return (
     <div className="chantierOpRow">
       <div className="chantierOpRowMain">
@@ -418,15 +461,7 @@ function BeRow({ chantier, item, busy, canModify, mutate }: Props & { item: BeIt
   );
 }
 
-function WorkshopSpace({
-  chantier,
-  busy,
-  canModify,
-  mutate,
-  quoteGroups,
-  quoteLinesLoading,
-  quoteLinesError,
-}: TechnicalSpaceProps) {
+function WorkshopSpace({ chantier, busy, canModify, mutate, quoteGroups }: TechnicalSpaceProps) {
   const [creating, setCreating] = useState(false);
   const items = chantier.operational.workshopItems;
 
@@ -457,8 +492,6 @@ function WorkshopSpace({
           mode="workshop"
           busy={busy}
           quoteGroups={quoteGroups}
-          quoteLinesLoading={quoteLinesLoading}
-          quoteLinesError={quoteLinesError}
           onCancel={() => setCreating(false)}
           onCreate={async (value) => {
             const ok = await mutate(
@@ -489,7 +522,13 @@ function WorkshopSpace({
   );
 }
 
-function WorkshopRow({ chantier, item, busy, canModify, mutate }: Props & { item: WorkshopItem }) {
+function WorkshopRow({
+  chantier,
+  item,
+  busy,
+  canModify,
+  mutate,
+}: CoreProps & { item: WorkshopItem }) {
   return (
     <div className="chantierOpRow">
       <div className="chantierOpRowMain">
@@ -526,7 +565,7 @@ function WorkshopRow({ chantier, item, busy, canModify, mutate }: Props & { item
   );
 }
 
-function InstallSpace({ chantier, busy, canModify, mutate }: Props) {
+function InstallSpace({ chantier, busy, canModify, mutate }: CoreProps) {
   const items = chantier.operational.installItems;
   return (
     <div className="chantierOpSpace">
@@ -566,7 +605,13 @@ function InstallSpace({ chantier, busy, canModify, mutate }: Props) {
   );
 }
 
-function InstallRow({ chantier, item, busy, canModify, mutate }: Props & { item: InstallItem }) {
+function InstallRow({
+  chantier,
+  item,
+  busy,
+  canModify,
+  mutate,
+}: CoreProps & { item: InstallItem }) {
   const [status, setStatus] = useState<InstallItemStatus>(item.status);
   const [note, setNote] = useState(item.note ?? "");
 
@@ -626,27 +671,24 @@ function TechnicalCreateForm({
   mode,
   busy,
   quoteGroups,
-  quoteLinesLoading,
-  quoteLinesError,
   onCancel,
   onCreate,
 }: {
   mode: "be" | "workshop";
   busy: boolean;
   quoteGroups: QuoteGroup[];
-  quoteLinesLoading: boolean;
-  quoteLinesError: string | null;
   onCancel: () => void;
   onCreate: (value: {
     name: string;
     originKind: TechnicalOrigin;
     originLabel: string;
     installedByUs: boolean;
+    sourceQuoteId: string;
+    sourceQuoteLineId: string;
   }) => Promise<void>;
 }) {
   const [name, setName] = useState("");
-  const [originKind, setOriginKind] = useState<TechnicalOrigin>("QUOTE_LINE");
-  const [originLabelValue, setOriginLabelValue] = useState("");
+  const [selectedQuoteLine, setSelectedQuoteLine] = useState("");
   const [quoteSearch, setQuoteSearch] = useState("");
   const [installedByUs, setInstalledByUs] = useState(true);
 
@@ -654,14 +696,13 @@ function TechnicalCreateForm({
     () =>
       quoteGroups.flatMap((group) =>
         group.lines.map((line) => ({
-          quoteNumber: group.quoteNumber,
           line,
-          value: `${group.quoteNumber} · ${line.ref} · ${line.designation}`,
+          value: `${line.quoteId}:${line.quoteLineId}`,
         })),
       ),
     [quoteGroups],
   );
-  const normalizedSearch = quoteSearch.trim().toLocaleLowerCase("fr");
+  const normalizedSearch = quoteSearch.trim().toLocaleLowerCase("fr-FR");
   const visibleGroups = useMemo(
     () =>
       quoteGroups
@@ -669,8 +710,8 @@ function TechnicalCreateForm({
           ...group,
           lines: normalizedSearch
             ? group.lines.filter((line) =>
-                `${line.ref} ${line.designation}`
-                  .toLocaleLowerCase("fr")
+                `${line.quoteNumber} ${line.description}`
+                  .toLocaleLowerCase("fr-FR")
                   .includes(normalizedSearch),
               )
             : group.lines,
@@ -678,14 +719,12 @@ function TechnicalCreateForm({
         .filter((group) => group.lines.length > 0),
     [quoteGroups, normalizedSearch],
   );
-
-  const originReady = originKind === "TS" || Boolean(originLabelValue.trim());
+  const selectedQuote = quoteOptions.find((option) => option.value === selectedQuoteLine)?.line;
 
   function selectQuoteLine(value: string) {
-    setOriginLabelValue(value);
-    if (!value || name.trim()) return;
-    const selected = quoteOptions.find((option) => option.value === value);
-    if (selected) setName(selected.line.designation);
+    setSelectedQuoteLine(value);
+    const selected = quoteOptions.find((option) => option.value === value)?.line;
+    if (selected && !name.trim()) setName(selected.description);
   }
 
   return (
@@ -693,7 +732,8 @@ function TechnicalCreateForm({
       <div className="chantierTechnicalCreateTitle">
         <strong>{mode === "be" ? "Nouvel élément BE" : "Nouvel élément direct Atelier"}</strong>
         <span>
-          Chaque élément reste relié à une vraie ligne de devis, ou est identifié comme TS.
+          Chaque élément pointe vers une vraie ligne d’un devis accepté. Un TS accepté reste un
+          devis PAPOT normal, identifié comme TS.
         </span>
       </div>
 
@@ -706,88 +746,58 @@ function TechnicalCreateForm({
           placeholder="Ex. Banque accueil, meuble arrière-bar…"
         />
       </label>
-      <label>
-        <span>Origine *</span>
-        <select
-          value={originKind}
-          onChange={(event) => {
-            const next = event.target.value as TechnicalOrigin;
-            setOriginKind(next);
-            setOriginLabelValue("");
-            setQuoteSearch("");
-          }}
-        >
-          <option value="QUOTE_LINE">Ligne de devis</option>
-          <option value="TS">Travaux supplémentaires (TS)</option>
-        </select>
-      </label>
 
-      {originKind === "QUOTE_LINE" ? (
-        <div className="chantierQuotePicker isWide">
-          <label>
-            <span>Rechercher une ligne</span>
-            <input
-              value={quoteSearch}
-              onChange={(event) => setQuoteSearch(event.target.value)}
-              placeholder="N° ou texte, ex. 2.3 ou moulures"
-              disabled={quoteLinesLoading || quoteGroups.length === 0}
-            />
-          </label>
-          <label>
-            <span>Ligne du devis *</span>
-            <select
-              value={originLabelValue}
-              onChange={(event) => selectQuoteLine(event.target.value)}
-              disabled={quoteLinesLoading || quoteGroups.length === 0}
-            >
-              <option value="">
-                {quoteLinesLoading
-                  ? "Lecture des devis…"
-                  : quoteGroups.length === 0
-                    ? "Aucune ligne de devis disponible"
-                    : "Choisir une ligne…"}
-              </option>
-              {visibleGroups.map((group) => (
-                <optgroup key={group.quoteNumber} label={`Devis ${group.quoteNumber}`}>
-                  {group.lines.map((line) => {
-                    const value = `${group.quoteNumber} · ${line.ref} · ${line.designation}`;
-                    return (
-                      <option
-                        key={`${group.quoteNumber}-${line.ref}-${line.designation}`}
-                        value={value}
-                      >
-                        {line.ref} · {line.designation}
-                      </option>
-                    );
-                  })}
-                </optgroup>
-              ))}
-            </select>
-          </label>
-          {quoteLinesLoading ? <p>Lecture automatique des lignes des devis OBAT…</p> : null}
-          {!quoteLinesLoading && quoteGroups.length > 0 ? (
-            <p>
-              {quoteOptions.length} ligne{quoteOptions.length > 1 ? "s" : ""} trouvée
-              {quoteOptions.length > 1 ? "s" : ""} dans {quoteGroups.length} devis.
-            </p>
-          ) : null}
-          {!quoteLinesLoading && quoteGroups.length === 0 ? (
-            <p className="isWarning">
-              {quoteLinesError ??
-                "Aucune ligne lisible trouvée. Importe le PDF du devis OBAT dans l'affaire commerciale."}
-            </p>
-          ) : null}
-        </div>
-      ) : (
-        <label className="isWide">
-          <span>Description TS</span>
+      <div className="chantierQuotePicker isWide">
+        <label>
+          <span>Rechercher une ligne</span>
           <input
-            value={originLabelValue}
-            onChange={(event) => setOriginLabelValue(event.target.value)}
-            placeholder="Ex. ajout tablette demandé en réunion"
+            value={quoteSearch}
+            onChange={(event) => setQuoteSearch(event.target.value)}
+            placeholder="N° de devis ou texte, ex. banque accueil"
+            disabled={quoteGroups.length === 0}
           />
         </label>
-      )}
+        <label>
+          <span>Ligne du devis accepté *</span>
+          <select
+            value={selectedQuoteLine}
+            onChange={(event) => selectQuoteLine(event.target.value)}
+            disabled={quoteGroups.length === 0}
+          >
+            <option value="">
+              {quoteGroups.length === 0
+                ? "Aucun devis accepté avec ligne disponible"
+                : "Choisir une ligne…"}
+            </option>
+            {visibleGroups.map((group) => (
+              <optgroup
+                key={group.quote.id}
+                label={`${group.quote.quoteKind === "TS" ? "TS · " : ""}${group.quote.finalPdf?.quoteNumber ?? group.quote.model.subject} · ${group.quote.variantName} · V${group.quote.version}`}
+              >
+                {group.lines.map((line) => (
+                  <option
+                    key={`${line.quoteId}:${line.quoteLineId}`}
+                    value={`${line.quoteId}:${line.quoteLineId}`}
+                  >
+                    {line.description}
+                  </option>
+                ))}
+              </optgroup>
+            ))}
+          </select>
+        </label>
+        {quoteGroups.length > 0 ? (
+          <p>
+            {quoteOptions.length} ligne{quoteOptions.length > 1 ? "s" : ""} issue
+            {quoteOptions.length > 1 ? "s" : ""} des seuls devis / TS acceptés.
+          </p>
+        ) : (
+          <p className="isWarning">
+            Aucun devis natif accepté n’est disponible. Crée puis fais accepter le devis / TS depuis
+            l’espace Admin.
+          </p>
+        )}
+      </div>
 
       <label className="chantierTechnicalCheck">
         <input
@@ -805,14 +815,18 @@ function TechnicalCreateForm({
         <button
           type="button"
           className="isPrimary"
-          disabled={busy || !name.trim() || !originReady}
+          disabled={busy || !name.trim() || !selectedQuote}
           onClick={() =>
-            void onCreate({
-              name,
-              originKind,
-              originLabel: originLabelValue,
-              installedByUs,
-            })
+            selectedQuote
+              ? void onCreate({
+                  name,
+                  originKind: selectedQuote.quoteKind === "TS" ? "TS" : "QUOTE_LINE",
+                  originLabel: chantierQuoteLineDisplay(selectedQuote),
+                  installedByUs,
+                  sourceQuoteId: selectedQuote.quoteId,
+                  sourceQuoteLineId: selectedQuote.quoteLineId,
+                })
+              : undefined
           }
         >
           <Plus size={14} /> Créer
@@ -962,6 +976,120 @@ function OperationalStyles() {
         color: #746e7a;
         font-size: 13px;
         line-height: 1.5;
+      }
+      .chantierAdminBlock {
+        display: grid;
+        gap: 10px;
+        padding: 12px;
+        border: 1px solid #e6e0ee;
+        border-radius: 9px;
+        background: #fcfbfe;
+      }
+      .chantierAdminBlockTitle {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 10px;
+      }
+      .chantierAdminBlockTitle > div,
+      .chantierComplementaryQuotes > div {
+        display: grid;
+        gap: 3px;
+      }
+      .chantierAdminBlockTitle strong,
+      .chantierComplementaryQuotes > div > strong {
+        font-size: 14px;
+        color: #4f4956;
+      }
+      .chantierAdminBlockTitle span,
+      .chantierComplementaryQuotes > div > span {
+        color: #7c7582;
+        font-size: 12px;
+      }
+      .chantierAdminQuotes,
+      .chantierComplementaryQuotes,
+      .chantierTsRows {
+        display: grid;
+        gap: 7px;
+      }
+      .chantierAdminQuotes article,
+      .chantierComplementaryQuotes article,
+      .chantierTsRow {
+        padding: 10px;
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 10px;
+        border: 1px solid #e8e3ed;
+        border-radius: 8px;
+        background: white;
+      }
+      .chantierAdminQuotes article > div,
+      .chantierComplementaryQuotes article > span,
+      .chantierTsRow > div:first-child {
+        min-width: 0;
+        display: grid;
+        gap: 2px;
+      }
+      .chantierAdminQuotes span,
+      .chantierAdminQuotes small,
+      .chantierComplementaryQuotes small,
+      .chantierTsRow span {
+        color: #7f7885;
+        font-size: 11px;
+      }
+      .chantierAdminQuotes a,
+      .chantierNewQuoteLink,
+      .chantierComplementaryQuotes button,
+      .chantierTsCreate button,
+      .chantierTsLink button {
+        min-height: 34px;
+        padding: 0 9px;
+        display: inline-flex;
+        align-items: center;
+        gap: 5px;
+        border: 1px solid #a998e4;
+        border-radius: 7px;
+        background: #f7f3ff;
+        color: #6351bf;
+        font-size: 12px;
+        font-weight: 750;
+        text-decoration: none;
+        white-space: nowrap;
+      }
+      .chantierAdminQuoteActions {
+        display: flex;
+        gap: 6px;
+        flex-wrap: wrap;
+        justify-content: flex-end;
+      }
+      .chantierComplementaryQuotes {
+        padding-top: 4px;
+        border-top: 1px solid #eeeaf2;
+      }
+      .chantierTsCreate {
+        display: grid;
+        grid-template-columns: minmax(0, 1fr) auto;
+        gap: 7px;
+      }
+      .chantierTsCreate input,
+      .chantierTsLink input,
+      .chantierTsLink select {
+        width: 100%;
+        min-height: 35px;
+        padding: 7px 9px;
+        border: 1px solid #ddd8e5;
+        border-radius: 7px;
+        background: white;
+        color: #57515e;
+        font: inherit;
+        font-size: 12px;
+      }
+      .chantierTsLink {
+        min-width: min(520px, 60vw);
+        display: grid !important;
+        grid-template-columns: minmax(120px, 0.7fr) minmax(180px, 1.3fr) auto;
+        gap: 6px !important;
       }
       .chantierOpRows,
       .chantierInstallRows {
@@ -1189,6 +1317,23 @@ function OperationalStyles() {
         }
         .chantierInstallRow {
           grid-template-columns: 1fr 160px;
+        }
+        .chantierAdminBlockTitle,
+        .chantierAdminQuotes article,
+        .chantierComplementaryQuotes article,
+        .chantierTsRow {
+          align-items: stretch;
+          flex-direction: column;
+        }
+        .chantierAdminQuoteActions {
+          justify-content: flex-start;
+        }
+        .chantierTsLink {
+          min-width: 0;
+          grid-template-columns: 1fr;
+        }
+        .chantierTsCreate {
+          grid-template-columns: 1fr;
         }
         .chantierInstallRow textarea,
         .chantierInstallRow > button,

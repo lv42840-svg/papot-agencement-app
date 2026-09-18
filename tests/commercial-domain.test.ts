@@ -212,6 +212,39 @@ describe("Commercial V1", () => {
     expect(confirmed.retainedQuoteIds).toEqual([]);
   });
 
+  it("adds a complementary retained quote after confirmation without replacing earlier quotes", () => {
+    const source = createPiste();
+    const caseId = source.cases[0].id;
+    const initialQuoteId = "88888888-8888-4888-8888-888888888888";
+    const complementaryQuoteId = "99999999-9999-4999-8999-999999999999";
+
+    const confirmed = applyCommercialMutation(
+      source,
+      {
+        action: "setStatus",
+        caseId,
+        status: "CONFIRMED",
+        plannedInstallDate: "2026-11-10",
+        retainedQuoteIds: [initialQuoteId],
+      },
+      actor,
+    ).payload;
+
+    const withComplement = applyCommercialMutation(
+      confirmed,
+      {
+        action: "retainAdditionalQuote",
+        caseId,
+        quoteId: complementaryQuoteId,
+      },
+      actor,
+    ).payload.cases[0];
+
+    expect(withComplement.retainedQuoteIds).toEqual([initialQuoteId, complementaryQuoteId]);
+    expect(withComplement.history.at(-1)?.type).toBe("QUOTES_RETAINED");
+    expect(withComplement.history.at(-1)?.summary).toContain("Devis complémentaire");
+  });
+
   it("loads older affairs without retained quote ids as an empty selection", () => {
     const source = createPiste();
     const legacy = structuredClone(source) as unknown as Record<string, unknown>;

@@ -38,6 +38,7 @@ function numberedPayload(numbers: string[]): NativeQuotesPayload {
     quotes: numbers.map((quoteNumber, index) => ({
       id: `${String(index + 1).padStart(8, "0")}-1111-4111-8111-111111111111`,
       commercialCaseId: "22222222-2222-4222-8222-222222222222",
+      quoteKind: "STANDARD",
       variantName: "Base",
       version: index + 1,
       status: "SENT",

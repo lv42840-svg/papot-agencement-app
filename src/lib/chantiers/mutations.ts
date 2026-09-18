@@ -20,6 +20,8 @@ const technicalOriginInput = z.object({
   originKind: z.enum(["QUOTE_LINE", "TS"]),
   originLabel: nullableText(500),
   installedByUs: z.boolean(),
+  sourceQuoteId: z.string().uuid().nullable().optional(),
+  sourceQuoteLineId: z.string().uuid().nullable().optional(),
 });
 
 export const launchChantierSchema = z.object({
@@ -191,6 +193,8 @@ function createWorkshopFromBe(item: ChantierRecord, beItem: BeItem, now: Date): 
     originKind: beItem.originKind,
     originLabel: beItem.originLabel,
     installedByUs: beItem.installedByUs,
+    sourceQuoteId: beItem.sourceQuoteId,
+    sourceQuoteLineId: beItem.sourceQuoteLineId,
     status: "PREPARE",
     createdAt: timestamp,
     updatedAt: timestamp,
@@ -207,6 +211,8 @@ function createInstallFromTechnical(
     name: string;
     originKind: "QUOTE_LINE" | "TS";
     originLabel: string | null;
+    sourceQuoteId: string | null;
+    sourceQuoteLineId: string | null;
   },
   now: Date,
 ): InstallItem {
@@ -225,6 +231,8 @@ function createInstallFromTechnical(
     name: source.name,
     originKind: source.originKind,
     originLabel: source.originLabel,
+    sourceQuoteId: source.sourceQuoteId,
+    sourceQuoteLineId: source.sourceQuoteLineId,
     status: "TODO",
     note: null,
     createdAt: timestamp,
@@ -252,7 +260,8 @@ export function launchChantierFromCommercial(
     throw new Error("CHANTIER_ALREADY_LAUNCHED");
   }
 
-  const quotePresent = hasDocument(commercialCase, "QUOTE");
+  const quotePresent =
+    commercialCase.retainedQuoteIds.length > 0 || hasDocument(commercialCase, "QUOTE");
   const signedQuotePresent = commercialHasSignedQuote(commercialCase);
   const costingPresent = hasDocument(commercialCase, "COSTING");
 
@@ -269,6 +278,7 @@ export function launchChantierFromCommercial(
     id: commercialCase.id,
     sourceCommercialCaseId: commercialCase.id,
     sourceEntryId: commercialCase.sourceEntryId,
+    initialRetainedQuoteIds: [...commercialCase.retainedQuoteIds],
     number: null,
     reference: null,
     name: commercialCase.name,
@@ -397,6 +407,8 @@ export function applyChantierMutation(
       originKind: input.originKind,
       originLabel: text(input.originLabel),
       installedByUs: input.installedByUs,
+      sourceQuoteId: input.sourceQuoteId ?? null,
+      sourceQuoteLineId: input.sourceQuoteLineId ?? null,
       status: "TODO",
       createdAt: timestamp,
       updatedAt: timestamp,
@@ -430,6 +442,8 @@ export function applyChantierMutation(
             name: beItem.name,
             originKind: beItem.originKind,
             originLabel: beItem.originLabel,
+            sourceQuoteId: beItem.sourceQuoteId,
+            sourceQuoteLineId: beItem.sourceQuoteLineId,
           },
           now,
         );
@@ -456,6 +470,8 @@ export function applyChantierMutation(
       originKind: input.originKind,
       originLabel: text(input.originLabel),
       installedByUs: input.installedByUs,
+      sourceQuoteId: input.sourceQuoteId ?? null,
+      sourceQuoteLineId: input.sourceQuoteLineId ?? null,
       status: "PREPARE",
       createdAt: timestamp,
       updatedAt: timestamp,
@@ -470,6 +486,8 @@ export function applyChantierMutation(
           name: created.name,
           originKind: created.originKind,
           originLabel: created.originLabel,
+          sourceQuoteId: created.sourceQuoteId,
+          sourceQuoteLineId: created.sourceQuoteLineId,
         },
         now,
       );

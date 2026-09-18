@@ -15,6 +15,7 @@ import {
   parseLibraryPayload,
   type LibraryPayload,
 } from "@/lib/library/storage";
+import { quoteWorkflowMayChangeCommercialStatus } from "@/lib/quotes/chantier";
 import { startQuoteCommercialWorkflow } from "@/lib/quotes/commercial-bridge";
 import { createQuotesRepository } from "@/lib/quotes/create-repository";
 import { initializeQuoteVatFromClient } from "@/lib/quotes/legal-details";
@@ -116,16 +117,18 @@ export async function POST(request: Request) {
       if (client.isArchived) throw new Error("QUOTE_CLIENT_ARCHIVED");
 
       const now = new Date();
-      await commercialRepository.mutate((payload) =>
-        startQuoteCommercialWorkflow(
-          payload,
-          affair.id,
-          workflow.quoteOwnerName,
-          workflow.quoteDueDate,
-          actor,
-          now,
-        ),
-      );
+      if (quoteWorkflowMayChangeCommercialStatus(affair.status)) {
+        await commercialRepository.mutate((payload) =>
+          startQuoteCommercialWorkflow(
+            payload,
+            affair.id,
+            workflow.quoteOwnerName,
+            workflow.quoteDueDate,
+            actor,
+            now,
+          ),
+        );
+      }
 
       const repository = createQuotesRepository();
       const mutation = await repository.mutate((payload) => {

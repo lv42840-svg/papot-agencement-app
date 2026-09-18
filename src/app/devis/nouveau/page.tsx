@@ -6,22 +6,25 @@ import { createCommercialRepository } from "@/lib/commercial/create-repository";
 import { commercialParisDateKey, isCommercialClosed } from "@/lib/commercial/domain";
 import { listCommercialAssignableUsers } from "@/lib/commercial/people";
 import { requireDesktopRequestContext } from "@/lib/desktop/request-context";
+import { nextChantierComplementVariantName } from "@/lib/quotes/chantier";
+import { createQuotesRepository } from "@/lib/quotes/create-repository";
 
 export const dynamic = "force-dynamic";
 
 export default async function NewQuotePage({
   searchParams,
 }: {
-  searchParams: Promise<{ affaire?: string }>;
+  searchParams: Promise<{ affaire?: string; chantier?: string }>;
 }) {
-  const { affaire: requestedAffairId } = await searchParams;
+  const { affaire: requestedAffairId, chantier } = await searchParams;
   const context = await requireDesktopRequestContext("quotes", "READ");
   const commercialRepository = createCommercialRepository(context);
   const clientsRepository = await createClientsRepository(context);
-  const [commercial, clients, quoteOwners] = await Promise.all([
+  const [commercial, clients, quoteOwners, quotes] = await Promise.all([
     commercialRepository.load(),
     clientsRepository.load(),
     listCommercialAssignableUsers(),
+    createQuotesRepository().load(),
   ]);
   const clientsById = new Map(clients.clients.map((client) => [client.id, client]));
   const affairs = commercial.cases.flatMap((affair) => {
@@ -43,6 +46,13 @@ export default async function NewQuotePage({
   const initialAffairId = affairs.some((affair) => affair.id === requestedAffairId)
     ? requestedAffairId
     : undefined;
+  const requestedAffair = commercial.cases.find((affair) => affair.id === initialAffairId);
+  const chantierComplement =
+    chantier === "1" && requestedAffair?.status === "CONFIRMED" && Boolean(initialAffairId);
+  const initialVariantName =
+    chantierComplement && initialAffairId
+      ? nextChantierComplementVariantName(quotes, initialAffairId)
+      : "Base";
   const paymentTermOptions = Array.from(
     new Set(
       clients.clients
@@ -58,6 +68,11 @@ export default async function NewQuotePage({
         canWrite={context.moduleAccess.canWrite}
         today={commercialParisDateKey()}
         initialAffairId={initialAffairId}
+        initialVariantName={initialVariantName}
+        chantierComplement={chantierComplement}
+        backHref={
+          chantierComplement && initialAffairId ? `/chantiers/${initialAffairId}` : "/devis"
+        }
         paymentTermOptions={paymentTermOptions}
         quoteOwners={quoteOwners}
         defaultQuoteOwnerName={context.user.displayName}

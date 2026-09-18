@@ -35,3 +35,18 @@ export function validateRetainedQuoteSelection(
 
   return retainedQuoteIds.map((quoteId) => selectable.find((quote) => quote.id === quoteId)!);
 }
+
+export function validateAdditionalRetainedQuote(
+  source: NativeQuotesPayload,
+  commercialCaseId: string,
+  quoteId: string,
+): NativeQuoteRecord {
+  const payload = parseNativeQuotesPayload(source);
+  const quote = payload.quotes.find(
+    (candidate) => candidate.id === quoteId && candidate.commercialCaseId === commercialCaseId,
+  );
+  if (!quote || !quoteCanBeRetained(quote)) {
+    throw new Error("COMMERCIAL_RETAINED_QUOTE_INVALID");
+  }
+  return quote;
+}

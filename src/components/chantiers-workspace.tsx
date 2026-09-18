@@ -380,7 +380,9 @@ function LaunchSheet({
     install: number;
   }) => Promise<void>;
 }) {
-  const quotePresent = item.documents.some((document) => document.category === "QUOTE");
+  const quotePresent =
+    item.retainedQuoteIds.length > 0 ||
+    item.documents.some((document) => document.category === "QUOTE");
   const signedQuotePresent = item.documents.some(
     (document) => document.category === "QUOTE" && document.isSignedQuote,
   );

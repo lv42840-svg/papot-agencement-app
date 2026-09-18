@@ -28,6 +28,7 @@ import {
 const createDraftMutationSchema = z.object({
   action: z.literal("createDraft"),
   commercialCaseId: z.string().uuid(),
+  quoteKind: z.enum(["STANDARD", "TS"]).default("STANDARD"),
   subject: z.string().trim().min(1).max(240),
   issueDate: quoteDateSchema,
   variantName: z.string().trim().min(1).max(120).default("Base"),
@@ -206,6 +207,7 @@ function createDraft(
   const record = nativeQuoteRecordSchema.parse({
     id: quoteId,
     commercialCaseId: input.commercialCaseId,
+    quoteKind: input.quoteKind,
     variantName: input.variantName,
     version,
     status: "DRAFT",

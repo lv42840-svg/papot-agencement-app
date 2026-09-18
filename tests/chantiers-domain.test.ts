@@ -375,6 +375,80 @@ describe("Chantiers V1 foundation", () => {
     expect(restored.operational.beItems).toHaveLength(1);
   });
 
+  it("snapshots the retained quotes present when the chantier is launched", () => {
+    const commercialCase = confirmedCommercialCase();
+    const retainedQuoteId = "88888888-8888-4888-8888-888888888888";
+    commercialCase.retainedQuoteIds = [retainedQuoteId];
+
+    const result = launchChantierFromCommercial(
+      createInitialChantiersPayload(),
+      commercialCase,
+      {
+        commercialCaseId: commercialCase.id,
+        quoteMissingDeclared: false,
+        signedQuoteMissingDeclared: true,
+        costingMissingDeclared: true,
+        be: 0,
+        workshop: 0,
+        install: 0,
+      },
+      actor,
+    ).payload.chantiers[0];
+
+    expect(result.initialRetainedQuoteIds).toEqual([retainedQuoteId]);
+    expect(result.launchDocuments.quote).toBe("PRESENT");
+  });
+
+  it("propagates durable quote ids from BE to Atelier and Pose", () => {
+    let source = launch().payload;
+    const chantierId = source.chantiers[0].id;
+    const quoteId = "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa";
+    const quoteLineId = "bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb";
+
+    source = applyChantierMutation(
+      source,
+      {
+        action: "createBeItem",
+        chantierId,
+        name: "Banque accueil",
+        originKind: "QUOTE_LINE",
+        originLabel: "D-2026-0001 · Banque accueil",
+        sourceQuoteId: quoteId,
+        sourceQuoteLineId: quoteLineId,
+        installedByUs: true,
+      },
+      actor,
+    ).payload;
+
+    const be = source.chantiers[0].operational.beItems[0];
+    const validated = applyChantierMutation(
+      source,
+      { action: "setBeStatus", chantierId, beItemId: be.id, status: "VALIDATED" },
+      actor,
+    ).payload.chantiers[0];
+
+    expect(be.sourceQuoteId).toBe(quoteId);
+    expect(be.sourceQuoteLineId).toBe(quoteLineId);
+    expect(validated.operational.workshopItems[0].sourceQuoteId).toBe(quoteId);
+    expect(validated.operational.workshopItems[0].sourceQuoteLineId).toBe(quoteLineId);
+    expect(validated.operational.installItems[0].sourceQuoteId).toBe(quoteId);
+    expect(validated.operational.installItems[0].sourceQuoteLineId).toBe(quoteLineId);
+  });
+
+  it("defaults legacy chantier quote links without destructive migration", () => {
+    const source = launch().payload;
+    const legacy = JSON.parse(JSON.stringify(source)) as {
+      chantiers: Array<{
+        initialRetainedQuoteIds?: unknown;
+        operational: { beItems: Array<Record<string, unknown>> };
+      }>;
+    };
+    delete legacy.chantiers[0].initialRetainedQuoteIds;
+
+    const parsed = parseChantiersPayload(legacy);
+    expect(parsed.chantiers[0].initialRetainedQuoteIds).toEqual([]);
+  });
+
   it("supports Active → Terminé → Active without recreating the chantier", () => {
     const source = launch().payload;
     const id = source.chantiers[0].id;

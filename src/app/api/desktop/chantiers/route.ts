@@ -5,6 +5,11 @@ import { hasEffectiveSpecialPermission, requireSpecialPermission } from "@/lib/a
 import { createChantiersRepository } from "@/lib/chantiers/create-repository";
 import type { ChantiersPayload } from "@/lib/chantiers/domain";
 import {
+  chantierQuoteLineDisplay,
+  resolveRetainedChantierQuoteLine,
+} from "@/lib/chantiers/quote-links";
+import { createCommercialRepository } from "@/lib/commercial/create-repository";
+import {
   applyChantierMutation,
   chantierCapabilities,
   chantierMutationSchema,
@@ -14,12 +19,17 @@ import {
   desktopRequestErrorStatus,
   requireDesktopRequestContext,
 } from "@/lib/desktop/request-context";
+import { createQuotesRepository } from "@/lib/quotes/create-repository";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
 type Owner = { userId: string; deviceId: string; displayName: string };
 type PermissionUser = { id: string };
+
+function mutationNeedsCommercialOrigin(input: { action: string }): boolean {
+  return input.action === "createBeItem" || input.action === "createWorkshopItem";
+}
 
 function noStoreJson(body: unknown, init?: ResponseInit) {
   const response = NextResponse.json(body, init);
@@ -95,11 +105,49 @@ export async function POST(request: Request) {
 
     const repository = createChantiersRepository(context);
     const actor = { userId: context.owner.userId, displayName: context.owner.displayName };
+    const commercialRepository = mutationNeedsCommercialOrigin(input)
+      ? await createCommercialRepository(context)
+      : null;
+    const commercial = commercialRepository ? await commercialRepository.load() : null;
+    const quotes = mutationNeedsCommercialOrigin(input)
+      ? await createQuotesRepository().load()
+      : null;
 
     stage = "apply-and-save-mutation";
-    const mutation = await repository.mutate((payload) =>
-      applyChantierMutation(payload, input, actor),
-    );
+    const mutation = await repository.mutate((payload) => {
+      let normalizedInput = input;
+
+      if (mutationNeedsCommercialOrigin(input)) {
+        const chantier = payload.chantiers.find((candidate) => candidate.id === input.chantierId);
+        if (!chantier) throw new Error("CHANTIER_NOT_FOUND");
+        const affair = commercial?.cases.find(
+          (candidate) => candidate.id === chantier.sourceCommercialCaseId,
+        );
+        if (!affair) throw new Error("CHANTIER_COMMERCIAL_CASE_NOT_FOUND");
+        if (!quotes) throw new Error("CHANTIER_QUOTES_UNAVAILABLE");
+
+        if (input.action === "createBeItem" || input.action === "createWorkshopItem") {
+          if (!input.sourceQuoteId || !input.sourceQuoteLineId) {
+            throw new Error("CHANTIER_QUOTE_LINE_REQUIRED");
+          }
+          const reference = resolveRetainedChantierQuoteLine(
+            affair,
+            quotes,
+            input.sourceQuoteId,
+            input.sourceQuoteLineId,
+          );
+          normalizedInput = {
+            ...input,
+            originKind: reference.quoteKind === "TS" ? "TS" : "QUOTE_LINE",
+            originLabel: chantierQuoteLineDisplay(reference),
+            sourceQuoteId: reference.quoteId,
+            sourceQuoteLineId: reference.quoteLineId,
+          };
+        }
+      }
+
+      return applyChantierMutation(payload, normalizedInput, actor);
+    });
 
     console.info("[PAPOT][Chantiers] POST saved", { ms: Date.now() - startedAt });
     return noStoreJson(
