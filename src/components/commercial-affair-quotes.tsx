@@ -105,10 +105,7 @@ export function CommercialAffairQuotes({ item }: { item: CommercialCase }) {
     [quotes],
   );
   const variantCount = useMemo(
-    () =>
-      new Set(
-        quotes.map((quote) => quote.variantName.trim().toLocaleLowerCase("fr-FR")),
-      ).size,
+    () => new Set(quotes.map((quote) => quote.variantName.trim().toLocaleLowerCase("fr-FR"))).size,
     [quotes],
   );
 
@@ -141,14 +138,22 @@ export function CommercialAffairQuotes({ item }: { item: CommercialCase }) {
         </div>
       ) : (
         <>
-          <div className="commercialAffairQuotesOverview" aria-label="Synthèse des devis de l’affaire">
+          <div
+            className="commercialAffairQuotesOverview"
+            aria-label="Synthèse des devis de l’affaire"
+          >
             <div>
               <strong>{currentQuoteCount}</strong>
-              <span>proposition{currentQuoteCount > 1 ? "s" : ""} courante{currentQuoteCount > 1 ? "s" : ""}</span>
+              <span>
+                proposition{currentQuoteCount > 1 ? "s" : ""} courante
+                {currentQuoteCount > 1 ? "s" : ""}
+              </span>
             </div>
             <div>
               <strong>{quotes.length}</strong>
-              <span>version{quotes.length > 1 ? "s" : ""} conservée{quotes.length > 1 ? "s" : ""}</span>
+              <span>
+                version{quotes.length > 1 ? "s" : ""} conservée{quotes.length > 1 ? "s" : ""}
+              </span>
             </div>
             <div>
               <strong>{variantCount}</strong>
@@ -180,7 +185,9 @@ export function CommercialAffairQuotes({ item }: { item: CommercialCase }) {
                     <div>
                       <strong>{quote.model.subject}</strong>
                       <span>
-                        {quote.finalPdf ? `${quote.finalPdf.quoteNumber} · ` : "Numéro à attribuer · "}
+                        {quote.finalPdf
+                          ? `${quote.finalPdf.quoteNumber} · `
+                          : "Numéro à attribuer · "}
                         {quote.variantName} · V{quote.version} · {dateLabel(quote.model.issueDate)}
                       </span>
                     </div>
