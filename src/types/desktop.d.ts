@@ -30,6 +30,20 @@ declare global {
         kind: "commercial-document";
         storagePath: string;
       }) => Promise<{ ok: true } | { ok: false; error: string }>;
+      composeOutlookMail: (input: {
+        kind: "quote-email";
+        to: string;
+        subject: string;
+        body: string;
+        storagePath: string;
+      }) => Promise<
+        | {
+            ok: true;
+            method: "CLASSIC_OUTLOOK" | "OUTLOOK_PROTOCOL";
+            attachmentAttached: boolean;
+          }
+        | { ok: false; error: string }
+      >;
     };
   }
 }

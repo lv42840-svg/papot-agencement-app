@@ -50,6 +50,8 @@ export function QuoteDirectEditor({
   canWrite,
   clientName,
   affairName,
+  recipientEmail,
+  recipientName,
   paymentTermOptions,
   contractState,
 }: {
@@ -58,6 +60,8 @@ export function QuoteDirectEditor({
   canWrite: boolean;
   clientName: string;
   affairName: string;
+  recipientEmail: string;
+  recipientName: string;
   paymentTermOptions: string[];
   contractState: QuoteContractSelectionState;
 }) {
@@ -90,7 +94,14 @@ export function QuoteDirectEditor({
         </div>
       ) : null}
       <QuoteLifecycleActions quote={quote} canWrite={canWrite} />
-      <QuoteSendAction quote={quote} canWrite={canWrite} onSaved={setPayload} />
+      <QuoteSendAction
+        quote={quote}
+        canWrite={canWrite}
+        affairName={affairName}
+        recipientEmail={recipientEmail}
+        recipientName={recipientName}
+        onSaved={setPayload}
+      />
 
       <QuoteGeneralInfoEditor
         quote={quote}

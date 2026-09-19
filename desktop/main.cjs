@@ -17,6 +17,7 @@ const {
 } = require("./setup-store.cjs");
 const { databasePath, openLocalDatabase } = require("./local-database.cjs");
 const { resolveBusinessFilePath, resolveBusinessFolderPath } = require("./business-folder.cjs");
+const { openOutlookDraft } = require("./outlook-compose.cjs");
 const { startDevelopmentServer, startPackagedServer } = require("./server-manager.cjs");
 
 const appUrl = normalizeLocalAppUrl(process.env.PAPOT_APP_URL || DEFAULT_DESKTOP_APP_URL);
@@ -288,6 +289,59 @@ function registerBusinessFileHandler() {
   });
 }
 
+function publicOutlookError(error) {
+  const code = error instanceof Error ? error.message : "OUTLOOK_OPEN_FAILED";
+  const known = new Set([
+    "OUTLOOK_COMPOSE_INVALID",
+    "OUTLOOK_ATTACHMENT_NOT_FOUND",
+    "OUTLOOK_OPEN_FAILED",
+    "DESKTOP_BUSINESS_FILE_INVALID",
+    "DESKTOP_BUSINESS_FILE_ROOT_UNAVAILABLE",
+  ]);
+  return known.has(code) ? code : "OUTLOOK_OPEN_FAILED";
+}
+
+function registerOutlookHandler() {
+  ipcMain.handle("papot:outlook:compose", async (_event, rawInput) => {
+    try {
+      if (!rawInput || typeof rawInput !== "object" || rawInput.kind !== "quote-email") {
+        throw new Error("OUTLOOK_COMPOSE_INVALID");
+      }
+
+      const attachmentPath = resolveBusinessFilePath(businessFilesRoot(), {
+        kind: "commercial-document",
+        storagePath: rawInput.storagePath,
+      });
+
+      let stats;
+      try {
+        stats = await fs.promises.stat(attachmentPath);
+      } catch (error) {
+        if (error && typeof error === "object" && error.code === "ENOENT") {
+          throw new Error("OUTLOOK_ATTACHMENT_NOT_FOUND");
+        }
+        throw error;
+      }
+      if (!stats.isFile()) throw new Error("OUTLOOK_ATTACHMENT_NOT_FOUND");
+
+      return await openOutlookDraft(
+        {
+          to: rawInput.to,
+          subject: rawInput.subject,
+          body: rawInput.body,
+          attachmentPath,
+        },
+        {
+          platform: process.platform,
+          openExternal: (url) => shell.openExternal(url),
+        },
+      );
+    } catch (error) {
+      return { ok: false, error: publicOutlookError(error) };
+    }
+  });
+}
+
 function createMainWindow() {
   const window = new BrowserWindow({
     width: 1440,
@@ -358,6 +412,7 @@ app.whenReady().then(async () => {
   registerDesktopSetupHandler();
   registerBusinessFolderHandler();
   registerBusinessFileHandler();
+  registerOutlookHandler();
 
   session.defaultSession.setPermissionCheckHandler(() => false);
   session.defaultSession.setPermissionRequestHandler((_webContents, _permission, callback) => {
