@@ -30,6 +30,15 @@ export default async function QuotePage({ params }: { params: Promise<{ quoteId:
     ? `${affair.name}${affair.siteLabel ? ` · ${affair.siteLabel}` : ""}`
     : "Affaire introuvable";
   const clientName = client ? clientDisplayName(client) : "Client introuvable";
+  const primaryContact =
+    client?.contacts.find((contact) => contact.id === affair?.primaryContactId) ??
+    client?.contacts.find((contact) => contact.isPrimary) ??
+    null;
+  const recipientEmail =
+    affair?.contactEmail?.trim() || primaryContact?.email.trim() || client?.email.trim() || "";
+  const recipientName =
+    affair?.contactName?.trim() ||
+    [primaryContact?.firstName, primaryContact?.lastName].filter(Boolean).join(" ").trim();
   const contractState = quoteContractSelectionState(quote, affair);
   const paymentTermOptions = Array.from(
     new Set(
@@ -47,6 +56,8 @@ export default async function QuotePage({ params }: { params: Promise<{ quoteId:
         canWrite={context.moduleAccess.canWrite}
         clientName={clientName}
         affairName={affairName}
+        recipientEmail={recipientEmail}
+        recipientName={recipientName}
         paymentTermOptions={paymentTermOptions}
         contractState={contractState}
       />
