@@ -39,7 +39,8 @@ a {
 }
 button,
 input,
-select {
+select,
+textarea {
   font: inherit;
 }
 button {
@@ -666,5 +667,323 @@ select:focus {
       background-color 0.12s ease,
       color 0.12s ease,
       box-shadow 0.12s ease;
+  }
+}
+
+/* Cadre de l'application Windows PAPOT */
+.desktopAppShellV2 {
+  min-height: 100vh;
+  display: grid;
+  grid-template-columns: 228px minmax(0, 1fr);
+  background: radial-gradient(circle at 88% 3%, rgb(196 181 253 / 0.17), transparent 31%), #f7f6fb;
+}
+.desktopSidebarV2 {
+  min-height: 100vh;
+  display: flex;
+  flex-direction: column;
+  color: white;
+  background: linear-gradient(180deg, #a58bee 0%, #8971dd 48%, #7964cf 100%);
+  box-shadow: 8px 0 28px rgb(77 55 145 / 0.12);
+}
+.desktopBrandV2 {
+  min-height: 120px;
+  padding: 25px 24px 21px;
+  display: grid;
+  align-content: center;
+  border-bottom: 1px solid rgb(255 255 255 / 0.17);
+}
+.desktopBrandScript {
+  font-family: Georgia, "Times New Roman", serif;
+  font-size: 29px;
+  font-style: italic;
+  letter-spacing: 0.04em;
+}
+.desktopBrandName {
+  margin-top: 6px;
+  font-size: 10px;
+  font-weight: 800;
+  letter-spacing: 0.3em;
+}
+.desktopNavV2 {
+  display: grid;
+  gap: 3px;
+  padding: 14px 12px;
+}
+.desktopNavV2 > a,
+.desktopNavV2 > span {
+  min-height: 39px;
+  padding: 0 12px;
+  display: flex;
+  align-items: center;
+  gap: 11px;
+  border-radius: 8px;
+  font-size: 12px;
+}
+.desktopNavV2 > a:hover {
+  background: rgb(255 255 255 / 0.2);
+}
+.desktopNavV2 > a:first-child {
+  background: rgb(255 255 255 / 0.23);
+  box-shadow: inset 0 0 0 1px rgb(255 255 255 / 0.08);
+}
+.desktopNavDisabled {
+  color: rgb(255 255 255 / 0.72);
+}
+.desktopNavDisabled small {
+  margin-left: auto;
+  font-size: 8px;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  opacity: 0.68;
+}
+.desktopSidebarFooter {
+  margin-top: auto;
+  padding: 18px 24px;
+  color: rgb(255 255 255 / 0.7);
+}
+.desktopVersion {
+  font-size: 8px;
+  font-weight: 750;
+  letter-spacing: 0.08em;
+}
+.desktopWorkspace {
+  min-width: 0;
+}
+.desktopTopbar {
+  min-height: 74px;
+  padding: 0 30px;
+  display: flex;
+  justify-content: flex-end;
+  align-items: center;
+  gap: 22px;
+  background: rgb(255 255 255 / 0.85);
+  border-bottom: 1px solid #ebe8f2;
+  backdrop-filter: blur(12px);
+}
+.desktopConnection {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  color: #43835f;
+  font-size: 11px;
+  font-weight: 700;
+}
+.desktopConnection::before {
+  content: "";
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: #51bc7b;
+  box-shadow: 0 0 0 3px #e7f7ed;
+}
+.desktopIdentity {
+  display: flex;
+  align-items: center;
+  gap: 11px;
+}
+.desktopIdentity > div {
+  display: grid;
+  text-align: right;
+}
+.desktopIdentity strong {
+  font-size: 12px;
+}
+.desktopIdentity div span {
+  margin-top: 2px;
+  color: var(--muted);
+  font-size: 10px;
+}
+.desktopAvatar {
+  width: 36px;
+  height: 36px;
+  display: grid;
+  place-items: center;
+  border-radius: 50%;
+  background: #8f7bd8;
+  color: white;
+  font-size: 11px;
+  font-weight: 800;
+}
+.desktopMain {
+  width: min(1320px, 100%);
+  margin: 0 auto;
+  padding: 28px 30px 46px;
+}
+.dashboardHeading {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 20px;
+  margin-bottom: 24px;
+}
+.dashboardHeading h1 {
+  margin-bottom: 4px;
+  font-size: 27px;
+}
+.dashboardDate {
+  margin: 0;
+  color: var(--muted);
+  font-size: 12px;
+  text-transform: capitalize;
+}
+.dashboardStats {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 14px;
+  margin-bottom: 16px;
+}
+.dashboardStat {
+  min-height: 106px;
+  padding: 17px;
+  display: flex;
+  align-items: flex-start;
+  gap: 13px;
+  background: white;
+  border: 1px solid #ebe8f2;
+  border-radius: 12px;
+  box-shadow: 0 5px 18px rgb(49 37 89 / 0.045);
+}
+.dashboardStatIcon {
+  width: 39px;
+  height: 39px;
+  display: grid;
+  place-items: center;
+  flex: 0 0 auto;
+  border-radius: 50%;
+}
+.dashboardStat > div {
+  display: grid;
+}
+.dashboardStat strong {
+  font-size: 24px;
+  line-height: 1;
+}
+.dashboardStat div > span {
+  margin-top: 6px;
+  font-size: 12px;
+  font-weight: 750;
+}
+.dashboardStat small {
+  margin-top: 3px;
+  color: var(--muted);
+  font-size: 10px;
+}
+.dashboardStatPurple .dashboardStatIcon {
+  color: #7f60eb;
+  background: #eee9ff;
+}
+.dashboardStatGold .dashboardStatIcon {
+  color: #bd7927;
+  background: #fff2df;
+}
+.dashboardStatGreen .dashboardStatIcon {
+  color: #2b9b62;
+  background: #e4f8ec;
+}
+.dashboardStatBlue .dashboardStatIcon {
+  color: #2783d7;
+  background: #e7f3ff;
+}
+.dashboardGrid {
+  display: grid;
+  grid-template-columns: minmax(0, 1.4fr) minmax(280px, 0.9fr);
+  gap: 16px;
+}
+.dashboardPanel {
+  min-height: 250px;
+  padding: 19px;
+  background: white;
+  border: 1px solid #ebe8f2;
+  border-radius: 12px;
+  box-shadow: 0 5px 18px rgb(49 37 89 / 0.04);
+}
+.dashboardPanelHeader {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 16px;
+  padding-bottom: 15px;
+  border-bottom: 1px solid #f0edf5;
+}
+.dashboardPanelHeader h2 {
+  font-size: 15px;
+}
+.dashboardPanelHeader p {
+  margin: 3px 0 0;
+  color: var(--muted);
+  font-size: 10px;
+}
+.dashboardPanelHeader > a {
+  color: #8065e7;
+  font-size: 11px;
+  font-weight: 750;
+}
+.dashboardEmpty {
+  min-height: 170px;
+  display: grid;
+  place-items: center;
+  align-content: center;
+  gap: 16px;
+  color: var(--muted);
+  text-align: center;
+  font-size: 11px;
+}
+.dashboardEmpty p {
+  margin: 0;
+}
+.dashboardEmptyCompact {
+  min-height: 160px;
+}
+.calendarPreview {
+  width: min(440px, 100%);
+  display: grid;
+  grid-template-columns: repeat(5, 1fr);
+  gap: 7px;
+}
+.calendarPreview span {
+  min-height: 62px;
+  padding-top: 10px;
+  border-radius: 8px;
+  background: #f6f3ff;
+  color: #665c7f;
+  font-size: 10px;
+  font-weight: 750;
+}
+.calendarPreview .calendarToday {
+  color: #6848d9;
+  background: #e9e1ff;
+}
+.clipboardEmpty {
+  width: 160px;
+  display: grid;
+  gap: 9px;
+}
+.clipboardEmpty span {
+  height: 12px;
+  border-radius: 5px;
+  background: #f0edf6;
+}
+.clipboardEmpty span:nth-child(2) {
+  width: 82%;
+}
+.clipboardEmpty span:nth-child(3) {
+  width: 64%;
+}
+.dashboardQuickPanel {
+  grid-column: 1 / -1;
+  min-height: 0;
+}
+.dashboardQuickActions {
+  display: flex;
+  gap: 10px;
+  padding-top: 17px;
+}
+
+@media (max-width: 1050px) {
+  .desktopAppShellV2 {
+    grid-template-columns: 205px minmax(0, 1fr);
+  }
+  .dashboardStats {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 }
