@@ -10,14 +10,17 @@ const CLASSIC_OUTLOOK_SCRIPT = [
   "$mail.Subject = $env:PAPOT_OUTLOOK_SUBJECT",
   "$mail.Display($false)",
   "Start-Sleep -Milliseconds 150",
-  "if ($env:PAPOT_OUTLOOK_BODY) { $mail.Body = $env:PAPOT_OUTLOOK_BODY + \"\`r\`n\`r\`n\" + $mail.Body }",
+  'if ($env:PAPOT_OUTLOOK_BODY) { $mail.Body = $env:PAPOT_OUTLOOK_BODY + "\`r\`n\`r\`n" + $mail.Body }',
   "if ($env:PAPOT_OUTLOOK_ATTACHMENT) { [void]$mail.Attachments.Add($env:PAPOT_OUTLOOK_ATTACHMENT) }",
 ].join("; ");
 
 function cleanText(value, maxLength, errorCode) {
   if (typeof value !== "string") throw new Error(errorCode);
   const normalized = value.replace(/\r\n?/g, "\n").trim();
-  if (normalized.length > maxLength || /[\u0000-\u0008\u000B\u000C\u000E-\u001F]/.test(normalized)) {
+  if (
+    normalized.length > maxLength ||
+    /[\u0000-\u0008\u000B\u000C\u000E-\u001F]/.test(normalized)
+  ) {
     throw new Error(errorCode);
   }
   return normalized;
@@ -28,11 +31,7 @@ function normalizeOutlookComposeInput(rawInput) {
   const to = cleanText(rawInput.to ?? "", 1000, "OUTLOOK_COMPOSE_INVALID");
   const subject = cleanText(rawInput.subject ?? "", 500, "OUTLOOK_COMPOSE_INVALID");
   const body = cleanText(rawInput.body ?? "", 10_000, "OUTLOOK_COMPOSE_INVALID");
-  const attachmentPath = cleanText(
-    rawInput.attachmentPath ?? "",
-    4000,
-    "OUTLOOK_COMPOSE_INVALID",
-  );
+  const attachmentPath = cleanText(rawInput.attachmentPath ?? "", 4000, "OUTLOOK_COMPOSE_INVALID");
   if (!subject) throw new Error("OUTLOOK_COMPOSE_INVALID");
   return { to, subject, body, attachmentPath };
 }
@@ -57,11 +56,7 @@ function execFilePromise(execFile, executable, args, options) {
 
 async function openOutlookDraft(
   rawInput,
-  {
-    platform = process.platform,
-    execFile = defaultExecFile,
-    openExternal,
-  },
+  { platform = process.platform, execFile = defaultExecFile, openExternal },
 ) {
   const input = normalizeOutlookComposeInput(rawInput);
 
@@ -70,7 +65,14 @@ async function openOutlookDraft(
       await execFilePromise(
         execFile,
         "powershell.exe",
-        ["-NoProfile", "-NonInteractive", "-ExecutionPolicy", "Bypass", "-Command", CLASSIC_OUTLOOK_SCRIPT],
+        [
+          "-NoProfile",
+          "-NonInteractive",
+          "-ExecutionPolicy",
+          "Bypass",
+          "-Command",
+          CLASSIC_OUTLOOK_SCRIPT,
+        ],
         {
           windowsHide: true,
           env: {
