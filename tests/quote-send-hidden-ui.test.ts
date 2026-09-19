@@ -20,6 +20,10 @@ describe("quote final PDF action visibility", () => {
     expect(sendAction).toContain("Valider et envoyer");
     expect(sendAction).toContain('quote.status === "FROZEN"');
     expect(sendAction).toContain("PDF validé");
+    expect(sendAction).toContain("Envoyer avec Outlook");
+    expect(sendAction).toContain("composeOutlookMail");
+    expect(sendAction).toContain("Valider et ouvrir Outlook");
+    expect(sendAction).toContain("attachmentAttached");
   });
 
   it("n'attribue pas une erreur PDF inconnue a la date de relance", () => {
