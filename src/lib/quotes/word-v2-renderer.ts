@@ -274,6 +274,7 @@ type CellRenderOptions = {
   bottomBorder?: boolean;
   fill?: string;
   noWrap?: boolean;
+  width?: number;
 };
 
 function addNoWrapToCellProperties(properties: string): string {
@@ -290,7 +291,8 @@ function makeCell(
   if (options.bottomBorder) properties = addBottomBorderToCellProperties(properties);
   if (options.fill) properties = addCellShadingToProperties(properties, options.fill);
   if (options.noWrap) properties = addNoWrapToCellProperties(properties);
-  return `<w:tc>${properties}${paragraph}</w:tc>`;
+  const cell = `<w:tc>${properties}${paragraph}</w:tc>`;
+  return options.width === undefined ? cell : setCellWidth(cell, options.width);
 }
 
 function findOpeningTagStart(xml: string, tagName: string, beforeIndex: number): number {
@@ -640,28 +642,35 @@ function bodyRowXml(
   );
 
   const renderedCells = [
-    makeCell(cells[0], numberParagraph, { ...cellOptions, noWrap: true }),
-    makeCell(cells[1], descriptionParagraph, cellOptions),
+    makeCell(cells[0], numberParagraph, {
+      ...cellOptions,
+      noWrap: true,
+      width: QUOTE_TABLE_WIDTHS[0],
+    }),
+    makeCell(cells[1], descriptionParagraph, {
+      ...cellOptions,
+      width: QUOTE_TABLE_WIDTHS[1],
+    }),
     makeCell(
       cells[2],
       item.kind === "LINE"
         ? plainParagraphXml(formatQuantity(item.quantity ?? 0), { align: "right" })
         : plainParagraphXml(""),
-      cellOptions,
+      { ...cellOptions, width: QUOTE_TABLE_WIDTHS[2] },
     ),
     makeCell(
       cells[3],
       item.kind === "LINE" && item.unitPriceHt !== null
         ? plainParagraphXml(formatMoneyEuros(item.unitPriceHt), { align: "right" })
         : plainParagraphXml(""),
-      cellOptions,
+      { ...cellOptions, width: QUOTE_TABLE_WIDTHS[3] },
     ),
     makeCell(
       cells[4],
       item.kind === "LINE" && item.vatRatePercent !== null
         ? plainParagraphXml(formatVat(item.vatRatePercent), { align: "center" })
         : plainParagraphXml(""),
-      cellOptions,
+      { ...cellOptions, width: QUOTE_TABLE_WIDTHS[4] },
     ),
     makeCell(
       cells[5],
@@ -671,7 +680,7 @@ function bodyRowXml(
             bold: isHeading,
           })
         : plainParagraphXml(""),
-      cellOptions,
+      { ...cellOptions, width: QUOTE_TABLE_WIDTHS[5] },
     ),
   ];
 

@@ -249,8 +249,12 @@ function rowContaining(xml: string, text: string): string {
   return row;
 }
 
+function rowCellXml(row: string): string[] {
+  return Array.from(row.matchAll(/<w:tc\b[\s\S]*?<\/w:tc>/g), (match) => match[0]);
+}
+
 function rowCells(row: string): string[] {
-  return Array.from(row.matchAll(/<w:tc\b[\s\S]*?<\/w:tc>/g), (match) => xmlText(match[0]));
+  return rowCellXml(row).map(xmlText);
 }
 
 describe("quote Word V2 dynamic body", () => {
@@ -281,8 +285,11 @@ describe("quote Word V2 dynamic body", () => {
     const cells = rowCells(lineRow);
     expect(cells).toHaveLength(6);
     expect(cells[0]).toBe("1.1.1");
-    expect(lineRow).toContain("<w:noWrap/>");
-    expect(lineRow).toContain('<w:jc w:val="left"/>');
+    const cellXml = rowCellXml(lineRow);
+    expect(cellXml[0]).toContain('<w:tcW w:w="850" w:type="dxa"/>');
+    expect(cellXml[0]).toContain("<w:noWrap/>");
+    expect(cellXml[0]).toContain('<w:jc w:val="left"/>');
+    expect(cellXml[1]).toContain('<w:tcW w:w="4933" w:type="dxa"/>');
     expect(cells[1]).toBe("Banque d'accueil\navec retour à la ligne");
     expect(cells[2]).toBe("2,5");
     expect(cells[3]).toContain("1");
