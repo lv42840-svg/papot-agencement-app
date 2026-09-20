@@ -4,6 +4,7 @@ import type { QuoteDocumentData, QuoteDocumentTaxLine } from "./document-data";
 const VAT_SUMMARY_ANCHOR = "{{PAPOT_VAT_SUMMARY}}";
 const VAT_LINES_ANCHOR = "{{PAPOT_VAT_LINES_ANCHOR}}";
 const WORD_TABLE_CELL_PATTERN = /<w:tc\b[\s\S]*?<\/w:tc>/g;
+const FINANCIAL_TOTALS_WIDTHS = [2900, 1672] as const;
 
 const moneyFormatter = new Intl.NumberFormat("fr-FR", {
   style: "currency",
@@ -92,6 +93,19 @@ function cellProperties(cellXml: string): string {
   return cellXml.match(/<w:tcPr>[\s\S]*?<\/w:tcPr>/)?.[0] ?? "";
 }
 
+function normalizedCellProperties(cellXml: string, width: number): string {
+  let properties = cellProperties(cellXml);
+  properties = properties.replace(/<w:gridSpan\b[^>]*\/>/g, "");
+  if (/<w:tcW\b[^>]*\/>/.test(properties)) {
+    properties = properties.replace(/<w:tcW\b[^>]*\/>/, `<w:tcW w:w="${width}" w:type="dxa"/>`);
+  } else if (properties) {
+    properties = properties.replace("</w:tcPr>", `<w:tcW w:w="${width}" w:type="dxa"/></w:tcPr>`);
+  } else {
+    properties = `<w:tcPr><w:tcW w:w="${width}" w:type="dxa"/></w:tcPr>`;
+  }
+  return properties;
+}
+
 function paragraphProperties(cellXml: string): string {
   return cellXml.match(/<w:pPr>[\s\S]*?<\/w:pPr>/)?.[0] ?? "";
 }
@@ -100,10 +114,26 @@ function runProperties(cellXml: string): string {
   return cellXml.match(/<w:rPr>[\s\S]*?<\/w:rPr>/)?.[0] ?? "";
 }
 
-function cellWithText(templateCell: string, value: string): string {
+function paragraphWithAlignment(properties: string, alignment?: "left" | "right"): string {
+  if (!alignment) return properties;
+  const jc = `<w:jc w:val="${alignment}"/>`;
+  if (/<w:jc\b[^>]*\/>/.test(properties)) {
+    return properties.replace(/<w:jc\b[^>]*\/>/, jc);
+  }
+  return properties ? properties.replace("</w:pPr>", `${jc}</w:pPr>`) : `<w:pPr>${jc}</w:pPr>`;
+}
+
+function cellWithText(
+  templateCell: string,
+  value: string,
+  options: { width?: number; align?: "left" | "right" } = {},
+): string {
   const text = escapeXmlText(value);
-  const tcPr = cellProperties(templateCell);
-  const pPr = paragraphProperties(templateCell);
+  const tcPr =
+    options.width === undefined
+      ? cellProperties(templateCell)
+      : normalizedCellProperties(templateCell, options.width);
+  const pPr = paragraphWithAlignment(paragraphProperties(templateCell), options.align);
   const rPr = runProperties(templateCell);
 
   return [
@@ -120,16 +150,25 @@ function rowWithLabelAndAmount(template: AnchoredRow, label: string, amount: str
   const lastCellIndex = template.cells.length - 1;
 
   if (template.cells.length === 1 || template.anchorCellIndex === lastCellIndex) {
-    const onlyCell = cellWithText(
-      template.cells[template.anchorCellIndex]!,
-      `${label} : ${amount}`,
-    );
-    return `<w:tr>${rowProperties}${onlyCell}</w:tr>`;
+    const sourceCell = template.cells[template.anchorCellIndex]!;
+    const labelCell = cellWithText(sourceCell, label, {
+      width: FINANCIAL_TOTALS_WIDTHS[0],
+      align: "left",
+    });
+    const amountCell = cellWithText(sourceCell, amount, {
+      width: FINANCIAL_TOTALS_WIDTHS[1],
+      align: "right",
+    });
+    return `<w:tr>${rowProperties}${labelCell}${amountCell}</w:tr>`;
   }
 
   const cells = template.cells.map((cell, index) => {
-    if (index === template.anchorCellIndex) return cellWithText(cell, label);
-    if (index === lastCellIndex) return cellWithText(cell, amount);
+    if (index === template.anchorCellIndex) {
+      return cellWithText(cell, label, { align: "left" });
+    }
+    if (index === lastCellIndex) {
+      return cellWithText(cell, amount, { align: "right" });
+    }
     return cell;
   });
 
