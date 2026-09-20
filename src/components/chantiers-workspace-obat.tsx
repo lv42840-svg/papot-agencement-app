@@ -475,9 +475,11 @@ function LaunchSheet({
       const result = await requestObatAnalysis(files);
       setObatFiles(files);
       setAnalysis(result);
-      if (result.hours.be !== null) setBe(String(result.hours.be));
-      if (result.hours.workshop !== null) setWorkshop(String(result.hours.workshop));
-      if (result.hours.install !== null) setInstall(String(result.hours.install));
+      if (!hoursFromRetainedQuotes) {
+        if (result.hours.be !== null) setBe(String(result.hours.be));
+        if (result.hours.workshop !== null) setWorkshop(String(result.hours.workshop));
+        if (result.hours.install !== null) setInstall(String(result.hours.install));
+      }
       if (result.files.some((file) => file.kind === "QUOTE")) setQuoteMissing(false);
       if (result.files.some((file) => file.kind === "COSTING")) setCostingMissing(false);
     } catch (analysisError) {
