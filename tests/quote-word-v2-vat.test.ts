@@ -24,7 +24,6 @@ function rowContaining(xml: string, text: string): string {
   return row;
 }
 
-
 function makeDocument(taxLines: QuoteDocumentTaxLine[]): QuoteDocumentData {
   return {
     totals: {

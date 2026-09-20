@@ -97,15 +97,9 @@ function normalizedCellProperties(cellXml: string, width: number): string {
   let properties = cellProperties(cellXml);
   properties = properties.replace(/<w:gridSpan\b[^>]*\/>/g, "");
   if (/<w:tcW\b[^>]*\/>/.test(properties)) {
-    properties = properties.replace(
-      /<w:tcW\b[^>]*\/>/,
-      `<w:tcW w:w="${width}" w:type="dxa"/>`,
-    );
+    properties = properties.replace(/<w:tcW\b[^>]*\/>/, `<w:tcW w:w="${width}" w:type="dxa"/>`);
   } else if (properties) {
-    properties = properties.replace(
-      "</w:tcPr>",
-      `<w:tcW w:w="${width}" w:type="dxa"/></w:tcPr>`,
-    );
+    properties = properties.replace("</w:tcPr>", `<w:tcW w:w="${width}" w:type="dxa"/></w:tcPr>`);
   } else {
     properties = `<w:tcPr><w:tcW w:w="${width}" w:type="dxa"/></w:tcPr>`;
   }
@@ -126,9 +120,7 @@ function paragraphWithAlignment(properties: string, alignment?: "left" | "right"
   if (/<w:jc\b[^>]*\/>/.test(properties)) {
     return properties.replace(/<w:jc\b[^>]*\/>/, jc);
   }
-  return properties
-    ? properties.replace("</w:pPr>", `${jc}</w:pPr>`)
-    : `<w:pPr>${jc}</w:pPr>`;
+  return properties ? properties.replace("</w:pPr>", `${jc}</w:pPr>`) : `<w:pPr>${jc}</w:pPr>`;
 }
 
 function cellWithText(
