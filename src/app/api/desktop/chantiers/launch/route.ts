@@ -6,6 +6,7 @@ import {
   launchChantierFromAffair,
   launchChantierFromAffairSchema,
 } from "@/lib/chantiers/launch-from-affair";
+import { deriveChantierLaunchHours } from "@/lib/chantiers/launch-hours";
 import { chantierCapabilities } from "@/lib/chantiers/mutations";
 import { ChantiersRepositoryError } from "@/lib/chantiers/repository";
 import { createCommercialRepository } from "@/lib/commercial/create-repository";
@@ -13,6 +14,7 @@ import {
   desktopRequestErrorStatus,
   requireDesktopRequestContext,
 } from "@/lib/desktop/request-context";
+import { createQuotesRepository } from "@/lib/quotes/create-repository";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -51,9 +53,23 @@ export async function POST(request: Request) {
     const affair = commercial.cases.find((item) => item.id === input.commercialCaseId);
     if (!affair) throw new Error("CHANTIER_COMMERCIAL_CASE_NOT_FOUND");
 
+    stage = "derive-launch-hours";
+    const quotes = await createQuotesRepository().load();
+    const launchHours = deriveChantierLaunchHours(affair, quotes);
+
     stage = "apply-and-save-launch";
     const mutation = await chantiersRepository.mutate((payload) =>
-      launchChantierFromAffair(payload, affair, input, actor),
+      launchChantierFromAffair(
+        payload,
+        affair,
+        {
+          ...input,
+          be: launchHours.hours.be,
+          workshop: launchHours.hours.workshop,
+          install: launchHours.hours.install,
+        },
+        actor,
+      ),
     );
 
     console.info("[PAPOT][Chantiers] launch from affair saved", { ms: Date.now() - startedAt });
