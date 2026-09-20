@@ -16,6 +16,15 @@ function rowCount(xml: string): number {
   return Array.from(xml.matchAll(/<w:tr(?:\s[^>]*)?>/g)).length;
 }
 
+function rowContaining(xml: string, text: string): string {
+  const row = Array.from(xml.matchAll(/<w:tr\b[\s\S]*?<\/w:tr>/g))
+    .map((match) => match[0])
+    .find((candidate) => candidate.includes(text));
+  if (!row) throw new Error(`TEST_ROW_MISSING:${text}`);
+  return row;
+}
+
+
 function makeDocument(taxLines: QuoteDocumentTaxLine[]): QuoteDocumentData {
   return {
     totals: {
@@ -40,6 +49,11 @@ describe("quote Word V2 VAT", () => {
     expect(xml).toContain("TVA 20 %");
     expect(xml).toContain("24,69");
     expect(xml).not.toContain("sur 123,45");
+    const vatRow = rowContaining(xml, "TVA 20 %");
+    expect((vatRow.match(/<w:tc\b/g) ?? []).length).toBe(2);
+    expect(vatRow).toContain('<w:tcW w:w="2900" w:type="dxa"/>');
+    expect(vatRow).toContain('<w:tcW w:w="1672" w:type="dxa"/>');
+    expect(vatRow).toContain('<w:jc w:val="right"/>');
     expect(xml).toContain("{{total_ht}}");
     expect(xml).toContain("{{total_ttc}}");
     expect(rowCount(xml)).toBe(rowCount(originalXml) - 1);
