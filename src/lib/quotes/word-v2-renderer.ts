@@ -273,7 +273,13 @@ function addCellShadingToProperties(properties: string, fill: string): string {
 type CellRenderOptions = {
   bottomBorder?: boolean;
   fill?: string;
+  noWrap?: boolean;
 };
+
+function addNoWrapToCellProperties(properties: string): string {
+  if (/<w:noWrap\b[^>]*\/>/.test(properties)) return properties;
+  return properties.replace("</w:tcPr>", "<w:noWrap/></w:tcPr>");
+}
 
 function makeCell(
   templateCell: string,
@@ -283,6 +289,7 @@ function makeCell(
   let properties = cellProperties(templateCell);
   if (options.bottomBorder) properties = addBottomBorderToCellProperties(properties);
   if (options.fill) properties = addCellShadingToProperties(properties, options.fill);
+  if (options.noWrap) properties = addNoWrapToCellProperties(properties);
   return `<w:tc>${properties}${paragraph}</w:tc>`;
 }
 
@@ -295,7 +302,7 @@ function findOpeningTagStart(xml: string, tagName: string, beforeIndex: number):
   return lastStart;
 }
 
-const QUOTE_TABLE_WIDTHS = [567, 5216, 1134, 1417, 1077, 1587] as const;
+const QUOTE_TABLE_WIDTHS = [850, 4933, 1134, 1417, 1077, 1587] as const;
 const QUOTE_TABLE_TOTAL_WIDTH = QUOTE_TABLE_WIDTHS.reduce((sum, width) => sum + width, 0);
 const FINANCIAL_TABLE_WIDTHS = [6314, 4572] as const;
 const FINANCIAL_TABLE_TOTAL_WIDTH = FINANCIAL_TABLE_WIDTHS.reduce((sum, width) => sum + width, 0);
@@ -618,7 +625,7 @@ function bodyRowXml(
     item.kind === "SECTION" ? "E9E2F7" : item.kind === "SUBSECTION" ? "F5F1FB" : undefined;
   const cellOptions: CellRenderOptions = { ...options, fill: headingFill };
   const numberParagraph = plainParagraphXml(item.number, {
-    align: isHeading ? "left" : "center",
+    align: "left",
     bold: isHeading,
     fontSizePx: isHeading ? headingFontSize : undefined,
     keepNext: isHeading,
@@ -633,7 +640,7 @@ function bodyRowXml(
   );
 
   const renderedCells = [
-    makeCell(cells[0], numberParagraph, cellOptions),
+    makeCell(cells[0], numberParagraph, { ...cellOptions, noWrap: true }),
     makeCell(cells[1], descriptionParagraph, cellOptions),
     makeCell(
       cells[2],

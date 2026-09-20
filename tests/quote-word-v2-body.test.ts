@@ -281,6 +281,8 @@ describe("quote Word V2 dynamic body", () => {
     const cells = rowCells(lineRow);
     expect(cells).toHaveLength(6);
     expect(cells[0]).toBe("1.1.1");
+    expect(lineRow).toContain("<w:noWrap/>");
+    expect(lineRow).toContain('<w:jc w:val="left"/>');
     expect(cells[1]).toBe("Banque d'accueil\navec retour à la ligne");
     expect(cells[2]).toBe("2,5");
     expect(cells[3]).toContain("1");

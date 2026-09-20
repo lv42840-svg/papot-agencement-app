@@ -47,8 +47,8 @@ describe("quote Word V2 template contract", () => {
 
     for (const table of [bodyTable!, optionsTable!]) {
       expect(table).toContain('<w:tblLayout w:type="fixed"');
-      expect(table).toContain('<w:gridCol w:w="567"');
-      expect(table).toContain('<w:gridCol w:w="5216"');
+      expect(table).toContain('<w:gridCol w:w="850"');
+      expect(table).toContain('<w:gridCol w:w="4933"');
       expect(table).toContain('<w:gridCol w:w="1134"');
       expect(table).toContain('<w:gridCol w:w="1417"');
       expect(table).toContain('<w:gridCol w:w="1077"');
