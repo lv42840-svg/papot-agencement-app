@@ -24,8 +24,10 @@ import {
   type ChantiersPayload,
 } from "@/lib/chantiers/domain";
 import type { ChantierCapabilities } from "@/lib/chantiers/mutations";
+import { deriveChantierLaunchHours } from "@/lib/chantiers/launch-hours";
 import { obatKindForFile, requestObatAnalysis } from "@/lib/obat/client";
 import type { ObatImportAnalysis } from "@/lib/obat/domain";
+import type { NativeQuotesPayload } from "@/lib/quotes/store";
 
 type ChantiersSnapshot = {
   payload: ChantiersPayload;
@@ -36,6 +38,7 @@ type ChantiersSnapshot = {
 };
 
 type CommercialSnapshot = { payload: CommercialPayload };
+type QuotesSnapshot = { payload: NativeQuotesPayload };
 type ViewMode = "ACTIVE" | "DONE" | "ARCHIVED";
 
 const errorMessages: Record<string, string> = {
@@ -51,6 +54,8 @@ const errorMessages: Record<string, string> = {
   CHANTIER_SIGNED_QUOTE_DECLARATION_REQUIRED:
     "Indique explicitement que tu n'as pas le devis signé.",
   CHANTIER_COSTING_DECLARATION_REQUIRED: "Indique explicitement que tu n'as pas le déboursé OBAT.",
+  CHANTIER_RETAINED_QUOTE_NOT_FOUND:
+    "Un devis retenu est introuvable. Actualise les devis avant de lancer le chantier.",
 };
 
 function normalize(value: string): string {
@@ -116,6 +121,7 @@ export function ChantiersWorkspaceObat() {
   const router = useRouter();
   const [chantiersSnapshot, setChantiersSnapshot] = useState<ChantiersSnapshot | null>(null);
   const [commercialSnapshot, setCommercialSnapshot] = useState<CommercialSnapshot | null>(null);
+  const [quotesSnapshot, setQuotesSnapshot] = useState<QuotesSnapshot | null>(null);
   const [loading, setLoading] = useState(true);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -127,9 +133,10 @@ export function ChantiersWorkspaceObat() {
     setLoading(true);
     setError(null);
     try {
-      const [chantiersResponse, commercialResponse] = await Promise.all([
+      const [chantiersResponse, commercialResponse, quotesResponse] = await Promise.all([
         fetch("/api/desktop/chantiers", { cache: "no-store" }),
         fetch("/api/desktop/commercial", { cache: "no-store" }),
+        fetch("/api/desktop/quotes", { cache: "no-store" }),
       ]);
       const chantiersBody = (await chantiersResponse.json()) as ChantiersSnapshot & {
         error?: string;
@@ -137,10 +144,13 @@ export function ChantiersWorkspaceObat() {
       const commercialBody = (await commercialResponse.json()) as CommercialSnapshot & {
         error?: string;
       };
+      const quotesBody = (await quotesResponse.json()) as QuotesSnapshot & { error?: string };
       if (!chantiersResponse.ok) throw new Error(chantiersBody.error ?? "CHANTIERS_LOAD_FAILED");
       if (!commercialResponse.ok) throw new Error(commercialBody.error ?? "COMMERCIAL_LOAD_FAILED");
+      if (!quotesResponse.ok) throw new Error(quotesBody.error ?? "QUOTES_LOAD_FAILED");
       setChantiersSnapshot(chantiersBody);
       setCommercialSnapshot(commercialBody);
+      setQuotesSnapshot(quotesBody);
     } catch (loadError) {
       const code = loadError instanceof Error ? loadError.message : "CHANTIERS_LOAD_FAILED";
       setError(errorMessages[code] ?? "Impossible de charger les chantiers.");
@@ -272,9 +282,11 @@ export function ChantiersWorkspaceObat() {
               </button>
             ))}
           </div>
-          {selectedLaunch ? (
+          {selectedLaunch && quotesSnapshot ? (
             <LaunchSheet
+              key={selectedLaunch.id}
               item={selectedLaunch}
+              quotes={quotesSnapshot.payload}
               busy={busy}
               onCancel={() => setLaunchCaseId(null)}
               onLaunch={launch}
@@ -396,11 +408,13 @@ function SummaryCard({
 
 function LaunchSheet({
   item,
+  quotes,
   busy,
   onCancel,
   onLaunch,
 }: {
   item: CommercialCase;
+  quotes: NativeQuotesPayload;
   busy: boolean;
   onCancel: () => void;
   onLaunch: (body: {
@@ -424,12 +438,14 @@ function LaunchSheet({
   const costingDocument =
     item.documents.find((document) => document.category === "COSTING" && document.isCurrent) ??
     item.documents.find((document) => document.category === "COSTING");
+  const launchHours = deriveChantierLaunchHours(item, quotes);
+  const hoursFromRetainedQuotes = launchHours.source === "RETAINED_QUOTES";
   const [quoteMissing, setQuoteMissing] = useState(false);
   const [signedQuoteMissing, setSignedQuoteMissing] = useState(false);
   const [costingMissing, setCostingMissing] = useState(false);
-  const [be, setBe] = useState(String(item.provisionHours.be));
-  const [workshop, setWorkshop] = useState(String(item.provisionHours.workshop));
-  const [install, setInstall] = useState(String(item.provisionHours.install));
+  const [be, setBe] = useState(String(launchHours.hours.be));
+  const [workshop, setWorkshop] = useState(String(launchHours.hours.workshop));
+  const [install, setInstall] = useState(String(launchHours.hours.install));
   const [obatFiles, setObatFiles] = useState<File[]>([]);
   const [analysis, setAnalysis] = useState<ObatImportAnalysis | null>(null);
   const [signedFile, setSignedFile] = useState<File | null>(null);
@@ -697,6 +713,7 @@ function LaunchSheet({
               min="0"
               step="0.1"
               value={be}
+              readOnly={hoursFromRetainedQuotes}
               onChange={(event) => setBe(event.target.value)}
             />
             <em>h</em>
@@ -710,6 +727,7 @@ function LaunchSheet({
               min="0"
               step="0.1"
               value={workshop}
+              readOnly={hoursFromRetainedQuotes}
               onChange={(event) => setWorkshop(event.target.value)}
             />
             <em>h</em>
@@ -723,6 +741,7 @@ function LaunchSheet({
               min="0"
               step="0.1"
               value={install}
+              readOnly={hoursFromRetainedQuotes}
               onChange={(event) => setInstall(event.target.value)}
             />
             <em>h</em>
@@ -732,8 +751,9 @@ function LaunchSheet({
 
       <div className="launchFooter">
         <p>
-          Chaque document doit être présent, ajouté maintenant ou explicitement déclaré absent. Les
-          fichiers ajoutés sont classés dans l&apos;affaire avant le lancement.
+          {hoursFromRetainedQuotes
+            ? "Les heures BE, Atelier et Pose sont reprises automatiquement du ou des devis retenus. Aucune ressaisie au lancement."
+            : "Aucun devis natif retenu : les heures proviennent de la charge commerciale. Chaque document doit être présent, ajouté maintenant ou explicitement déclaré absent."}
         </p>
         <button
           type="button"
