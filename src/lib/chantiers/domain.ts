@@ -10,6 +10,7 @@ export const technicalOriginSchema = z.enum(["QUOTE_LINE", "TS"]);
 export const beItemStatusSchema = z.enum(["TODO", "DRAW", "VALIDATION", "VALIDATED"]);
 export const workshopItemStatusSchema = z.enum(["PREPARE", "READY", "IN_PROGRESS", "DONE"]);
 export const installItemStatusSchema = z.enum(["TODO", "IN_PROGRESS", "DONE"]);
+export const quoteLineProgressStatusSchema = z.enum(["TODO", "DONE"]);
 export const operationalSpaceIdSchema = z.enum([
   "admin",
   "be",
@@ -85,18 +86,28 @@ export const installItemSchema = z.object({
   updatedAt: isoDateTimeSchema,
 });
 
+export const quoteLineProgressItemSchema = z.object({
+  quoteId: z.string().uuid(),
+  quoteLineId: z.string().uuid(),
+  status: quoteLineProgressStatusSchema,
+  updatedAt: isoDateTimeSchema,
+  updatedByName: z.string().trim().min(1).max(120),
+});
+
 export const chantierOperationalSchema = z
   .object({
     spaces: operationalSpaceStatesSchema,
     beItems: z.array(beItemSchema).default([]),
     workshopItems: z.array(workshopItemSchema).default([]),
     installItems: z.array(installItemSchema).default([]),
+    quoteLineProgress: z.array(quoteLineProgressItemSchema).default([]),
   })
   .default({
     spaces: defaultOperationalSpaceStates,
     beItems: [],
     workshopItems: [],
     installItems: [],
+    quoteLineProgress: [],
   });
 
 export const chantierHistoryEventSchema = z.object({
@@ -167,11 +178,13 @@ export type TechnicalOrigin = z.infer<typeof technicalOriginSchema>;
 export type BeItemStatus = z.infer<typeof beItemStatusSchema>;
 export type WorkshopItemStatus = z.infer<typeof workshopItemStatusSchema>;
 export type InstallItemStatus = z.infer<typeof installItemStatusSchema>;
+export type QuoteLineProgressStatus = z.infer<typeof quoteLineProgressStatusSchema>;
 export type OperationalSpaceId = z.infer<typeof operationalSpaceIdSchema>;
 export type OperationalSpaceState = z.infer<typeof operationalSpaceStateSchema>;
 export type BeItem = z.infer<typeof beItemSchema>;
 export type WorkshopItem = z.infer<typeof workshopItemSchema>;
 export type InstallItem = z.infer<typeof installItemSchema>;
+export type QuoteLineProgressItem = z.infer<typeof quoteLineProgressItemSchema>;
 export type ChantierOperational = z.infer<typeof chantierOperationalSchema>;
 export type ChantierHistoryEvent = z.infer<typeof chantierHistoryEventSchema>;
 export type ChantierRecord = z.infer<typeof chantierRecordSchema>;
