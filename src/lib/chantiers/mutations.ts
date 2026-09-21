@@ -92,6 +92,14 @@ export const chantierMutationSchema = z.discriminatedUnion("action", [
     state: z.enum(["APPLICABLE", "NOT_APPLICABLE"]),
   }),
   z.object({
+    action: z.literal("setQuoteLineProgress"),
+    chantierId: z.string().uuid(),
+    quoteId: z.string().uuid(),
+    quoteLineId: z.string().uuid(),
+    status: z.enum(["TODO", "DONE"]),
+    quoteLineLabel: nullableText(500),
+  }),
+  z.object({
     action: z.literal("markDone"),
     chantierId: z.string().uuid(),
   }),
@@ -314,6 +322,7 @@ export function launchChantierFromCommercial(
       beItems: [],
       workshopItems: [],
       installItems: [],
+      quoteLineProgress: [],
     },
     launchedAt: timestamp,
     launchedByName: actor.displayName,
@@ -533,6 +542,42 @@ export function applyChantierMutation(
       actor.displayName,
       "OPERATIONAL_STATUS_UPDATED",
       `Pose · ${installItem.name} : ${INSTALL_STATUS_LABELS[previous]} → ${INSTALL_STATUS_LABELS[input.status]}${installItem.note ? ` · ${installItem.note}` : ""}.`,
+      now,
+    );
+    return { payload, focusChantierId: item.id };
+  }
+
+  if (input.action === "setQuoteLineProgress") {
+    ensureOperationalEditable(item);
+    const previous = item.operational.quoteLineProgress.find(
+      (candidate) =>
+        candidate.quoteId === input.quoteId && candidate.quoteLineId === input.quoteLineId,
+    );
+    const previousStatus = previous?.status ?? "TODO";
+    if (previousStatus === input.status) {
+      throw new Error("CHANTIER_QUOTE_LINE_PROGRESS_UNCHANGED");
+    }
+
+    if (previous) {
+      previous.status = input.status;
+      previous.updatedAt = now.toISOString();
+      previous.updatedByName = actor.displayName;
+    } else {
+      item.operational.quoteLineProgress.push({
+        quoteId: input.quoteId,
+        quoteLineId: input.quoteLineId,
+        status: input.status,
+        updatedAt: now.toISOString(),
+        updatedByName: actor.displayName,
+      });
+    }
+
+    touch(item, actor, now);
+    history(
+      item,
+      actor.displayName,
+      "OPERATIONAL_STATUS_UPDATED",
+      `Ligne devis · ${text(input.quoteLineLabel) ?? input.quoteLineId} : ${previousStatus === "DONE" ? "Réalisée" : "À faire"} → ${input.status === "DONE" ? "Réalisée" : "À faire"}.`,
       now,
     );
     return { payload, focusChantierId: item.id };
