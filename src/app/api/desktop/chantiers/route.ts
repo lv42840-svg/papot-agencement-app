@@ -28,7 +28,11 @@ type Owner = { userId: string; deviceId: string; displayName: string };
 type PermissionUser = { id: string };
 
 function mutationNeedsCommercialOrigin(input: { action: string }): boolean {
-  return input.action === "createBeItem" || input.action === "createWorkshopItem";
+  return (
+    input.action === "createBeItem" ||
+    input.action === "createWorkshopItem" ||
+    input.action === "setQuoteLineProgress"
+  );
 }
 
 function noStoreJson(body: unknown, init?: ResponseInit) {
@@ -142,6 +146,21 @@ export async function POST(request: Request) {
             originLabel: chantierQuoteLineDisplay(reference),
             sourceQuoteId: reference.quoteId,
             sourceQuoteLineId: reference.quoteLineId,
+          };
+        }
+
+        if (input.action === "setQuoteLineProgress") {
+          const reference = resolveRetainedChantierQuoteLine(
+            affair,
+            quotes,
+            input.quoteId,
+            input.quoteLineId,
+          );
+          normalizedInput = {
+            ...input,
+            quoteId: reference.quoteId,
+            quoteLineId: reference.quoteLineId,
+            quoteLineLabel: chantierQuoteLineDisplay(reference),
           };
         }
       }

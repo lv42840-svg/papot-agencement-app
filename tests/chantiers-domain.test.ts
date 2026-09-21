@@ -153,6 +153,7 @@ describe("Chantiers V1 foundation", () => {
       beItems: [],
       workshopItems: [],
       installItems: [],
+      quoteLineProgress: [],
     });
     expect(item.launchDocuments).toEqual({
       quote: "MISSING_DECLARED",

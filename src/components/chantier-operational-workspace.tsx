@@ -231,6 +231,7 @@ function AdminSpace({
   quoteGroups,
   busy,
   canModify,
+  mutate,
   mutateCommercial,
 }: CoreProps & {
   commercialCase: CommercialCase | null;
@@ -246,6 +247,12 @@ function AdminSpace({
         )
         .sort((left, right) => right.updatedAt.localeCompare(left.updatedAt))
     : [];
+  const quoteLineProgress = new Map(
+    chantier.operational.quoteLineProgress.map((item) => [
+      `${item.quoteId}:${item.quoteLineId}`,
+      item.status,
+    ]),
+  );
 
   return (
     <div className="chantierOpSpace">
@@ -287,6 +294,50 @@ function AdminSpace({
                     · {lines.length} ligne{lines.length > 1 ? "s" : ""} de référence
                   </small>
                 </div>
+                {lines.length > 0 ? (
+                  <div className="chantierQuoteProgress">
+                    {lines.map((line) => {
+                      const progress =
+                        quoteLineProgress.get(`${line.quoteId}:${line.quoteLineId}`) ?? "TODO";
+                      return (
+                        <div
+                          key={`${line.quoteId}:${line.quoteLineId}`}
+                          className={`chantierQuoteProgressRow${progress === "DONE" ? " isDone" : ""}`}
+                        >
+                          <span className="chantierQuoteProgressIdentity">
+                            <strong>{line.description}</strong>
+                            <small>
+                              {line.quantity} {line.unit}
+                            </small>
+                          </span>
+                          <button
+                            type="button"
+                            disabled={busy || !canModify}
+                            className={progress === "DONE" ? "isDone" : ""}
+                            onClick={() =>
+                              void mutate(
+                                {
+                                  action: "setQuoteLineProgress",
+                                  chantierId: chantier.id,
+                                  quoteId: line.quoteId,
+                                  quoteLineId: line.quoteLineId,
+                                  status: progress === "DONE" ? "TODO" : "DONE",
+                                  quoteLineLabel: chantierQuoteLineDisplay(line),
+                                },
+                                progress === "DONE"
+                                  ? "Ligne remise à faire."
+                                  : "Ligne marquée réalisée.",
+                              )
+                            }
+                          >
+                            <CheckCircle2 size={14} />
+                            {progress === "DONE" ? "Réalisée" : "Marquer réalisée"}
+                          </button>
+                        </div>
+                      );
+                    })}
+                  </div>
+                ) : null}
                 <div className="chantierAdminQuoteActions">
                   {commercialCase && quote.finalPdf ? (
                     <a
@@ -1024,6 +1075,64 @@ function OperationalStyles() {
         border: 1px solid #e8e3ed;
         border-radius: 8px;
         background: white;
+      }
+      .chantierAdminQuotes article {
+        flex-wrap: wrap;
+      }
+      .chantierQuoteProgress {
+        flex: 1 0 100%;
+        display: grid;
+        gap: 5px;
+        padding-top: 7px;
+        border-top: 1px solid #f0edf3;
+      }
+      .chantierQuoteProgressRow {
+        min-height: 38px;
+        padding: 5px 7px;
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 10px;
+        border-radius: 7px;
+        background: #fbfafc;
+      }
+      .chantierQuoteProgressRow.isDone {
+        background: #f3faf5;
+      }
+      .chantierQuoteProgressIdentity {
+        min-width: 0;
+        display: grid;
+        gap: 2px;
+      }
+      .chantierQuoteProgressIdentity strong {
+        overflow: hidden;
+        color: #514b58;
+        font-size: 12px;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+      }
+      .chantierQuoteProgressIdentity small {
+        color: #8a8390;
+        font-size: 10px;
+      }
+      .chantierQuoteProgressRow button {
+        min-height: 31px;
+        padding: 0 9px;
+        display: inline-flex;
+        align-items: center;
+        gap: 5px;
+        border: 1px solid #b5a9df;
+        border-radius: 7px;
+        background: #f8f5ff;
+        color: #6552bf;
+        font-size: 11px;
+        font-weight: 750;
+        white-space: nowrap;
+      }
+      .chantierQuoteProgressRow button.isDone {
+        border-color: #a9d1b5;
+        background: #edf8f0;
+        color: #34744b;
       }
       .chantierAdminQuotes article > div,
       .chantierComplementaryQuotes article > span,

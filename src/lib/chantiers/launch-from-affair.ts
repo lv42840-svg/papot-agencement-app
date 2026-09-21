@@ -84,6 +84,7 @@ export function launchChantierFromAffair(
       beItems: [],
       workshopItems: [],
       installItems: [],
+      quoteLineProgress: [],
     },
     launchedAt: timestamp,
     launchedByName: actor.displayName,
