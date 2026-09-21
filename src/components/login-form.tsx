@@ -24,7 +24,8 @@ export function LoginForm() {
       setBusy(false);
       return;
     }
-    router.replace("/");
+    const body = (await response.json()) as { mustChangePassword?: boolean };
+    router.replace(body.mustChangePassword ? "/change-password" : "/");
     router.refresh();
   }
 

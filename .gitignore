@@ -2,8 +2,15 @@ node_modules/
 .next/
 out/
 coverage/
+release/
+build/*.png
+.papot-dev/
 .env
 .env.local
 .env.*.local
 *.log
 .DS_Store
+
+*.tsbuildinfo
+
+.dev.vars*

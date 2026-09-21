@@ -1,0 +1,10 @@
+{
+  "name": "PAPOT PWA Probe",
+  "short_name": "PAPOT Probe",
+  "start_url": "./",
+  "scope": "./",
+  "display": "standalone",
+  "background_color": "#ffffff",
+  "theme_color": "#111827",
+  "description": "Probe technique temporaire pour valider le transport mobile PAPOT."
+}
