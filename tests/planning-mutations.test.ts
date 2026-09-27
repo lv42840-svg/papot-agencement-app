@@ -1,6 +1,9 @@
 import { describe, expect, it } from "vitest";
 import { createInitialPlanningPayload } from "../src/lib/planning/domain";
-import { applyPlanningMacroMutation, applyPlanningPersonCapacityMutation } from "../src/lib/planning/mutations";
+import {
+  applyPlanningMacroMutation,
+  applyPlanningPersonCapacityMutation,
+} from "../src/lib/planning/mutations";
 
 const chantierId = "11111111-1111-4111-8111-111111111111";
 const active = new Set([chantierId]);

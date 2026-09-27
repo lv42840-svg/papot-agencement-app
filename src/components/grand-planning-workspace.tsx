@@ -283,10 +283,7 @@ export function GrandPlanningWorkspace({ initialYear }: { initialYear: number })
                   <strong>{person.displayName}</strong>
                   <small>
                     {formatHours(
-                      Object.values(person.weeklySchedule).reduce(
-                        (sum, hours) => sum + hours,
-                        0,
-                      ),
+                      Object.values(person.weeklySchedule).reduce((sum, hours) => sum + hours, 0),
                     )}{" "}
                     h / semaine
                   </small>
