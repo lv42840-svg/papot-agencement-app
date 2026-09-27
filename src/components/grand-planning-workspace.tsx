@@ -2,7 +2,11 @@
 
 import Link from "next/link";
 import { useCallback, useEffect, useMemo, useState } from "react";
-import type { GrandPlanningChantierRow, PlanningActivity } from "@/lib/planning/domain";
+import type {
+  GrandPlanningChantierRow,
+  GrandPlanningProvisionRow,
+  PlanningActivity,
+} from "@/lib/planning/domain";
 
 type WeeklyCapacity = {
   week: string;
@@ -37,6 +41,7 @@ type PlanningSnapshot = {
   year: number;
   weeks: string[];
   rows: GrandPlanningChantierRow[];
+  provisionalRows: GrandPlanningProvisionRow[];
   weeklyCapacity: WeeklyCapacity[];
   peopleCapacity: PersonCapacity[];
   absences: PlanningAbsence[];
@@ -123,6 +128,16 @@ export function GrandPlanningWorkspace({ initialYear }: { initialYear: number })
         activities: chantier.activities.filter((activity) => activity.remainingHours !== 0),
       }))
       .filter((chantier) => chantier.activities.length > 0);
+  }, [snapshot]);
+
+  const provisionalUnallocated = useMemo(() => {
+    if (!snapshot) return [];
+    return snapshot.provisionalRows
+      .map((item) => ({
+        ...item,
+        activities: item.activities.filter((activity) => activity.provisionHours !== 0),
+      }))
+      .filter((item) => item.activities.length > 0);
   }, [snapshot]);
 
   function scheduleDraftKey(userId: string, day: keyof PersonCapacity["weeklySchedule"]) {
@@ -381,6 +396,57 @@ export function GrandPlanningWorkspace({ initialYear }: { initialYear: number })
                       key={activity.activity}
                     >
                       {activity.label} {formatHours(activity.remainingHours)} h
+                    </span>
+                  ))}
+                </div>
+              </div>
+            ))}
+          </div>
+        </section>
+      ) : null}
+
+      {provisionalUnallocated.length > 0 ? (
+        <section
+          className="planningUnallocatedPanel planningProvisionUnallocatedPanel"
+          aria-label="Charges provisionnelles à répartir"
+        >
+          <div className="planningUnallocatedHeader">
+            <div>
+              <p className="eyebrow">Provisionnel</p>
+              <h2>Charges commerciales à répartir</h2>
+              <p className="muted">
+                Affaires non confirmées. Ces heures ne sont pas comptées dans la charge ferme.
+              </p>
+            </div>
+            <strong>
+              {formatHours(
+                provisionalUnallocated.reduce(
+                  (total, item) =>
+                    total +
+                    item.activities.reduce(
+                      (subtotal, activity) => subtotal + activity.provisionHours,
+                      0,
+                    ),
+                  0,
+                ),
+              )}{" "}
+              h
+            </strong>
+          </div>
+          <div className="planningUnallocatedList">
+            {provisionalUnallocated.map((item) => (
+              <div className="planningUnallocatedRow" key={item.caseId}>
+                <div className="planningProvisionCaseMeta">
+                  <strong>{item.name}</strong>
+                  <span>{item.statusLabel}</span>
+                  {item.expectedConfirmationDate ? (
+                    <small>Confirmation prévue {item.expectedConfirmationDate}</small>
+                  ) : null}
+                </div>
+                <div>
+                  {item.activities.map((activity) => (
+                    <span key={activity.activity}>
+                      {activity.label} {formatHours(activity.provisionHours)} h
                     </span>
                   ))}
                 </div>
@@ -898,6 +964,28 @@ export function GrandPlanningWorkspace({ initialYear }: { initialYear: number })
           background: #fff9ed;
           border: 1px solid #efdcb4;
           border-radius: 11px;
+        }
+        .planningProvisionUnallocatedPanel {
+          background: #f7f4ff;
+          border-color: #d9d0f1;
+        }
+        .planningProvisionUnallocatedPanel .planningUnallocatedHeader > strong {
+          color: #6e5db7;
+        }
+        .planningProvisionCaseMeta {
+          min-width: 210px;
+          display: grid !important;
+          gap: 2px !important;
+        }
+        .planningProvisionCaseMeta > strong {
+          min-width: 0;
+        }
+        .planningProvisionCaseMeta span,
+        .planningProvisionCaseMeta small {
+          padding: 0 !important;
+          background: transparent !important;
+          color: var(--muted);
+          font-weight: 600;
         }
         .planningUnallocatedHeader {
           display: flex;
