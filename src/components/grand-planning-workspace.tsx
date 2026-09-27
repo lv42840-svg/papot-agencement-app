@@ -613,10 +613,7 @@ export function GrandPlanningWorkspace({ initialYear }: { initialYear: number })
                     })}
                     <td className="planningScheduleTotal">
                       {formatHours(
-                        Object.values(person.weeklySchedule).reduce(
-                          (sum, hours) => sum + hours,
-                          0,
-                        ),
+                        Object.values(person.weeklySchedule).reduce((sum, hours) => sum + hours, 0),
                       )}{" "}
                       h
                     </td>
@@ -804,9 +801,7 @@ export function GrandPlanningWorkspace({ initialYear }: { initialYear: number })
                           Dispo F. {formatHours(capacity?.firmAvailableHours ?? 0)}
                         </span>
                         <span
-                          className={availabilityClass(
-                            capacity?.availableWithProvisionHours ?? 0,
-                          )}
+                          className={availabilityClass(capacity?.availableWithProvisionHours ?? 0)}
                         >
                           Dispo F+P{" "}
                           {formatHours(capacity?.availableWithProvisionHours ?? 0)}
