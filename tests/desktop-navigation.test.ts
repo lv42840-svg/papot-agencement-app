@@ -15,7 +15,7 @@ describe("desktop navigation", () => {
     const planningEntries = desktopNavigation.filter((item) => item.moduleKey === "planning");
 
     expect(planningEntries).toEqual([
-      expect.objectContaining({ label: "Planning", href: "/planning/2026-S38" }),
+      expect.objectContaining({ label: "Planning", href: "/planning" }),
     ]);
     expect(desktopNavigation.some((item) => item.label === "Grand planning")).toBe(false);
     expect(desktopNavigation.some((item) => item.label === "Petit planning")).toBe(false);
