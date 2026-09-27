@@ -904,6 +904,14 @@ export function GrandPlanningWorkspace({ initialYear }: { initialYear: number })
                   )),
                 )}
 
+                {snapshot.provisionalRows.length > 0 ? (
+                  <tr className="planningPotentialDivider">
+                    <th colSpan={snapshot.weeks.length + 4} scope="rowgroup">
+                      POTENTIEL
+                    </th>
+                  </tr>
+                ) : null}
+
                 {snapshot.provisionalRows.flatMap((item) =>
                   item.activities.map((activity, activityIndex) => (
                     <tr
@@ -1396,6 +1404,18 @@ export function GrandPlanningWorkspace({ initialYear }: { initialYear: number })
         }
         .planningProvisionStart > * {
           border-top: 2px solid #d8cff0;
+        }
+        .planningPotentialDivider th {
+          height: 34px;
+          padding: 0 14px;
+          border-top: 3px solid #b9a9e8;
+          border-bottom: 2px solid #d8cff0;
+          background: #eee9fb !important;
+          color: #5f4fa1;
+          text-align: left;
+          font-size: 11px;
+          font-weight: 900;
+          letter-spacing: 0.08em;
         }
         .planningProvisionRow > th,
         .planningProvisionRow > td,

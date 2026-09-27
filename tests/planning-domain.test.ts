@@ -208,6 +208,25 @@ describe("grand planning domain", () => {
     ]);
   });
 
+  it("uses the shared potential order for provisional rows", () => {
+    const commercial = commercialPayload();
+    const secondCaseId = "77777777-7777-4777-8777-777777777777";
+    commercial.cases.push({
+      ...commercial.cases[0],
+      id: secondCaseId,
+      name: "Deuxième affaire provisionnée",
+      provisionHours: { be: 1, workshop: 2, install: 3 },
+    });
+    const planning: PlanningPayload = {
+      ...createInitialPlanningPayload(),
+      provisionalOrder: [secondCaseId, provisionCaseId],
+    };
+
+    const rows = buildCommercialProvisionRows(commercial, planning, 2026);
+
+    expect(rows.map((row) => row.caseId)).toEqual([secondCaseId, provisionCaseId]);
+  });
+
   it("calculates provisional remaining hours and allows a negative balance", () => {
     const planning: PlanningPayload = {
       ...createInitialPlanningPayload(),
@@ -249,6 +268,7 @@ describe("grand planning domain", () => {
     const planning: PlanningPayload = {
       schemaVersion: 1,
       chantierOrder: [],
+      provisionalOrder: [],
       peopleCapacity: [],
       absences: [],
       provisionalAllocations: [],
@@ -284,6 +304,7 @@ describe("grand planning domain", () => {
     const planning: PlanningPayload = {
       schemaVersion: 1,
       chantierOrder: [],
+      provisionalOrder: [],
       peopleCapacity: [],
       absences: [],
       provisionalAllocations: [],

@@ -59,6 +59,7 @@ export const planningPayloadSchema = z
     macroAllocations: z.array(planningMacroAllocationSchema),
     provisionalAllocations: z.array(planningProvisionalAllocationSchema).default([]),
     chantierOrder: z.array(z.string().uuid()),
+    provisionalOrder: z.array(z.string().uuid()).default([]),
     peopleCapacity: z.array(planningPersonCapacitySchema).default([]),
     absences: z.array(planningAbsenceSchema).default([]),
   })
@@ -109,6 +110,14 @@ export const planningPayloadSchema = z
         message: "PLANNING_CHANTIER_ORDER_DUPLICATE",
       });
     }
+
+    if (new Set(value.provisionalOrder).size !== value.provisionalOrder.length) {
+      context.addIssue({
+        code: z.ZodIssueCode.custom,
+        path: ["provisionalOrder"],
+        message: "PLANNING_PROVISIONAL_ORDER_DUPLICATE",
+      });
+    }
   });
 
 export type PlanningMacroAllocation = z.infer<typeof planningMacroAllocationSchema>;
@@ -156,6 +165,7 @@ export function createInitialPlanningPayload(): PlanningPayload {
     macroAllocations: [],
     provisionalAllocations: [],
     chantierOrder: [],
+    provisionalOrder: [],
     peopleCapacity: [],
     absences: [],
   };
@@ -283,38 +293,52 @@ export function buildCommercialProvisionRows(
   const weeks = new Set(planningYearWeekIds(year));
   const activities: PlanningActivity[] = ["BE", "WORKSHOP", "INSTALL"];
 
+  const rank = new Map(planningPayload.provisionalOrder.map((id, index) => [id, index]));
+
   return commercialPayload.cases
     .filter(isCommercialActive)
-    .map((item) => ({
-      caseId: item.id,
-      name: item.name,
-      status: item.status,
-      statusLabel: COMMERCIAL_STATUS_LABELS[item.status],
-      expectedConfirmationDate: item.expectedConfirmationDate,
-      activities: activities.map((activity) => {
-        const matching = planningPayload.provisionalAllocations.filter(
-          (allocation) => allocation.caseId === item.id && allocation.activity === activity,
-        );
-        const weeklyHours = Object.fromEntries(
-          matching
-            .filter((allocation) => weeks.has(allocation.week))
-            .map((allocation) => [allocation.week, allocation.hours]),
-        );
-        const allocatedHours = matching.reduce((sum, allocation) => sum + allocation.hours, 0);
-        const provisionHours = provisionHoursForActivity(item.provisionHours, activity);
-        return {
-          activity,
-          label: PLANNING_ACTIVITY_LABELS[activity],
-          provisionHours,
-          allocatedHours,
-          remainingHours: provisionHours - allocatedHours,
-          weeklyHours,
-        };
-      }),
+    .map((item, inputIndex) => ({
+      inputIndex,
+      row: {
+        caseId: item.id,
+        name: item.name,
+        status: item.status,
+        statusLabel: COMMERCIAL_STATUS_LABELS[item.status],
+        expectedConfirmationDate: item.expectedConfirmationDate,
+        activities: activities.map((activity) => {
+          const matching = planningPayload.provisionalAllocations.filter(
+            (allocation) => allocation.caseId === item.id && allocation.activity === activity,
+          );
+          const weeklyHours = Object.fromEntries(
+            matching
+              .filter((allocation) => weeks.has(allocation.week))
+              .map((allocation) => [allocation.week, allocation.hours]),
+          );
+          const allocatedHours = matching.reduce((sum, allocation) => sum + allocation.hours, 0);
+          const provisionHours = provisionHoursForActivity(item.provisionHours, activity);
+          return {
+            activity,
+            label: PLANNING_ACTIVITY_LABELS[activity],
+            provisionHours,
+            allocatedHours,
+            remainingHours: provisionHours - allocatedHours,
+            weeklyHours,
+          };
+        }),
+      },
     }))
-    .filter((item) =>
-      item.activities.some(
+    .filter(({ row }) =>
+      row.activities.some(
         (activity) => activity.provisionHours !== 0 || activity.allocatedHours !== 0,
       ),
-    );
+    )
+    .sort((left, right) => {
+      const leftRank = rank.get(left.row.caseId);
+      const rightRank = rank.get(right.row.caseId);
+      if (leftRank != null && rightRank != null) return leftRank - rightRank;
+      if (leftRank != null) return -1;
+      if (rightRank != null) return 1;
+      return left.inputIndex - right.inputIndex;
+    })
+    .map(({ row }) => row);
 }

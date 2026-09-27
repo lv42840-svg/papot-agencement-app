@@ -35,6 +35,12 @@ describe("grand planning commercial provision bridge", () => {
     expect(uiSource).toContain("Dispo +P");
   });
 
+  it("separates firm work from the potential block explicitly", () => {
+    expect(uiSource).toContain("planningPotentialDivider");
+    expect(uiSource).toContain("POTENTIEL");
+    expect(uiSource).toContain("snapshot.provisionalRows.length > 0");
+  });
+
   it("edits provisional hours in the same annual table with a lighter visual treatment", () => {
     expect(apiSource).toContain('input.action === "setProvisionHours"');
     expect(uiSource).toContain('action: "setProvisionHours"');

@@ -30,7 +30,10 @@ import {
   requireDesktopRequestContext,
 } from "@/lib/desktop/request-context";
 import { createPlanningRepository } from "@/lib/planning/create-repository";
-import { clearPlanningProvisionForCommercialCase } from "@/lib/planning/mutations";
+import {
+  clearPlanningProvisionForCommercialCase,
+  syncPlanningPotentialOrderForCommercialCase,
+} from "@/lib/planning/mutations";
 import { createQuotesRepository } from "@/lib/quotes/create-repository";
 import {
   validateAdditionalRetainedQuote,
@@ -285,6 +288,12 @@ export async function POST(request: Request) {
       stage = "clear-planning-provision";
       await createPlanningRepository().mutate((payload) =>
         clearPlanningProvisionForCommercialCase(payload, caseId),
+      );
+    } else if (input.action === "updateProvision") {
+      const hasProvisionReference = input.be > 0 || input.workshop > 0 || input.install > 0;
+      stage = "sync-planning-potential-order";
+      await createPlanningRepository().mutate((payload) =>
+        syncPlanningPotentialOrderForCommercialCase(payload, input.caseId, hasProvisionReference),
       );
     }
 
