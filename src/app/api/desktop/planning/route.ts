@@ -26,6 +26,7 @@ import {
   applyPlanningFullWeekAbsenceMutation,
   applyPlanningMacroMutation,
   applyPlanningPersonCapacityMutation,
+  applyPlanningProvisionalMutation,
   planningMutationSchema,
 } from "@/lib/planning/mutations";
 
@@ -43,7 +44,12 @@ function noStoreJson(body: unknown, init?: ResponseInit) {
 function statusFor(code: string): number {
   const requestStatus = desktopRequestErrorStatus(code);
   if (requestStatus) return requestStatus;
-  if (code === "PLANNING_CHANTIER_NOT_ACTIVE" || code === "PLANNING_USER_NOT_ACTIVE") return 409;
+  if (
+    code === "PLANNING_CHANTIER_NOT_ACTIVE" ||
+    code === "PLANNING_COMMERCIAL_CASE_NOT_ACTIVE" ||
+    code === "PLANNING_USER_NOT_ACTIVE"
+  )
+    return 409;
   if (code.includes("VERSION_CONFLICT")) return 409;
   if (code.includes("INVALID")) return 400;
   return 400;
@@ -83,7 +89,7 @@ async function snapshot(
     ]);
   const weeks = planningYearWeekIds(year);
   const rows = buildFirmGrandPlanningRows(chantiers, planning, year);
-  const provisionalRows = buildCommercialProvisionRows(commercial);
+  const provisionalRows = buildCommercialProvisionRows(commercial, planning, year);
   const firmLoadByWeek = new Map<string, number>();
 
   for (const row of rows) {
@@ -163,6 +169,20 @@ export async function POST(request: Request) {
       );
       await planningRepository.mutate((payload) =>
         applyPlanningMacroMutation(payload, input, activeChantierIds),
+      );
+    } else if (input.action === "setProvisionHours") {
+      await requireSpecialPermission(context.user, "planning.edit_macro");
+      const commercial = await createCommercialRepository(context).load();
+      const activeCommercialCaseIds = new Set(
+        commercial.cases
+          .filter(
+            (item) =>
+              item.status !== "CONFIRMED" && item.status !== "LOST" && item.status !== "ABANDONED",
+          )
+          .map((item) => item.id),
+      );
+      await planningRepository.mutate((payload) =>
+        applyPlanningProvisionalMutation(payload, input, activeCommercialCaseIds),
       );
     } else {
       await requireSpecialPermission(context.user, "planning.manage_schedules");

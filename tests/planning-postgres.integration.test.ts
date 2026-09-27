@@ -47,9 +47,38 @@ describeWithPostgres("Planning PostgreSQL storage", () => {
     await expect(createPostgresPlanningRepository(pool).load()).resolves.toEqual({
       schemaVersion: 1,
       macroAllocations: [],
+      provisionalAllocations: [],
       chantierOrder: [],
       peopleCapacity: [],
       absences: [],
+    });
+  });
+
+  it("persists provisional weekly allocations without requiring a storage migration", async () => {
+    const repository = createPostgresPlanningRepository(pool);
+
+    await repository.mutate((payload) => ({
+      ...payload,
+      provisionalAllocations: [
+        ...payload.provisionalAllocations,
+        {
+          caseId: "22222222-2222-4222-8222-222222222222",
+          activity: "INSTALL" as const,
+          week: "2026-W42",
+          hours: 16,
+        },
+      ],
+    }));
+
+    await expect(repository.load()).resolves.toMatchObject({
+      provisionalAllocations: [
+        {
+          caseId: "22222222-2222-4222-8222-222222222222",
+          activity: "INSTALL",
+          week: "2026-W42",
+          hours: 16,
+        },
+      ],
     });
   });
 

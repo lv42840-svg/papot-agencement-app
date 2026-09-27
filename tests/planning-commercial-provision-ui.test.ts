@@ -13,7 +13,7 @@ const uiSource = readFileSync(
 describe("grand planning commercial provision bridge", () => {
   it("loads commercial provisions into the planning snapshot without storing totals in planning", () => {
     expect(apiSource).toContain("createCommercialRepository(context).load()");
-    expect(apiSource).toContain("buildCommercialProvisionRows(commercial)");
+    expect(apiSource).toContain("buildCommercialProvisionRows(commercial, planning, year)");
     expect(apiSource).toContain("provisionalRows");
   });
 
@@ -22,5 +22,14 @@ describe("grand planning commercial provision bridge", () => {
     expect(uiSource).toContain("Affaires non confirmées");
     expect(uiSource).toContain("Ces heures ne sont pas comptées dans la charge ferme.");
     expect(uiSource).toContain("provisionalUnallocated");
+    expect(uiSource).toContain("activity.remainingHours");
+  });
+
+  it("edits provisional hours in the same annual table with a lighter visual treatment", () => {
+    expect(apiSource).toContain('input.action === "setProvisionHours"');
+    expect(uiSource).toContain('action: "setProvisionHours"');
+    expect(uiSource).toContain("planningProvisionRow");
+    expect(uiSource).toContain("planningProvisionCaseCell");
+    expect(uiSource).toContain("Provisionnel · {item.statusLabel}");
   });
 });
