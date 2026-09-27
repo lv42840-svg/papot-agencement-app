@@ -25,6 +25,7 @@ type UserRow = {
   can_manage_permissions: boolean;
   must_change_password: boolean;
   accent_key: string;
+  planning_potential_collapsed: boolean;
   module_permissions: unknown;
   special_permissions: unknown;
 };
@@ -53,6 +54,7 @@ function rowToUser(row: UserRow): AuthUserRecord {
     canManagePermissions: row.can_manage_permissions,
     mustChangePassword: row.must_change_password,
     accentKey: row.accent_key,
+    planningPotentialCollapsed: row.planning_potential_collapsed || undefined,
     modulePermissions: row.module_permissions as AuthUserRecord["modulePermissions"],
     specialPermissions: row.special_permissions as AuthUserRecord["specialPermissions"],
   };
@@ -87,10 +89,11 @@ async function insertUser(
         can_manage_permissions,
         must_change_password,
         accent_key,
+        planning_potential_collapsed,
         module_permissions,
         special_permissions
       )
-      VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10::jsonb, $11::jsonb)
+      VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11::jsonb, $12::jsonb)
     `,
     [
       user.id,
@@ -102,6 +105,7 @@ async function insertUser(
       user.canManagePermissions,
       user.mustChangePassword,
       user.accentKey,
+      user.planningPotentialCollapsed ?? false,
       JSON.stringify(user.modulePermissions),
       JSON.stringify(user.specialPermissions),
     ],
@@ -145,6 +149,7 @@ export async function loadAuthPayloadFromQueryable(queryable: AuthQueryable): Pr
       can_manage_permissions,
       must_change_password,
       accent_key,
+      planning_potential_collapsed,
       module_permissions,
       special_permissions
     FROM papot_auth_users
