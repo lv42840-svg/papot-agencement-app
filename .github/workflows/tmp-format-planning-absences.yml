@@ -1,0 +1,32 @@
+name: Temporary Planning Absences Formatter
+on:
+  push:
+    branches:
+      - feat/planning-absences
+permissions:
+  contents: write
+jobs:
+  format:
+    if: github.actor != 'github-actions[bot]'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.ref_name }}
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - run: |
+          npx prettier --write \
+            src/components/grand-planning-workspace.tsx \
+            src/lib/planning/mutations.ts
+      - name: Commit formatting
+        run: |
+          if git diff --quiet; then exit 0; fi
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add src/components/grand-planning-workspace.tsx src/lib/planning/mutations.ts
+          git commit -m "style(planning): applique Prettier aux absences"
+          git push origin "HEAD:${GITHUB_REF_NAME}"
