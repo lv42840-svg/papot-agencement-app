@@ -1,8 +1,8 @@
 import "server-only";
 
 import type { Pool, PoolClient } from "pg";
-import { getServerDbPool } from "@/lib/server-db/pool";
-import { withServerDbTransaction } from "@/lib/server-db/transaction";
+import { getServerDbPool } from "../server-db/pool";
+import { withServerDbTransaction } from "../server-db/transaction";
 import { parsePlanningPayload } from "./domain";
 import type { PlanningRepository } from "./repository";
 
