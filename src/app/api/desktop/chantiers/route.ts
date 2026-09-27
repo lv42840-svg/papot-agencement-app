@@ -19,6 +19,11 @@ import {
   desktopRequestErrorStatus,
   requireDesktopRequestContext,
 } from "@/lib/desktop/request-context";
+import { createPlanningRepository } from "@/lib/planning/create-repository";
+import {
+  closePlanningFirmChantier,
+  reopenPlanningFirmChantier,
+} from "@/lib/planning/mutations";
 import { createQuotesRepository } from "@/lib/quotes/create-repository";
 
 export const runtime = "nodejs";
@@ -50,8 +55,9 @@ async function snapshot(
 ) {
   const actor = { userId: owner.userId, displayName: owner.displayName };
   const baseCapabilities = chantierCapabilities(actor);
-  const [canLaunchSpecial, canArchiveSpecial] = await Promise.all([
+  const [canLaunchSpecial, canCloseReopenSpecial, canArchiveSpecial] = await Promise.all([
     hasEffectiveSpecialPermission(user, "commercial.confirm_launch"),
+    hasEffectiveSpecialPermission(user, "chantiers.close_reopen"),
     hasEffectiveSpecialPermission(user, "chantiers.archive_reactivate"),
   ]);
   return {
@@ -62,6 +68,7 @@ async function snapshot(
       canRead: true,
       canModify: canWrite,
       canLaunch: canWrite && canLaunchSpecial,
+      canCloseReopen: canWrite && canCloseReopenSpecial,
       canArchive: canWrite && canArchiveSpecial,
     },
     focusChantierId,
@@ -167,6 +174,18 @@ export async function POST(request: Request) {
 
       return applyChantierMutation(payload, normalizedInput, actor);
     });
+
+    if (input.action === "markDone") {
+      stage = "clear-planning-firm";
+      await createPlanningRepository().mutate((payload) =>
+        closePlanningFirmChantier(payload, input.chantierId),
+      );
+    } else if (input.action === "reactivate") {
+      stage = "reopen-planning-firm";
+      await createPlanningRepository().mutate((payload) =>
+        reopenPlanningFirmChantier(payload, input.chantierId),
+      );
+    }
 
     console.info("[PAPOT][Chantiers] POST saved", { ms: Date.now() - startedAt });
     return noStoreJson(
