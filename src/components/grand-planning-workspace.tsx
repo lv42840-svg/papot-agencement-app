@@ -993,8 +993,7 @@ export function GrandPlanningWorkspace({
                       })}
                     </tr>
                   )),
-                    )
-                  : null}
+                )}
 
                 {snapshot.provisionalRows.length > 0 ? (
                   <tr className="planningPotentialDivider">
@@ -1124,8 +1123,9 @@ export function GrandPlanningWorkspace({
                         );
                       })}
                     </tr>
-                  )),
-                )}
+                      )),
+                    )
+                  : null}
               </tbody>
             </table>
           </div>
