@@ -531,9 +531,11 @@ function LifecycleTab({
   capabilities: ChantierCapabilities;
   mutate: (body: MutationBody, message: string) => Promise<boolean>;
 }) {
+  const [closeReason, setCloseReason] = useState("");
   const [reactivateReason, setReactivateReason] = useState("");
   const [archiveReviewed, setArchiveReviewed] = useState(false);
   const [unarchiveReason, setUnarchiveReason] = useState("");
+  const canManageDoneLifecycle = capabilities.canCloseReopen || capabilities.canArchive;
 
   return (
     <section className="chantierCard">
@@ -555,19 +557,24 @@ function LifecycleTab({
         </div>
       </div>
 
-      {chantier.status === "ACTIVE" && capabilities.canModify ? (
+      {chantier.status === "ACTIVE" && capabilities.canCloseReopen ? (
         <div className="chantierLifecycleAction">
           <p>
-            Le statut Terminé signifie que les travaux principaux sont finis. Les documents,
-            factures, réserves et SAV pourront continuer à évoluer.
+            Le passage à Terminé retire le chantier du Grand planning actif. Son historique chantier
+            reste conservé.
           </p>
+          <input
+            value={closeReason}
+            onChange={(event) => setCloseReason(event.target.value)}
+            placeholder="Motif obligatoire"
+          />
           <button
             type="button"
             className="secondaryButton"
-            disabled={busy}
+            disabled={busy || !closeReason.trim()}
             onClick={() =>
               void mutate(
-                { action: "markDone", chantierId: chantier.id },
+                { action: "markDone", chantierId: chantier.id, reason: closeReason },
                 "Chantier passé à Terminé.",
               )
             }
@@ -577,29 +584,31 @@ function LifecycleTab({
         </div>
       ) : null}
 
-      {chantier.status === "DONE" && capabilities.canModify ? (
+      {chantier.status === "DONE" && canManageDoneLifecycle ? (
         <div className="chantierLifecycleAction chantierLifecycleSplit">
-          <div>
-            <strong>Reprendre les travaux</strong>
-            <input
-              value={reactivateReason}
-              onChange={(event) => setReactivateReason(event.target.value)}
-              placeholder="Note facultative"
-            />
-            <button
-              type="button"
-              className="secondaryButton"
-              disabled={busy}
-              onClick={() =>
-                void mutate(
-                  { action: "reactivate", chantierId: chantier.id, reason: reactivateReason },
-                  "Chantier remis en Actif.",
-                )
-              }
-            >
-              <RotateCcw size={15} /> Remettre Actif
-            </button>
-          </div>
+          {capabilities.canCloseReopen ? (
+            <div>
+              <strong>Reprendre les travaux</strong>
+              <input
+                value={reactivateReason}
+                onChange={(event) => setReactivateReason(event.target.value)}
+                placeholder="Motif obligatoire"
+              />
+              <button
+                type="button"
+                className="secondaryButton"
+                disabled={busy || !reactivateReason.trim()}
+                onClick={() =>
+                  void mutate(
+                    { action: "reactivate", chantierId: chantier.id, reason: reactivateReason },
+                    "Chantier remis en Actif.",
+                  )
+                }
+              >
+                <RotateCcw size={15} /> Remettre Actif
+              </button>
+            </div>
+          ) : null}
           {capabilities.canArchive ? (
             <div>
               <strong>Archiver</strong>

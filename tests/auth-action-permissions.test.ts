@@ -52,9 +52,13 @@ describe("chantier special permissions", () => {
     );
   });
 
-  it("keeps ordinary chantier lifecycle changes under module WRITE", () => {
-    expect(chantierSpecialPermissionForMutation({ action: "markDone" })).toBeNull();
-    expect(chantierSpecialPermissionForMutation({ action: "reactivate" })).toBeNull();
+  it("requires the dedicated close reopen permission for chantier lifecycle changes", () => {
+    expect(chantierSpecialPermissionForMutation({ action: "markDone" })).toBe(
+      "chantiers.close_reopen",
+    );
+    expect(chantierSpecialPermissionForMutation({ action: "reactivate" })).toBe(
+      "chantiers.close_reopen",
+    );
   });
 });
 
@@ -66,6 +70,11 @@ describe("permission catalog", () => {
         expect.objectContaining({ key: "billing", future: true }),
       ]),
     );
+  });
+
+  it("contains the validated chantier close reopen right", () => {
+    const keys = SPECIAL_PERMISSIONS.map((permission) => permission.key);
+    expect(keys).toContain("chantiers.close_reopen");
   });
 
   it("contains the validated planning special rights", () => {

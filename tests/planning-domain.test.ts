@@ -264,6 +264,19 @@ describe("grand planning domain", () => {
     expect(be?.weeklyHours).toEqual({ "2026-W52": 2 });
   });
 
+  it("subtracts actual hours from the firm amount still to distribute", () => {
+    const payload = chantiersPayload();
+    payload.chantiers[0].actualHours = { be: 2, workshop: 6, install: 10 };
+
+    const row = buildFirmGrandPlanningRows(payload, createInitialPlanningPayload(), 2026)[0];
+
+    expect(row.activities).toEqual([
+      expect.objectContaining({ activity: "BE", plannedHours: 10, remainingHours: 8 }),
+      expect.objectContaining({ activity: "WORKSHOP", plannedHours: 20, remainingHours: 14 }),
+      expect.objectContaining({ activity: "INSTALL", plannedHours: 30, remainingHours: 20 }),
+    ]);
+  });
+
   it("calculates à répartir from the full allocation and allows a negative balance", () => {
     const planning: PlanningPayload = {
       schemaVersion: 1,

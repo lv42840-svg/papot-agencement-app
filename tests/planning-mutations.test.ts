@@ -10,7 +10,9 @@ import {
   applyPlanningPotentialOrderMutation,
   applyPlanningProvisionalMutation,
   clearPlanningProvisionForCommercialCase,
+  closePlanningFirmChantier,
   convertPlanningProvisionToFirm,
+  reopenPlanningFirmChantier,
   syncPlanningPotentialOrderForCommercialCase,
 } from "../src/lib/planning/mutations";
 
@@ -111,6 +113,69 @@ describe("grand planning mutations", () => {
         new Set(),
       ),
     ).toThrow("PLANNING_CHANTIER_NOT_ACTIVE");
+  });
+});
+
+describe("firm chantier lifecycle in planning", () => {
+  it("removes every firm allocation and order reference when a chantier closes", () => {
+    const otherChantierId = "33333333-3333-4333-8333-333333333333";
+    const source = {
+      ...createInitialPlanningPayload(),
+      chantierOrder: [chantierId, otherChantierId],
+      macroAllocations: [
+        {
+          chantierId,
+          activity: "BE" as const,
+          week: "2026-W40",
+          hours: 8,
+        },
+        {
+          chantierId,
+          activity: "INSTALL" as const,
+          week: "2027-W02",
+          hours: 12,
+        },
+        {
+          chantierId: otherChantierId,
+          activity: "WORKSHOP" as const,
+          week: "2026-W41",
+          hours: 15,
+        },
+      ],
+    };
+
+    const result = closePlanningFirmChantier(source, chantierId);
+
+    expect(result.chantierOrder).toEqual([otherChantierId]);
+    expect(result.macroAllocations).toEqual([
+      {
+        chantierId: otherChantierId,
+        activity: "WORKSHOP",
+        week: "2026-W41",
+        hours: 15,
+      },
+    ]);
+  });
+
+  it("reopens at the top without restoring any previous weekly allocation", () => {
+    const otherChantierId = "33333333-3333-4333-8333-333333333333";
+    const source = {
+      ...createInitialPlanningPayload(),
+      chantierOrder: [otherChantierId],
+      macroAllocations: [
+        {
+          chantierId,
+          activity: "WORKSHOP" as const,
+          week: "2026-W40",
+          hours: 20,
+        },
+      ],
+    };
+
+    const result = reopenPlanningFirmChantier(source, chantierId);
+
+    expect(result.chantierOrder).toEqual([chantierId, otherChantierId]);
+    expect(result.macroAllocations).toEqual([]);
   });
 });
 

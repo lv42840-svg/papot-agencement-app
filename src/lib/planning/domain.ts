@@ -201,6 +201,15 @@ export function plannedHoursForActivity(
   return chantier.plannedHours.install;
 }
 
+export function actualHoursForActivity(
+  chantier: Pick<ChantierRecord, "actualHours">,
+  activity: PlanningActivity,
+): number {
+  if (activity === "BE") return chantier.actualHours.be;
+  if (activity === "WORKSHOP") return chantier.actualHours.workshop;
+  return chantier.actualHours.install;
+}
+
 export function weeksInIsoYear(year: number): number {
   const date = new Date(Date.UTC(year, 11, 28));
   const day = date.getUTCDay() || 7;
@@ -263,12 +272,13 @@ export function buildFirmGrandPlanningRows(
         );
         const allocatedHours = matching.reduce((sum, allocation) => sum + allocation.hours, 0);
         const plannedHours = plannedHoursForActivity(chantier, activity);
+        const actualHours = actualHoursForActivity(chantier, activity);
         return {
           activity,
           label: PLANNING_ACTIVITY_LABELS[activity],
           plannedHours,
           allocatedHours,
-          remainingHours: plannedHours - allocatedHours,
+          remainingHours: plannedHours - actualHours - allocatedHours,
           weeklyHours,
         };
       }),
