@@ -1013,13 +1013,12 @@ export function GrandPlanningWorkspace({
                   </tr>
                 ) : null}
 
-                {!potentialCollapsed
-                  ? snapshot.provisionalRows.flatMap((item, itemIndex) =>
+                {snapshot.provisionalRows.flatMap((item, itemIndex) =>
                   item.activities.map((activity, activityIndex) => (
                     <tr
                       className={`planningProvisionRow ${
                         activityIndex === 0 ? "planningProvisionStart" : ""
-                      }`}
+                      } ${potentialCollapsed ? "isCollapsed" : ""}`}
                       key={`provisional:${item.caseId}:${activity.activity}`}
                     >
                       {activityIndex === 0 ? (
@@ -1123,9 +1122,8 @@ export function GrandPlanningWorkspace({
                         );
                       })}
                     </tr>
-                      )),
-                    )
-                  : null}
+                  )),
+                )}
               </tbody>
             </table>
           </div>
@@ -1593,6 +1591,9 @@ export function GrandPlanningWorkspace({
         .planningProvisionRow .planningWeekCell input {
           color: #71698a;
           font-weight: 600;
+        }
+        .planningProvisionRow.isCollapsed {
+          display: none;
         }
         .planningFirmCaseHeader {
           display: flex;
