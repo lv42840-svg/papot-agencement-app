@@ -803,8 +803,7 @@ export function GrandPlanningWorkspace({ initialYear }: { initialYear: number })
                         <span
                           className={availabilityClass(capacity?.availableWithProvisionHours ?? 0)}
                         >
-                          Dispo F+P{" "}
-                          {formatHours(capacity?.availableWithProvisionHours ?? 0)}
+                          Dispo F+P {formatHours(capacity?.availableWithProvisionHours ?? 0)}
                         </span>
                       </th>
                     );
@@ -872,12 +871,7 @@ export function GrandPlanningWorkspace({ initialYear }: { initialYear: number })
                                 }))
                               }
                               onBlur={() =>
-                                void saveCell(
-                                  chantier.chantierId,
-                                  activity.activity,
-                                  week,
-                                  current,
-                                )
+                                void saveCell(chantier.chantierId, activity.activity, week, current)
                               }
                               onKeyDown={(event) => {
                                 if (event.key === "Enter") event.currentTarget.blur();
