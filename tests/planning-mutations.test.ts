@@ -7,6 +7,7 @@ import {
   applyPlanningMacroMutation,
   applyPlanningPersonCapacityMutation,
   applyPlanningProvisionalMutation,
+  convertPlanningProvisionToFirm,
 } from "../src/lib/planning/mutations";
 
 const chantierId = "11111111-1111-4111-8111-111111111111";
@@ -188,6 +189,100 @@ describe("provisional grand planning mutations", () => {
         new Set(),
       ),
     ).toThrow("PLANNING_COMMERCIAL_CASE_NOT_ACTIVE");
+  });
+});
+
+describe("planning provision to firm conversion", () => {
+  it("keeps the same weeks and hours while changing only the allocation nature", () => {
+    const source = {
+      ...createInitialPlanningPayload(),
+      chantierOrder: ["33333333-3333-4333-8333-333333333333"],
+      provisionalAllocations: [
+        {
+          caseId: commercialCaseId,
+          activity: "WORKSHOP" as const,
+          week: "2026-W40",
+          hours: 30,
+        },
+        {
+          caseId: commercialCaseId,
+          activity: "INSTALL" as const,
+          week: "2026-W42",
+          hours: 12,
+        },
+      ],
+    };
+
+    const result = convertPlanningProvisionToFirm(source, commercialCaseId, chantierId);
+
+    expect(result.provisionalAllocations).toEqual([]);
+    expect(result.macroAllocations).toEqual([
+      {
+        chantierId,
+        activity: "WORKSHOP",
+        week: "2026-W40",
+        hours: 30,
+      },
+      {
+        chantierId,
+        activity: "INSTALL",
+        week: "2026-W42",
+        hours: 12,
+      },
+    ]);
+    expect(result.chantierOrder).toEqual([chantierId, "33333333-3333-4333-8333-333333333333"]);
+  });
+
+  it("leaves unrelated provisional allocations untouched", () => {
+    const otherCaseId = "44444444-4444-4444-8444-444444444444";
+    const source = {
+      ...createInitialPlanningPayload(),
+      provisionalAllocations: [
+        {
+          caseId: commercialCaseId,
+          activity: "BE" as const,
+          week: "2026-W39",
+          hours: 6,
+        },
+        {
+          caseId: otherCaseId,
+          activity: "WORKSHOP" as const,
+          week: "2026-W41",
+          hours: 18,
+        },
+      ],
+    };
+
+    const result = convertPlanningProvisionToFirm(source, commercialCaseId, chantierId);
+
+    expect(result.macroAllocations).toEqual([
+      {
+        chantierId,
+        activity: "BE",
+        week: "2026-W39",
+        hours: 6,
+      },
+    ]);
+    expect(result.provisionalAllocations).toEqual([
+      {
+        caseId: otherCaseId,
+        activity: "WORKSHOP",
+        week: "2026-W41",
+        hours: 18,
+      },
+    ]);
+  });
+
+  it("puts the launched chantier at the top even when no provision was positioned", () => {
+    const source = {
+      ...createInitialPlanningPayload(),
+      chantierOrder: ["33333333-3333-4333-8333-333333333333"],
+    };
+
+    const result = convertPlanningProvisionToFirm(source, commercialCaseId, chantierId);
+
+    expect(result.macroAllocations).toEqual([]);
+    expect(result.chantierOrder[0]).toBe(chantierId);
   });
 });
 
