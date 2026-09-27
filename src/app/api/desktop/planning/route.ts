@@ -105,10 +105,7 @@ async function snapshot(
   for (const row of provisionalRows) {
     for (const activity of row.activities) {
       for (const [week, hours] of Object.entries(activity.weeklyHours)) {
-        provisionalLoadByWeek.set(
-          week,
-          (provisionalLoadByWeek.get(week) ?? 0) + hours,
-        );
+        provisionalLoadByWeek.set(week, (provisionalLoadByWeek.get(week) ?? 0) + hours);
       }
     }
   }
