@@ -1,0 +1,47 @@
+name: Temporary Planning Formatter
+
+on:
+  push:
+    branches:
+      - feat/planning-macro-foundation
+
+permissions:
+  contents: write
+
+jobs:
+  format:
+    if: github.actor != 'github-actions[bot]'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.ref_name }}
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - name: Apply project Prettier
+        run: |
+          npx prettier --write \
+            src/app/api/desktop/planning/route.ts \
+            src/components/grand-planning-workspace.tsx \
+            src/lib/planning/domain.ts \
+            src/lib/planning/mutations.ts \
+            tests/planning-domain.test.ts
+      - name: Commit formatting
+        run: |
+          if git diff --quiet; then
+            echo "No formatting changes needed."
+            exit 0
+          fi
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add \
+            src/app/api/desktop/planning/route.ts \
+            src/components/grand-planning-workspace.tsx \
+            src/lib/planning/domain.ts \
+            src/lib/planning/mutations.ts \
+            tests/planning-domain.test.ts
+          git commit -m "style(planning): applique Prettier"
+          git push origin "HEAD:${GITHUB_REF_NAME}"
