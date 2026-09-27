@@ -18,7 +18,9 @@ export const planningMacroMutationSchema = z.object({
   hours: z.number().finite().nonnegative().max(10_000),
 });
 
-export type PlanningMacroMutation = z.infer<\n  typeof planningMacroMutationSchema\n>;
+export type PlanningMacroMutation = z.infer<
+  typeof planningMacroMutationSchema
+>;
 
 export function applyPlanningMacroMutation(
   source: PlanningPayload,
