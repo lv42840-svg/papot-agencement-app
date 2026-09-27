@@ -49,6 +49,7 @@ describeWithPostgres("Planning PostgreSQL storage", () => {
       macroAllocations: [],
       provisionalAllocations: [],
       chantierOrder: [],
+      provisionalOrder: [],
       peopleCapacity: [],
       absences: [],
     });
