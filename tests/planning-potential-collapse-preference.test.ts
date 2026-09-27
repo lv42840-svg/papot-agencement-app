@@ -21,7 +21,7 @@ describe("planning potential collapse preference", () => {
   it("keeps the POTENTIEL divider visible while conditionally hiding only provisional rows", () => {
     expect(uiSource).toContain("planningPotentialToggle");
     expect(uiSource).toContain("aria-expanded={!potentialCollapsed}");
-    expect(uiSource).toContain("!potentialCollapsed");
+    expect(uiSource).toContain('potentialCollapsed ? "isCollapsed" : ""');
     expect(uiSource).toContain("<strong>POTENTIEL</strong>");
   });
 
