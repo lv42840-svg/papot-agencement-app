@@ -560,8 +560,8 @@ function LifecycleTab({
       {chantier.status === "ACTIVE" && capabilities.canCloseReopen ? (
         <div className="chantierLifecycleAction">
           <p>
-            Le passage à Terminé retire le chantier du Grand planning actif. Son historique
-            chantier reste conservé.
+            Le passage à Terminé retire le chantier du Grand planning actif. Son historique chantier
+            reste conservé.
           </p>
           <input
             value={closeReason}
