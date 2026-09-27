@@ -3,6 +3,7 @@ import { DEFAULT_WEEKLY_SCHEDULE, isoWeekDates, scheduleHoursForDate } from "./c
 import {
   allocationKey,
   parsePlanningPayload,
+  provisionalAllocationKey,
   planningAbsenceTypeSchema,
   planningActivitySchema,
   type PlanningPayload,
@@ -24,6 +25,13 @@ export const planningMutationSchema = z.discriminatedUnion("action", [
   z.object({
     action: z.literal("setMacroHours"),
     chantierId: z.string().uuid(),
+    activity: planningActivitySchema,
+    week: weekSchema,
+    hours: z.number().finite().nonnegative().max(10_000),
+  }),
+  z.object({
+    action: z.literal("setProvisionalHours"),
+    caseId: z.string().uuid(),
     activity: planningActivitySchema,
     week: weekSchema,
     hours: z.number().finite().nonnegative().max(10_000),
@@ -57,6 +65,10 @@ export const planningMutationSchema = z.discriminatedUnion("action", [
 export const planningMacroMutationSchema = planningMutationSchema.options[0];
 export type PlanningMutation = z.infer<typeof planningMutationSchema>;
 export type PlanningMacroMutation = Extract<PlanningMutation, { action: "setMacroHours" }>;
+export type PlanningProvisionalMutation = Extract<
+  PlanningMutation,
+  { action: "setProvisionalHours" }
+>;
 export type PlanningPersonCapacityMutation = Extract<
   PlanningMutation,
   { action: "setPersonCapacity" }
@@ -99,6 +111,81 @@ export function applyPlanningMacroMutation(
   if (index >= 0) payload.macroAllocations[index] = next;
   else payload.macroAllocations.push(next);
 
+  return parsePlanningPayload(payload);
+}
+
+export function applyPlanningProvisionalMutation(
+  source: PlanningPayload,
+  input: PlanningProvisionalMutation,
+  activeCommercialCaseIds: ReadonlySet<string>,
+): PlanningPayload {
+  if (!activeCommercialCaseIds.has(input.caseId)) {
+    throw new Error("PLANNING_COMMERCIAL_CASE_NOT_ACTIVE");
+  }
+
+  const payload = structuredClone(parsePlanningPayload(source));
+  const key = provisionalAllocationKey(input.caseId, input.activity, input.week);
+  const index = payload.provisionalAllocations.findIndex(
+    (allocation) =>
+      provisionalAllocationKey(allocation.caseId, allocation.activity, allocation.week) === key,
+  );
+
+  if (input.hours === 0) {
+    if (index >= 0) payload.provisionalAllocations.splice(index, 1);
+    return parsePlanningPayload(payload);
+  }
+
+  const next = {
+    caseId: input.caseId,
+    activity: input.activity,
+    week: input.week,
+    hours: input.hours,
+  };
+
+  if (index >= 0) payload.provisionalAllocations[index] = next;
+  else payload.provisionalAllocations.push(next);
+
+  return parsePlanningPayload(payload);
+}
+
+export function removePlanningProvisionalAllocationsForCases(
+  source: PlanningPayload,
+  caseIds: ReadonlySet<string>,
+): PlanningPayload {
+  const payload = structuredClone(parsePlanningPayload(source));
+  payload.provisionalAllocations = payload.provisionalAllocations.filter(
+    (allocation) => !caseIds.has(allocation.caseId),
+  );
+  return parsePlanningPayload(payload);
+}
+
+export function convertPlanningProvisionToFirm(
+  source: PlanningPayload,
+  caseId: string,
+): PlanningPayload {
+  const payload = structuredClone(parsePlanningPayload(source));
+  const provisional = payload.provisionalAllocations.filter(
+    (allocation) => allocation.caseId === caseId,
+  );
+
+  for (const allocation of provisional) {
+    const key = allocationKey(caseId, allocation.activity, allocation.week);
+    const index = payload.macroAllocations.findIndex(
+      (firm) => allocationKey(firm.chantierId, firm.activity, firm.week) === key,
+    );
+    const next = {
+      chantierId: caseId,
+      activity: allocation.activity,
+      week: allocation.week,
+      hours: allocation.hours,
+    };
+    if (index >= 0) payload.macroAllocations[index] = next;
+    else payload.macroAllocations.push(next);
+  }
+
+  payload.provisionalAllocations = payload.provisionalAllocations.filter(
+    (allocation) => allocation.caseId !== caseId,
+  );
   return parsePlanningPayload(payload);
 }
 
