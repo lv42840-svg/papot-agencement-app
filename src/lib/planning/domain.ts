@@ -22,12 +22,31 @@ export const planningMacroAllocationSchema = z.object({
   hours: z.number().finite().nonnegative(),
 });
 
+export const planningAbsenceTypeSchema = z.enum(["VACATION", "SICK", "OTHER"]);
+export type PlanningAbsenceType = z.infer<typeof planningAbsenceTypeSchema>;
+
+export const planningAbsenceSchema = z.object({
+  id: z.string().uuid(),
+  userId: z.string().uuid(),
+  type: planningAbsenceTypeSchema,
+  date: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, "PLANNING_ABSENCE_DATE_INVALID"),
+  hours: z.number().finite().positive().max(24),
+});
+export type PlanningAbsence = z.infer<typeof planningAbsenceSchema>;
+
+export const PLANNING_ABSENCE_TYPE_LABELS: Record<PlanningAbsenceType, string> = {
+  VACATION: "Congés",
+  SICK: "Arrêt",
+  OTHER: "Autre",
+};
+
 export const planningPayloadSchema = z
   .object({
     schemaVersion: z.literal(1),
     macroAllocations: z.array(planningMacroAllocationSchema),
     chantierOrder: z.array(z.string().uuid()),
     peopleCapacity: z.array(planningPersonCapacitySchema).default([]),
+    absences: z.array(planningAbsenceSchema).default([]),
   })
   .superRefine((value, context) => {
     const seen = new Set<string>();
@@ -41,6 +60,19 @@ export const planningPayloadSchema = z
         });
       }
       seen.add(key);
+    });
+
+    const absenceKeys = new Set<string>();
+    value.absences.forEach((absence, index) => {
+      const key = `${absence.userId}:${absence.date}`;
+      if (absenceKeys.has(key)) {
+        context.addIssue({
+          code: z.ZodIssueCode.custom,
+          path: ["absences", index],
+          message: "PLANNING_ABSENCE_DUPLICATE_DATE",
+        });
+      }
+      absenceKeys.add(key);
     });
 
     if (new Set(value.chantierOrder).size !== value.chantierOrder.length) {
@@ -78,6 +110,7 @@ export function createInitialPlanningPayload(): PlanningPayload {
     macroAllocations: [],
     chantierOrder: [],
     peopleCapacity: [],
+    absences: [],
   };
 }
 
