@@ -89,7 +89,13 @@ function parseHours(value: string): number | null {
   return parsed;
 }
 
-export function GrandPlanningWorkspace({ initialYear }: { initialYear: number }) {
+export function GrandPlanningWorkspace({
+  initialYear,
+  initialPotentialCollapsed,
+}: {
+  initialYear: number;
+  initialPotentialCollapsed: boolean;
+}) {
   const [snapshot, setSnapshot] = useState<PlanningSnapshot | null>(null);
   const [message, setMessage] = useState("Chargement du planning…");
   const [drafts, setDrafts] = useState<Record<string, string>>({});
@@ -101,6 +107,8 @@ export function GrandPlanningWorkspace({ initialYear }: { initialYear: number })
   const [absenceHours, setAbsenceHours] = useState("7,8");
   const [absenceWeek, setAbsenceWeek] = useState(`${initialYear}-W01`);
   const [absenceEditId, setAbsenceEditId] = useState<string | null>(null);
+  const [potentialCollapsed, setPotentialCollapsed] = useState(initialPotentialCollapsed);
+  const [potentialPreferenceSaving, setPotentialPreferenceSaving] = useState(false);
 
   const load = useCallback(async () => {
     setMessage("Chargement du planning…");
@@ -232,6 +240,23 @@ export function GrandPlanningWorkspace({ initialYear }: { initialYear: number })
     setMessage(successMessage);
     setSavingKey(null);
     return true;
+  }
+
+  async function togglePotentialCollapsed() {
+    if (potentialPreferenceSaving) return;
+    const next = !potentialCollapsed;
+    setPotentialCollapsed(next);
+    setPotentialPreferenceSaving(true);
+    const response = await fetch("/api/me/planning-preferences", {
+      method: "PATCH",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ planningPotentialCollapsed: next }),
+    });
+    if (!response.ok) {
+      setPotentialCollapsed(!next);
+      setMessage("Impossible d’enregistrer la préférence d’affichage.");
+    }
+    setPotentialPreferenceSaving(false);
   }
 
   async function moveFirm(chantierId: string, direction: -1 | 1) {
@@ -968,17 +993,29 @@ export function GrandPlanningWorkspace({ initialYear }: { initialYear: number })
                       })}
                     </tr>
                   )),
-                )}
+                    )
+                  : null}
 
                 {snapshot.provisionalRows.length > 0 ? (
                   <tr className="planningPotentialDivider">
                     <th colSpan={snapshot.weeks.length + 4} scope="rowgroup">
-                      POTENTIEL
+                      <button
+                        aria-expanded={!potentialCollapsed}
+                        className="planningPotentialToggle"
+                        disabled={potentialPreferenceSaving}
+                        onClick={() => void togglePotentialCollapsed()}
+                        type="button"
+                      >
+                        <span>{potentialCollapsed ? "▶" : "▼"}</span>
+                        <strong>POTENTIEL</strong>
+                        <small>{snapshot.provisionalRows.length} affaire(s)</small>
+                      </button>
                     </th>
                   </tr>
                 ) : null}
 
-                {snapshot.provisionalRows.flatMap((item, itemIndex) =>
+                {!potentialCollapsed
+                  ? snapshot.provisionalRows.flatMap((item, itemIndex) =>
                   item.activities.map((activity, activityIndex) => (
                     <tr
                       className={`planningProvisionRow ${
@@ -1512,6 +1549,34 @@ export function GrandPlanningWorkspace({ initialYear }: { initialYear: number })
           font-size: 11px;
           font-weight: 900;
           letter-spacing: 0.08em;
+        }
+        .planningPotentialToggle {
+          width: 100%;
+          min-height: 32px;
+          display: flex;
+          align-items: center;
+          gap: 8px;
+          padding: 0;
+          border: 0;
+          background: transparent;
+          color: inherit;
+          text-align: left;
+          cursor: pointer;
+        }
+        .planningPotentialToggle:disabled {
+          cursor: wait;
+          opacity: 0.65;
+        }
+        .planningPotentialToggle strong {
+          font-size: 11px;
+          letter-spacing: 0.08em;
+        }
+        .planningPotentialToggle small {
+          margin-left: auto;
+          color: #7a6daa;
+          font-size: 10px;
+          letter-spacing: 0;
+          font-weight: 700;
         }
         .planningProvisionRow > th,
         .planningProvisionRow > td,
