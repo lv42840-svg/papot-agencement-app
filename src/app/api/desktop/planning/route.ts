@@ -1,14 +1,24 @@
 import { NextResponse } from "next/server";
 import { ZodError, z } from "zod";
 import { hasEffectiveSpecialPermission, requireSpecialPermission } from "@/lib/auth/permissions";
+import { readAuthPayload } from "@/lib/auth/store";
 import { createChantiersRepository } from "@/lib/chantiers/create-repository";
 import {
   desktopRequestErrorStatus,
   requireDesktopRequestContext,
 } from "@/lib/desktop/request-context";
-import { buildFirmGrandPlanningRows, planningYearWeekIds } from "@/lib/planning/domain";
-import { planningMacroMutationSchema, applyPlanningMacroMutation } from "@/lib/planning/mutations";
+import {
+  buildWeeklyCapacityIndicators,
+  DEFAULT_WEEKLY_SCHEDULE,
+  type PlanningPersonCapacity,
+} from "@/lib/planning/capacity";
 import { createPlanningRepository } from "@/lib/planning/create-repository";
+import { buildFirmGrandPlanningRows, planningYearWeekIds } from "@/lib/planning/domain";
+import {
+  applyPlanningMacroMutation,
+  applyPlanningPersonCapacityMutation,
+  planningMutationSchema,
+} from "@/lib/planning/mutations";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -24,10 +34,27 @@ function noStoreJson(body: unknown, init?: ResponseInit) {
 function statusFor(code: string): number {
   const requestStatus = desktopRequestErrorStatus(code);
   if (requestStatus) return requestStatus;
-  if (code === "PLANNING_CHANTIER_NOT_ACTIVE") return 409;
+  if (code === "PLANNING_CHANTIER_NOT_ACTIVE" || code === "PLANNING_USER_NOT_ACTIVE") return 409;
   if (code.includes("VERSION_CONFLICT")) return 409;
   if (code.includes("INVALID")) return 400;
   return 400;
+}
+
+function effectivePeopleCapacity(
+  planningPeople: PlanningPersonCapacity[],
+  users: Awaited<ReturnType<typeof readAuthPayload>>["users"],
+): PlanningPersonCapacity[] {
+  const configured = new Map(planningPeople.map((person) => [person.userId, person]));
+  return users
+    .filter((user) => user.isActive)
+    .map(
+      (user): PlanningPersonCapacity =>
+        configured.get(user.id) ?? {
+          userId: user.id,
+          countsInMacroCapacity: false,
+          weeklySchedule: DEFAULT_WEEKLY_SCHEDULE,
+        },
+    );
 }
 
 async function snapshot(
@@ -36,19 +63,41 @@ async function snapshot(
   user: { id: string },
   context: Awaited<ReturnType<typeof requireDesktopRequestContext>>,
 ) {
-  const [planning, chantiers, canEditMacro] = await Promise.all([
+  const [planning, chantiers, auth, canEditMacro, canManageSchedules] = await Promise.all([
     createPlanningRepository().load(),
     createChantiersRepository(context).load(),
+    readAuthPayload(),
     hasEffectiveSpecialPermission(user, "planning.edit_macro"),
+    hasEffectiveSpecialPermission(user, "planning.manage_schedules"),
   ]);
+  const weeks = planningYearWeekIds(year);
+  const rows = buildFirmGrandPlanningRows(chantiers, planning, year);
+  const firmLoadByWeek = new Map<string, number>();
+
+  for (const row of rows) {
+    for (const activity of row.activities) {
+      for (const [week, hours] of Object.entries(activity.weeklyHours)) {
+        firmLoadByWeek.set(week, (firmLoadByWeek.get(week) ?? 0) + hours);
+      }
+    }
+  }
+
+  const peopleCapacity = effectivePeopleCapacity(planning.peopleCapacity, auth.users);
+  const userById = new Map(auth.users.map((candidate) => [candidate.id, candidate]));
 
   return {
     year,
-    weeks: planningYearWeekIds(year),
-    rows: buildFirmGrandPlanningRows(chantiers, planning, year),
+    weeks,
+    rows,
+    weeklyCapacity: buildWeeklyCapacityIndicators(weeks, peopleCapacity, firmLoadByWeek),
+    peopleCapacity: peopleCapacity.map((person) => ({
+      ...person,
+      displayName: userById.get(person.userId)?.displayName ?? "Utilisateur",
+    })),
     capabilities: {
       canRead: true,
       canEditMacro: canWrite && canEditMacro,
+      canManageSchedules: canWrite && canManageSchedules,
     },
   };
 }
@@ -74,22 +123,31 @@ export async function POST(request: Request) {
   try {
     const body = await request.json();
     const year = yearSchema.parse(body.year ?? new Date().getFullYear());
-    const input = planningMacroMutationSchema.parse(body);
+    const input = planningMutationSchema.parse(body);
     const context = await requireDesktopRequestContext("planning", "WRITE");
-    await requireSpecialPermission(context.user, "planning.edit_macro");
-
-    const chantiersRepository = createChantiersRepository(context);
-    const chantiers = await chantiersRepository.load();
-    const activeChantierIds = new Set(
-      chantiers.chantiers
-        .filter((chantier) => chantier.status === "ACTIVE")
-        .map((chantier) => chantier.id),
-    );
-
     const planningRepository = createPlanningRepository();
-    await planningRepository.mutate((payload) =>
-      applyPlanningMacroMutation(payload, input, activeChantierIds),
-    );
+
+    if (input.action === "setMacroHours") {
+      await requireSpecialPermission(context.user, "planning.edit_macro");
+      const chantiers = await createChantiersRepository(context).load();
+      const activeChantierIds = new Set(
+        chantiers.chantiers
+          .filter((chantier) => chantier.status === "ACTIVE")
+          .map((chantier) => chantier.id),
+      );
+      await planningRepository.mutate((payload) =>
+        applyPlanningMacroMutation(payload, input, activeChantierIds),
+      );
+    } else {
+      await requireSpecialPermission(context.user, "planning.manage_schedules");
+      const auth = await readAuthPayload();
+      const activeUserIds = new Set(
+        auth.users.filter((candidate) => candidate.isActive).map((candidate) => candidate.id),
+      );
+      await planningRepository.mutate((payload) =>
+        applyPlanningPersonCapacityMutation(payload, input, activeUserIds),
+      );
+    }
 
     return noStoreJson(await snapshot(year, true, context.user, context));
   } catch (error) {
