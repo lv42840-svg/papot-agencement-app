@@ -4,6 +4,7 @@ import { hasEffectiveSpecialPermission, requireSpecialPermission } from "@/lib/a
 import { readAuthPayload } from "@/lib/auth/store";
 import { createChantiersRepository } from "@/lib/chantiers/create-repository";
 import { createCommercialRepository } from "@/lib/commercial/create-repository";
+import { isCommercialActive } from "@/lib/commercial/domain";
 import {
   desktopRequestErrorStatus,
   requireDesktopRequestContext,
@@ -26,6 +27,7 @@ import {
   applyPlanningFullWeekAbsenceMutation,
   applyPlanningMacroMutation,
   applyPlanningPersonCapacityMutation,
+  applyPlanningPotentialOrderMutation,
   applyPlanningProvisionalMutation,
   planningMutationSchema,
 } from "@/lib/planning/mutations";
@@ -184,16 +186,33 @@ export async function POST(request: Request) {
       await requireSpecialPermission(context.user, "planning.edit_macro");
       const commercial = await createCommercialRepository(context).load();
       const activeCommercialCaseIds = new Set(
-        commercial.cases
-          .filter(
-            (item) =>
-              item.status !== "CONFIRMED" && item.status !== "LOST" && item.status !== "ABANDONED",
-          )
-          .map((item) => item.id),
+        commercial.cases.filter(isCommercialActive).map((item) => item.id),
       );
       await planningRepository.mutate((payload) =>
         applyPlanningProvisionalMutation(payload, input, activeCommercialCaseIds),
       );
+    } else if (input.action === "setPotentialOrder") {
+      await requireSpecialPermission(context.user, "planning.edit_macro");
+      const commercial = await createCommercialRepository(context).load();
+      const activeCases = commercial.cases.filter(isCommercialActive);
+      const activeCaseIds = new Set(activeCases.map((item) => item.id));
+      const referenceCaseIds = new Set(
+        activeCases
+          .filter(
+            (item) =>
+              item.provisionHours.be > 0 ||
+              item.provisionHours.workshop > 0 ||
+              item.provisionHours.install > 0,
+          )
+          .map((item) => item.id),
+      );
+      await planningRepository.mutate((payload) => {
+        const activePotentialCaseIds = new Set(referenceCaseIds);
+        for (const allocation of payload.provisionalAllocations) {
+          if (activeCaseIds.has(allocation.caseId)) activePotentialCaseIds.add(allocation.caseId);
+        }
+        return applyPlanningPotentialOrderMutation(payload, input, activePotentialCaseIds);
+      });
     } else {
       await requireSpecialPermission(context.user, "planning.manage_schedules");
       const auth = await readAuthPayload();

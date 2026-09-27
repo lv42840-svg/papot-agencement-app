@@ -234,6 +234,24 @@ export function GrandPlanningWorkspace({ initialYear }: { initialYear: number })
     return true;
   }
 
+  async function movePotential(caseId: string, direction: -1 | 1) {
+    if (!snapshot?.capabilities.canEditMacro) return;
+    const orderedCaseIds = snapshot.provisionalRows.map((item) => item.caseId);
+    const currentIndex = orderedCaseIds.indexOf(caseId);
+    const nextIndex = currentIndex + direction;
+    if (currentIndex < 0 || nextIndex < 0 || nextIndex >= orderedCaseIds.length) return;
+
+    [orderedCaseIds[currentIndex], orderedCaseIds[nextIndex]] = [
+      orderedCaseIds[nextIndex],
+      orderedCaseIds[currentIndex],
+    ];
+
+    await postPlanningMutation(
+      { action: "setPotentialOrder", orderedCaseIds },
+      "Ordre du potentiel enregistré.",
+    );
+  }
+
   async function saveAbsence() {
     if (!snapshot?.capabilities.canManageSchedules || !absenceUserId) return;
     const hours = parseHours(absenceHours);
@@ -912,7 +930,7 @@ export function GrandPlanningWorkspace({ initialYear }: { initialYear: number })
                   </tr>
                 ) : null}
 
-                {snapshot.provisionalRows.flatMap((item) =>
+                {snapshot.provisionalRows.flatMap((item, itemIndex) =>
                   item.activities.map((activity, activityIndex) => (
                     <tr
                       className={`planningProvisionRow ${
@@ -926,7 +944,37 @@ export function GrandPlanningWorkspace({ initialYear }: { initialYear: number })
                           rowSpan={3}
                           scope="rowgroup"
                         >
-                          <strong>{item.name}</strong>
+                          <div className="planningPotentialCaseHeader">
+                            <strong>{item.name}</strong>
+                            <span className="planningPotentialOrderActions">
+                              <button
+                                aria-label={`Monter ${item.name} dans le potentiel`}
+                                className="secondary"
+                                disabled={
+                                  !snapshot.capabilities.canEditMacro ||
+                                  savingKey === "planning-mutation" ||
+                                  itemIndex === 0
+                                }
+                                onClick={() => void movePotential(item.caseId, -1)}
+                                type="button"
+                              >
+                                ↑
+                              </button>
+                              <button
+                                aria-label={`Descendre ${item.name} dans le potentiel`}
+                                className="secondary"
+                                disabled={
+                                  !snapshot.capabilities.canEditMacro ||
+                                  savingKey === "planning-mutation" ||
+                                  itemIndex === snapshot.provisionalRows.length - 1
+                                }
+                                onClick={() => void movePotential(item.caseId, 1)}
+                                type="button"
+                              >
+                                ↓
+                              </button>
+                            </span>
+                          </div>
                           <span>Provisionnel · {item.statusLabel}</span>
                           {item.expectedConfirmationDate ? (
                             <small>Confirmation prévue {item.expectedConfirmationDate}</small>
@@ -1432,6 +1480,29 @@ export function GrandPlanningWorkspace({ initialYear }: { initialYear: number })
         .planningProvisionRow .planningWeekCell input {
           color: #71698a;
           font-weight: 600;
+        }
+        .planningPotentialCaseHeader {
+          display: flex;
+          align-items: center;
+          justify-content: space-between;
+          gap: 8px;
+        }
+        .planningPotentialCaseHeader > strong {
+          min-width: 0;
+        }
+        .planningPotentialOrderActions {
+          display: inline-flex;
+          gap: 3px;
+        }
+        .planningPotentialOrderActions button {
+          width: 25px;
+          min-width: 25px;
+          min-height: 24px;
+          height: 24px;
+          padding: 0;
+          border-radius: 5px;
+          font-size: 12px;
+          line-height: 1;
         }
         .planningProvisionRow .planningWeekCell input:hover:not(:disabled),
         .planningProvisionRow .planningWeekCell input:focus {

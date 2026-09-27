@@ -41,6 +41,14 @@ describe("grand planning commercial provision bridge", () => {
     expect(uiSource).toContain("snapshot.provisionalRows.length > 0");
   });
 
+  it("allows authorized users to reorder potential affairs inside their shared block", () => {
+    expect(apiSource).toContain('input.action === "setPotentialOrder"');
+    expect(uiSource).toContain('action: "setPotentialOrder"');
+    expect(uiSource).toContain("movePotential");
+    expect(uiSource).toContain("Monter ${item.name} dans le potentiel");
+    expect(uiSource).toContain("Descendre ${item.name} dans le potentiel");
+  });
+
   it("edits provisional hours in the same annual table with a lighter visual treatment", () => {
     expect(apiSource).toContain('input.action === "setProvisionHours"');
     expect(uiSource).toContain('action: "setProvisionHours"');
