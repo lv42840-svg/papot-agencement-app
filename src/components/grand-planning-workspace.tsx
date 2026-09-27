@@ -360,10 +360,7 @@ export function GrandPlanningWorkspace({ initialYear }: { initialYear: number })
                               savingKey === `capacity:${person.userId}`
                             }
                             inputMode="decimal"
-                            value={
-                              scheduleDrafts[key] ??
-                              formatHours(person.weeklySchedule[day])
-                            }
+                            value={scheduleDrafts[key] ?? formatHours(person.weeklySchedule[day])}
                             onChange={(event) =>
                               setScheduleDrafts((current) => ({
                                 ...current,
@@ -388,11 +385,9 @@ export function GrandPlanningWorkspace({ initialYear }: { initialYear: number })
                     })}
                     <td className="planningScheduleTotal">
                       {formatHours(
-                        Object.values(person.weeklySchedule).reduce(
-                          (sum, hours) => sum + hours,
-                          0,
-                        ),
-                      )} h
+                        Object.values(person.weeklySchedule).reduce((sum, hours) => sum + hours, 0),
+                      )}{" "}
+                      h
                     </td>
                   </tr>
                 ))}
