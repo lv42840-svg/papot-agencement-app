@@ -28,6 +28,13 @@ export const planningMacroAllocationSchema = z.object({
   hours: z.number().finite().nonnegative(),
 });
 
+export const planningProvisionalAllocationSchema = z.object({
+  caseId: z.string().uuid(),
+  activity: planningActivitySchema,
+  week: isoWeekSchema,
+  hours: z.number().finite().nonnegative(),
+});
+
 export const planningAbsenceTypeSchema = z.enum(["VACATION", "SICK", "OTHER"]);
 export type PlanningAbsenceType = z.infer<typeof planningAbsenceTypeSchema>;
 
@@ -50,6 +57,7 @@ export const planningPayloadSchema = z
   .object({
     schemaVersion: z.literal(1),
     macroAllocations: z.array(planningMacroAllocationSchema),
+    provisionalAllocations: z.array(planningProvisionalAllocationSchema).default([]),
     chantierOrder: z.array(z.string().uuid()),
     peopleCapacity: z.array(planningPersonCapacitySchema).default([]),
     absences: z.array(planningAbsenceSchema).default([]),
@@ -66,6 +74,19 @@ export const planningPayloadSchema = z
         });
       }
       seen.add(key);
+    });
+
+    const provisionalSeen = new Set<string>();
+    value.provisionalAllocations.forEach((allocation, index) => {
+      const key = provisionalAllocationKey(allocation.caseId, allocation.activity, allocation.week);
+      if (provisionalSeen.has(key)) {
+        context.addIssue({
+          code: z.ZodIssueCode.custom,
+          path: ["provisionalAllocations", index],
+          message: "PLANNING_PROVISIONAL_ALLOCATION_DUPLICATE",
+        });
+      }
+      provisionalSeen.add(key);
     });
 
     const absenceKeys = new Set<string>();
@@ -91,6 +112,7 @@ export const planningPayloadSchema = z
   });
 
 export type PlanningMacroAllocation = z.infer<typeof planningMacroAllocationSchema>;
+export type PlanningProvisionalAllocation = z.infer<typeof planningProvisionalAllocationSchema>;
 export type PlanningPayload = z.infer<typeof planningPayloadSchema>;
 
 export type GrandPlanningActivityRow = {
@@ -114,6 +136,9 @@ export type GrandPlanningProvisionActivityRow = {
   activity: PlanningActivity;
   label: string;
   provisionHours: number;
+  allocatedHours: number;
+  remainingHours: number;
+  weeklyHours: Record<string, number>;
 };
 
 export type GrandPlanningProvisionRow = {
@@ -129,6 +154,7 @@ export function createInitialPlanningPayload(): PlanningPayload {
   return {
     schemaVersion: 1,
     macroAllocations: [],
+    provisionalAllocations: [],
     chantierOrder: [],
     peopleCapacity: [],
     absences: [],
@@ -146,6 +172,14 @@ export function allocationKey(
   week: string,
 ): string {
   return `${chantierId}:${activity}:${week}`;
+}
+
+export function provisionalAllocationKey(
+  caseId: string,
+  activity: PlanningActivity,
+  week: string,
+): string {
+  return `${caseId}:${activity}:${week}`;
 }
 
 export function plannedHoursForActivity(
@@ -243,7 +277,10 @@ function provisionHoursForActivity(
 
 export function buildCommercialProvisionRows(
   commercialPayload: CommercialPayload,
+  planningPayload: PlanningPayload,
+  year: number,
 ): GrandPlanningProvisionRow[] {
+  const weeks = new Set(planningYearWeekIds(year));
   const activities: PlanningActivity[] = ["BE", "WORKSHOP", "INSTALL"];
 
   return commercialPayload.cases
@@ -254,11 +291,30 @@ export function buildCommercialProvisionRows(
       status: item.status,
       statusLabel: COMMERCIAL_STATUS_LABELS[item.status],
       expectedConfirmationDate: item.expectedConfirmationDate,
-      activities: activities.map((activity) => ({
-        activity,
-        label: PLANNING_ACTIVITY_LABELS[activity],
-        provisionHours: provisionHoursForActivity(item.provisionHours, activity),
-      })),
+      activities: activities.map((activity) => {
+        const matching = planningPayload.provisionalAllocations.filter(
+          (allocation) => allocation.caseId === item.id && allocation.activity === activity,
+        );
+        const weeklyHours = Object.fromEntries(
+          matching
+            .filter((allocation) => weeks.has(allocation.week))
+            .map((allocation) => [allocation.week, allocation.hours]),
+        );
+        const allocatedHours = matching.reduce((sum, allocation) => sum + allocation.hours, 0);
+        const provisionHours = provisionHoursForActivity(item.provisionHours, activity);
+        return {
+          activity,
+          label: PLANNING_ACTIVITY_LABELS[activity],
+          provisionHours,
+          allocatedHours,
+          remainingHours: provisionHours - allocatedHours,
+          weeklyHours,
+        };
+      }),
     }))
-    .filter((item) => item.activities.some((activity) => activity.provisionHours !== 0));
+    .filter((item) =>
+      item.activities.some(
+        (activity) => activity.provisionHours !== 0 || activity.allocatedHours !== 0,
+      ),
+    );
 }
