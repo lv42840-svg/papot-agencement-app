@@ -535,6 +535,7 @@ function LifecycleTab({
   const [reactivateReason, setReactivateReason] = useState("");
   const [archiveReviewed, setArchiveReviewed] = useState(false);
   const [unarchiveReason, setUnarchiveReason] = useState("");
+  const canManageDoneLifecycle = capabilities.canCloseReopen || capabilities.canArchive;
 
   return (
     <section className="chantierCard">
@@ -583,8 +584,7 @@ function LifecycleTab({
         </div>
       ) : null}
 
-      {chantier.status === "DONE" &&
-      (capabilities.canCloseReopen || capabilities.canArchive) ? (
+      {chantier.status === "DONE" && canManageDoneLifecycle ? (
         <div className="chantierLifecycleAction chantierLifecycleSplit">
           {capabilities.canCloseReopen ? (
             <div>
