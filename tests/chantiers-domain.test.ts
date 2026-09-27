@@ -450,15 +450,28 @@ describe("Chantiers V1 foundation", () => {
     expect(parsed.chantiers[0].initialRetainedQuoteIds).toEqual([]);
   });
 
+  it("requires a reason to close and reopen a chantier", () => {
+    const source = launch().payload;
+    const id = source.chantiers[0].id;
+
+    expect(() =>
+      chantierMutationSchema.parse({ action: "markDone", chantierId: id, reason: "   " }),
+    ).toThrow();
+    expect(() =>
+      chantierMutationSchema.parse({ action: "reactivate", chantierId: id, reason: "   " }),
+    ).toThrow();
+  });
+
   it("supports Active → Terminé → Active without recreating the chantier", () => {
     const source = launch().payload;
     const id = source.chantiers[0].id;
     const done = applyChantierMutation(
       source,
-      { action: "markDone", chantierId: id },
+      { action: "markDone", chantierId: id, reason: "Travaux principaux terminés" },
       actor,
     ).payload;
     expect(done.chantiers[0].status).toBe("DONE");
+    expect(done.chantiers[0].history.at(-1)?.summary).toContain("Travaux principaux terminés");
 
     const active = applyChantierMutation(
       done,
@@ -482,7 +495,7 @@ describe("Chantiers V1 foundation", () => {
 
     const done = applyChantierMutation(
       source,
-      { action: "markDone", chantierId: id },
+      { action: "markDone", chantierId: id, reason: "Travaux principaux terminés" },
       actor,
     ).payload;
     const archived = applyChantierMutation(
