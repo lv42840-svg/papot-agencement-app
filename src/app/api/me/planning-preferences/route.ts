@@ -6,9 +6,9 @@ export async function PATCH(request: Request) {
   const user = await getCurrentUser();
   if (!user) return NextResponse.json({ error: "Non authentifié." }, { status: 401 });
 
-  const body = (await request.json().catch(() => null)) as
-    | { planningPotentialCollapsed?: unknown }
-    | null;
+  const body = (await request.json().catch(() => null)) as {
+    planningPotentialCollapsed?: unknown;
+  } | null;
   if (typeof body?.planningPotentialCollapsed !== "boolean") {
     return NextResponse.json({ error: "Préférence invalide." }, { status: 400 });
   }
