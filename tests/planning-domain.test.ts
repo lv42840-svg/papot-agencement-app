@@ -91,7 +91,7 @@ describe("grand planning domain", () => {
       "WORKSHOP",
       "INSTALL",
     ]);
-    expect(rows[0]?.activities.map((item) => item.plannedHours)).toEqual([10, 20, 30]);
+    expect(rows[0]?.activities.map((item) => item.plannedHours)).toEqual([\n      10,\n      20,\n      30,\n    ]);
   });
 
   it("calculates à répartir from the full allocation and allows a negative balance", () => {
@@ -99,8 +99,8 @@ describe("grand planning domain", () => {
       schemaVersion: 1,
       chantierOrder: [],
       macroAllocations: [
-        { chantierId: activeId, activity: "WORKSHOP", week: "2026-W40", hours: 12 },
-        { chantierId: activeId, activity: "WORKSHOP", week: "2026-W41", hours: 18 },
+        {\n          chantierId: activeId,\n          activity: "WORKSHOP",\n          week: "2026-W40",\n          hours: 12,\n        },
+        {\n          chantierId: activeId,\n          activity: "WORKSHOP",\n          week: "2026-W41",\n          hours: 18,\n        },
       ],
     };
 
@@ -126,7 +126,7 @@ describe("grand planning domain", () => {
       ],
     };
 
-    const be = buildFirmGrandPlanningRows(chantiersPayload(), planning, 2026)[0]?.activities[0];
+    const be = buildFirmGrandPlanningRows(\n      chantiersPayload(),\n      planning,\n      2026,\n    )[0]?.activities[0];
 
     expect(be?.allocatedHours).toBe(6);
     expect(be?.remainingHours).toBe(4);
