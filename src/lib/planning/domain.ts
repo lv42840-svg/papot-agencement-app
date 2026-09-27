@@ -30,7 +30,7 @@ export const planningPayloadSchema = z
   .superRefine((value, context) => {
     const seen = new Set<string>();
     value.macroAllocations.forEach((allocation, index) => {
-      const key = allocationKey(allocation.chantierId, allocation.activity, allocation.week);
+      const key = allocationKey(\n        allocation.chantierId,\n        allocation.activity,\n        allocation.week,\n      );
       if (seen.has(key)) {
         context.addIssue({
           code: z.ZodIssueCode.custom,
@@ -50,7 +50,7 @@ export const planningPayloadSchema = z
     }
   });
 
-export type PlanningMacroAllocation = z.infer<typeof planningMacroAllocationSchema>;
+export type PlanningMacroAllocation = z.infer<\n  typeof planningMacroAllocationSchema\n>;
 export type PlanningPayload = z.infer<typeof planningPayloadSchema>;
 
 export type GrandPlanningActivityRow = {
@@ -105,7 +105,7 @@ export function weeksInIsoYear(year: number): number {
   const day = date.getUTCDay() || 7;
   date.setUTCDate(date.getUTCDate() + 4 - day);
   const yearStart = new Date(Date.UTC(date.getUTCFullYear(), 0, 1));
-  return Math.ceil(((date.getTime() - yearStart.getTime()) / 86_400_000 + 1) / 7);
+  return Math.ceil(\n    ((date.getTime() - yearStart.getTime()) / 86_400_000 + 1) / 7,\n  );
 }
 
 export function planningYearWeekIds(year: number): string[] {
@@ -145,33 +145,37 @@ export function buildFirmGrandPlanningRows(
   const weeks = new Set(planningYearWeekIds(year));
   const activities: PlanningActivity[] = ["BE", "WORKSHOP", "INSTALL"];
 
-  return orderActiveChantiers(chantiersPayload.chantiers, planningPayload.chantierOrder).map(
-    (chantier) => ({
-      chantierId: chantier.id,
-      name: chantier.name,
-      reference: chantier.reference,
-      plannedInstallDate: chantier.plannedInstallDate,
-      activities: activities.map((activity) => {
-        const matching = planningPayload.macroAllocations.filter(
-          (allocation) =>
-            allocation.chantierId === chantier.id && allocation.activity === activity,
-        );
-        const weeklyHours = Object.fromEntries(
-          matching
-            .filter((allocation) => weeks.has(allocation.week))
-            .map((allocation) => [allocation.week, allocation.hours]),
-        );
-        const allocatedHours = matching.reduce((sum, allocation) => sum + allocation.hours, 0);
-        const plannedHours = plannedHoursForActivity(chantier, activity);
-        return {
-          activity,
-          label: PLANNING_ACTIVITY_LABELS[activity],
-          plannedHours,
-          allocatedHours,
-          remainingHours: plannedHours - allocatedHours,
-          weeklyHours,
-        };
-      }),
+  return orderActiveChantiers(
+    chantiersPayload.chantiers,
+    planningPayload.chantierOrder,
+  ).map((chantier) => ({
+    chantierId: chantier.id,
+    name: chantier.name,
+    reference: chantier.reference,
+    plannedInstallDate: chantier.plannedInstallDate,
+    activities: activities.map((activity) => {
+      const matching = planningPayload.macroAllocations.filter(
+        (allocation) =>
+          allocation.chantierId === chantier.id && allocation.activity === activity,
+      );
+      const weeklyHours = Object.fromEntries(
+        matching
+          .filter((allocation) => weeks.has(allocation.week))
+          .map((allocation) => [allocation.week, allocation.hours]),
+      );
+      const allocatedHours = matching.reduce(
+        (sum, allocation) => sum + allocation.hours,
+        0,
+      );
+      const plannedHours = plannedHoursForActivity(chantier, activity);
+      return {
+        activity,
+        label: PLANNING_ACTIVITY_LABELS[activity],
+        plannedHours,
+        allocatedHours,
+        remainingHours: plannedHours - allocatedHours,
+        weeklyHours,
+      };
     }),
-  );
+  }));
 }
