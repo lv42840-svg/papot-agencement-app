@@ -19,6 +19,11 @@ import {
   desktopRequestErrorStatus,
   requireDesktopRequestContext,
 } from "@/lib/desktop/request-context";
+import { createPlanningRepository } from "@/lib/planning/create-repository";
+import {
+  removeFirmPlanningForChantier,
+  restoreFirmPlanningOrderForChantier,
+} from "@/lib/planning/mutations";
 import { createQuotesRepository } from "@/lib/quotes/create-repository";
 
 export const runtime = "nodejs";
@@ -167,6 +172,20 @@ export async function POST(request: Request) {
 
       return applyChantierMutation(payload, normalizedInput, actor);
     });
+
+    if (
+      input.action === "markDone" ||
+      input.action === "reactivate" ||
+      input.action === "unarchive"
+    ) {
+      stage = "sync-planning-lifecycle";
+      await createPlanningRepository().mutate((payload) => {
+        if (input.action === "markDone") {
+          return removeFirmPlanningForChantier(payload, input.chantierId);
+        }
+        return restoreFirmPlanningOrderForChantier(payload, input.chantierId);
+      });
+    }
 
     console.info("[PAPOT][Chantiers] POST saved", { ms: Date.now() - startedAt });
     return noStoreJson(
