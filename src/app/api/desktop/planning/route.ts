@@ -91,11 +91,20 @@ async function snapshot(
   const rows = buildFirmGrandPlanningRows(chantiers, planning, year);
   const provisionalRows = buildCommercialProvisionRows(commercial, planning, year);
   const firmLoadByWeek = new Map<string, number>();
+  const provisionalLoadByWeek = new Map<string, number>();
 
   for (const row of rows) {
     for (const activity of row.activities) {
       for (const [week, hours] of Object.entries(activity.weeklyHours)) {
         firmLoadByWeek.set(week, (firmLoadByWeek.get(week) ?? 0) + hours);
+      }
+    }
+  }
+
+  for (const row of provisionalRows) {
+    for (const activity of row.activities) {
+      for (const [week, hours] of Object.entries(activity.weeklyHours)) {
+        provisionalLoadByWeek.set(week, (provisionalLoadByWeek.get(week) ?? 0) + hours);
       }
     }
   }
@@ -113,6 +122,7 @@ async function snapshot(
       peopleCapacity,
       firmLoadByWeek,
       planning.absences,
+      provisionalLoadByWeek,
     ),
     absences: planning.absences
       .filter((absence) => absence.date.startsWith(String(year)))

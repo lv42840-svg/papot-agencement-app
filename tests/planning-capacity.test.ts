@@ -102,8 +102,53 @@ describe("grand planning weekly capacity", () => {
       week: "2026-W40",
       totalCapacityHours: 39,
       firmLoadHours: 30,
+      provisionalLoadHours: 0,
       firmAvailableHours: 9,
+      availableWithProvisionHours: 9,
     });
+  });
+
+  it("keeps firm availability separate from provisional availability", () => {
+    const indicators = buildWeeklyCapacityIndicators(
+      ["2026-W40"],
+      [
+        {
+          userId: lucienId,
+          countsInMacroCapacity: true,
+          weeklySchedule: DEFAULT_WEEKLY_SCHEDULE,
+        },
+      ],
+      new Map([["2026-W40", 20]]),
+      [],
+      new Map([["2026-W40", 12]]),
+    );
+
+    expect(indicators[0]).toMatchObject({
+      totalCapacityHours: 39,
+      firmLoadHours: 20,
+      provisionalLoadHours: 12,
+      firmAvailableHours: 19,
+      availableWithProvisionHours: 7,
+    });
+  });
+
+  it("allows provisional availability to become negative without changing firm availability", () => {
+    const indicators = buildWeeklyCapacityIndicators(
+      ["2026-W40"],
+      [
+        {
+          userId: lucienId,
+          countsInMacroCapacity: true,
+          weeklySchedule: DEFAULT_WEEKLY_SCHEDULE,
+        },
+      ],
+      new Map([["2026-W40", 25]]),
+      [],
+      new Map([["2026-W40", 20]]),
+    );
+
+    expect(indicators[0]?.firmAvailableHours).toBe(14);
+    expect(indicators[0]?.availableWithProvisionHours).toBe(-6);
   });
 
   it("allows negative availability when firm load exceeds capacity", () => {

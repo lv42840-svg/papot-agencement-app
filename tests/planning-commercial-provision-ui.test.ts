@@ -25,6 +25,16 @@ describe("grand planning commercial provision bridge", () => {
     expect(uiSource).toContain("activity.remainingHours");
   });
 
+  it("shows separate weekly firm and provisional availability indicators", () => {
+    expect(apiSource).toContain("provisionalLoadByWeek");
+    expect(uiSource).toContain("provisionalLoadHours");
+    expect(uiSource).toContain("availableWithProvisionHours");
+    expect(uiSource).toContain("Ferme");
+    expect(uiSource).toContain("Prov.");
+    expect(uiSource).toContain("Dispo F");
+    expect(uiSource).toContain("Dispo +P");
+  });
+
   it("edits provisional hours in the same annual table with a lighter visual treatment", () => {
     expect(apiSource).toContain('input.action === "setProvisionHours"');
     expect(uiSource).toContain('action: "setProvisionHours"');

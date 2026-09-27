@@ -12,7 +12,9 @@ type WeeklyCapacity = {
   week: string;
   totalCapacityHours: number;
   firmLoadHours: number;
+  provisionalLoadHours: number;
   firmAvailableHours: number;
+  availableWithProvisionHours: number;
 };
 type PersonCapacity = {
   userId: string;
@@ -791,15 +793,29 @@ export function GrandPlanningWorkspace({ initialYear }: { initialYear: number })
                       <th className="planningWeekHead" key={week} title={week}>
                         <strong>{weekLabel(week)}</strong>
                         <span>Cap. {formatHours(capacity?.totalCapacityHours ?? 0)}</span>
-                        <span>Charge {formatHours(capacity?.firmLoadHours ?? 0)}</span>
+                        <span>Ferme {formatHours(capacity?.firmLoadHours ?? 0)}</span>
+                        <span className="planningWeekProvisional">
+                          Prov. {formatHours(capacity?.provisionalLoadHours ?? 0)}
+                        </span>
                         <span
                           className={
                             (capacity?.firmAvailableHours ?? 0) < 0
                               ? "planningWeekAvailable isNegative"
                               : "planningWeekAvailable"
                           }
+                          title="Disponible ferme"
                         >
-                          Dispo {formatHours(capacity?.firmAvailableHours ?? 0)}
+                          Dispo F {formatHours(capacity?.firmAvailableHours ?? 0)}
+                        </span>
+                        <span
+                          className={
+                            (capacity?.availableWithProvisionHours ?? 0) < 0
+                              ? "planningWeekAvailable planningWeekWithProvision isNegative"
+                              : "planningWeekAvailable planningWeekWithProvision"
+                          }
+                          title="Disponible avec provisionnel"
+                        >
+                          Dispo +P {formatHours(capacity?.availableWithProvisionHours ?? 0)}
                         </span>
                       </th>
                     );
@@ -1326,8 +1342,14 @@ export function GrandPlanningWorkspace({ initialYear }: { initialYear: number })
           font-weight: 650;
           white-space: nowrap;
         }
+        .planningWeekProvisional {
+          color: #71698a;
+        }
         .planningWeekAvailable {
           color: #39714c;
+        }
+        .planningWeekWithProvision {
+          font-weight: 750 !important;
         }
         .planningWeekAvailable.isNegative {
           color: #b34435;
