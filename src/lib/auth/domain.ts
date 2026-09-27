@@ -14,6 +14,7 @@ const userSchema = z.object({
   canManagePermissions: z.boolean(),
   mustChangePassword: z.boolean(),
   accentKey: z.string().min(1),
+  planningPotentialCollapsed: z.boolean().optional(),
   modulePermissions: z.record(accessLevelSchema),
   specialPermissions: z.array(z.string()),
 });
