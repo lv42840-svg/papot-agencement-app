@@ -230,10 +230,7 @@ describe("planning provision to firm conversion", () => {
         hours: 12,
       },
     ]);
-    expect(result.chantierOrder).toEqual([
-      chantierId,
-      "33333333-3333-4333-8333-333333333333",
-    ]);
+    expect(result.chantierOrder).toEqual([chantierId, "33333333-3333-4333-8333-333333333333"]);
   });
 
   it("leaves unrelated provisional allocations untouched", () => {
