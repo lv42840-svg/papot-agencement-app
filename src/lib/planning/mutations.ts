@@ -301,9 +301,7 @@ export function removeFirmPlanningForChantier(
   payload.macroAllocations = payload.macroAllocations.filter(
     (allocation) => allocation.chantierId !== chantierId,
   );
-  payload.chantierOrder = payload.chantierOrder.filter(
-    (candidate) => candidate !== chantierId,
-  );
+  payload.chantierOrder = payload.chantierOrder.filter((candidate) => candidate !== chantierId);
   return parsePlanningPayload(payload);
 }
 
