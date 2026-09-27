@@ -1,5 +1,6 @@
 import { z } from "zod";
 import type { ChantierRecord, ChantiersPayload } from "@/lib/chantiers/domain";
+import { planningPersonCapacitySchema } from "./capacity";
 
 export const planningActivitySchema = z.enum(["BE", "WORKSHOP", "INSTALL"]);
 export type PlanningActivity = z.infer<typeof planningActivitySchema>;
@@ -26,6 +27,7 @@ export const planningPayloadSchema = z
     schemaVersion: z.literal(1),
     macroAllocations: z.array(planningMacroAllocationSchema),
     chantierOrder: z.array(z.string().uuid()),
+    peopleCapacity: z.array(planningPersonCapacitySchema).default([]),
   })
   .superRefine((value, context) => {
     const seen = new Set<string>();
@@ -75,6 +77,7 @@ export function createInitialPlanningPayload(): PlanningPayload {
     schemaVersion: 1,
     macroAllocations: [],
     chantierOrder: [],
+    peopleCapacity: [],
   };
 }
 
