@@ -3,6 +3,7 @@ import { ZodError, z } from "zod";
 import { hasEffectiveSpecialPermission, requireSpecialPermission } from "@/lib/auth/permissions";
 import { readAuthPayload } from "@/lib/auth/store";
 import { createChantiersRepository } from "@/lib/chantiers/create-repository";
+import { createCommercialRepository } from "@/lib/commercial/create-repository";
 import {
   desktopRequestErrorStatus,
   requireDesktopRequestContext,
@@ -14,6 +15,7 @@ import {
 } from "@/lib/planning/capacity";
 import { createPlanningRepository } from "@/lib/planning/create-repository";
 import {
+  buildCommercialProvisionRows,
   buildFirmGrandPlanningRows,
   PLANNING_ABSENCE_TYPE_LABELS,
   planningYearWeekIds,
@@ -70,15 +72,17 @@ async function snapshot(
   user: { id: string },
   context: Awaited<ReturnType<typeof requireDesktopRequestContext>>,
 ) {
-  const [planning, chantiers, auth, canEditMacro, canManageSchedules] = await Promise.all([
+  const [planning, chantiers, commercial, auth, canEditMacro, canManageSchedules] = await Promise.all([
     createPlanningRepository().load(),
     createChantiersRepository(context).load(),
+    createCommercialRepository(context).load(),
     readAuthPayload(),
     hasEffectiveSpecialPermission(user, "planning.edit_macro"),
     hasEffectiveSpecialPermission(user, "planning.manage_schedules"),
   ]);
   const weeks = planningYearWeekIds(year);
   const rows = buildFirmGrandPlanningRows(chantiers, planning, year);
+  const provisionalRows = buildCommercialProvisionRows(commercial);
   const firmLoadByWeek = new Map<string, number>();
 
   for (const row of rows) {
@@ -96,6 +100,7 @@ async function snapshot(
     year,
     weeks,
     rows,
+    provisionalRows,
     weeklyCapacity: buildWeeklyCapacityIndicators(
       weeks,
       peopleCapacity,
