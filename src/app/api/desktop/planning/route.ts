@@ -1,13 +1,13 @@
 import { NextResponse } from "next/server";
 import { ZodError, z } from "zod";
-import { hasEffectiveSpecialPermission, requireSpecialPermission } from "@/lib/auth/permissions";
+import {\n  hasEffectiveSpecialPermission,\n  requireSpecialPermission,\n} from "@/lib/auth/permissions";
 import { createChantiersRepository } from "@/lib/chantiers/create-repository";
 import {
   desktopRequestErrorStatus,
   requireDesktopRequestContext,
 } from "@/lib/desktop/request-context";
-import { buildFirmGrandPlanningRows, planningYearWeekIds } from "@/lib/planning/domain";
-import { planningMacroMutationSchema, applyPlanningMacroMutation } from "@/lib/planning/mutations";
+import {\n  buildFirmGrandPlanningRows,\n  planningYearWeekIds,\n} from "@/lib/planning/domain";
+import {\n  planningMacroMutationSchema,\n  applyPlanningMacroMutation,\n} from "@/lib/planning/mutations";
 import { createPlanningRepository } from "@/lib/planning/create-repository";
 
 export const runtime = "nodejs";
@@ -30,7 +30,7 @@ function statusFor(code: string): number {
   return 400;
 }
 
-async function snapshot(year: number, canWrite: boolean, user: { id: string }, context: Awaited<ReturnType<typeof requireDesktopRequestContext>>) {
+async function snapshot(\n  year: number,\n  canWrite: boolean,\n  user: { id: string },\n  context: Awaited<ReturnType<typeof requireDesktopRequestContext>>,\n) {
   const [planning, chantiers, canEditMacro] = await Promise.all([
     createPlanningRepository().load(),
     createChantiersRepository(context).load(),
@@ -52,7 +52,7 @@ export async function GET(request: Request) {
   try {
     const context = await requireDesktopRequestContext("planning", "READ");
     const url = new URL(request.url);
-    const year = yearSchema.parse(url.searchParams.get("year") ?? new Date().getFullYear());
+    const year = yearSchema.parse(\n      url.searchParams.get("year") ?? new Date().getFullYear(),\n    );
     return noStoreJson(
       await snapshot(year, context.moduleAccess.canWrite, context.user, context),
     );
