@@ -11,6 +11,7 @@ import {
 
 const activeId = "11111111-1111-4111-8111-111111111111";
 const doneId = "22222222-2222-4222-8222-222222222222";
+const provisionCaseId = "33333333-3333-4333-8333-333333333333";
 
 function chantier(id: string, status: "ACTIVE" | "DONE") {
   return {
@@ -111,7 +112,7 @@ function commercialPayload(): CommercialPayload {
     cases: [
       {
         ...base,
-        id: "33333333-3333-4333-8333-333333333333",
+        id: provisionCaseId,
         name: "Affaire provisionnée",
         status: "PISTE",
         provisionHours: { be: 5, workshop: 20, install: 8 },
@@ -166,20 +167,82 @@ describe("grand planning domain", () => {
   });
 
   it("builds provision rows only from active non-confirmed commercial affairs with hours", () => {
-    const rows = buildCommercialProvisionRows(commercialPayload());
+    const rows = buildCommercialProvisionRows(
+      commercialPayload(),
+      createInitialPlanningPayload(),
+      2026,
+    );
 
     expect(rows).toHaveLength(1);
     expect(rows[0]).toMatchObject({
-      caseId: "33333333-3333-4333-8333-333333333333",
+      caseId: provisionCaseId,
       name: "Affaire provisionnée",
       status: "PISTE",
       statusLabel: "Piste",
     });
     expect(rows[0]?.activities).toEqual([
-      { activity: "BE", label: "BE", provisionHours: 5 },
-      { activity: "WORKSHOP", label: "Atelier", provisionHours: 20 },
-      { activity: "INSTALL", label: "Pose", provisionHours: 8 },
+      {
+        activity: "BE",
+        label: "BE",
+        provisionHours: 5,
+        allocatedHours: 0,
+        remainingHours: 5,
+        weeklyHours: {},
+      },
+      {
+        activity: "WORKSHOP",
+        label: "Atelier",
+        provisionHours: 20,
+        allocatedHours: 0,
+        remainingHours: 20,
+        weeklyHours: {},
+      },
+      {
+        activity: "INSTALL",
+        label: "Pose",
+        provisionHours: 8,
+        allocatedHours: 0,
+        remainingHours: 8,
+        weeklyHours: {},
+      },
     ]);
+  });
+
+  it("calculates provisional remaining hours and allows a negative balance", () => {
+    const planning: PlanningPayload = {
+      ...createInitialPlanningPayload(),
+      provisionalAllocations: [
+        { caseId: provisionCaseId, activity: "WORKSHOP", week: "2026-W40", hours: 12 },
+        { caseId: provisionCaseId, activity: "WORKSHOP", week: "2026-W41", hours: 15 },
+      ],
+    };
+
+    const row = buildCommercialProvisionRows(commercialPayload(), planning, 2026)[0];
+    const workshop = row?.activities.find((item) => item.activity === "WORKSHOP");
+
+    expect(workshop?.provisionHours).toBe(20);
+    expect(workshop?.allocatedHours).toBe(27);
+    expect(workshop?.remainingHours).toBe(-7);
+    expect(workshop?.weeklyHours).toEqual({
+      "2026-W40": 12,
+      "2026-W41": 15,
+    });
+  });
+
+  it("keeps provisional allocations from other years in the global remaining balance", () => {
+    const planning: PlanningPayload = {
+      ...createInitialPlanningPayload(),
+      provisionalAllocations: [
+        { caseId: provisionCaseId, activity: "BE", week: "2026-W52", hours: 2 },
+        { caseId: provisionCaseId, activity: "BE", week: "2027-W01", hours: 1 },
+      ],
+    };
+
+    const be = buildCommercialProvisionRows(commercialPayload(), planning, 2026)[0]?.activities[0];
+
+    expect(be?.allocatedHours).toBe(3);
+    expect(be?.remainingHours).toBe(2);
+    expect(be?.weeklyHours).toEqual({ "2026-W52": 2 });
   });
 
   it("calculates à répartir from the full allocation and allows a negative balance", () => {
@@ -188,6 +251,7 @@ describe("grand planning domain", () => {
       chantierOrder: [],
       peopleCapacity: [],
       absences: [],
+      provisionalAllocations: [],
       macroAllocations: [
         {
           chantierId: activeId,
@@ -222,6 +286,7 @@ describe("grand planning domain", () => {
       chantierOrder: [],
       peopleCapacity: [],
       absences: [],
+      provisionalAllocations: [],
       macroAllocations: [
         { chantierId: activeId, activity: "BE", week: "2026-W52", hours: 4 },
         { chantierId: activeId, activity: "BE", week: "2027-W01", hours: 2 },
