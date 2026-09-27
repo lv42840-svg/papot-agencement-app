@@ -283,9 +283,9 @@ export async function POST(request: Request) {
       const caseId = caseIdForMutation(input);
       if (!caseId) throw new Error("COMMERCIAL_CASE_NOT_FOUND");
       stage = "clear-planning-provision";
-      await createPlanningRepository().mutate((payload) => ({
-        payload: clearPlanningProvisionForCommercialCase(payload, caseId),
-      }));
+      await createPlanningRepository().mutate((payload) =>
+        clearPlanningProvisionForCommercialCase(payload, caseId),
+      );
     }
 
     console.info("[PAPOT][Commercial] POST saved", { ms: Date.now() - startedAt });
