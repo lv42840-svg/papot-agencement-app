@@ -211,6 +211,30 @@ export function applyPlanningPotentialOrderMutation(
   return parsePlanningPayload(payload);
 }
 
+export function closePlanningFirmChantier(
+  source: PlanningPayload,
+  chantierId: string,
+): PlanningPayload {
+  const payload = structuredClone(parsePlanningPayload(source));
+  payload.macroAllocations = payload.macroAllocations.filter(
+    (allocation) => allocation.chantierId !== chantierId,
+  );
+  payload.chantierOrder = payload.chantierOrder.filter((candidate) => candidate !== chantierId);
+  return parsePlanningPayload(payload);
+}
+
+export function reopenPlanningFirmChantier(
+  source: PlanningPayload,
+  chantierId: string,
+): PlanningPayload {
+  const payload = closePlanningFirmChantier(source, chantierId);
+  payload.chantierOrder = [
+    chantierId,
+    ...payload.chantierOrder.filter((candidate) => candidate !== chantierId),
+  ];
+  return parsePlanningPayload(payload);
+}
+
 export function convertPlanningProvisionToFirm(
   source: PlanningPayload,
   commercialCaseId: string,
