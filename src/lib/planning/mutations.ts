@@ -145,6 +145,13 @@ export function applyPlanningProvisionalMutation(
   if (index >= 0) payload.provisionalAllocations[index] = next;
   else payload.provisionalAllocations.push(next);
 
+  if (!payload.provisionalOrder.includes(input.caseId)) {
+    payload.provisionalOrder = [
+      input.caseId,
+      ...payload.provisionalOrder.filter((candidate) => candidate !== input.caseId),
+    ];
+  }
+
   return parsePlanningPayload(payload);
 }
 
@@ -178,6 +185,9 @@ export function convertPlanningProvisionToFirm(
   payload.provisionalAllocations = payload.provisionalAllocations.filter(
     (allocation) => allocation.caseId !== commercialCaseId,
   );
+  payload.provisionalOrder = payload.provisionalOrder.filter(
+    (candidate) => candidate !== commercialCaseId,
+  );
   payload.chantierOrder = [
     chantierId,
     ...payload.chantierOrder.filter((candidate) => candidate !== chantierId),
@@ -194,6 +204,36 @@ export function clearPlanningProvisionForCommercialCase(
   payload.provisionalAllocations = payload.provisionalAllocations.filter(
     (allocation) => allocation.caseId !== commercialCaseId,
   );
+  payload.provisionalOrder = payload.provisionalOrder.filter(
+    (candidate) => candidate !== commercialCaseId,
+  );
+  return parsePlanningPayload(payload);
+}
+
+export function syncPlanningPotentialOrderForCommercialCase(
+  source: PlanningPayload,
+  commercialCaseId: string,
+  hasProvisionReference: boolean,
+): PlanningPayload {
+  const payload = structuredClone(parsePlanningPayload(source));
+  const isKnown = payload.provisionalOrder.includes(commercialCaseId);
+  const hasWeeklyAllocation = payload.provisionalAllocations.some(
+    (allocation) => allocation.caseId === commercialCaseId,
+  );
+
+  if (hasProvisionReference) {
+    if (!isKnown) {
+      payload.provisionalOrder = [
+        commercialCaseId,
+        ...payload.provisionalOrder.filter((candidate) => candidate !== commercialCaseId),
+      ];
+    }
+  } else if (!hasWeeklyAllocation) {
+    payload.provisionalOrder = payload.provisionalOrder.filter(
+      (candidate) => candidate !== commercialCaseId,
+    );
+  }
+
   return parsePlanningPayload(payload);
 }
 
