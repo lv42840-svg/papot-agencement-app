@@ -2,10 +2,7 @@
 
 import Link from "next/link";
 import { useCallback, useEffect, useMemo, useState } from "react";
-import type {
-  GrandPlanningChantierRow,
-  PlanningActivity,
-} from "@/lib/planning/domain";
+import type { GrandPlanningChantierRow, PlanningActivity } from "@/lib/planning/domain";
 
 type PlanningSnapshot = {
   year: number;

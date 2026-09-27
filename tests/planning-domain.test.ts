@@ -86,16 +86,8 @@ describe("grand planning domain", () => {
 
     expect(rows).toHaveLength(1);
     expect(rows[0]?.chantierId).toBe(activeId);
-    expect(rows[0]?.activities.map((item) => item.activity)).toEqual([
-      "BE",
-      "WORKSHOP",
-      "INSTALL",
-    ]);
-    expect(rows[0]?.activities.map((item) => item.plannedHours)).toEqual([
-      10,
-      20,
-      30,
-    ]);
+    expect(rows[0]?.activities.map((item) => item.activity)).toEqual(["BE", "WORKSHOP", "INSTALL"]);
+    expect(rows[0]?.activities.map((item) => item.plannedHours)).toEqual([10, 20, 30]);
   });
 
   it("calculates à répartir from the full allocation and allows a negative balance", () => {
@@ -140,11 +132,7 @@ describe("grand planning domain", () => {
       ],
     };
 
-    const be = buildFirmGrandPlanningRows(
-      chantiersPayload(),
-      planning,
-      2026,
-    )[0]?.activities[0];
+    const be = buildFirmGrandPlanningRows(chantiersPayload(), planning, 2026)[0]?.activities[0];
 
     expect(be?.allocatedHours).toBe(6);
     expect(be?.remainingHours).toBe(4);

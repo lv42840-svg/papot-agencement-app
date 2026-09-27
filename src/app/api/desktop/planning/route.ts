@@ -1,22 +1,13 @@
 import { NextResponse } from "next/server";
 import { ZodError, z } from "zod";
-import {
-  hasEffectiveSpecialPermission,
-  requireSpecialPermission,
-} from "@/lib/auth/permissions";
+import { hasEffectiveSpecialPermission, requireSpecialPermission } from "@/lib/auth/permissions";
 import { createChantiersRepository } from "@/lib/chantiers/create-repository";
 import {
   desktopRequestErrorStatus,
   requireDesktopRequestContext,
 } from "@/lib/desktop/request-context";
-import {
-  buildFirmGrandPlanningRows,
-  planningYearWeekIds,
-} from "@/lib/planning/domain";
-import {
-  planningMacroMutationSchema,
-  applyPlanningMacroMutation,
-} from "@/lib/planning/mutations";
+import { buildFirmGrandPlanningRows, planningYearWeekIds } from "@/lib/planning/domain";
+import { planningMacroMutationSchema, applyPlanningMacroMutation } from "@/lib/planning/mutations";
 import { createPlanningRepository } from "@/lib/planning/create-repository";
 
 export const runtime = "nodejs";
@@ -66,12 +57,8 @@ export async function GET(request: Request) {
   try {
     const context = await requireDesktopRequestContext("planning", "READ");
     const url = new URL(request.url);
-    const year = yearSchema.parse(
-      url.searchParams.get("year") ?? new Date().getFullYear(),
-    );
-    return noStoreJson(
-      await snapshot(year, context.moduleAccess.canWrite, context.user, context),
-    );
+    const year = yearSchema.parse(url.searchParams.get("year") ?? new Date().getFullYear());
+    return noStoreJson(await snapshot(year, context.moduleAccess.canWrite, context.user, context));
   } catch (error) {
     const code =
       error instanceof ZodError

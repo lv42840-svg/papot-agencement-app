@@ -6,9 +6,7 @@ import {
   type PlanningPayload,
 } from "./domain";
 
-const weekSchema = z
-  .string()
-  .regex(/^\d{4}-W(?:0[1-9]|[1-4]\d|5[0-3])$/, "PLANNING_WEEK_INVALID");
+const weekSchema = z.string().regex(/^\d{4}-W(?:0[1-9]|[1-4]\d|5[0-3])$/, "PLANNING_WEEK_INVALID");
 
 export const planningMacroMutationSchema = z.object({
   action: z.literal("setMacroHours"),
@@ -18,9 +16,7 @@ export const planningMacroMutationSchema = z.object({
   hours: z.number().finite().nonnegative().max(10_000),
 });
 
-export type PlanningMacroMutation = z.infer<
-  typeof planningMacroMutationSchema
->;
+export type PlanningMacroMutation = z.infer<typeof planningMacroMutationSchema>;
 
 export function applyPlanningMacroMutation(
   source: PlanningPayload,
@@ -35,11 +31,7 @@ export function applyPlanningMacroMutation(
   const key = allocationKey(input.chantierId, input.activity, input.week);
   const index = payload.macroAllocations.findIndex(
     (allocation) =>
-      allocationKey(
-        allocation.chantierId,
-        allocation.activity,
-        allocation.week,
-      ) === key,
+      allocationKey(allocation.chantierId, allocation.activity, allocation.week) === key,
   );
 
   if (input.hours === 0) {
