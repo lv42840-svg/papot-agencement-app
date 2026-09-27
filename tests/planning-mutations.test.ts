@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { createInitialPlanningPayload } from "../src/lib/planning/domain";
-import { applyPlanningMacroMutation } from "../src/lib/planning/mutations";
+import { applyPlanningMacroMutation, applyPlanningPersonCapacityMutation } from "../src/lib/planning/mutations";
 
 const chantierId = "11111111-1111-4111-8111-111111111111";
 const active = new Set([chantierId]);
@@ -98,5 +98,69 @@ describe("grand planning mutations", () => {
         new Set(),
       ),
     ).toThrow("PLANNING_CHANTIER_NOT_ACTIVE");
+  });
+});
+
+describe("planning person capacity mutations", () => {
+  const userId = "33333333-3333-4333-8333-333333333333";
+
+  it("stores inclusion and the individual weekly schedule", () => {
+    const result = applyPlanningPersonCapacityMutation(
+      createInitialPlanningPayload(),
+      {
+        action: "setPersonCapacity",
+        userId,
+        countsInMacroCapacity: true,
+        weeklySchedule: {
+          monday: 8,
+          tuesday: 8,
+          wednesday: 8,
+          thursday: 8,
+          friday: 7,
+          saturday: 0,
+          sunday: 0,
+        },
+      },
+      new Set([userId]),
+    );
+
+    expect(result.peopleCapacity).toEqual([
+      {
+        userId,
+        countsInMacroCapacity: true,
+        weeklySchedule: {
+          monday: 8,
+          tuesday: 8,
+          wednesday: 8,
+          thursday: 8,
+          friday: 7,
+          saturday: 0,
+          sunday: 0,
+        },
+      },
+    ]);
+  });
+
+  it("refuses capacity changes for an inactive user", () => {
+    expect(() =>
+      applyPlanningPersonCapacityMutation(
+        createInitialPlanningPayload(),
+        {
+          action: "setPersonCapacity",
+          userId,
+          countsInMacroCapacity: true,
+          weeklySchedule: {
+            monday: 8,
+            tuesday: 8,
+            wednesday: 8,
+            thursday: 8,
+            friday: 7,
+            saturday: 0,
+            sunday: 0,
+          },
+        },
+        new Set(),
+      ),
+    ).toThrow("PLANNING_USER_NOT_ACTIVE");
   });
 });
