@@ -47,6 +47,7 @@ describeWithPostgres("Planning PostgreSQL storage", () => {
     await expect(createPostgresPlanningRepository(pool).load()).resolves.toEqual({
       schemaVersion: 1,
       macroAllocations: [],
+      provisionalAllocations: [],
       chantierOrder: [],
       peopleCapacity: [],
       absences: [],
