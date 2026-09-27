@@ -14,6 +14,8 @@ import {
   desktopRequestErrorStatus,
   requireDesktopRequestContext,
 } from "@/lib/desktop/request-context";
+import { createPlanningRepository } from "@/lib/planning/create-repository";
+import { convertPlanningProvisionToFirm } from "@/lib/planning/mutations";
 import { createQuotesRepository } from "@/lib/quotes/create-repository";
 
 export const runtime = "nodejs";
@@ -70,6 +72,11 @@ export async function POST(request: Request) {
         },
         actor,
       ),
+    );
+
+    stage = "convert-planning-provision";
+    await createPlanningRepository().mutate((payload) =>
+      convertPlanningProvisionToFirm(payload, affair.id, mutation.focusChantierId),
     );
 
     console.info("[PAPOT][Chantiers] launch from affair saved", { ms: Date.now() - startedAt });
