@@ -6,6 +6,7 @@ import {
   applyPlanningFullWeekAbsenceMutation,
   applyPlanningMacroMutation,
   applyPlanningPersonCapacityMutation,
+  applyPlanningPotentialOrderMutation,
   applyPlanningProvisionalMutation,
   clearPlanningProvisionForCommercialCase,
   convertPlanningProvisionToFirm,
@@ -213,6 +214,39 @@ describe("provisional grand planning mutations", () => {
         new Set(),
       ),
     ).toThrow("PLANNING_COMMERCIAL_CASE_NOT_ACTIVE");
+  });
+});
+
+describe("planning manual potential order", () => {
+  it("stores a complete shared order for the visible potential block", () => {
+    const secondCaseId = "44444444-4444-4444-8444-444444444444";
+    const result = applyPlanningPotentialOrderMutation(
+      {
+        ...createInitialPlanningPayload(),
+        provisionalOrder: [commercialCaseId, secondCaseId],
+      },
+      {
+        action: "setPotentialOrder",
+        orderedCaseIds: [secondCaseId, commercialCaseId],
+      },
+      new Set([commercialCaseId, secondCaseId]),
+    );
+
+    expect(result.provisionalOrder).toEqual([secondCaseId, commercialCaseId]);
+  });
+
+  it("refuses an incomplete or foreign potential order", () => {
+    const secondCaseId = "44444444-4444-4444-8444-444444444444";
+    expect(() =>
+      applyPlanningPotentialOrderMutation(
+        createInitialPlanningPayload(),
+        {
+          action: "setPotentialOrder",
+          orderedCaseIds: [commercialCaseId],
+        },
+        new Set([commercialCaseId, secondCaseId]),
+      ),
+    ).toThrow("PLANNING_POTENTIAL_ORDER_INVALID");
   });
 });
 
