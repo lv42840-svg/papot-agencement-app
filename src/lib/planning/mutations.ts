@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { DEFAULT_WEEKLY_SCHEDULE } from "./capacity";
 import {
   allocationKey,
   parsePlanningPayload,
@@ -8,15 +9,39 @@ import {
 
 const weekSchema = z.string().regex(/^\d{4}-W(?:0[1-9]|[1-4]\d|5[0-3])$/, "PLANNING_WEEK_INVALID");
 
-export const planningMacroMutationSchema = z.object({
-  action: z.literal("setMacroHours"),
-  chantierId: z.string().uuid(),
-  activity: planningActivitySchema,
-  week: weekSchema,
-  hours: z.number().finite().nonnegative().max(10_000),
+const weekdayHoursMutationSchema = z.object({
+  monday: z.number().finite().nonnegative().max(24),
+  tuesday: z.number().finite().nonnegative().max(24),
+  wednesday: z.number().finite().nonnegative().max(24),
+  thursday: z.number().finite().nonnegative().max(24),
+  friday: z.number().finite().nonnegative().max(24),
+  saturday: z.number().finite().nonnegative().max(24),
+  sunday: z.number().finite().nonnegative().max(24),
 });
 
-export type PlanningMacroMutation = z.infer<typeof planningMacroMutationSchema>;
+export const planningMutationSchema = z.discriminatedUnion("action", [
+  z.object({
+    action: z.literal("setMacroHours"),
+    chantierId: z.string().uuid(),
+    activity: planningActivitySchema,
+    week: weekSchema,
+    hours: z.number().finite().nonnegative().max(10_000),
+  }),
+  z.object({
+    action: z.literal("setPersonCapacity"),
+    userId: z.string().uuid(),
+    countsInMacroCapacity: z.boolean(),
+    weeklySchedule: weekdayHoursMutationSchema,
+  }),
+]);
+
+export const planningMacroMutationSchema = planningMutationSchema.options[0];
+export type PlanningMutation = z.infer<typeof planningMutationSchema>;
+export type PlanningMacroMutation = Extract<PlanningMutation, { action: "setMacroHours" }>;
+export type PlanningPersonCapacityMutation = Extract<
+  PlanningMutation,
+  { action: "setPersonCapacity" }
+>;
 
 export function applyPlanningMacroMutation(
   source: PlanningPayload,
@@ -48,6 +73,27 @@ export function applyPlanningMacroMutation(
 
   if (index >= 0) payload.macroAllocations[index] = next;
   else payload.macroAllocations.push(next);
+
+  return parsePlanningPayload(payload);
+}
+
+export function applyPlanningPersonCapacityMutation(
+  source: PlanningPayload,
+  input: PlanningPersonCapacityMutation,
+  activeUserIds: ReadonlySet<string>,
+): PlanningPayload {
+  if (!activeUserIds.has(input.userId)) throw new Error("PLANNING_USER_NOT_ACTIVE");
+
+  const payload = structuredClone(parsePlanningPayload(source));
+  const index = payload.peopleCapacity.findIndex((person) => person.userId === input.userId);
+  const next = {
+    userId: input.userId,
+    countsInMacroCapacity: input.countsInMacroCapacity,
+    weeklySchedule: input.weeklySchedule ?? DEFAULT_WEEKLY_SCHEDULE,
+  };
+
+  if (index >= 0) payload.peopleCapacity[index] = next;
+  else payload.peopleCapacity.push(next);
 
   return parsePlanningPayload(payload);
 }
