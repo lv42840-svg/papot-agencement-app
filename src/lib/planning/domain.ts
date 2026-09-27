@@ -1,4 +1,10 @@
 import { z } from "zod";
+import {
+  COMMERCIAL_STATUS_LABELS,
+  isCommercialActive,
+  type CommercialPayload,
+  type CommercialStatus,
+} from "../commercial/domain";
 import type { ChantierRecord, ChantiersPayload } from "@/lib/chantiers/domain";
 import { planningPersonCapacitySchema } from "./capacity";
 
@@ -102,6 +108,21 @@ export type GrandPlanningChantierRow = {
   reference: string | null;
   plannedInstallDate: string;
   activities: GrandPlanningActivityRow[];
+};
+
+export type GrandPlanningProvisionActivityRow = {
+  activity: PlanningActivity;
+  label: string;
+  provisionHours: number;
+};
+
+export type GrandPlanningProvisionRow = {
+  caseId: string;
+  name: string;
+  status: CommercialStatus;
+  statusLabel: string;
+  expectedConfirmationDate: string | null;
+  activities: GrandPlanningProvisionActivityRow[];
 };
 
 export function createInitialPlanningPayload(): PlanningPayload {
@@ -209,4 +230,35 @@ export function buildFirmGrandPlanningRows(
       }),
     }),
   );
+}
+
+function provisionHoursForActivity(
+  provisionHours: { be: number; workshop: number; install: number },
+  activity: PlanningActivity,
+): number {
+  if (activity === "BE") return provisionHours.be;
+  if (activity === "WORKSHOP") return provisionHours.workshop;
+  return provisionHours.install;
+}
+
+export function buildCommercialProvisionRows(
+  commercialPayload: CommercialPayload,
+): GrandPlanningProvisionRow[] {
+  const activities: PlanningActivity[] = ["BE", "WORKSHOP", "INSTALL"];
+
+  return commercialPayload.cases
+    .filter(isCommercialActive)
+    .map((item) => ({
+      caseId: item.id,
+      name: item.name,
+      status: item.status,
+      statusLabel: COMMERCIAL_STATUS_LABELS[item.status],
+      expectedConfirmationDate: item.expectedConfirmationDate,
+      activities: activities.map((activity) => ({
+        activity,
+        label: PLANNING_ACTIVITY_LABELS[activity],
+        provisionHours: provisionHoursForActivity(item.provisionHours, activity),
+      })),
+    }))
+    .filter((item) => item.activities.some((activity) => activity.provisionHours !== 0));
 }

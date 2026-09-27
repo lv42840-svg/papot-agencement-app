@@ -1,6 +1,8 @@
 import { describe, expect, it } from "vitest";
 import type { ChantiersPayload } from "../src/lib/chantiers/domain";
+import type { CommercialPayload } from "../src/lib/commercial/domain";
 import {
+  buildCommercialProvisionRows,
   buildFirmGrandPlanningRows,
   createInitialPlanningPayload,
   planningYearWeekIds,
@@ -71,6 +73,79 @@ function chantiersPayload(): ChantiersPayload {
   };
 }
 
+function commercialPayload(): CommercialPayload {
+  const base = {
+    sourceEntryId: null,
+    clientId: null,
+    primaryContactId: null,
+    clientName: "Client",
+    siteLabel: null,
+    siteAddressOverride: null,
+    contactName: null,
+    contactPhone: null,
+    contactEmail: null,
+    description: null,
+    nextAction: null,
+    reviewDate: "2026-10-15",
+    expectedConfirmationDate: null,
+    plannedInstallDate: null,
+    confirmedAt: null,
+    retainedQuoteIds: [],
+    closedAt: null,
+    closingReason: null,
+    documents: [],
+    createdAt: "2026-09-27T10:00:00.000Z",
+    createdByName: "Lucien",
+    updatedAt: "2026-09-27T10:00:00.000Z",
+    updatedByName: "Lucien",
+    history: [],
+    quoteOwnerName: null,
+    quoteDueDate: null,
+    quoteSentAt: null,
+    quoteNotes: "",
+  };
+
+  return {
+    schemaVersion: 2,
+    clients: [],
+    cases: [
+      {
+        ...base,
+        id: "33333333-3333-4333-8333-333333333333",
+        name: "Affaire provisionnée",
+        status: "PISTE",
+        provisionHours: { be: 5, workshop: 20, install: 8 },
+      },
+      {
+        ...base,
+        id: "44444444-4444-4444-8444-444444444444",
+        name: "Affaire confirmée",
+        status: "CONFIRMED",
+        reviewDate: null,
+        plannedInstallDate: "2026-12-01",
+        confirmedAt: "2026-09-27T11:00:00.000Z",
+        provisionHours: { be: 4, workshop: 4, install: 4 },
+      },
+      {
+        ...base,
+        id: "55555555-5555-4555-8555-555555555555",
+        name: "Affaire perdue",
+        status: "LOST",
+        reviewDate: null,
+        closedAt: "2026-09-27T11:00:00.000Z",
+        provisionHours: { be: 7, workshop: 7, install: 7 },
+      },
+      {
+        ...base,
+        id: "66666666-6666-4666-8666-666666666666",
+        name: "Sans provision",
+        status: "PISTE",
+        provisionHours: { be: 0, workshop: 0, install: 0 },
+      },
+    ],
+  };
+}
+
 describe("grand planning domain", () => {
   it("builds a complete ISO year", () => {
     expect(planningYearWeekIds(2026)[0]).toBe("2026-W01");
@@ -88,6 +163,23 @@ describe("grand planning domain", () => {
     expect(rows[0]?.chantierId).toBe(activeId);
     expect(rows[0]?.activities.map((item) => item.activity)).toEqual(["BE", "WORKSHOP", "INSTALL"]);
     expect(rows[0]?.activities.map((item) => item.plannedHours)).toEqual([10, 20, 30]);
+  });
+
+  it("builds provision rows only from active non-confirmed commercial affairs with hours", () => {
+    const rows = buildCommercialProvisionRows(commercialPayload());
+
+    expect(rows).toHaveLength(1);
+    expect(rows[0]).toMatchObject({
+      caseId: "33333333-3333-4333-8333-333333333333",
+      name: "Affaire provisionnée",
+      status: "PISTE",
+      statusLabel: "Piste",
+    });
+    expect(rows[0]?.activities).toEqual([
+      { activity: "BE", label: "BE", provisionHours: 5 },
+      { activity: "WORKSHOP", label: "Atelier", provisionHours: 20 },
+      { activity: "INSTALL", label: "Pose", provisionHours: 8 },
+    ]);
   });
 
   it("calculates à répartir from the full allocation and allows a negative balance", () => {
