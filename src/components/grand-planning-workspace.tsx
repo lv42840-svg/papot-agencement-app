@@ -234,6 +234,24 @@ export function GrandPlanningWorkspace({ initialYear }: { initialYear: number })
     return true;
   }
 
+  async function moveFirm(chantierId: string, direction: -1 | 1) {
+    if (!snapshot?.capabilities.canEditMacro) return;
+    const orderedChantierIds = snapshot.rows.map((item) => item.chantierId);
+    const currentIndex = orderedChantierIds.indexOf(chantierId);
+    const nextIndex = currentIndex + direction;
+    if (currentIndex < 0 || nextIndex < 0 || nextIndex >= orderedChantierIds.length) return;
+
+    [orderedChantierIds[currentIndex], orderedChantierIds[nextIndex]] = [
+      orderedChantierIds[nextIndex],
+      orderedChantierIds[currentIndex],
+    ];
+
+    await postPlanningMutation(
+      { action: "setChantierOrder", orderedChantierIds },
+      "Ordre des chantiers enregistré.",
+    );
+  }
+
   async function movePotential(caseId: string, direction: -1 | 1) {
     if (!snapshot?.capabilities.canEditMacro) return;
     const orderedCaseIds = snapshot.provisionalRows.map((item) => item.caseId);
@@ -849,7 +867,7 @@ export function GrandPlanningWorkspace({ initialYear }: { initialYear: number })
                   </tr>
                 ) : null}
 
-                {snapshot.rows.flatMap((chantier) =>
+                {snapshot.rows.flatMap((chantier, chantierIndex) =>
                   chantier.activities.map((activity, activityIndex) => (
                     <tr
                       className={activityIndex === 0 ? "planningChantierStart" : undefined}
@@ -861,7 +879,37 @@ export function GrandPlanningWorkspace({ initialYear }: { initialYear: number })
                           rowSpan={3}
                           scope="rowgroup"
                         >
-                          <strong>{chantier.name}</strong>
+                          <div className="planningFirmCaseHeader">
+                            <strong>{chantier.name}</strong>
+                            <span className="planningFirmOrderActions">
+                              <button
+                                aria-label={`Monter ${chantier.name} dans les chantiers fermes`}
+                                className="secondary"
+                                disabled={
+                                  !snapshot.capabilities.canEditMacro ||
+                                  savingKey === "planning-mutation" ||
+                                  chantierIndex === 0
+                                }
+                                onClick={() => void moveFirm(chantier.chantierId, -1)}
+                                type="button"
+                              >
+                                ↑
+                              </button>
+                              <button
+                                aria-label={`Descendre ${chantier.name} dans les chantiers fermes`}
+                                className="secondary"
+                                disabled={
+                                  !snapshot.capabilities.canEditMacro ||
+                                  savingKey === "planning-mutation" ||
+                                  chantierIndex === snapshot.rows.length - 1
+                                }
+                                onClick={() => void moveFirm(chantier.chantierId, 1)}
+                                type="button"
+                              >
+                                ↓
+                              </button>
+                            </span>
+                          </div>
                           {chantier.reference ? <span>{chantier.reference}</span> : null}
                           <small>Pose prévue {chantier.plannedInstallDate}</small>
                         </th>
@@ -1480,6 +1528,29 @@ export function GrandPlanningWorkspace({ initialYear }: { initialYear: number })
         .planningProvisionRow .planningWeekCell input {
           color: #71698a;
           font-weight: 600;
+        }
+        .planningFirmCaseHeader {
+          display: flex;
+          align-items: center;
+          justify-content: space-between;
+          gap: 8px;
+        }
+        .planningFirmCaseHeader > strong {
+          min-width: 0;
+        }
+        .planningFirmOrderActions {
+          display: inline-flex;
+          gap: 3px;
+        }
+        .planningFirmOrderActions button {
+          width: 25px;
+          min-width: 25px;
+          min-height: 24px;
+          height: 24px;
+          padding: 0;
+          border-radius: 5px;
+          font-size: 12px;
+          line-height: 1;
         }
         .planningPotentialCaseHeader {
           display: flex;
