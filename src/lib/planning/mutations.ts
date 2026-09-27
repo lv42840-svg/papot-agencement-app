@@ -66,10 +66,7 @@ export type PlanningFullWeekAbsenceMutation = Extract<
   PlanningMutation,
   { action: "setFullWeekAbsence" }
 >;
-export type PlanningDeleteAbsenceMutation = Extract<
-  PlanningMutation,
-  { action: "deleteAbsence" }
->;
+export type PlanningDeleteAbsenceMutation = Extract<PlanningMutation, { action: "deleteAbsence" }>;
 
 export function applyPlanningMacroMutation(
   source: PlanningPayload,

@@ -251,10 +251,7 @@ export function GrandPlanningWorkspace({ initialYear }: { initialYear: number })
 
   async function deleteAbsence(absenceId: string) {
     if (!snapshot?.capabilities.canManageSchedules) return;
-    await postPlanningMutation(
-      { action: "deleteAbsence", absenceId },
-      "Absence supprimée.",
-    );
+    await postPlanningMutation({ action: "deleteAbsence", absenceId }, "Absence supprimée.");
   }
 
   function editAbsence(absence: PlanningAbsence) {
@@ -520,9 +517,7 @@ export function GrandPlanningWorkspace({ initialYear }: { initialYear: number })
               <select
                 value={absenceType}
                 disabled={!snapshot.capabilities.canManageSchedules}
-                onChange={(event) =>
-                  setAbsenceType(event.target.value as PlanningAbsence["type"])
-                }
+                onChange={(event) => setAbsenceType(event.target.value as PlanningAbsence["type"])}
               >
                 <option value="VACATION">Congés</option>
                 <option value="SICK">Arrêt</option>
@@ -552,8 +547,7 @@ export function GrandPlanningWorkspace({ initialYear }: { initialYear: number })
               className="secondaryButton"
               type="button"
               disabled={
-                !snapshot.capabilities.canManageSchedules ||
-                savingKey === "planning-mutation"
+                !snapshot.capabilities.canManageSchedules || savingKey === "planning-mutation"
               }
               onClick={() => void saveAbsence()}
             >
@@ -584,8 +578,7 @@ export function GrandPlanningWorkspace({ initialYear }: { initialYear: number })
               className="secondaryButton"
               type="button"
               disabled={
-                !snapshot.capabilities.canManageSchedules ||
-                savingKey === "planning-mutation"
+                !snapshot.capabilities.canManageSchedules || savingKey === "planning-mutation"
               }
               onClick={() => void saveFullWeekAbsence()}
             >
