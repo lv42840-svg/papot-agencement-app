@@ -7,6 +7,7 @@ import {
   applyPlanningMacroMutation,
   applyPlanningPersonCapacityMutation,
   applyPlanningProvisionalMutation,
+  clearPlanningProvisionForCommercialCase,
   convertPlanningProvisionToFirm,
 } from "../src/lib/planning/mutations";
 
@@ -189,6 +190,65 @@ describe("provisional grand planning mutations", () => {
         new Set(),
       ),
     ).toThrow("PLANNING_COMMERCIAL_CASE_NOT_ACTIVE");
+  });
+});
+
+describe("planning provision cleanup", () => {
+  it("removes every weekly provision allocation for the closed commercial affair", () => {
+    const otherCaseId = "44444444-4444-4444-8444-444444444444";
+    const source = {
+      ...createInitialPlanningPayload(),
+      provisionalAllocations: [
+        {
+          caseId: commercialCaseId,
+          activity: "BE" as const,
+          week: "2026-W39",
+          hours: 6,
+        },
+        {
+          caseId: commercialCaseId,
+          activity: "WORKSHOP" as const,
+          week: "2026-W40",
+          hours: 18,
+        },
+        {
+          caseId: otherCaseId,
+          activity: "INSTALL" as const,
+          week: "2026-W41",
+          hours: 12,
+        },
+      ],
+    };
+
+    const result = clearPlanningProvisionForCommercialCase(source, commercialCaseId);
+
+    expect(result.provisionalAllocations).toEqual([
+      {
+        caseId: otherCaseId,
+        activity: "INSTALL",
+        week: "2026-W41",
+        hours: 12,
+      },
+    ]);
+  });
+
+  it("is idempotent so reopening cannot restore an old weekly distribution", () => {
+    const source = {
+      ...createInitialPlanningPayload(),
+      provisionalAllocations: [
+        {
+          caseId: commercialCaseId,
+          activity: "WORKSHOP" as const,
+          week: "2026-W40",
+          hours: 20,
+        },
+      ],
+    };
+
+    const cleared = clearPlanningProvisionForCommercialCase(source, commercialCaseId);
+    const clearedAgain = clearPlanningProvisionForCommercialCase(cleared, commercialCaseId);
+
+    expect(clearedAgain.provisionalAllocations).toEqual([]);
   });
 });
 

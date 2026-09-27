@@ -186,6 +186,17 @@ export function convertPlanningProvisionToFirm(
   return parsePlanningPayload(payload);
 }
 
+export function clearPlanningProvisionForCommercialCase(
+  source: PlanningPayload,
+  commercialCaseId: string,
+): PlanningPayload {
+  const payload = structuredClone(parsePlanningPayload(source));
+  payload.provisionalAllocations = payload.provisionalAllocations.filter(
+    (allocation) => allocation.caseId !== commercialCaseId,
+  );
+  return parsePlanningPayload(payload);
+}
+
 export function applyPlanningPersonCapacityMutation(
   source: PlanningPayload,
   input: PlanningPersonCapacityMutation,
