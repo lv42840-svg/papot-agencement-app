@@ -148,6 +148,44 @@ export function applyPlanningProvisionalMutation(
   return parsePlanningPayload(payload);
 }
 
+export function convertPlanningProvisionToFirm(
+  source: PlanningPayload,
+  commercialCaseId: string,
+  chantierId: string,
+): PlanningPayload {
+  const payload = structuredClone(parsePlanningPayload(source));
+  const matching = payload.provisionalAllocations.filter(
+    (allocation) => allocation.caseId === commercialCaseId,
+  );
+
+  for (const allocation of matching) {
+    const key = allocationKey(chantierId, allocation.activity, allocation.week);
+    const existingIndex = payload.macroAllocations.findIndex(
+      (candidate) =>
+        allocationKey(candidate.chantierId, candidate.activity, candidate.week) === key,
+    );
+    const firmAllocation = {
+      chantierId,
+      activity: allocation.activity,
+      week: allocation.week,
+      hours: allocation.hours,
+    };
+
+    if (existingIndex >= 0) payload.macroAllocations[existingIndex] = firmAllocation;
+    else payload.macroAllocations.push(firmAllocation);
+  }
+
+  payload.provisionalAllocations = payload.provisionalAllocations.filter(
+    (allocation) => allocation.caseId !== commercialCaseId,
+  );
+  payload.chantierOrder = [
+    chantierId,
+    ...payload.chantierOrder.filter((candidate) => candidate !== chantierId),
+  ];
+
+  return parsePlanningPayload(payload);
+}
+
 export function applyPlanningPersonCapacityMutation(
   source: PlanningPayload,
   input: PlanningPersonCapacityMutation,
