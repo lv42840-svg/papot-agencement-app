@@ -12,13 +12,14 @@ export async function PATCH(request: Request) {
   if (typeof body?.planningPotentialCollapsed !== "boolean") {
     return NextResponse.json({ error: "Préférence invalide." }, { status: 400 });
   }
+  const planningPotentialCollapsed = body.planningPotentialCollapsed;
 
   await mutateAuthPayload(user.id, (payload) => {
     const target = payload.users.find(
       (candidate) => candidate.id === user.id && candidate.isActive,
     );
     if (!target) throw new Error("AUTH_USER_NOT_FOUND");
-    target.planningPotentialCollapsed = body.planningPotentialCollapsed;
+    target.planningPotentialCollapsed = planningPotentialCollapsed;
   });
 
   return NextResponse.json({ ok: true });
