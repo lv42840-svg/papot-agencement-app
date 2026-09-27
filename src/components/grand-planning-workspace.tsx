@@ -52,8 +52,13 @@ type PlanningSnapshot = {
   };
 };
 
-function cellKey(chantierId: string, activity: PlanningActivity, week: string) {
-  return `${chantierId}:${activity}:${week}`;
+function cellKey(
+  kind: "firm" | "provisional",
+  id: string,
+  activity: PlanningActivity,
+  week: string,
+) {
+  return `${kind}:${id}:${activity}:${week}`;
 }
 
 function weekLabel(week: string) {
@@ -135,7 +140,7 @@ export function GrandPlanningWorkspace({ initialYear }: { initialYear: number })
     return snapshot.provisionalRows
       .map((item) => ({
         ...item,
-        activities: item.activities.filter((activity) => activity.provisionHours !== 0),
+        activities: item.activities.filter((activity) => activity.remainingHours !== 0),
       }))
       .filter((item) => item.activities.length > 0);
   }, [snapshot]);
@@ -284,7 +289,7 @@ export function GrandPlanningWorkspace({ initialYear }: { initialYear: number })
     displayedValue: number,
   ) {
     if (!snapshot?.capabilities.canEditMacro) return;
-    const key = cellKey(chantierId, activity, week);
+    const key = cellKey("firm", chantierId, activity, week);
     const raw = drafts[key] ?? formatHours(displayedValue);
     const hours = parseHours(raw);
 
@@ -339,6 +344,68 @@ export function GrandPlanningWorkspace({ initialYear }: { initialYear: number })
     setMessage("Planning enregistré.");
   }
 
+  async function saveProvisionalCell(
+    caseId: string,
+    activity: PlanningActivity,
+    week: string,
+    displayedValue: number,
+  ) {
+    if (!snapshot?.capabilities.canEditMacro) return;
+    const key = cellKey("provisional", caseId, activity, week);
+    const raw = drafts[key] ?? formatHours(displayedValue);
+    const hours = parseHours(raw);
+
+    if (hours == null) {
+      setDrafts((current) => {
+        const next = { ...current };
+        delete next[key];
+        return next;
+      });
+      setMessage("Valeur invalide : saisissez un nombre d’heures positif.");
+      return;
+    }
+
+    if (hours === displayedValue) {
+      setDrafts((current) => {
+        const next = { ...current };
+        delete next[key];
+        return next;
+      });
+      return;
+    }
+
+    setSavingKey(key);
+    setMessage("Enregistrement du provisionnel…");
+    const response = await fetch("/api/desktop/planning", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        action: "setProvisionHours",
+        year: snapshot.year,
+        caseId,
+        activity,
+        week,
+        hours,
+      }),
+    });
+    const result = (await response.json()) as PlanningSnapshot & { error?: string };
+
+    if (!response.ok) {
+      setMessage(result.error ?? "Enregistrement impossible.");
+      setSavingKey(null);
+      return;
+    }
+
+    setSnapshot(result);
+    setDrafts((current) => {
+      const next = { ...current };
+      delete next[key];
+      return next;
+    });
+    setSavingKey(null);
+    setMessage("Charge provisionnelle enregistrée.");
+  }
+
   return (
     <div className="grandPlanningWorkspace">
       <div className="pageHeader grandPlanningHeader">
@@ -346,7 +413,7 @@ export function GrandPlanningWorkspace({ initialYear }: { initialYear: number })
           <p className="eyebrow">Planning</p>
           <h1>Grand planning {initialYear}</h1>
           <p className="muted">
-            Charge ferme des chantiers confirmés · BE / Atelier / Pose · saisie directe par semaine
+            Charges fermes et provisionnelles · BE / Atelier / Pose · saisie directe par semaine
           </p>
         </div>
         <div className="grandPlanningYearNav" aria-label="Navigation année">
@@ -424,7 +491,7 @@ export function GrandPlanningWorkspace({ initialYear }: { initialYear: number })
                   (total, item) =>
                     total +
                     item.activities.reduce(
-                      (subtotal, activity) => subtotal + activity.provisionHours,
+                      (subtotal, activity) => subtotal + activity.remainingHours,
                       0,
                     ),
                   0,
@@ -446,7 +513,7 @@ export function GrandPlanningWorkspace({ initialYear }: { initialYear: number })
                 <div>
                   {item.activities.map((activity) => (
                     <span key={activity.activity}>
-                      {activity.label} {formatHours(activity.provisionHours)} h
+                      {activity.label} {formatHours(activity.remainingHours)} h
                     </span>
                   ))}
                 </div>
@@ -480,71 +547,173 @@ export function GrandPlanningWorkspace({ initialYear }: { initialYear: number })
                 </tr>
               </thead>
               <tbody>
-                {snapshot.peopleCapacity.map((person) => (
-                  <tr key={person.userId}>
-                    <th scope="row">{person.displayName}</th>
-                    <td>
-                      <label className="planningCapacityToggle">
-                        <input
-                          type="checkbox"
-                          checked={person.countsInMacroCapacity}
-                          disabled={
-                            !snapshot.capabilities.canManageSchedules ||
-                            savingKey === `capacity:${person.userId}`
-                          }
-                          onChange={(event) =>
-                            void savePersonCapacity({
-                              ...person,
-                              countsInMacroCapacity: event.target.checked,
-                            })
-                          }
-                        />
-                        <span>{person.countsInMacroCapacity ? "Oui" : "Non"}</span>
-                      </label>
-                    </td>
-                    {WEEKDAYS.map(([day, label]) => {
-                      const key = scheduleDraftKey(person.userId, day);
-                      return (
-                        <td key={day}>
-                          <input
-                            aria-label={`${person.displayName} ${label}`}
-                            className="planningScheduleHours"
-                            disabled={
-                              !snapshot.capabilities.canManageSchedules ||
-                              savingKey === `capacity:${person.userId}`
-                            }
-                            inputMode="decimal"
-                            value={scheduleDrafts[key] ?? formatHours(person.weeklySchedule[day])}
-                            onChange={(event) =>
-                              setScheduleDrafts((current) => ({
-                                ...current,
-                                [key]: event.target.value,
-                              }))
-                            }
-                            onBlur={() => void saveScheduleDay(person, day)}
-                            onKeyDown={(event) => {
-                              if (event.key === "Enter") event.currentTarget.blur();
-                              if (event.key === "Escape") {
-                                setScheduleDrafts((current) => {
-                                  const next = { ...current };
-                                  delete next[key];
-                                  return next;
-                                });
-                                event.currentTarget.blur();
-                              }
-                            }}
-                          />
-                        </td>
-                      );
-                    })}
-                    <td className="planningScheduleTotal">
-                      {formatHours(
-                        Object.values(person.weeklySchedule).reduce((sum, hours) => sum + hours, 0),
-                      )}{" "}
-                      h
+                {snapshot.rows.length === 0 && snapshot.provisionalRows.length === 0 ? (
+                  <tr>
+                    <td className="planningEmpty" colSpan={snapshot.weeks.length + 4}>
+                      Aucun chantier ou affaire provisionnelle à planifier.
                     </td>
                   </tr>
-                ))}
+                ) : null}
+
+                {snapshot.rows.flatMap((chantier) =>
+                  chantier.activities.map((activity, activityIndex) => (
+                    <tr
+                      className={activityIndex === 0 ? "planningChantierStart" : undefined}
+                      key={`firm:${chantier.chantierId}:${activity.activity}`}
+                    >
+                      {activityIndex === 0 ? (
+                        <th
+                          className="planningSticky planningChantierCell"
+                          rowSpan={3}
+                          scope="rowgroup"
+                        >
+                          <strong>{chantier.name}</strong>
+                          {chantier.reference ? <span>{chantier.reference}</span> : null}
+                          <small>Pose prévue {chantier.plannedInstallDate}</small>
+                        </th>
+                      ) : null}
+                      <th className="planningSticky planningActivityCell" scope="row">
+                        {activity.label}
+                      </th>
+                      <td className="planningSticky planningMetricCell">
+                        {formatHours(activity.plannedHours)}
+                      </td>
+                      <td
+                        className={`planningSticky planningMetricCell planningRemainingCell ${
+                          activity.remainingHours > 0
+                            ? "isPositive"
+                            : activity.remainingHours < 0
+                              ? "isNegative"
+                              : "isZero"
+                        }`}
+                      >
+                        {formatHours(activity.remainingHours)}
+                      </td>
+                      {snapshot.weeks.map((week) => {
+                        const current = activity.weeklyHours[week] ?? 0;
+                        const key = cellKey("firm", chantier.chantierId, activity.activity, week);
+                        return (
+                          <td className="planningWeekCell" key={week}>
+                            <input
+                              aria-label={`${chantier.name} ${activity.label} ${week}`}
+                              className={savingKey === key ? "isSaving" : undefined}
+                              disabled={!snapshot.capabilities.canEditMacro || savingKey === key}
+                              inputMode="decimal"
+                              value={drafts[key] ?? (current === 0 ? "" : formatHours(current))}
+                              onChange={(event) =>
+                                setDrafts((currentDrafts) => ({
+                                  ...currentDrafts,
+                                  [key]: event.target.value,
+                                }))
+                              }
+                              onBlur={() =>
+                                void saveCell(
+                                  chantier.chantierId,
+                                  activity.activity,
+                                  week,
+                                  current,
+                                )
+                              }
+                              onKeyDown={(event) => {
+                                if (event.key === "Enter") event.currentTarget.blur();
+                                if (event.key === "Escape") {
+                                  setDrafts((currentDrafts) => {
+                                    const next = { ...currentDrafts };
+                                    delete next[key];
+                                    return next;
+                                  });
+                                  event.currentTarget.blur();
+                                }
+                              }}
+                            />
+                          </td>
+                        );
+                      })}
+                    </tr>
+                  )),
+                )}
+
+                {snapshot.provisionalRows.flatMap((item) =>
+                  item.activities.map((activity, activityIndex) => (
+                    <tr
+                      className={`planningProvisionRow ${
+                        activityIndex === 0 ? "planningProvisionStart" : ""
+                      }`}
+                      key={`provisional:${item.caseId}:${activity.activity}`}
+                    >
+                      {activityIndex === 0 ? (
+                        <th
+                          className="planningSticky planningChantierCell planningProvisionCaseCell"
+                          rowSpan={3}
+                          scope="rowgroup"
+                        >
+                          <strong>{item.name}</strong>
+                          <span>Provisionnel · {item.statusLabel}</span>
+                          {item.expectedConfirmationDate ? (
+                            <small>Confirmation prévue {item.expectedConfirmationDate}</small>
+                          ) : null}
+                        </th>
+                      ) : null}
+                      <th className="planningSticky planningActivityCell" scope="row">
+                        {activity.label}
+                      </th>
+                      <td className="planningSticky planningMetricCell">
+                        {formatHours(activity.provisionHours)}
+                      </td>
+                      <td
+                        className={`planningSticky planningMetricCell planningRemainingCell ${
+                          activity.remainingHours > 0
+                            ? "isPositive"
+                            : activity.remainingHours < 0
+                              ? "isNegative"
+                              : "isZero"
+                        }`}
+                      >
+                        {formatHours(activity.remainingHours)}
+                      </td>
+                      {snapshot.weeks.map((week) => {
+                        const current = activity.weeklyHours[week] ?? 0;
+                        const key = cellKey("provisional", item.caseId, activity.activity, week);
+                        return (
+                          <td className="planningWeekCell" key={week}>
+                            <input
+                              aria-label={`${item.name} provisionnel ${activity.label} ${week}`}
+                              className={savingKey === key ? "isSaving" : undefined}
+                              disabled={!snapshot.capabilities.canEditMacro || savingKey === key}
+                              inputMode="decimal"
+                              value={drafts[key] ?? (current === 0 ? "" : formatHours(current))}
+                              onChange={(event) =>
+                                setDrafts((currentDrafts) => ({
+                                  ...currentDrafts,
+                                  [key]: event.target.value,
+                                }))
+                              }
+                              onBlur={() =>
+                                void saveProvisionalCell(
+                                  item.caseId,
+                                  activity.activity,
+                                  week,
+                                  current,
+                                )
+                              }
+                              onKeyDown={(event) => {
+                                if (event.key === "Enter") event.currentTarget.blur();
+                                if (event.key === "Escape") {
+                                  setDrafts((currentDrafts) => {
+                                    const next = { ...currentDrafts };
+                                    delete next[key];
+                                    return next;
+                                  });
+                                  event.currentTarget.blur();
+                                }
+                              }}
+                            />
+                          </td>
+                        );
+                      })}
+                    </tr>
+                  )),
+                )}
               </tbody>
             </table>
           </div>
@@ -695,7 +864,10 @@ export function GrandPlanningWorkspace({ initialYear }: { initialYear: number })
             <strong>Prévu</strong> = volume chantier
           </span>
           <span>
-            <strong>À répartir</strong> = prévu − semaines déjà positionnées
+            <strong>À répartir</strong> = volume de référence − semaines déjà positionnées
+          </span>
+          <span>
+            <strong>Provisionnel</strong> = affaire non confirmée, affichée plus claire
           </span>
           {!snapshot?.capabilities.canEditMacro ? (
             <span className="planningReadOnly">Lecture seule</span>
@@ -780,7 +952,7 @@ export function GrandPlanningWorkspace({ initialYear }: { initialYear: number })
                         </td>
                         {snapshot.weeks.map((week) => {
                           const current = activity.weeklyHours[week] ?? 0;
-                          const key = cellKey(chantier.chantierId, activity.activity, week);
+                          const key = cellKey("firm", chantier.chantierId, activity.activity, week);
                           return (
                             <td className="planningWeekCell" key={week}>
                               <input
@@ -1224,6 +1396,32 @@ export function GrandPlanningWorkspace({ initialYear }: { initialYear: number })
         }
         .planningChantierStart > * {
           border-top: 1px solid #dcd5e8;
+        }
+        .planningProvisionStart > * {
+          border-top: 2px solid #d8cff0;
+        }
+        .planningProvisionRow > th,
+        .planningProvisionRow > td,
+        .planningProvisionRow .planningActivityCell,
+        .planningProvisionRow .planningMetricCell {
+          background: #faf8ff !important;
+        }
+        .planningProvisionRow .planningRemainingCell.isPositive {
+          background: #fff8fb !important;
+        }
+        .planningProvisionRow .planningRemainingCell.isNegative {
+          background: #f6f4fb !important;
+        }
+        .planningProvisionRow .planningWeekCell input {
+          color: #71698a;
+          font-weight: 600;
+        }
+        .planningProvisionRow .planningWeekCell input:hover:not(:disabled),
+        .planningProvisionRow .planningWeekCell input:focus {
+          background: #f2eefb;
+        }
+        .planningProvisionCaseCell {
+          background: #f5f1ff !important;
         }
         .planningEmpty {
           height: 160px;
