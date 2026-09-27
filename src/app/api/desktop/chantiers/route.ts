@@ -20,10 +20,7 @@ import {
   requireDesktopRequestContext,
 } from "@/lib/desktop/request-context";
 import { createPlanningRepository } from "@/lib/planning/create-repository";
-import {
-  closePlanningFirmChantier,
-  reopenPlanningFirmChantier,
-} from "@/lib/planning/mutations";
+import { closePlanningFirmChantier, reopenPlanningFirmChantier } from "@/lib/planning/mutations";
 import { createQuotesRepository } from "@/lib/quotes/create-repository";
 
 export const runtime = "nodejs";
@@ -55,12 +52,11 @@ async function snapshot(
 ) {
   const actor = { userId: owner.userId, displayName: owner.displayName };
   const baseCapabilities = chantierCapabilities(actor);
-  const [canLaunchSpecial, canCloseReopenSpecial, canArchiveSpecial] =
-    await Promise.all([
-      hasEffectiveSpecialPermission(user, "commercial.confirm_launch"),
-      hasEffectiveSpecialPermission(user, "chantiers.close_reopen"),
-      hasEffectiveSpecialPermission(user, "chantiers.archive_reactivate"),
-    ]);
+  const [canLaunchSpecial, canCloseReopenSpecial, canArchiveSpecial] = await Promise.all([
+    hasEffectiveSpecialPermission(user, "commercial.confirm_launch"),
+    hasEffectiveSpecialPermission(user, "chantiers.close_reopen"),
+    hasEffectiveSpecialPermission(user, "chantiers.archive_reactivate"),
+  ]);
   return {
     payload,
     actor,
