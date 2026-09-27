@@ -23,6 +23,7 @@ import {
 } from "@/lib/planning/domain";
 import {
   applyPlanningAbsenceMutation,
+  applyPlanningChantierOrderMutation,
   applyPlanningDeleteAbsenceMutation,
   applyPlanningFullWeekAbsenceMutation,
   applyPlanningMacroMutation,
@@ -181,6 +182,17 @@ export async function POST(request: Request) {
       );
       await planningRepository.mutate((payload) =>
         applyPlanningMacroMutation(payload, input, activeChantierIds),
+      );
+    } else if (input.action === "setChantierOrder") {
+      await requireSpecialPermission(context.user, "planning.edit_macro");
+      const chantiers = await createChantiersRepository(context).load();
+      const activeChantierIds = new Set(
+        chantiers.chantiers
+          .filter((chantier) => chantier.status === "ACTIVE")
+          .map((chantier) => chantier.id),
+      );
+      await planningRepository.mutate((payload) =>
+        applyPlanningChantierOrderMutation(payload, input, activeChantierIds),
       );
     } else if (input.action === "setProvisionHours") {
       await requireSpecialPermission(context.user, "planning.edit_macro");
