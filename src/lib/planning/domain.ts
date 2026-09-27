@@ -4,7 +4,7 @@ import {
   isCommercialActive,
   type CommercialPayload,
   type CommercialStatus,
-} from "@/lib/commercial/domain";
+} from "../commercial/domain";
 import type { ChantierRecord, ChantiersPayload } from "@/lib/chantiers/domain";
 import { planningPersonCapacitySchema } from "./capacity";
 
