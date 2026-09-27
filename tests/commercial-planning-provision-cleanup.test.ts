@@ -18,4 +18,10 @@ describe("commercial planning provision cleanup bridge", () => {
     expect(source).toContain('input.action === "reopen"');
     expect(source).toContain('stage = "clear-planning-provision"');
   });
+
+  it("syncs the shared potential order when commercial provision is edited", () => {
+    expect(source).toContain('input.action === "updateProvision"');
+    expect(source).toContain("syncPlanningPotentialOrderForCommercialCase");
+    expect(source).toContain('stage = "sync-planning-potential-order"');
+  });
 });
