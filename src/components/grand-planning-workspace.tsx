@@ -12,7 +12,9 @@ type WeeklyCapacity = {
   week: string;
   totalCapacityHours: number;
   firmLoadHours: number;
+  provisionalLoadHours: number;
   firmAvailableHours: number;
+  availableWithProvisionHours: number;
 };
 type PersonCapacity = {
   userId: string;
@@ -53,7 +55,11 @@ type PlanningSnapshot = {
 };
 
 function cellKey(chantierId: string, activity: PlanningActivity, week: string) {
-  return `${chantierId}:${activity}:${week}`;
+  return `firm:${chantierId}:${activity}:${week}`;
+}
+
+function provisionCellKey(caseId: string, activity: PlanningActivity, week: string) {
+  return `provision:${caseId}:${activity}:${week}`;
 }
 
 function weekLabel(week: string) {
@@ -80,6 +86,12 @@ function parseHours(value: string): number | null {
   const parsed = Number(normalized);
   if (!Number.isFinite(parsed) || parsed < 0) return null;
   return parsed;
+}
+
+function availabilityClass(value: number) {
+  if (value <= 0) return "planningWeekAvailable isNegative";
+  if (value < 39) return "planningWeekAvailable isTight";
+  return "planningWeekAvailable";
 }
 
 export function GrandPlanningWorkspace({ initialYear }: { initialYear: number }) {
@@ -135,7 +147,7 @@ export function GrandPlanningWorkspace({ initialYear }: { initialYear: number })
     return snapshot.provisionalRows
       .map((item) => ({
         ...item,
-        activities: item.activities.filter((activity) => activity.provisionHours !== 0),
+        activities: item.activities.filter((activity) => activity.remainingHours !== 0),
       }))
       .filter((item) => item.activities.length > 0);
   }, [snapshot]);
@@ -339,6 +351,68 @@ export function GrandPlanningWorkspace({ initialYear }: { initialYear: number })
     setMessage("Planning enregistré.");
   }
 
+  async function saveProvisionCell(
+    caseId: string,
+    activity: PlanningActivity,
+    week: string,
+    displayedValue: number,
+  ) {
+    if (!snapshot?.capabilities.canEditMacro) return;
+    const key = provisionCellKey(caseId, activity, week);
+    const raw = drafts[key] ?? formatHours(displayedValue);
+    const hours = parseHours(raw);
+
+    if (hours == null) {
+      setDrafts((current) => {
+        const next = { ...current };
+        delete next[key];
+        return next;
+      });
+      setMessage("Valeur invalide : saisissez un nombre d’heures positif.");
+      return;
+    }
+
+    if (hours === displayedValue) {
+      setDrafts((current) => {
+        const next = { ...current };
+        delete next[key];
+        return next;
+      });
+      return;
+    }
+
+    setSavingKey(key);
+    setMessage("Enregistrement de la provision…");
+    const response = await fetch("/api/desktop/planning", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        action: "setProvisionalHours",
+        year: snapshot.year,
+        caseId,
+        activity,
+        week,
+        hours,
+      }),
+    });
+    const result = (await response.json()) as PlanningSnapshot & { error?: string };
+
+    if (!response.ok) {
+      setMessage(result.error ?? "Enregistrement impossible.");
+      setSavingKey(null);
+      return;
+    }
+
+    setSnapshot(result);
+    setDrafts((current) => {
+      const next = { ...current };
+      delete next[key];
+      return next;
+    });
+    setSavingKey(null);
+    setMessage("Provision enregistrée.");
+  }
+
   return (
     <div className="grandPlanningWorkspace">
       <div className="pageHeader grandPlanningHeader">
@@ -346,7 +420,7 @@ export function GrandPlanningWorkspace({ initialYear }: { initialYear: number })
           <p className="eyebrow">Planning</p>
           <h1>Grand planning {initialYear}</h1>
           <p className="muted">
-            Charge ferme des chantiers confirmés · BE / Atelier / Pose · saisie directe par semaine
+            Charges fermes et provisionnelles · BE / Atelier / Pose · saisie directe par semaine
           </p>
         </div>
         <div className="grandPlanningYearNav" aria-label="Navigation année">
