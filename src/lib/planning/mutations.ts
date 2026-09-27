@@ -1,0 +1,53 @@
+import { z } from "zod";
+import {
+  allocationKey,
+  parsePlanningPayload,
+  planningActivitySchema,
+  type PlanningPayload,
+} from "./domain";
+
+const weekSchema = z.string().regex(/^\d{4}-W(?:0[1-9]|[1-4]\d|5[0-3])$/, "PLANNING_WEEK_INVALID");
+
+export const planningMacroMutationSchema = z.object({
+  action: z.literal("setMacroHours"),
+  chantierId: z.string().uuid(),
+  activity: planningActivitySchema,
+  week: weekSchema,
+  hours: z.number().finite().nonnegative().max(10_000),
+});
+
+export type PlanningMacroMutation = z.infer<typeof planningMacroMutationSchema>;
+
+export function applyPlanningMacroMutation(
+  source: PlanningPayload,
+  input: PlanningMacroMutation,
+  activeChantierIds: ReadonlySet<string>,
+): PlanningPayload {
+  if (!activeChantierIds.has(input.chantierId)) {
+    throw new Error("PLANNING_CHANTIER_NOT_ACTIVE");
+  }
+
+  const payload = structuredClone(parsePlanningPayload(source));
+  const key = allocationKey(input.chantierId, input.activity, input.week);
+  const index = payload.macroAllocations.findIndex(
+    (allocation) =>
+      allocationKey(allocation.chantierId, allocation.activity, allocation.week) === key,
+  );
+
+  if (input.hours === 0) {
+    if (index >= 0) payload.macroAllocations.splice(index, 1);
+    return parsePlanningPayload(payload);
+  }
+
+  const next = {
+    chantierId: input.chantierId,
+    activity: input.activity,
+    week: input.week,
+    hours: input.hours,
+  };
+
+  if (index >= 0) payload.macroAllocations[index] = next;
+  else payload.macroAllocations.push(next);
+
+  return parsePlanningPayload(payload);
+}

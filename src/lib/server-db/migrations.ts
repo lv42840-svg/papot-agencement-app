@@ -21,6 +21,8 @@ const COMPANY_PROFILE_STORAGE_VERSION = 8;
 const COMPANY_PROFILE_STORAGE_NAME = "company_profile_postgres_storage";
 const QUOTES_STORAGE_VERSION = 9;
 const QUOTES_STORAGE_NAME = "quotes_postgres_storage";
+const PLANNING_STORAGE_VERSION = 10;
+const PLANNING_STORAGE_NAME = "planning_postgres_storage";
 
 async function ensureMigrationRegistry(client: PoolClient): Promise<void> {
   await client.query(`
@@ -171,6 +173,27 @@ async function ensureQuotesStorage(client: PoolClient): Promise<void> {
   `);
 }
 
+async function ensurePlanningStorage(client: PoolClient): Promise<void> {
+  await client.query(`
+    CREATE TABLE IF NOT EXISTS papot_planning_state (
+      scope TEXT PRIMARY KEY CHECK (scope = 'global'),
+      version INTEGER NOT NULL DEFAULT 1 CHECK (version > 0),
+      payload JSONB NOT NULL CHECK (jsonb_typeof(payload) = 'object'),
+      updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+    )
+  `);
+
+  await client.query(`
+    INSERT INTO papot_planning_state (scope, version, payload)
+    VALUES (
+      'global',
+      1,
+      '{"schemaVersion":1,"macroAllocations":[],"chantierOrder":[]}'::jsonb
+    )
+    ON CONFLICT (scope) DO NOTHING
+  `);
+}
+
 async function ensureCompanyProfileStorage(client: PoolClient): Promise<void> {
   await client.query(`
     CREATE TABLE IF NOT EXISTS papot_company_profile (
@@ -282,6 +305,16 @@ export async function runServerDbMigrations(pool: Pool = getServerDbPool()): Pro
         ON CONFLICT (version) DO NOTHING
       `,
       [QUOTES_STORAGE_VERSION, QUOTES_STORAGE_NAME],
+    );
+
+    await ensurePlanningStorage(client);
+    await client.query(
+      `
+        INSERT INTO papot_schema_migrations (version, name)
+        VALUES ($1, $2)
+        ON CONFLICT (version) DO NOTHING
+      `,
+      [PLANNING_STORAGE_VERSION, PLANNING_STORAGE_NAME],
     );
 
     await client.query("COMMIT");
