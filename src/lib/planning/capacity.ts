@@ -1,4 +1,5 @@
 import { z } from "zod";
+import type { PlanningAbsence } from "./domain";
 
 const weekdayHoursSchema = z.object({
   monday: z.number().finite().nonnegative().max(24),
@@ -99,7 +100,7 @@ export function frenchNationalPublicHolidayIds(year: number): Set<string> {
   return ids;
 }
 
-function isoWeekDates(weekId: string): Date[] {
+export function isoWeekDates(weekId: string): Date[] {
   const match = /^(\d{4})-W(\d{2})$/.exec(weekId);
   if (!match) throw new Error("PLANNING_WEEK_INVALID");
   const year = Number(match[1]);
@@ -111,35 +112,51 @@ function isoWeekDates(weekId: string): Date[] {
   return Array.from({ length: 7 }, (_, index) => addUtcDays(monday, index));
 }
 
+export function scheduleHoursForDate(
+  schedule: PlanningPersonCapacity["weeklySchedule"],
+  date: Date,
+): number {
+  const holidays = frenchNationalPublicHolidayIds(date.getUTCFullYear());
+  if (holidays.has(dateId(date))) return 0;
+  const day = date.getUTCDay();
+  const index = day === 0 ? 6 : day - 1;
+  return schedule[WEEKDAY_KEYS[index]];
+}
+
 export function weeklyScheduleHoursForWeek(
   schedule: PlanningPersonCapacity["weeklySchedule"],
   weekId: string,
 ): number {
   const dates = isoWeekDates(weekId);
-  const holidayYears = new Map<number, Set<string>>();
-  return dates.reduce((sum, date, index) => {
-    const year = date.getUTCFullYear();
-    let holidays = holidayYears.get(year);
-    if (!holidays) {
-      holidays = frenchNationalPublicHolidayIds(year);
-      holidayYears.set(year, holidays);
-    }
-    return holidays.has(dateId(date)) ? sum : sum + schedule[WEEKDAY_KEYS[index]];
-  }, 0);
+  return dates.reduce((sum, date) => sum + scheduleHoursForDate(schedule, date), 0);
 }
 
 export function buildWeeklyCapacityIndicators(
   weeks: string[],
   people: PlanningPersonCapacity[],
   firmLoadByWeek: ReadonlyMap<string, number>,
+  absences: PlanningAbsence[] = [],
 ): PlanningWeekCapacity[] {
   const countedPeople = people.filter((person) => person.countsInMacroCapacity);
 
   return weeks.map((week) => {
-    const totalCapacityHours = countedPeople.reduce(
-      (sum, person) => sum + weeklyScheduleHoursForWeek(person.weeklySchedule, week),
-      0,
-    );
+    const dates = isoWeekDates(week);
+    const totalCapacityHours = countedPeople.reduce((sum, person) => {
+      const absencesByDate = new Map(
+        absences
+          .filter((absence) => absence.userId === person.userId)
+          .map((absence) => [absence.date, absence]),
+      );
+      return (
+        sum +
+        dates.reduce((personWeek, date) => {
+          const scheduled = scheduleHoursForDate(person.weeklySchedule, date);
+          const absence = absencesByDate.get(dateId(date));
+          const unavailable = absence ? Math.min(absence.hours, scheduled) : 0;
+          return personWeek + Math.max(0, scheduled - unavailable);
+        }, 0)
+      );
+    }, 0);
     const firmLoadHours = firmLoadByWeek.get(week) ?? 0;
     return {
       week,

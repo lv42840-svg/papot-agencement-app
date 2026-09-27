@@ -13,8 +13,15 @@ import {
   type PlanningPersonCapacity,
 } from "@/lib/planning/capacity";
 import { createPlanningRepository } from "@/lib/planning/create-repository";
-import { buildFirmGrandPlanningRows, planningYearWeekIds } from "@/lib/planning/domain";
 import {
+  buildFirmGrandPlanningRows,
+  PLANNING_ABSENCE_TYPE_LABELS,
+  planningYearWeekIds,
+} from "@/lib/planning/domain";
+import {
+  applyPlanningAbsenceMutation,
+  applyPlanningDeleteAbsenceMutation,
+  applyPlanningFullWeekAbsenceMutation,
   applyPlanningMacroMutation,
   applyPlanningPersonCapacityMutation,
   planningMutationSchema,
@@ -89,7 +96,20 @@ async function snapshot(
     year,
     weeks,
     rows,
-    weeklyCapacity: buildWeeklyCapacityIndicators(weeks, peopleCapacity, firmLoadByWeek),
+    weeklyCapacity: buildWeeklyCapacityIndicators(
+      weeks,
+      peopleCapacity,
+      firmLoadByWeek,
+      planning.absences,
+    ),
+    absences: planning.absences
+      .filter((absence) => absence.date.startsWith(String(year)))
+      .map((absence) => ({
+        ...absence,
+        displayName: userById.get(absence.userId)?.displayName ?? "Utilisateur",
+        typeLabel: PLANNING_ABSENCE_TYPE_LABELS[absence.type],
+      }))
+      .sort((left, right) => left.date.localeCompare(right.date)),
     peopleCapacity: peopleCapacity.map((person) => ({
       ...person,
       displayName: userById.get(person.userId)?.displayName ?? "Utilisateur",
@@ -144,9 +164,24 @@ export async function POST(request: Request) {
       const activeUserIds = new Set(
         auth.users.filter((candidate) => candidate.isActive).map((candidate) => candidate.id),
       );
-      await planningRepository.mutate((payload) =>
-        applyPlanningPersonCapacityMutation(payload, input, activeUserIds),
-      );
+
+      if (input.action === "setPersonCapacity") {
+        await planningRepository.mutate((payload) =>
+          applyPlanningPersonCapacityMutation(payload, input, activeUserIds),
+        );
+      } else if (input.action === "setAbsence") {
+        await planningRepository.mutate((payload) =>
+          applyPlanningAbsenceMutation(payload, input, activeUserIds),
+        );
+      } else if (input.action === "setFullWeekAbsence") {
+        await planningRepository.mutate((payload) =>
+          applyPlanningFullWeekAbsenceMutation(payload, input, activeUserIds),
+        );
+      } else {
+        await planningRepository.mutate((payload) =>
+          applyPlanningDeleteAbsenceMutation(payload, input),
+        );
+      }
     }
 
     return noStoreJson(await snapshot(year, true, context.user, context));

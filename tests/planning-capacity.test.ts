@@ -27,6 +27,56 @@ describe("grand planning weekly capacity", () => {
     expect(weeklyScheduleHoursForWeek(DEFAULT_WEEKLY_SCHEDULE, "2026-W20")).toBe(31.2);
   });
 
+  it("deducts recorded absences from weekly capacity", () => {
+    const indicators = buildWeeklyCapacityIndicators(
+      ["2026-W40"],
+      [
+        {
+          userId: lucienId,
+          countsInMacroCapacity: true,
+          weeklySchedule: DEFAULT_WEEKLY_SCHEDULE,
+        },
+      ],
+      new Map(),
+      [
+        {
+          id: "33333333-3333-4333-8333-333333333333",
+          userId: lucienId,
+          type: "VACATION",
+          date: "2026-09-28",
+          hours: 7.8,
+        },
+      ],
+    );
+
+    expect(indicators[0]?.totalCapacityHours).toBe(31.2);
+  });
+
+  it("caps an absence at the scheduled capacity of the day", () => {
+    const indicators = buildWeeklyCapacityIndicators(
+      ["2026-W40"],
+      [
+        {
+          userId: lucienId,
+          countsInMacroCapacity: true,
+          weeklySchedule: DEFAULT_WEEKLY_SCHEDULE,
+        },
+      ],
+      new Map(),
+      [
+        {
+          id: "33333333-3333-4333-8333-333333333333",
+          userId: lucienId,
+          type: "OTHER",
+          date: "2026-09-28",
+          hours: 12,
+        },
+      ],
+    );
+
+    expect(indicators[0]?.totalCapacityHours).toBe(31.2);
+  });
+
   it("includes only people explicitly counted in macro capacity", () => {
     const indicators = buildWeeklyCapacityIndicators(
       ["2026-W40"],

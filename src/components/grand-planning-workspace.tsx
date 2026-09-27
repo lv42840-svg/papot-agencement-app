@@ -24,12 +24,22 @@ type PersonCapacity = {
     sunday: number;
   };
 };
+type PlanningAbsence = {
+  id: string;
+  userId: string;
+  displayName: string;
+  type: "VACATION" | "SICK" | "OTHER";
+  typeLabel: string;
+  date: string;
+  hours: number;
+};
 type PlanningSnapshot = {
   year: number;
   weeks: string[];
   rows: GrandPlanningChantierRow[];
   weeklyCapacity: WeeklyCapacity[];
   peopleCapacity: PersonCapacity[];
+  absences: PlanningAbsence[];
   capabilities: {
     canRead: boolean;
     canEditMacro: boolean;
@@ -73,6 +83,12 @@ export function GrandPlanningWorkspace({ initialYear }: { initialYear: number })
   const [drafts, setDrafts] = useState<Record<string, string>>({});
   const [savingKey, setSavingKey] = useState<string | null>(null);
   const [scheduleDrafts, setScheduleDrafts] = useState<Record<string, string>>({});
+  const [absenceUserId, setAbsenceUserId] = useState("");
+  const [absenceType, setAbsenceType] = useState<PlanningAbsence["type"]>("VACATION");
+  const [absenceDate, setAbsenceDate] = useState(`${initialYear}-01-01`);
+  const [absenceHours, setAbsenceHours] = useState("7,8");
+  const [absenceWeek, setAbsenceWeek] = useState(`${initialYear}-W01`);
+  const [absenceEditId, setAbsenceEditId] = useState<string | null>(null);
 
   const load = useCallback(async () => {
     setMessage("Chargement du planning…");
@@ -85,6 +101,7 @@ export function GrandPlanningWorkspace({ initialYear }: { initialYear: number })
       return;
     }
     setSnapshot(result);
+    setAbsenceUserId((current) => current || result.peopleCapacity[0]?.userId || "");
     setMessage("");
   }, [initialYear]);
 
@@ -172,6 +189,77 @@ export function GrandPlanningWorkspace({ initialYear }: { initialYear: number })
     setSnapshot(result);
     setSavingKey(null);
     setMessage("Capacité enregistrée.");
+  }
+
+  async function postPlanningMutation(body: Record<string, unknown>, successMessage: string) {
+    if (!snapshot) return false;
+    setSavingKey("planning-mutation");
+    setMessage("Enregistrement…");
+    const response = await fetch("/api/desktop/planning", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ ...body, year: snapshot.year }),
+    });
+    const result = (await response.json()) as PlanningSnapshot & { error?: string };
+    if (!response.ok) {
+      setMessage(result.error ?? "Enregistrement impossible.");
+      setSavingKey(null);
+      return false;
+    }
+    setSnapshot(result);
+    setMessage(successMessage);
+    setSavingKey(null);
+    return true;
+  }
+
+  async function saveAbsence() {
+    if (!snapshot?.capabilities.canManageSchedules || !absenceUserId) return;
+    const hours = parseHours(absenceHours);
+    if (hours == null || hours <= 0 || hours > 24) {
+      setMessage("Absence invalide : saisissez entre 0 et 24 h.");
+      return;
+    }
+    const saved = await postPlanningMutation(
+      {
+        action: "setAbsence",
+        id: absenceEditId ?? undefined,
+        userId: absenceUserId,
+        type: absenceType,
+        date: absenceDate,
+        hours,
+      },
+      "Absence enregistrée.",
+    );
+    if (saved) {
+      setAbsenceEditId(null);
+    }
+  }
+
+  async function saveFullWeekAbsence() {
+    if (!snapshot?.capabilities.canManageSchedules || !absenceUserId) return;
+    const saved = await postPlanningMutation(
+      {
+        action: "setFullWeekAbsence",
+        userId: absenceUserId,
+        type: absenceType,
+        week: absenceWeek,
+      },
+      "Semaine d’absence enregistrée.",
+    );
+    if (saved) setAbsenceEditId(null);
+  }
+
+  async function deleteAbsence(absenceId: string) {
+    if (!snapshot?.capabilities.canManageSchedules) return;
+    await postPlanningMutation({ action: "deleteAbsence", absenceId }, "Absence supprimée.");
+  }
+
+  function editAbsence(absence: PlanningAbsence) {
+    setAbsenceEditId(absence.id);
+    setAbsenceUserId(absence.userId);
+    setAbsenceType(absence.type);
+    setAbsenceDate(absence.date);
+    setAbsenceHours(formatHours(absence.hours));
   }
 
   async function saveCell(
@@ -397,6 +485,144 @@ export function GrandPlanningWorkspace({ initialYear }: { initialYear: number })
         </section>
       ) : null}
 
+      {snapshot ? (
+        <section className="planningAbsenceSettings">
+          <div className="planningCapacitySettingsHeader">
+            <div>
+              <p className="eyebrow">Indisponibilités</p>
+              <h2>Congés, arrêts et autres absences</h2>
+            </div>
+            {!snapshot.capabilities.canManageSchedules ? (
+              <span className="planningReadOnly">Lecture seule</span>
+            ) : null}
+          </div>
+
+          <div className="planningAbsenceForm">
+            <label>
+              Personne
+              <select
+                value={absenceUserId}
+                disabled={!snapshot.capabilities.canManageSchedules}
+                onChange={(event) => setAbsenceUserId(event.target.value)}
+              >
+                {snapshot.peopleCapacity.map((person) => (
+                  <option key={person.userId} value={person.userId}>
+                    {person.displayName}
+                  </option>
+                ))}
+              </select>
+            </label>
+            <label>
+              Type
+              <select
+                value={absenceType}
+                disabled={!snapshot.capabilities.canManageSchedules}
+                onChange={(event) => setAbsenceType(event.target.value as PlanningAbsence["type"])}
+              >
+                <option value="VACATION">Congés</option>
+                <option value="SICK">Arrêt</option>
+                <option value="OTHER">Autre</option>
+              </select>
+            </label>
+            <label>
+              Date
+              <input
+                type="date"
+                value={absenceDate}
+                disabled={!snapshot.capabilities.canManageSchedules}
+                onChange={(event) => setAbsenceDate(event.target.value)}
+              />
+            </label>
+            <label>
+              Heures
+              <input
+                className="planningAbsenceHours"
+                inputMode="decimal"
+                value={absenceHours}
+                disabled={!snapshot.capabilities.canManageSchedules}
+                onChange={(event) => setAbsenceHours(event.target.value)}
+              />
+            </label>
+            <button
+              className="secondaryButton"
+              type="button"
+              disabled={
+                !snapshot.capabilities.canManageSchedules || savingKey === "planning-mutation"
+              }
+              onClick={() => void saveAbsence()}
+            >
+              {absenceEditId ? "Modifier l’absence" : "Ajouter l’absence"}
+            </button>
+            {absenceEditId ? (
+              <button
+                className="secondaryButton"
+                type="button"
+                onClick={() => setAbsenceEditId(null)}
+              >
+                Annuler
+              </button>
+            ) : null}
+          </div>
+
+          <div className="planningFullWeekForm">
+            <label>
+              Semaine complète
+              <input
+                type="week"
+                value={absenceWeek}
+                disabled={!snapshot.capabilities.canManageSchedules}
+                onChange={(event) => setAbsenceWeek(event.target.value)}
+              />
+            </label>
+            <button
+              className="secondaryButton"
+              type="button"
+              disabled={
+                !snapshot.capabilities.canManageSchedules || savingKey === "planning-mutation"
+              }
+              onClick={() => void saveFullWeekAbsence()}
+            >
+              Mettre toute la semaine en absence
+            </button>
+          </div>
+
+          <div className="planningAbsenceList">
+            {snapshot.absences.length === 0 ? (
+              <p className="muted">Aucune absence enregistrée sur {snapshot.year}.</p>
+            ) : (
+              snapshot.absences.map((absence) => (
+                <div className="planningAbsenceRow" key={absence.id}>
+                  <div>
+                    <strong>{absence.displayName}</strong>
+                    <span>{absence.date}</span>
+                    <span>{absence.typeLabel}</span>
+                    <span>{formatHours(absence.hours)} h</span>
+                  </div>
+                  {snapshot.capabilities.canManageSchedules ? (
+                    <div className="planningAbsenceActions">
+                      <button
+                        className="secondaryButton"
+                        type="button"
+                        onClick={() => editAbsence(absence)}
+                      >
+                        Modifier
+                      </button>
+                      <button
+                        className="secondaryButton"
+                        type="button"
+                        onClick={() => void deleteAbsence(absence.id)}
+                      >
+                        Supprimer
+                      </button>
+                    </div>
+                  ) : null}
+                </div>
+              ))
+            )}
+          </div>
+        </section>
+      ) : null}
+
       <section className="panel grandPlanningPanel">
         <div className="grandPlanningLegend">
           <span>
@@ -604,6 +830,67 @@ export function GrandPlanningWorkspace({ initialYear }: { initialYear: number })
         .planningScheduleTotal {
           min-width: 58px;
           font-weight: 800;
+        }
+        .planningAbsenceSettings {
+          margin-bottom: 14px;
+          padding: 14px 16px;
+          background: #fff;
+          border: 1px solid var(--border);
+          border-radius: 11px;
+        }
+        .planningAbsenceForm,
+        .planningFullWeekForm {
+          display: flex;
+          align-items: end;
+          gap: 8px;
+          flex-wrap: wrap;
+          margin-top: 10px;
+        }
+        .planningAbsenceForm label,
+        .planningFullWeekForm label {
+          display: grid;
+          gap: 4px;
+          color: var(--muted);
+          font-size: 10px;
+          font-weight: 700;
+        }
+        .planningAbsenceForm select,
+        .planningAbsenceForm input,
+        .planningFullWeekForm input {
+          min-height: 32px;
+          min-width: 130px;
+        }
+        .planningAbsenceHours {
+          width: 72px;
+          min-width: 72px !important;
+        }
+        .planningAbsenceList {
+          display: grid;
+          gap: 6px;
+          margin-top: 12px;
+        }
+        .planningAbsenceRow {
+          display: flex;
+          align-items: center;
+          justify-content: space-between;
+          gap: 12px;
+          padding: 7px 8px;
+          border: 1px solid #eeeaf4;
+          border-radius: 8px;
+          font-size: 11px;
+        }
+        .planningAbsenceRow > div:first-child {
+          display: flex;
+          gap: 10px;
+          align-items: center;
+          flex-wrap: wrap;
+        }
+        .planningAbsenceRow span {
+          color: var(--muted);
+        }
+        .planningAbsenceActions {
+          display: flex;
+          gap: 6px;
         }
         .planningUnallocatedPanel {
           margin-bottom: 14px;
