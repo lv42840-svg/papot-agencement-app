@@ -73,7 +73,6 @@ function chantiersPayload(): ChantiersPayload {
   };
 }
 
-
 function commercialPayload(): CommercialPayload {
   const base = {
     sourceEntryId: null,
@@ -165,7 +164,6 @@ describe("grand planning domain", () => {
     expect(rows[0]?.activities.map((item) => item.activity)).toEqual(["BE", "WORKSHOP", "INSTALL"]);
     expect(rows[0]?.activities.map((item) => item.plannedHours)).toEqual([10, 20, 30]);
   });
-
 
   it("builds provision rows only from active non-confirmed commercial affairs with hours", () => {
     const rows = buildCommercialProvisionRows(commercialPayload());
