@@ -95,6 +95,7 @@ describe("grand planning domain", () => {
       schemaVersion: 1,
       chantierOrder: [],
       peopleCapacity: [],
+      absences: [],
       macroAllocations: [
         {
           chantierId: activeId,
@@ -128,6 +129,7 @@ describe("grand planning domain", () => {
       schemaVersion: 1,
       chantierOrder: [],
       peopleCapacity: [],
+      absences: [],
       macroAllocations: [
         { chantierId: activeId, activity: "BE", week: "2026-W52", hours: 4 },
         { chantierId: activeId, activity: "BE", week: "2027-W01", hours: 2 },
