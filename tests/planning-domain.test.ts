@@ -304,6 +304,7 @@ describe("grand planning domain", () => {
     const planning: PlanningPayload = {
       schemaVersion: 1,
       chantierOrder: [],
+      provisionalOrder: [],
       peopleCapacity: [],
       absences: [],
       provisionalAllocations: [],
