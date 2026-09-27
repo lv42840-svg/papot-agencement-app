@@ -4,6 +4,7 @@ import { hasEffectiveSpecialPermission, requireSpecialPermission } from "@/lib/a
 import { readAuthPayload } from "@/lib/auth/store";
 import { createChantiersRepository } from "@/lib/chantiers/create-repository";
 import { createCommercialRepository } from "@/lib/commercial/create-repository";
+import { isCommercialActive } from "@/lib/commercial/domain";
 import {
   desktopRequestErrorStatus,
   requireDesktopRequestContext,
@@ -26,6 +27,7 @@ import {
   applyPlanningFullWeekAbsenceMutation,
   applyPlanningMacroMutation,
   applyPlanningPersonCapacityMutation,
+  applyPlanningProvisionalMutation,
   planningMutationSchema,
 } from "@/lib/planning/mutations";
 
@@ -43,7 +45,12 @@ function noStoreJson(body: unknown, init?: ResponseInit) {
 function statusFor(code: string): number {
   const requestStatus = desktopRequestErrorStatus(code);
   if (requestStatus) return requestStatus;
-  if (code === "PLANNING_CHANTIER_NOT_ACTIVE" || code === "PLANNING_USER_NOT_ACTIVE") return 409;
+  if (
+    code === "PLANNING_CHANTIER_NOT_ACTIVE" ||
+    code === "PLANNING_COMMERCIAL_CASE_NOT_ACTIVE" ||
+    code === "PLANNING_USER_NOT_ACTIVE"
+  )
+    return 409;
   if (code.includes("VERSION_CONFLICT")) return 409;
   if (code.includes("INVALID")) return 400;
   return 400;
@@ -83,13 +90,22 @@ async function snapshot(
     ]);
   const weeks = planningYearWeekIds(year);
   const rows = buildFirmGrandPlanningRows(chantiers, planning, year);
-  const provisionalRows = buildCommercialProvisionRows(commercial);
+  const provisionalRows = buildCommercialProvisionRows(commercial, planning, year);
   const firmLoadByWeek = new Map<string, number>();
+  const provisionalLoadByWeek = new Map<string, number>();
 
   for (const row of rows) {
     for (const activity of row.activities) {
       for (const [week, hours] of Object.entries(activity.weeklyHours)) {
         firmLoadByWeek.set(week, (firmLoadByWeek.get(week) ?? 0) + hours);
+      }
+    }
+  }
+
+  for (const row of provisionalRows) {
+    for (const activity of row.activities) {
+      for (const [week, hours] of Object.entries(activity.weeklyHours)) {
+        provisionalLoadByWeek.set(week, (provisionalLoadByWeek.get(week) ?? 0) + hours);
       }
     }
   }
@@ -107,6 +123,7 @@ async function snapshot(
       peopleCapacity,
       firmLoadByWeek,
       planning.absences,
+      provisionalLoadByWeek,
     ),
     absences: planning.absences
       .filter((absence) => absence.date.startsWith(String(year)))
@@ -163,6 +180,15 @@ export async function POST(request: Request) {
       );
       await planningRepository.mutate((payload) =>
         applyPlanningMacroMutation(payload, input, activeChantierIds),
+      );
+    } else if (input.action === "setProvisionalHours") {
+      await requireSpecialPermission(context.user, "planning.edit_macro");
+      const commercial = await createCommercialRepository(context).load();
+      const activeCommercialCaseIds = new Set(
+        commercial.cases.filter(isCommercialActive).map((item) => item.id),
+      );
+      await planningRepository.mutate((payload) =>
+        applyPlanningProvisionalMutation(payload, input, activeCommercialCaseIds),
       );
     } else {
       await requireSpecialPermission(context.user, "planning.manage_schedules");

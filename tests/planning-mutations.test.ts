@@ -6,6 +6,9 @@ import {
   applyPlanningFullWeekAbsenceMutation,
   applyPlanningMacroMutation,
   applyPlanningPersonCapacityMutation,
+  applyPlanningProvisionalMutation,
+  convertPlanningProvisionToFirm,
+  removePlanningProvisionalAllocationsForCases,
 } from "../src/lib/planning/mutations";
 
 const chantierId = "11111111-1111-4111-8111-111111111111";
@@ -104,6 +107,129 @@ describe("grand planning mutations", () => {
         new Set(),
       ),
     ).toThrow("PLANNING_CHANTIER_NOT_ACTIVE");
+  });
+});
+
+describe("planning provisional allocation mutations", () => {
+  const caseId = "44444444-4444-4444-8444-444444444444";
+  const activeCases = new Set([caseId]);
+
+  it("sets, replaces and removes a provisional weekly cell", () => {
+    const first = applyPlanningProvisionalMutation(
+      createInitialPlanningPayload(),
+      {
+        action: "setProvisionalHours",
+        caseId,
+        activity: "WORKSHOP",
+        week: "2026-W40",
+        hours: 20,
+      },
+      activeCases,
+    );
+    const replaced = applyPlanningProvisionalMutation(
+      first,
+      {
+        action: "setProvisionalHours",
+        caseId,
+        activity: "WORKSHOP",
+        week: "2026-W40",
+        hours: 30,
+      },
+      activeCases,
+    );
+    const cleared = applyPlanningProvisionalMutation(
+      replaced,
+      {
+        action: "setProvisionalHours",
+        caseId,
+        activity: "WORKSHOP",
+        week: "2026-W40",
+        hours: 0,
+      },
+      activeCases,
+    );
+
+    expect(replaced.provisionalAllocations).toEqual([
+      {
+        caseId,
+        activity: "WORKSHOP",
+        week: "2026-W40",
+        hours: 30,
+      },
+    ]);
+    expect(cleared.provisionalAllocations).toEqual([]);
+  });
+
+  it("allows a provisional cell to exceed the commercial provision balance", () => {
+    const result = applyPlanningProvisionalMutation(
+      createInitialPlanningPayload(),
+      {
+        action: "setProvisionalHours",
+        caseId,
+        activity: "INSTALL",
+        week: "2026-W40",
+        hours: 500,
+      },
+      activeCases,
+    );
+
+    expect(result.provisionalAllocations[0]?.hours).toBe(500);
+  });
+
+  it("refuses to plan an inactive commercial affair", () => {
+    expect(() =>
+      applyPlanningProvisionalMutation(
+        createInitialPlanningPayload(),
+        {
+          action: "setProvisionalHours",
+          caseId,
+          activity: "BE",
+          week: "2026-W40",
+          hours: 4,
+        },
+        new Set(),
+      ),
+    ).toThrow("PLANNING_COMMERCIAL_CASE_NOT_ACTIVE");
+  });
+
+  it("purges provisional allocations when an affair is lost", () => {
+    const source = createInitialPlanningPayload();
+    source.provisionalAllocations = [
+      { caseId, activity: "BE", week: "2026-W40", hours: 4 },
+      {
+        caseId: "55555555-5555-4555-8555-555555555555",
+        activity: "BE",
+        week: "2026-W40",
+        hours: 8,
+      },
+    ];
+
+    const result = removePlanningProvisionalAllocationsForCases(source, new Set([caseId]));
+
+    expect(result.provisionalAllocations).toEqual([
+      {
+        caseId: "55555555-5555-4555-8555-555555555555",
+        activity: "BE",
+        week: "2026-W40",
+        hours: 8,
+      },
+    ]);
+  });
+
+  it("converts an existing provisional schedule to firm without moving weeks", () => {
+    const source = createInitialPlanningPayload();
+    source.provisionalAllocations = [
+      { caseId, activity: "BE", week: "2026-W40", hours: 4 },
+      { caseId, activity: "WORKSHOP", week: "2026-W41", hours: 12 },
+    ];
+
+    const result = convertPlanningProvisionToFirm(source, caseId);
+
+    expect(result.provisionalAllocations).toEqual([]);
+    expect(result.macroAllocations).toEqual([
+      { chantierId: caseId, activity: "BE", week: "2026-W40", hours: 4 },
+      { chantierId: caseId, activity: "WORKSHOP", week: "2026-W41", hours: 12 },
+    ]);
   });
 });
 

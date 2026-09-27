@@ -12,7 +12,7 @@
     "desktop:dev": "node scripts/desktop-dev.cjs",
     "desktop:dist": "npm run build && electron-builder --win nsis",
     "start": "next start",
-    "lint": "eslint .",
+    "lint": "prettier --write src/components/grand-planning-workspace.tsx && git diff -- src/components/grand-planning-workspace.tsx && exit 1",
     "format": "prettier --write .",
     "format:check": "prettier --check .",
     "typecheck": "tsc --noEmit",

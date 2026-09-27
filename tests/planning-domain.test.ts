@@ -166,7 +166,16 @@ describe("grand planning domain", () => {
   });
 
   it("builds provision rows only from active non-confirmed commercial affairs with hours", () => {
-    const rows = buildCommercialProvisionRows(commercialPayload());
+    const planning = createInitialPlanningPayload();
+    planning.provisionalAllocations = [
+      {
+        caseId: "33333333-3333-4333-8333-333333333333",
+        activity: "WORKSHOP",
+        week: "2026-W40",
+        hours: 6,
+      },
+    ];
+    const rows = buildCommercialProvisionRows(commercialPayload(), planning, 2026);
 
     expect(rows).toHaveLength(1);
     expect(rows[0]).toMatchObject({
@@ -176,10 +185,56 @@ describe("grand planning domain", () => {
       statusLabel: "Piste",
     });
     expect(rows[0]?.activities).toEqual([
-      { activity: "BE", label: "BE", provisionHours: 5 },
-      { activity: "WORKSHOP", label: "Atelier", provisionHours: 20 },
-      { activity: "INSTALL", label: "Pose", provisionHours: 8 },
+      {
+        activity: "BE",
+        label: "BE",
+        provisionHours: 5,
+        allocatedHours: 0,
+        remainingHours: 5,
+        weeklyHours: {},
+      },
+      {
+        activity: "WORKSHOP",
+        label: "Atelier",
+        provisionHours: 20,
+        allocatedHours: 6,
+        remainingHours: 14,
+        weeklyHours: { "2026-W40": 6 },
+      },
+      {
+        activity: "INSTALL",
+        label: "Pose",
+        provisionHours: 8,
+        allocatedHours: 0,
+        remainingHours: 8,
+        weeklyHours: {},
+      },
     ]);
+  });
+
+  it("allows provisional over-allocation and keeps allocations from other years in the balance", () => {
+    const planning = createInitialPlanningPayload();
+    planning.provisionalAllocations = [
+      {
+        caseId: "33333333-3333-4333-8333-333333333333",
+        activity: "BE",
+        week: "2026-W52",
+        hours: 4,
+      },
+      {
+        caseId: "33333333-3333-4333-8333-333333333333",
+        activity: "BE",
+        week: "2027-W01",
+        hours: 3,
+      },
+    ];
+
+    const be = buildCommercialProvisionRows(commercialPayload(), planning, 2026)[0]?.activities[0];
+
+    expect(be?.provisionHours).toBe(5);
+    expect(be?.allocatedHours).toBe(7);
+    expect(be?.remainingHours).toBe(-2);
+    expect(be?.weeklyHours).toEqual({ "2026-W52": 4 });
   });
 
   it("calculates à répartir from the full allocation and allows a negative balance", () => {
@@ -188,6 +243,7 @@ describe("grand planning domain", () => {
       chantierOrder: [],
       peopleCapacity: [],
       absences: [],
+      provisionalAllocations: [],
       macroAllocations: [
         {
           chantierId: activeId,
@@ -222,6 +278,7 @@ describe("grand planning domain", () => {
       chantierOrder: [],
       peopleCapacity: [],
       absences: [],
+      provisionalAllocations: [],
       macroAllocations: [
         { chantierId: activeId, activity: "BE", week: "2026-W52", hours: 4 },
         { chantierId: activeId, activity: "BE", week: "2027-W01", hours: 2 },

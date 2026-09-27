@@ -22,7 +22,9 @@ export type PlanningWeekCapacity = {
   week: string;
   totalCapacityHours: number;
   firmLoadHours: number;
+  provisionalLoadHours: number;
   firmAvailableHours: number;
+  availableWithProvisionHours: number;
 };
 
 export const DEFAULT_WEEKLY_SCHEDULE = {
@@ -136,6 +138,7 @@ export function buildWeeklyCapacityIndicators(
   people: PlanningPersonCapacity[],
   firmLoadByWeek: ReadonlyMap<string, number>,
   absences: PlanningAbsence[] = [],
+  provisionalLoadByWeek: ReadonlyMap<string, number> = new Map(),
 ): PlanningWeekCapacity[] {
   const countedPeople = people.filter((person) => person.countsInMacroCapacity);
 
@@ -158,11 +161,15 @@ export function buildWeeklyCapacityIndicators(
       );
     }, 0);
     const firmLoadHours = firmLoadByWeek.get(week) ?? 0;
+    const provisionalLoadHours = provisionalLoadByWeek.get(week) ?? 0;
+    const firmAvailableHours = totalCapacityHours - firmLoadHours;
     return {
       week,
       totalCapacityHours,
       firmLoadHours,
-      firmAvailableHours: totalCapacityHours - firmLoadHours,
+      provisionalLoadHours,
+      firmAvailableHours,
+      availableWithProvisionHours: firmAvailableHours - provisionalLoadHours,
     };
   });
 }

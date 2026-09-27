@@ -15,6 +15,7 @@ import {
 import { createCommercialRepository } from "@/lib/commercial/create-repository";
 import {
   applyCommercialAutomaticTransitions,
+  isCommercialClosed,
   type CommercialPayload,
 } from "@/lib/commercial/domain";
 import {
@@ -29,6 +30,8 @@ import {
   desktopRequestErrorStatus,
   requireDesktopRequestContext,
 } from "@/lib/desktop/request-context";
+import { createPlanningRepository } from "@/lib/planning/create-repository";
+import { removePlanningProvisionalAllocationsForCases } from "@/lib/planning/mutations";
 import { createQuotesRepository } from "@/lib/quotes/create-repository";
 import {
   validateAdditionalRetainedQuote,
@@ -267,6 +270,17 @@ export async function POST(request: Request) {
 
     stage = "apply-and-save-mutation";
     const mutation = await repository.mutate(buildMutation);
+
+    const focusedCase = mutation.focusCaseId
+      ? mutation.payload.cases.find((item) => item.id === mutation.focusCaseId)
+      : null;
+    if (focusedCase && isCommercialClosed(focusedCase)) {
+      stage = "purge-planning-provision";
+      await createPlanningRepository().mutate((payload) =>
+        removePlanningProvisionalAllocationsForCases(payload, new Set([focusedCase.id])),
+      );
+    }
+
     console.info("[PAPOT][Commercial] POST saved", { ms: Date.now() - startedAt });
     return noStoreJson(
       await snapshot(

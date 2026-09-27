@@ -13,8 +13,16 @@ const uiSource = readFileSync(
 describe("grand planning commercial provision bridge", () => {
   it("loads commercial provisions into the planning snapshot without storing totals in planning", () => {
     expect(apiSource).toContain("createCommercialRepository(context).load()");
-    expect(apiSource).toContain("buildCommercialProvisionRows(commercial)");
+    expect(apiSource).toContain("buildCommercialProvisionRows(commercial, planning, year)");
     expect(apiSource).toContain("provisionalRows");
+  });
+
+  it("wires weekly provisional editing into the same grand planning grid", () => {
+    expect(apiSource).toContain('input.action === "setProvisionalHours"');
+    expect(uiSource).toContain('action: "setProvisionalHours"');
+    expect(uiSource).toContain("POTENTIEL");
+    expect(uiSource).toContain("planningPotentialWeekCell");
+    expect(uiSource).toContain("Dispo F+P");
   });
 
   it("shows a separate unallocated provision panel and keeps it distinct from firm load", () => {

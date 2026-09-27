@@ -102,7 +102,34 @@ describe("grand planning weekly capacity", () => {
       week: "2026-W40",
       totalCapacityHours: 39,
       firmLoadHours: 30,
+      provisionalLoadHours: 0,
       firmAvailableHours: 9,
+      availableWithProvisionHours: 9,
+    });
+  });
+
+  it("keeps firm availability separate from availability with provision", () => {
+    const indicators = buildWeeklyCapacityIndicators(
+      ["2026-W40"],
+      [
+        {
+          userId: lucienId,
+          countsInMacroCapacity: true,
+          weeklySchedule: DEFAULT_WEEKLY_SCHEDULE,
+        },
+      ],
+      new Map([["2026-W40", 20]]),
+      [],
+      new Map([["2026-W40", 15]]),
+    );
+
+    expect(indicators[0]).toEqual({
+      week: "2026-W40",
+      totalCapacityHours: 39,
+      firmLoadHours: 20,
+      provisionalLoadHours: 15,
+      firmAvailableHours: 19,
+      availableWithProvisionHours: 4,
     });
   });
 
