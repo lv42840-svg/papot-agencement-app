@@ -1355,6 +1355,9 @@ export function GrandPlanningWorkspace({ initialYear }: { initialYear: number })
         .planningWeekAvailable {
           color: #39714c;
         }
+        .planningWeekAvailable.isTight {
+          color: #a76b18;
+        }
         .planningWeekAvailable.isNegative {
           color: #b34435;
         }
@@ -1394,6 +1397,33 @@ export function GrandPlanningWorkspace({ initialYear }: { initialYear: number })
         }
         .planningWeekCell input.isSaving {
           background: #f2effb;
+        }
+        .planningPotentialSeparator th {
+          height: 30px;
+          padding: 0 10px;
+          border-top: 2px solid #cfc5ef;
+          border-bottom: 2px solid #cfc5ef;
+          background: #eee9fb !important;
+          color: #6e5db7;
+          text-align: left;
+          font-size: 10px;
+          font-weight: 850;
+          letter-spacing: 0.08em;
+        }
+        .planningPotentialCell {
+          background: #faf8ff !important;
+        }
+        .planningPotentialWeekCell {
+          background: #fcfbff !important;
+        }
+        .planningPotentialWeekCell input {
+          background: rgb(247 244 255 / 0.62);
+        }
+        .planningPotentialCell.planningRemainingCell.isPositive {
+          background: #fff9fb !important;
+        }
+        .planningPotentialCell.planningRemainingCell.isNegative {
+          background: #f7f4ff !important;
         }
         .planningChantierStart > * {
           border-top: 1px solid #dcd5e8;
