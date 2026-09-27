@@ -9,6 +9,8 @@ import {
   applyPlanningPersonCapacityMutation,
   applyPlanningPotentialOrderMutation,
   applyPlanningProvisionalMutation,
+  removeFirmPlanningForChantier,
+  restoreFirmPlanningOrderForChantier,
   clearPlanningProvisionForCommercialCase,
   convertPlanningProvisionToFirm,
   syncPlanningPotentialOrderForCommercialCase,
@@ -111,6 +113,56 @@ describe("grand planning mutations", () => {
         new Set(),
       ),
     ).toThrow("PLANNING_CHANTIER_NOT_ACTIVE");
+  });
+});
+
+describe("planning chantier lifecycle bridge", () => {
+  it("removes all active firm allocations and the shared order when a chantier is closed", () => {
+    const otherChantierId = "33333333-3333-4333-8333-333333333333";
+    const source = {
+      ...createInitialPlanningPayload(),
+      chantierOrder: [chantierId, otherChantierId],
+      macroAllocations: [
+        { chantierId, activity: "BE" as const, week: "2026-W40", hours: 8 },
+        { chantierId, activity: "WORKSHOP" as const, week: "2026-W41", hours: 20 },
+        { chantierId: otherChantierId, activity: "INSTALL" as const, week: "2026-W42", hours: 12 },
+      ],
+    };
+
+    const result = removeFirmPlanningForChantier(source, chantierId);
+
+    expect(result.chantierOrder).toEqual([otherChantierId]);
+    expect(result.macroAllocations).toEqual([
+      {
+        chantierId: otherChantierId,
+        activity: "INSTALL",
+        week: "2026-W42",
+        hours: 12,
+      },
+    ]);
+  });
+
+  it("reopens a chantier at the top without restoring any old weekly allocation", () => {
+    const otherChantierId = "33333333-3333-4333-8333-333333333333";
+    const source = {
+      ...createInitialPlanningPayload(),
+      chantierOrder: [otherChantierId],
+      macroAllocations: [
+        { chantierId: otherChantierId, activity: "INSTALL" as const, week: "2026-W42", hours: 12 },
+      ],
+    };
+
+    const result = restoreFirmPlanningOrderForChantier(source, chantierId);
+
+    expect(result.chantierOrder).toEqual([chantierId, otherChantierId]);
+    expect(result.macroAllocations).toEqual([
+      {
+        chantierId: otherChantierId,
+        activity: "INSTALL",
+        week: "2026-W42",
+        hours: 12,
+      },
+    ]);
   });
 });
 
