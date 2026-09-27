@@ -293,6 +293,35 @@ export function syncPlanningPotentialOrderForCommercialCase(
   return parsePlanningPayload(payload);
 }
 
+export function removeFirmPlanningForChantier(
+  source: PlanningPayload,
+  chantierId: string,
+): PlanningPayload {
+  const payload = structuredClone(parsePlanningPayload(source));
+  payload.macroAllocations = payload.macroAllocations.filter(
+    (allocation) => allocation.chantierId !== chantierId,
+  );
+  payload.chantierOrder = payload.chantierOrder.filter(
+    (candidate) => candidate !== chantierId,
+  );
+  return parsePlanningPayload(payload);
+}
+
+export function restoreFirmPlanningOrderForChantier(
+  source: PlanningPayload,
+  chantierId: string,
+): PlanningPayload {
+  const payload = structuredClone(parsePlanningPayload(source));
+  payload.macroAllocations = payload.macroAllocations.filter(
+    (allocation) => allocation.chantierId !== chantierId,
+  );
+  payload.chantierOrder = [
+    chantierId,
+    ...payload.chantierOrder.filter((candidate) => candidate !== chantierId),
+  ];
+  return parsePlanningPayload(payload);
+}
+
 export function applyPlanningPersonCapacityMutation(
   source: PlanningPayload,
   input: PlanningPersonCapacityMutation,
