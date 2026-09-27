@@ -4,13 +4,36 @@ import Link from "next/link";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import type { GrandPlanningChantierRow, PlanningActivity } from "@/lib/planning/domain";
 
+type WeeklyCapacity = {
+  week: string;
+  totalCapacityHours: number;
+  firmLoadHours: number;
+  firmAvailableHours: number;
+};
+type PersonCapacity = {
+  userId: string;
+  displayName: string;
+  countsInMacroCapacity: boolean;
+  weeklySchedule: {
+    monday: number;
+    tuesday: number;
+    wednesday: number;
+    thursday: number;
+    friday: number;
+    saturday: number;
+    sunday: number;
+  };
+};
 type PlanningSnapshot = {
   year: number;
   weeks: string[];
   rows: GrandPlanningChantierRow[];
+  weeklyCapacity: WeeklyCapacity[];
+  peopleCapacity: PersonCapacity[];
   capabilities: {
     canRead: boolean;
     canEditMacro: boolean;
+    canManageSchedules: boolean;
   };
 };
 
@@ -58,6 +81,11 @@ export function GrandPlanningWorkspace({ initialYear }: { initialYear: number })
     void load();
   }, [load]);
 
+  const capacityByWeek = useMemo(
+    () => new Map(snapshot?.weeklyCapacity.map((item) => [item.week, item]) ?? []),
+    [snapshot],
+  );
+
   const unallocated = useMemo(() => {
     if (!snapshot) return [];
     return snapshot.rows
@@ -68,6 +96,32 @@ export function GrandPlanningWorkspace({ initialYear }: { initialYear: number })
       }))
       .filter((chantier) => chantier.activities.length > 0);
   }, [snapshot]);
+
+  async function savePersonCapacity(person: PersonCapacity) {
+    if (!snapshot?.capabilities.canManageSchedules) return;
+    setSavingKey(`capacity:${person.userId}`);
+    setMessage("Enregistrement de la capacité…");
+    const response = await fetch("/api/desktop/planning", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        action: "setPersonCapacity",
+        year: snapshot.year,
+        userId: person.userId,
+        countsInMacroCapacity: person.countsInMacroCapacity,
+        weeklySchedule: person.weeklySchedule,
+      }),
+    });
+    const result = (await response.json()) as PlanningSnapshot & { error?: string };
+    if (!response.ok) {
+      setMessage(result.error ?? "Enregistrement impossible.");
+      setSavingKey(null);
+      return;
+    }
+    setSnapshot(result);
+    setSavingKey(null);
+    setMessage("Capacité enregistrée.");
+  }
 
   async function saveCell(
     chantierId: string,
@@ -197,6 +251,52 @@ export function GrandPlanningWorkspace({ initialYear }: { initialYear: number })
         </section>
       ) : null}
 
+      {snapshot ? (
+        <section className="planningCapacitySettings">
+          <div className="planningCapacitySettingsHeader">
+            <div>
+              <p className="eyebrow">Capacité équipe</p>
+              <h2>Personnes comptées dans le grand planning</h2>
+            </div>
+            {!snapshot.capabilities.canManageSchedules ? (
+              <span className="planningReadOnly">Lecture seule</span>
+            ) : null}
+          </div>
+          <div className="planningCapacityPeople">
+            {snapshot.peopleCapacity.map((person) => (
+              <label className="planningCapacityPerson" key={person.userId}>
+                <input
+                  type="checkbox"
+                  checked={person.countsInMacroCapacity}
+                  disabled={
+                    !snapshot.capabilities.canManageSchedules ||
+                    savingKey === `capacity:${person.userId}`
+                  }
+                  onChange={(event) =>
+                    void savePersonCapacity({
+                      ...person,
+                      countsInMacroCapacity: event.target.checked,
+                    })
+                  }
+                />
+                <span>
+                  <strong>{person.displayName}</strong>
+                  <small>
+                    {formatHours(
+                      Object.values(person.weeklySchedule).reduce(
+                        (sum, hours) => sum + hours,
+                        0,
+                      ),
+                    )}{" "}
+                    h / semaine
+                  </small>
+                </span>
+              </label>
+            ))}
+          </div>
+        </section>
+      ) : null}
+
       <section className="panel grandPlanningPanel">
         <div className="grandPlanningLegend">
           <span>
@@ -223,11 +323,25 @@ export function GrandPlanningWorkspace({ initialYear }: { initialYear: number })
                   <th className="planningSticky planningMetricColumn planningRemainingColumn">
                     À répartir
                   </th>
-                  {snapshot.weeks.map((week) => (
-                    <th className="planningWeekHead" key={week} title={week}>
-                      {weekLabel(week)}
-                    </th>
-                  ))}
+                  {snapshot.weeks.map((week) => {
+                    const capacity = capacityByWeek.get(week);
+                    return (
+                      <th className="planningWeekHead" key={week} title={week}>
+                        <strong>{weekLabel(week)}</strong>
+                        <span>Cap. {formatHours(capacity?.totalCapacityHours ?? 0)}</span>
+                        <span>Charge {formatHours(capacity?.firmLoadHours ?? 0)}</span>
+                        <span
+                          className={
+                            (capacity?.firmAvailableHours ?? 0) < 0
+                              ? "planningWeekAvailable isNegative"
+                              : "planningWeekAvailable"
+                          }
+                        >
+                          Dispo {formatHours(capacity?.firmAvailableHours ?? 0)}
+                        </span>
+                      </th>
+                    );
+                  })}
                 </tr>
               </thead>
               <tbody>
@@ -338,6 +452,47 @@ export function GrandPlanningWorkspace({ initialYear }: { initialYear: number })
           gap: 8px;
           flex-wrap: wrap;
         }
+        .planningCapacitySettings {
+          margin-bottom: 14px;
+          padding: 14px 16px;
+          background: #fff;
+          border: 1px solid var(--border);
+          border-radius: 11px;
+        }
+        .planningCapacitySettingsHeader {
+          display: flex;
+          justify-content: space-between;
+          align-items: flex-start;
+          gap: 16px;
+        }
+        .planningCapacitySettingsHeader h2 {
+          margin: 0;
+          font-size: 15px;
+        }
+        .planningCapacityPeople {
+          display: flex;
+          flex-wrap: wrap;
+          gap: 8px;
+          margin-top: 10px;
+        }
+        .planningCapacityPerson {
+          display: flex;
+          align-items: center;
+          gap: 7px;
+          padding: 7px 9px;
+          border: 1px solid #e5e0ee;
+          border-radius: 8px;
+          font-size: 11px;
+        }
+        .planningCapacityPerson span,
+        .planningCapacityPerson small {
+          display: block;
+        }
+        .planningCapacityPerson small {
+          margin-top: 1px;
+          color: var(--muted);
+          font-size: 9px;
+        }
         .planningUnallocatedPanel {
           margin-bottom: 14px;
           padding: 16px 18px;
@@ -443,7 +598,7 @@ export function GrandPlanningWorkspace({ initialYear }: { initialYear: number })
           position: sticky;
           top: 0;
           z-index: 8;
-          height: 42px;
+          min-height: 66px;
           background: #f7f4ff;
           color: #675d7e;
           font-size: 10px;
@@ -526,6 +681,22 @@ export function GrandPlanningWorkspace({ initialYear }: { initialYear: number })
         }
         .planningRemainingCell.isZero {
           color: #22242a;
+        }
+        .planningWeekHead strong,
+        .planningWeekHead span {
+          display: block;
+        }
+        .planningWeekHead span {
+          margin-top: 2px;
+          font-size: 8px;
+          font-weight: 650;
+          white-space: nowrap;
+        }
+        .planningWeekAvailable {
+          color: #39714c;
+        }
+        .planningWeekAvailable.isNegative {
+          color: #b34435;
         }
         .planningWeekHead,
         .planningWeekCell {
