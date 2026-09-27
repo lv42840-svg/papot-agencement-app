@@ -72,14 +72,15 @@ async function snapshot(
   user: { id: string },
   context: Awaited<ReturnType<typeof requireDesktopRequestContext>>,
 ) {
-  const [planning, chantiers, commercial, auth, canEditMacro, canManageSchedules] = await Promise.all([
-    createPlanningRepository().load(),
-    createChantiersRepository(context).load(),
-    createCommercialRepository(context).load(),
-    readAuthPayload(),
-    hasEffectiveSpecialPermission(user, "planning.edit_macro"),
-    hasEffectiveSpecialPermission(user, "planning.manage_schedules"),
-  ]);
+  const [planning, chantiers, commercial, auth, canEditMacro, canManageSchedules] =
+    await Promise.all([
+      createPlanningRepository().load(),
+      createChantiersRepository(context).load(),
+      createCommercialRepository(context).load(),
+      readAuthPayload(),
+      hasEffectiveSpecialPermission(user, "planning.edit_macro"),
+      hasEffectiveSpecialPermission(user, "planning.manage_schedules"),
+    ]);
   const weeks = planningYearWeekIds(year);
   const rows = buildFirmGrandPlanningRows(chantiers, planning, year);
   const provisionalRows = buildCommercialProvisionRows(commercial);
