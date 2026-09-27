@@ -177,9 +177,7 @@ export async function POST(request: Request) {
         commercial.cases
           .filter(
             (item) =>
-              item.status !== "CONFIRMED" &&
-              item.status !== "LOST" &&
-              item.status !== "ABANDONED",
+              item.status !== "CONFIRMED" && item.status !== "LOST" && item.status !== "ABANDONED",
           )
           .map((item) => item.id),
       );
