@@ -32,6 +32,7 @@ export type CurrentUser = {
   displayName: string;
   email: string;
   accentKey: string;
+  planningPotentialCollapsed: boolean;
   canManagePermissions: boolean;
   mustChangePassword: boolean;
 };
@@ -106,6 +107,7 @@ export async function getCurrentUser(): Promise<CurrentUser | null> {
     displayName: user.displayName,
     email: user.email,
     accentKey: user.accentKey,
+    planningPotentialCollapsed: user.planningPotentialCollapsed ?? false,
     canManagePermissions: user.canManagePermissions,
     mustChangePassword: user.mustChangePassword,
   };

@@ -23,6 +23,8 @@ const QUOTES_STORAGE_VERSION = 9;
 const QUOTES_STORAGE_NAME = "quotes_postgres_storage";
 const PLANNING_STORAGE_VERSION = 10;
 const PLANNING_STORAGE_NAME = "planning_postgres_storage";
+const USER_UI_PREFERENCES_VERSION = 11;
+const USER_UI_PREFERENCES_NAME = "user_ui_preferences";
 
 async function ensureMigrationRegistry(client: PoolClient): Promise<void> {
   await client.query(`
@@ -106,6 +108,13 @@ async function ensureAuthStorage(client: PoolClient): Promise<void> {
   await client.query(`
     CREATE INDEX IF NOT EXISTS papot_auth_sessions_expires_at_index
     ON papot_auth_sessions (expires_at)
+  `);
+}
+
+async function ensureUserUiPreferences(client: PoolClient): Promise<void> {
+  await client.query(`
+    ALTER TABLE papot_auth_users
+    ADD COLUMN IF NOT EXISTS planning_potential_collapsed BOOLEAN NOT NULL DEFAULT FALSE
   `);
 }
 
@@ -315,6 +324,16 @@ export async function runServerDbMigrations(pool: Pool = getServerDbPool()): Pro
         ON CONFLICT (version) DO NOTHING
       `,
       [PLANNING_STORAGE_VERSION, PLANNING_STORAGE_NAME],
+    );
+
+    await ensureUserUiPreferences(client);
+    await client.query(
+      `
+        INSERT INTO papot_schema_migrations (version, name)
+        VALUES ($1, $2)
+        ON CONFLICT (version) DO NOTHING
+      `,
+      [USER_UI_PREFERENCES_VERSION, USER_UI_PREFERENCES_NAME],
     );
 
     await client.query("COMMIT");

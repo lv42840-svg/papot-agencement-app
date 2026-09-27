@@ -1,12 +1,13 @@
 import { DesktopAppShell } from "@/components/desktop-app-shell";
 import { GrandPlanningWorkspace } from "@/components/grand-planning-workspace";
+import { requireUser } from "@/lib/auth/session";
 
 export default async function PlanningPage({
   searchParams,
 }: {
   searchParams: Promise<{ year?: string }>;
 }) {
-  const params = await searchParams;
+  const [params, user] = await Promise.all([searchParams, requireUser()]);
   const parsedYear = Number(params.year);
   const year =
     Number.isInteger(parsedYear) && parsedYear >= 2020 && parsedYear <= 2100
@@ -15,7 +16,10 @@ export default async function PlanningPage({
 
   return (
     <DesktopAppShell>
-      <GrandPlanningWorkspace initialYear={year} />
+      <GrandPlanningWorkspace
+        initialPotentialCollapsed={user.planningPotentialCollapsed}
+        initialYear={year}
+      />
     </DesktopAppShell>
   );
 }

@@ -91,6 +91,10 @@ describeWithPostgres("Auth PostgreSQL foundation and cutover", () => {
     );
 
     expect(migration.rows[0]?.count).toBe("1");
+    const preferenceMigration = await pool.query<{ count: string }>(
+      "SELECT COUNT(*)::text AS count FROM papot_schema_migrations WHERE version = 11 AND name = 'user_ui_preferences'",
+    );
+    expect(preferenceMigration.rows[0]?.count).toBe("1");
     expect(tables.rows[0]).toEqual({
       users: "papot_auth_users",
       sessions: "papot_auth_sessions",
@@ -111,6 +115,27 @@ describeWithPostgres("Auth PostgreSQL foundation and cutover", () => {
       { id: initialPayload.users[0].id, version: 1 },
       { id: initialPayload.users[1].id, version: 1 },
     ]);
+  });
+
+  it("persists the personal planning potential collapse preference", async () => {
+    const repository = createPostgresAuthRepository(pool);
+    await repository.replaceSnapshot(initialPayload);
+
+    await repository.mutate((payload) => {
+      const user = payload.users.find((candidate) => candidate.id === initialPayload.users[0].id);
+      if (!user) throw new Error("TEST_USER_NOT_FOUND");
+      user.planningPotentialCollapsed = true;
+    });
+
+    const loaded = await repository.load();
+    expect(
+      loaded.users.find((user) => user.id === initialPayload.users[0].id)
+        ?.planningPotentialCollapsed,
+    ).toBe(true);
+    expect(
+      loaded.users.find((user) => user.id === initialPayload.users[1].id)
+        ?.planningPotentialCollapsed,
+    ).toBeUndefined();
   });
 
   it("keeps the previous snapshot when a replacement violates unique email protection", async () => {
