@@ -74,9 +74,12 @@ export async function POST(request: Request) {
       ),
     );
 
+    const launchedChantierId = mutation.focusChantierId;
+    if (!launchedChantierId) throw new Error("CHANTIER_LAUNCH_FOCUS_MISSING");
+
     stage = "convert-planning-provision";
     await createPlanningRepository().mutate((payload) =>
-      convertPlanningProvisionToFirm(payload, affair.id, mutation.focusChantierId),
+      convertPlanningProvisionToFirm(payload, affair.id, launchedChantierId),
     );
 
     console.info("[PAPOT][Chantiers] launch from affair saved", { ms: Date.now() - startedAt });
