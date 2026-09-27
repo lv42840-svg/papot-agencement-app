@@ -30,6 +30,10 @@ export const planningMutationSchema = z.discriminatedUnion("action", [
     hours: z.number().finite().nonnegative().max(10_000),
   }),
   z.object({
+    action: z.literal("setChantierOrder"),
+    orderedChantierIds: z.array(z.string().uuid()).max(1000),
+  }),
+  z.object({
     action: z.literal("setProvisionHours"),
     caseId: z.string().uuid(),
     activity: planningActivitySchema,
@@ -69,6 +73,10 @@ export const planningMutationSchema = z.discriminatedUnion("action", [
 export const planningMacroMutationSchema = planningMutationSchema.options[0];
 export type PlanningMutation = z.infer<typeof planningMutationSchema>;
 export type PlanningMacroMutation = Extract<PlanningMutation, { action: "setMacroHours" }>;
+export type PlanningChantierOrderMutation = Extract<
+  PlanningMutation,
+  { action: "setChantierOrder" }
+>;
 export type PlanningProvisionalMutation = Extract<
   PlanningMutation,
   { action: "setProvisionHours" }
@@ -119,6 +127,26 @@ export function applyPlanningMacroMutation(
   if (index >= 0) payload.macroAllocations[index] = next;
   else payload.macroAllocations.push(next);
 
+  return parsePlanningPayload(payload);
+}
+
+export function applyPlanningChantierOrderMutation(
+  source: PlanningPayload,
+  input: PlanningChantierOrderMutation,
+  activeChantierIds: ReadonlySet<string>,
+): PlanningPayload {
+  if (new Set(input.orderedChantierIds).size !== input.orderedChantierIds.length) {
+    throw new Error("PLANNING_CHANTIER_ORDER_DUPLICATE");
+  }
+  if (
+    input.orderedChantierIds.length !== activeChantierIds.size ||
+    input.orderedChantierIds.some((chantierId) => !activeChantierIds.has(chantierId))
+  ) {
+    throw new Error("PLANNING_CHANTIER_ORDER_INVALID");
+  }
+
+  const payload = structuredClone(parsePlanningPayload(source));
+  payload.chantierOrder = [...input.orderedChantierIds];
   return parsePlanningPayload(payload);
 }
 
