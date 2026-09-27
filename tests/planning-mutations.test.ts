@@ -9,6 +9,7 @@ import {
   applyPlanningProvisionalMutation,
   clearPlanningProvisionForCommercialCase,
   convertPlanningProvisionToFirm,
+  syncPlanningPotentialOrderForCommercialCase,
 } from "../src/lib/planning/mutations";
 
 const chantierId = "11111111-1111-4111-8111-111111111111";
@@ -148,6 +149,28 @@ describe("provisional grand planning mutations", () => {
     ]);
   });
 
+  it("adds a newly planned affair at the top of the shared potential order", () => {
+    const olderCaseId = "44444444-4444-4444-8444-444444444444";
+    const source = {
+      ...createInitialPlanningPayload(),
+      provisionalOrder: [olderCaseId],
+    };
+
+    const result = applyPlanningProvisionalMutation(
+      source,
+      {
+        action: "setProvisionHours",
+        caseId: commercialCaseId,
+        activity: "WORKSHOP",
+        week: "2026-W40",
+        hours: 12,
+      },
+      new Set([commercialCaseId, olderCaseId]),
+    );
+
+    expect(result.provisionalOrder).toEqual([commercialCaseId, olderCaseId]);
+  });
+
   it("removes a provisional allocation when the cell returns to zero", () => {
     const filled = applyPlanningProvisionalMutation(
       createInitialPlanningPayload(),
@@ -193,11 +216,39 @@ describe("provisional grand planning mutations", () => {
   });
 });
 
+describe("planning potential order lifecycle", () => {
+  it("inserts a first commercial provision at the top without re-promoting an existing affair", () => {
+    const olderCaseId = "44444444-4444-4444-8444-444444444444";
+    const source = {
+      ...createInitialPlanningPayload(),
+      provisionalOrder: [olderCaseId],
+    };
+
+    const inserted = syncPlanningPotentialOrderForCommercialCase(source, commercialCaseId, true);
+    expect(inserted.provisionalOrder).toEqual([commercialCaseId, olderCaseId]);
+
+    const unchanged = syncPlanningPotentialOrderForCommercialCase(inserted, olderCaseId, true);
+    expect(unchanged.provisionalOrder).toEqual([commercialCaseId, olderCaseId]);
+  });
+
+  it("removes an affair from the potential order when no reference or weekly allocation remains", () => {
+    const source = {
+      ...createInitialPlanningPayload(),
+      provisionalOrder: [commercialCaseId],
+    };
+
+    const result = syncPlanningPotentialOrderForCommercialCase(source, commercialCaseId, false);
+
+    expect(result.provisionalOrder).toEqual([]);
+  });
+});
+
 describe("planning provision cleanup", () => {
   it("removes every weekly provision allocation for the closed commercial affair", () => {
     const otherCaseId = "44444444-4444-4444-8444-444444444444";
     const source = {
       ...createInitialPlanningPayload(),
+      provisionalOrder: [commercialCaseId, otherCaseId],
       provisionalAllocations: [
         {
           caseId: commercialCaseId,
@@ -230,6 +281,7 @@ describe("planning provision cleanup", () => {
         hours: 12,
       },
     ]);
+    expect(result.provisionalOrder).toEqual([otherCaseId]);
   });
 
   it("is idempotent so reopening cannot restore an old weekly distribution", () => {
@@ -257,6 +309,7 @@ describe("planning provision to firm conversion", () => {
     const source = {
       ...createInitialPlanningPayload(),
       chantierOrder: ["33333333-3333-4333-8333-333333333333"],
+      provisionalOrder: [commercialCaseId],
       provisionalAllocations: [
         {
           caseId: commercialCaseId,
@@ -291,6 +344,7 @@ describe("planning provision to firm conversion", () => {
       },
     ]);
     expect(result.chantierOrder).toEqual([chantierId, "33333333-3333-4333-8333-333333333333"]);
+    expect(result.provisionalOrder).toEqual([]);
   });
 
   it("leaves unrelated provisional allocations untouched", () => {
