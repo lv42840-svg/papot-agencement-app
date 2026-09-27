@@ -49,6 +49,16 @@ function formatHours(value: number) {
   return Number.isInteger(value) ? String(value) : String(value).replace(".", ",");
 }
 
+const WEEKDAYS = [
+  ["monday", "Lun"],
+  ["tuesday", "Mar"],
+  ["wednesday", "Mer"],
+  ["thursday", "Jeu"],
+  ["friday", "Ven"],
+  ["saturday", "Sam"],
+  ["sunday", "Dim"],
+] as const;
+
 function parseHours(value: string): number | null {
   const normalized = value.trim().replace(",", ".");
   if (!normalized) return 0;
@@ -62,6 +72,7 @@ export function GrandPlanningWorkspace({ initialYear }: { initialYear: number })
   const [message, setMessage] = useState("Chargement du planning…");
   const [drafts, setDrafts] = useState<Record<string, string>>({});
   const [savingKey, setSavingKey] = useState<string | null>(null);
+  const [scheduleDrafts, setScheduleDrafts] = useState<Record<string, string>>({});
 
   const load = useCallback(async () => {
     setMessage("Chargement du planning…");
@@ -96,6 +107,46 @@ export function GrandPlanningWorkspace({ initialYear }: { initialYear: number })
       }))
       .filter((chantier) => chantier.activities.length > 0);
   }, [snapshot]);
+
+  function scheduleDraftKey(userId: string, day: keyof PersonCapacity["weeklySchedule"]) {
+    return `${userId}:${day}`;
+  }
+
+  async function saveScheduleDay(
+    person: PersonCapacity,
+    day: keyof PersonCapacity["weeklySchedule"],
+  ) {
+    if (!snapshot?.capabilities.canManageSchedules) return;
+    const key = scheduleDraftKey(person.userId, day);
+    const raw = scheduleDrafts[key] ?? formatHours(person.weeklySchedule[day]);
+    const hours = parseHours(raw);
+    if (hours == null || hours > 24) {
+      setScheduleDrafts((current) => {
+        const next = { ...current };
+        delete next[key];
+        return next;
+      });
+      setMessage("Horaire invalide : saisissez entre 0 et 24 h.");
+      return;
+    }
+    if (hours === person.weeklySchedule[day]) {
+      setScheduleDrafts((current) => {
+        const next = { ...current };
+        delete next[key];
+        return next;
+      });
+      return;
+    }
+    await savePersonCapacity({
+      ...person,
+      weeklySchedule: { ...person.weeklySchedule, [day]: hours },
+    });
+    setScheduleDrafts((current) => {
+      const next = { ...current };
+      delete next[key];
+      return next;
+    });
+  }
 
   async function savePersonCapacity(person: PersonCapacity) {
     if (!snapshot?.capabilities.canManageSchedules) return;
@@ -262,34 +313,91 @@ export function GrandPlanningWorkspace({ initialYear }: { initialYear: number })
               <span className="planningReadOnly">Lecture seule</span>
             ) : null}
           </div>
-          <div className="planningCapacityPeople">
-            {snapshot.peopleCapacity.map((person) => (
-              <label className="planningCapacityPerson" key={person.userId}>
-                <input
-                  type="checkbox"
-                  checked={person.countsInMacroCapacity}
-                  disabled={
-                    !snapshot.capabilities.canManageSchedules ||
-                    savingKey === `capacity:${person.userId}`
-                  }
-                  onChange={(event) =>
-                    void savePersonCapacity({
-                      ...person,
-                      countsInMacroCapacity: event.target.checked,
-                    })
-                  }
-                />
-                <span>
-                  <strong>{person.displayName}</strong>
-                  <small>
-                    {formatHours(
-                      Object.values(person.weeklySchedule).reduce((sum, hours) => sum + hours, 0),
-                    )}{" "}
-                    h / semaine
-                  </small>
-                </span>
-              </label>
-            ))}
+          <div className="planningScheduleTableWrap">
+            <table className="planningScheduleTable">
+              <thead>
+                <tr>
+                  <th>Personne</th>
+                  <th>Capacité</th>
+                  {WEEKDAYS.map(([, label]) => (
+                    <th key={label}>{label}</th>
+                  ))}
+                  <th>Total</th>
+                </tr>
+              </thead>
+              <tbody>
+                {snapshot.peopleCapacity.map((person) => (
+                  <tr key={person.userId}>
+                    <th scope="row">{person.displayName}</th>
+                    <td>
+                      <label className="planningCapacityToggle">
+                        <input
+                          type="checkbox"
+                          checked={person.countsInMacroCapacity}
+                          disabled={
+                            !snapshot.capabilities.canManageSchedules ||
+                            savingKey === `capacity:${person.userId}`
+                          }
+                          onChange={(event) =>
+                            void savePersonCapacity({
+                              ...person,
+                              countsInMacroCapacity: event.target.checked,
+                            })
+                          }
+                        />
+                        <span>{person.countsInMacroCapacity ? "Oui" : "Non"}</span>
+                      </label>
+                    </td>
+                    {WEEKDAYS.map(([day, label]) => {
+                      const key = scheduleDraftKey(person.userId, day);
+                      return (
+                        <td key={day}>
+                          <input
+                            aria-label={`${person.displayName} ${label}`}
+                            className="planningScheduleHours"
+                            disabled={
+                              !snapshot.capabilities.canManageSchedules ||
+                              savingKey === `capacity:${person.userId}`
+                            }
+                            inputMode="decimal"
+                            value={
+                              scheduleDrafts[key] ??
+                              formatHours(person.weeklySchedule[day])
+                            }
+                            onChange={(event) =>
+                              setScheduleDrafts((current) => ({
+                                ...current,
+                                [key]: event.target.value,
+                              }))
+                            }
+                            onBlur={() => void saveScheduleDay(person, day)}
+                            onKeyDown={(event) => {
+                              if (event.key === "Enter") event.currentTarget.blur();
+                              if (event.key === "Escape") {
+                                setScheduleDrafts((current) => {
+                                  const next = { ...current };
+                                  delete next[key];
+                                  return next;
+                                });
+                                event.currentTarget.blur();
+                              }
+                            }}
+                          />
+                        </td>
+                      );
+                    })}
+                    <td className="planningScheduleTotal">
+                      {formatHours(
+                        Object.values(person.weeklySchedule).reduce(
+                          (sum, hours) => sum + hours,
+                          0,
+                        ),
+                      )} h
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
           </div>
         </section>
       ) : null}
@@ -466,29 +574,41 @@ export function GrandPlanningWorkspace({ initialYear }: { initialYear: number })
           margin: 0;
           font-size: 15px;
         }
-        .planningCapacityPeople {
-          display: flex;
-          flex-wrap: wrap;
-          gap: 8px;
+        .planningScheduleTableWrap {
           margin-top: 10px;
+          overflow-x: auto;
         }
-        .planningCapacityPerson {
-          display: flex;
-          align-items: center;
-          gap: 7px;
-          padding: 7px 9px;
-          border: 1px solid #e5e0ee;
-          border-radius: 8px;
+        .planningScheduleTable {
+          width: 100%;
+          min-width: 760px;
+          border-collapse: collapse;
           font-size: 11px;
         }
-        .planningCapacityPerson span,
-        .planningCapacityPerson small {
-          display: block;
+        .planningScheduleTable th,
+        .planningScheduleTable td {
+          padding: 5px 6px;
+          border-bottom: 1px solid #eeeaf4;
+          text-align: center;
         }
-        .planningCapacityPerson small {
-          margin-top: 1px;
-          color: var(--muted);
-          font-size: 9px;
+        .planningScheduleTable th:first-child {
+          min-width: 150px;
+          text-align: left;
+        }
+        .planningCapacityToggle {
+          display: inline-flex;
+          align-items: center;
+          gap: 5px;
+          font-weight: 700;
+        }
+        .planningScheduleHours {
+          width: 48px;
+          min-height: 28px;
+          padding: 0 4px;
+          text-align: center;
+        }
+        .planningScheduleTotal {
+          min-width: 58px;
+          font-weight: 800;
         }
         .planningUnallocatedPanel {
           margin-bottom: 14px;
