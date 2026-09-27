@@ -6,10 +6,12 @@ import {
   applyPlanningFullWeekAbsenceMutation,
   applyPlanningMacroMutation,
   applyPlanningPersonCapacityMutation,
+  applyPlanningProvisionalMutation,
 } from "../src/lib/planning/mutations";
 
 const chantierId = "11111111-1111-4111-8111-111111111111";
 const active = new Set([chantierId]);
+const commercialCaseId = "22222222-2222-4222-8222-222222222222";
 
 describe("grand planning mutations", () => {
   it("sets and replaces weekly hours without duplicating a cell", () => {
@@ -104,6 +106,88 @@ describe("grand planning mutations", () => {
         new Set(),
       ),
     ).toThrow("PLANNING_CHANTIER_NOT_ACTIVE");
+  });
+});
+
+describe("provisional grand planning mutations", () => {
+  const activeCommercialCases = new Set([commercialCaseId]);
+
+  it("sets and replaces provisional weekly hours without duplicating a cell", () => {
+    const first = applyPlanningProvisionalMutation(
+      createInitialPlanningPayload(),
+      {
+        action: "setProvisionHours",
+        caseId: commercialCaseId,
+        activity: "WORKSHOP",
+        week: "2026-W40",
+        hours: 20,
+      },
+      activeCommercialCases,
+    );
+    const second = applyPlanningProvisionalMutation(
+      first,
+      {
+        action: "setProvisionHours",
+        caseId: commercialCaseId,
+        activity: "WORKSHOP",
+        week: "2026-W40",
+        hours: 35,
+      },
+      activeCommercialCases,
+    );
+
+    expect(second.provisionalAllocations).toEqual([
+      {
+        caseId: commercialCaseId,
+        activity: "WORKSHOP",
+        week: "2026-W40",
+        hours: 35,
+      },
+    ]);
+  });
+
+  it("removes a provisional allocation when the cell returns to zero", () => {
+    const filled = applyPlanningProvisionalMutation(
+      createInitialPlanningPayload(),
+      {
+        action: "setProvisionHours",
+        caseId: commercialCaseId,
+        activity: "BE",
+        week: "2026-W40",
+        hours: 8,
+      },
+      activeCommercialCases,
+    );
+
+    const cleared = applyPlanningProvisionalMutation(
+      filled,
+      {
+        action: "setProvisionHours",
+        caseId: commercialCaseId,
+        activity: "BE",
+        week: "2026-W40",
+        hours: 0,
+      },
+      activeCommercialCases,
+    );
+
+    expect(cleared.provisionalAllocations).toEqual([]);
+  });
+
+  it("refuses to plan a commercial affair that is no longer active", () => {
+    expect(() =>
+      applyPlanningProvisionalMutation(
+        createInitialPlanningPayload(),
+        {
+          action: "setProvisionHours",
+          caseId: commercialCaseId,
+          activity: "INSTALL",
+          week: "2026-W40",
+          hours: 4,
+        },
+        new Set(),
+      ),
+    ).toThrow("PLANNING_COMMERCIAL_CASE_NOT_ACTIVE");
   });
 });
 
