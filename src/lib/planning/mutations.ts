@@ -37,6 +37,10 @@ export const planningMutationSchema = z.discriminatedUnion("action", [
     hours: z.number().finite().nonnegative().max(10_000),
   }),
   z.object({
+    action: z.literal("setPotentialOrder"),
+    orderedCaseIds: z.array(z.string().uuid()).max(1000),
+  }),
+  z.object({
     action: z.literal("setPersonCapacity"),
     userId: z.string().uuid(),
     countsInMacroCapacity: z.boolean(),
@@ -68,6 +72,10 @@ export type PlanningMacroMutation = Extract<PlanningMutation, { action: "setMacr
 export type PlanningProvisionalMutation = Extract<
   PlanningMutation,
   { action: "setProvisionHours" }
+>;
+export type PlanningPotentialOrderMutation = Extract<
+  PlanningMutation,
+  { action: "setPotentialOrder" }
 >;
 export type PlanningPersonCapacityMutation = Extract<
   PlanningMutation,
@@ -152,6 +160,26 @@ export function applyPlanningProvisionalMutation(
     ];
   }
 
+  return parsePlanningPayload(payload);
+}
+
+export function applyPlanningPotentialOrderMutation(
+  source: PlanningPayload,
+  input: PlanningPotentialOrderMutation,
+  activePotentialCaseIds: ReadonlySet<string>,
+): PlanningPayload {
+  if (new Set(input.orderedCaseIds).size !== input.orderedCaseIds.length) {
+    throw new Error("PLANNING_POTENTIAL_ORDER_DUPLICATE");
+  }
+  if (
+    input.orderedCaseIds.length !== activePotentialCaseIds.size ||
+    input.orderedCaseIds.some((caseId) => !activePotentialCaseIds.has(caseId))
+  ) {
+    throw new Error("PLANNING_POTENTIAL_ORDER_INVALID");
+  }
+
+  const payload = structuredClone(parsePlanningPayload(source));
+  payload.provisionalOrder = [...input.orderedCaseIds];
   return parsePlanningPayload(payload);
 }
 
