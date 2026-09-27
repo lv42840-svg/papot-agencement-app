@@ -30,7 +30,11 @@ export const planningPayloadSchema = z
   .superRefine((value, context) => {
     const seen = new Set<string>();
     value.macroAllocations.forEach((allocation, index) => {
-      const key = allocationKey(\n        allocation.chantierId,\n        allocation.activity,\n        allocation.week,\n      );
+      const key = allocationKey(
+        allocation.chantierId,
+        allocation.activity,
+        allocation.week,
+      );
       if (seen.has(key)) {
         context.addIssue({
           code: z.ZodIssueCode.custom,
@@ -50,7 +54,9 @@ export const planningPayloadSchema = z
     }
   });
 
-export type PlanningMacroAllocation = z.infer<\n  typeof planningMacroAllocationSchema\n>;
+export type PlanningMacroAllocation = z.infer<
+  typeof planningMacroAllocationSchema
+>;
 export type PlanningPayload = z.infer<typeof planningPayloadSchema>;
 
 export type GrandPlanningActivityRow = {
@@ -105,7 +111,9 @@ export function weeksInIsoYear(year: number): number {
   const day = date.getUTCDay() || 7;
   date.setUTCDate(date.getUTCDate() + 4 - day);
   const yearStart = new Date(Date.UTC(date.getUTCFullYear(), 0, 1));
-  return Math.ceil(\n    ((date.getTime() - yearStart.getTime()) / 86_400_000 + 1) / 7,\n  );
+  return Math.ceil(
+    ((date.getTime() - yearStart.getTime()) / 86_400_000 + 1) / 7,
+  );
 }
 
 export function planningYearWeekIds(year: number): string[] {
