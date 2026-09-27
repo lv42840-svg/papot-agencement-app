@@ -173,7 +173,11 @@ export async function POST(request: Request) {
       return applyChantierMutation(payload, normalizedInput, actor);
     });
 
-    if (input.action === "markDone" || input.action === "reactivate" || input.action === "unarchive") {
+    if (
+      input.action === "markDone" ||
+      input.action === "reactivate" ||
+      input.action === "unarchive"
+    ) {
       stage = "sync-planning-lifecycle";
       await createPlanningRepository().mutate((payload) => {
         if (input.action === "markDone") {
