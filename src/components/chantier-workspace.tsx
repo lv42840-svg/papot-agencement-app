@@ -588,26 +588,26 @@ function LifecycleTab({
         <div className="chantierLifecycleAction chantierLifecycleSplit">
           {capabilities.canCloseReopen ? (
             <div>
-            <strong>Reprendre les travaux</strong>
-            <input
-              value={reactivateReason}
-              onChange={(event) => setReactivateReason(event.target.value)}
-              placeholder="Motif obligatoire"
-            />
-            <button
-              type="button"
-              className="secondaryButton"
-              disabled={busy || !reactivateReason.trim()}
-              onClick={() =>
-                void mutate(
-                  { action: "reactivate", chantierId: chantier.id, reason: reactivateReason },
-                  "Chantier remis en Actif.",
-                )
-              }
-            >
-              <RotateCcw size={15} /> Remettre Actif
-            </button>
-          </div>
+              <strong>Reprendre les travaux</strong>
+              <input
+                value={reactivateReason}
+                onChange={(event) => setReactivateReason(event.target.value)}
+                placeholder="Motif obligatoire"
+              />
+              <button
+                type="button"
+                className="secondaryButton"
+                disabled={busy || !reactivateReason.trim()}
+                onClick={() =>
+                  void mutate(
+                    { action: "reactivate", chantierId: chantier.id, reason: reactivateReason },
+                    "Chantier remis en Actif.",
+                  )
+                }
+              >
+                <RotateCcw size={15} /> Remettre Actif
+              </button>
+            </div>
           ) : null}
           {capabilities.canArchive ? (
             <div>
