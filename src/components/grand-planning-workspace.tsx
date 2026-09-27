@@ -867,12 +867,7 @@ export function GrandPlanningWorkspace({ initialYear }: { initialYear: number })
                                 }))
                               }
                               onBlur={() =>
-                                void saveCell(
-                                  chantier.chantierId,
-                                  activity.activity,
-                                  week,
-                                  current,
-                                )
+                                void saveCell(chantier.chantierId, activity.activity, week, current)
                               }
                               onKeyDown={(event) => {
                                 if (event.key === "Enter") event.currentTarget.blur();
