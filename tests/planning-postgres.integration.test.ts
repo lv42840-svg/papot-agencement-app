@@ -48,10 +48,30 @@ describeWithPostgres("Planning PostgreSQL storage", () => {
       schemaVersion: 1,
       macroAllocations: [],
       provisionalAllocations: [],
+      actualHours: [],
       chantierOrder: [],
       provisionalOrder: [],
       peopleCapacity: [],
       absences: [],
+    });
+  });
+
+  it("persists actual hours without requiring a storage migration", async () => {
+    const repository = createPostgresPlanningRepository(pool);
+    const userId = "33333333-3333-4333-8333-333333333333";
+
+    await repository.mutate((payload) => ({
+      ...payload,
+      actualHours: [
+        ...payload.actualHours,
+        { chantierId, userId, activity: "INSTALL" as const, week: "2026-W39", hours: 12 },
+      ],
+    }));
+
+    await expect(repository.load()).resolves.toMatchObject({
+      actualHours: [
+        { chantierId, userId, activity: "INSTALL", week: "2026-W39", hours: 12 },
+      ],
     });
   });
 
