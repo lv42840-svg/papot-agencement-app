@@ -116,3 +116,8 @@ export function groupGrandPlanningMonths(
 
   return groups;
 }
+
+export function isPlanningWeekPast(week: string, now = new Date()): boolean {
+  const currentWeek = isoWeekKey(now);
+  return isoWeekMonday(week).getTime() < isoWeekMonday(currentWeek).getTime();
+}
