@@ -540,6 +540,16 @@ function LifecycleTab({
   const [reactivateReason, setReactivateReason] = useState("");
   const [archiveReviewed, setArchiveReviewed] = useState(false);
   const [unarchiveReason, setUnarchiveReason] = useState("");
+  const closeWarningParts = closeWarning
+    ? [
+        closeWarning.futureAllocatedHours > 0
+          ? `${closeWarning.futureAllocatedHours} h encore positionnées dans les semaines actuelles ou futures`
+          : null,
+        closeWarning.remainingToAllocateHours > 0
+          ? `${closeWarning.remainingToAllocateHours} h encore à répartir`
+          : null,
+      ].filter((value): value is string => Boolean(value))
+    : [];
 
   return (
     <section className="chantierCard">
@@ -571,18 +581,8 @@ function LifecycleTab({
             <div className="chantierLifecycleWarning">
               <strong>Attention, il reste de la charge dans le Grand planning.</strong>
               <span>
-                {closeWarning.futureAllocatedHours > 0
-                  ? `${closeWarning.futureAllocatedHours} h encore positionnées dans les semaines actuelles ou futures`
-                  : null}
-                {closeWarning.futureAllocatedHours > 0 &&
-                closeWarning.remainingToAllocateHours > 0
-                  ? " · "
-                  : null}
-                {closeWarning.remainingToAllocateHours > 0
-                  ? `${closeWarning.remainingToAllocateHours} h encore à répartir`
-                  : null}
-                . Le passage à Terminé retirera ces charges du planning actif et libérera la
-                capacité.
+                {closeWarningParts.join(" · ")}. Le passage à Terminé retirera ces charges du
+                planning actif et libérera la capacité.
               </span>
             </div>
           ) : null}
