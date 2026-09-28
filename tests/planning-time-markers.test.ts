@@ -5,6 +5,8 @@ import {
   groupGrandPlanningMonths,
   isoWeekKey,
   isoWeekMonday,
+  assertPlanningWeekEditable,
+  isPlanningWeekPast,
   weekDateRangeLabel,
 } from "../src/lib/planning/time-markers";
 
@@ -43,6 +45,21 @@ describe("grand planning time markers", () => {
     expect(meta[2].startsMonth).toBe(true);
     expect(meta[3].monthLabel).toBe("OCTOBRE");
     expect(meta[3].startsMonth).toBe(false);
+  });
+
+  it("locks a week only from the Monday of the following week in Paris time", () => {
+    expect(isPlanningWeekPast("2026-W40", new Date("2026-10-04T21:59:00Z"))).toBe(false);
+    expect(isPlanningWeekPast("2026-W40", new Date("2026-10-04T22:01:00Z"))).toBe(true);
+    expect(isPlanningWeekPast("2026-W41", new Date("2026-10-04T22:01:00Z"))).toBe(false);
+  });
+
+  it("throws the shared server guard for a past week", () => {
+    expect(() => assertPlanningWeekEditable("2026-W40", new Date("2026-10-04T22:01:00Z"))).toThrow(
+      "PLANNING_PAST_WEEK_LOCKED",
+    );
+    expect(() =>
+      assertPlanningWeekEditable("2026-W41", new Date("2026-10-04T22:01:00Z")),
+    ).not.toThrow();
   });
 
   it("groups consecutive weekly columns under their French month label", () => {
