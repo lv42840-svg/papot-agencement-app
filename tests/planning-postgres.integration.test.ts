@@ -69,9 +69,7 @@ describeWithPostgres("Planning PostgreSQL storage", () => {
     }));
 
     await expect(repository.load()).resolves.toMatchObject({
-      actualHours: [
-        { chantierId, userId, activity: "INSTALL", week: "2026-W39", hours: 12 },
-      ],
+      actualHours: [{ chantierId, userId, activity: "INSTALL", week: "2026-W39", hours: 12 }],
     });
   });
 
