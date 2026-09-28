@@ -23,10 +23,7 @@ describe("grand planning time markers", () => {
   });
 
   it("attaches a crossing week to the month of its Monday", () => {
-    const meta = buildGrandPlanningWeekMeta(
-      ["2026-W40"],
-      new Date(2026, 8, 28, 12),
-    )[0];
+    const meta = buildGrandPlanningWeekMeta(["2026-W40"], new Date(2026, 8, 28, 12))[0];
 
     expect(meta.monthLabel).toBe(FRENCH_MONTHS[8]);
     expect(meta.monthLabel).toBe("SEPTEMBRE");
