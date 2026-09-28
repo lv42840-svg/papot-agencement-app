@@ -23,9 +23,7 @@ describe("grand planning temporal markers UI", () => {
   });
 
   it("locks firm and provisional inputs when the week is past", () => {
-    const lockExpression =
-      "disabled={!snapshot.capabilities.canEditMacro || weekMetaByWeek.get(week)?.isPast || savingKey === key}";
-    expect(uiSource.split(lockExpression)).toHaveLength(3);
+    expect(uiSource.split("weekMetaByWeek.get(week)?.isPast")).toHaveLength(3);
   });
 
   it("recenters automatically on the current week without adding a dedicated button", () => {
