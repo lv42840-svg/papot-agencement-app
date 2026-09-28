@@ -216,9 +216,7 @@ export function weeksInIsoYear(year: number): number {
 }
 
 export function isoWeekIdForDate(input: Date): string {
-  const date = new Date(
-    Date.UTC(input.getUTCFullYear(), input.getUTCMonth(), input.getUTCDate()),
-  );
+  const date = new Date(Date.UTC(input.getUTCFullYear(), input.getUTCMonth(), input.getUTCDate()));
   const day = date.getUTCDay() || 7;
   date.setUTCDate(date.getUTCDate() + 4 - day);
   const isoYear = date.getUTCFullYear();
@@ -249,15 +247,12 @@ export function buildChantierPlanningCloseWarning(
     );
   }
 
-  const remainingToAllocateHours = (["BE", "WORKSHOP", "INSTALL"] as PlanningActivity[]).reduce(
-    (sum, activity) =>
-      sum +
-      Math.max(
-        0,
-        plannedHoursForActivity(chantier, activity) - (allocatedByActivity.get(activity) ?? 0),
-      ),
-    0,
-  );
+  const activities: PlanningActivity[] = ["BE", "WORKSHOP", "INSTALL"];
+  const remainingToAllocateHours = activities.reduce((sum, activity) => {
+    const plannedHours = plannedHoursForActivity(chantier, activity);
+    const allocatedHours = allocatedByActivity.get(activity) ?? 0;
+    return sum + Math.max(0, plannedHours - allocatedHours);
+  }, 0);
 
   return {
     futureAllocatedHours,
