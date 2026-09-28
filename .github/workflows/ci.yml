@@ -15,11 +15,6 @@ jobs:
           node-version: 22
           cache: npm
       - run: npm ci
-      - name: Show Brique 1 Prettier diff
-        run: |
-          npx prettier --write src/components/grand-planning-workspace.tsx src/lib/planning/time-markers.ts tests/planning-time-markers-ui.test.ts tests/planning-time-markers.test.ts
-          git diff -- src/components/grand-planning-workspace.tsx src/lib/planning/time-markers.ts tests/planning-time-markers-ui.test.ts tests/planning-time-markers.test.ts
-          exit 1
       - run: npm run lint
       - run: npm run typecheck
       - run: npm test
