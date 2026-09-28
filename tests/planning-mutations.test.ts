@@ -123,13 +123,27 @@ describe("planning actual hours", () => {
   it("sets, corrects and clears actual hours for one person without duplicates", () => {
     const first = applyPlanningActualHoursMutation(
       createInitialPlanningPayload(),
-      { action: "setActualHours", chantierId, userId, activity: "WORKSHOP", week: "2026-W39", hours: 7 },
+      {
+        action: "setActualHours",
+        chantierId,
+        userId,
+        activity: "WORKSHOP",
+        week: "2026-W39",
+        hours: 7,
+      },
       active,
       new Set([userId]),
     );
     const corrected = applyPlanningActualHoursMutation(
       first,
-      { action: "setActualHours", chantierId, userId, activity: "WORKSHOP", week: "2026-W39", hours: 8 },
+      {
+        action: "setActualHours",
+        chantierId,
+        userId,
+        activity: "WORKSHOP",
+        week: "2026-W39",
+        hours: 8,
+      },
       active,
       new Set([userId]),
     );
@@ -139,7 +153,14 @@ describe("planning actual hours", () => {
 
     const cleared = applyPlanningActualHoursMutation(
       corrected,
-      { action: "setActualHours", chantierId, userId, activity: "WORKSHOP", week: "2026-W39", hours: 0 },
+      {
+        action: "setActualHours",
+        chantierId,
+        userId,
+        activity: "WORKSHOP",
+        week: "2026-W39",
+        hours: 0,
+      },
       active,
       new Set([userId]),
     );
@@ -150,7 +171,14 @@ describe("planning actual hours", () => {
     expect(() =>
       applyPlanningActualHoursMutation(
         createInitialPlanningPayload(),
-        { action: "setActualHours", chantierId, userId, activity: "BE", week: "2026-W39", hours: 4 },
+        {
+          action: "setActualHours",
+          chantierId,
+          userId,
+          activity: "BE",
+          week: "2026-W39",
+          hours: 4,
+        },
         new Set(),
         new Set([userId]),
       ),
@@ -158,7 +186,14 @@ describe("planning actual hours", () => {
     expect(() =>
       applyPlanningActualHoursMutation(
         createInitialPlanningPayload(),
-        { action: "setActualHours", chantierId, userId, activity: "BE", week: "2026-W39", hours: 4 },
+        {
+          action: "setActualHours",
+          chantierId,
+          userId,
+          activity: "BE",
+          week: "2026-W39",
+          hours: 4,
+        },
         active,
         new Set(),
       ),
