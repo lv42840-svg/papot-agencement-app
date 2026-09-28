@@ -300,6 +300,39 @@ describe("grand planning domain", () => {
     });
   });
 
+  it("shows saved actual hours immediately without changing the allocation balance", () => {
+    const planning: PlanningPayload = {
+      ...createInitialPlanningPayload(),
+      macroAllocations: [
+        { chantierId: activeId, activity: "WORKSHOP", week: "2026-W39", hours: 18 },
+      ],
+      actualHours: [
+        {
+          chantierId: activeId,
+          userId: "77777777-7777-4777-8777-777777777777",
+          activity: "WORKSHOP",
+          week: "2026-W39",
+          hours: 7,
+        },
+        {
+          chantierId: activeId,
+          userId: "88888888-8888-4888-8888-888888888888",
+          activity: "WORKSHOP",
+          week: "2026-W39",
+          hours: 6,
+        },
+      ],
+    };
+
+    const workshop = buildFirmGrandPlanningRows(chantiersPayload(), planning, 2026)[0]?.activities.find(
+      (item) => item.activity === "WORKSHOP",
+    );
+
+    expect(workshop?.weeklyHours["2026-W39"]).toBe(13);
+    expect(workshop?.allocatedHours).toBe(18);
+    expect(workshop?.remainingHours).toBe(2);
+  });
+
   it("keeps allocations from other years in the global remaining balance", () => {
     const planning: PlanningPayload = {
       schemaVersion: 1,
