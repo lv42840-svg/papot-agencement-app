@@ -46,25 +46,22 @@ export function isoWeekMonday(week: string): Date {
 }
 
 export function isoWeekKey(date: Date): string {
-  const calendarDate = new Date(
-    Date.UTC(date.getFullYear(), date.getMonth(), date.getDate()),
-  );
+  const calendarDate = new Date(Date.UTC(date.getFullYear(), date.getMonth(), date.getDate()));
   const isoDay = calendarDate.getUTCDay() || 7;
   calendarDate.setUTCDate(calendarDate.getUTCDate() + 4 - isoDay);
 
   const isoYear = calendarDate.getUTCFullYear();
   const yearStart = new Date(Date.UTC(isoYear, 0, 1));
-  const weekNumber = Math.ceil(
-    ((calendarDate.getTime() - yearStart.getTime()) / DAY_MS + 1) / 7,
-  );
+  const weekNumber = Math.ceil(((calendarDate.getTime() - yearStart.getTime()) / DAY_MS + 1) / 7);
 
   return `${isoYear}-W${String(weekNumber).padStart(2, "0")}`;
 }
 
 function shortDate(date: Date): string {
-  return `${String(date.getUTCDate()).padStart(2, "0")}/${String(
-    date.getUTCMonth() + 1,
-  ).padStart(2, "0")}`;
+  return `${String(date.getUTCDate()).padStart(2, "0")}/${String(date.getUTCMonth() + 1).padStart(
+    2,
+    "0",
+  )}`;
 }
 
 export function weekDateRangeLabel(week: string): string {
