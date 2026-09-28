@@ -325,9 +325,11 @@ describe("grand planning domain", () => {
       ],
     };
 
-    const workshop = buildFirmGrandPlanningRows(chantiersPayload(), planning, 2026)[0]?.activities.find(
-      (item) => item.activity === "WORKSHOP",
-    );
+    const workshop = buildFirmGrandPlanningRows(
+      chantiersPayload(),
+      planning,
+      2026,
+    )[0]?.activities.find((item) => item.activity === "WORKSHOP");
 
     expect(workshop?.weeklyHours["2026-W39"]).toBe(13);
     expect(workshop?.allocatedHours).toBe(18);
