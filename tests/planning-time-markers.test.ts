@@ -6,6 +6,7 @@ import {
   isoWeekKey,
   isoWeekMonday,
   weekDateRangeLabel,
+  isPlanningWeekPast,
 } from "../src/lib/planning/time-markers";
 
 describe("grand planning time markers", () => {
@@ -43,6 +44,12 @@ describe("grand planning time markers", () => {
     expect(meta[2].startsMonth).toBe(true);
     expect(meta[3].monthLabel).toBe("OCTOBRE");
     expect(meta[3].startsMonth).toBe(false);
+  });
+
+  it("locks a week only from the Monday of the following week", () => {
+    expect(isPlanningWeekPast("2026-W40", new Date(2026, 9, 4, 12))).toBe(false);
+    expect(isPlanningWeekPast("2026-W40", new Date(2026, 9, 5, 0, 1))).toBe(true);
+    expect(isPlanningWeekPast("2026-W41", new Date(2026, 9, 5, 0, 1))).toBe(false);
   });
 
   it("groups consecutive weekly columns under their French month label", () => {
