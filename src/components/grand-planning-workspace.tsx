@@ -1,12 +1,17 @@
 "use client";
 
 import Link from "next/link";
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type {
   GrandPlanningChantierRow,
   GrandPlanningProvisionRow,
   PlanningActivity,
 } from "@/lib/planning/domain";
+import {
+  buildGrandPlanningWeekMeta,
+  groupGrandPlanningMonths,
+  isoWeekKey,
+} from "@/lib/planning/time-markers";
 
 type WeeklyCapacity = {
   week: string;
@@ -109,6 +114,8 @@ export function GrandPlanningWorkspace({
   const [absenceEditId, setAbsenceEditId] = useState<string | null>(null);
   const [potentialCollapsed, setPotentialCollapsed] = useState(initialPotentialCollapsed);
   const [potentialPreferenceSaving, setPotentialPreferenceSaving] = useState(false);
+  const planningScrollerRef = useRef<HTMLDivElement | null>(null);
+  const currentWeek = useMemo(() => isoWeekKey(new Date()), []);
 
   const load = useCallback(async () => {
     setMessage("Chargement du planning…");
@@ -133,6 +140,40 @@ export function GrandPlanningWorkspace({
     () => new Map(snapshot?.weeklyCapacity.map((item) => [item.week, item]) ?? []),
     [snapshot],
   );
+
+  const weekMeta = useMemo(
+    () => buildGrandPlanningWeekMeta(snapshot?.weeks ?? []),
+    [snapshot?.weeks],
+  );
+  const weekMetaByWeek = useMemo(
+    () => new Map(weekMeta.map((item) => [item.week, item])),
+    [weekMeta],
+  );
+  const monthGroups = useMemo(() => groupGrandPlanningMonths(weekMeta), [weekMeta]);
+
+  useEffect(() => {
+    const scroller = planningScrollerRef.current;
+    if (!snapshot || !scroller || !snapshot.weeks.includes(currentWeek)) return;
+
+    const currentHeader = scroller.querySelector<HTMLElement>(
+      `[data-planning-week="${currentWeek}"]`,
+    );
+    if (!currentHeader) return;
+
+    const stickyColumnsWidth = 408;
+    scroller.scrollLeft = Math.max(0, currentHeader.offsetLeft - stickyColumnsWidth - 12);
+  }, [currentWeek, snapshot]);
+
+  function weekClassName(week: string) {
+    const meta = weekMetaByWeek.get(week);
+    return [
+      meta?.startsMonth ? "planningMonthStart" : "",
+      meta?.isPast ? "planningPastWeek" : "",
+      meta?.isCurrent ? "planningCurrentWeek" : "",
+    ]
+      .filter(Boolean)
+      .join(" ");
+  }
 
   const unallocated = useMemo(() => {
     if (!snapshot) return [];
@@ -838,20 +879,46 @@ export function GrandPlanningWorkspace({
         {message ? <p className="planningMessage">{message}</p> : null}
 
         {snapshot ? (
-          <div className="grandPlanningScroller">
+          <div className="grandPlanningScroller" ref={planningScrollerRef}>
             <table className="grandPlanningTable">
               <thead>
-                <tr>
-                  <th className="planningSticky planningChantierColumn">Chantier</th>
-                  <th className="planningSticky planningActivityColumn">Activité</th>
-                  <th className="planningSticky planningMetricColumn">Prévu</th>
-                  <th className="planningSticky planningMetricColumn planningRemainingColumn">
+                <tr className="planningMonthRow">
+                  <th className="planningSticky planningChantierColumn" rowSpan={2}>
+                    Chantier
+                  </th>
+                  <th className="planningSticky planningActivityColumn" rowSpan={2}>
+                    Activité
+                  </th>
+                  <th className="planningSticky planningMetricColumn" rowSpan={2}>
+                    Prévu
+                  </th>
+                  <th
+                    className="planningSticky planningMetricColumn planningRemainingColumn"
+                    rowSpan={2}
+                  >
                     À répartir
                   </th>
-                  {snapshot.weeks.map((week) => {
+                  {monthGroups.map((group, index) => (
+                    <th
+                      className={`planningMonthHead ${index > 0 ? "planningMonthStart" : ""}`}
+                      colSpan={group.span}
+                      key={group.key}
+                    >
+                      {group.label}
+                    </th>
+                  ))}
+                </tr>
+                <tr className="planningWeekRow">
+                  {weekMeta.map((meta) => {
+                    const week = meta.week;
                     const capacity = capacityByWeek.get(week);
                     return (
-                      <th className="planningWeekHead" key={week} title={week}>
+                      <th
+                        className={`planningWeekHead ${weekClassName(week)}`}
+                        data-planning-week={week}
+                        key={week}
+                        title={`${weekLabel(week)} · ${meta.dateRangeLabel}`}
+                      >
                         <strong>{weekLabel(week)}</strong>
                         <span>Cap. {formatHours(capacity?.totalCapacityHours ?? 0)}</span>
                         <span>Ferme {formatHours(capacity?.firmLoadHours ?? 0)}</span>
@@ -960,7 +1027,7 @@ export function GrandPlanningWorkspace({
                         const current = activity.weeklyHours[week] ?? 0;
                         const key = cellKey("firm", chantier.chantierId, activity.activity, week);
                         return (
-                          <td className="planningWeekCell" key={week}>
+                          <td className={`planningWeekCell ${weekClassName(week)}`} key={week}>
                             <input
                               aria-label={`${chantier.name} ${activity.label} ${week}`}
                               className={savingKey === key ? "isSaving" : undefined}
@@ -1085,7 +1152,7 @@ export function GrandPlanningWorkspace({
                         const current = activity.weeklyHours[week] ?? 0;
                         const key = cellKey("provisional", item.caseId, activity.activity, week);
                         return (
-                          <td className="planningWeekCell" key={week}>
+                          <td className={`planningWeekCell ${weekClassName(week)}`} key={week}>
                             <input
                               aria-label={`${item.name} provisionnel ${activity.label} ${week}`}
                               className={savingKey === key ? "isSaving" : undefined}
@@ -1385,13 +1452,35 @@ export function GrandPlanningWorkspace({
         }
         .grandPlanningTable thead th {
           position: sticky;
-          top: 0;
           z-index: 8;
-          min-height: 66px;
           background: #f7f4ff;
           color: #675d7e;
           font-size: 10px;
           font-weight: 800;
+        }
+        .planningMonthRow th {
+          top: 0;
+        }
+        .planningMonthHead {
+          height: 28px;
+          min-height: 28px;
+          padding: 0 6px;
+          border-bottom: 1px solid #ddd5ee !important;
+          background: #eee9fb !important;
+          color: #5f4fa1 !important;
+          font-size: 10px !important;
+          font-weight: 900 !important;
+          letter-spacing: 0.06em;
+          text-align: left;
+        }
+        .planningWeekRow th {
+          top: 28px;
+          min-height: 66px;
+        }
+        .planningMonthRow .planningSticky {
+          top: 0;
+          z-index: 12;
+          vertical-align: middle;
         }
         .planningSticky {
           position: sticky;
@@ -1499,6 +1588,30 @@ export function GrandPlanningWorkspace({
           min-width: 50px;
           max-width: 50px;
           text-align: center;
+        }
+        .planningMonthStart {
+          border-left: 2px solid #c8bce7 !important;
+        }
+        .planningPastWeek {
+          background: #f4f3f6 !important;
+          color: #8a8791 !important;
+        }
+        .planningPastWeek input {
+          color: #77747e !important;
+          opacity: 0.72 !important;
+        }
+        .planningCurrentWeek {
+          box-shadow:
+            inset 2px 0 0 #7560bd,
+            inset -2px 0 0 #7560bd;
+          background: #fbf9ff !important;
+        }
+        .planningWeekHead.planningCurrentWeek {
+          border-top: 2px solid #7560bd !important;
+          color: #4f3c91 !important;
+        }
+        .grandPlanningTable tbody tr:last-child .planningCurrentWeek {
+          border-bottom: 2px solid #7560bd !important;
         }
         .planningWeekCell {
           height: 32px;
