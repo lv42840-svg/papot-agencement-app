@@ -21,9 +21,10 @@ import {
   PLANNING_ABSENCE_TYPE_LABELS,
   planningYearWeekIds,
 } from "@/lib/planning/domain";
-import { assertPlanningWeekEditable } from "@/lib/planning/time-markers";
+import { assertPlanningWeekEditable, isPlanningWeekPast } from "@/lib/planning/time-markers";
 import {
   applyPlanningAbsenceMutation,
+  applyPlanningActualHoursMutation,
   applyPlanningChantierOrderMutation,
   applyPlanningDeleteAbsenceMutation,
   applyPlanningFullWeekAbsenceMutation,
@@ -184,6 +185,24 @@ export async function POST(request: Request) {
       );
       await planningRepository.mutate((payload) =>
         applyPlanningMacroMutation(payload, input, activeChantierIds),
+      );
+    } else if (input.action === "setActualHours") {
+      await requireSpecialPermission(context.user, "planning.enter_actual_hours");
+      if (!isPlanningWeekPast(input.week)) throw new Error("PLANNING_ACTUAL_HOURS_WEEK_NOT_PAST");
+      const [chantiers, auth] = await Promise.all([
+        createChantiersRepository(context).load(),
+        readAuthPayload(),
+      ]);
+      const activeChantierIds = new Set(
+        chantiers.chantiers
+          .filter((chantier) => chantier.status === "ACTIVE")
+          .map((chantier) => chantier.id),
+      );
+      const activeUserIds = new Set(
+        auth.users.filter((candidate) => candidate.isActive).map((candidate) => candidate.id),
+      );
+      await planningRepository.mutate((payload) =>
+        applyPlanningActualHoursMutation(payload, input, activeChantierIds, activeUserIds),
       );
     } else if (input.action === "setChantierOrder") {
       await requireSpecialPermission(context.user, "planning.edit_macro");
