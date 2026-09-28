@@ -52,9 +52,13 @@ describe("chantier special permissions", () => {
     );
   });
 
-  it("keeps ordinary chantier lifecycle changes under module WRITE", () => {
-    expect(chantierSpecialPermissionForMutation({ action: "markDone" })).toBeNull();
-    expect(chantierSpecialPermissionForMutation({ action: "reactivate" })).toBeNull();
+  it("requires one shared permission to close and reopen a chantier", () => {
+    expect(chantierSpecialPermissionForMutation({ action: "markDone" })).toBe(
+      "chantiers.close_reopen",
+    );
+    expect(chantierSpecialPermissionForMutation({ action: "reactivate" })).toBe(
+      "chantiers.close_reopen",
+    );
   });
 });
 
@@ -64,6 +68,18 @@ describe("permission catalog", () => {
       expect.arrayContaining([
         expect.objectContaining({ key: "quotes", future: true }),
         expect.objectContaining({ key: "billing", future: true }),
+      ]),
+    );
+  });
+
+  it("contains the dedicated chantier lifecycle right", () => {
+    expect(SPECIAL_PERMISSIONS).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          key: "chantiers.close_reopen",
+          label: "Fermer / réouvrir un chantier",
+          moduleKey: "chantiers",
+        }),
       ]),
     );
   });
