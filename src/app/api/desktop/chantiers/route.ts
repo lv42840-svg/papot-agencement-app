@@ -20,6 +20,7 @@ import {
   requireDesktopRequestContext,
 } from "@/lib/desktop/request-context";
 import { createPlanningRepository } from "@/lib/planning/create-repository";
+import { buildChantierPlanningCloseWarning } from "@/lib/planning/domain";
 import {
   removeFirmPlanningForChantier,
   restoreFirmPlanningOrderForChantier,
@@ -55,6 +56,8 @@ async function snapshot(
 ) {
   const actor = { userId: owner.userId, displayName: owner.displayName };
   const baseCapabilities = chantierCapabilities(actor);
+  const planningPayload = await createPlanningRepository().load();
+  const now = new Date();
   const [canLaunchSpecial, canArchiveSpecial] = await Promise.all([
     hasEffectiveSpecialPermission(user, "commercial.confirm_launch"),
     hasEffectiveSpecialPermission(user, "chantiers.archive_reactivate"),
@@ -70,7 +73,13 @@ async function snapshot(
       canArchive: canWrite && canArchiveSpecial,
     },
     focusChantierId,
-    serverNow: new Date().toISOString(),
+    planningCloseWarnings: Object.fromEntries(
+      payload.chantiers.map((chantier) => [
+        chantier.id,
+        buildChantierPlanningCloseWarning(chantier, planningPayload, now),
+      ]),
+    ),
+    serverNow: now.toISOString(),
   };
 }
 
