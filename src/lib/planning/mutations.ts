@@ -1,6 +1,7 @@
 import { z } from "zod";
 import { DEFAULT_WEEKLY_SCHEDULE, isoWeekDates, scheduleHoursForDate } from "./capacity";
 import {
+  actualHoursKey,
   allocationKey,
   parsePlanningPayload,
   provisionalAllocationKey,
@@ -28,6 +29,14 @@ export const planningMutationSchema = z.discriminatedUnion("action", [
     activity: planningActivitySchema,
     week: weekSchema,
     hours: z.number().finite().nonnegative().max(10_000),
+  }),
+  z.object({
+    action: z.literal("setActualHours"),
+    chantierId: z.string().uuid(),
+    userId: z.string().uuid(),
+    activity: planningActivitySchema,
+    week: weekSchema,
+    hours: z.number().finite().nonnegative().max(168),
   }),
   z.object({
     action: z.literal("setChantierOrder"),
@@ -73,6 +82,7 @@ export const planningMutationSchema = z.discriminatedUnion("action", [
 export const planningMacroMutationSchema = planningMutationSchema.options[0];
 export type PlanningMutation = z.infer<typeof planningMutationSchema>;
 export type PlanningMacroMutation = Extract<PlanningMutation, { action: "setMacroHours" }>;
+export type PlanningActualHoursMutation = Extract<PlanningMutation, { action: "setActualHours" }>;
 export type PlanningChantierOrderMutation = Extract<
   PlanningMutation,
   { action: "setChantierOrder" }
@@ -126,6 +136,44 @@ export function applyPlanningMacroMutation(
 
   if (index >= 0) payload.macroAllocations[index] = next;
   else payload.macroAllocations.push(next);
+
+  return parsePlanningPayload(payload);
+}
+
+export function applyPlanningActualHoursMutation(
+  source: PlanningPayload,
+  input: PlanningActualHoursMutation,
+  activeChantierIds: ReadonlySet<string>,
+  activeUserIds: ReadonlySet<string>,
+): PlanningPayload {
+  if (!activeChantierIds.has(input.chantierId)) {
+    throw new Error("PLANNING_CHANTIER_NOT_ACTIVE");
+  }
+  if (!activeUserIds.has(input.userId)) {
+    throw new Error("PLANNING_USER_NOT_ACTIVE");
+  }
+
+  const payload = structuredClone(parsePlanningPayload(source));
+  const key = actualHoursKey(input.chantierId, input.userId, input.activity, input.week);
+  const index = payload.actualHours.findIndex(
+    (entry) => actualHoursKey(entry.chantierId, entry.userId, entry.activity, entry.week) === key,
+  );
+
+  if (input.hours === 0) {
+    if (index >= 0) payload.actualHours.splice(index, 1);
+    return parsePlanningPayload(payload);
+  }
+
+  const next = {
+    chantierId: input.chantierId,
+    userId: input.userId,
+    activity: input.activity,
+    week: input.week,
+    hours: input.hours,
+  };
+
+  if (index >= 0) payload.actualHours[index] = next;
+  else payload.actualHours.push(next);
 
   return parsePlanningPayload(payload);
 }

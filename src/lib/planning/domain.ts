@@ -35,6 +35,14 @@ export const planningProvisionalAllocationSchema = z.object({
   hours: z.number().finite().nonnegative(),
 });
 
+export const planningActualHoursSchema = z.object({
+  chantierId: z.string().uuid(),
+  userId: z.string().uuid(),
+  activity: planningActivitySchema,
+  week: isoWeekSchema,
+  hours: z.number().finite().nonnegative(),
+});
+
 export const planningAbsenceTypeSchema = z.enum(["VACATION", "SICK", "OTHER"]);
 export type PlanningAbsenceType = z.infer<typeof planningAbsenceTypeSchema>;
 
@@ -58,6 +66,7 @@ export const planningPayloadSchema = z
     schemaVersion: z.literal(1),
     macroAllocations: z.array(planningMacroAllocationSchema),
     provisionalAllocations: z.array(planningProvisionalAllocationSchema).default([]),
+    actualHours: z.array(planningActualHoursSchema).default([]),
     chantierOrder: z.array(z.string().uuid()),
     provisionalOrder: z.array(z.string().uuid()).default([]),
     peopleCapacity: z.array(planningPersonCapacitySchema).default([]),
@@ -88,6 +97,19 @@ export const planningPayloadSchema = z
         });
       }
       provisionalSeen.add(key);
+    });
+
+    const actualHoursSeen = new Set<string>();
+    value.actualHours.forEach((entry, index) => {
+      const key = actualHoursKey(entry.chantierId, entry.userId, entry.activity, entry.week);
+      if (actualHoursSeen.has(key)) {
+        context.addIssue({
+          code: z.ZodIssueCode.custom,
+          path: ["actualHours", index],
+          message: "PLANNING_ACTUAL_HOURS_DUPLICATE",
+        });
+      }
+      actualHoursSeen.add(key);
     });
 
     const absenceKeys = new Set<string>();
@@ -122,6 +144,7 @@ export const planningPayloadSchema = z
 
 export type PlanningMacroAllocation = z.infer<typeof planningMacroAllocationSchema>;
 export type PlanningProvisionalAllocation = z.infer<typeof planningProvisionalAllocationSchema>;
+export type PlanningActualHours = z.infer<typeof planningActualHoursSchema>;
 export type PlanningPayload = z.infer<typeof planningPayloadSchema>;
 
 export type GrandPlanningActivityRow = {
@@ -170,6 +193,7 @@ export function createInitialPlanningPayload(): PlanningPayload {
     schemaVersion: 1,
     macroAllocations: [],
     provisionalAllocations: [],
+    actualHours: [],
     chantierOrder: [],
     provisionalOrder: [],
     peopleCapacity: [],
@@ -196,6 +220,15 @@ export function provisionalAllocationKey(
   week: string,
 ): string {
   return `${caseId}:${activity}:${week}`;
+}
+
+export function actualHoursKey(
+  chantierId: string,
+  userId: string,
+  activity: PlanningActivity,
+  week: string,
+): string {
+  return `${chantierId}:${userId}:${activity}:${week}`;
 }
 
 export function plannedHoursForActivity(
@@ -313,6 +346,17 @@ export function buildFirmGrandPlanningRows(
             .filter((allocation) => weeks.has(allocation.week))
             .map((allocation) => [allocation.week, allocation.hours]),
         );
+        const actualByWeek = new Map<string, number>();
+        for (const entry of planningPayload.actualHours) {
+          if (
+            entry.chantierId === chantier.id &&
+            entry.activity === activity &&
+            weeks.has(entry.week)
+          ) {
+            actualByWeek.set(entry.week, (actualByWeek.get(entry.week) ?? 0) + entry.hours);
+          }
+        }
+        for (const [week, hours] of actualByWeek) weeklyHours[week] = hours;
         const allocatedHours = matching.reduce((sum, allocation) => sum + allocation.hours, 0);
         const plannedHours = plannedHoursForActivity(chantier, activity);
         return {
