@@ -102,11 +102,12 @@ export const chantierMutationSchema = z.discriminatedUnion("action", [
   z.object({
     action: z.literal("markDone"),
     chantierId: z.string().uuid(),
+    reason: z.string().trim().min(1).max(2000),
   }),
   z.object({
     action: z.literal("reactivate"),
     chantierId: z.string().uuid(),
-    reason: z.string().trim().max(2000).optional().default(""),
+    reason: z.string().trim().min(1).max(2000),
   }),
   z.object({
     action: z.literal("archive"),
@@ -616,7 +617,13 @@ export function applyChantierMutation(
     item.status = "DONE";
     item.completedAt = now.toISOString();
     touch(item, actor, now);
-    history(item, actor.displayName, "MARKED_DONE", "Chantier passé à Terminé.", now);
+    history(
+      item,
+      actor.displayName,
+      "MARKED_DONE",
+      `Chantier passé à Terminé. Motif : ${input.reason}`,
+      now,
+    );
     return { payload, focusChantierId: item.id };
   }
 
@@ -629,7 +636,7 @@ export function applyChantierMutation(
       item,
       actor.displayName,
       "REACTIVATED",
-      `Chantier remis en Actif${input.reason.trim() ? ` · ${input.reason.trim()}` : ""}.`,
+      `Chantier remis en Actif. Motif : ${input.reason}`,
       now,
     );
     return { payload, focusChantierId: item.id };
