@@ -19,9 +19,7 @@ describe("chantier close reopen permission", () => {
 
   it("hides close and reopen actions when the capability is absent", () => {
     expect(uiSource).toContain('chantier.status === "ACTIVE" && capabilities.canCloseReopen');
-    expect(uiSource).toContain(
-      "(capabilities.canCloseReopen || capabilities.canArchive)",
-    );
+    expect(uiSource).toContain("canManageDoneLifecycle");
     expect(uiSource).toContain("{capabilities.canCloseReopen ? (");
   });
 });
