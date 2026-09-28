@@ -15,6 +15,11 @@ jobs:
           node-version: 22
           cache: npm
       - run: npm ci
+      - name: Show Brique 2 Prettier diff
+        run: |
+          npx prettier --write tests/planning-time-markers.test.ts
+          git diff -- tests/planning-time-markers.test.ts
+          exit 1
       - run: npm run lint
       - run: npm run typecheck
       - run: npm test
