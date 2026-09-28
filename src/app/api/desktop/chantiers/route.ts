@@ -58,8 +58,9 @@ async function snapshot(
   const baseCapabilities = chantierCapabilities(actor);
   const planningPayload = await createPlanningRepository().load();
   const now = new Date();
-  const [canLaunchSpecial, canArchiveSpecial] = await Promise.all([
+  const [canLaunchSpecial, canCloseReopenSpecial, canArchiveSpecial] = await Promise.all([
     hasEffectiveSpecialPermission(user, "commercial.confirm_launch"),
+    hasEffectiveSpecialPermission(user, "chantiers.close_reopen"),
     hasEffectiveSpecialPermission(user, "chantiers.archive_reactivate"),
   ]);
   return {
@@ -70,6 +71,7 @@ async function snapshot(
       canRead: true,
       canModify: canWrite,
       canLaunch: canWrite && canLaunchSpecial,
+      canCloseReopen: canWrite && canCloseReopenSpecial,
       canArchive: canWrite && canArchiveSpecial,
     },
     focusChantierId,
