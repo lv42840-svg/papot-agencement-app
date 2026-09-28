@@ -117,7 +117,25 @@ export function groupGrandPlanningMonths(
   return groups;
 }
 
+function planningLocalCalendarDate(now: Date): Date {
+  const parts = new Intl.DateTimeFormat("en-CA", {
+    timeZone: "Europe/Paris",
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+  }).formatToParts(now);
+  const values = Object.fromEntries(parts.map((part) => [part.type, part.value]));
+  return new Date(Date.UTC(Number(values.year), Number(values.month) - 1, Number(values.day)));
+}
+
 export function isPlanningWeekPast(week: string, now = new Date()): boolean {
-  const currentWeek = isoWeekKey(now);
+  const planningDate = planningLocalCalendarDate(now);
+  const currentWeek = isoWeekKey(
+    new Date(planningDate.getUTCFullYear(), planningDate.getUTCMonth(), planningDate.getUTCDate()),
+  );
   return isoWeekMonday(week).getTime() < isoWeekMonday(currentWeek).getTime();
+}
+
+export function assertPlanningWeekEditable(week: string, now = new Date()): void {
+  if (isPlanningWeekPast(week, now)) throw new Error("PLANNING_PAST_WEEK_LOCKED");
 }
