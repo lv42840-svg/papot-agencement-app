@@ -82,10 +82,7 @@ export const planningMutationSchema = z.discriminatedUnion("action", [
 export const planningMacroMutationSchema = planningMutationSchema.options[0];
 export type PlanningMutation = z.infer<typeof planningMutationSchema>;
 export type PlanningMacroMutation = Extract<PlanningMutation, { action: "setMacroHours" }>;
-export type PlanningActualHoursMutation = Extract<
-  PlanningMutation,
-  { action: "setActualHours" }
->;
+export type PlanningActualHoursMutation = Extract<PlanningMutation, { action: "setActualHours" }>;
 export type PlanningChantierOrderMutation = Extract<
   PlanningMutation,
   { action: "setChantierOrder" }
