@@ -1031,7 +1031,11 @@ export function GrandPlanningWorkspace({
                             <input
                               aria-label={`${chantier.name} ${activity.label} ${week}`}
                               className={savingKey === key ? "isSaving" : undefined}
-                              disabled={!snapshot.capabilities.canEditMacro || weekMetaByWeek.get(week)?.isPast || savingKey === key}
+                              disabled={
+                                !snapshot.capabilities.canEditMacro ||
+                                weekMetaByWeek.get(week)?.isPast ||
+                                savingKey === key
+                              }
                               inputMode="decimal"
                               value={drafts[key] ?? (current === 0 ? "" : formatHours(current))}
                               onChange={(event) =>
@@ -1156,7 +1160,11 @@ export function GrandPlanningWorkspace({
                             <input
                               aria-label={`${item.name} provisionnel ${activity.label} ${week}`}
                               className={savingKey === key ? "isSaving" : undefined}
-                              disabled={!snapshot.capabilities.canEditMacro || weekMetaByWeek.get(week)?.isPast || savingKey === key}
+                              disabled={
+                                !snapshot.capabilities.canEditMacro ||
+                                weekMetaByWeek.get(week)?.isPast ||
+                                savingKey === key
+                              }
                               inputMode="decimal"
                               value={drafts[key] ?? (current === 0 ? "" : formatHours(current))}
                               onChange={(event) =>
