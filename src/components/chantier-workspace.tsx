@@ -34,6 +34,7 @@ import type {
   CommercialDocument,
   CommercialPayload,
 } from "@/lib/commercial/domain";
+import type { ChantierPlanningCloseWarning } from "@/lib/planning/domain";
 import type { NativeQuotesPayload } from "@/lib/quotes/store";
 
 type ChantiersSnapshot = {
@@ -41,6 +42,7 @@ type ChantiersSnapshot = {
   actor: { userId: string; displayName: string };
   capabilities: ChantierCapabilities;
   focusChantierId?: string;
+  planningCloseWarnings: Record<string, ChantierPlanningCloseWarning>;
   serverNow: string;
 };
 
@@ -329,6 +331,7 @@ export function ChantierWorkspace({ chantierId }: { chantierId: string }) {
             chantier={chantier}
             busy={busy}
             capabilities={chantiersSnapshot.capabilities}
+            closeWarning={chantiersSnapshot.planningCloseWarnings[chantier.id] ?? null}
             mutate={mutate}
           />
         ) : null}
@@ -524,16 +527,29 @@ function LifecycleTab({
   chantier,
   busy,
   capabilities,
+  closeWarning,
   mutate,
 }: {
   chantier: ChantierRecord;
   busy: boolean;
   capabilities: ChantierCapabilities;
+  closeWarning: ChantierPlanningCloseWarning | null;
   mutate: (body: MutationBody, message: string) => Promise<boolean>;
 }) {
+  const [closeReason, setCloseReason] = useState("");
   const [reactivateReason, setReactivateReason] = useState("");
   const [archiveReviewed, setArchiveReviewed] = useState(false);
   const [unarchiveReason, setUnarchiveReason] = useState("");
+  const closeWarningParts = closeWarning
+    ? [
+        closeWarning.futureAllocatedHours > 0
+          ? `${closeWarning.futureAllocatedHours} h encore positionnées dans les semaines actuelles ou futures`
+          : null,
+        closeWarning.remainingToAllocateHours > 0
+          ? `${closeWarning.remainingToAllocateHours} h encore à répartir`
+          : null,
+      ].filter((value): value is string => Boolean(value))
+    : [];
 
   return (
     <section className="chantierCard">
@@ -561,13 +577,27 @@ function LifecycleTab({
             Le statut Terminé signifie que les travaux principaux sont finis. Les documents,
             factures, réserves et SAV pourront continuer à évoluer.
           </p>
+          {closeWarning?.hasRemainingCharge ? (
+            <div className="chantierLifecycleWarning">
+              <strong>Attention, il reste de la charge dans le Grand planning.</strong>
+              <span>
+                {closeWarningParts.join(" · ")}. Le passage à Terminé retirera ces charges du
+                planning actif et libérera la capacité.
+              </span>
+            </div>
+          ) : null}
+          <input
+            value={closeReason}
+            onChange={(event) => setCloseReason(event.target.value)}
+            placeholder="Motif obligatoire de fermeture"
+          />
           <button
             type="button"
             className="secondaryButton"
-            disabled={busy}
+            disabled={busy || !closeReason.trim()}
             onClick={() =>
               void mutate(
-                { action: "markDone", chantierId: chantier.id },
+                { action: "markDone", chantierId: chantier.id, reason: closeReason },
                 "Chantier passé à Terminé.",
               )
             }
@@ -584,12 +614,12 @@ function LifecycleTab({
             <input
               value={reactivateReason}
               onChange={(event) => setReactivateReason(event.target.value)}
-              placeholder="Note facultative"
+              placeholder="Motif obligatoire de réouverture"
             />
             <button
               type="button"
               className="secondaryButton"
-              disabled={busy}
+              disabled={busy || !reactivateReason.trim()}
               onClick={() =>
                 void mutate(
                   { action: "reactivate", chantierId: chantier.id, reason: reactivateReason },
@@ -1218,6 +1248,22 @@ function ChantierStyles() {
         border-radius: 7px;
         background: white;
         font-size: 13px;
+      }
+      .chantierLifecycleWarning {
+        padding: 10px 11px;
+        display: grid;
+        gap: 4px;
+        border: 1px solid #e6c88f;
+        border-radius: 8px;
+        background: #fff9ec;
+        color: #8a6220;
+      }
+      .chantierLifecycleWarning strong {
+        font-size: 12px;
+      }
+      .chantierLifecycleWarning span {
+        font-size: 11.5px;
+        line-height: 1.45;
       }
       .chantierLifecycleSplit {
         grid-template-columns: 1fr 1fr;
