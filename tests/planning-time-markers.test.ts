@@ -5,9 +5,9 @@ import {
   groupGrandPlanningMonths,
   isoWeekKey,
   isoWeekMonday,
-  weekDateRangeLabel,
-  isPlanningWeekPast,
   assertPlanningWeekEditable,
+  isPlanningWeekPast,
+  weekDateRangeLabel,
 } from "../src/lib/planning/time-markers";
 
 describe("grand planning time markers", () => {
