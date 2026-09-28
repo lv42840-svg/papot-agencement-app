@@ -15,11 +15,6 @@ jobs:
           node-version: 22
           cache: npm
       - run: npm ci
-      - name: Show Brique 3 Prettier diff
-        run: |
-          npx prettier --write src/lib/planning/mutations.ts tests/planning-domain.test.ts tests/planning-mutations.test.ts tests/planning-postgres.integration.test.ts
-          git diff -- src/lib/planning/mutations.ts tests/planning-domain.test.ts tests/planning-mutations.test.ts tests/planning-postgres.integration.test.ts
-          exit 1
       - run: npm run lint
       - run: npm run typecheck
       - run: npm test
