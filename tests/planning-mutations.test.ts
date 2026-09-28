@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import { createInitialPlanningPayload } from "../src/lib/planning/domain";
 import {
   applyPlanningAbsenceMutation,
+  applyPlanningActualHoursMutation,
   applyPlanningChantierOrderMutation,
   applyPlanningDeleteAbsenceMutation,
   applyPlanningFullWeekAbsenceMutation,
@@ -113,6 +114,55 @@ describe("grand planning mutations", () => {
         new Set(),
       ),
     ).toThrow("PLANNING_CHANTIER_NOT_ACTIVE");
+  });
+});
+
+describe("planning actual hours", () => {
+  const userId = "33333333-3333-4333-8333-333333333333";
+
+  it("sets, corrects and clears actual hours for one person without duplicates", () => {
+    const first = applyPlanningActualHoursMutation(
+      createInitialPlanningPayload(),
+      { action: "setActualHours", chantierId, userId, activity: "WORKSHOP", week: "2026-W39", hours: 7 },
+      active,
+      new Set([userId]),
+    );
+    const corrected = applyPlanningActualHoursMutation(
+      first,
+      { action: "setActualHours", chantierId, userId, activity: "WORKSHOP", week: "2026-W39", hours: 8 },
+      active,
+      new Set([userId]),
+    );
+    expect(corrected.actualHours).toEqual([
+      { chantierId, userId, activity: "WORKSHOP", week: "2026-W39", hours: 8 },
+    ]);
+
+    const cleared = applyPlanningActualHoursMutation(
+      corrected,
+      { action: "setActualHours", chantierId, userId, activity: "WORKSHOP", week: "2026-W39", hours: 0 },
+      active,
+      new Set([userId]),
+    );
+    expect(cleared.actualHours).toEqual([]);
+  });
+
+  it("refuses actual hours for an inactive chantier or person", () => {
+    expect(() =>
+      applyPlanningActualHoursMutation(
+        createInitialPlanningPayload(),
+        { action: "setActualHours", chantierId, userId, activity: "BE", week: "2026-W39", hours: 4 },
+        new Set(),
+        new Set([userId]),
+      ),
+    ).toThrow("PLANNING_CHANTIER_NOT_ACTIVE");
+    expect(() =>
+      applyPlanningActualHoursMutation(
+        createInitialPlanningPayload(),
+        { action: "setActualHours", chantierId, userId, activity: "BE", week: "2026-W39", hours: 4 },
+        active,
+        new Set(),
+      ),
+    ).toThrow("PLANNING_USER_NOT_ACTIVE");
   });
 });
 
