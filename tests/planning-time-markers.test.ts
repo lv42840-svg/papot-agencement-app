@@ -54,9 +54,9 @@ describe("grand planning time markers", () => {
   });
 
   it("throws the shared server guard for a past week", () => {
-    expect(() =>
-      assertPlanningWeekEditable("2026-W40", new Date("2026-10-04T22:01:00Z")),
-    ).toThrow("PLANNING_PAST_WEEK_LOCKED");
+    expect(() => assertPlanningWeekEditable("2026-W40", new Date("2026-10-04T22:01:00Z"))).toThrow(
+      "PLANNING_PAST_WEEK_LOCKED",
+    );
     expect(() =>
       assertPlanningWeekEditable("2026-W41", new Date("2026-10-04T22:01:00Z")),
     ).not.toThrow();
