@@ -25,6 +25,6 @@ describe("grand planning temporal markers UI", () => {
   it("recenters automatically on the current week without adding a dedicated button", () => {
     expect(uiSource).toContain("planningScrollerRef.current");
     expect(uiSource).toContain("scroller.scrollLeft");
-    expect(uiSource).not.toContain('>Semaine en cours<');
+    expect(uiSource).not.toContain(">Semaine en cours<");
   });
 });
