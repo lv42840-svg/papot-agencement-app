@@ -159,6 +159,12 @@ export type GrandPlanningProvisionRow = {
   activities: GrandPlanningProvisionActivityRow[];
 };
 
+export type ChantierPlanningCloseWarning = {
+  futureAllocatedHours: number;
+  remainingToAllocateHours: number;
+  hasRemainingCharge: boolean;
+};
+
 export function createInitialPlanningPayload(): PlanningPayload {
   return {
     schemaVersion: 1,
@@ -207,6 +213,57 @@ export function weeksInIsoYear(year: number): number {
   date.setUTCDate(date.getUTCDate() + 4 - day);
   const yearStart = new Date(Date.UTC(date.getUTCFullYear(), 0, 1));
   return Math.ceil(((date.getTime() - yearStart.getTime()) / 86_400_000 + 1) / 7);
+}
+
+export function isoWeekIdForDate(input: Date): string {
+  const date = new Date(
+    Date.UTC(input.getUTCFullYear(), input.getUTCMonth(), input.getUTCDate()),
+  );
+  const day = date.getUTCDay() || 7;
+  date.setUTCDate(date.getUTCDate() + 4 - day);
+  const isoYear = date.getUTCFullYear();
+  const yearStart = new Date(Date.UTC(isoYear, 0, 1));
+  const week = Math.ceil(((date.getTime() - yearStart.getTime()) / 86_400_000 + 1) / 7);
+  return `${isoYear}-W${String(week).padStart(2, "0")}`;
+}
+
+export function buildChantierPlanningCloseWarning(
+  chantier: Pick<ChantierRecord, "id" | "plannedHours">,
+  planningPayload: PlanningPayload,
+  now: Date = new Date(),
+): ChantierPlanningCloseWarning {
+  const currentWeek = isoWeekIdForDate(now);
+  const matching = planningPayload.macroAllocations.filter(
+    (allocation) => allocation.chantierId === chantier.id,
+  );
+
+  const futureAllocatedHours = matching
+    .filter((allocation) => allocation.week >= currentWeek)
+    .reduce((sum, allocation) => sum + allocation.hours, 0);
+
+  const allocatedByActivity = new Map<PlanningActivity, number>();
+  for (const allocation of matching) {
+    allocatedByActivity.set(
+      allocation.activity,
+      (allocatedByActivity.get(allocation.activity) ?? 0) + allocation.hours,
+    );
+  }
+
+  const remainingToAllocateHours = (["BE", "WORKSHOP", "INSTALL"] as PlanningActivity[]).reduce(
+    (sum, activity) =>
+      sum +
+      Math.max(
+        0,
+        plannedHoursForActivity(chantier, activity) - (allocatedByActivity.get(activity) ?? 0),
+      ),
+    0,
+  );
+
+  return {
+    futureAllocatedHours,
+    remainingToAllocateHours,
+    hasRemainingCharge: futureAllocatedHours > 0 || remainingToAllocateHours > 0,
+  };
 }
 
 export function planningYearWeekIds(year: number): string[] {
