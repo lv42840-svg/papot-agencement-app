@@ -21,7 +21,7 @@ import {
   PLANNING_ABSENCE_TYPE_LABELS,
   planningYearWeekIds,
 } from "@/lib/planning/domain";
-import { isPlanningWeekPast } from "@/lib/planning/time-markers";
+import { assertPlanningWeekEditable } from "@/lib/planning/time-markers";
 import {
   applyPlanningAbsenceMutation,
   applyPlanningChantierOrderMutation,
@@ -175,7 +175,7 @@ export async function POST(request: Request) {
 
     if (input.action === "setMacroHours") {
       await requireSpecialPermission(context.user, "planning.edit_macro");
-      if (isPlanningWeekPast(input.week)) throw new Error("PLANNING_PAST_WEEK_LOCKED");
+      assertPlanningWeekEditable(input.week);
       const chantiers = await createChantiersRepository(context).load();
       const activeChantierIds = new Set(
         chantiers.chantiers
@@ -198,7 +198,7 @@ export async function POST(request: Request) {
       );
     } else if (input.action === "setProvisionHours") {
       await requireSpecialPermission(context.user, "planning.edit_macro");
-      if (isPlanningWeekPast(input.week)) throw new Error("PLANNING_PAST_WEEK_LOCKED");
+      assertPlanningWeekEditable(input.week);
       const commercial = await createCommercialRepository(context).load();
       const activeCommercialCaseIds = new Set(
         commercial.cases.filter(isCommercialActive).map((item) => item.id),
