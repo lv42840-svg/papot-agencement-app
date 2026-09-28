@@ -42,8 +42,10 @@ describe("grand planning time markers", () => {
     expect(meta[0].isPast).toBe(true);
     expect(meta[1].isCurrent).toBe(true);
     expect(meta[2].isPast).toBe(false);
+    expect(meta[2].monthLabel).toBe("OCTOBRE");
+    expect(meta[2].startsMonth).toBe(true);
     expect(meta[3].monthLabel).toBe("OCTOBRE");
-    expect(meta[3].startsMonth).toBe(true);
+    expect(meta[3].startsMonth).toBe(false);
   });
 
   it("groups consecutive weekly columns under their French month label", () => {
