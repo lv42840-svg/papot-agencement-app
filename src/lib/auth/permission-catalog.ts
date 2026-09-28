@@ -52,6 +52,11 @@ export const SPECIAL_PERMISSIONS = [
     moduleKey: "planning",
   },
   {
+    key: "chantiers.close_reopen",
+    label: "Fermer / réouvrir un chantier",
+    moduleKey: "chantiers",
+  },
+  {
     key: "chantiers.archive_reactivate",
     label: "Archiver / réactiver un chantier archivé",
     moduleKey: "chantiers",
