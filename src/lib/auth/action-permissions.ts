@@ -20,6 +20,9 @@ export function commercialSpecialPermissionForMutation(input: {
 export function chantierSpecialPermissionForMutation(input: {
   action: string;
 }): SpecialPermissionKey | null {
+  if (input.action === "markDone" || input.action === "reactivate") {
+    return "chantiers.close_reopen";
+  }
   if (input.action === "archive" || input.action === "unarchive") {
     return "chantiers.archive_reactivate";
   }

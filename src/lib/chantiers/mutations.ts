@@ -130,11 +130,18 @@ export type ChantierCapabilities = {
   canRead: boolean;
   canModify: boolean;
   canLaunch: boolean;
+  canCloseReopen: boolean;
   canArchive: boolean;
 };
 
 export function chantierCapabilities(_actor: ChantierActor): ChantierCapabilities {
-  return { canRead: true, canModify: true, canLaunch: true, canArchive: true };
+  return {
+    canRead: true,
+    canModify: true,
+    canLaunch: true,
+    canCloseReopen: true,
+    canArchive: true,
+  };
 }
 
 function text(value: string): string | null {

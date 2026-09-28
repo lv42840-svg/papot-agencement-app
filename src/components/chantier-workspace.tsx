@@ -540,6 +540,7 @@ function LifecycleTab({
   const [reactivateReason, setReactivateReason] = useState("");
   const [archiveReviewed, setArchiveReviewed] = useState(false);
   const [unarchiveReason, setUnarchiveReason] = useState("");
+  const canManageDoneLifecycle = capabilities.canCloseReopen || capabilities.canArchive;
   const closeWarningParts = closeWarning
     ? [
         closeWarning.futureAllocatedHours > 0
@@ -571,7 +572,7 @@ function LifecycleTab({
         </div>
       </div>
 
-      {chantier.status === "ACTIVE" && capabilities.canModify ? (
+      {chantier.status === "ACTIVE" && capabilities.canCloseReopen ? (
         <div className="chantierLifecycleAction">
           <p>
             Le statut Terminé signifie que les travaux principaux sont finis. Les documents,
@@ -607,29 +608,31 @@ function LifecycleTab({
         </div>
       ) : null}
 
-      {chantier.status === "DONE" && capabilities.canModify ? (
+      {chantier.status === "DONE" && canManageDoneLifecycle ? (
         <div className="chantierLifecycleAction chantierLifecycleSplit">
-          <div>
-            <strong>Reprendre les travaux</strong>
-            <input
-              value={reactivateReason}
-              onChange={(event) => setReactivateReason(event.target.value)}
-              placeholder="Motif obligatoire de réouverture"
-            />
-            <button
-              type="button"
-              className="secondaryButton"
-              disabled={busy || !reactivateReason.trim()}
-              onClick={() =>
-                void mutate(
-                  { action: "reactivate", chantierId: chantier.id, reason: reactivateReason },
-                  "Chantier remis en Actif.",
-                )
-              }
-            >
-              <RotateCcw size={15} /> Remettre Actif
-            </button>
-          </div>
+          {capabilities.canCloseReopen ? (
+            <div>
+              <strong>Reprendre les travaux</strong>
+              <input
+                value={reactivateReason}
+                onChange={(event) => setReactivateReason(event.target.value)}
+                placeholder="Motif obligatoire de réouverture"
+              />
+              <button
+                type="button"
+                className="secondaryButton"
+                disabled={busy || !reactivateReason.trim()}
+                onClick={() =>
+                  void mutate(
+                    { action: "reactivate", chantierId: chantier.id, reason: reactivateReason },
+                    "Chantier remis en Actif.",
+                  )
+                }
+              >
+                <RotateCcw size={15} /> Remettre Actif
+              </button>
+            </div>
+          ) : null}
           {capabilities.canArchive ? (
             <div>
               <strong>Archiver</strong>
