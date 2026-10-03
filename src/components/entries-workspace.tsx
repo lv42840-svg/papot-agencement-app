@@ -200,7 +200,6 @@ export function EntriesWorkspace() {
     }
   }, []);
 
-
   const payload = snapshot?.payload;
   const now = useMemo(() => new Date(snapshot?.serverNow ?? Date.now()), [snapshot?.serverNow]);
   const qualifyEntries = useMemo(
@@ -319,7 +318,6 @@ export function EntriesWorkspace() {
           ))}
         </section>
       ) : null}
-
 
       {snapshot ? (
         <div className="entriesMainGrid">
