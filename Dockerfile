@@ -30,6 +30,7 @@ WORKDIR /app
 COPY --from=builder /app/.next/standalone ./
 COPY --from=builder /app/.next/static ./.next/static
 COPY --from=builder /app/public ./public
+COPY --from=builder /app/docs/templates ./docs/templates
 COPY --from=dependencies /app/node_modules ./node_modules
 
 RUN mkdir -p /srv/papot/agencement/documents /srv/papot/agencement/modeles \
