@@ -6,7 +6,13 @@ import { FormEvent, useEffect, useMemo, useRef, useState } from "react";
 
 type ContextPayload = {
   clients: Array<{ id: string; name: string }>;
-  cases: Array<{ id: string; name: string; clientId: string | null; clientName: string; status: string }>;
+  cases: Array<{
+    id: string;
+    name: string;
+    clientId: string | null;
+    clientName: string;
+    status: string;
+  }>;
   tags: Array<{ id: string; label: string; active: boolean; sortOrder: number }>;
   error?: string;
 };
@@ -131,7 +137,9 @@ export function MobileEntryCapture() {
           >
             <option value="">Aucun / à qualifier plus tard</option>
             {(context?.clients ?? []).map((client) => (
-              <option key={client.id} value={client.id}>{client.name}</option>
+              <option key={client.id} value={client.id}>
+                {client.name}
+              </option>
             ))}
           </select>
         </label>
@@ -142,7 +150,8 @@ export function MobileEntryCapture() {
             <option value="">Client seulement / aucune affaire</option>
             {visibleCases.map((item) => (
               <option key={item.id} value={item.id}>
-                {item.name}{item.clientName ? ` · ${item.clientName}` : ""}
+                {item.name}
+                {item.clientName ? ` · ${item.clientName}` : ""}
               </option>
             ))}
           </select>
@@ -204,9 +213,7 @@ export function MobileEntryCapture() {
               <button
                 type="button"
                 key={`${file.name}-${index}`}
-                onClick={() =>
-                  setFiles((current) => current.filter((_, i) => i !== index))
-                }
+                onClick={() => setFiles((current) => current.filter((_, i) => i !== index))}
               >
                 {file.name} ×
               </button>
@@ -219,34 +226,7 @@ export function MobileEntryCapture() {
         </button>
       </form>
 
-      <style jsx global>{`
-        .mobileCapturePage { min-height: 100vh; background: #f7f5fb; padding: 14px; color: var(--text); }
-        .mobileCaptureHeader { display:flex; justify-content:space-between; align-items:center; gap:12px; margin-bottom:14px; }
-        .mobileCaptureHeader > div { display:grid; gap:2px; }
-        .mobileCaptureHeader strong { font-size:14px; color:#5c49ad; }
-        .mobileCaptureHeader span { font-size:22px; font-weight:800; }
-        .mobileCaptureHeader a { color:#6657a7; font-size:13px; font-weight:700; text-decoration:none; }
-        .mobileCaptureCard { display:grid; gap:13px; padding:14px; border:1px solid #e4dff0; border-radius:15px; background:#fff; }
-        .mobileCaptureField { display:grid; gap:6px; font-size:12px; font-weight:750; color:#5f596d; }
-        .mobileCaptureField textarea, .mobileCaptureField select { width:100%; border:1px solid #dcd7e7; border-radius:10px; background:#fff; padding:11px; font:inherit; color:var(--text); }
-        .mobileCaptureField textarea { resize:vertical; font-size:16px; }
-        .mobileCaptureField select { min-height:44px; }
-        .mobileUrgentButton { width:max-content; min-height:38px; padding:0 12px; display:inline-flex; align-items:center; gap:7px; border:1px solid #e5caca; border-radius:9px; background:#fff; }
-        .mobileUrgentButton.isActive { background:#fff0f0; border-color:#d98d8d; color:#a33c3c; }
-        .mobileCaptureTags { display:flex; flex-wrap:wrap; gap:7px; }
-        .mobileCaptureTags button { min-height:34px; padding:0 10px; border:1px solid #ddd8e8; border-radius:999px; background:#fff; }
-        .mobileCaptureTags button.isSelected { background:#eee9ff; border-color:#bcaee8; color:#5c49ad; }
-        .mobileCaptureFiles { display:grid; grid-template-columns:1fr 1fr; gap:9px; }
-        .mobileCaptureFiles button { min-height:44px; display:flex; justify-content:center; align-items:center; gap:7px; border:1px solid #ddd8e8; border-radius:10px; background:#fff; }
-        .mobilePendingFiles { display:flex; flex-wrap:wrap; gap:6px; }
-        .mobilePendingFiles button { border:0; border-radius:999px; padding:7px 9px; background:#f1eef8; color:#625a72; font-size:11px; }
-        .mobileSubmitButton { min-height:52px; display:flex; align-items:center; justify-content:center; gap:8px; border:0; border-radius:12px; background:#6751c8; color:#fff; font-size:16px; font-weight:800; }
-        .mobileSubmitButton:disabled { opacity:.55; }
-        .mobileCaptureMessage { display:flex; align-items:center; gap:7px; padding:10px 12px; margin-bottom:10px; border-radius:10px; font-size:13px; }
-        .mobileCaptureMessage.isError { background:#fff0f0; color:#a33c3c; }
-        .mobileCaptureMessage.isSuccess { background:#eef9f2; color:#287548; }
-        @media (min-width: 720px) { .mobileCapturePage { max-width:560px; margin:0 auto; padding-top:24px; } }
-      `}</style>
+
     </main>
   );
 }
