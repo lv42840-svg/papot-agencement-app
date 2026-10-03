@@ -108,7 +108,9 @@ export function EntriesSettingsWorkspace() {
             first={index === 0}
             last={index === tags.length - 1}
             busy={busy}
-            onMove={(direction) => mutate({ action: "tagMove", tagId: tag.id, direction })}
+            onMove={(direction) =>
+              mutate({ action: "tagMove", tagId: tag.id, direction })
+            }
             onSave={(label, active) =>
               mutate(
                 { action: "tagUpdate", tagId: tag.id, label, active },
@@ -216,7 +218,11 @@ function TagRow({
 
   return (
     <div className="entriesSettingsRow">
-      <input value={label} onChange={(event) => setLabel(event.target.value)} disabled={busy} />
+      <input
+        value={label}
+        onChange={(event) => setLabel(event.target.value)}
+        disabled={busy}
+      />
       <label className="entriesSettingsActive">
         <input
           type="checkbox"
