@@ -1,9 +1,6 @@
 import { NextResponse } from "next/server";
 
-import {
-  getServerDbPool,
-  runServerDbMigrations,
-} from "@/lib/server-db";
+import { getServerDbPool, runServerDbMigrations } from "@/lib/server-db";
 
 export const dynamic = "force-dynamic";
 
