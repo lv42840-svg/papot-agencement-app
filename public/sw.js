@@ -11,11 +11,8 @@ async function installCaptureShell() {
 
 async function clearOldCaches() {
   const keys = await caches.keys();
-  await Promise.all(
-    keys
-      .filter((key) => key !== CACHE)
-      .map((key) => caches.delete(key)),
-  );
+  const oldKeys = keys.filter((key) => key !== CACHE);
+  await Promise.all(oldKeys.map((key) => caches.delete(key)));
 }
 
 self.addEventListener("install", (event) => {
@@ -24,12 +21,7 @@ self.addEventListener("install", (event) => {
 });
 
 self.addEventListener("activate", (event) => {
-  event.waitUntil(
-    Promise.all([
-      self.clients.claim(),
-      clearOldCaches(),
-    ]),
-  );
+  event.waitUntil(Promise.all([self.clients.claim(), clearOldCaches()]));
 });
 
 self.addEventListener("fetch", (event) => {
