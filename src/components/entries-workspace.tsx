@@ -13,10 +13,12 @@ import {
   Eye,
   FileText,
   Paperclip,
+  Plus,
   RefreshCw,
   Save,
   Tag,
   Upload,
+  Trash2,
   UserRound,
   X,
 } from "lucide-react";
@@ -49,6 +51,12 @@ type MutationFn = (
   successMessage?: string,
 ) => Promise<EntriesApiSnapshot | null>;
 type UploadFn = (entryId: string, files: File[]) => Promise<boolean>;
+type NextActionDraft = {
+  id: string;
+  text: string;
+  assigneeName: string;
+  dueDate: string;
+};
 
 const errorMessages: Record<string, string> = {
   DESKTOP_RUNTIME_NOT_CONFIGURED: "Le poste PAPOT n'est pas configuré.",
@@ -510,10 +518,16 @@ function EntryDetail({
   onOpenEntry: (entryId: string) => void;
 }) {
   const [description, setDescription] = useState(entry.structuredDescription ?? entry.rawText);
-  const [nextAction, setNextAction] = useState(entry.nextAction ?? "");
+  const nextAction = entry.nextAction ?? "";
   const [tagIds, setTagIds] = useState(entry.tagIds);
-  const [assigneeName, setAssigneeName] = useState(entry.assigneeName ?? "");
-  const [dueDate, setDueDate] = useState(entry.dueDate ?? "");
+  const [actionDrafts, setActionDrafts] = useState<NextActionDraft[]>(() => [
+    {
+      id: `action-${entry.id}-1`,
+      text: entry.status === "TO_QUALIFY" ? (entry.nextAction ?? "") : "",
+      assigneeName: "",
+      dueDate: "",
+    },
+  ]);
   const [result, setResult] = useState(entry.result ?? "");
   const [snoozeDate, setSnoozeDate] = useState("");
   const [snoozeReason, setSnoozeReason] = useState("");
@@ -646,15 +660,7 @@ function EntryDetail({
                         onChange={(event) => setDescription(event.target.value)}
                       />
                     </label>
-                    <label className="entriesField">
-                      <span>J'en fais quoi ?</span>
-                      <textarea
-                        rows={2}
-                        value={nextAction}
-                        onChange={(event) => setNextAction(event.target.value)}
-                        placeholder="Action attendue ou prochaine étape"
-                      />
-                    </label>
+
                     <button
                       type="button"
                       className="secondaryButton entriesSaveDraft"
@@ -665,7 +671,7 @@ function EntryDetail({
                             action: "qualifyDraft",
                             entryId: entry.id,
                             description,
-                            nextAction,
+                            nextAction: "",
                             tagIds,
                           },
                           "Qualification enregistrée. L'entrée reste dans À qualifier.",
@@ -685,59 +691,136 @@ function EntryDetail({
               {capabilities.canQualify ? (
                 <section className="entriesDetailSection entriesActionSection">
                   <div className="entriesSectionTitle">
-                    <UserRound size={15} /> Prendre en charge
+                    <UserRound size={15} /> Actions suivantes
                   </div>
-                  <div className="entriesTwoFields">
-                    <label className="entriesField">
-                      <span>Responsable</span>
-                      <input
-                        list={`entry-assignees-${entry.id}`}
-                        value={assigneeName}
-                        onChange={(event) => setAssigneeName(event.target.value)}
-                        placeholder="Choisir un utilisateur…"
-                      />
-                      <datalist id={`entry-assignees-${entry.id}`}>
-                        {suggestedAssignees.map((name) => (
-                          <option value={name} key={name} />
-                        ))}
-                      </datalist>
-                    </label>
-                    <label className="entriesField">
-                      <span>Date limite</span>
-                      <input
-                        type="date"
-                        value={dueDate}
-                        onChange={(event) => setDueDate(event.target.value)}
-                      />
-                    </label>
+                  <div className="entriesNextActions">
+                    {actionDrafts.map((actionDraft, index) => (
+                      <div className="entriesNextActionCard" key={actionDraft.id}>
+                        <div className="entriesNextActionHeader">
+                          <strong>Action suivante {index + 1}</strong>
+                          {actionDrafts.length > 1 ? (
+                            <button
+                              type="button"
+                              className="entriesIconButton"
+                              title="Supprimer cette action"
+                              onClick={() =>
+                                setActionDrafts((current) =>
+                                  current.filter((item) => item.id !== actionDraft.id),
+                                )
+                              }
+                            >
+                              <Trash2 size={15} />
+                            </button>
+                          ) : null}
+                        </div>
+                        <label className="entriesField">
+                          <span>Action suivante</span>
+                          <textarea
+                            rows={2}
+                            value={actionDraft.text}
+                            onChange={(event) =>
+                              setActionDrafts((current) =>
+                                current.map((item) =>
+                                  item.id === actionDraft.id
+                                    ? { ...item, text: event.target.value }
+                                    : item,
+                                ),
+                              )
+                            }
+                            placeholder="Ex. Préparer le devis, rappeler le client..."
+                          />
+                        </label>
+                        <div className="entriesTwoFields">
+                          <label className="entriesField">
+                            <span>Responsable</span>
+                            <input
+                              list={`entry-assignees-${entry.id}`}
+                              value={actionDraft.assigneeName}
+                              onChange={(event) =>
+                                setActionDrafts((current) =>
+                                  current.map((item) =>
+                                    item.id === actionDraft.id
+                                      ? { ...item, assigneeName: event.target.value }
+                                      : item,
+                                  ),
+                                )
+                              }
+                              placeholder="Choisir un utilisateur…"
+                            />
+                          </label>
+                          <label className="entriesField">
+                            <span>Date limite</span>
+                            <input
+                              type="date"
+                              value={actionDraft.dueDate}
+                              onChange={(event) =>
+                                setActionDrafts((current) =>
+                                  current.map((item) =>
+                                    item.id === actionDraft.id
+                                      ? { ...item, dueDate: event.target.value }
+                                      : item,
+                                  ),
+                                )
+                              }
+                            />
+                          </label>
+                        </div>
+                      </div>
+                    ))}
+                    <datalist id={`entry-assignees-${entry.id}`}>
+                      {suggestedAssignees.map((name) => (
+                        <option value={name} key={name} />
+                      ))}
+                    </datalist>
+                    <button
+                      type="button"
+                      className="secondaryButton"
+                      disabled={busy || actionDrafts.length >= 20}
+                      onClick={() =>
+                        setActionDrafts((current) => [
+                          ...current,
+                          {
+                            id: crypto.randomUUID(),
+                            text: "",
+                            assigneeName: "",
+                            dueDate: "",
+                          },
+                        ])
+                      }
+                    >
+                      <Plus size={15} /> Ajouter une action
+                    </button>
+                    <button
+                      type="button"
+                      className="primaryButton"
+                      disabled={
+                        busy ||
+                        !description.trim() ||
+                        actionDrafts.length === 0 ||
+                        actionDrafts.some(
+                          (item) => !item.text.trim() || !item.assigneeName.trim() || !item.dueDate,
+                        )
+                      }
+                      onClick={() =>
+                        void mutate(
+                          {
+                            action: "qualifyActions",
+                            entryId: entry.id,
+                            description,
+                            tagIds,
+                            actions: actionDrafts.map((item) => ({
+                              text: item.text,
+                              assigneeName: item.assigneeName,
+                              dueDate: item.dueDate,
+                            })),
+                          },
+                          `Note validée et ${actionDrafts.length} action${actionDrafts.length > 1 ? "s" : ""} créée${actionDrafts.length > 1 ? "s" : ""}.`,
+                        )
+                      }
+                    >
+                      Valider la note et créer les actions
+                    </button>
                   </div>
-                  <button
-                    type="button"
-                    className="primaryButton"
-                    disabled={
-                      busy ||
-                      !description.trim() ||
-                      !nextAction.trim() ||
-                      !assigneeName.trim() ||
-                      !dueDate
-                    }
-                    onClick={() =>
-                      void mutate(
-                        {
-                          action: "qualifyAssign",
-                          entryId: entry.id,
-                          description,
-                          nextAction,
-                          assigneeName,
-                          dueDate,
-                          tagIds,
-                        },
-                        "Entrée qualifiée et affectée.",
-                      )
-                    }
-                  >
-                    Affecter avec échéance
-                  </button>
                   <div className="entriesDivider" />
                   <label className="entriesField">
                     <span>Résultat facultatif</span>
@@ -1881,6 +1964,28 @@ function EntriesStyles() {
       }
       .entriesActionSection {
         background: #fdfcff;
+      }
+      .entriesNextActions {
+        display: grid;
+        gap: 10px;
+      }
+      .entriesNextActionCard {
+        display: grid;
+        gap: 10px;
+        padding: 11px;
+        border: 1px solid #e8e2f2;
+        border-radius: 9px;
+        background: #fff;
+      }
+      .entriesNextActionHeader {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 8px;
+      }
+      .entriesNextActionHeader strong {
+        color: #625d70;
+        font-size: 10px;
       }
       .entriesDivider {
         height: 1px;

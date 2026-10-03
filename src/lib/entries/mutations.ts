@@ -38,6 +38,22 @@ export const entriesMutationSchema = z.discriminatedUnion("action", [
     tagIds: tagIdsSchema,
   }),
   z.object({
+    action: z.literal("qualifyActions"),
+    entryId: z.string().uuid(),
+    description: z.string().trim().min(1).max(4000),
+    tagIds: tagIdsSchema,
+    actions: z
+      .array(
+        z.object({
+          text: z.string().trim().min(1).max(2000),
+          assigneeName: z.string().trim().min(1).max(120),
+          dueDate: dateOnlySchema,
+        }),
+      )
+      .min(1)
+      .max(20),
+  }),
+  z.object({
     action: z.literal("updateAssigned"),
     entryId: z.string().uuid(),
     description: z.string().trim().min(1).max(4000),
@@ -355,6 +371,67 @@ export function applyEntriesMutation(
       now,
     );
     return { payload, focusEntryId: entry.id };
+  }
+
+  if (input.action === "qualifyActions") {
+    requireCapability(capabilities.canQualify, "QUALIFICATION_FORBIDDEN");
+    assertToQualify(entry);
+    ensureTagIds(payload, input.tagIds);
+
+    entry.structuredDescription = input.description;
+    entry.nextAction = null;
+    entry.tagIds = [...input.tagIds];
+    entry.status = "DONE";
+    entry.result = `${input.actions.length} action${input.actions.length > 1 ? "s" : ""} suivante${input.actions.length > 1 ? "s" : ""} créée${input.actions.length > 1 ? "s" : ""}.`;
+    entry.completedAt = now;
+    entry.snoozedUntilDate = null;
+
+    const createdActions: EntryRecord[] = input.actions.map((action) => {
+      const child: EntryRecord = {
+        id: randomUUID(),
+        rawText: action.text,
+        structuredDescription: input.description,
+        nextAction: action.text,
+        tagIds: [...input.tagIds],
+        priority: entry.priority,
+        status: "ASSIGNED",
+        createdAt: now,
+        createdByName: actor.displayName,
+        assigneeName: action.assigneeName,
+        dueDate: action.dueDate,
+        snoozedUntilDate: null,
+        result: null,
+        completedAt: null,
+        parentEntryId: entry.id,
+        clientId: entry.clientId ?? null,
+        commercialCaseId: entry.commercialCaseId ?? null,
+        derivedEntryIds: [],
+        attachments: [],
+        history: [],
+      };
+      history(child, actor, "CREATED", `Action créée depuis « ${entry.rawText} ».`, now);
+      history(
+        child,
+        actor,
+        "ASSIGNED",
+        `Affectée à ${action.assigneeName}, échéance ${action.dueDate}.`,
+        now,
+      );
+      entry.derivedEntryIds.push(child.id);
+      history(entry, actor, "DERIVED_CREATED", `Action liée créée : « ${action.text} ».`, now);
+      return child;
+    });
+
+    history(
+      entry,
+      actor,
+      "COMPLETED",
+      `Note validée avec ${createdActions.length} action${createdActions.length > 1 ? "s" : ""} suivante${createdActions.length > 1 ? "s" : ""}.`,
+      now,
+    );
+
+    payload.entries.unshift(...createdActions);
+    return { payload, focusEntryId: createdActions[0]?.id ?? entry.id };
   }
 
   if (input.action === "updateAssigned") {
