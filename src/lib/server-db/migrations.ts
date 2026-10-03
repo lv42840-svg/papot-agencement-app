@@ -75,7 +75,7 @@ async function ensureFreshWebBootstrap(client: PoolClient): Promise<void> {
   ];
 
   const allBusinessEmpty = businessCounts.every((count) => count === "0");
-  const alreadyBootstrapped = row.cutovers === "7";
+  const alreadyBootstrapped = row.cutovers === "9";
 
   if (alreadyBootstrapped) return;
   if (!allBusinessEmpty || row.cutovers !== "0") {
@@ -167,6 +167,8 @@ async function ensureFreshWebBootstrap(client: PoolClient): Promise<void> {
     "chantiers",
     "library",
     "quotes",
+    "commercial_document_files",
+    "entry_attachment_files",
   ]) {
     await client.query(
       `
