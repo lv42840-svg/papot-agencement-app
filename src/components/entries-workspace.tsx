@@ -676,7 +676,9 @@ function EntryDetail({
                     </button>
                   </>
                 ) : (
-                  <p className="entriesReadOnlyNote">Tu n’as pas le droit de qualifier cette entrée.</p>
+                  <p className="entriesReadOnlyNote">
+                    Tu n’as pas le droit de qualifier cette entrée.
+                  </p>
                 )}
               </section>
 
