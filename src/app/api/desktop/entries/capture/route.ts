@@ -2,6 +2,9 @@ import { randomUUID } from "node:crypto";
 import { NextResponse } from "next/server";
 import { z } from "zod";
 import { requireModuleRequestContext } from "@/lib/auth/module-request-context";
+import { createClientsRepository } from "@/lib/clients/create-repository";
+import { createCommercialRepository } from "@/lib/commercial/create-repository";
+import { isCommercialClosed } from "@/lib/commercial/domain";
 import { desktopRequestErrorStatus } from "@/lib/desktop/request-context";
 import { createEntryAttachmentTransport } from "@/lib/entries/attachment-file-runtime";
 import {
@@ -24,6 +27,8 @@ const captureSchema = z.object({
   rawText: z.string().trim().min(1).max(4000),
   priority: z.enum(["NORMAL", "URGENT"]).default("NORMAL"),
   tagIds: z.array(z.string().min(1).max(100)).max(12).default([]),
+  clientId: z.string().uuid().nullable().optional(),
+  commercialCaseId: z.string().uuid().nullable().optional(),
 });
 
 function actorFor(context: Awaited<ReturnType<typeof requireModuleRequestContext>>): EntriesActor {
@@ -52,6 +57,7 @@ function statusFor(code: string): number {
   if (code === "SERVER_FILE_ROOT_UNAVAILABLE") return 503;
   if (code.includes("INTEGRITY") || code.includes("CUTOVER_VALIDATION")) return 500;
   if (code.includes("TOO_LARGE")) return 413;
+  if (code.endsWith("_NOT_FOUND")) return 404;
   if (code.includes("CONFLICT")) return 409;
   return 400;
 }
@@ -74,13 +80,42 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: "ENTRIES_REQUEST_INVALID" }, { status: 400 });
     }
 
+    const rawClientId = String(form.get("clientId") ?? "").trim();
+    const rawCommercialCaseId = String(form.get("commercialCaseId") ?? "").trim();
     const parsed = captureSchema.safeParse({
       rawText: String(form.get("rawText") ?? ""),
       priority: String(form.get("priority") ?? "NORMAL"),
       tagIds: rawTagIds,
+      clientId: rawClientId || null,
+      commercialCaseId: rawCommercialCaseId || null,
     });
     if (!parsed.success) {
       return NextResponse.json({ error: "ENTRIES_REQUEST_INVALID" }, { status: 400 });
+    }
+
+    let clientId = parsed.data.clientId ?? null;
+    const commercialCaseId = parsed.data.commercialCaseId ?? null;
+
+    if (clientId || commercialCaseId) {
+      const [clientsPayload, commercialPayload] = await Promise.all([
+        createClientsRepository().then((clients) => clients.load()),
+        createCommercialRepository().load(),
+      ]);
+
+      if (clientId) {
+        const client = clientsPayload.clients.find(
+          (candidate) => candidate.id === clientId && !candidate.isArchived,
+        );
+        if (!client) throw new Error("CLIENT_NOT_FOUND");
+      }
+
+      if (commercialCaseId) {
+        const commercialCase = commercialPayload.cases.find(
+          (candidate) => candidate.id === commercialCaseId && !isCommercialClosed(candidate),
+        );
+        if (!commercialCase) throw new Error("COMMERCIAL_CASE_NOT_FOUND");
+        if (commercialCase.clientId) clientId = commercialCase.clientId;
+      }
     }
 
     if (files.length > 0) {
@@ -90,7 +125,16 @@ export async function POST(request: Request) {
     }
 
     const entryId = randomUUID();
-    const created = await repository.mutate({ action: "create", entryId, ...parsed.data }, actor);
+    const created = await repository.mutate(
+      {
+        action: "create",
+        entryId,
+        ...parsed.data,
+        clientId,
+        commercialCaseId,
+      },
+      actor,
+    );
 
     if (!transport || files.length === 0) {
       return NextResponse.json(snapshot(created.payload, actor, created.focusEntryId), {

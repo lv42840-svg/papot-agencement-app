@@ -7,8 +7,10 @@ import { acquireNextcloudCommercialSnapshot } from "./nextcloud-repository";
 import { createPostgresCommercialRepository } from "./postgres-repository";
 import type { CommercialRepository } from "./repository";
 
+type LegacyCommercialCutoverContext = Pick<DesktopRequestContext, "desktop" | "owner">;
+
 export function createCommercialRepository(
-  context: Pick<DesktopRequestContext, "desktop" | "owner">,
+  context?: LegacyCommercialCutoverContext,
 ): CommercialRepository {
   if (isLocalStorageMode()) return createLocalCommercialRepository();
 
@@ -20,11 +22,13 @@ export function createCommercialRepository(
       await runServerDbMigrations(pool);
       await ensureCommercialPostgresCutover({
         pool,
-        acquireSource: () =>
-          acquireNextcloudCommercialSnapshot({
+        acquireSource: () => {
+          if (!context) throw new Error("COMMERCIAL_LEGACY_CUTOVER_CONTEXT_REQUIRED");
+          return acquireNextcloudCommercialSnapshot({
             desktop: context.desktop,
             owner: context.owner,
-          }),
+          });
+        },
       });
       return createPostgresCommercialRepository(pool);
     })();
