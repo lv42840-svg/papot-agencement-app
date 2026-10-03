@@ -1,6 +1,6 @@
 import Link from "next/link";
 import { redirect } from "next/navigation";
-import { BriefcaseBusiness, Clock3, FolderOpen, ListTodo, Plus } from "lucide-react";
+import { BriefcaseBusiness, Camera, Clock3, FolderOpen, ListTodo, Plus } from "lucide-react";
 import { DashboardChantierStat } from "@/components/dashboard-chantier-stat";
 import { DashboardCommercialStats } from "@/components/dashboard-commercial-stats";
 import { DesktopAppShell } from "@/components/desktop-app-shell";
@@ -18,9 +18,14 @@ export default async function DesktopReadyPage() {
         <div>
           <h1>Bonjour 👋</h1>
         </div>
-        <Link className="primaryButton" href="/entrees">
-          <Plus size={18} /> Nouvelle entrée
-        </Link>
+        <div className="buttonRow">
+          <Link className="secondaryButton" href="/entrees">
+            <Plus size={18} /> Nouvelle entrée
+          </Link>
+          <Link className="primaryButton" href="/capture">
+            <Camera size={18} /> Capture
+          </Link>
+        </div>
       </div>
 
       <section className="dashboardStats" aria-label="Indicateurs principaux">
@@ -63,6 +68,9 @@ export default async function DesktopReadyPage() {
             </div>
           </div>
           <div className="dashboardQuickActions">
+            <Link className="secondaryButton" href="/capture">
+              <Camera size={17} /> Capture
+            </Link>
             <Link className="secondaryButton" href="/entrees">
               <Plus size={17} /> Nouvelle entrée
             </Link>
