@@ -1,9 +1,11 @@
 "use client";
 
+import Link from "next/link";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   AlertTriangle,
   Bell,
+  Camera,
   Check,
   CheckCircle2,
   Clock3,
@@ -270,14 +272,19 @@ export function EntriesWorkspace() {
           <h1>Entrées</h1>
           <p>Qualification, pièces jointes et suivi des actions.</p>
         </div>
-        <button
-          className="entriesRefreshButton"
-          type="button"
-          onClick={() => void load()}
-          disabled={busy}
-        >
-          <RefreshCw size={16} /> Actualiser
-        </button>
+        <div className="buttonRow">
+          <Link className="primaryButton" href="/capture">
+            <Camera size={16} /> Capture
+          </Link>
+          <button
+            className="entriesRefreshButton"
+            type="button"
+            onClick={() => void load()}
+            disabled={busy}
+          >
+            <RefreshCw size={16} /> Actualiser
+          </button>
+        </div>
       </section>
 
       {error ? <div className="entriesMessage entriesMessageError">{error}</div> : null}
