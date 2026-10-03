@@ -33,6 +33,15 @@ let cachedRuntime:
     }
   | undefined;
 
+function serverDeviceId(): string {
+  const value = process.env.PAPOT_SERVER_DEVICE_ID?.trim();
+  if (!value) throw new Error("PAPOT_SERVER_DEVICE_ID_REQUIRED");
+  if (!/^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(value)) {
+    throw new Error("PAPOT_SERVER_DEVICE_ID_INVALID");
+  }
+  return value;
+}
+
 export function createDesktopSharedResourceRuntime(): DesktopSharedResourceRuntime {
   if (isLocalStorageMode()) {
     const local = createLocalSharedResourceRuntime();
@@ -44,6 +53,19 @@ export function createDesktopSharedResourceRuntime(): DesktopSharedResourceRunti
       nextcloudUserId: "local",
       syncRoot: "LOCAL",
       deviceId: local.deviceId,
+    } as unknown as DesktopSharedResourceRuntime;
+  }
+
+  if ((process.env.PAPOT_STORAGE_MODE ?? "").trim().toLowerCase() === "postgres") {
+    const local = createLocalSharedResourceRuntime();
+    return {
+      coordinator: local.coordinator,
+      locks: local.locks,
+      states: local.states,
+      dav: null,
+      nextcloudUserId: "web",
+      syncRoot: "WEB",
+      deviceId: serverDeviceId(),
     } as unknown as DesktopSharedResourceRuntime;
   }
 
