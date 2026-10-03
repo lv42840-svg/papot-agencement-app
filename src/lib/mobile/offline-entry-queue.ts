@@ -60,13 +60,47 @@ export async function removeOfflineEntry(id: string): Promise<void> {
   db.close();
 }
 
-export function draftToFormData(draft: OfflineEntryDraft): FormData {
-  const form = new FormData();
-  form.set("rawText", draft.rawText);
-  form.set("priority", draft.priority);
-  form.set("tagIds", JSON.stringify(draft.tagIds));
-  form.set("clientId", draft.clientId);
-  form.set("commercialCaseId", draft.commercialCaseId);
-  draft.files.forEach((file) => form.append("files", file, file.name));
-  return form;
+export type MobileEntryCapturePayload = {
+  rawText: string;
+  priority: "NORMAL" | "URGENT";
+  tagIds: string[];
+  clientId: string | null;
+  commercialCaseId: string | null;
+  files: Array<{
+    name: string;
+    type: string;
+    base64: string;
+  }>;
+};
+
+function bytesToBase64(bytes: Uint8Array): string {
+  let binary = "";
+  const chunkSize = 0x8000;
+  for (let offset = 0; offset < bytes.length; offset += chunkSize) {
+    binary += String.fromCharCode(...bytes.subarray(offset, offset + chunkSize));
+  }
+  return btoa(binary);
+}
+
+export async function draftToJsonPayload(
+  draft: OfflineEntryDraft,
+): Promise<MobileEntryCapturePayload> {
+  const files = [];
+  for (const file of draft.files) {
+    const bytes = new Uint8Array(await file.arrayBuffer());
+    files.push({
+      name: file.name || "piece-jointe",
+      type: file.type || "application/octet-stream",
+      base64: bytesToBase64(bytes),
+    });
+  }
+
+  return {
+    rawText: draft.rawText,
+    priority: draft.priority,
+    tagIds: draft.tagIds,
+    clientId: draft.clientId || null,
+    commercialCaseId: draft.commercialCaseId || null,
+    files,
+  };
 }

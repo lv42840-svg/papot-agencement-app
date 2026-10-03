@@ -12,7 +12,7 @@ import {
 } from "lucide-react";
 import { FormEvent, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
-  draftToFormData,
+  draftToJsonPayload,
   listOfflineEntries,
   queueOfflineEntry,
   removeOfflineEntry,
@@ -61,9 +61,10 @@ export function MobileEntryCapture() {
     try {
       const queued = await listOfflineEntries();
       for (const draft of queued) {
-        const response = await fetch("/api/desktop/entries/capture", {
+        const response = await fetch("/api/mobile/entries/capture", {
           method: "POST",
-          body: draftToFormData(draft),
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(await draftToJsonPayload(draft)),
         });
         if (!response.ok) {
           const body = (await response.json()) as { error?: string };
@@ -203,9 +204,10 @@ export function MobileEntryCapture() {
         commercialCaseId,
         files,
       };
-      const response = await fetch("/api/desktop/entries/capture", {
+      const response = await fetch("/api/mobile/entries/capture", {
         method: "POST",
-        body: draftToFormData(draft),
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(await draftToJsonPayload(draft)),
       });
       const body = (await response.json()) as { error?: string };
       if (!response.ok) throw new Error(body.error ?? "Envoi impossible");
