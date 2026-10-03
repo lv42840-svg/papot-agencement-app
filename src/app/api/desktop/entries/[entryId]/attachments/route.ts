@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { requireModuleRequestContext } from "@/lib/auth/module-request-context";
+import { buildEntriesActor } from "@/lib/entries/actor";
 import { desktopRequestErrorStatus } from "@/lib/desktop/request-context";
 import { createEntryAttachmentTransport } from "@/lib/entries/attachment-file-runtime";
 import { cleanupEntryAttachments, uploadEntryAttachments } from "@/lib/entries/attachment-storage";
@@ -15,15 +16,6 @@ export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
 type RouteContext = { params: Promise<{ entryId: string }> };
-
-function actorFor(context: Awaited<ReturnType<typeof requireModuleRequestContext>>): EntriesActor {
-  return {
-    userId: context.user.id,
-    displayName: context.user.displayName,
-    canQualify: context.moduleAccess.canWrite,
-    canManageTags: context.user.canManagePermissions,
-  };
-}
 
 function snapshot(payload: EntriesPayload, actor: EntriesActor, focusEntryId?: string) {
   return {
@@ -51,7 +43,7 @@ export async function POST(request: Request, context: RouteContext) {
   try {
     const { entryId } = await context.params;
     const requestContext = await requireModuleRequestContext("capture", "WRITE");
-    const actor = actorFor(requestContext);
+    const actor = await buildEntriesActor(requestContext);
     const repository = await createEntriesRepository();
     const form = await request.formData();
     const files = form.getAll("files").filter((value): value is File => value instanceof File);

@@ -2,6 +2,7 @@ import { randomUUID } from "node:crypto";
 import { NextResponse } from "next/server";
 import { z } from "zod";
 import { requireModuleRequestContext } from "@/lib/auth/module-request-context";
+import { buildEntriesActor } from "@/lib/entries/actor";
 import { createClientsRepository } from "@/lib/clients/create-repository";
 import { createCommercialRepository } from "@/lib/commercial/create-repository";
 import { isCommercialClosed } from "@/lib/commercial/domain";
@@ -31,15 +32,6 @@ const captureSchema = z.object({
   commercialCaseId: z.string().uuid().nullable().optional(),
 });
 
-function actorFor(context: Awaited<ReturnType<typeof requireModuleRequestContext>>): EntriesActor {
-  return {
-    userId: context.user.id,
-    displayName: context.user.displayName,
-    canQualify: context.moduleAccess.canWrite,
-    canManageTags: context.user.canManagePermissions,
-  };
-}
-
 function snapshot(payload: EntriesPayload, actor: EntriesActor, focusEntryId?: string) {
   return {
     payload,
@@ -68,7 +60,7 @@ export async function POST(request: Request) {
 
   try {
     const context = await requireModuleRequestContext("capture", "WRITE");
-    const actor = actorFor(context);
+    const actor = await buildEntriesActor(context);
     const repository = await createEntriesRepository();
     const form = await request.formData();
     const files = form.getAll("files").filter((value): value is File => value instanceof File);

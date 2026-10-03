@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { ZodError } from "zod";
 import { requireModuleRequestContext } from "@/lib/auth/module-request-context";
+import { buildEntriesActor } from "@/lib/entries/actor";
 import { desktopRequestErrorStatus } from "@/lib/desktop/request-context";
 import { createEntriesRepository } from "@/lib/entries/create-repository";
 import type { EntriesPayload } from "@/lib/entries/domain";
@@ -13,15 +14,6 @@ import {
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
-
-function actorFor(context: Awaited<ReturnType<typeof requireModuleRequestContext>>): EntriesActor {
-  return {
-    userId: context.user.id,
-    displayName: context.user.displayName,
-    canQualify: context.moduleAccess.canWrite,
-    canManageTags: context.user.canManagePermissions,
-  };
-}
 
 function noStoreJson(body: unknown, init?: ResponseInit) {
   const response = NextResponse.json(body, init);
@@ -53,7 +45,7 @@ function errorStatus(code: string): number {
 export async function GET() {
   try {
     const context = await requireModuleRequestContext("capture", "READ");
-    const actor = actorFor(context);
+    const actor = await buildEntriesActor(context);
     const repository = await createEntriesRepository();
     const payload = await repository.load();
     return noStoreJson(publicSnapshot(payload, actor));
@@ -71,7 +63,7 @@ export async function POST(request: Request) {
     const input = entriesMutationSchema.parse(await request.json());
     stage = "create-context";
     const context = await requireModuleRequestContext("capture", "WRITE");
-    const actor = actorFor(context);
+    const actor = await buildEntriesActor(context);
     const repository = await createEntriesRepository();
 
     stage = "mutate-repository";
