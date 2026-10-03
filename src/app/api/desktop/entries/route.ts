@@ -2,12 +2,12 @@ import { NextResponse } from "next/server";
 import { ZodError } from "zod";
 import { requireModuleRequestContext } from "@/lib/auth/module-request-context";
 import { desktopRequestErrorStatus } from "@/lib/desktop/request-context";
+import { listEntryAssigneeNames } from "@/lib/entries/assignees";
 import { createEntriesRepository } from "@/lib/entries/create-repository";
 import type { EntriesPayload } from "@/lib/entries/domain";
 import {
   entriesCapabilities,
   entriesMutationSchema,
-  listSuggestedAssignees,
   type EntriesActor,
 } from "@/lib/entries/mutations";
 
@@ -29,12 +29,12 @@ function noStoreJson(body: unknown, init?: ResponseInit) {
   return response;
 }
 
-function publicSnapshot(payload: EntriesPayload, actor: EntriesActor, focusEntryId?: string) {
+async function publicSnapshot(payload: EntriesPayload, actor: EntriesActor, focusEntryId?: string) {
   return {
     payload,
     actor: { userId: actor.userId, displayName: actor.displayName },
     capabilities: entriesCapabilities(actor),
-    suggestedAssignees: listSuggestedAssignees(payload, actor),
+    suggestedAssignees: await listEntryAssigneeNames(payload, actor),
     focusEntryId,
     serverNow: new Date().toISOString(),
   };
@@ -56,7 +56,7 @@ export async function GET() {
     const actor = actorFor(context);
     const repository = await createEntriesRepository();
     const payload = await repository.load();
-    return noStoreJson(publicSnapshot(payload, actor));
+    return noStoreJson(await publicSnapshot(payload, actor));
   } catch (error) {
     const code = error instanceof Error ? error.message : "ENTRIES_LOAD_FAILED";
     return noStoreJson({ status: "error", error: code }, { status: errorStatus(code) });
@@ -78,7 +78,7 @@ export async function POST(request: Request) {
     const mutation = await repository.mutate(input, actor);
 
     console.info("[PAPOT][Entries] POST saved", { ms: Date.now() - startedAt });
-    return noStoreJson(publicSnapshot(mutation.payload, actor, mutation.focusEntryId));
+    return noStoreJson(await publicSnapshot(mutation.payload, actor, mutation.focusEntryId));
   } catch (error) {
     const code =
       error instanceof ZodError
