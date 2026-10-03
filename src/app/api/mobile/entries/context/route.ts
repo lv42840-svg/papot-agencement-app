@@ -43,7 +43,8 @@ export async function GET() {
       { headers: { "Cache-Control": "no-store" } },
     );
   } catch (error) {
-    const code = error instanceof Error ? error.message : "MOBILE_ENTRY_CONTEXT_FAILED";
+    const code =
+      error instanceof Error ? error.message : "MOBILE_ENTRY_CONTEXT_FAILED";
     return NextResponse.json({ error: code }, { status: 400 });
   }
 }
