@@ -9,10 +9,11 @@ Ce dossier constitue le socle de déploiement de PAPOT AGENCEMENT sur `agencemen
 - exposition locale uniquement sur `127.0.0.1:3002` ;
 - publication HTTPS assurée par Caddy ;
 - réseau Docker interne `papot-internal` commun aux services PAPOT ;
-- documents AGENCEMENT sous `/srv/papot/agencement` et arborescence métier sous `/srv/agencement` ;
+- documents techniques sous `/srv/papot/agencement` et fichiers métier AGENCEMENT sous `/srv/agencement` ;
 - le code Electron/desktop reste présent pendant la migration mais n'est pas utilisé par ce déploiement ;
 - le VPS utilise `PAPOT_STORAGE_MODE=postgres` ;
-- une base neuve utilise `PAPOT_POSTGRES_BOOTSTRAP_MODE=fresh` afin d'initialiser les états métier sans contacter Nextcloud.
+- une base neuve utilise `PAPOT_POSTGRES_BOOTSTRAP_MODE=fresh` afin d'initialiser les états métier sans contacter Nextcloud ;
+- `PAPOT_SERVER_FILES_ROOT=/srv/agencement` rend les pièces jointes et documents indépendants du runtime desktop.
 
 ## Préparation VPS
 
