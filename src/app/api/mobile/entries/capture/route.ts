@@ -57,9 +57,7 @@ function snapshot(payload: EntriesPayload, actor: EntriesActor, focusEntryId?: s
   };
 }
 
-function decodeFiles(
-  files: Array<{ name: string; type: string; base64: string }>,
-): File[] {
+function decodeFiles(files: Array<{ name: string; type: string; base64: string }>): File[] {
   return files.map((item) => {
     const bytes = Buffer.from(item.base64, "base64");
     return new File([bytes], item.name, {
@@ -149,7 +147,10 @@ export async function POST(request: Request) {
 
     return NextResponse.json(
       { error: code },
-      { status: code.endsWith("_NOT_FOUND") ? 404 : 400, headers: { "Cache-Control": "no-store" } },
+      {
+        status: code.endsWith("_NOT_FOUND") ? 404 : 400,
+        headers: { "Cache-Control": "no-store" },
+      },
     );
   }
 }
