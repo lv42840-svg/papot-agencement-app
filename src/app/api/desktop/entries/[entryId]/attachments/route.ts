@@ -64,7 +64,9 @@ export async function POST(request: Request, context: RouteContext) {
       return NextResponse.json({ error: "ENTRY_NOT_FOUND" }, { status: 404 });
     }
 
-    const transport = await createEntryAttachmentTransport({ owner: { displayName: requestContext.user.displayName } });
+    const transport = await createEntryAttachmentTransport({
+      owner: { displayName: requestContext.user.displayName },
+    });
     let uploaded = [] as Awaited<ReturnType<typeof uploadEntryAttachments>>;
     try {
       uploaded = await uploadEntryAttachments(transport, entryId, files);
