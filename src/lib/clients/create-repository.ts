@@ -7,8 +7,10 @@ import { acquireNextcloudClientsSnapshot } from "./nextcloud-repository";
 import { createPostgresClientsRepository } from "./postgres-repository";
 import type { ClientsRepository } from "./repository";
 
+type LegacyClientsCutoverContext = Pick<DesktopRequestContext, "desktop" | "owner">;
+
 export async function createClientsRepository(
-  context: Pick<DesktopRequestContext, "desktop" | "owner">,
+  context?: LegacyClientsCutoverContext,
 ): Promise<ClientsRepository> {
   if (isLocalStorageMode()) return createLocalClientsRepository();
 
@@ -16,12 +18,14 @@ export async function createClientsRepository(
   await runServerDbMigrations(pool);
   await ensureClientsPostgresCutover({
     pool,
-    acquireSource: () =>
-      acquireNextcloudClientsSnapshot({
+    acquireSource: () => {
+      if (!context) throw new Error("CLIENTS_LEGACY_CUTOVER_CONTEXT_REQUIRED");
+      return acquireNextcloudClientsSnapshot({
         states: context.desktop.states,
         locks: context.desktop.locks,
         owner: context.owner,
-      }),
+      });
+    },
   });
 
   return createPostgresClientsRepository(pool);
