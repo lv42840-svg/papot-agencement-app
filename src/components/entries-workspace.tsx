@@ -6,8 +6,6 @@ import {
   Bell,
   Check,
   CheckCircle2,
-  ChevronDown,
-  ChevronUp,
   Clock3,
   Download,
   Eye,
@@ -418,10 +416,6 @@ export function EntriesWorkspace() {
             Seul le texte est obligatoire. Tags, urgence, photos et documents restent facultatifs.
           </div>
         </form>
-      ) : null}
-
-      {snapshot?.capabilities.canManageTags ? (
-        <TagAdmin tags={snapshot.payload.tags} busy={busy} mutate={mutate} />
       ) : null}
 
       {snapshot ? (
@@ -1379,118 +1373,6 @@ function StatusBadge({ entry, now }: { entry: EntryRecord; now: Date }) {
     <span className="entriesBadge entriesBadgeAlert">À remonter</span>
   ) : (
     <span className="entriesBadge entriesBadgeQualify">À qualifier</span>
-  );
-}
-
-function TagAdmin({
-  tags,
-  busy,
-  mutate,
-}: {
-  tags: EntriesTag[];
-  busy: boolean;
-  mutate: MutationFn;
-}) {
-  const [newLabel, setNewLabel] = useState("");
-  const ordered = [...tags].sort((a, b) => a.sortOrder - b.sortOrder);
-  return (
-    <details className="entriesTagAdmin">
-      <summary>
-        <Tag size={14} /> Gérer les tags
-      </summary>
-      <div className="entriesTagAdminBody">
-        <form
-          onSubmit={(event) => {
-            event.preventDefault();
-            if (!newLabel.trim()) return;
-            void mutate({ action: "tagAdd", label: newLabel }, "Tag ajouté.").then((ok) => {
-              if (ok) setNewLabel("");
-            });
-          }}
-        >
-          <input
-            value={newLabel}
-            onChange={(event) => setNewLabel(event.target.value)}
-            placeholder="Nouveau tag"
-          />
-          <button type="submit" className="secondaryButton" disabled={busy || !newLabel.trim()}>
-            <Plus size={14} /> Ajouter
-          </button>
-        </form>
-        <div className="entriesTagAdminList">
-          {ordered.map((tag, index) => (
-            <TagAdminRow
-              key={tag.id}
-              tag={tag}
-              first={index === 0}
-              last={index === ordered.length - 1}
-              busy={busy}
-              mutate={mutate}
-            />
-          ))}
-        </div>
-      </div>
-    </details>
-  );
-}
-
-function TagAdminRow({
-  tag,
-  first,
-  last,
-  busy,
-  mutate,
-}: {
-  tag: EntriesTag;
-  first: boolean;
-  last: boolean;
-  busy: boolean;
-  mutate: MutationFn;
-}) {
-  const [label, setLabel] = useState(tag.label);
-  const [active, setActive] = useState(tag.active);
-  useEffect(() => {
-    setLabel(tag.label);
-    setActive(tag.active);
-  }, [tag.label, tag.active]);
-  return (
-    <div className="entriesTagAdminRow">
-      <input value={label} onChange={(event) => setLabel(event.target.value)} />
-      <label>
-        <input
-          type="checkbox"
-          checked={active}
-          onChange={(event) => setActive(event.target.checked)}
-        />{" "}
-        Actif
-      </label>
-      <button
-        type="button"
-        title="Monter"
-        disabled={busy || first}
-        onClick={() => void mutate({ action: "tagMove", tagId: tag.id, direction: "up" })}
-      >
-        <ChevronUp size={15} />
-      </button>
-      <button
-        type="button"
-        title="Descendre"
-        disabled={busy || last}
-        onClick={() => void mutate({ action: "tagMove", tagId: tag.id, direction: "down" })}
-      >
-        <ChevronDown size={15} />
-      </button>
-      <button
-        type="button"
-        className="entriesTinyButton"
-        disabled={busy || !label.trim()}
-        onClick={() =>
-          void mutate({ action: "tagUpdate", tagId: tag.id, label, active }, "Tag enregistré.")
-        }
-      >
-        Enregistrer
-      </button>
-    </div>
   );
 }
 
