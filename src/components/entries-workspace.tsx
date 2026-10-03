@@ -798,8 +798,7 @@ function EntryDetail({
                         !description.trim() ||
                         actionDrafts.length === 0 ||
                         actionDrafts.some(
-                          (item) =>
-                            !item.text.trim() || !item.assigneeName.trim() || !item.dueDate,
+                          (item) => !item.text.trim() || !item.assigneeName.trim() || !item.dueDate,
                         )
                       }
                       onClick={() =>
