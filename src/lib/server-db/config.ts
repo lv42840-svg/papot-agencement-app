@@ -30,7 +30,7 @@ export function getServerDbConfig(env: ServerDbEnv = process.env): ServerDbConfi
 
   return {
     connectionString,
-    applicationName: DEFAULT_APPLICATION_NAME,
+    applicationName: env.PAPOT_DATABASE_APPLICATION_NAME?.trim() || DEFAULT_APPLICATION_NAME,
     maxConnections: 10,
     connectionTimeoutMillis: 5_000,
     idleTimeoutMillis: 30_000,

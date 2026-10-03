@@ -21,6 +21,15 @@ describe("central PostgreSQL configuration", () => {
     });
   });
 
+  it("uses an explicit PostgreSQL application name when provided", () => {
+    const config = getServerDbConfig({
+      PAPOT_DATABASE_URL: "postgresql://papot:secret@papot-server:5432/papot",
+      PAPOT_DATABASE_APPLICATION_NAME: "papot-agencement-web",
+    });
+
+    expect(config.applicationName).toBe("papot-agencement-web");
+  });
+
   it("rejects non-PostgreSQL protocols", () => {
     expect(() => getServerDbConfig({ PAPOT_DATABASE_URL: "https://papot-server/papot" })).toThrow(
       "must use the postgresql:// or postgres:// protocol",

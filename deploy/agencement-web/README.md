@@ -10,7 +10,9 @@ Ce dossier constitue le socle de déploiement de PAPOT AGENCEMENT sur `agencemen
 - publication HTTPS assurée par Caddy ;
 - réseau Docker interne `papot-internal` commun aux services PAPOT ;
 - documents AGENCEMENT sous `/srv/papot/agencement` et arborescence métier sous `/srv/agencement` ;
-- le code Electron/desktop reste présent pendant la migration mais n'est pas utilisé par ce déploiement.
+- le code Electron/desktop reste présent pendant la migration mais n'est pas utilisé par ce déploiement ;
+- le VPS utilise `PAPOT_STORAGE_MODE=postgres` ;
+- une base neuve utilise `PAPOT_POSTGRES_BOOTSTRAP_MODE=fresh` afin d'initialiser les états métier sans contacter Nextcloud.
 
 ## Préparation VPS
 
@@ -31,6 +33,8 @@ sudo chown -R 1000:1000 /srv/papot/agencement
 ```
 
 Copier ensuite `.env.example` vers `.env` et renseigner le vrai mot de passe PostgreSQL.
+
+Le bootstrap `fresh` est volontairement protégé : s'il détecte déjà des données métier ou un cutover partiel, il refuse de continuer au lieu d'écraser ou de requalifier silencieusement la base.
 
 ## Démarrage
 

@@ -26,6 +26,163 @@ const PLANNING_STORAGE_NAME = "planning_postgres_storage";
 const USER_UI_PREFERENCES_VERSION = 11;
 const USER_UI_PREFERENCES_NAME = "user_ui_preferences";
 
+const FRESH_WEB_SOURCE = "fresh:web";
+const FRESH_WEB_HASH = "fresh-empty-v1";
+const EMPTY_UUID = "00000000-0000-0000-0000-000000000000";
+
+type ServerDbEnv = Record<string, string | undefined>;
+
+function freshWebBootstrapEnabled(env: ServerDbEnv): boolean {
+  return (env.PAPOT_POSTGRES_BOOTSTRAP_MODE ?? "").trim().toLowerCase() === "fresh";
+}
+
+async function ensureFreshWebBootstrap(client: PoolClient): Promise<void> {
+  const counts = await client.query<{
+    clients: string;
+    auth_users: string;
+    auth_sessions: string;
+    entries: string;
+    commercial: string;
+    chantiers: string;
+    library: string;
+    quotes: string;
+    cutovers: string;
+  }>(`
+    SELECT
+      (SELECT COUNT(*)::text FROM papot_clients) AS clients,
+      (SELECT COUNT(*)::text FROM papot_auth_users) AS auth_users,
+      (SELECT COUNT(*)::text FROM papot_auth_sessions) AS auth_sessions,
+      (SELECT COUNT(*)::text FROM papot_entries_state) AS entries,
+      (SELECT COUNT(*)::text FROM papot_commercial_state) AS commercial,
+      (SELECT COUNT(*)::text FROM papot_chantiers_state) AS chantiers,
+      (SELECT COUNT(*)::text FROM papot_library_state) AS library,
+      (SELECT COUNT(*)::text FROM papot_quotes_state) AS quotes,
+      (SELECT COUNT(*)::text FROM papot_domain_cutovers) AS cutovers
+  `);
+
+  const row = counts.rows[0];
+  if (!row) throw new Error("PAPOT_FRESH_BOOTSTRAP_STATE_UNAVAILABLE");
+
+  const businessCounts = [
+    row.clients,
+    row.auth_users,
+    row.auth_sessions,
+    row.entries,
+    row.commercial,
+    row.chantiers,
+    row.library,
+    row.quotes,
+  ];
+
+  const allBusinessEmpty = businessCounts.every((count) => count === "0");
+  const alreadyBootstrapped = row.cutovers === "7";
+
+  if (alreadyBootstrapped) return;
+  if (!allBusinessEmpty || row.cutovers !== "0") {
+    throw new Error("PAPOT_FRESH_BOOTSTRAP_REQUIRES_EMPTY_DATABASE");
+  }
+
+  await client.query(
+    `
+      INSERT INTO papot_entries_state (scope, version, payload)
+      VALUES (
+        'global',
+        1,
+        $1::jsonb
+      )
+    `,
+    [
+      JSON.stringify({
+        schemaVersion: 1,
+        tags: [
+          { id: "contact", label: "Contact", active: true, sortOrder: 0 },
+          { id: "devis", label: "Devis", active: true, sortOrder: 1 },
+          { id: "chiffrage-seul", label: "Chiffrage seul", active: true, sortOrder: 2 },
+          { id: "sav", label: "SAV", active: true, sortOrder: 3 },
+          {
+            id: "intervention-chantier",
+            label: "Intervention chantier",
+            active: true,
+            sortOrder: 4,
+          },
+          {
+            id: "compte-rendu-chantier",
+            label: "Compte rendu de chantier",
+            active: true,
+            sortOrder: 5,
+          },
+        ],
+        entries: [],
+        notifications: [],
+      }),
+    ],
+  );
+
+  await client.query(
+    `
+      INSERT INTO papot_commercial_state (scope, version, payload)
+      VALUES ('global', 1, '{"schemaVersion":2,"clients":[],"cases":[]}'::jsonb)
+    `,
+  );
+
+  await client.query(
+    `
+      INSERT INTO papot_chantiers_state (scope, version, payload)
+      VALUES ('global', 1, '{"schemaVersion":1,"chantiers":[]}'::jsonb)
+    `,
+  );
+
+  await client.query(
+    `
+      INSERT INTO papot_library_state (
+        scope,
+        version,
+        payload,
+        updated_by_user_id,
+        updated_by_device_id
+      )
+      VALUES (
+        'catalog',
+        0,
+        '{"schemaVersion":1,"components":[],"ouvrages":[]}'::jsonb,
+        $1,
+        $1
+      )
+    `,
+    [EMPTY_UUID],
+  );
+
+  await client.query(
+    `
+      INSERT INTO papot_quotes_state (scope, version, payload)
+      VALUES ('global', 1, '{"schemaVersion":1,"quotes":[]}'::jsonb)
+    `,
+  );
+
+  for (const domain of [
+    "clients",
+    "auth",
+    "entries",
+    "commercial",
+    "chantiers",
+    "library",
+    "quotes",
+  ]) {
+    await client.query(
+      `
+        INSERT INTO papot_domain_cutovers (
+          domain,
+          source,
+          source_hash,
+          record_count
+        )
+        VALUES ($1, $2, $3, 0)
+      `,
+      [domain, FRESH_WEB_SOURCE, FRESH_WEB_HASH],
+    );
+  }
+}
+
 async function ensureMigrationRegistry(client: PoolClient): Promise<void> {
   await client.query(`
     CREATE TABLE IF NOT EXISTS papot_schema_migrations (
@@ -220,7 +377,10 @@ async function ensureCompanyProfileStorage(client: PoolClient): Promise<void> {
   `);
 }
 
-export async function runServerDbMigrations(pool: Pool = getServerDbPool()): Promise<void> {
+export async function runServerDbMigrations(
+  pool: Pool = getServerDbPool(),
+  env: ServerDbEnv = process.env,
+): Promise<void> {
   const client = await pool.connect();
 
   try {
@@ -335,6 +495,10 @@ export async function runServerDbMigrations(pool: Pool = getServerDbPool()): Pro
       `,
       [USER_UI_PREFERENCES_VERSION, USER_UI_PREFERENCES_NAME],
     );
+
+    if (freshWebBootstrapEnabled(env)) {
+      await ensureFreshWebBootstrap(client);
+    }
 
     await client.query("COMMIT");
   } catch (error) {
