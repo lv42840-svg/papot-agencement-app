@@ -25,6 +25,7 @@ const createInput = {
   phone: "04 77 00 00 00",
   email: "contact@example.test",
   siret: "12345678901234",
+  vatNumber: "FR12345678901",
   paymentTerms: "45 jours fin de mois",
   notes: "Client test",
   contacts: [],
