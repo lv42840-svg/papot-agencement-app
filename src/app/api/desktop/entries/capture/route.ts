@@ -9,10 +9,10 @@ import {
   uploadEntryAttachments,
   type EntryAttachmentTransport,
 } from "@/lib/entries/attachment-storage";
+import { listEntryAssigneeNames } from "@/lib/entries/assignees";
 import { createEntriesRepository } from "@/lib/entries/create-repository";
 import {
   entriesCapabilities,
-  listSuggestedAssignees,
   type EntriesActor,
 } from "@/lib/entries/mutations";
 import type { EntriesPayload } from "@/lib/entries/domain";
@@ -35,12 +35,12 @@ function actorFor(context: Awaited<ReturnType<typeof requireModuleRequestContext
   };
 }
 
-function snapshot(payload: EntriesPayload, actor: EntriesActor, focusEntryId?: string) {
+async function snapshot(payload: EntriesPayload, actor: EntriesActor, focusEntryId?: string) {
   return {
     payload,
     actor: { userId: actor.userId, displayName: actor.displayName },
     capabilities: entriesCapabilities(actor),
-    suggestedAssignees: listSuggestedAssignees(payload, actor),
+    suggestedAssignees: await listEntryAssigneeNames(payload, actor),
     focusEntryId,
     serverNow: new Date().toISOString(),
   };
@@ -93,14 +93,14 @@ export async function POST(request: Request) {
     const created = await repository.mutate({ action: "create", entryId, ...parsed.data }, actor);
 
     if (!transport || files.length === 0) {
-      return NextResponse.json(snapshot(created.payload, actor, created.focusEntryId), {
+      return NextResponse.json(await snapshot(created.payload, actor, created.focusEntryId), {
         headers: { "Cache-Control": "no-store" },
       });
     }
 
     uploaded = await uploadEntryAttachments(transport, entryId, files);
     const mutation = await repository.registerAttachments(entryId, uploaded, actor);
-    return NextResponse.json(snapshot(mutation.payload, actor, mutation.focusEntryId), {
+    return NextResponse.json(await snapshot(mutation.payload, actor, mutation.focusEntryId), {
       headers: { "Cache-Control": "no-store" },
     });
   } catch (error) {

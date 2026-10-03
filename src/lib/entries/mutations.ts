@@ -502,11 +502,3 @@ export function applyEntriesMutation(
   throw new Error("ENTRY_MUTATION_UNSUPPORTED");
 }
 
-export function listSuggestedAssignees(payload: EntriesPayload, actor: EntriesActor): string[] {
-  const names = new Set<string>(["Nadia", "Lucien", actor.displayName]);
-  for (const entry of payload.entries) {
-    if (entry.assigneeName) names.add(entry.assigneeName);
-    names.add(entry.createdByName);
-  }
-  return [...names].filter(Boolean).sort((a, b) => a.localeCompare(b, "fr-FR"));
-}
