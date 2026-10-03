@@ -23,6 +23,7 @@ const baseFields = {
   phone: "04 77 00 00 00",
   email: "contact@dupont.test",
   siret: "12345678901234",
+  vatNumber: "FR12345678901",
   paymentTerms: "45 jours fin de mois",
   notes: "Client test",
   contacts: [],
@@ -40,6 +41,7 @@ describe("clients domain", () => {
     expect(result.payload.clients).toHaveLength(1);
     expect(result.payload.clients[0].companyName).toBe("Dupont Agencement");
     expect(result.payload.clients[0].paymentTerms).toBe("45 jours fin de mois");
+    expect(result.payload.clients[0].vatNumber).toBe("FR12345678901");
     expect(result.payload.clients[0].isArchived).toBe(false);
     expect(isClientReadyForConfirmation(result.payload.clients[0])).toBe(true);
   });
