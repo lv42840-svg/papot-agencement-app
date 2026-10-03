@@ -6,11 +6,7 @@ const PLACEHOLDER_PREFIX = "CHANGE_ME";
 
 export function verifyBootstrapToken(provided: string): boolean {
   const expected = process.env.PAPOT_BOOTSTRAP_TOKEN?.trim() ?? "";
-  if (
-    expected.length < 24 ||
-    expected.startsWith(PLACEHOLDER_PREFIX) ||
-    provided.length === 0
-  ) {
+  if (expected.length < 24 || expected.startsWith(PLACEHOLDER_PREFIX) || provided.length === 0) {
     return false;
   }
 
