@@ -51,6 +51,7 @@ type ClientDraft = {
   phone: string;
   email: string;
   siret: string;
+  vatNumber: string;
   paymentTerms: string;
   defaultVatRatePercent: string;
   notes: string;
@@ -110,6 +111,7 @@ function emptyDraft(): ClientDraft {
     phone: "",
     email: "",
     siret: "",
+    vatNumber: "",
     paymentTerms: "",
     defaultVatRatePercent: String(DEFAULT_VAT_RATE_PERCENT),
     notes: "",
@@ -130,6 +132,7 @@ function clientToDraft(client: ClientRecord): ClientDraft {
     phone: client.phone,
     email: client.email,
     siret: client.siret,
+    vatNumber: client.vatNumber,
     paymentTerms: client.paymentTerms,
     defaultVatRatePercent: String(client.defaultVatRatePercent).replace(".", ","),
     notes: client.notes,
@@ -394,7 +397,7 @@ export function ClientsWorkspace() {
             <input
               value={query}
               onChange={(event) => setQuery(event.target.value)}
-              placeholder="Rechercher nom, téléphone, e-mail, SIRET…"
+              placeholder="Rechercher nom, téléphone, e-mail, SIRET, TVA…"
               aria-label="Rechercher un client"
             />
           </div>
@@ -572,6 +575,16 @@ export function ClientsWorkspace() {
                           disabled={!editable}
                           inputMode="numeric"
                           placeholder="14 chiffres"
+                        />
+                      </label>
+                      <label className="clientsField">
+                        N° TVA intracommunautaire
+                        <input
+                          value={draft.vatNumber}
+                          onChange={(event) => updateDraft("vatNumber", event.target.value)}
+                          disabled={!editable}
+                          placeholder="FR..."
+                          autoCapitalize="characters"
                         />
                       </label>
                     </>
