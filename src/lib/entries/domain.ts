@@ -58,6 +58,8 @@ export const entryRecordSchema = z.object({
   result: z.string().trim().max(4000).nullable(),
   completedAt: isoDateTimeSchema.nullable(),
   parentEntryId: z.string().uuid().nullable(),
+  clientId: z.string().uuid().nullable().optional(),
+  commercialCaseId: z.string().uuid().nullable().optional(),
   derivedEntryIds: z.array(z.string().uuid()),
   attachments: z.array(entryAttachmentSchema).default([]),
   history: z.array(entryHistoryEventSchema),
