@@ -16,6 +16,7 @@ const roots: string[] = [];
 const previousDesktopConfig = process.env.PAPOT_DESKTOP_CONFIG_JSON;
 const previousStorageMode = process.env.PAPOT_STORAGE_MODE;
 const previousLocalFilesPath = process.env.PAPOT_LOCAL_FILES_PATH;
+const previousServerFilesRoot = process.env.PAPOT_SERVER_FILES_ROOT;
 
 async function temporaryRoot(): Promise<string> {
   const root = await mkdtemp(path.join(os.tmpdir(), "papot-server-files-"));
@@ -32,6 +33,9 @@ afterEach(async () => {
 
   if (previousLocalFilesPath === undefined) delete process.env.PAPOT_LOCAL_FILES_PATH;
   else process.env.PAPOT_LOCAL_FILES_PATH = previousLocalFilesPath;
+
+  if (previousServerFilesRoot === undefined) delete process.env.PAPOT_SERVER_FILES_ROOT;
+  else process.env.PAPOT_SERVER_FILES_ROOT = previousServerFilesRoot;
 
   await Promise.all(roots.splice(0).map((root) => rm(root, { recursive: true, force: true })));
 });
@@ -98,7 +102,26 @@ describe("server file storage", () => {
     await expect(store.readBytes(storagePath)).rejects.toThrow("SERVER_FILE_NOT_FOUND");
   });
 
-  it("builds the runtime store from the configured shared_data_path in server mode", async () => {
+  it("builds the runtime store from the explicit server files root in PostgreSQL mode", async () => {
+    const root = await temporaryRoot();
+    process.env.PAPOT_STORAGE_MODE = "postgres";
+    process.env.PAPOT_SERVER_FILES_ROOT = root;
+    delete process.env.PAPOT_DESKTOP_CONFIG_JSON;
+
+    const store = getServerFileStore();
+    expect(store.rootPath).toBe(path.resolve(root));
+    await expect(store.assertReady()).resolves.toBeUndefined();
+  });
+
+  it("rejects a relative explicit server files root", () => {
+    process.env.PAPOT_STORAGE_MODE = "postgres";
+    process.env.PAPOT_SERVER_FILES_ROOT = "relative/path";
+    delete process.env.PAPOT_DESKTOP_CONFIG_JSON;
+
+    expect(() => getServerFileStore()).toThrow("SERVER_FILE_ROOT_INVALID");
+  });
+
+  it("keeps the desktop shared_data_path fallback in server mode", async () => {
     const root = await temporaryRoot();
     process.env.PAPOT_STORAGE_MODE = "server";
     process.env.PAPOT_DESKTOP_CONFIG_JSON = JSON.stringify({

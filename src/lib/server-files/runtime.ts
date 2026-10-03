@@ -12,23 +12,35 @@ type DesktopFileRuntimeConfig = {
 
 let cached: { cacheKey: string; store: ServerFileStore } | undefined;
 
+function cachedStore(cacheKey: string, rootPath: string): ServerFileStore {
+  if (cached?.cacheKey === cacheKey) return cached.store;
+
+  fs.mkdirSync(rootPath, { recursive: true });
+  const store = new ServerFileStore(rootPath);
+  cached = { cacheKey, store };
+  return store;
+}
+
 export function getServerFileStore(): ServerFileStore {
   if (isLocalStorageMode()) {
     const rootPath = path.resolve(
       process.env.PAPOT_LOCAL_FILES_PATH?.trim() || path.join(process.cwd(), ".papot-dev", "files"),
     );
-    const cacheKey = `local:${rootPath}`;
-    if (cached?.cacheKey === cacheKey) return cached.store;
+    return cachedStore(`local:${rootPath}`, rootPath);
+  }
 
-    fs.mkdirSync(rootPath, { recursive: true });
-    const store = new ServerFileStore(rootPath);
-    cached = { cacheKey, store };
-    return store;
+  const configuredServerRoot = process.env.PAPOT_SERVER_FILES_ROOT?.trim();
+  if (configuredServerRoot) {
+    if (!path.isAbsolute(configuredServerRoot)) {
+      throw new Error("SERVER_FILE_ROOT_INVALID");
+    }
+    const rootPath = path.resolve(configuredServerRoot);
+    return cachedStore(`server:${rootPath}`, rootPath);
   }
 
   const rawConfig = process.env.PAPOT_DESKTOP_CONFIG_JSON;
-  if (!rawConfig) throw new Error("DESKTOP_RUNTIME_NOT_CONFIGURED");
-  const cacheKey = `server:${rawConfig}`;
+  if (!rawConfig) throw new Error("SERVER_FILE_RUNTIME_NOT_CONFIGURED");
+  const cacheKey = `desktop:${rawConfig}`;
   if (cached?.cacheKey === cacheKey) return cached.store;
 
   let config: DesktopFileRuntimeConfig;
@@ -42,7 +54,6 @@ export function getServerFileStore(): ServerFileStore {
     throw new Error("DESKTOP_SHARED_PATH_REQUIRED");
   }
 
-  const store = new ServerFileStore(config.shared_data_path);
-  cached = { cacheKey, store };
-  return store;
+  const rootPath = path.resolve(config.shared_data_path);
+  return cachedStore(cacheKey, rootPath);
 }
