@@ -32,7 +32,6 @@ const EMPTY_UUID = "00000000-0000-0000-0000-000000000000";
 
 type ServerDbEnv = Record<string, string | undefined>;
 
-
 function freshWebBootstrapEnabled(env: ServerDbEnv): boolean {
   return (env.PAPOT_POSTGRES_BOOTSTRAP_MODE ?? "").trim().toLowerCase() === "fresh";
 }
