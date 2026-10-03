@@ -106,6 +106,8 @@ export type EntriesActor = {
   displayName: string;
   canQualify?: boolean;
   canManageTags?: boolean;
+  assignmentCandidates?: string[];
+  notificationRecipients?: string[];
 };
 export type EntriesCapabilities = { canQualify: boolean; canManageTags: boolean };
 export type EntriesMutationResult = { payload: EntriesPayload; focusEntryId?: string };
@@ -420,20 +422,20 @@ export function applyEntriesMutation(
       `Échéance repoussée du ${oldDate} au ${input.dueDate}. Motif : ${input.reason}`,
       now,
     );
-    notify(
-      payload,
-      entry.id,
-      "Nadia",
-      `${actor.displayName} a repoussé « ${entry.rawText} » au ${input.dueDate}. Motif : ${input.reason}`,
-      now,
+    const recipients = new Set(
+      (actor.notificationRecipients ?? []).filter(
+        (name) => normalizePersonName(name) !== normalizePersonName(actor.displayName),
+      ),
     );
-    notify(
-      payload,
-      entry.id,
-      "Lucien",
-      `${actor.displayName} a repoussé « ${entry.rawText} » au ${input.dueDate}. Motif : ${input.reason}`,
-      now,
-    );
+    for (const recipientName of recipients) {
+      notify(
+        payload,
+        entry.id,
+        recipientName,
+        `${actor.displayName} a repoussé « ${entry.rawText} » au ${input.dueDate}. Motif : ${input.reason}`,
+        now,
+      );
+    }
     return { payload, focusEntryId: entry.id };
   }
 
@@ -509,7 +511,7 @@ export function applyEntriesMutation(
 }
 
 export function listSuggestedAssignees(payload: EntriesPayload, actor: EntriesActor): string[] {
-  const names = new Set<string>(["Nadia", "Lucien", actor.displayName]);
+  const names = new Set<string>([...(actor.assignmentCandidates ?? []), actor.displayName]);
   for (const entry of payload.entries) {
     if (entry.assigneeName) names.add(entry.assigneeName);
     names.add(entry.createdByName);
