@@ -31,8 +31,7 @@ export function EntriesSettingsWorkspace() {
       if (!response.ok) throw new Error(body.error ?? "ENTRIES_SETTINGS_LOAD_FAILED");
       setSnapshot(body);
     } catch (loadError) {
-      const code =
-        loadError instanceof Error ? loadError.message : "ENTRIES_SETTINGS_LOAD_FAILED";
+      const code = loadError instanceof Error ? loadError.message : "ENTRIES_SETTINGS_LOAD_FAILED";
       setError(errorMessages[code] ?? "Impossible de charger les tags.");
     }
   }, []);
