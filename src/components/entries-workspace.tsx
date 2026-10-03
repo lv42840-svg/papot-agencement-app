@@ -518,10 +518,8 @@ function EntryDetail({
   onOpenEntry: (entryId: string) => void;
 }) {
   const [description, setDescription] = useState(entry.structuredDescription ?? entry.rawText);
-  const [nextAction, setNextAction] = useState(entry.nextAction ?? "");
+  const nextAction = entry.nextAction ?? "";
   const [tagIds, setTagIds] = useState(entry.tagIds);
-  const [assigneeName, setAssigneeName] = useState(entry.assigneeName ?? "");
-  const [dueDate, setDueDate] = useState(entry.dueDate ?? "");
   const [actionDrafts, setActionDrafts] = useState<NextActionDraft[]>(() => [
     {
       id: `action-${entry.id}-1`,
