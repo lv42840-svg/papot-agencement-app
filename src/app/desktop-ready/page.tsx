@@ -1,6 +1,6 @@
 import Link from "next/link";
 import { redirect } from "next/navigation";
-import { BriefcaseBusiness, Camera, Clock3, FolderOpen, ListTodo, Plus } from "lucide-react";
+import { BriefcaseBusiness, Camera, Clock3, FolderOpen, Inbox, ListTodo } from "lucide-react";
 import { DashboardChantierStat } from "@/components/dashboard-chantier-stat";
 import { DashboardCommercialStats } from "@/components/dashboard-commercial-stats";
 import { DesktopAppShell } from "@/components/desktop-app-shell";
@@ -20,7 +20,7 @@ export default async function DesktopReadyPage() {
         </div>
         <div className="buttonRow">
           <Link className="secondaryButton" href="/entrees">
-            <Plus size={18} /> Nouvelle entrée
+            <Inbox size={18} /> Entrées
           </Link>
           <Link className="primaryButton" href="/capture">
             <Camera size={18} /> Capture
@@ -72,7 +72,7 @@ export default async function DesktopReadyPage() {
               <Camera size={17} /> Capture
             </Link>
             <Link className="secondaryButton" href="/entrees">
-              <Plus size={17} /> Nouvelle entrée
+              <Inbox size={17} /> Entrées
             </Link>
             <Link className="secondaryButton" href="/tasks">
               <ListTodo size={17} /> Mes tâches
