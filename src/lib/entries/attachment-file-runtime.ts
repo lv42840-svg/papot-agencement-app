@@ -10,8 +10,15 @@ import {
   type EntryAttachmentTransport,
 } from "./attachment-storage";
 
+type EntryAttachmentRuntimeContext = {
+  owner: {
+    displayName: string;
+  };
+  desktop?: DesktopRequestContext["desktop"];
+};
+
 export async function createEntryAttachmentTransport(
-  context: Pick<DesktopRequestContext, "desktop" | "owner">,
+  context: EntryAttachmentRuntimeContext,
 ): Promise<EntryAttachmentTransport> {
   const store = getServerFileStore();
   await store.assertReady();
@@ -28,15 +35,19 @@ export async function createEntryAttachmentTransport(
   await ensureEntryAttachmentFilesCutover({
     pool,
     store,
-    readLegacy: (attachment) =>
-      readLegacyEntryAttachmentBytes(
+    readLegacy: (attachment) => {
+      if (!context.desktop) {
+        throw new Error("ENTRY_ATTACHMENT_LEGACY_CUTOVER_CONTEXT_REQUIRED");
+      }
+      return readLegacyEntryAttachmentBytes(
         {
           dav: context.desktop.dav,
           nextcloudUserId: context.desktop.nextcloudUserId,
           syncRoot: context.desktop.syncRoot,
         },
         attachment,
-      ),
+      );
+    },
   });
 
   return {

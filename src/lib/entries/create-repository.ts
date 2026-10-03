@@ -7,8 +7,10 @@ import { acquireNextcloudEntriesSnapshot } from "./nextcloud-repository";
 import { createPostgresEntriesRepository } from "./postgres-repository";
 import type { EntriesRepository } from "./repository";
 
+type LegacyEntriesCutoverContext = Pick<DesktopRequestContext, "desktop" | "owner">;
+
 export async function createEntriesRepository(
-  context: Pick<DesktopRequestContext, "desktop" | "owner">,
+  context?: LegacyEntriesCutoverContext,
 ): Promise<EntriesRepository> {
   if (isLocalStorageMode()) return createLocalEntriesRepository();
 
@@ -16,11 +18,13 @@ export async function createEntriesRepository(
   await runServerDbMigrations(pool);
   await ensureEntriesPostgresCutover({
     pool,
-    acquireSource: () =>
-      acquireNextcloudEntriesSnapshot({
+    acquireSource: () => {
+      if (!context) throw new Error("ENTRIES_LEGACY_CUTOVER_CONTEXT_REQUIRED");
+      return acquireNextcloudEntriesSnapshot({
         desktop: context.desktop,
         owner: context.owner,
-      }),
+      });
+    },
   });
 
   return createPostgresEntriesRepository(pool);

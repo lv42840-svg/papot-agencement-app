@@ -1,8 +1,6 @@
 import { NextResponse } from "next/server";
-import {
-  desktopRequestErrorStatus,
-  requireDesktopRequestContext,
-} from "@/lib/desktop/request-context";
+import { requireModuleRequestContext } from "@/lib/auth/module-request-context";
+import { desktopRequestErrorStatus } from "@/lib/desktop/request-context";
 import { createEntryAttachmentTransport } from "@/lib/entries/attachment-file-runtime";
 import { readEntryAttachment } from "@/lib/entries/attachment-storage";
 import { createEntriesRepository } from "@/lib/entries/create-repository";
@@ -30,8 +28,8 @@ function statusFor(code: string): number {
 export async function GET(request: Request, context: RouteContext) {
   try {
     const { entryId, attachmentId } = await context.params;
-    const requestContext = await requireDesktopRequestContext("capture", "READ");
-    const repository = await createEntriesRepository(requestContext);
+    const requestContext = await requireModuleRequestContext("capture", "READ");
+    const repository = await createEntriesRepository();
     const payload = await repository.load();
     const entry = payload.entries.find((candidate) => candidate.id === entryId);
     if (!entry) return NextResponse.json({ error: "ENTRY_NOT_FOUND" }, { status: 404 });
@@ -40,7 +38,9 @@ export async function GET(request: Request, context: RouteContext) {
       return NextResponse.json({ error: "ENTRY_ATTACHMENT_NOT_FOUND" }, { status: 404 });
     }
 
-    const transport = await createEntryAttachmentTransport(requestContext);
+    const transport = await createEntryAttachmentTransport({
+      owner: { displayName: requestContext.user.displayName },
+    });
     const bytes = await readEntryAttachment(transport, attachment);
     const download = new URL(request.url).searchParams.get("download") === "1";
     const canInline =

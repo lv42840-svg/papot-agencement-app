@@ -1,9 +1,7 @@
 import { NextResponse } from "next/server";
 import { ZodError } from "zod";
-import {
-  desktopRequestErrorStatus,
-  requireDesktopRequestContext,
-} from "@/lib/desktop/request-context";
+import { requireModuleRequestContext } from "@/lib/auth/module-request-context";
+import { desktopRequestErrorStatus } from "@/lib/desktop/request-context";
 import { createEntriesRepository } from "@/lib/entries/create-repository";
 import type { EntriesPayload } from "@/lib/entries/domain";
 import {
@@ -16,7 +14,7 @@ import {
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
-function actorFor(context: Awaited<ReturnType<typeof requireDesktopRequestContext>>): EntriesActor {
+function actorFor(context: Awaited<ReturnType<typeof requireModuleRequestContext>>): EntriesActor {
   return {
     userId: context.user.id,
     displayName: context.user.displayName,
@@ -54,9 +52,9 @@ function errorStatus(code: string): number {
 
 export async function GET() {
   try {
-    const context = await requireDesktopRequestContext("capture", "READ");
+    const context = await requireModuleRequestContext("capture", "READ");
     const actor = actorFor(context);
-    const repository = await createEntriesRepository(context);
+    const repository = await createEntriesRepository();
     const payload = await repository.load();
     return noStoreJson(publicSnapshot(payload, actor));
   } catch (error) {
@@ -72,9 +70,9 @@ export async function POST(request: Request) {
   try {
     const input = entriesMutationSchema.parse(await request.json());
     stage = "create-context";
-    const context = await requireDesktopRequestContext("capture", "WRITE");
+    const context = await requireModuleRequestContext("capture", "WRITE");
     const actor = actorFor(context);
-    const repository = await createEntriesRepository(context);
+    const repository = await createEntriesRepository();
 
     stage = "mutate-repository";
     const mutation = await repository.mutate(input, actor);

@@ -1,8 +1,6 @@
 import { NextResponse } from "next/server";
-import {
-  desktopRequestErrorStatus,
-  requireDesktopRequestContext,
-} from "@/lib/desktop/request-context";
+import { requireModuleRequestContext } from "@/lib/auth/module-request-context";
+import { desktopRequestErrorStatus } from "@/lib/desktop/request-context";
 import { createEntryAttachmentTransport } from "@/lib/entries/attachment-file-runtime";
 import { cleanupEntryAttachments, uploadEntryAttachments } from "@/lib/entries/attachment-storage";
 import { createEntriesRepository } from "@/lib/entries/create-repository";
@@ -18,7 +16,7 @@ export const dynamic = "force-dynamic";
 
 type RouteContext = { params: Promise<{ entryId: string }> };
 
-function actorFor(context: Awaited<ReturnType<typeof requireDesktopRequestContext>>): EntriesActor {
+function actorFor(context: Awaited<ReturnType<typeof requireModuleRequestContext>>): EntriesActor {
   return {
     userId: context.user.id,
     displayName: context.user.displayName,
@@ -52,9 +50,9 @@ function statusFor(code: string): number {
 export async function POST(request: Request, context: RouteContext) {
   try {
     const { entryId } = await context.params;
-    const requestContext = await requireDesktopRequestContext("capture", "WRITE");
+    const requestContext = await requireModuleRequestContext("capture", "WRITE");
     const actor = actorFor(requestContext);
-    const repository = await createEntriesRepository(requestContext);
+    const repository = await createEntriesRepository();
     const form = await request.formData();
     const files = form.getAll("files").filter((value): value is File => value instanceof File);
     if (files.length === 0) {
@@ -66,7 +64,9 @@ export async function POST(request: Request, context: RouteContext) {
       return NextResponse.json({ error: "ENTRY_NOT_FOUND" }, { status: 404 });
     }
 
-    const transport = await createEntryAttachmentTransport(requestContext);
+    const transport = await createEntryAttachmentTransport({
+      owner: { displayName: requestContext.user.displayName },
+    });
     let uploaded = [] as Awaited<ReturnType<typeof uploadEntryAttachments>>;
     try {
       uploaded = await uploadEntryAttachments(transport, entryId, files);

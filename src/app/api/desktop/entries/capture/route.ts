@@ -1,10 +1,8 @@
 import { randomUUID } from "node:crypto";
 import { NextResponse } from "next/server";
 import { z } from "zod";
-import {
-  desktopRequestErrorStatus,
-  requireDesktopRequestContext,
-} from "@/lib/desktop/request-context";
+import { requireModuleRequestContext } from "@/lib/auth/module-request-context";
+import { desktopRequestErrorStatus } from "@/lib/desktop/request-context";
 import { createEntryAttachmentTransport } from "@/lib/entries/attachment-file-runtime";
 import {
   cleanupEntryAttachments,
@@ -28,7 +26,7 @@ const captureSchema = z.object({
   tagIds: z.array(z.string().min(1).max(100)).max(12).default([]),
 });
 
-function actorFor(context: Awaited<ReturnType<typeof requireDesktopRequestContext>>): EntriesActor {
+function actorFor(context: Awaited<ReturnType<typeof requireModuleRequestContext>>): EntriesActor {
   return {
     userId: context.user.id,
     displayName: context.user.displayName,
@@ -63,9 +61,9 @@ export async function POST(request: Request) {
   let transport: EntryAttachmentTransport | null = null;
 
   try {
-    const context = await requireDesktopRequestContext("capture", "WRITE");
+    const context = await requireModuleRequestContext("capture", "WRITE");
     const actor = actorFor(context);
-    const repository = await createEntriesRepository(context);
+    const repository = await createEntriesRepository();
     const form = await request.formData();
     const files = form.getAll("files").filter((value): value is File => value instanceof File);
 
@@ -85,7 +83,11 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: "ENTRIES_REQUEST_INVALID" }, { status: 400 });
     }
 
-    if (files.length > 0) transport = await createEntryAttachmentTransport(context);
+    if (files.length > 0) {
+      transport = await createEntryAttachmentTransport({
+        owner: { displayName: context.user.displayName },
+      });
+    }
 
     const entryId = randomUUID();
     const created = await repository.mutate({ action: "create", entryId, ...parsed.data }, actor);
