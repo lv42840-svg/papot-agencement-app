@@ -1,7 +1,15 @@
 "use client";
 
 import Link from "next/link";
-import { AlertTriangle, Camera, CheckCircle2, FilePlus2, RefreshCw, Send, WifiOff } from "lucide-react";
+import {
+  AlertTriangle,
+  Camera,
+  CheckCircle2,
+  FilePlus2,
+  RefreshCw,
+  Send,
+  WifiOff,
+} from "lucide-react";
 import { FormEvent, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   draftToFormData,
@@ -367,11 +375,10 @@ export function MobileEntryCapture() {
         ) : null}
 
         <button className="mobileSubmitButton" type="submit" disabled={busy || !rawText.trim()}>
-          <Send size={18} /> {busy ? "Enregistrement..." : online ? "Envoyer l’entrée" : "Garder hors ligne"}
+          <Send size={18} />{" "}
+          {busy ? "Enregistrement..." : online ? "Envoyer l’entrée" : "Garder hors ligne"}
         </button>
       </form>
-
-
     </main>
   );
 }
