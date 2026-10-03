@@ -1177,3 +1177,35 @@ select:focus {
     margin: 0 auto;
   }
 }
+
+.mobileCaptureMessage.isOffline {
+  color: #795f16;
+  background: #fff7dc;
+}
+
+.mobileCaptureQueue {
+  display: flex;
+  gap: 10px;
+  align-items: center;
+  justify-content: space-between;
+  padding: 10px 12px;
+  margin-bottom: 10px;
+  color: #5d5370;
+  font-size: 12px;
+  background: #f2eefb;
+  border: 1px solid #ddd4f3;
+  border-radius: 10px;
+}
+
+.mobileCaptureQueue button {
+  display: inline-flex;
+  gap: 6px;
+  align-items: center;
+  min-height: 34px;
+  padding: 0 10px;
+  color: #5c49ad;
+  font-weight: 750;
+  background: #fff;
+  border: 1px solid #cfc4ed;
+  border-radius: 8px;
+}
