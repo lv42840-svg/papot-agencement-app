@@ -77,7 +77,27 @@ export function MobileEntryCapture() {
     void refreshQueuedCount();
 
     if ("serviceWorker" in navigator) {
-      void navigator.serviceWorker.register("/sw.js");
+      void navigator.serviceWorker.register("/sw.js").then(async () => {
+        if (!("caches" in window)) return;
+        const cache = await caches.open("papot-mobile-shell-v2");
+        const resources = new Set<string>(["/capture"]);
+        for (const entry of performance.getEntriesByType("resource")) {
+          const url = new URL(entry.name);
+          if (
+            url.origin === window.location.origin &&
+            (url.pathname.startsWith("/_next/") || url.pathname === "/capture")
+          ) {
+            resources.add(url.pathname + url.search);
+          }
+        }
+        for (const resource of resources) {
+          try {
+            await cache.add(resource);
+          } catch {
+            // A single optional asset must not block offline preparation.
+          }
+        }
+      });
     }
 
     const cachedContext = localStorage.getItem("papot-mobile-entry-context");
