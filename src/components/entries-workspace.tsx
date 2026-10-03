@@ -547,6 +547,9 @@ function EntryDetail({
   const visibleTags = payload.tags
     .filter((tag) => tag.active || tagIds.includes(tag.id))
     .sort((a, b) => a.sortOrder - b.sortOrder);
+  const latestReassignment = [...entry.history]
+    .reverse()
+    .find((event) => event.type === "REASSIGNED");
 
   return (
     <div className="entriesDetail">
@@ -939,6 +942,15 @@ function EntryDetail({
                   </div>
                 ) : null}
               </section>
+              {latestReassignment ? (
+                <section className="entriesDetailSection entriesCompactSection">
+                  <strong>Dernière réaffectation</strong>
+                  <p>{latestReassignment.summary}</p>
+                  <span>
+                    {latestReassignment.actorName} · {formatDateTime(latestReassignment.at)}
+                  </span>
+                </section>
+              ) : null}
               {entry.structuredDescription ? (
                 <section className="entriesDetailSection entriesCompactSection">
                   <strong>C'est quoi ?</strong>
@@ -952,6 +964,145 @@ function EntryDetail({
                   <div className="entriesSectionTitle">
                     <Clock3 size={15} /> Mes actions
                   </div>
+                  <div className="entriesNextActions">
+                    {actionDrafts.map((actionDraft, index) => (
+                      <div className="entriesNextActionCard" key={actionDraft.id}>
+                        <div className="entriesNextActionHeader">
+                          <strong>Nouvelle action {index + 1}</strong>
+                          {actionDrafts.length > 1 ? (
+                            <button
+                              type="button"
+                              className="entriesIconButton"
+                              title="Supprimer cette action"
+                              onClick={() =>
+                                setActionDrafts((current) =>
+                                  current.filter((item) => item.id !== actionDraft.id),
+                                )
+                              }
+                            >
+                              <Trash2 size={15} />
+                            </button>
+                          ) : null}
+                        </div>
+                        <label className="entriesField">
+                          <span>Action</span>
+                          <textarea
+                            rows={2}
+                            value={actionDraft.text}
+                            onChange={(event) =>
+                              setActionDrafts((current) =>
+                                current.map((item) =>
+                                  item.id === actionDraft.id
+                                    ? { ...item, text: event.target.value }
+                                    : item,
+                                ),
+                              )
+                            }
+                            placeholder="Ex. Rappeler le client, préparer une commande..."
+                          />
+                        </label>
+                        <div className="entriesTwoFields">
+                          <label className="entriesField">
+                            <span>Responsable</span>
+                            <input
+                              list={`entry-assigned-actions-${entry.id}`}
+                              value={actionDraft.assigneeName}
+                              onChange={(event) =>
+                                setActionDrafts((current) =>
+                                  current.map((item) =>
+                                    item.id === actionDraft.id
+                                      ? { ...item, assigneeName: event.target.value }
+                                      : item,
+                                  ),
+                                )
+                              }
+                              placeholder="Choisir un utilisateur…"
+                            />
+                          </label>
+                          <label className="entriesField">
+                            <span>Date limite</span>
+                            <input
+                              type="date"
+                              value={actionDraft.dueDate}
+                              onChange={(event) =>
+                                setActionDrafts((current) =>
+                                  current.map((item) =>
+                                    item.id === actionDraft.id
+                                      ? { ...item, dueDate: event.target.value }
+                                      : item,
+                                  ),
+                                )
+                              }
+                            />
+                          </label>
+                        </div>
+                      </div>
+                    ))}
+                    <datalist id={`entry-assigned-actions-${entry.id}`}>
+                      {suggestedAssignees.map((name) => (
+                        <option value={name} key={name} />
+                      ))}
+                    </datalist>
+                    <div className="buttonRow">
+                      <button
+                        type="button"
+                        className="secondaryButton"
+                        disabled={busy || actionDrafts.length >= 20}
+                        onClick={() =>
+                          setActionDrafts((current) => [
+                            ...current,
+                            {
+                              id: crypto.randomUUID(),
+                              text: "",
+                              assigneeName: "",
+                              dueDate: "",
+                            },
+                          ])
+                        }
+                      >
+                        <Plus size={15} /> Ajouter une action
+                      </button>
+                      <button
+                        type="button"
+                        className="secondaryButton"
+                        disabled={
+                          busy ||
+                          actionDrafts.length === 0 ||
+                          actionDrafts.some(
+                            (item) => !item.text.trim() || !item.assigneeName.trim() || !item.dueDate,
+                          )
+                        }
+                        onClick={() =>
+                          void mutate(
+                            {
+                              action: "assignedActions",
+                              entryId: entry.id,
+                              actions: actionDrafts.map((item) => ({
+                                text: item.text,
+                                assigneeName: item.assigneeName,
+                                dueDate: item.dueDate,
+                              })),
+                            },
+                            `${actionDrafts.length} action${actionDrafts.length > 1 ? "s" : ""} créée${actionDrafts.length > 1 ? "s" : ""}. La tâche reste ouverte.`,
+                          ).then((saved) => {
+                            if (saved) {
+                              setActionDrafts([
+                                {
+                                  id: crypto.randomUUID(),
+                                  text: "",
+                                  assigneeName: "",
+                                  dueDate: "",
+                                },
+                              ]);
+                            }
+                          })
+                        }
+                      >
+                        Enregistrer les actions
+                      </button>
+                    </div>
+                  </div>
+                  <div className="entriesDivider" />
                   <label className="entriesField">
                     <span>Résultat facultatif</span>
                     <textarea
