@@ -547,6 +547,9 @@ function EntryDetail({
   const visibleTags = payload.tags
     .filter((tag) => tag.active || tagIds.includes(tag.id))
     .sort((a, b) => a.sortOrder - b.sortOrder);
+  const latestReassignment = [...entry.history]
+    .reverse()
+    .find((event) => event.type === "REASSIGNED");
 
   return (
     <div className="entriesDetail">
@@ -939,6 +942,15 @@ function EntryDetail({
                   </div>
                 ) : null}
               </section>
+              {latestReassignment ? (
+                <section className="entriesDetailSection entriesCompactSection">
+                  <strong>Dernière réaffectation</strong>
+                  <p>{latestReassignment.summary}</p>
+                  <span>
+                    {latestReassignment.actorName} · {formatDateTime(latestReassignment.at)}
+                  </span>
+                </section>
+              ) : null}
               {entry.structuredDescription ? (
                 <section className="entriesDetailSection entriesCompactSection">
                   <strong>C'est quoi ?</strong>
