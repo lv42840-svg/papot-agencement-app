@@ -32,7 +32,9 @@ export function MobileEntryCapture() {
         if (!response.ok) throw new Error(body.error ?? "Chargement impossible");
         setContext(body);
       })
-      .catch((loadError) => setError(loadError instanceof Error ? loadError.message : "Chargement impossible"));
+      .catch((loadError) =>
+        setError(loadError instanceof Error ? loadError.message : "Chargement impossible"),
+      );
   }, []);
 
   const visibleCases = useMemo(() => {
@@ -120,7 +122,13 @@ export function MobileEntryCapture() {
 
         <label className="mobileCaptureField">
           <span>Client</span>
-          <select value={clientId} onChange={(event) => { setClientId(event.target.value); setCommercialCaseId(""); }}>
+          <select
+            value={clientId}
+            onChange={(event) => {
+              setClientId(event.target.value);
+              setCommercialCaseId("");
+            }}
+          >
             <option value="">Aucun / à qualifier plus tard</option>
             {(context?.clients ?? []).map((client) => (
               <option key={client.id} value={client.id}>{client.name}</option>
@@ -146,7 +154,13 @@ export function MobileEntryCapture() {
               type="button"
               key={tag.id}
               className={tagIds.includes(tag.id) ? "isSelected" : ""}
-              onClick={() => setTagIds((current) => current.includes(tag.id) ? current.filter((id) => id !== tag.id) : [...current, tag.id])}
+              onClick={() =>
+                setTagIds((current) =>
+                  current.includes(tag.id)
+                    ? current.filter((id) => id !== tag.id)
+                    : [...current, tag.id],
+                )
+              }
             >
               {tag.label}
             </button>
@@ -160,7 +174,10 @@ export function MobileEntryCapture() {
             type="file"
             accept="image/*"
             capture="environment"
-            onChange={(event) => { addFiles(Array.from(event.target.files ?? [])); event.currentTarget.value = ""; }}
+            onChange={(event) => {
+              addFiles(Array.from(event.target.files ?? []));
+              event.currentTarget.value = "";
+            }}
           />
           <input
             ref={filesRef}
@@ -168,7 +185,10 @@ export function MobileEntryCapture() {
             type="file"
             multiple
             accept="image/*,application/pdf"
-            onChange={(event) => { addFiles(Array.from(event.target.files ?? [])); event.currentTarget.value = ""; }}
+            onChange={(event) => {
+              addFiles(Array.from(event.target.files ?? []));
+              event.currentTarget.value = "";
+            }}
           />
           <button type="button" onClick={() => cameraRef.current?.click()}>
             <Camera size={17} /> Photo
@@ -181,7 +201,13 @@ export function MobileEntryCapture() {
         {files.length > 0 ? (
           <div className="mobilePendingFiles">
             {files.map((file, index) => (
-              <button type="button" key={`${file.name}-${index}`} onClick={() => setFiles((current) => current.filter((_, i) => i !== index))}>
+              <button
+                type="button"
+                key={`${file.name}-${index}`}
+                onClick={() =>
+                  setFiles((current) => current.filter((_, i) => i !== index))
+                }
+              >
                 {file.name} ×
               </button>
             ))}
