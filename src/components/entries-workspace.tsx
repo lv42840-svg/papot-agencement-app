@@ -1,19 +1,16 @@
 "use client";
 
-import { FormEvent, useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   AlertTriangle,
   Bell,
   Check,
   CheckCircle2,
-  ChevronDown,
-  ChevronUp,
   Clock3,
   Download,
   Eye,
   FileText,
   Paperclip,
-  Plus,
   RefreshCw,
   Save,
   Tag,
@@ -110,10 +107,6 @@ export function EntriesWorkspace() {
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
-  const [captureText, setCaptureText] = useState("");
-  const [capturePriority, setCapturePriority] = useState<"NORMAL" | "URGENT">("NORMAL");
-  const [captureTagIds, setCaptureTagIds] = useState<string[]>([]);
-  const [captureFiles, setCaptureFiles] = useState<File[]>([]);
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -205,36 +198,6 @@ export function EntriesWorkspace() {
     }
   }, []);
 
-  async function submitCapture(event: FormEvent<HTMLFormElement>) {
-    event.preventDefault();
-    if (!captureText.trim()) return;
-    const created = await mutate({
-      action: "create",
-      rawText: captureText,
-      priority: capturePriority,
-      tagIds: captureTagIds,
-    });
-    if (!created?.focusEntryId) return;
-
-    const entryId = created.focusEntryId;
-    const files = captureFiles;
-    setCaptureText("");
-    setCapturePriority("NORMAL");
-    setCaptureTagIds([]);
-    setCaptureFiles([]);
-    setTab("TO_QUALIFY");
-
-    if (files.length > 0) {
-      const uploaded = await uploadAttachments(entryId, files);
-      if (!uploaded) {
-        setError(
-          "L'entrée a bien été créée, mais ses pièces jointes n'ont pas toutes été ajoutées. Tu peux les remettre depuis le détail de l'entrée.",
-        );
-      }
-    } else {
-      setNotice("Entrée ajoutée à À qualifier.");
-    }
-  }
 
   const payload = snapshot?.payload;
   const now = useMemo(() => new Date(snapshot?.serverNow ?? Date.now()), [snapshot?.serverNow]);
@@ -305,7 +268,7 @@ export function EntriesWorkspace() {
       <section className="entriesPageHeading">
         <div>
           <h1>Entrées</h1>
-          <p>Capture rapide, qualification, pièces jointes et suivi des actions.</p>
+          <p>Qualification, pièces jointes et suivi des actions.</p>
         </div>
         <button
           className="entriesRefreshButton"
@@ -350,79 +313,6 @@ export function EntriesWorkspace() {
         </section>
       ) : null}
 
-      {snapshot ? (
-        <form className="entriesQuickCapture" onSubmit={submitCapture}>
-          <div className="entriesQuickCaptureMain">
-            <div className="entriesCaptureIcon">
-              <Plus size={19} />
-            </div>
-            <label className="entriesCaptureField">
-              <span>Nouvelle entrée</span>
-              <textarea
-                value={captureText}
-                onChange={(event) => setCaptureText(event.target.value)}
-                placeholder="Client, lieu, besoin ou note rapide"
-                rows={2}
-                disabled={busy}
-                required
-              />
-            </label>
-            <button
-              className="primaryButton entriesAddButton"
-              type="submit"
-              disabled={busy || !captureText.trim()}
-            >
-              {busy ? "Enregistrement…" : "Ajouter"}
-            </button>
-          </div>
-          <div className="entriesQuickOptions">
-            <button
-              type="button"
-              className={`entriesUrgentToggle${capturePriority === "URGENT" ? " isActive" : ""}`}
-              onClick={() =>
-                setCapturePriority((current) => (current === "URGENT" ? "NORMAL" : "URGENT"))
-              }
-            >
-              <AlertTriangle size={14} /> Urgent
-            </button>
-            {snapshot.payload.tags
-              .filter((tag) => tag.active)
-              .sort((a, b) => a.sortOrder - b.sortOrder)
-              .map((tag) => (
-                <button
-                  type="button"
-                  key={tag.id}
-                  className={`entriesTagChoice${captureTagIds.includes(tag.id) ? " isSelected" : ""}`}
-                  onClick={() =>
-                    setCaptureTagIds((current) =>
-                      current.includes(tag.id)
-                        ? current.filter((tagId) => tagId !== tag.id)
-                        : [...current, tag.id],
-                    )
-                  }
-                >
-                  {tag.label}
-                </button>
-              ))}
-            <FilePicker
-              label="Ajouter des pièces"
-              files={captureFiles}
-              onChange={setCaptureFiles}
-              disabled={busy}
-            />
-          </div>
-          {captureFiles.length > 0 ? (
-            <PendingFiles files={captureFiles} onChange={setCaptureFiles} />
-          ) : null}
-          <div className="entriesCaptureHint">
-            Seul le texte est obligatoire. Tags, urgence, photos et documents restent facultatifs.
-          </div>
-        </form>
-      ) : null}
-
-      {snapshot?.capabilities.canManageTags ? (
-        <TagAdmin tags={snapshot.payload.tags} busy={busy} mutate={mutate} />
-      ) : null}
 
       {snapshot ? (
         <div className="entriesMainGrid">
@@ -1379,118 +1269,6 @@ function StatusBadge({ entry, now }: { entry: EntryRecord; now: Date }) {
     <span className="entriesBadge entriesBadgeAlert">À remonter</span>
   ) : (
     <span className="entriesBadge entriesBadgeQualify">À qualifier</span>
-  );
-}
-
-function TagAdmin({
-  tags,
-  busy,
-  mutate,
-}: {
-  tags: EntriesTag[];
-  busy: boolean;
-  mutate: MutationFn;
-}) {
-  const [newLabel, setNewLabel] = useState("");
-  const ordered = [...tags].sort((a, b) => a.sortOrder - b.sortOrder);
-  return (
-    <details className="entriesTagAdmin">
-      <summary>
-        <Tag size={14} /> Gérer les tags
-      </summary>
-      <div className="entriesTagAdminBody">
-        <form
-          onSubmit={(event) => {
-            event.preventDefault();
-            if (!newLabel.trim()) return;
-            void mutate({ action: "tagAdd", label: newLabel }, "Tag ajouté.").then((ok) => {
-              if (ok) setNewLabel("");
-            });
-          }}
-        >
-          <input
-            value={newLabel}
-            onChange={(event) => setNewLabel(event.target.value)}
-            placeholder="Nouveau tag"
-          />
-          <button type="submit" className="secondaryButton" disabled={busy || !newLabel.trim()}>
-            <Plus size={14} /> Ajouter
-          </button>
-        </form>
-        <div className="entriesTagAdminList">
-          {ordered.map((tag, index) => (
-            <TagAdminRow
-              key={tag.id}
-              tag={tag}
-              first={index === 0}
-              last={index === ordered.length - 1}
-              busy={busy}
-              mutate={mutate}
-            />
-          ))}
-        </div>
-      </div>
-    </details>
-  );
-}
-
-function TagAdminRow({
-  tag,
-  first,
-  last,
-  busy,
-  mutate,
-}: {
-  tag: EntriesTag;
-  first: boolean;
-  last: boolean;
-  busy: boolean;
-  mutate: MutationFn;
-}) {
-  const [label, setLabel] = useState(tag.label);
-  const [active, setActive] = useState(tag.active);
-  useEffect(() => {
-    setLabel(tag.label);
-    setActive(tag.active);
-  }, [tag.label, tag.active]);
-  return (
-    <div className="entriesTagAdminRow">
-      <input value={label} onChange={(event) => setLabel(event.target.value)} />
-      <label>
-        <input
-          type="checkbox"
-          checked={active}
-          onChange={(event) => setActive(event.target.checked)}
-        />{" "}
-        Actif
-      </label>
-      <button
-        type="button"
-        title="Monter"
-        disabled={busy || first}
-        onClick={() => void mutate({ action: "tagMove", tagId: tag.id, direction: "up" })}
-      >
-        <ChevronUp size={15} />
-      </button>
-      <button
-        type="button"
-        title="Descendre"
-        disabled={busy || last}
-        onClick={() => void mutate({ action: "tagMove", tagId: tag.id, direction: "down" })}
-      >
-        <ChevronDown size={15} />
-      </button>
-      <button
-        type="button"
-        className="entriesTinyButton"
-        disabled={busy || !label.trim()}
-        onClick={() =>
-          void mutate({ action: "tagUpdate", tagId: tag.id, label, active }, "Tag enregistré.")
-        }
-      >
-        Enregistrer
-      </button>
-    </div>
   );
 }
 
