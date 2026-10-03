@@ -151,6 +151,71 @@ describe("Entries business rules", () => {
     });
   });
 
+  it("creates several assigned next actions from one validated note", () => {
+    const created = applyEntriesMutation(
+      createInitialEntriesPayload(),
+      {
+        action: "create",
+        rawText: "Réunion chantier Martin",
+        priority: "NORMAL",
+        tagIds: ["compte-rendu-chantier"],
+      },
+      lucien,
+      new Date("2026-09-12T10:00:00.000Z"),
+    ).payload;
+
+    const note = created.entries[0];
+    const updated = applyEntriesMutation(
+      created,
+      {
+        action: "qualifyActions",
+        entryId: note.id,
+        description: "Compte rendu de la réunion chantier Martin",
+        tagIds: ["compte-rendu-chantier"],
+        actions: [
+          {
+            text: "Envoyer le plan corrigé",
+            assigneeName: "Lucien",
+            dueDate: "2026-09-15",
+          },
+          {
+            text: "Commander les poignées",
+            assigneeName: "Nadia",
+            dueDate: "2026-09-16",
+          },
+        ],
+      },
+      lucien,
+      new Date("2026-09-12T10:05:00.000Z"),
+    ).payload;
+
+    const parent = updated.entries.find((entry) => entry.id === note.id);
+    const children = updated.entries.filter((entry) => entry.parentEntryId === note.id);
+
+    expect(parent).toMatchObject({
+      status: "DONE",
+      structuredDescription: "Compte rendu de la réunion chantier Martin",
+    });
+    expect(parent?.derivedEntryIds).toHaveLength(2);
+    expect(children).toHaveLength(2);
+    expect(children).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          rawText: "Envoyer le plan corrigé",
+          status: "ASSIGNED",
+          assigneeName: "Lucien",
+          dueDate: "2026-09-15",
+        }),
+        expect.objectContaining({
+          rawText: "Commander les poignées",
+          status: "ASSIGNED",
+          assigneeName: "Nadia",
+          dueDate: "2026-09-16",
+        }),
+      ]),
+    );
+  });
+
   it("allows Voir plus tard immediately and keeps its reason", () => {
     const initial = createInitialEntriesPayload();
     const createdAt = new Date("2026-09-07T08:00:00.000Z");
