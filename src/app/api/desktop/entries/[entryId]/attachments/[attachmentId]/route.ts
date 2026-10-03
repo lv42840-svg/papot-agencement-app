@@ -38,7 +38,9 @@ export async function GET(request: Request, context: RouteContext) {
       return NextResponse.json({ error: "ENTRY_ATTACHMENT_NOT_FOUND" }, { status: 404 });
     }
 
-    const transport = await createEntryAttachmentTransport({ owner: { displayName: requestContext.user.displayName } });
+    const transport = await createEntryAttachmentTransport({
+      owner: { displayName: requestContext.user.displayName },
+    });
     const bytes = await readEntryAttachment(transport, attachment);
     const download = new URL(request.url).searchParams.get("download") === "1";
     const canInline =
