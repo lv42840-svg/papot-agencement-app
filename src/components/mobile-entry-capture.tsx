@@ -1,8 +1,23 @@
 "use client";
 
 import Link from "next/link";
-import { AlertTriangle, Camera, CheckCircle2, FilePlus2, Send } from "lucide-react";
-import { FormEvent, useEffect, useMemo, useRef, useState } from "react";
+import {
+  AlertTriangle,
+  Camera,
+  CheckCircle2,
+  FilePlus2,
+  RefreshCw,
+  Send,
+  WifiOff,
+} from "lucide-react";
+import { FormEvent, useCallback, useEffect, useMemo, useRef, useState } from "react";
+import {
+  draftToFormData,
+  listOfflineEntries,
+  queueOfflineEntry,
+  removeOfflineEntry,
+  type OfflineEntryDraft,
+} from "@/lib/mobile/offline-entry-queue";
 
 type ContextPayload = {
   clients: Array<{ id: string; name: string }>;
@@ -28,20 +43,102 @@ export function MobileEntryCapture() {
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState(false);
+  const [online, setOnline] = useState(true);
+  const [queuedCount, setQueuedCount] = useState(0);
+  const [syncing, setSyncing] = useState(false);
   const cameraRef = useRef<HTMLInputElement>(null);
   const filesRef = useRef<HTMLInputElement>(null);
 
+  const refreshQueuedCount = useCallback(async () => {
+    const queued = await listOfflineEntries();
+    setQueuedCount(queued.length);
+  }, []);
+
+  const syncQueuedEntries = useCallback(async () => {
+    if (!navigator.onLine) return;
+    setSyncing(true);
+    setError(null);
+    try {
+      const queued = await listOfflineEntries();
+      for (const draft of queued) {
+        const response = await fetch("/api/desktop/entries/capture", {
+          method: "POST",
+          body: draftToFormData(draft),
+        });
+        if (!response.ok) {
+          const body = (await response.json()) as { error?: string };
+          throw new Error(body.error ?? "Synchronisation impossible");
+        }
+        await removeOfflineEntry(draft.id);
+      }
+      await refreshQueuedCount();
+      if (queued.length > 0) setSuccess(true);
+    } catch (syncError) {
+      setError(syncError instanceof Error ? syncError.message : "Synchronisation impossible");
+    } finally {
+      setSyncing(false);
+    }
+  }, [refreshQueuedCount]);
+
   useEffect(() => {
+    setOnline(navigator.onLine);
+    void refreshQueuedCount();
+
+    if ("serviceWorker" in navigator) {
+      void navigator.serviceWorker.register("/sw.js").then(async () => {
+        if (!("caches" in window)) return;
+        const cache = await caches.open("papot-mobile-shell-v2");
+        const resources = new Set<string>(["/capture"]);
+        for (const entry of performance.getEntriesByType("resource")) {
+          const url = new URL(entry.name);
+          if (
+            url.origin === window.location.origin &&
+            (url.pathname.startsWith("/_next/") || url.pathname === "/capture")
+          ) {
+            resources.add(url.pathname + url.search);
+          }
+        }
+        for (const resource of resources) {
+          try {
+            await cache.add(resource);
+          } catch {
+            // A single optional asset must not block offline preparation.
+          }
+        }
+      });
+    }
+
+    const cachedContext = localStorage.getItem("papot-mobile-entry-context");
+    if (cachedContext) {
+      try {
+        setContext(JSON.parse(cachedContext) as ContextPayload);
+      } catch {
+        localStorage.removeItem("papot-mobile-entry-context");
+      }
+    }
+
     void fetch("/api/mobile/entries/context", { cache: "no-store" })
       .then(async (response) => {
         const body = (await response.json()) as ContextPayload;
         if (!response.ok) throw new Error(body.error ?? "Chargement impossible");
         setContext(body);
+        localStorage.setItem("papot-mobile-entry-context", JSON.stringify(body));
       })
-      .catch((loadError) =>
-        setError(loadError instanceof Error ? loadError.message : "Chargement impossible"),
-      );
-  }, []);
+      .catch(() => undefined);
+
+    const handleOnline = () => {
+      setOnline(true);
+      void syncQueuedEntries();
+    };
+    const handleOffline = () => setOnline(false);
+    window.addEventListener("online", handleOnline);
+    window.addEventListener("offline", handleOffline);
+
+    return () => {
+      window.removeEventListener("online", handleOnline);
+      window.removeEventListener("offline", handleOffline);
+    };
+  }, [refreshQueuedCount, syncQueuedEntries]);
 
   const visibleCases = useMemo(() => {
     const all = context?.cases ?? [];
@@ -58,32 +155,69 @@ export function MobileEntryCapture() {
     setFiles((current) => [...current, ...next].slice(0, 12));
   }
 
+  function resetForm() {
+    setRawText("");
+    setPriority("NORMAL");
+    setTagIds([]);
+    setClientId("");
+    setCommercialCaseId("");
+    setFiles([]);
+  }
+
+  async function saveOfflineDraft(): Promise<void> {
+    const draft: OfflineEntryDraft = {
+      id: crypto.randomUUID(),
+      createdAt: new Date().toISOString(),
+      rawText,
+      priority,
+      tagIds,
+      clientId,
+      commercialCaseId,
+      files,
+    };
+    await queueOfflineEntry(draft);
+    await refreshQueuedCount();
+    resetForm();
+  }
+
   async function submit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     if (!rawText.trim()) return;
     setBusy(true);
     setError(null);
     setSuccess(false);
+
     try {
-      const form = new FormData();
-      form.set("rawText", rawText);
-      form.set("priority", priority);
-      form.set("tagIds", JSON.stringify(tagIds));
-      form.set("clientId", clientId);
-      form.set("commercialCaseId", commercialCaseId);
-      files.forEach((file) => form.append("files", file));
-      const response = await fetch("/api/desktop/entries/capture", { method: "POST", body: form });
+      if (!navigator.onLine) {
+        await saveOfflineDraft();
+        return;
+      }
+
+      const draft: OfflineEntryDraft = {
+        id: crypto.randomUUID(),
+        createdAt: new Date().toISOString(),
+        rawText,
+        priority,
+        tagIds,
+        clientId,
+        commercialCaseId,
+        files,
+      };
+      const response = await fetch("/api/desktop/entries/capture", {
+        method: "POST",
+        body: draftToFormData(draft),
+      });
       const body = (await response.json()) as { error?: string };
       if (!response.ok) throw new Error(body.error ?? "Envoi impossible");
-      setRawText("");
-      setPriority("NORMAL");
-      setTagIds([]);
-      setClientId("");
-      setCommercialCaseId("");
-      setFiles([]);
+      resetForm();
       setSuccess(true);
     } catch (submitError) {
-      setError(submitError instanceof Error ? submitError.message : "Envoi impossible");
+      if (!navigator.onLine || submitError instanceof TypeError) {
+        await saveOfflineDraft();
+        setOnline(false);
+      } else {
+        setError(submitError instanceof Error ? submitError.message : "Envoi impossible");
+      }
     } finally {
       setBusy(false);
     }
@@ -99,6 +233,25 @@ export function MobileEntryCapture() {
         <Link href="/entrees">Entrées</Link>
       </header>
 
+      {!online ? (
+        <div className="mobileCaptureMessage isOffline">
+          <WifiOff size={18} /> Hors ligne. Les captures restent sur l’iPhone.
+        </div>
+      ) : null}
+      {queuedCount > 0 ? (
+        <div className="mobileCaptureQueue">
+          <strong>
+            {queuedCount} entrée{queuedCount > 1 ? "s" : ""} en attente
+          </strong>
+          <button
+            type="button"
+            disabled={!online || syncing}
+            onClick={() => void syncQueuedEntries()}
+          >
+            <RefreshCw size={15} /> {syncing ? "Synchronisation..." : "Synchroniser"}
+          </button>
+        </div>
+      ) : null}
       {error ? <div className="mobileCaptureMessage isError">{error}</div> : null}
       {success ? (
         <div className="mobileCaptureMessage isSuccess">
@@ -222,11 +375,10 @@ export function MobileEntryCapture() {
         ) : null}
 
         <button className="mobileSubmitButton" type="submit" disabled={busy || !rawText.trim()}>
-          <Send size={18} /> {busy ? "Envoi..." : "Envoyer l’entrée"}
+          <Send size={18} />{" "}
+          {busy ? "Enregistrement..." : online ? "Envoyer l’entrée" : "Garder hors ligne"}
         </button>
       </form>
-
-
     </main>
   );
 }

@@ -1,3 +1,4 @@
+import "./mobile.css";
 import { MobileEntryCapture } from "@/components/mobile-entry-capture";
 import { requireUser } from "@/lib/auth/session";
 
