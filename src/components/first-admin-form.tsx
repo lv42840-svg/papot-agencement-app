@@ -39,13 +39,7 @@ export function FirstAdminForm() {
     <form className="loginForm" onSubmit={submit}>
       <label>
         Clé d’initialisation
-        <input
-          name="bootstrapToken"
-          type="password"
-          autoComplete="off"
-          required
-          disabled={busy}
-        />
+        <input name="bootstrapToken" type="password" autoComplete="off" required disabled={busy} />
       </label>
       <label>
         Nom de l’administrateur
