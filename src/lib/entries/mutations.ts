@@ -62,6 +62,20 @@ export const entriesMutationSchema = z.discriminatedUnion("action", [
     tagIds: tagIdsSchema,
   }),
   z.object({
+    action: z.literal("assignedActions"),
+    entryId: z.string().uuid(),
+    actions: z
+      .array(
+        z.object({
+          text: z.string().trim().min(1).max(2000),
+          assigneeName: z.string().trim().min(1).max(120),
+          dueDate: dateOnlySchema,
+        }),
+      )
+      .min(1)
+      .max(20),
+  }),
+  z.object({
     action: z.literal("qualifyDone"),
     entryId: z.string().uuid(),
     result: z.string().trim().max(4000).optional().default(""),
@@ -448,6 +462,50 @@ export function applyEntriesMutation(
       "Informations de la tâche mises à jour depuis Mes tâches.",
       now,
     );
+    return { payload, focusEntryId: entry.id };
+  }
+
+  if (input.action === "assignedActions") {
+    assertAssignedToActor(entry, actor);
+
+    const createdActions: EntryRecord[] = input.actions.map((action) => {
+      const child: EntryRecord = {
+        id: randomUUID(),
+        rawText: action.text,
+        structuredDescription: entry.structuredDescription,
+        nextAction: action.text,
+        tagIds: [...entry.tagIds],
+        priority: entry.priority,
+        status: "ASSIGNED",
+        createdAt: now,
+        createdByName: actor.displayName,
+        assigneeName: action.assigneeName,
+        dueDate: action.dueDate,
+        snoozedUntilDate: null,
+        result: null,
+        completedAt: null,
+        parentEntryId: entry.id,
+        clientId: entry.clientId ?? null,
+        commercialCaseId: entry.commercialCaseId ?? null,
+        derivedEntryIds: [],
+        attachments: [],
+        history: [],
+      };
+
+      history(child, actor, "CREATED", `Action créée depuis « ${entry.rawText} ».`, now);
+      history(
+        child,
+        actor,
+        "ASSIGNED",
+        `Affectée à ${action.assigneeName}, échéance ${action.dueDate}.`,
+        now,
+      );
+      entry.derivedEntryIds.push(child.id);
+      history(entry, actor, "DERIVED_CREATED", `Action liée créée : « ${action.text} ».`, now);
+      return child;
+    });
+
+    payload.entries.unshift(...createdActions);
     return { payload, focusEntryId: entry.id };
   }
 
