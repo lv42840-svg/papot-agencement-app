@@ -83,7 +83,11 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: "ENTRIES_REQUEST_INVALID" }, { status: 400 });
     }
 
-    if (files.length > 0) transport = await createEntryAttachmentTransport({ owner: { displayName: context.user.displayName } });
+    if (files.length > 0) {
+      transport = await createEntryAttachmentTransport({
+        owner: { displayName: context.user.displayName },
+      });
+    }
 
     const entryId = randomUUID();
     const created = await repository.mutate({ action: "create", entryId, ...parsed.data }, actor);
