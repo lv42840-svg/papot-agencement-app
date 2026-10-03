@@ -55,8 +55,8 @@ const errorMessages: Record<string, string> = {
   ENTRIES_LOCKED: "Les entrées sont modifiées sur un autre poste. Réessaie dans quelques secondes.",
   ENTRIES_VERSION_CONFLICT: "Les entrées ont changé sur un autre poste. La liste a été rechargée.",
   ENTRIES_REQUEST_INVALID: "Les informations envoyées sont incomplètes ou invalides.",
-  QUALIFICATION_FORBIDDEN: "La qualification est réservée à Nadia et Lucien.",
-  TAG_ADMIN_FORBIDDEN: "La gestion des tags est réservée à Lucien.",
+  QUALIFICATION_FORBIDDEN: "Tu n’as pas le droit de qualifier cette entrée.",
+  TAG_ADMIN_FORBIDDEN: "Tu n’as pas le droit de gérer les tags.",
   ENTRY_NOT_FOUND: "Cette entrée n'existe plus.",
   ENTRY_NOT_TO_QUALIFY: "Cette entrée a déjà quitté la boîte À qualifier.",
   ENTRY_NOT_ASSIGNED_TO_ACTOR: "Cette action est affectée à une autre personne.",
@@ -676,7 +676,7 @@ function EntryDetail({
                     </button>
                   </>
                 ) : (
-                  <p className="entriesReadOnlyNote">Qualification réservée à Nadia et Lucien.</p>
+                  <p className="entriesReadOnlyNote">Tu n’as pas le droit de qualifier cette entrée.</p>
                 )}
               </section>
 
@@ -692,7 +692,7 @@ function EntryDetail({
                         list={`entry-assignees-${entry.id}`}
                         value={assigneeName}
                         onChange={(event) => setAssigneeName(event.target.value)}
-                        placeholder="Nadia, Lucien…"
+                        placeholder="Choisir un utilisateur…"
                       />
                       <datalist id={`entry-assignees-${entry.id}`}>
                         {suggestedAssignees.map((name) => (
@@ -918,7 +918,7 @@ function EntryDetail({
                           dueDate: postponeDate,
                           reason: postponeReason,
                         },
-                        "Échéance reportée. Nadia et Lucien sont informés dans PAPOT.",
+                        "Échéance reportée. Les responsables sont informés dans PAPOT.",
                       )
                     }
                   >
