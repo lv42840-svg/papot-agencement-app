@@ -1,11 +1,11 @@
 import "server-only";
 
-import { createLocalSharedResourceRuntime } from "@/lib/local-db/shared-resources";
-import { isLocalStorageMode } from "@/lib/local-db/runtime";
-import { NextcloudDavClient } from "@/lib/sync/nextcloud-dav";
-import { SharedResourceEditCoordinator } from "@/lib/sync/resource-edit-coordinator";
-import { NextcloudResourceLockStore } from "@/lib/sync/resource-lock-store";
-import { NextcloudSharedResourceStore } from "@/lib/sync/resource-state-store";
+import { createLocalSharedResourceRuntime } from "../local-db/shared-resources";
+import { isLocalStorageMode } from "../local-db/runtime";
+import { NextcloudDavClient } from "../sync/nextcloud-dav";
+import { SharedResourceEditCoordinator } from "../sync/resource-edit-coordinator";
+import { NextcloudResourceLockStore } from "../sync/resource-lock-store";
+import { NextcloudSharedResourceStore } from "../sync/resource-state-store";
 
 type DesktopRuntimeConfig = {
   nextcloud_base_url: string;
