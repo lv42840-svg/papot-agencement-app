@@ -40,7 +40,7 @@ const writableClientFields = {
   phone: z.string().trim().max(80).default(""),
   email: optionalEmailSchema.default(""),
   siret: optionalSiretSchema.default(""),
-  vatNumber: z.string().trim().max(40).default(""),
+  vatNumber: z.string().trim().max(40).optional(),
   paymentTerms: z.string().trim().max(1000).default(""),
   defaultVatRatePercent: vatRatePercentSchema.optional(),
   notes: z.string().trim().max(4000).default(""),
@@ -118,7 +118,7 @@ function writableValues(input: WritableMutation, existing?: ClientRecord) {
     phone: input.phone,
     email: input.email,
     siret: input.siret,
-    vatNumber: input.vatNumber,
+    vatNumber: input.vatNumber ?? existing?.vatNumber ?? "",
     paymentTerms: input.paymentTerms,
     defaultVatRatePercent:
       input.defaultVatRatePercent ?? existing?.defaultVatRatePercent ?? DEFAULT_VAT_RATE_PERCENT,
