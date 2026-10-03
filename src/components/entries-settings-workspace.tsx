@@ -110,10 +110,7 @@ export function EntriesSettingsWorkspace() {
             busy={busy}
             onMove={(direction) => mutate({ action: "tagMove", tagId: tag.id, direction })}
             onSave={(label, active) =>
-              mutate(
-                { action: "tagUpdate", tagId: tag.id, label, active },
-                "Tag enregistré.",
-              )
+              mutate({ action: "tagUpdate", tagId: tag.id, label, active }, "Tag enregistré.")
             }
           />
         ))}
