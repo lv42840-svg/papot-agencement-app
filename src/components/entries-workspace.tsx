@@ -1968,6 +1968,28 @@ function EntriesStyles() {
       .entriesActionSection {
         background: #fdfcff;
       }
+      .entriesNextActions {
+        display: grid;
+        gap: 10px;
+      }
+      .entriesNextActionCard {
+        display: grid;
+        gap: 10px;
+        padding: 11px;
+        border: 1px solid #e8e2f2;
+        border-radius: 9px;
+        background: #fff;
+      }
+      .entriesNextActionHeader {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 8px;
+      }
+      .entriesNextActionHeader strong {
+        color: #625d70;
+        font-size: 10px;
+      }
       .entriesDivider {
         height: 1px;
         margin: 2px 0;
