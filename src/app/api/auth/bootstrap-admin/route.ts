@@ -1,11 +1,13 @@
 import { randomUUID } from "node:crypto";
 import { NextResponse } from "next/server";
 import { z } from "zod";
+import { verifyBootstrapToken } from "@/lib/auth/bootstrap";
 import { MODULE_PERMISSIONS, SPECIAL_PERMISSIONS } from "@/lib/auth/permission-catalog";
 import { hashPassword } from "@/lib/auth/password";
 import { authHasUsers, mutateAuthPayload } from "@/lib/auth/store";
 
 const schema = z.object({
+  bootstrapToken: z.string().min(1).max(512),
   displayName: z.string().trim().min(1).max(160),
   email: z.string().trim().email().max(240),
   password: z.string().min(12).max(512),
@@ -21,6 +23,10 @@ export async function POST(request: Request) {
       },
       { status: 400 },
     );
+  }
+
+  if (!verifyBootstrapToken(parsed.data.bootstrapToken)) {
+    return NextResponse.json({ error: "Initialisation non autorisée." }, { status: 403 });
   }
 
   if (await authHasUsers()) {

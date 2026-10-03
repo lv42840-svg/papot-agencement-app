@@ -33,9 +33,11 @@ sudo mkdir -p /srv/agencement
 sudo chown -R 1000:1000 /srv/papot/agencement
 ```
 
-Copier ensuite `.env.example` vers `.env` et renseigner le vrai mot de passe PostgreSQL.
+Copier ensuite `.env.example` vers `.env`, renseigner le vrai mot de passe PostgreSQL et générer `PAPOT_BOOTSTRAP_TOKEN` avec `openssl rand -hex 32`.
 
 Le bootstrap `fresh` est volontairement protégé : s'il détecte déjà des données métier ou un cutover partiel, il refuse de continuer au lieu d'écraser ou de requalifier silencieusement la base.
+
+La création du premier administrateur demande également `PAPOT_BOOTSTRAP_TOKEN`. Cette clé reste uniquement dans le `.env` du VPS et n'est jamais stockée dans le code.
 
 ## Démarrage
 

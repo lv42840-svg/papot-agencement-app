@@ -18,6 +18,7 @@ export function FirstAdminForm() {
       method: "POST",
       headers: { "content-type": "application/json" },
       body: JSON.stringify({
+        bootstrapToken: String(form.get("bootstrapToken") ?? ""),
         displayName: String(form.get("displayName") ?? ""),
         email: String(form.get("email") ?? ""),
         password: String(form.get("password") ?? ""),
@@ -36,6 +37,10 @@ export function FirstAdminForm() {
 
   return (
     <form className="loginForm" onSubmit={submit}>
+      <label>
+        Clé d’initialisation
+        <input name="bootstrapToken" type="password" autoComplete="off" required disabled={busy} />
+      </label>
       <label>
         Nom de l’administrateur
         <input name="displayName" autoComplete="name" required disabled={busy} />
