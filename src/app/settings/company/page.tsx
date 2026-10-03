@@ -1,5 +1,6 @@
 import { redirect } from "next/navigation";
 import { CompanyProfileWorkspace } from "@/components/company-profile-workspace";
+import { SettingsSectionNav } from "@/components/settings-section-nav";
 import { DesktopAppShell } from "@/components/desktop-app-shell";
 import { requireUser } from "@/lib/auth/session";
 
@@ -11,6 +12,7 @@ export default async function CompanySettingsPage() {
 
   return (
     <DesktopAppShell>
+      <SettingsSectionNav active="company" />
       <CompanyProfileWorkspace />
     </DesktopAppShell>
   );
