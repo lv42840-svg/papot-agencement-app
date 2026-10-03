@@ -4,10 +4,8 @@ import { createClientsRepository } from "@/lib/clients/create-repository";
 import type { ClientsPayload } from "@/lib/clients/domain";
 import { clientsMutationSchema } from "@/lib/clients/mutations";
 import { ClientsRepositoryError } from "@/lib/clients/repository";
-import {
-  desktopRequestErrorStatus,
-  requireDesktopRequestContext,
-} from "@/lib/desktop/request-context";
+import { requireModuleRequestContext } from "@/lib/auth/module-request-context";
+import { desktopRequestErrorStatus } from "@/lib/desktop/request-context";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -34,8 +32,8 @@ function errorStatus(code: string): number {
 
 export async function GET() {
   try {
-    const context = await requireDesktopRequestContext("clients", "READ");
-    const repository = await createClientsRepository(context);
+    const context = await requireModuleRequestContext("clients", "READ");
+    const repository = await createClientsRepository();
     const payload = await repository.load();
     return noStoreJson(publicSnapshot(payload, context.moduleAccess.canWrite));
   } catch (error) {
@@ -51,8 +49,8 @@ export async function POST(request: Request) {
   try {
     const input = clientsMutationSchema.parse(await request.json());
     stage = "create-repository";
-    const context = await requireDesktopRequestContext("clients", "WRITE");
-    const repository = await createClientsRepository(context);
+    const context = await requireModuleRequestContext("clients", "WRITE");
+    const repository = await createClientsRepository();
 
     stage = "mutate";
     const mutation = await repository.mutate(input, {
