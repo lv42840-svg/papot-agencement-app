@@ -1,0 +1,66 @@
+import { notFound } from "next/navigation";
+import { DesktopAppShell } from "@/components/desktop-app-shell";
+import { QuoteDirectEditor } from "@/components/quote-direct-editor";
+import { createClientsRepository } from "@/lib/clients/create-repository";
+import { clientDisplayName } from "@/lib/clients/domain";
+import { createCommercialRepository } from "@/lib/commercial/create-repository";
+import { requireDesktopRequestContext } from "@/lib/desktop/request-context";
+import { createQuotesRepository } from "@/lib/quotes/create-repository";
+import { quoteContractSelectionState } from "@/lib/quotes/retention";
+
+export const dynamic = "force-dynamic";
+
+export default async function QuotePage({ params }: { params: Promise<{ quoteId: string }> }) {
+  const { quoteId } = await params;
+  const context = await requireDesktopRequestContext("quotes", "READ");
+  const commercialRepository = createCommercialRepository(context);
+  const clientsRepository = await createClientsRepository(context);
+  const [payload, commercial, clients] = await Promise.all([
+    createQuotesRepository().load(),
+    commercialRepository.load(),
+    clientsRepository.load(),
+  ]);
+
+  const quote = payload.quotes.find((candidate) => candidate.id === quoteId);
+  if (!quote) notFound();
+
+  const affair = commercial.cases.find((candidate) => candidate.id === quote.commercialCaseId);
+  const client = clients.clients.find((candidate) => candidate.id === quote.model.clientId);
+  const affairName = affair
+    ? `${affair.name}${affair.siteLabel ? ` · ${affair.siteLabel}` : ""}`
+    : "Affaire introuvable";
+  const clientName = client ? clientDisplayName(client) : "Client introuvable";
+  const primaryContact =
+    client?.contacts.find((contact) => contact.id === affair?.primaryContactId) ??
+    client?.contacts.find((contact) => contact.isPrimary) ??
+    null;
+  const recipientEmail =
+    affair?.contactEmail?.trim() || primaryContact?.email.trim() || client?.email.trim() || "";
+  const recipientName =
+    affair?.contactName?.trim() ||
+    [primaryContact?.firstName, primaryContact?.lastName].filter(Boolean).join(" ").trim();
+  const contractState = quoteContractSelectionState(quote, affair);
+  const paymentTermOptions = Array.from(
+    new Set(
+      [quote.model.paymentTerms, ...clients.clients.map((candidate) => candidate.paymentTerms)]
+        .map((value) => value.trim())
+        .filter((value) => value.length > 0),
+    ),
+  );
+
+  return (
+    <DesktopAppShell>
+      <QuoteDirectEditor
+        initialPayload={payload}
+        quoteId={quoteId}
+        canWrite={context.moduleAccess.canWrite}
+        clientName={clientName}
+        affairName={affairName}
+        recipientEmail={recipientEmail}
+        recipientName={recipientName}
+        paymentTermOptions={paymentTermOptions}
+        contractState={contractState}
+      />
+    </DesktopAppShell>
+  );
+}

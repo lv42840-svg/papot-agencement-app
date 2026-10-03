@@ -1,0 +1,29 @@
+import { commercialParisDateKey } from "./domain";
+import type { QuoteStatus } from "@/lib/quotes/domain";
+
+export type CommercialQuoteDisplayStatus = QuoteStatus | "FOLLOW_UP";
+
+export const COMMERCIAL_QUOTE_STATUS_LABELS: Record<CommercialQuoteDisplayStatus, string> = {
+  DRAFT: "Brouillon",
+  FROZEN: "Validé",
+  SENT: "Envoyé",
+  FOLLOW_UP: "À relancer",
+  ACCEPTED: "Accepté",
+  REJECTED: "Refusé",
+  CANCELLED: "Annulé",
+  SUPERSEDED: "Version précédente",
+};
+
+export function commercialQuoteDisplayStatus(
+  quoteStatus: QuoteStatus,
+  followUpDate: string | null,
+  now: Date = new Date(),
+): CommercialQuoteDisplayStatus {
+  if (quoteStatus !== "SENT") return quoteStatus;
+  if (followUpDate && followUpDate <= commercialParisDateKey(now)) return "FOLLOW_UP";
+  return "SENT";
+}
+
+export function quoteEditorHref(quoteId: string): string {
+  return `/devis/${encodeURIComponent(quoteId)}`;
+}

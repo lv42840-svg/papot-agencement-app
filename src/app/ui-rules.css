@@ -1,0 +1,211 @@
+/*
+ * PAPOT AGENCEMENT UI CONTRACT
+ * Functional UI uses exactly three text sizes:
+ * - page title: 18px
+ * - section title: 15px
+ * - body / labels / controls: 13px
+ * Brand artwork is the only intentional typography exception.
+ */
+
+:root {
+  --papot-font-page-title: 18px;
+  --papot-font-section-title: 15px;
+  --papot-font-body: 13px;
+  --papot-control-height: 36px;
+  --papot-icon-control-size: 32px;
+  --papot-check-size: 16px;
+}
+
+body {
+  font-size: var(--papot-font-body);
+  line-height: 1.35;
+}
+
+body h1 {
+  font-size: var(--papot-font-page-title) !important;
+  line-height: 1.2;
+}
+
+body h2,
+body h3 {
+  font-size: var(--papot-font-section-title) !important;
+  line-height: 1.25;
+}
+
+body p,
+body label,
+body button,
+body input,
+body select,
+body textarea,
+body small {
+  font-size: var(--papot-font-body) !important;
+}
+
+.desktopNav a,
+.navPending,
+.profileName,
+.eyebrow,
+.tableHead,
+.listRow,
+.listRow strong,
+.statusBadge,
+.typeBadge,
+.countBadge,
+.formError,
+.adminBadge,
+.adminSessionRow,
+.adminEmpty {
+  font-size: var(--papot-font-body) !important;
+}
+
+/* Brand lockup is artwork, not functional UI typography. */
+.brandName {
+  font-size: 26px !important;
+}
+
+.brandCompact .brandName {
+  font-size: 21px !important;
+}
+
+.brandSubtitle {
+  font-size: 10px !important;
+}
+
+.primaryButton,
+.secondaryButton,
+input:not([type="checkbox"]):not([type="radio"]),
+select {
+  min-height: var(--papot-control-height) !important;
+}
+
+.primaryButton,
+.secondaryButton {
+  padding: 0 14px !important;
+}
+
+.iconButton {
+  width: var(--papot-icon-control-size) !important;
+  height: var(--papot-icon-control-size) !important;
+}
+
+input[type="checkbox"],
+input[type="radio"] {
+  width: var(--papot-check-size) !important;
+  min-width: var(--papot-check-size) !important;
+  height: var(--papot-check-size) !important;
+  min-height: var(--papot-check-size) !important;
+  padding: 0 !important;
+  margin: 1px 0 0 !important;
+  flex: 0 0 var(--papot-check-size);
+  accent-color: var(--accent);
+}
+
+/* User administration is deliberately dense and deterministic. */
+.adminUsersPage {
+  gap: 14px !important;
+}
+
+.adminPanel,
+.adminUserCard {
+  padding: 16px !important;
+  border-radius: 10px !important;
+}
+
+.adminCreateGrid {
+  grid-template-columns: repeat(3, minmax(220px, 1fr)) auto !important;
+  gap: 10px !important;
+  margin-top: 10px !important;
+}
+
+.adminCreateGrid > .primaryButton {
+  min-width: 190px;
+}
+
+.adminProfileGrid {
+  grid-template-columns: minmax(220px, 1fr) minmax(220px, 1fr) auto !important;
+  gap: 10px !important;
+  margin-top: 10px !important;
+}
+
+.adminProfileGrid > .secondaryButton {
+  min-width: 180px;
+}
+
+.adminSection {
+  margin-top: 14px !important;
+  padding-top: 14px !important;
+}
+
+.adminModuleGrid {
+  grid-template-columns: repeat(6, minmax(0, 1fr)) !important;
+  gap: 10px 12px !important;
+}
+
+.adminModuleRow {
+  grid-template-columns: minmax(0, 1fr) 110px !important;
+  gap: 8px !important;
+}
+
+.adminSpecialGrid {
+  grid-template-columns: repeat(4, minmax(0, 1fr)) !important;
+  gap: 8px 14px !important;
+  margin-top: 12px !important;
+}
+
+.adminCheck {
+  align-items: center !important;
+  gap: 8px !important;
+  min-height: 28px;
+}
+
+/* Technical module keys are implementation details, never user-facing labels. */
+.adminCheck > span > small {
+  display: none !important;
+}
+
+.adminResetForm label {
+  flex: 0 1 620px !important;
+  max-width: 620px;
+}
+
+.adminSessionRow {
+  padding: 8px 10px !important;
+}
+
+@media (max-width: 1599px) {
+  .adminModuleGrid {
+    grid-template-columns: repeat(4, minmax(0, 1fr)) !important;
+  }
+}
+
+@media (max-width: 1199px) {
+  .adminCreateGrid,
+  .adminProfileGrid {
+    grid-template-columns: repeat(2, minmax(0, 1fr)) !important;
+  }
+
+  .adminModuleGrid,
+  .adminSpecialGrid {
+    grid-template-columns: repeat(2, minmax(0, 1fr)) !important;
+  }
+}
+
+@media (max-width: 799px) {
+  .adminCreateGrid,
+  .adminProfileGrid,
+  .adminModuleGrid,
+  .adminSpecialGrid {
+    grid-template-columns: 1fr !important;
+  }
+
+  .adminCreateGrid > .primaryButton,
+  .adminProfileGrid > .secondaryButton {
+    width: 100%;
+  }
+
+  .adminResetForm label {
+    flex-basis: 100% !important;
+    max-width: none;
+  }
+}

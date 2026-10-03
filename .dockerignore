@@ -1,0 +1,9 @@
+node_modules
+.next
+release
+.git
+.env
+.env.*
+!.env.example
+desktop
+build

@@ -1,0 +1,40 @@
+services:
+  agencement-web:
+    build:
+      context: ../..
+      dockerfile: Dockerfile
+    container_name: papot-agencement-web
+    restart: unless-stopped
+    env_file:
+      - .env
+    environment:
+      NODE_ENV: production
+      NEXT_TELEMETRY_DISABLED: "1"
+      HOSTNAME: 0.0.0.0
+      PORT: "3002"
+    ports:
+      - "127.0.0.1:3002:3002"
+    volumes:
+      - /srv/papot/agencement/documents:/srv/papot/agencement/documents
+      - /srv/papot/agencement/modeles:/srv/papot/agencement/modeles
+      - /srv/agencement:/srv/agencement
+    networks:
+      - papot-internal
+      - agencement-web
+    healthcheck:
+      test:
+        - CMD
+        - node
+        - -e
+        - "fetch('http://127.0.0.1:3002/api/health').then(r=>{if(!r.ok)process.exit(1)}).catch(()=>process.exit(1))"
+      interval: 10s
+      timeout: 5s
+      retries: 12
+      start_period: 20s
+
+networks:
+  papot-internal:
+    external: true
+    name: papot-internal
+  agencement-web:
+    driver: bridge
