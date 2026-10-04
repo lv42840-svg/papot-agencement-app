@@ -2,22 +2,12 @@ import "server-only";
 
 import { getCurrentUser } from "@/lib/auth/session";
 import { hasModuleAccess, type AccessLevel } from "@/lib/auth/permissions";
-import { createDesktopSharedResourceRuntime } from "@/lib/desktop/shared-resource-runtime";
 
 export type ModuleRequestContext = {
   user: NonNullable<Awaited<ReturnType<typeof getCurrentUser>>>;
   moduleAccess: {
     canRead: boolean;
     canWrite: boolean;
-  };
-};
-
-export type DesktopRequestContext = ModuleRequestContext & {
-  desktop: ReturnType<typeof createDesktopSharedResourceRuntime>;
-  owner: {
-    userId: string;
-    deviceId: string;
-    displayName: string;
   };
 };
 
@@ -39,23 +29,6 @@ export async function requireModuleRequestContext(
   return {
     user,
     moduleAccess: { canRead, canWrite },
-  };
-}
-
-export async function requireDesktopRequestContext(
-  moduleKey: string,
-  required: AccessLevel,
-): Promise<DesktopRequestContext> {
-  const base = await requireModuleRequestContext(moduleKey, required);
-  const desktop = createDesktopSharedResourceRuntime();
-  return {
-    ...base,
-    desktop,
-    owner: {
-      userId: base.user.id,
-      deviceId: desktop.deviceId,
-      displayName: base.user.displayName,
-    },
   };
 }
 
