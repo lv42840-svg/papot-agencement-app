@@ -131,11 +131,22 @@ export function createNextcloudEntriesRepository(params: {
       const resource = await params.desktop.states.get(ENTRIES_RESOURCE);
       return parseEntriesPayload(resource?.payload);
     },
-    async mutate(input, actor) {
-      return persist((payload) => applyEntriesMutation(payload, input, actor));
+    async mutate(input, actor, expectedRevision) {
+      return persist((payload) =>
+        applyEntriesMutation(payload, input, actor, new Date(), expectedRevision),
+      );
     },
-    async registerAttachments(entryId, attachments, actor) {
-      return persist((payload) => registerEntryAttachments(payload, entryId, attachments, actor));
+    async registerAttachments(entryId, attachments, actor, expectedRevision) {
+      return persist((payload) =>
+        registerEntryAttachments(
+          payload,
+          entryId,
+          attachments,
+          actor,
+          new Date(),
+          expectedRevision,
+        ),
+      );
     },
   };
 }
