@@ -17,7 +17,7 @@ declare global {
         subject: string;
         body: string;
         storagePath: string;
-      }) => Promise<{ ok: boolean; error?: string; attachmentAttached?: boolean }>;
+      }) => Promise<{ ok: boolean; error?: string; method: "CLASSIC_OUTLOOK" | "OUTLOOK_PROTOCOL"; attachmentAttached?: boolean }>;
     };
   }
 }
