@@ -43,14 +43,23 @@ export function launchChantierFromAffair(
   const nativeQuote = affair.retainedQuoteIds.length > 0;
   const historicalCosting = hasHistoricalDocument(affair, "COSTING");
   const timestamp = now.toISOString();
+  const launchYear = now.getFullYear();
+  const existingNumbers = payload.chantiers
+    .filter((candidate) => candidate.launchYear === launchYear)
+    .map((candidate) => candidate.number)
+    .filter((value): value is string => Boolean(value))
+    .map((value) => Number(value.split("-").at(-1)))
+    .filter((value) => Number.isInteger(value) && value > 0);
+  const nextSequence = existingNumbers.length > 0 ? Math.max(...existingNumbers) + 1 : 1;
+  const chantierNumber = `${launchYear}-${String(nextSequence).padStart(3, "0")}`;
 
   const item: ChantierRecord = {
     id: affair.id,
     sourceCommercialCaseId: affair.id,
     sourceEntryId: affair.sourceEntryId,
     initialRetainedQuoteIds: [...affair.retainedQuoteIds],
-    number: null,
-    reference: null,
+    number: chantierNumber,
+    reference: affair.name,
     name: affair.name,
     clientName: affair.clientName,
     companyName: null,
@@ -62,7 +71,7 @@ export function launchChantierFromAffair(
     nextAction: affair.nextAction,
     status: "ACTIVE",
     plannedInstallDate: affair.plannedInstallDate,
-    launchYear: now.getFullYear(),
+    launchYear,
     launchDocuments: {
       quote: nativeQuote || historicalQuote ? "PRESENT" : "MISSING_DECLARED",
       signedQuote: "MISSING_DECLARED",
