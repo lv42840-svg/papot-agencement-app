@@ -232,7 +232,37 @@ export function createInitialChantiersPayload(): ChantiersPayload {
 
 export function parseChantiersPayload(value: unknown): ChantiersPayload {
   if (value == null) return createInitialChantiersPayload();
-  return chantiersPayloadSchema.parse(value);
+  const payload = chantiersPayloadSchema.parse(value);
+
+  const byYear = new Map<number, ChantierRecord[]>();
+  for (const chantier of payload.chantiers) {
+    const group = byYear.get(chantier.launchYear) ?? [];
+    group.push(chantier);
+    byYear.set(chantier.launchYear, group);
+    if (!chantier.reference) chantier.reference = chantier.name;
+  }
+
+  for (const [year, chantiers] of byYear) {
+    const used = new Set(
+      chantiers
+        .map((chantier) => chantier.number)
+        .filter((number): number is string => Boolean(number))
+        .map((number) => Number(number.split("-").at(-1)))
+        .filter((number) => Number.isInteger(number) && number > 0),
+    );
+    let next = 1;
+    for (const chantier of [...chantiers].sort((left, right) =>
+      left.launchedAt.localeCompare(right.launchedAt),
+    )) {
+      if (chantier.number) continue;
+      while (used.has(next)) next += 1;
+      chantier.number = `${year}-${String(next).padStart(3, "0")}`;
+      used.add(next);
+      next += 1;
+    }
+  }
+
+  return payload;
 }
 
 export function chantierRemainingHours(item: ChantierRecord): ChantierHours {
