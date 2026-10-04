@@ -107,9 +107,9 @@ export async function POST(request: Request) {
 
     if (input.action === "createDraft") {
       const workflow = quoteCommercialWorkflowSchema.parse(rawInput);
-      const commercialContext = await requireModuleRequestContext("commercial", "WRITE");
-      const commercialRepository = createCommercialRepository(commercialContext);
-      const clientsRepository = await createClientsRepository(context);
+      await requireModuleRequestContext("commercial", "WRITE");
+      const commercialRepository = createCommercialRepository();
+      const clientsRepository = await createClientsRepository();
       const [commercial, clients] = await Promise.all([
         commercialRepository.load(),
         clientsRepository.load(),
