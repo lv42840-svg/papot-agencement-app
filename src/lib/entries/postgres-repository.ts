@@ -70,11 +70,22 @@ export function createPostgresEntriesRepository(pool: Pool = getServerDbPool()):
       const row = await loadState(pool);
       return parseEntriesPayload(row.payload);
     },
-    async mutate(input, actor) {
-      return persist((payload) => applyEntriesMutation(payload, input, actor));
+    async mutate(input, actor, expectedRevision) {
+      return persist((payload) =>
+        applyEntriesMutation(payload, input, actor, new Date(), expectedRevision),
+      );
     },
-    async registerAttachments(entryId, attachments, actor) {
-      return persist((payload) => registerEntryAttachments(payload, entryId, attachments, actor));
+    async registerAttachments(entryId, attachments, actor, expectedRevision) {
+      return persist((payload) =>
+        registerEntryAttachments(
+          payload,
+          entryId,
+          attachments,
+          actor,
+          new Date(),
+          expectedRevision,
+        ),
+      );
     },
   };
 }
