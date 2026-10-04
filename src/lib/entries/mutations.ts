@@ -159,6 +159,22 @@ function findEntry(payload: EntriesPayload, entryId: string): EntryRecord {
   return entry;
 }
 
+export function entryRevision(entry: EntryRecord): string {
+  return entry.history.at(-1)?.id ?? "none";
+}
+
+function assertEntryRevision(
+  entry: EntryRecord,
+  expectedRevision?: string,
+): void {
+  if (
+    expectedRevision !== undefined &&
+    entryRevision(entry) !== expectedRevision
+  ) {
+    throw new Error("ENTRIES_VERSION_CONFLICT");
+  }
+}
+
 function assertToQualify(entry: EntryRecord): void {
   if (entry.status !== "TO_QUALIFY") throw new Error("ENTRY_NOT_TO_QUALIFY");
 }
@@ -226,9 +242,11 @@ export function registerEntryAttachments(
   attachments: EntryAttachment[],
   actor: EntriesActor,
   nowDate: Date = new Date(),
+  expectedRevision?: string,
 ): EntriesMutationResult {
   const payload = structuredClone(source);
   const entry = findEntry(payload, entryId);
+  assertEntryRevision(entry, expectedRevision);
   const knownIds = new Set(entry.attachments.map((item) => item.id));
   const knownPaths = new Set(entry.attachments.map((item) => item.storagePath));
   if (attachments.some((item) => knownIds.has(item.id) || knownPaths.has(item.storagePath))) {
@@ -257,6 +275,7 @@ export function applyEntriesMutation(
   input: EntriesMutation,
   actor: EntriesActor,
   nowDate: Date = new Date(),
+  expectedEntryRevision?: string,
 ): EntriesMutationResult {
   const payload = structuredClone(source);
   const capabilities = entriesCapabilities(actor);
@@ -341,6 +360,7 @@ export function applyEntriesMutation(
   }
 
   const entry = findEntry(payload, input.entryId);
+  assertEntryRevision(entry, expectedEntryRevision);
 
   if (input.action === "qualifyDraft") {
     requireCapability(capabilities.canQualify, "QUALIFICATION_FORBIDDEN");
