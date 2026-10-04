@@ -107,9 +107,7 @@ export async function GET() {
       deviceId: context.user.id,
       displayName: context.user.displayName,
     };
-    return noStoreJson(
-      await snapshot(payload, owner, context.user, context.moduleAccess.canWrite),
-    );
+    return noStoreJson(await snapshot(payload, owner, context.user, context.moduleAccess.canWrite));
   } catch (error) {
     const code = error instanceof Error ? error.message : "CHANTIERS_LOAD_FAILED";
     return noStoreJson({ error: code }, { status: statusFor(code) });

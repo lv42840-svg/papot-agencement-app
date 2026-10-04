@@ -550,15 +550,10 @@ function LaunchSheet({
         setUploadedQuote(true);
       }
       if (costings.length > 0 && !uploadedCosting) {
-        const uploaded = await uploadCommercialDocument(
-          item.id,
-          costings,
-          currentUpdatedAt,
-          {
-            category: "COSTING",
-            versionLabel: analysis.quoteNumber ?? "",
-          },
-        );
+        const uploaded = await uploadCommercialDocument(item.id, costings, currentUpdatedAt, {
+          category: "COSTING",
+          versionLabel: analysis.quoteNumber ?? "",
+        });
         const refreshed =
           uploaded.payload.cases.find((candidate) => candidate.id === item.id) ?? updated;
         currentUpdatedAt = refreshed.updatedAt;
@@ -569,16 +564,11 @@ function LaunchSheet({
     }
 
     if (signedFile && !uploadedSigned) {
-      const uploaded = await uploadCommercialDocument(
-        item.id,
-        [signedFile],
-        currentUpdatedAt,
-        {
-          category: "QUOTE",
-          versionLabel: analysis?.quoteNumber ?? "",
-          isSignedQuote: true,
-        },
-      );
+      const uploaded = await uploadCommercialDocument(item.id, [signedFile], currentUpdatedAt, {
+        category: "QUOTE",
+        versionLabel: analysis?.quoteNumber ?? "",
+        isSignedQuote: true,
+      });
       const refreshed =
         uploaded.payload.cases.find((candidate) => candidate.id === item.id) ?? item;
       currentUpdatedAt = refreshed.updatedAt;
