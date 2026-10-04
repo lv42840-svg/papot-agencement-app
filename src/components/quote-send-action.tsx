@@ -278,7 +278,7 @@ export function QuoteSendAction({
         </div>
         {canWrite ? (
           <button type="button" className="primaryButton" onClick={() => startMode("SEND")}>
-            <Send size={15} aria-hidden="true" /> Envoyer avec Outlook
+            <Send size={15} aria-hidden="true" /> Envoyer
           </button>
         ) : null}
       </div>
@@ -309,10 +309,10 @@ export function QuoteSendAction({
         {mode === "VALIDATE"
           ? "Le PDF recevra son numéro définitif et sera figé. Le devis restera non envoyé."
           : outlookOpenedWithoutAttachment
-            ? "Outlook est déjà ouvert. Après l’envoi manuel, confirme simplement dans PAPOT."
+            ? "Le mail est déjà préparé. Après l’envoi manuel, confirme simplement dans PAPOT."
             : alreadyValidated
-              ? "Le PDF est déjà figé. PAPOT va ouvrir Outlook avec le devis joint."
-              : "Le PDF sera figé puis PAPOT ouvrira Outlook avec le devis joint."}
+              ? "Le PDF est déjà figé. PAPOT va préparer le mail d’envoi."
+              : "Le PDF sera figé puis PAPOT préparera le mail d’envoi."}
       </div>
       {mode === "SEND" ? (
         <>
@@ -344,14 +344,14 @@ export function QuoteSendAction({
           {saving
             ? mode === "VALIDATE"
               ? "Validation du PDF…"
-              : "Ouverture d’Outlook…"
+              : "Préparation du mail…"
             : mode === "VALIDATE"
               ? "Confirmer la validation"
               : outlookOpenedWithoutAttachment
                 ? "J’ai envoyé"
                 : alreadyValidated
-                  ? "Ouvrir Outlook"
-                  : "Valider et ouvrir Outlook"}
+                  ? "Préparer l’envoi"
+                  : "Valider et préparer l’envoi"}
         </button>
       </div>
       <style jsx>{`
