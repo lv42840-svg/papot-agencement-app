@@ -33,7 +33,7 @@ function validateTemplate(value: string, context: z.RefinementCtx) {
 
 export const quoteEmailSettingsSchema = z
   .object({
-    fromEmail: z.string().trim().email().max(240).default("noreply@papot.eu"),
+    fromEmail: z.string().trim().email().max(240).default("noreply@papot.app"),
     ccEmail: z.string().trim().email().max(240).default("contact@papot.eu"),
     replyToEmail: z.string().trim().email().max(240).default("contact@papot.eu"),
     subjectTemplate: z
