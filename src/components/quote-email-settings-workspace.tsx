@@ -144,6 +144,51 @@ export function QuoteEmailSettingsWorkspace() {
           display: grid;
           gap: 16px;
         }
+        .quoteEmailSettings .companyProfileCard {
+          border: 1px solid #e7e2ef;
+          border-radius: 16px;
+          background: #fff;
+          padding: 18px;
+          box-shadow: 0 5px 18px rgb(55 39 112 / 0.05);
+        }
+        .quoteEmailSettings .companyProfileCard h2 {
+          margin: 0 0 14px;
+          font-size: 16px;
+        }
+        .quoteEmailSettings .companyProfileGrid {
+          display: grid;
+          grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+          gap: 12px;
+        }
+        .quoteEmailSettings .companyField {
+          display: grid;
+          gap: 6px;
+          font-size: 13px;
+          font-weight: 650;
+        }
+        .quoteEmailSettings .companyField input {
+          min-height: 40px;
+          border: 1px solid #dcd6eb;
+          border-radius: 10px;
+          padding: 8px 10px;
+          background: #fff;
+          font: inherit;
+          font-weight: 400;
+        }
+        .quoteEmailSettings .companyProfileActions {
+          display: flex;
+          justify-content: flex-end;
+        }
+        .quoteEmailSettings .companySaved {
+          margin: 0;
+          border: 1px solid #cce4d5;
+          border-radius: 10px;
+          background: #f0faf4;
+          color: #2e6a43;
+          padding: 10px 12px;
+          font-size: 13px;
+          font-weight: 650;
+        }
         .quoteEmailForm {
           display: grid;
           gap: 12px;
