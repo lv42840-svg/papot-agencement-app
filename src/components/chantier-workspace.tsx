@@ -31,6 +31,11 @@ import {
   type ChantiersPayload,
 } from "@/lib/chantiers/domain";
 import type { ChantierCapabilities } from "@/lib/chantiers/mutations";
+import {
+  clientDisplayName,
+  type ClientRecord,
+  type ClientsPayload,
+} from "@/lib/clients/domain";
 import type {
   CommercialCase,
   CommercialDocument,
@@ -49,6 +54,7 @@ type ChantiersSnapshot = {
 };
 
 type CommercialSnapshot = { payload: CommercialPayload };
+type ClientsSnapshot = { payload: ClientsPayload; canWrite: boolean };
 type QuotesSnapshot = { payload: NativeQuotesPayload; canWrite: boolean };
 type MutationBody = Record<string, unknown> & { action: string };
 type ChantierTab =
@@ -123,6 +129,7 @@ function statusTone(item: ChantierRecord): string {
 export function ChantierWorkspace({ chantierId }: { chantierId: string }) {
   const [chantiersSnapshot, setChantiersSnapshot] = useState<ChantiersSnapshot | null>(null);
   const [commercialSnapshot, setCommercialSnapshot] = useState<CommercialSnapshot | null>(null);
+  const [clientsSnapshot, setClientsSnapshot] = useState<ClientsSnapshot | null>(null);
   const [quotesSnapshot, setQuotesSnapshot] = useState<QuotesSnapshot | null>(null);
   const [loading, setLoading] = useState(true);
   const [busy, setBusy] = useState(false);
@@ -134,23 +141,28 @@ export function ChantierWorkspace({ chantierId }: { chantierId: string }) {
     setLoading(true);
     setError(null);
     try {
-      const [chantiersResponse, commercialResponse, quotesResponse] = await Promise.all([
-        fetch("/api/desktop/chantiers", { cache: "no-store" }),
-        fetch("/api/desktop/commercial", { cache: "no-store" }),
-        fetch("/api/desktop/quotes", { cache: "no-store" }),
-      ]);
+      const [chantiersResponse, commercialResponse, clientsResponse, quotesResponse] =
+        await Promise.all([
+          fetch("/api/desktop/chantiers", { cache: "no-store" }),
+          fetch("/api/desktop/commercial", { cache: "no-store" }),
+          fetch("/api/desktop/clients", { cache: "no-store" }),
+          fetch("/api/desktop/quotes", { cache: "no-store" }),
+        ]);
       const chantiersBody = (await chantiersResponse.json()) as ChantiersSnapshot & {
         error?: string;
       };
       const commercialBody = (await commercialResponse.json()) as CommercialSnapshot & {
         error?: string;
       };
+      const clientsBody = (await clientsResponse.json()) as ClientsSnapshot & { error?: string };
       const quotesBody = (await quotesResponse.json()) as QuotesSnapshot & { error?: string };
       if (!chantiersResponse.ok) throw new Error(chantiersBody.error ?? "CHANTIERS_LOAD_FAILED");
       if (!commercialResponse.ok) throw new Error(commercialBody.error ?? "COMMERCIAL_LOAD_FAILED");
+      if (!clientsResponse.ok) throw new Error(clientsBody.error ?? "CLIENTS_LOAD_FAILED");
       if (!quotesResponse.ok) throw new Error(quotesBody.error ?? "QUOTES_LOAD_FAILED");
       setChantiersSnapshot(chantiersBody);
       setCommercialSnapshot(commercialBody);
+      setClientsSnapshot(clientsBody);
       setQuotesSnapshot(quotesBody);
     } catch (loadError) {
       const code = loadError instanceof Error ? loadError.message : "CHANTIERS_LOAD_FAILED";
@@ -174,6 +186,12 @@ export function ChantierWorkspace({ chantierId }: { chantierId: string }) {
         (item) => item.id === chantier?.sourceCommercialCaseId,
       ) ?? null,
     [commercialSnapshot, chantier?.sourceCommercialCaseId],
+  );
+  const clientRecord = useMemo(
+    () =>
+      clientsSnapshot?.payload.clients.find((client) => client.id === commercialCase?.clientId) ??
+      null,
+    [clientsSnapshot, commercialCase?.clientId],
   );
 
   const mutateCommercial = useCallback(async (body: MutationBody, successMessage: string) => {
@@ -323,6 +341,8 @@ export function ChantierWorkspace({ chantierId }: { chantierId: string }) {
         {activeTab === "client" ? (
           <ClientTab
             chantier={chantier}
+            clientRecord={clientRecord}
+            commercialCase={commercialCase}
             busy={busy}
             canModify={chantiersSnapshot.capabilities.canModify && chantier.status !== "ARCHIVED"}
             mutate={mutate}
@@ -376,38 +396,58 @@ export function ChantierWorkspace({ chantierId }: { chantierId: string }) {
 
 function ClientTab({
   chantier,
+  clientRecord,
+  commercialCase,
   busy,
   canModify,
   mutate,
 }: {
   chantier: ChantierRecord;
+  clientRecord: ClientRecord | null;
+  commercialCase: CommercialCase | null;
   busy: boolean;
   canModify: boolean;
   mutate: (body: MutationBody, message: string) => Promise<boolean>;
 }) {
+  const primaryContact =
+    clientRecord?.contacts.find((contact) => contact.id === commercialCase?.primaryContactId) ??
+    clientRecord?.contacts.find((contact) => contact.isPrimary) ??
+    null;
+  const sourceClientName = clientRecord ? clientDisplayName(clientRecord) : chantier.clientName ?? "";
+  const sourceCompanyName =
+    clientRecord && clientRecord.type !== "PARTICULIER"
+      ? clientRecord.companyName
+      : chantier.companyName ?? "";
+  const sourceContactName =
+    primaryContact
+      ? [primaryContact.firstName, primaryContact.lastName].filter(Boolean).join(" ")
+      : chantier.contactName ?? "";
+  const sourcePhone = primaryContact?.phone || clientRecord?.phone || chantier.contactPhone || "";
+  const sourceEmail = primaryContact?.email || clientRecord?.email || chantier.contactEmail || "";
+
   const [editing, setEditing] = useState(false);
-  const [reference, setReference] = useState(chantier.reference ?? "");
+  const [reference, setReference] = useState(chantier.reference ?? commercialCase?.name ?? "");
   const [name, setName] = useState(chantier.name);
-  const [clientName, setClientName] = useState(chantier.clientName ?? "");
-  const [companyName, setCompanyName] = useState(chantier.companyName ?? "");
-  const [siteLabel, setSiteLabel] = useState(chantier.siteLabel ?? "");
-  const [contactName, setContactName] = useState(chantier.contactName ?? "");
-  const [contactPhone, setContactPhone] = useState(chantier.contactPhone ?? "");
-  const [contactEmail, setContactEmail] = useState(chantier.contactEmail ?? "");
-  const [description, setDescription] = useState(chantier.description ?? "");
-  const [nextAction, setNextAction] = useState(chantier.nextAction ?? "");
+  const [clientName, setClientName] = useState(sourceClientName);
+  const [companyName, setCompanyName] = useState(sourceCompanyName);
+  const [siteLabel, setSiteLabel] = useState(chantier.siteLabel ?? commercialCase?.siteLabel ?? "");
+  const [contactName, setContactName] = useState(sourceContactName);
+  const [contactPhone, setContactPhone] = useState(sourcePhone);
+  const [contactEmail, setContactEmail] = useState(sourceEmail);
+  const [description, setDescription] = useState(chantier.description ?? commercialCase?.description ?? "");
+  const [nextAction, setNextAction] = useState(chantier.nextAction ?? commercialCase?.nextAction ?? "");
 
   function resetForm() {
-    setReference(chantier.reference ?? "");
+    setReference(chantier.reference ?? commercialCase?.name ?? "");
     setName(chantier.name);
-    setClientName(chantier.clientName ?? "");
-    setCompanyName(chantier.companyName ?? "");
-    setSiteLabel(chantier.siteLabel ?? "");
-    setContactName(chantier.contactName ?? "");
-    setContactPhone(chantier.contactPhone ?? "");
-    setContactEmail(chantier.contactEmail ?? "");
-    setDescription(chantier.description ?? "");
-    setNextAction(chantier.nextAction ?? "");
+    setClientName(sourceClientName);
+    setCompanyName(sourceCompanyName);
+    setSiteLabel(chantier.siteLabel ?? commercialCase?.siteLabel ?? "");
+    setContactName(sourceContactName);
+    setContactPhone(sourcePhone);
+    setContactEmail(sourceEmail);
+    setDescription(chantier.description ?? commercialCase?.description ?? "");
+    setNextAction(chantier.nextAction ?? commercialCase?.nextAction ?? "");
   }
 
   async function save() {
@@ -536,17 +576,17 @@ function ClientTab({
             <InfoCell label="N° chantier" value={chantier.number} strong />
             <InfoCell label="Référence" value={chantier.reference} strong />
             <InfoCell label="Nom du chantier" value={chantier.name} />
-            <InfoCell label="Client" value={chantier.clientName} />
-            <InfoCell label="Société" value={chantier.companyName} />
-            <InfoCell label="Lieu chantier" value={chantier.siteLabel} />
-            <InfoCell label="Contact" value={chantier.contactName} />
-            <InfoCell label="Téléphone" value={chantier.contactPhone} />
-            <InfoCell label="E-mail" value={chantier.contactEmail} />
+            <InfoCell label="Client" value={sourceClientName} />
+            <InfoCell label="Société" value={sourceCompanyName} />
+            <InfoCell label="Lieu chantier" value={chantier.siteLabel ?? commercialCase?.siteLabel} />
+            <InfoCell label="Contact" value={sourceContactName} />
+            <InfoCell label="Téléphone" value={sourcePhone} />
+            <InfoCell label="E-mail" value={sourceEmail} />
             <InfoCell label="Pose prévisionnelle" value={formatDateOnly(chantier.plannedInstallDate)} />
           </div>
           <div className="chantierIdentityNotes">
-            <InfoCell label="C'est quoi ?" value={chantier.description} />
-            <InfoCell label="J'en fais quoi ?" value={chantier.nextAction} />
+            <InfoCell label="C'est quoi ?" value={chantier.description ?? commercialCase?.description} />
+            <InfoCell label="J'en fais quoi ?" value={chantier.nextAction ?? commercialCase?.nextAction} />
           </div>
           {!canModify ? (
             <p className="chantierHint">
