@@ -1,0 +1,31 @@
+name: Format Chantiers web
+
+on:
+  push:
+    branches:
+      - fix/agencement-concurrent-writes
+
+permissions:
+  contents: write
+
+jobs:
+  format:
+    if: github.actor != 'github-actions[bot]'
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: true
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - run: npm ci --no-audit --no-fund
+      - run: |
+          npx prettier --write             "src/app/api/desktop/chantiers/route.ts"             "src/components/chantiers-workspace-obat.tsx"             "src/lib/chantiers/create-repository.ts"             "src/lib/chantiers/postgres-factory.ts"
+      - name: Commit formatting if needed
+        run: |
+          git add             "src/app/api/desktop/chantiers/route.ts"             "src/components/chantiers-workspace-obat.tsx"             "src/lib/chantiers/create-repository.ts"             "src/lib/chantiers/postgres-factory.ts"
+          if git diff --cached --quiet; then exit 0; fi
+          git -c user.name="PAPOT development" -c user.email="dev@papot.app" commit -m "style(chantiers): format web runtime changes"
+          git push origin HEAD:fix/agencement-concurrent-writes
