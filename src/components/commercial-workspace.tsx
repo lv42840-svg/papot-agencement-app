@@ -51,6 +51,17 @@ type CommercialSnapshot = {
 };
 
 type MutationBody = Record<string, unknown> & { action: string };
+type CommercialUploadFn = (
+  caseId: string,
+  files: File[],
+  options: {
+    category: CommercialDocumentCategory;
+    versionLabel: string;
+    variantLabel: string;
+    isCurrent: boolean;
+    isSignedQuote: boolean;
+  },
+) => Promise<CommercialSnapshot | null>;
 type ListMode = "active" | "confirmed" | "archives";
 type CommercialDetailTab = "client" | "follow" | "notes" | "documents" | "capacity" | "history";
 
@@ -607,7 +618,7 @@ function CommercialCaseDetail({
   capabilities: CommercialCapabilities;
   suggestedPeople: string[];
   mutate: (body: MutationBody, successMessage: string) => Promise<CommercialSnapshot | null>;
-  uploadDocuments: ReturnType<typeof useCommercialData>["uploadDocuments"];
+  uploadDocuments: CommercialUploadFn;
 }) {
   const [activeTab, setActiveTab] = useState<CommercialDetailTab>("client");
   const closed = isCommercialClosed(item);
@@ -1215,7 +1226,7 @@ function DocumentsSection({
   item: CommercialCase;
   busy: boolean;
   canModify: boolean;
-  uploadDocuments: ReturnType<typeof useCommercialData>["uploadDocuments"];
+  uploadDocuments: CommercialUploadFn;
 }) {
   const [category, setCategory] = useState<CommercialDocumentCategory>("RECEIVED");
   const [versionLabel, setVersionLabel] = useState("");
