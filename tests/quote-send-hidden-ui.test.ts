@@ -28,7 +28,7 @@ describe("quote final PDF action visibility", () => {
     expect(sendAction).toContain("> Envoyer");
     expect(sendAction).toContain("Valider et envoyer");
     expect(sendAction).toContain("Envoi du devis…");
-    expect(emailSettings).toContain("noreply@papot.eu");
+    expect(emailSettings).toContain("noreply@papot.app");
     expect(emailSettings).toContain("contact@papot.eu");
     expect(sendAction).not.toContain("mailto:");
   });
