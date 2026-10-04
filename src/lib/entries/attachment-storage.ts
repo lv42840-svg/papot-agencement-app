@@ -12,7 +12,6 @@ export type EntryAttachmentTransport = {
   displayName: string;
 };
 
-
 function safeFileName(value: string): string {
   const cleaned = value
     .trim()
@@ -92,7 +91,6 @@ export async function readEntryAttachment(
   }
   return bytes;
 }
-
 
 export async function cleanupEntryAttachments(
   transport: Pick<EntryAttachmentTransport, "store">,
