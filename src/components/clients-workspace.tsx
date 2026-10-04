@@ -167,6 +167,7 @@ export function ClientsWorkspace() {
   const [showArchived, setShowArchived] = useState(false);
   const [selectedId, setSelectedId] = useState<string | null>(requestedFocusId);
   const [mode, setMode] = useState<EditMode>("view");
+  const [editingUpdatedAt, setEditingUpdatedAt] = useState<string | null>(null);
   const [draft, setDraft] = useState<ClientDraft>(emptyDraft);
 
   const load = useCallback(async () => {
@@ -265,6 +266,7 @@ export function ClientsWorkspace() {
   function startNew() {
     setSelectedId(null);
     setDraft(emptyDraft());
+    setEditingUpdatedAt(null);
     setMode("new");
     setError(null);
     setNotice(null);
@@ -273,6 +275,7 @@ export function ClientsWorkspace() {
   function selectClient(client: ClientRecord) {
     setSelectedId(client.id);
     setDraft(clientToDraft(client));
+    setEditingUpdatedAt(null);
     setMode("view");
     setError(null);
     setNotice(null);
@@ -281,6 +284,7 @@ export function ClientsWorkspace() {
   function cancelEdit() {
     if (selectedClient) {
       setDraft(clientToDraft(selectedClient));
+      setEditingUpdatedAt(null);
       setMode("view");
       return;
     }
@@ -346,7 +350,12 @@ export function ClientsWorkspace() {
     }
     if (mode === "edit" && selectedClient) {
       await mutate(
-        { action: "update", clientId: selectedClient.id, ...fields },
+        {
+          action: "update",
+          clientId: selectedClient.id,
+          expectedUpdatedAt: editingUpdatedAt,
+          ...fields,
+        },
         "Fiche client enregistrée.",
       );
     }
@@ -355,7 +364,11 @@ export function ClientsWorkspace() {
   async function archiveSelected() {
     if (!selectedClient) return;
     const result = await mutate(
-      { action: "archive", clientId: selectedClient.id },
+      {
+        action: "archive",
+        clientId: selectedClient.id,
+        expectedUpdatedAt: selectedClient.updatedAt,
+      },
       "Client archivé.",
     );
     if (result) setShowArchived(true);
@@ -363,7 +376,14 @@ export function ClientsWorkspace() {
 
   async function reactivateSelected() {
     if (!selectedClient) return;
-    await mutate({ action: "reactivate", clientId: selectedClient.id }, "Client réactivé.");
+    await mutate(
+      {
+        action: "reactivate",
+        clientId: selectedClient.id,
+        expectedUpdatedAt: selectedClient.updatedAt,
+      },
+      "Client réactivé.",
+    );
   }
 
   const canWrite = snapshot?.canWrite === true;
@@ -471,7 +491,10 @@ export function ClientsWorkspace() {
                     <button
                       className="secondaryButton"
                       type="button"
-                      onClick={() => setMode("edit")}
+                      onClick={() => {
+                        setEditingUpdatedAt(displayedClient.updatedAt);
+                        setMode("edit");
+                      }}
                     >
                       Modifier
                     </button>
