@@ -2,7 +2,7 @@ import { NextResponse } from "next/server";
 import { ZodError } from "zod";
 import {
   desktopRequestErrorStatus,
-  requireDesktopRequestContext,
+  requireModuleRequestContext,
 } from "@/lib/desktop/request-context";
 import {
   assertQuoteRevision,
@@ -48,7 +48,7 @@ function errorStatus(code: string): number {
 export async function POST(request: Request) {
   try {
     const input = quotePricingMutationSchema.parse(await request.json());
-    const context = await requireDesktopRequestContext("quotes", "WRITE");
+    const context = await requireModuleRequestContext("quotes", "WRITE");
     const actor = { userId: context.user.id, displayName: context.user.displayName };
     const repository = createQuotesRepository();
     const expectedRevision = expectedQuoteRevision(request);
