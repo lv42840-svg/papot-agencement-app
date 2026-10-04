@@ -76,13 +76,17 @@ export function QuoteEmailSettingsWorkspace() {
         <div>
           <h1>E-mails des devis</h1>
           <p className="muted">
-            Même principe que les bons de commande PAPOT CONCEPT : modèle partagé dans les paramètres,
-            puis message modifiable juste avant l’envoi.
+            Même principe que les bons de commande PAPOT CONCEPT : modèle partagé dans les
+            paramètres, puis message modifiable juste avant l’envoi.
           </p>
         </div>
       </div>
 
-      {error ? <p className="formError" role="alert">{error}</p> : null}
+      {error ? (
+        <p className="formError" role="alert">
+          {error}
+        </p>
+      ) : null}
       {saved ? <p className="companySaved">Modèle d’e-mail enregistré.</p> : null}
 
       <article className="companyProfileCard">
@@ -128,13 +132,19 @@ export function QuoteEmailSettingsWorkspace() {
             />
           </label>
           <p className="muted">
-            Variables disponibles : {QUOTE_EMAIL_TEMPLATE_VARIABLES.map((name) => `{{${name}}}`).join(", ")}
+            Variables disponibles :{" "}
+            {QUOTE_EMAIL_TEMPLATE_VARIABLES.map((name) => `{{${name}}}`).join(", ")}
           </p>
         </div>
       </article>
 
       <div className="companyProfileActions">
-        <button className="primaryButton" type="button" onClick={() => void save()} disabled={busy}>
+        <button
+          className="primaryButton"
+          type="button"
+          onClick={() => void save()}
+          disabled={busy}
+        >
           {busy ? "Enregistrement…" : "Enregistrer le modèle d’e-mail"}
         </button>
       </div>
@@ -233,7 +243,11 @@ function Field({
   return (
     <label className="companyField">
       {label}
-      <input type={type} value={value} onChange={(event) => onChange(event.target.value)} />
+      <input
+        type={type}
+        value={value}
+        onChange={(event) => onChange(event.target.value)}
+      />
     </label>
   );
 }
