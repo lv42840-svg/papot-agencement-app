@@ -723,6 +723,14 @@ function AffairDetail({
             )}
           </p>
         </div>
+        {item.clientId && !isCommercialClosed(item) ? (
+          <Link
+            href={`/devis/nouveau?affaire=${encodeURIComponent(item.id)}`}
+            className="primaryButton commercialV2CreateQuote"
+          >
+            <FilePlus2 size={14} /> Créer un devis
+          </Link>
+        ) : null}
       </header>
       <nav className="commercialV2Tabs">
         <button className={tab === "affair" ? "active" : ""} onClick={() => setTab("affair")}>
@@ -1557,7 +1565,18 @@ function CommercialV2Styles() {
       }
       .commercialV2DetailHeader {
         padding: 18px 20px 13px;
+        display: flex;
+        align-items: flex-start;
+        justify-content: space-between;
+        gap: 14px;
         border-bottom: 1px solid #eeeaf2;
+      }
+      .commercialV2CreateQuote {
+        display: inline-flex;
+        align-items: center;
+        gap: 6px;
+        text-decoration: none;
+        white-space: nowrap;
       }
       .commercialV2DetailHeader h2 {
         margin: 7px 0 2px;
