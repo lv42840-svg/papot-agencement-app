@@ -374,24 +374,27 @@ async function ensureQuoteEmailSettingsStorage(client: PoolClient): Promise<void
     )
   `);
 
-  await client.query(`
-    INSERT INTO papot_quote_email_settings (scope, version, payload)
-    VALUES (
-      'global',
-      1,
-      $1::jsonb
-    )
-    ON CONFLICT (scope) DO NOTHING
-  `, [
-    JSON.stringify({
-      fromEmail: "noreply@papot.app",
-      ccEmail: "contact@papot.eu",
-      replyToEmail: "contact@papot.eu",
-      subjectTemplate: "Devis {{NUM_DEVIS}} - {{AFFAIRE}}",
-      bodyTemplate:
-        "{{BONJOUR}}\n\nVeuillez trouver ci-joint notre devis {{NUM_DEVIS}} concernant {{OBJET_DEVIS}}.\n\nBien cordialement,\nPAPOT AGENCEMENT",
-    }),
-  ]);
+  await client.query(
+    `
+      INSERT INTO papot_quote_email_settings (scope, version, payload)
+      VALUES (
+        'global',
+        1,
+        $1::jsonb
+      )
+      ON CONFLICT (scope) DO NOTHING
+    `,
+    [
+      JSON.stringify({
+        fromEmail: "noreply@papot.app",
+        ccEmail: "contact@papot.eu",
+        replyToEmail: "contact@papot.eu",
+        subjectTemplate: "Devis {{NUM_DEVIS}} - {{AFFAIRE}}",
+        bodyTemplate:
+          "{{BONJOUR}}\n\nVeuillez trouver ci-joint notre devis {{NUM_DEVIS}} concernant {{OBJET_DEVIS}}.\n\nBien cordialement,\nPAPOT AGENCEMENT",
+      }),
+    ],
+  );
 }
 
 async function ensureCompanyProfileStorage(client: PoolClient): Promise<void> {
