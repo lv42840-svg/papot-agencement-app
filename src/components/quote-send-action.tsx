@@ -179,14 +179,14 @@ export function QuoteSendAction({
     setError("");
     try {
       if (mode === "VALIDATE") {
-        const payload = await postFinalize(quote.id, "VALIDATE", "");
+        const payload = await postFinalize(quote.id, "VALIDATE", "", quote.updatedAt);
         onSaved(payload);
         setMode(null);
         return;
       }
 
       if (outlookOpenedWithoutAttachment) {
-        const sentPayload = await postFinalize(quote.id, "SEND", followUpDate);
+        const sentPayload = await postFinalize(quote.id, "SEND", followUpDate, quote.updatedAt);
         onSaved(sentPayload);
         setOutlookOpenedWithoutAttachment(false);
         setMode(null);
@@ -195,7 +195,7 @@ export function QuoteSendAction({
 
       let validatedQuote = quote;
       if (quote.status === "DRAFT") {
-        const validatedPayload = await postFinalize(quote.id, "VALIDATE", "");
+        const validatedPayload = await postFinalize(quote.id, "VALIDATE", "", quote.updatedAt);
         onSaved(validatedPayload);
         const nextQuote = validatedPayload.quotes.find((candidate) => candidate.id === quote.id);
         if (!nextQuote) throw new Error("QUOTE_NOT_FOUND");
@@ -218,7 +218,12 @@ export function QuoteSendAction({
         return;
       }
 
-      const sentPayload = await postFinalize(quote.id, "SEND", followUpDate);
+      const sentPayload = await postFinalize(
+        quote.id,
+        "SEND",
+        followUpDate,
+        validatedQuote.updatedAt,
+      );
       onSaved(sentPayload);
       setMode(null);
     } catch (caught) {
