@@ -75,3 +75,19 @@ jobs:
           name: quote-word-v2-pdf-qa
           path: tmp/pdf-qa
           if-no-files-found: error
+
+  format-debug:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - name: Show exact formatting diff
+        run: |
+          npx prettier --write src/components/entries-workspace.tsx
+          git diff -- src/components/entries-workspace.tsx
+          exit 1
+
