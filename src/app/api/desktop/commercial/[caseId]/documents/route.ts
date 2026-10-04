@@ -20,7 +20,7 @@ import {
 } from "@/lib/commercial/mutations";
 import {
   desktopRequestErrorStatus,
-  requireDesktopRequestContext,
+  requireModuleRequestContext,
 } from "@/lib/desktop/request-context";
 
 export const runtime = "nodejs";
@@ -75,10 +75,15 @@ function statusFor(code: string): number {
 export async function POST(request: Request, context: RouteContext) {
   try {
     const { caseId } = await context.params;
-    const requestContext = await requireDesktopRequestContext("commercial", "WRITE");
-    const { owner, user } = requestContext;
-    const repository = createCommercialRepository(requestContext);
-    const clients = await createClientsRepository(requestContext);
+    const requestContext = await requireModuleRequestContext("commercial", "WRITE");
+    const { user } = requestContext;
+    const owner = {
+      userId: user.id,
+      deviceId: user.id,
+      displayName: user.displayName,
+    };
+    const repository = createCommercialRepository();
+    const clients = await createClientsRepository();
     const form = await request.formData();
     const files = form.getAll("files").filter((value): value is File => value instanceof File);
     const category = commercialDocumentCategorySchema.parse(form.get("category"));
@@ -98,7 +103,9 @@ export async function POST(request: Request, context: RouteContext) {
 
     const creationYear = new Date(item.createdAt).getFullYear();
     const actor = { userId: owner.userId, displayName: owner.displayName };
-    const transport = await createCommercialDocumentTransport(requestContext);
+    const transport = await createCommercialDocumentTransport({
+      displayName: user.displayName,
+    });
 
     let uploaded = [] as Awaited<ReturnType<typeof uploadCommercialDocuments>>;
     try {
