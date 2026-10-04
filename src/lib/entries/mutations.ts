@@ -1,5 +1,6 @@
-import { randomUUID } from "node:crypto";
 import { z } from "zod";
+
+const randomUUID = () => globalThis.crypto.randomUUID();
 import {
   normalizePersonName,
   parisDateKey,
