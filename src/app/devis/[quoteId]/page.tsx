@@ -5,6 +5,7 @@ import { createClientsRepository } from "@/lib/clients/create-repository";
 import { clientDisplayName } from "@/lib/clients/domain";
 import { createCommercialRepository } from "@/lib/commercial/create-repository";
 import { requireModuleRequestContext } from "@/lib/desktop/request-context";
+import { createQuoteEmailSettingsRepository } from "@/lib/quote-email-settings/create-repository";
 import { createQuotesRepository } from "@/lib/quotes/create-repository";
 import { quoteContractSelectionState } from "@/lib/quotes/retention";
 
@@ -15,10 +16,11 @@ export default async function QuotePage({ params }: { params: Promise<{ quoteId:
   const context = await requireModuleRequestContext("quotes", "READ");
   const commercialRepository = createCommercialRepository();
   const clientsRepository = await createClientsRepository();
-  const [payload, commercial, clients] = await Promise.all([
+  const [payload, commercial, clients, emailSettings] = await Promise.all([
     createQuotesRepository().load(),
     commercialRepository.load(),
     clientsRepository.load(),
+    createQuoteEmailSettingsRepository().load(),
   ]);
 
   const quote = payload.quotes.find((candidate) => candidate.id === quoteId);
@@ -58,6 +60,7 @@ export default async function QuotePage({ params }: { params: Promise<{ quoteId:
         affairName={affairName}
         recipientEmail={recipientEmail}
         recipientName={recipientName}
+        emailSettings={emailSettings}
         paymentTermOptions={paymentTermOptions}
         contractState={contractState}
       />
