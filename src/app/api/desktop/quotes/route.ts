@@ -16,6 +16,11 @@ import {
   type LibraryPayload,
 } from "@/lib/library/storage";
 import { quoteWorkflowMayChangeCommercialStatus } from "@/lib/quotes/chantier";
+import {
+  assertQuoteRevision,
+  expectedQuoteRevision,
+  quoteConcurrencyStatus,
+} from "@/lib/quotes/concurrency";
 import { startQuoteCommercialWorkflow } from "@/lib/quotes/commercial-bridge";
 import { createQuotesRepository } from "@/lib/quotes/create-repository";
 import { initializeQuoteVatFromClient } from "@/lib/quotes/legal-details";
@@ -46,6 +51,8 @@ function publicSnapshot(payload: NativeQuotesPayload, canWrite: boolean, focusQu
 function errorStatus(code: string): number {
   const requestStatus = desktopRequestErrorStatus(code);
   if (requestStatus) return requestStatus;
+  const concurrencyStatus = quoteConcurrencyStatus(code);
+  if (concurrencyStatus) return concurrencyStatus;
   if (
     code === "QUOTE_AFFAIR_NOT_FOUND" ||
     code === "QUOTE_CLIENT_NOT_FOUND" ||
@@ -94,6 +101,8 @@ export async function POST(request: Request) {
   try {
     const rawInput = await request.json();
     const input = quotesMutationSchema.parse(rawInput);
+    const expectedRevision =
+      input.action === "createDraft" ? null : expectedQuoteRevision(request);
     const context = await requireDesktopRequestContext("quotes", "WRITE");
     const actor = { userId: context.user.id, displayName: context.user.displayName };
 
@@ -215,6 +224,7 @@ export async function POST(request: Request) {
 
     const repository = createQuotesRepository();
     const mutation = await repository.mutate(async (payload) => {
+      assertQuoteRevision(payload, input.quoteId, expectedRevision!);
       const result = applyQuotesMutation(
         payload,
         input,
