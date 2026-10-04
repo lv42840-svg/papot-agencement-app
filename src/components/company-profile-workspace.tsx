@@ -6,6 +6,7 @@ import { SettingsSectionNav } from "./settings-section-nav";
 
 type ApiResponse = {
   profile?: CompanyProfile;
+  version?: number;
   error?: string;
 };
 
@@ -14,11 +15,18 @@ function errorMessage(code: string) {
   if (code === "AUTH_REQUIRED") return "Connexion requise.";
   if (code === "COMPANY_PROFILE_REQUEST_INVALID") return "Certaines informations sont invalides.";
   if (code === "COMPANY_PROFILE_INVALID") return "La fiche société enregistrée est invalide.";
+  if (code === "COMPANY_PROFILE_VERSION_CONFLICT") {
+    return "La fiche société a été modifiée ailleurs. Recharge la page avant d'enregistrer.";
+  }
+  if (code === "COMPANY_PROFILE_VERSION_REQUIRED") {
+    return "La version ouverte de la fiche société est introuvable. Recharge la page.";
+  }
   return code || "Une erreur est survenue.";
 }
 
 export function CompanyProfileWorkspace() {
   const [profile, setProfile] = useState<CompanyProfile | null>(null);
+  const [version, setVersion] = useState<number | null>(null);
   const [error, setError] = useState("");
   const [saved, setSaved] = useState(false);
   const [busy, setBusy] = useState(false);
@@ -32,6 +40,7 @@ export function CompanyProfileWorkspace() {
         return;
       }
       setProfile(body.profile);
+      setVersion(body.version ?? null);
     })();
   }, []);
 
@@ -41,14 +50,17 @@ export function CompanyProfileWorkspace() {
   }
 
   async function save() {
-    if (!profile) return;
+    if (!profile || version === null) return;
     setBusy(true);
     setError("");
     setSaved(false);
     try {
       const response = await fetch("/api/admin/company-profile", {
         method: "POST",
-        headers: { "content-type": "application/json" },
+        headers: {
+          "content-type": "application/json",
+          "if-match": `"${version}"`,
+        },
         body: JSON.stringify(profile),
       });
       const body = (await response.json().catch(() => null)) as ApiResponse | null;
@@ -57,6 +69,7 @@ export function CompanyProfileWorkspace() {
         return;
       }
       setProfile(body.profile);
+      setVersion(body.version ?? version);
       setSaved(true);
     } finally {
       setBusy(false);
