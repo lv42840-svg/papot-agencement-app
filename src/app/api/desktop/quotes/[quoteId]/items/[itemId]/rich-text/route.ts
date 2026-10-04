@@ -4,6 +4,11 @@ import {
   desktopRequestErrorStatus,
   requireDesktopRequestContext,
 } from "@/lib/desktop/request-context";
+import {
+  assertQuoteRevision,
+  expectedQuoteRevision,
+  quoteConcurrencyStatus,
+} from "@/lib/quotes/concurrency";
 import { createQuotesRepository } from "@/lib/quotes/create-repository";
 import { quoteRichTextSchema } from "@/lib/quotes/model";
 import { applyQuoteRichTextUpdate } from "@/lib/quotes/rich-text-mutation";
@@ -21,6 +26,8 @@ const requestSchema = z.object({
 function statusFor(code: string): number {
   const requestStatus = desktopRequestErrorStatus(code);
   if (requestStatus) return requestStatus;
+  const concurrencyStatus = quoteConcurrencyStatus(code);
+  if (concurrencyStatus) return concurrencyStatus;
   if (code === "QUOTE_NOT_FOUND" || code === "QUOTE_ITEM_NOT_FOUND") return 404;
   if (code === "QUOTE_NOT_EDITABLE") return 409;
   return 400;
@@ -32,14 +39,18 @@ export async function POST(request: Request, context: RouteContext) {
     const requestContext = await requireDesktopRequestContext("quotes", "WRITE");
     const body = requestSchema.parse(await request.json());
     const repository = createQuotesRepository();
+    const expectedRevision = expectedQuoteRevision(request);
     const actor = {
       userId: requestContext.owner.userId,
       displayName: requestContext.owner.displayName,
     };
-    const mutation = await repository.mutate((payload) => ({
-      payload: applyQuoteRichTextUpdate(payload, { quoteId, itemId, ...body }, actor),
-      focusQuoteId: quoteId,
-    }));
+    const mutation = await repository.mutate((payload) => {
+      assertQuoteRevision(payload, quoteId, expectedRevision);
+      return {
+        payload: applyQuoteRichTextUpdate(payload, { quoteId, itemId, ...body }, actor),
+        focusQuoteId: quoteId,
+      };
+    });
 
     return NextResponse.json(
       { payload: mutation.payload },
