@@ -15,6 +15,7 @@ type LifecycleResponse = {
 };
 
 function errorLabel(code: string): string {
+  if (code === "QUOTE_VERSION_CONFLICT") return "Ce devis a été modifié ailleurs. Recharge-le avant de recommencer.";
   if (code === "QUOTE_VERSION_SOURCE_OUTDATED") {
     return "Cette version n’est plus la version courante. Ouvre la dernière version pour continuer.";
   }
