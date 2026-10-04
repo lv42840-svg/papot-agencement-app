@@ -1,6 +1,6 @@
 import "server-only";
 
-import { randomUUID } from "node:crypto";
+import { createHash, randomUUID } from "node:crypto";
 import { hashPassword } from "@/lib/auth/password";
 import { getCurrentUser, type CurrentUser } from "@/lib/auth/session";
 import type { AccessLevel } from "@/lib/auth/permissions";
@@ -24,6 +24,7 @@ export type AdminUserSnapshot = {
   modulePermissions: Record<string, AccessLevel>;
   specialPermissions: string[];
   sessions: AdminUserSession[];
+  revision: string;
 };
 
 export async function requirePermissionAdministrator(): Promise<CurrentUser> {
@@ -34,11 +35,56 @@ export async function requirePermissionAdministrator(): Promise<CurrentUser> {
   return user;
 }
 
+function managedUserRevision(user: {
+  id: string;
+  displayName: string;
+  email: string;
+  isActive: boolean;
+  canManagePermissions: boolean;
+  mustChangePassword: boolean;
+  modulePermissions: Record<string, AccessLevel>;
+  specialPermissions: string[];
+}): string {
+  return createHash("sha256")
+    .update(
+      JSON.stringify({
+        id: user.id,
+        displayName: user.displayName,
+        email: user.email,
+        isActive: user.isActive,
+        canManagePermissions: user.canManagePermissions,
+        mustChangePassword: user.mustChangePassword,
+        modulePermissions: Object.entries(user.modulePermissions).sort(([a], [b]) =>
+          a.localeCompare(b),
+        ),
+        specialPermissions: [...user.specialPermissions].sort(),
+      }),
+    )
+    .digest("hex");
+}
+
+function assertManagedUserRevision(
+  user: Parameters<typeof managedUserRevision>[0],
+  expectedRevision?: string,
+): void {
+  if (
+    expectedRevision !== undefined &&
+    managedUserRevision(user) !== expectedRevision
+  ) {
+    throw new Error("USER_VERSION_CONFLICT");
+  }
+}
+
 export function userAdminErrorStatus(code: string): number {
   if (code === "AUTH_REQUIRED") return 401;
   if (code === "PASSWORD_CHANGE_REQUIRED" || code === "ADMIN_FORBIDDEN") return 403;
   if (code === "USER_NOT_FOUND") return 404;
-  if (code === "USER_EMAIL_EXISTS" || code === "CANNOT_DISABLE_SELF") return 409;
+  if (
+    code === "USER_EMAIL_EXISTS" ||
+    code === "CANNOT_DISABLE_SELF" ||
+    code === "USER_VERSION_CONFLICT"
+  )
+    return 409;
   return 400;
 }
 
@@ -71,6 +117,7 @@ export async function listAdminUsers(): Promise<AdminUserSnapshot[]> {
       mustChangePassword: user.mustChangePassword,
       modulePermissions: { ...user.modulePermissions },
       specialPermissions: [...user.specialPermissions].sort(),
+      revision: managedUserRevision(user),
       sessions: payload.sessions
         .filter((session) => session.userId === user.id)
         .sort((a, b) => Date.parse(b.createdAt) - Date.parse(a.createdAt))
@@ -116,6 +163,7 @@ export async function updateManagedUserProfile(input: {
   userId: string;
   displayName: string;
   email: string;
+  expectedRevision?: string;
 }) {
   const actor = await requirePermissionAdministrator();
   const email = input.email.trim().toLowerCase();
@@ -123,6 +171,7 @@ export async function updateManagedUserProfile(input: {
     assertEmailAvailable(payload.users, email, input.userId);
     const user = payload.users.find((candidate) => candidate.id === input.userId);
     if (!user) throw new Error("USER_NOT_FOUND");
+    assertManagedUserRevision(user, input.expectedRevision);
     user.displayName = input.displayName.trim();
     user.email = email;
   });
@@ -132,11 +181,13 @@ export async function setManagedUserActive(input: {
   userId: string;
   isActive: boolean;
   actorUserId: string;
+  expectedRevision?: string;
 }) {
   if (!input.isActive && input.userId === input.actorUserId) throw new Error("CANNOT_DISABLE_SELF");
   await mutateAuthPayload(input.actorUserId, (payload) => {
     const user = payload.users.find((candidate) => candidate.id === input.userId);
     if (!user) throw new Error("USER_NOT_FOUND");
+    assertManagedUserRevision(user, input.expectedRevision);
     user.isActive = input.isActive;
     if (!input.isActive) {
       payload.sessions = payload.sessions.filter((session) => session.userId !== input.userId);
@@ -148,11 +199,13 @@ export async function replaceManagedUserPermissions(input: {
   userId: string;
   modules: Array<{ moduleKey: string; accessLevel: AccessLevel }>;
   specialPermissions: string[];
+  expectedRevision?: string;
 }) {
   const actor = await requirePermissionAdministrator();
   await mutateAuthPayload(actor.id, (payload) => {
     const user = payload.users.find((candidate) => candidate.id === input.userId);
     if (!user) throw new Error("USER_NOT_FOUND");
+    assertManagedUserRevision(user, input.expectedRevision);
     user.modulePermissions = Object.fromEntries(
       input.modules.map((permission) => [permission.moduleKey, permission.accessLevel]),
     );
