@@ -11,6 +11,11 @@ const sendAction = readFileSync(
   "utf-8",
 );
 
+const emailSettings = readFileSync(
+  new URL("../src/lib/quote-email-settings/domain.ts", import.meta.url),
+  "utf-8",
+);
+
 describe("quote final PDF action visibility", () => {
   it("expose l'action de génération et gel dans l'interface active du devis", () => {
     expect(directEditor).toContain("QuoteSendAction");
@@ -23,8 +28,8 @@ describe("quote final PDF action visibility", () => {
     expect(sendAction).toContain("> Envoyer");
     expect(sendAction).toContain("Valider et envoyer");
     expect(sendAction).toContain("Envoi du devis…");
-    expect(sendAction).toContain("noreply@papot.eu");
-    expect(sendAction).toContain("contact@papot.eu");
+    expect(emailSettings).toContain("noreply@papot.eu");
+    expect(emailSettings).toContain("contact@papot.eu");
     expect(sendAction).not.toContain("mailto:");
   });
 
