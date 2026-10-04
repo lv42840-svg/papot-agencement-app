@@ -1,30 +1,42 @@
 name: Chantier lifecycle verification
+
 on:
   push:
     branches: [fix/chantier-cancel-close-20261004]
     paths: [.github/workflows/chantier-lifecycle-once.yml]
+
 permissions:
-  contents: read
+  contents: write
+
 jobs:
-  inspect:
+  verify:
     runs-on: ubuntu-latest
-    timeout-minutes: 5
+    timeout-minutes: 15
     steps:
       - uses: actions/checkout@v4
-      - name: Inspect existing lifecycle dependencies
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - name: Apply checked lifecycle changes
+        run: python3 .github/chantier-lifecycle-patch.py
+      - run: npm ci
+      - name: Run installed formatter and validate full repository
         run: |
-          git grep -n -E 'ChantierStatus|status.*(DONE|ARCHIVED)|removeFirmPlanningForChantier|restoreFirmPlanningOrderForChantier' -- src/lib/planning src/components/planning* src/lib/chantiers src/lib/auth src/components/chantiers-workspace.tsx src/components/chantier-operational-workspace.tsx src/components/dashboard-chantier-stat.tsx tests/chantier* tests/planning* || true
-          python3 - <<'PY'
-          from pathlib import Path
-          import re
-          for name in ['src/lib/planning/mutations.ts','src/lib/planning/domain.ts','src/lib/chantiers/postgres-repository.ts','tests/chantiers-domain.test.ts','tests/chantier-close-reopen-permission-ui.test.ts','tests/chantier-lifecycle-warning-ui.test.ts']:
-              text=Path(name).read_text()
-              print('\nFILE '+name)
-              if 'planning/' not in name:
-                  print(text)
-                  continue
-              for match in re.finditer(r'export function (\w+)\(',text):
-                  if match.group(1) in ['removeFirmPlanningForChantier','restoreFirmPlanningOrderForChantier','buildChantierPlanningCloseWarning','buildPlanningRows','buildFirmPlanningRows']:
-                      end=text.find('\nexport ',match.start()+1)
-                      print(text[match.start():end if end!=-1 else len(text)])
-          PY
+          node -e 'if (require("prettier/package.json").version !== "3.4.2") process.exit(1)'
+          xargs ./node_modules/.bin/prettier --write < /tmp/chantier-changed-files.txt
+          ./node_modules/.bin/prettier --write .github/workflows/chantier-lifecycle-once.yml
+          npm run format:check
+          git diff --check
+      - run: npm run lint
+      - run: npm run typecheck
+      - run: npm test
+      - run: npm run build
+      - name: Commit only verified source and regression tests
+        run: |
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          xargs git add -- < /tmp/chantier-changed-files.txt
+          git diff --cached --stat
+          git commit -m 'feat(chantiers): distinguish cancellation and closure with preserved records'
+          git push origin HEAD:fix/chantier-cancel-close-20261004
