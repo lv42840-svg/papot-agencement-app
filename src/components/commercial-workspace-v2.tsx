@@ -8,6 +8,7 @@ import {
   CheckCircle2,
   Clock3,
   ExternalLink,
+  FilePlus2,
   FileText,
   History,
   Paperclip,
@@ -198,7 +199,12 @@ function useCommercial() {
   }, []);
 
   const upload = useCallback(
-    async (caseId: string, files: File[], category: CommercialDocumentCategory) => {
+    async (
+      caseId: string,
+      files: File[],
+      category: CommercialDocumentCategory,
+      expectedUpdatedAt: string,
+    ) => {
       if (!files.length) return null;
       setBusy(true);
       setError(null);
@@ -209,6 +215,7 @@ function useCommercial() {
         form.set("category", category);
         form.set("isCurrent", "1");
         form.set("isSignedQuote", "0");
+        form.set("expectedUpdatedAt", expectedUpdatedAt);
         const response = await fetch(`/api/desktop/commercial/${caseId}/documents`, {
           method: "POST",
           body: form,
@@ -316,8 +323,12 @@ export function CommercialWorkspaceV2({ affairId }: { affairId?: string }) {
               busy={busy}
               canModify={snapshot.capabilities.canModify}
               canConfirm={snapshot.capabilities.canConfirm}
-              mutate={mutate}
-              upload={upload}
+              mutate={(body, success) =>
+                mutate({ ...body, expectedUpdatedAt: selected.updatedAt }, success)
+              }
+              upload={(caseId, files, category) =>
+                upload(caseId, files, category, selected.updatedAt)
+              }
             />
           </main>
         ) : (
@@ -712,6 +723,14 @@ function AffairDetail({
             )}
           </p>
         </div>
+        {item.clientId && !isCommercialClosed(item) ? (
+          <Link
+            href={`/devis/nouveau?affaire=${encodeURIComponent(item.id)}`}
+            className="primaryButton commercialV2CreateQuote"
+          >
+            <FilePlus2 size={14} /> Créer un devis
+          </Link>
+        ) : null}
       </header>
       <nav className="commercialV2Tabs">
         <button className={tab === "affair" ? "active" : ""} onClick={() => setTab("affair")}>
@@ -1546,7 +1565,18 @@ function CommercialV2Styles() {
       }
       .commercialV2DetailHeader {
         padding: 18px 20px 13px;
+        display: flex;
+        align-items: flex-start;
+        justify-content: space-between;
+        gap: 14px;
         border-bottom: 1px solid #eeeaf2;
+      }
+      .commercialV2CreateQuote {
+        display: inline-flex;
+        align-items: center;
+        gap: 6px;
+        text-decoration: none;
+        white-space: nowrap;
       }
       .commercialV2DetailHeader h2 {
         margin: 7px 0 2px;
