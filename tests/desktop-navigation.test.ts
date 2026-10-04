@@ -21,7 +21,6 @@ describe("desktop navigation", () => {
     });
   });
 
-
   it("exposes one Planning entry instead of separate grand and petit planning entries", () => {
     const planningEntries = desktopNavigation.filter((item) => item.moduleKey === "planning");
 

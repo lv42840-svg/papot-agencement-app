@@ -71,9 +71,7 @@ describe("permission catalog", () => {
       key: "quotes",
       label: "Devis / Chiffrage",
     });
-    expect(billing).toEqual(
-      expect.objectContaining({ key: "billing", future: true }),
-    );
+    expect(billing).toEqual(expect.objectContaining({ key: "billing", future: true }));
   });
 
   it("contains the dedicated chantier lifecycle right", () => {
