@@ -7,7 +7,7 @@ import { applyCommercialMutation, registerCommercialDocuments } from "@/lib/comm
 import { createCompanyProfileRepository } from "@/lib/company-profile/create-repository";
 import {
   desktopRequestErrorStatus,
-  requireDesktopRequestContext,
+  requireModuleRequestContext,
 } from "@/lib/desktop/request-context";
 import { quoteWorkflowMayChangeCommercialStatus } from "@/lib/quotes/chantier";
 import {
@@ -95,8 +95,8 @@ export async function POST(request: Request, { params }: { params: Promise<{ quo
     const { quoteId } = await params;
     const expectedRevision = expectedQuoteRevision(request);
     const input = sendQuoteSchema.parse(await request.json());
-    const quoteContext = await requireDesktopRequestContext("quotes", "WRITE");
-    const commercialContext = await requireDesktopRequestContext("commercial", "WRITE");
+    const quoteContext = await requireModuleRequestContext("quotes", "WRITE");
+    const commercialContext = await requireModuleRequestContext("commercial", "WRITE");
     const actor = {
       userId: quoteContext.user.id,
       displayName: quoteContext.user.displayName,
