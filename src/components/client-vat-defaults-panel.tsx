@@ -107,7 +107,9 @@ export function ClientVatDefaultsPanel() {
       setNotice("TVA par défaut enregistrée pour cette fiche client.");
     } catch (saveError) {
       if (saveError instanceof Error && saveError.message === "CLIENTS_VERSION_CONFLICT") {
-        setError("Cette fiche client a été modifiée ailleurs. Recharge les taux avant de recommencer.");
+        setError(
+          "Cette fiche client a été modifiée ailleurs. Recharge les taux avant de recommencer.",
+        );
       } else {
         setError("Le taux de TVA n’a pas pu être enregistré.");
       }

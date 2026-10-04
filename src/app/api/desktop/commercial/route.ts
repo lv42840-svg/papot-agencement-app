@@ -244,9 +244,7 @@ export async function POST(request: Request) {
       isRetry: boolean,
     ): Promise<CommercialMutationResult> => {
       if (input.action !== "create") {
-        const current = source.cases.find(
-          (candidate) => candidate.id === input.caseId,
-        );
+        const current = source.cases.find((candidate) => candidate.id === input.caseId);
         if (!current) throw new Error("COMMERCIAL_CASE_NOT_FOUND");
         assertCommercialRevision(current, expectedUpdatedAt!);
       }

@@ -20,9 +20,9 @@ export async function PATCH(request: Request) {
 
   try {
     await mutateAuthPayload(user.id, (payload) => {
-    const target = payload.users.find(
-      (candidate) => candidate.id === user.id && candidate.isActive,
-    );
+      const target = payload.users.find(
+        (candidate) => candidate.id === user.id && candidate.isActive,
+      );
       if (!target) throw new Error("AUTH_USER_NOT_FOUND");
       const current = target.planningPotentialCollapsed ?? false;
       if (current !== body.expectedPlanningPotentialCollapsed) {

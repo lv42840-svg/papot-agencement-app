@@ -111,9 +111,7 @@ export async function POST(request: Request, context: RouteContext) {
       });
 
       const mutation = await repository.mutate((payload) => {
-        const current = payload.cases.find(
-          (candidate) => candidate.id === caseId,
-        );
+        const current = payload.cases.find((candidate) => candidate.id === caseId);
         if (!current) throw new Error("COMMERCIAL_CASE_NOT_FOUND");
         assertCommercialRevision(current, expectedUpdatedAt);
         return registerCommercialDocuments(payload, caseId, uploaded, actor);

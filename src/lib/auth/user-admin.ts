@@ -67,10 +67,7 @@ function assertManagedUserRevision(
   user: Parameters<typeof managedUserRevision>[0],
   expectedRevision?: string,
 ): void {
-  if (
-    expectedRevision !== undefined &&
-    managedUserRevision(user) !== expectedRevision
-  ) {
+  if (expectedRevision !== undefined && managedUserRevision(user) !== expectedRevision) {
     throw new Error("USER_VERSION_CONFLICT");
   }
 }

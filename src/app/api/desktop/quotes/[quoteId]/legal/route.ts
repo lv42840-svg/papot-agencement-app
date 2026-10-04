@@ -46,7 +46,8 @@ export async function PATCH(
           ? error.message
           : "QUOTE_LEGAL_DETAILS_UPDATE_FAILED";
     const concurrencyStatus = quoteConcurrencyStatus(code);
-    const status = concurrencyStatus ??
+    const status =
+      concurrencyStatus ??
       (code === "QUOTE_NOT_FOUND" || code === "QUOTE_LINE_NOT_FOUND"
         ? 404
         : code === "QUOTE_NOT_EDITABLE"

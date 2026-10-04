@@ -11,10 +11,7 @@ import {
   createInitialCommercialPayload,
   parseCommercialPayload,
 } from "../src/lib/commercial/domain";
-import {
-  applyCommercialMutation,
-  assertCommercialRevision,
-} from "../src/lib/commercial/mutations";
+import { applyCommercialMutation, assertCommercialRevision } from "../src/lib/commercial/mutations";
 import { createPostgresCommercialRepository } from "../src/lib/commercial/postgres-repository";
 import { runServerDbMigrations } from "../src/lib/server-db/migrations";
 import { closeServerDbPool, getServerDbPool } from "../src/lib/server-db/pool";

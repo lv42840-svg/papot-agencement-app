@@ -164,14 +164,8 @@ export function entryRevision(entry: EntryRecord): string {
   return entry.history.at(-1)?.id ?? "none";
 }
 
-function assertEntryRevision(
-  entry: EntryRecord,
-  expectedRevision?: string,
-): void {
-  if (
-    expectedRevision !== undefined &&
-    entryRevision(entry) !== expectedRevision
-  ) {
+function assertEntryRevision(entry: EntryRecord, expectedRevision?: string): void {
+  if (expectedRevision !== undefined && entryRevision(entry) !== expectedRevision) {
     throw new Error("ENTRIES_VERSION_CONFLICT");
   }
 }

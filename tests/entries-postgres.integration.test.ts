@@ -197,9 +197,7 @@ describeWithPostgres("Entries PostgreSQL cutover", () => {
     const repository = createPostgresEntriesRepository(pool);
     const entryId = "45454545-4545-4545-8545-454545454545";
     await repository.mutate(createInput(entryId, "Entrée partagée"), actor);
-    const opened = (await repository.load()).entries.find(
-      (entry) => entry.id === entryId,
-    )!;
+    const opened = (await repository.load()).entries.find((entry) => entry.id === entryId)!;
     const expectedRevision = entryRevision(opened);
 
     await repository.mutate(
@@ -227,9 +225,7 @@ describeWithPostgres("Entries PostgreSQL cutover", () => {
       ),
     ).rejects.toThrow("ENTRIES_VERSION_CONFLICT");
 
-    const current = (await repository.load()).entries.find(
-      (entry) => entry.id === entryId,
-    )!;
+    const current = (await repository.load()).entries.find((entry) => entry.id === entryId)!;
     expect(current.structuredDescription).toBe("Qualification Nadia");
     expect(current.nextAction).toBe("Appeler le client");
     expect(current.status).toBe("TO_QUALIFY");

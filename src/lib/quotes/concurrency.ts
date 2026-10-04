@@ -9,9 +9,7 @@ export function expectedQuoteRevision(request: Request): string {
   if (!raw) throw new Error("QUOTE_VERSION_REQUIRED");
 
   const revision =
-    raw.length >= 2 && raw.startsWith('"') && raw.endsWith('"')
-      ? raw.slice(1, -1)
-      : raw;
+    raw.length >= 2 && raw.startsWith('"') && raw.endsWith('"') ? raw.slice(1, -1) : raw;
 
   if (!revision || revision.length > 100) {
     throw new Error("QUOTE_VERSION_REQUIRED");

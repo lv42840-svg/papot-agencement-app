@@ -30,16 +30,10 @@ export async function POST(request: Request) {
     const rawVersion = request.headers.get("if-match")?.replace(/^"|"$/g, "");
     const expectedVersion = Number(rawVersion);
     if (!Number.isInteger(expectedVersion) || expectedVersion < 0) {
-      return noStoreJson(
-        { error: "COMPANY_PROFILE_VERSION_REQUIRED" },
-        { status: 428 },
-      );
+      return noStoreJson({ error: "COMPANY_PROFILE_VERSION_REQUIRED" }, { status: 428 });
     }
     const profile = companyProfileSchema.parse(await request.json().catch(() => null));
-    const saved = await createCompanyProfileRepository().replaceIfVersion(
-      profile,
-      expectedVersion,
-    );
+    const saved = await createCompanyProfileRepository().replaceIfVersion(profile, expectedVersion);
     return noStoreJson(saved);
   } catch (error) {
     const code =

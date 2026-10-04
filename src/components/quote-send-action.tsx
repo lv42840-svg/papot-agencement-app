@@ -9,7 +9,8 @@ type ApiResponse = { payload?: NativeQuotesPayload; error?: string };
 type FinalizeMode = "VALIDATE" | "SEND";
 
 function sendErrorLabel(code?: string): string {
-  if (code === "QUOTE_VERSION_CONFLICT") return "Ce devis a été modifié ailleurs. Recharge-le avant de le valider ou de l’envoyer.";
+  if (code === "QUOTE_VERSION_CONFLICT")
+    return "Ce devis a été modifié ailleurs. Recharge-le avant de le valider ou de l’envoyer.";
   if (code === "MODULE_FORBIDDEN") {
     return "Droit de modification Devis et Commercial requis.";
   }

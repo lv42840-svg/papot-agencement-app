@@ -46,9 +46,7 @@ async function planningRevision(payload: PlanningPayload): Promise<string> {
     "SHA-256",
     new TextEncoder().encode(JSON.stringify(payload)),
   );
-  return Array.from(new Uint8Array(digest), (byte) =>
-    byte.toString(16).padStart(2, "0"),
-  ).join("");
+  return Array.from(new Uint8Array(digest), (byte) => byte.toString(16).padStart(2, "0")).join("");
 }
 
 function noStoreJson(body: unknown, init?: ResponseInit) {
@@ -185,16 +183,12 @@ export async function POST(request: Request) {
     const year = yearSchema.parse(body.year ?? new Date().getFullYear());
     const input = planningMutationSchema.parse(body);
     const expectedRevision =
-      typeof body.expectedRevision === "string"
-        ? body.expectedRevision.trim()
-        : "";
+      typeof body.expectedRevision === "string" ? body.expectedRevision.trim() : "";
     if (!expectedRevision) throw new Error("PLANNING_VERSION_REQUIRED");
     const context = await requireDesktopRequestContext("planning", "WRITE");
     const planningRepository = createPlanningRepository();
     const mutatePlanning = async (
-      transform: (
-        payload: PlanningPayload,
-      ) => PlanningPayload | Promise<PlanningPayload>,
+      transform: (payload: PlanningPayload) => PlanningPayload | Promise<PlanningPayload>,
     ) =>
       planningRepository.mutate(async (payload) => {
         if ((await planningRevision(payload)) !== expectedRevision) {
@@ -296,9 +290,7 @@ export async function POST(request: Request) {
           applyPlanningFullWeekAbsenceMutation(payload, input, activeUserIds),
         );
       } else {
-        await mutatePlanning((payload) =>
-          applyPlanningDeleteAbsenceMutation(payload, input),
-        );
+        await mutatePlanning((payload) => applyPlanningDeleteAbsenceMutation(payload, input));
       }
     }
 

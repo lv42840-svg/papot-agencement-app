@@ -119,9 +119,7 @@ export async function POST(request: Request) {
     const raw = (await request.json()) as Record<string, unknown>;
     const input = chantierMutationSchema.parse(raw);
     const expectedUpdatedAt =
-      typeof raw.expectedUpdatedAt === "string"
-        ? raw.expectedUpdatedAt.trim()
-        : "";
+      typeof raw.expectedUpdatedAt === "string" ? raw.expectedUpdatedAt.trim() : "";
     if (!expectedUpdatedAt) throw new Error("CHANTIERS_VERSION_REQUIRED");
     stage = "create-runtime";
     const context = await requireDesktopRequestContext("chantiers", "WRITE");

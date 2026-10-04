@@ -155,10 +155,7 @@ function findChantier(payload: ChantiersPayload, chantierId: string): ChantierRe
   return item;
 }
 
-export function assertChantierRevision(
-  item: ChantierRecord,
-  expectedUpdatedAt: string,
-): void {
+export function assertChantierRevision(item: ChantierRecord, expectedUpdatedAt: string): void {
   if (item.updatedAt !== expectedUpdatedAt) {
     throw new Error("CHANTIERS_VERSION_CONFLICT");
   }

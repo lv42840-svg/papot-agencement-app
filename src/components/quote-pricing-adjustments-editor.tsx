@@ -54,7 +54,8 @@ function adjustmentValueLabel(adjustment: QuotePricingAdjustment): string {
 }
 
 function pricingErrorLabel(code: string): string {
-  if (code === "QUOTE_VERSION_CONFLICT") return "Ce devis a été modifié ailleurs. Recharge-le avant de recommencer.";
+  if (code === "QUOTE_VERSION_CONFLICT")
+    return "Ce devis a été modifié ailleurs. Recharge-le avant de recommencer.";
   if (code === "QUOTE_NOT_EDITABLE") return "Seul un brouillon peut être modifié.";
   if (code === "QUOTE_OPTION_TARGET_DUPLICATE") return "Cet élément est déjà une option.";
   if (code === "QUOTE_PASS_THROUGH_PERCENT_INVALID") {
@@ -116,8 +117,7 @@ export function QuotePricingAdjustmentsEditor({
   onSaved: (payload: NativeQuotesPayload) => void;
 }) {
   const editable = canWrite && quote.status === "DRAFT";
-  const postPricingForQuote = (body: Record<string, unknown>) =>
-    postPricing(body, quote.updatedAt);
+  const postPricingForQuote = (body: Record<string, unknown>) => postPricing(body, quote.updatedAt);
   const [kind, setKind] = useState<"PERCENTAGE" | "POSE_HOURS" | "HOTEL">("PERCENTAGE");
   const [label, setLabel] = useState("Commission architecte");
   const [value, setValue] = useState("5");

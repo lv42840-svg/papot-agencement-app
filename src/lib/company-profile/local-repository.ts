@@ -27,20 +27,16 @@ export function createLocalCompanyProfileRepository(): CompanyProfileRepository 
     },
 
     async replaceIfVersion(profile: CompanyProfile, expectedVersion: number) {
-      return mutateLocalSnapshot(
-        RESOURCE_KEY,
-        parseCompanyProfile,
-        (snapshot) => {
-          if (snapshot.version !== expectedVersion) {
-            throw new Error("COMPANY_PROFILE_VERSION_CONFLICT");
-          }
-          const parsed = parseCompanyProfile(profile);
-          return {
-            payload: parsed,
-            result: { version: snapshot.version + 1, profile: parsed },
-          };
-        },
-      );
+      return mutateLocalSnapshot(RESOURCE_KEY, parseCompanyProfile, (snapshot) => {
+        if (snapshot.version !== expectedVersion) {
+          throw new Error("COMPANY_PROFILE_VERSION_CONFLICT");
+        }
+        const parsed = parseCompanyProfile(profile);
+        return {
+          payload: parsed,
+          result: { version: snapshot.version + 1, profile: parsed },
+        };
+      });
     },
   };
 }

@@ -351,7 +351,9 @@ export function ClientsWorkspace() {
     }
     if (mode === "edit" && selectedClient) {
       if (!editingUpdatedAt) {
-        setError("La version ouverte de cette fiche est introuvable. Rouvre la fiche avant de modifier.");
+        setError(
+          "La version ouverte de cette fiche est introuvable. Rouvre la fiche avant de modifier.",
+        );
         return;
       }
       await mutate(

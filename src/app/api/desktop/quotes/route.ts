@@ -101,8 +101,7 @@ export async function POST(request: Request) {
   try {
     const rawInput = await request.json();
     const input = quotesMutationSchema.parse(rawInput);
-    const expectedRevision =
-      input.action === "createDraft" ? null : expectedQuoteRevision(request);
+    const expectedRevision = input.action === "createDraft" ? null : expectedQuoteRevision(request);
     const context = await requireDesktopRequestContext("quotes", "WRITE");
     const actor = { userId: context.user.id, displayName: context.user.displayName };
 

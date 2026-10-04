@@ -47,14 +47,9 @@ export async function POST(request: Request, context: RouteContext) {
     const repository = await createEntriesRepository();
     const form = await request.formData();
     const files = form.getAll("files").filter((value): value is File => value instanceof File);
-    const expectedEntryRevision = String(
-      form.get("expectedEntryRevision") ?? "",
-    ).trim();
+    const expectedEntryRevision = String(form.get("expectedEntryRevision") ?? "").trim();
     if (!expectedEntryRevision) {
-      return NextResponse.json(
-        { error: "ENTRIES_VERSION_REQUIRED" },
-        { status: 428 },
-      );
+      return NextResponse.json({ error: "ENTRIES_VERSION_REQUIRED" }, { status: 428 });
     }
     if (files.length === 0) {
       return NextResponse.json({ error: "ENTRY_ATTACHMENTS_REQUIRED" }, { status: 400 });

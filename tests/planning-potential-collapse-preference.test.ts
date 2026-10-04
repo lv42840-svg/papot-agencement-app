@@ -31,14 +31,9 @@ describe("planning potential collapse preference", () => {
     expect(apiSource).toContain("target.planningPotentialCollapsed");
   });
   it("sends the displayed preference as the stale-write precondition", () => {
-    expect(uiSource).toContain(
-      "expectedPlanningPotentialCollapsed: potentialCollapsed",
-    );
+    expect(uiSource).toContain("expectedPlanningPotentialCollapsed: potentialCollapsed");
     expect(apiSource).toContain("PREFERENCE_VERSION_REQUIRED");
     expect(apiSource).toContain("PREFERENCE_VERSION_CONFLICT");
-    expect(apiSource).toContain(
-      "current !== body.expectedPlanningPotentialCollapsed",
-    );
+    expect(apiSource).toContain("current !== body.expectedPlanningPotentialCollapsed");
   });
-
 });

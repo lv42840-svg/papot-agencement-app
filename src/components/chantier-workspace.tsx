@@ -174,61 +174,67 @@ export function ChantierWorkspace({ chantierId }: { chantierId: string }) {
     [commercialSnapshot, chantier?.sourceCommercialCaseId],
   );
 
-  const mutateCommercial = useCallback(async (body: MutationBody, successMessage: string) => {
-    setBusy(true);
-    setError(null);
-    setNotice(null);
-    try {
-      const response = await fetch("/api/desktop/commercial", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          ...body,
-          expectedUpdatedAt: commercialCase?.updatedAt,
-        }),
-      });
-      const result = (await response.json()) as CommercialSnapshot & { error?: string };
-      if (!response.ok) throw new Error(result.error ?? "COMMERCIAL_MUTATION_FAILED");
-      setCommercialSnapshot(result);
-      setNotice(successMessage);
-      return true;
-    } catch (mutationError) {
-      const code =
-        mutationError instanceof Error ? mutationError.message : "COMMERCIAL_MUTATION_FAILED";
-      setError(errorMessages[code] ?? "La modification commerciale a échoué.");
-      return false;
-    } finally {
-      setBusy(false);
-    }
-  }, [commercialCase?.updatedAt]);
+  const mutateCommercial = useCallback(
+    async (body: MutationBody, successMessage: string) => {
+      setBusy(true);
+      setError(null);
+      setNotice(null);
+      try {
+        const response = await fetch("/api/desktop/commercial", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            ...body,
+            expectedUpdatedAt: commercialCase?.updatedAt,
+          }),
+        });
+        const result = (await response.json()) as CommercialSnapshot & { error?: string };
+        if (!response.ok) throw new Error(result.error ?? "COMMERCIAL_MUTATION_FAILED");
+        setCommercialSnapshot(result);
+        setNotice(successMessage);
+        return true;
+      } catch (mutationError) {
+        const code =
+          mutationError instanceof Error ? mutationError.message : "COMMERCIAL_MUTATION_FAILED";
+        setError(errorMessages[code] ?? "La modification commerciale a échoué.");
+        return false;
+      } finally {
+        setBusy(false);
+      }
+    },
+    [commercialCase?.updatedAt],
+  );
 
-  const mutate = useCallback(async (body: MutationBody, successMessage: string) => {
-    setBusy(true);
-    setError(null);
-    setNotice(null);
-    try {
-      const response = await fetch("/api/desktop/chantiers", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          ...body,
-          expectedUpdatedAt: chantier?.updatedAt,
-        }),
-      });
-      const result = (await response.json()) as ChantiersSnapshot & { error?: string };
-      if (!response.ok) throw new Error(result.error ?? "CHANTIERS_MUTATION_FAILED");
-      setChantiersSnapshot(result);
-      setNotice(successMessage);
-      return true;
-    } catch (mutationError) {
-      const code =
-        mutationError instanceof Error ? mutationError.message : "CHANTIERS_MUTATION_FAILED";
-      setError(errorMessages[code] ?? "La modification du chantier a échoué.");
-      return false;
-    } finally {
-      setBusy(false);
-    }
-  }, [chantier?.updatedAt]);
+  const mutate = useCallback(
+    async (body: MutationBody, successMessage: string) => {
+      setBusy(true);
+      setError(null);
+      setNotice(null);
+      try {
+        const response = await fetch("/api/desktop/chantiers", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            ...body,
+            expectedUpdatedAt: chantier?.updatedAt,
+          }),
+        });
+        const result = (await response.json()) as ChantiersSnapshot & { error?: string };
+        if (!response.ok) throw new Error(result.error ?? "CHANTIERS_MUTATION_FAILED");
+        setChantiersSnapshot(result);
+        setNotice(successMessage);
+        return true;
+      } catch (mutationError) {
+        const code =
+          mutationError instanceof Error ? mutationError.message : "CHANTIERS_MUTATION_FAILED";
+        setError(errorMessages[code] ?? "La modification du chantier a échoué.");
+        return false;
+      } finally {
+        setBusy(false);
+      }
+    },
+    [chantier?.updatedAt],
+  );
 
   if (loading && !chantiersSnapshot) {
     return (

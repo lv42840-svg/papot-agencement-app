@@ -15,8 +15,6 @@ describe("accent preference concurrency", () => {
     expect(uiSource).toContain("expectedAccentKey: accent");
     expect(apiSource).toContain("PREFERENCE_VERSION_REQUIRED");
     expect(apiSource).toContain("PREFERENCE_VERSION_CONFLICT");
-    expect(apiSource).toContain(
-      "target.accentKey !== body.expectedAccentKey",
-    );
+    expect(apiSource).toContain("target.accentKey !== body.expectedAccentKey");
   });
 });

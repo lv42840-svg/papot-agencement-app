@@ -63,8 +63,7 @@ export async function POST(request: Request) {
   try {
     const raw = (await request.json()) as Record<string, unknown>;
     const input = entriesMutationSchema.parse(raw);
-    const entryMutation =
-      input.action !== "create" && "entryId" in input;
+    const entryMutation = input.action !== "create" && "entryId" in input;
     const expectedEntryRevision =
       entryMutation && typeof raw.expectedEntryRevision === "string"
         ? raw.expectedEntryRevision.trim()
@@ -78,11 +77,7 @@ export async function POST(request: Request) {
     const repository = await createEntriesRepository();
 
     stage = "mutate-repository";
-    const mutation = await repository.mutate(
-      input,
-      actor,
-      expectedEntryRevision,
-    );
+    const mutation = await repository.mutate(input, actor, expectedEntryRevision);
 
     console.info("[PAPOT][Entries] POST saved", { ms: Date.now() - startedAt });
     return noStoreJson(publicSnapshot(mutation.payload, actor, mutation.focusEntryId));

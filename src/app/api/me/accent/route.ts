@@ -18,9 +18,9 @@ export async function PATCH(request: Request) {
   }
   try {
     await mutateAuthPayload(user.id, (payload) => {
-    const target = payload.users.find(
-      (candidate) => candidate.id === user.id && candidate.isActive,
-    );
+      const target = payload.users.find(
+        (candidate) => candidate.id === user.id && candidate.isActive,
+      );
       if (!target) throw new Error("AUTH_USER_NOT_FOUND");
       if (target.accentKey !== body.expectedAccentKey) {
         throw new Error("PREFERENCE_VERSION_CONFLICT");

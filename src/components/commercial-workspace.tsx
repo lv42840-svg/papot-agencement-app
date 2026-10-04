@@ -446,10 +446,7 @@ export function CommercialWorkspace() {
                 capabilities={snapshot.capabilities}
                 suggestedPeople={snapshot.suggestedPeople}
                 mutate={(body, successMessage) =>
-                  mutate(
-                    { ...body, expectedUpdatedAt: selected.updatedAt },
-                    successMessage,
-                  )
+                  mutate({ ...body, expectedUpdatedAt: selected.updatedAt }, successMessage)
                 }
                 uploadDocuments={(caseId, files, options) =>
                   uploadDocuments(caseId, files, options, selected.updatedAt)

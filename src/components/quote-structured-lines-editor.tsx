@@ -293,7 +293,8 @@ function ouvrageTotalCents(quantityInput: string, unitPriceCents: number | null)
 }
 
 function lineErrorLabel(code: string): string {
-  if (code === "QUOTE_VERSION_CONFLICT") return "Ce devis a été modifié ailleurs. Recharge-le avant de recommencer.";
+  if (code === "QUOTE_VERSION_CONFLICT")
+    return "Ce devis a été modifié ailleurs. Recharge-le avant de recommencer.";
   if (code === "QUOTE_NOT_FOUND") return "Ce devis n’existe plus.";
   if (code === "QUOTE_NOT_EDITABLE") return "Seul un brouillon peut être modifié.";
   if (code === "QUOTE_LINE_NOT_FOUND") return "Cet ouvrage n’existe plus.";
