@@ -1,4 +1,3 @@
-import { createHash } from "node:crypto";
 import { NextResponse } from "next/server";
 import { ZodError, z } from "zod";
 import { hasEffectiveSpecialPermission, requireSpecialPermission } from "@/lib/auth/permissions";
@@ -42,10 +41,14 @@ export const dynamic = "force-dynamic";
 
 const yearSchema = z.coerce.number().int().min(2020).max(2100);
 
-function planningRevision(payload: PlanningPayload): string {
-  return createHash("sha256")
-    .update(JSON.stringify(payload))
-    .digest("hex");
+async function planningRevision(payload: PlanningPayload): Promise<string> {
+  const digest = await globalThis.crypto.subtle.digest(
+    "SHA-256",
+    new TextEncoder().encode(JSON.stringify(payload)),
+  );
+  return Array.from(new Uint8Array(digest), (byte) =>
+    byte.toString(16).padStart(2, "0"),
+  ).join("");
 }
 
 function noStoreJson(body: unknown, init?: ResponseInit) {
@@ -128,7 +131,7 @@ async function snapshot(
 
   return {
     year,
-    revision: planningRevision(planning),
+    revision: await planningRevision(planning),
     weeks,
     rows,
     provisionalRows,
@@ -194,7 +197,7 @@ export async function POST(request: Request) {
       ) => PlanningPayload | Promise<PlanningPayload>,
     ) =>
       planningRepository.mutate(async (payload) => {
-        if (planningRevision(payload) !== expectedRevision) {
+        if ((await planningRevision(payload)) !== expectedRevision) {
           throw new Error("PLANNING_VERSION_CONFLICT");
         }
         return transform(payload);
