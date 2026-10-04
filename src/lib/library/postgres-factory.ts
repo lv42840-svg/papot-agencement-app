@@ -1,12 +1,19 @@
-import type { DesktopRequestContext } from "@/lib/desktop/request-context";
+import type {
+  DesktopRequestContext,
+  ModuleRequestContext,
+} from "@/lib/desktop/request-context";
 import { getServerDbPool, runServerDbMigrations } from "@/lib/server-db";
 import { ensureLibraryPostgresCutover } from "./cutover";
 import { acquireNextcloudLibrarySnapshot } from "./legacy-snapshot";
 import { createPostgresLibraryRepository } from "./postgres-repository";
 import type { LibraryRepository } from "./repository";
 
+type PostgresLibraryContext =
+  | Pick<DesktopRequestContext, "desktop" | "owner">
+  | ModuleRequestContext;
+
 export function createPostgresBackedLibraryRepository(
-  context: Pick<DesktopRequestContext, "desktop" | "owner">,
+  context: PostgresLibraryContext,
 ): LibraryRepository {
   let repositoryPromise: Promise<LibraryRepository> | null = null;
 
@@ -16,13 +23,25 @@ export function createPostgresBackedLibraryRepository(
       await runServerDbMigrations(pool);
       await ensureLibraryPostgresCutover({
         pool,
-        acquireSource: () =>
-          acquireNextcloudLibrarySnapshot({
+        acquireSource: () => {
+          if (!("desktop" in context)) {
+            throw new Error("LIBRARY_LEGACY_CUTOVER_CONTEXT_REQUIRED");
+          }
+          return acquireNextcloudLibrarySnapshot({
             desktop: context.desktop,
             owner: context.owner,
-          }),
+          });
+        },
       });
-      return createPostgresLibraryRepository(context.owner, pool);
+      const owner =
+        "owner" in context
+          ? context.owner
+          : {
+              userId: context.user.id,
+              deviceId: "web",
+              displayName: context.user.displayName,
+            };
+      return createPostgresLibraryRepository(owner, pool);
     })();
     return repositoryPromise;
   };
