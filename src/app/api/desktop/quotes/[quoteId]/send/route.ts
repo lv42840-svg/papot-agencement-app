@@ -18,6 +18,7 @@ import {
 import { buildQuoteDocumentDataFromPayloads } from "@/lib/quotes/document-data-mapping";
 import { archiveFinalQuotePdf, nextFinalQuoteNumber } from "@/lib/quotes/final-pdf-archive";
 import { createQuotesRepository } from "@/lib/quotes/create-repository";
+import { sendQuoteEmail } from "@/lib/quotes/email";
 import { normalizeQuotePricingAfterModelMutation } from "@/lib/quotes/pricing-integrity";
 import {
   markFrozenNativeQuoteSent,
@@ -71,7 +72,9 @@ function errorStatus(code: string): number {
   )
     return 409;
   if (code === "QUOTE_FINAL_PDF_ARCHIVE_CONFLICT") return 409;
-  if (code === "SERVER_FILE_ROOT_UNAVAILABLE") return 503;
+  if (code === "SERVER_FILE_ROOT_UNAVAILABLE" || code === "QUOTE_EMAIL_NOT_CONFIGURED") return 503;
+  if (code === "QUOTE_EMAIL_SEND_FAILED") return 502;
+  if (code === "QUOTE_RECIPIENT_EMAIL_REQUIRED") return 400;
   if (
     code.startsWith("PDF_") ||
     code.startsWith("QUOTE_WORD_V2_TEMPLATE_") ||
@@ -127,8 +130,37 @@ export async function POST(request: Request, { params }: { params: Promise<{ quo
       );
       if (!commercialCase) throw new Error("COMMERCIAL_CASE_NOT_FOUND");
 
+      const client = clients.clients.find((candidate) => candidate.id === quote.model.clientId);
+      const primaryContact =
+        client?.contacts.find((contact) => contact.id === commercialCase.primaryContactId) ??
+        client?.contacts.find((contact) => contact.isPrimary) ??
+        null;
+      const recipientEmail =
+        commercialCase.contactEmail?.trim() ||
+        primaryContact?.email.trim() ||
+        client?.email.trim() ||
+        "";
+      const recipientName =
+        commercialCase.contactName?.trim() ||
+        [primaryContact?.firstName, primaryContact?.lastName].filter(Boolean).join(" ").trim();
+      const affairName = [commercialCase.name, commercialCase.siteLabel].filter(Boolean).join(" · ");
+
       if (quote.status === "FROZEN") {
         if (input.mode !== "SEND") throw new Error("QUOTE_NOT_EDITABLE");
+        if (!quote.finalPdf) throw new Error("QUOTE_NOT_FROZEN");
+        const pdfBytes = await transport.store.readBytes(
+          quote.finalPdf.storagePath,
+          quote.finalPdf.sha256,
+        );
+        await sendQuoteEmail({
+          to: recipientEmail,
+          recipientName,
+          quoteNumber: quote.finalPdf.quoteNumber,
+          affairName,
+          quoteSubject: quote.model.subject,
+          pdfFileName: quote.finalPdf.fileName,
+          pdfBytes,
+        });
         const sent = markFrozenNativeQuoteSent(payload, quoteId, input.followUpDate, actor, now);
 
         await commercialRepository.mutate((commercialPayload) => {
@@ -185,6 +217,18 @@ export async function POST(request: Request, { params }: { params: Promise<{ quo
           storagePath: archive.finalPdf.storagePath,
           deleteFile: (storagePath) => transport.store.deleteFile(storagePath),
         };
+      }
+
+      if (input.mode === "SEND") {
+        await sendQuoteEmail({
+          to: recipientEmail,
+          recipientName,
+          quoteNumber: archive.finalPdf.quoteNumber,
+          affairName,
+          quoteSubject: quote.model.subject,
+          pdfFileName: archive.finalPdf.fileName,
+          pdfBytes: generated.pdf,
+        });
       }
 
       const finalized =
