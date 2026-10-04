@@ -5,8 +5,8 @@ import { describe, expect, it } from "vitest";
 
 const root = fileURLToPath(new URL("..", import.meta.url));
 const forbidden = /nextcloud|obat/i;
-const roots = ["src", "desktop", "scripts", "relay", ".github"];
-const rootFiles = ["README.md", "package.json"];
+const roots = ["src", "desktop", "scripts", "relay", ".github", "tests", "deploy", "docs"];
+const rootFiles = ["README.md", "package.json", "package-lock.json", ".env.example"];
 
 function textFiles(dir: string): string[] {
   if (!existsSync(dir)) return [];
@@ -26,9 +26,11 @@ describe("legacy integrations removed", () => {
     ];
 
     const hits = files.flatMap((file) => {
+      const repoPath = relative(root, file).replaceAll("\\", "/");
+      if (repoPath === "tests/legacy-integrations-removed.test.ts") return [];
       const source = readFileSync(file, "utf-8");
-      if (!forbidden.test(source) && !forbidden.test(relative(root, file))) return [];
-      return [relative(root, file)];
+      if (!forbidden.test(source) && !forbidden.test(repoPath)) return [];
+      return [repoPath];
     });
 
     expect(hits).toEqual([]);
