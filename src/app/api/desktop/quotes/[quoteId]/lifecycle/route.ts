@@ -4,6 +4,11 @@ import {
   desktopRequestErrorStatus,
   requireDesktopRequestContext,
 } from "@/lib/desktop/request-context";
+import {
+  assertQuoteRevision,
+  expectedQuoteRevision,
+  quoteConcurrencyStatus,
+} from "@/lib/quotes/concurrency";
 import { createQuotesRepository } from "@/lib/quotes/create-repository";
 import { createQuoteVariant, createQuoteVersion, duplicateQuote } from "@/lib/quotes/lifecycle";
 
@@ -21,6 +26,8 @@ const lifecycleSchema = z
 function statusFor(code: string): number {
   const requestStatus = desktopRequestErrorStatus(code);
   if (requestStatus) return requestStatus;
+  const concurrencyStatus = quoteConcurrencyStatus(code);
+  if (concurrencyStatus) return concurrencyStatus;
   if (code === "QUOTE_NOT_FOUND") return 404;
   if (
     code === "QUOTE_VERSION_SOURCE_OUTDATED" ||
@@ -42,7 +49,9 @@ export async function POST(request: Request, context: RouteContext) {
       displayName: requestContext.owner.displayName,
     };
     const repository = createQuotesRepository();
+    const expectedRevision = expectedQuoteRevision(request);
     const mutation = await repository.mutate((payload) => {
+      assertQuoteRevision(payload, quoteId, expectedRevision);
       if (input.action === "createVersion") return createQuoteVersion(payload, quoteId, actor);
       if (input.action === "createVariant") return createQuoteVariant(payload, quoteId, actor);
       return duplicateQuote(payload, quoteId, actor);
