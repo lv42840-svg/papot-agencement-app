@@ -15,7 +15,7 @@ export function AccentPicker({ initialAccent }: { initialAccent: string }) {
     const response = await fetch("/api/me/accent", {
       method: "PATCH",
       headers: { "content-type": "application/json" },
-      body: JSON.stringify({ accentKey: next }),
+      body: JSON.stringify({ accentKey: next, expectedAccentKey: accent }),
     });
     if (response.ok) {
       setAccent(next);
