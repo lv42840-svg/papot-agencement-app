@@ -1,15 +1,11 @@
-import type { DesktopRequestContext, ModuleRequestContext } from "@/lib/desktop/request-context";
+import type { ModuleRequestContext } from "@/lib/desktop/request-context";
 import { isLocalStorageMode } from "@/lib/local-db/runtime";
-import { createSharedResourceLibraryRepository } from "./shared-resource-repository";
 import { createPostgresBackedLibraryRepository } from "./postgres-factory";
 import type { LibraryRepository } from "./repository";
 
-type LibraryContext = Pick<DesktopRequestContext, "desktop" | "owner"> | ModuleRequestContext;
-
-export function createLibraryRepository(context: LibraryContext): LibraryRepository {
+export function createLibraryRepository(context: ModuleRequestContext): LibraryRepository {
   if (isLocalStorageMode()) {
-    if (!("desktop" in context)) throw new Error("DESKTOP_RUNTIME_NOT_CONFIGURED");
-    return createSharedResourceLibraryRepository(context);
+    throw new Error("LOCAL_LIBRARY_UNSUPPORTED");
   }
   return createPostgresBackedLibraryRepository(context);
 }
