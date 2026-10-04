@@ -2,7 +2,7 @@ import { NextResponse } from "next/server";
 import { ZodError } from "zod";
 import {
   desktopRequestErrorStatus,
-  requireDesktopRequestContext,
+  requireModuleRequestContext,
 } from "@/lib/desktop/request-context";
 import {
   assertQuoteRevision,
@@ -35,7 +35,7 @@ export async function PATCH(
   try {
     const { quoteId } = await params;
     const input = quoteInternalNotesSchema.parse(await request.json());
-    const context = await requireDesktopRequestContext("quotes", "WRITE");
+    const context = await requireModuleRequestContext("quotes", "WRITE");
     const repository = createQuotesRepository();
     const expectedRevision = expectedQuoteRevision(request);
     const mutation = await repository.mutate((payload) => {
