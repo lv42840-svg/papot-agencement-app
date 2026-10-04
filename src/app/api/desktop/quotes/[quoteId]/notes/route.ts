@@ -2,8 +2,13 @@ import { NextResponse } from "next/server";
 import { ZodError } from "zod";
 import {
   desktopRequestErrorStatus,
-  requireDesktopRequestContext,
+  requireModuleRequestContext,
 } from "@/lib/desktop/request-context";
+import {
+  assertQuoteRevision,
+  expectedQuoteRevision,
+  quoteConcurrencyStatus,
+} from "@/lib/quotes/concurrency";
 import { createQuotesRepository } from "@/lib/quotes/create-repository";
 import {
   quoteInternalNotesSchema,
@@ -16,6 +21,8 @@ export const dynamic = "force-dynamic";
 function errorStatus(code: string): number {
   const requestStatus = desktopRequestErrorStatus(code);
   if (requestStatus) return requestStatus;
+  const concurrencyStatus = quoteConcurrencyStatus(code);
+  if (concurrencyStatus) return concurrencyStatus;
   if (code === "QUOTE_NOT_FOUND") return 404;
   if (code === "QUOTE_NOT_EDITABLE") return 409;
   return 400;
@@ -28,13 +35,15 @@ export async function PATCH(
   try {
     const { quoteId } = await params;
     const input = quoteInternalNotesSchema.parse(await request.json());
-    const context = await requireDesktopRequestContext("quotes", "WRITE");
+    const context = await requireModuleRequestContext("quotes", "WRITE");
     const repository = createQuotesRepository();
-    const mutation = await repository.mutate((payload) =>
-      updateDraftQuoteInternalNotes(payload, quoteId, input, {
+    const expectedRevision = expectedQuoteRevision(request);
+    const mutation = await repository.mutate((payload) => {
+      assertQuoteRevision(payload, quoteId, expectedRevision);
+      return updateDraftQuoteInternalNotes(payload, quoteId, input, {
         displayName: context.user.displayName,
-      }),
-    );
+      });
+    });
 
     const response = NextResponse.json({
       payload: mutation.payload,
