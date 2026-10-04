@@ -1,8 +1,13 @@
 import { NextResponse } from "next/server";
 import {
-  requireDesktopRequestContext,
+  requireModuleRequestContext,
   desktopRequestErrorStatus,
 } from "@/lib/desktop/request-context";
+import {
+  assertQuoteRevision,
+  expectedQuoteRevision,
+  quoteConcurrencyStatus,
+} from "@/lib/quotes/concurrency";
 import { createQuotesRepository } from "@/lib/quotes/create-repository";
 import { registerQuoteItemPhotos } from "@/lib/quotes/item-photos";
 import { cleanupQuoteItemPhotos, uploadQuoteItemPhotos } from "@/lib/quotes/item-photo-storage";
@@ -16,6 +21,8 @@ type RouteContext = { params: Promise<{ quoteId: string; itemId: string }> };
 function statusFor(code: string): number {
   const requestStatus = desktopRequestErrorStatus(code);
   if (requestStatus) return requestStatus;
+  const concurrencyStatus = quoteConcurrencyStatus(code);
+  if (concurrencyStatus) return concurrencyStatus;
   if (code === "QUOTE_NOT_FOUND" || code === "QUOTE_ITEM_NOT_FOUND") return 404;
   if (code === "QUOTE_NOT_EDITABLE") return 409;
   if (code === "QUOTE_ITEM_PHOTO_TOO_LARGE" || code === "QUOTE_ITEM_PHOTO_LIMIT") return 413;
@@ -29,10 +36,11 @@ export async function POST(request: Request, context: RouteContext) {
   let store: ReturnType<typeof getServerFileStore> | undefined;
   try {
     const { quoteId, itemId } = await context.params;
-    const requestContext = await requireDesktopRequestContext("quotes", "WRITE");
+    const requestContext = await requireModuleRequestContext("quotes", "WRITE");
     const repository = createQuotesRepository();
+    const expectedRevision = expectedQuoteRevision(request);
     const current = await repository.load();
-    const quote = current.quotes.find((candidate) => candidate.id === quoteId);
+    const quote = assertQuoteRevision(current, quoteId, expectedRevision);
     if (!quote) throw new Error("QUOTE_NOT_FOUND");
     if (quote.status !== "DRAFT") throw new Error("QUOTE_NOT_EDITABLE");
     const item = quote.model.items.find((candidate) => candidate.id === itemId);
@@ -50,15 +58,16 @@ export async function POST(request: Request, context: RouteContext) {
       quoteId,
       itemId,
       files,
-      uploadedByName: requestContext.owner.displayName,
+      uploadedByName: requestContext.user.displayName,
     });
     const actor = {
-      userId: requestContext.owner.userId,
-      displayName: requestContext.owner.displayName,
+      userId: requestContext.user.id,
+      displayName: requestContext.user.displayName,
     };
-    const mutation = await repository.mutate((payload) =>
-      registerQuoteItemPhotos(payload, quoteId, itemId, uploaded, actor),
-    );
+    const mutation = await repository.mutate((payload) => {
+      assertQuoteRevision(payload, quoteId, expectedRevision);
+      return registerQuoteItemPhotos(payload, quoteId, itemId, uploaded, actor);
+    });
     return NextResponse.json(
       { payload: mutation.payload },
       { headers: { "Cache-Control": "no-store" } },
