@@ -8,6 +8,7 @@ import {
   parseLibraryPayload,
   type LibraryPayload,
 } from "@/lib/library/storage";
+import { quoteRevisionHeaders } from "@/lib/quotes/concurrency";
 import { parseQuoteQuantityInput } from "@/lib/quotes/domain";
 import { publishQuoteOuvrageToLibrary } from "@/lib/quotes/library-publish";
 import {
@@ -213,6 +214,8 @@ function ouvrageUnitCostCents(components: OuvrageComponentForm[]): number | null
 }
 
 function lineErrorLabel(code: string): string {
+  if (code === "QUOTE_VERSION_CONFLICT")
+    return "Ce devis a été modifié ailleurs. Recharge-le avant de recommencer.";
   if (code === "QUOTE_NOT_FOUND") return "Ce devis n’existe plus.";
   if (code === "QUOTE_NOT_EDITABLE") return "Seul un brouillon peut être modifié.";
   if (code === "QUOTE_LINE_NOT_FOUND") return "Cet ouvrage n’existe plus.";
@@ -451,7 +454,10 @@ export function QuoteLinesEditor({
     try {
       const response = await fetch("/api/desktop/quotes", {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers: {
+          "Content-Type": "application/json",
+          ...quoteRevisionHeaders(quote.updatedAt),
+        },
         body: JSON.stringify({
           action: "upsertOuvrage",
           quoteId: quote.id,
