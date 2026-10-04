@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import {
-  requireDesktopRequestContext,
+  requireModuleRequestContext,
   desktopRequestErrorStatus,
 } from "@/lib/desktop/request-context";
 import {
@@ -36,7 +36,7 @@ export async function POST(request: Request, context: RouteContext) {
   let store: ReturnType<typeof getServerFileStore> | undefined;
   try {
     const { quoteId, itemId } = await context.params;
-    const requestContext = await requireDesktopRequestContext("quotes", "WRITE");
+    const requestContext = await requireModuleRequestContext("quotes", "WRITE");
     const repository = createQuotesRepository();
     const expectedRevision = expectedQuoteRevision(request);
     const current = await repository.load();
@@ -58,11 +58,11 @@ export async function POST(request: Request, context: RouteContext) {
       quoteId,
       itemId,
       files,
-      uploadedByName: requestContext.owner.displayName,
+      uploadedByName: requestContext.user.displayName,
     });
     const actor = {
-      userId: requestContext.owner.userId,
-      displayName: requestContext.owner.displayName,
+      userId: requestContext.user.id,
+      displayName: requestContext.user.displayName,
     };
     const mutation = await repository.mutate((payload) => {
       assertQuoteRevision(payload, quoteId, expectedRevision);
