@@ -32,6 +32,7 @@ import { ensureRequiredLaborComponents } from "@/lib/library/required-labor-comp
 import { productionActivityLabel, type ProductionActivity } from "@/lib/production-activity";
 import { calculateQuoteAdjustedPricing } from "@/lib/quotes/adjustments";
 import { duplicateQuoteComponent } from "@/lib/quotes/component-order";
+import { quoteRevisionHeaders } from "@/lib/quotes/concurrency";
 import { parseQuoteQuantityInput } from "@/lib/quotes/domain";
 import {
   publishQuoteComponentToLibrary,
@@ -371,10 +372,16 @@ async function postLibrary(body: Record<string, unknown>) {
   return data;
 }
 
-async function postQuotePricing(body: Record<string, unknown>): Promise<NativeQuotesPayload> {
+async function postQuotePricing(
+  body: Record<string, unknown>,
+  updatedAt: string,
+): Promise<NativeQuotesPayload> {
   const response = await fetch("/api/desktop/quotes/pricing", {
     method: "POST",
-    headers: { "Content-Type": "application/json" },
+    headers: {
+      "Content-Type": "application/json",
+      ...quoteRevisionHeaders(updatedAt),
+    },
     body: JSON.stringify(body),
   });
   const data = (await response.json()) as QuotesApiResponse;
@@ -395,6 +402,11 @@ export function QuoteStructuredLinesEditor({
   onSaved: (payload: NativeQuotesPayload) => void;
   headerActions?: ReactNode;
 }) {
+  const postQuotePricingForQuote = (body: Record<string, unknown>) => {
+    if (!quote) throw new Error("QUOTE_NOT_FOUND");
+    return postQuotePricing(body, quote.updatedAt);
+  };
+
   const [formOpen, setFormOpen] = useState(false);
   const [editingLineId, setEditingLineId] = useState<string | null>(null);
   const [newLineParentId, setNewLineParentId] = useState<string | null>(null);
@@ -693,7 +705,10 @@ export function QuoteStructuredLinesEditor({
     try {
       const response = await fetch("/api/desktop/quotes", {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers: {
+          "Content-Type": "application/json",
+          ...quoteRevisionHeaders(quote.updatedAt),
+        },
         body: JSON.stringify({
           action: "deleteItem",
           quoteId: quote.id,
@@ -797,7 +812,10 @@ export function QuoteStructuredLinesEditor({
     try {
       const response = await fetch("/api/desktop/quotes", {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers: {
+          "Content-Type": "application/json",
+          ...quoteRevisionHeaders(quote.updatedAt),
+        },
         body: JSON.stringify({
           action: "reorderItem",
           quoteId: quote.id,
@@ -864,12 +882,12 @@ export function QuoteStructuredLinesEditor({
 
     try {
       const payload = existing
-        ? await postQuotePricing({
+        ? await postQuotePricingForQuote({
             action: "removeOption",
             quoteId: quote.id,
             optionId: existing.id,
           })
-        : await postQuotePricing({
+        : await postQuotePricingForQuote({
             action: "upsertOption",
             quoteId: quote.id,
             option: {
@@ -907,7 +925,10 @@ export function QuoteStructuredLinesEditor({
     try {
       const response = await fetch("/api/desktop/quotes", {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers: {
+          "Content-Type": "application/json",
+          ...quoteRevisionHeaders(quote.updatedAt),
+        },
         body: JSON.stringify({
           action: "duplicateHeading",
           quoteId: quote.id,
@@ -955,7 +976,10 @@ export function QuoteStructuredLinesEditor({
             };
       const response = await fetch("/api/desktop/quotes", {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers: {
+          "Content-Type": "application/json",
+          ...quoteRevisionHeaders(quote.updatedAt),
+        },
         body: JSON.stringify(body),
       });
       const data = (await response.json()) as QuotesApiResponse;
@@ -1238,7 +1262,10 @@ export function QuoteStructuredLinesEditor({
     try {
       const response = await fetch("/api/desktop/quotes", {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers: {
+          "Content-Type": "application/json",
+          ...quoteRevisionHeaders(quote.updatedAt),
+        },
         body: JSON.stringify({
           action: "upsertOuvrage",
           quoteId: quote.id,
@@ -1284,7 +1311,10 @@ export function QuoteStructuredLinesEditor({
     try {
       const response = await fetch("/api/desktop/quotes", {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers: {
+          "Content-Type": "application/json",
+          ...quoteRevisionHeaders(quote.updatedAt),
+        },
         body: JSON.stringify({
           action: "duplicateLine",
           quoteId: quote.id,
@@ -2074,6 +2104,7 @@ export function QuoteStructuredLinesEditor({
         {presentationItemId === item.id ? (
           <QuoteItemPresentationPanel
             quoteId={quote!.id}
+            quoteUpdatedAt={quote!.updatedAt}
             item={item}
             editable={editable}
             onSaved={onSaved}
