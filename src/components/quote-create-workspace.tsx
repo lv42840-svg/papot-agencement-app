@@ -324,12 +324,7 @@ export function QuoteCreateWorkspace({
               <button
                 className="primaryButton"
                 type="submit"
-                disabled={
-                  saving ||
-                  !paymentTerms.trim() ||
-                  !quoteOwnerName.trim() ||
-                  !quoteDueDate
-                }
+                disabled={saving || !paymentTerms.trim() || !quoteOwnerName.trim() || !quoteDueDate}
               >
                 <FilePlus2 size={15} />{" "}
                 {saving ? "Création…" : `Créer et ouvrir ${initialVariantName} V1`}
