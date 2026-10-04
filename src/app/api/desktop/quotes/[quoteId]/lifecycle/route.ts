@@ -2,7 +2,7 @@ import { NextResponse } from "next/server";
 import { z } from "zod";
 import {
   desktopRequestErrorStatus,
-  requireDesktopRequestContext,
+  requireModuleRequestContext,
 } from "@/lib/desktop/request-context";
 import {
   assertQuoteRevision,
@@ -42,11 +42,11 @@ function statusFor(code: string): number {
 export async function POST(request: Request, context: RouteContext) {
   try {
     const { quoteId } = await context.params;
-    const requestContext = await requireDesktopRequestContext("quotes", "WRITE");
+    const requestContext = await requireModuleRequestContext("quotes", "WRITE");
     const input = lifecycleSchema.parse(await request.json());
     const actor = {
-      userId: requestContext.owner.userId,
-      displayName: requestContext.owner.displayName,
+      userId: requestContext.user.id,
+      displayName: requestContext.user.displayName,
     };
     const repository = createQuotesRepository();
     const expectedRevision = expectedQuoteRevision(request);
