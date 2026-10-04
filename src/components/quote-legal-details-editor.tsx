@@ -4,6 +4,7 @@ import { CheckCircle2, Percent, Save, TriangleAlert } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
 import { quoteHasCompleteWorkSchedule, resolveQuoteLineVatRate } from "@/lib/quotes/legal-details";
 import type { QuoteLine } from "@/lib/quotes/model";
+import { quoteRevisionHeaders } from "@/lib/quotes/concurrency";
 import type { NativeQuoteRecord, NativeQuotesPayload } from "@/lib/quotes/store";
 
 type LegalResponse = {
@@ -21,6 +22,8 @@ function parseRate(value: string): number | null {
 }
 
 function errorLabel(code: string): string {
+  if (code === "QUOTE_VERSION_CONFLICT")
+    return "Ce devis a été modifié ailleurs. Recharge-le avant de recommencer.";
   if (code === "QUOTE_NOT_EDITABLE") return "Seul un devis brouillon peut être modifié.";
   if (code === "QUOTE_WORK_END_BEFORE_START") {
     return "La date de fin ne peut pas être antérieure au début des travaux.";
@@ -76,7 +79,10 @@ export function QuoteLegalDetailsEditor({
   async function patch(body: Record<string, unknown>) {
     const response = await fetch(`/api/desktop/quotes/${quote.id}/legal`, {
       method: "PATCH",
-      headers: { "Content-Type": "application/json" },
+      headers: {
+        "Content-Type": "application/json",
+        ...quoteRevisionHeaders(quote.updatedAt),
+      },
       body: JSON.stringify(body),
     });
     const data = (await response.json()) as LegalResponse;

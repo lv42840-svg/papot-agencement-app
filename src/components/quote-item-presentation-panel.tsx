@@ -2,11 +2,13 @@
 
 import { type ChangeEvent, useEffect, useState } from "react";
 import { ImagePlus, Trash2, X } from "lucide-react";
+import { quoteRevisionHeaders } from "@/lib/quotes/concurrency";
 import type { QuoteItem } from "@/lib/quotes/model";
 import type { NativeQuotesPayload } from "@/lib/quotes/store";
 
 type Props = {
   quoteId: string;
+  quoteUpdatedAt: string;
   item: QuoteItem;
   editable: boolean;
   onSaved: (payload: NativeQuotesPayload) => void;
@@ -21,7 +23,14 @@ function itemLabel(item: QuoteItem): string {
   return item.text;
 }
 
-export function QuoteItemPresentationPanel({ quoteId, item, editable, onSaved, onClose }: Props) {
+export function QuoteItemPresentationPanel({
+  quoteId,
+  quoteUpdatedAt,
+  item,
+  editable,
+  onSaved,
+  onClose,
+}: Props) {
   const [uploading, setUploading] = useState(false);
   const [busyPhotoId, setBusyPhotoId] = useState<string | null>(null);
   const [previewPhotoId, setPreviewPhotoId] = useState<string | null>(null);
@@ -42,6 +51,7 @@ export function QuoteItemPresentationPanel({ quoteId, item, editable, onSaved, o
       for (const file of files) form.append("files", file);
       const response = await fetch(`/api/desktop/quotes/${quoteId}/items/${item.id}/photos`, {
         method: "POST",
+        headers: quoteRevisionHeaders(quoteUpdatedAt),
         body: form,
       });
       const data = (await response.json()) as ApiResponse;
@@ -72,7 +82,10 @@ export function QuoteItemPresentationPanel({ quoteId, item, editable, onSaved, o
         `/api/desktop/quotes/${quoteId}/items/${item.id}/photos/${photoId}`,
         {
           method: "PATCH",
-          headers: { "Content-Type": "application/json" },
+          headers: {
+            "Content-Type": "application/json",
+            ...quoteRevisionHeaders(quoteUpdatedAt),
+          },
           body: JSON.stringify({ clientVisible }),
         },
       );
@@ -93,7 +106,10 @@ export function QuoteItemPresentationPanel({ quoteId, item, editable, onSaved, o
     try {
       const response = await fetch(
         `/api/desktop/quotes/${quoteId}/items/${item.id}/photos/${photoId}`,
-        { method: "DELETE" },
+        {
+          method: "DELETE",
+          headers: quoteRevisionHeaders(quoteUpdatedAt),
+        },
       );
       const data = (await response.json()) as ApiResponse;
       if (!response.ok || !data.payload) throw new Error();

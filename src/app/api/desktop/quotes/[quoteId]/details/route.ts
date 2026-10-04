@@ -1,6 +1,11 @@
 import { NextResponse } from "next/server";
 import { ZodError } from "zod";
-import { requireDesktopRequestContext } from "@/lib/desktop/request-context";
+import { requireModuleRequestContext } from "@/lib/desktop/request-context";
+import {
+  assertQuoteRevision,
+  expectedQuoteRevision,
+  quoteConcurrencyStatus,
+} from "@/lib/quotes/concurrency";
 import { createQuotesRepository } from "@/lib/quotes/create-repository";
 import {
   quoteGeneralDetailsSchema,
@@ -17,13 +22,15 @@ export async function PATCH(
   try {
     const { quoteId } = await params;
     const details = quoteGeneralDetailsSchema.parse(await request.json());
-    const context = await requireDesktopRequestContext("quotes", "WRITE");
+    const context = await requireModuleRequestContext("quotes", "WRITE");
     const repository = createQuotesRepository();
-    const mutation = await repository.mutate((payload) =>
-      updateDraftQuoteGeneralDetails(payload, quoteId, details, {
+    const expectedRevision = expectedQuoteRevision(request);
+    const mutation = await repository.mutate((payload) => {
+      assertQuoteRevision(payload, quoteId, expectedRevision);
+      return updateDraftQuoteGeneralDetails(payload, quoteId, details, {
         displayName: context.user.displayName,
-      }),
-    );
+      });
+    });
     const response = NextResponse.json({
       payload: mutation.payload,
       canWrite: context.moduleAccess.canWrite,
@@ -38,12 +45,14 @@ export async function PATCH(
         : error instanceof Error
           ? error.message
           : "QUOTE_DETAILS_UPDATE_FAILED";
+    const concurrencyStatus = quoteConcurrencyStatus(code);
     const status =
-      code === "QUOTE_NOT_FOUND"
+      concurrencyStatus ??
+      (code === "QUOTE_NOT_FOUND"
         ? 404
         : code === "QUOTE_NOT_EDITABLE" || code === "QUOTE_VARIANT_VERSION_CONFLICT"
           ? 409
-          : 400;
+          : 400);
     return NextResponse.json({ error: code }, { status });
   }
 }

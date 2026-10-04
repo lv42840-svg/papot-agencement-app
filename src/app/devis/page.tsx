@@ -5,15 +5,15 @@ import { createClientsRepository } from "@/lib/clients/create-repository";
 import { clientDisplayName } from "@/lib/clients/domain";
 import { createCommercialRepository } from "@/lib/commercial/create-repository";
 import { isCommercialClosed } from "@/lib/commercial/domain";
-import { requireDesktopRequestContext } from "@/lib/desktop/request-context";
+import { requireModuleRequestContext } from "@/lib/desktop/request-context";
 import { createQuotesRepository } from "@/lib/quotes/create-repository";
 
 export const dynamic = "force-dynamic";
 
 export default async function QuotesPage() {
-  const context = await requireDesktopRequestContext("quotes", "READ");
-  const commercialRepository = createCommercialRepository(context);
-  const clientsRepository = await createClientsRepository(context);
+  const context = await requireModuleRequestContext("quotes", "READ");
+  const commercialRepository = createCommercialRepository();
+  const clientsRepository = await createClientsRepository();
   const quotesRepository = createQuotesRepository();
   const [quotes, commercial, clients] = await Promise.all([
     quotesRepository.load(),

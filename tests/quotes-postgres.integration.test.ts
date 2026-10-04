@@ -5,6 +5,7 @@ import { afterAll, beforeAll, beforeEach, describe, expect, it, vi } from "vites
 vi.mock("server-only", () => ({}));
 
 import { ensureQuotesPostgresCutover, quotesPayloadHash } from "../src/lib/quotes/cutover";
+import { assertQuoteRevision } from "../src/lib/quotes/concurrency";
 import { applyQuotesMutation, quotesMutationSchema } from "../src/lib/quotes/mutations";
 import { createPostgresQuotesRepository } from "../src/lib/quotes/postgres-repository";
 import {
@@ -152,6 +153,39 @@ describeWithPostgres("Quotes PostgreSQL cutover", () => {
     expect(loaded.quotes.map((quote) => quote.model.subject)).toEqual(
       expect.arrayContaining(["Devis poste A", "Devis poste B"]),
     );
+  });
+
+  it("rejects a stale browser edit of the same quote", async () => {
+    const source = appendQuote(createInitialNativeQuotesPayload(), "Devis partagé");
+    await ensureQuotesPostgresCutover({
+      pool,
+      acquireSource: async () => source,
+    });
+
+    const repository = createPostgresQuotesRepository(pool);
+    const opened = (await repository.load()).quotes[0];
+
+    await repository.mutate((payload) => {
+      assertQuoteRevision(payload, opened.id, opened.updatedAt);
+      const next = structuredClone(payload);
+      const quote = next.quotes.find((candidate) => candidate.id === opened.id);
+      if (!quote) throw new Error("QUOTE_NOT_FOUND");
+      quote.internalNotes = "Modification poste A";
+      quote.updatedAt = "2026-09-18T09:00:00.000Z";
+      quote.updatedByName = "Poste A";
+      return { payload: next, focusQuoteId: quote.id };
+    });
+
+    await expect(
+      repository.mutate((payload) => {
+        assertQuoteRevision(payload, opened.id, opened.updatedAt);
+        return { payload, focusQuoteId: opened.id };
+      }),
+    ).rejects.toThrow("QUOTE_VERSION_CONFLICT");
+
+    const current = (await repository.load()).quotes[0];
+    expect(current.internalNotes).toBe("Modification poste A");
+    expect(current.updatedByName).toBe("Poste A");
   });
 
   it("does not increment the version for a no-op mutation", async () => {
