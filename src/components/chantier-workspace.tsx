@@ -31,11 +31,7 @@ import {
   type ChantiersPayload,
 } from "@/lib/chantiers/domain";
 import type { ChantierCapabilities } from "@/lib/chantiers/mutations";
-import {
-  clientDisplayName,
-  type ClientRecord,
-  type ClientsPayload,
-} from "@/lib/clients/domain";
+import { clientDisplayName, type ClientRecord, type ClientsPayload } from "@/lib/clients/domain";
 import type {
   CommercialCase,
   CommercialDocument,
@@ -413,15 +409,16 @@ function ClientTab({
     clientRecord?.contacts.find((contact) => contact.id === commercialCase?.primaryContactId) ??
     clientRecord?.contacts.find((contact) => contact.isPrimary) ??
     null;
-  const sourceClientName = clientRecord ? clientDisplayName(clientRecord) : chantier.clientName ?? "";
+  const sourceClientName = clientRecord
+    ? clientDisplayName(clientRecord)
+    : (chantier.clientName ?? "");
   const sourceCompanyName =
     clientRecord && clientRecord.type !== "PARTICULIER"
       ? clientRecord.companyName
       : chantier.companyName ?? "";
-  const sourceContactName =
-    primaryContact
-      ? [primaryContact.firstName, primaryContact.lastName].filter(Boolean).join(" ")
-      : chantier.contactName ?? "";
+  const sourceContactName = primaryContact
+    ? [primaryContact.firstName, primaryContact.lastName].filter(Boolean).join(" ")
+    : (chantier.contactName ?? "");
   const sourcePhone = primaryContact?.phone || clientRecord?.phone || chantier.contactPhone || "";
   const sourceEmail = primaryContact?.email || clientRecord?.email || chantier.contactEmail || "";
 
@@ -434,8 +431,12 @@ function ClientTab({
   const [contactName, setContactName] = useState(sourceContactName);
   const [contactPhone, setContactPhone] = useState(sourcePhone);
   const [contactEmail, setContactEmail] = useState(sourceEmail);
-  const [description, setDescription] = useState(chantier.description ?? commercialCase?.description ?? "");
-  const [nextAction, setNextAction] = useState(chantier.nextAction ?? commercialCase?.nextAction ?? "");
+  const [description, setDescription] = useState(
+    chantier.description ?? commercialCase?.description ?? "",
+  );
+  const [nextAction, setNextAction] = useState(
+    chantier.nextAction ?? commercialCase?.nextAction ?? "",
+  );
 
   function resetForm() {
     setReference(chantier.reference ?? commercialCase?.name ?? "");
@@ -582,7 +583,10 @@ function ClientTab({
             <InfoCell label="Contact" value={sourceContactName} />
             <InfoCell label="Téléphone" value={sourcePhone} />
             <InfoCell label="E-mail" value={sourceEmail} />
-            <InfoCell label="Pose prévisionnelle" value={formatDateOnly(chantier.plannedInstallDate)} />
+            <InfoCell
+              label="Pose prévisionnelle"
+              value={formatDateOnly(chantier.plannedInstallDate)}
+            />
           </div>
           <div className="chantierIdentityNotes">
             <InfoCell label="C'est quoi ?" value={chantier.description ?? commercialCase?.description} />
