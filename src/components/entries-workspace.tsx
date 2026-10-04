@@ -1271,7 +1271,7 @@ function EntryAttachments({
       </div>
       {entry.attachments.length === 0 ? (
         <p className="entriesAttachmentEmpty">
-          {"Aucune pièce jointe. Les originaux ajoutés ici sont conservés dans le stockage PAPOT."}
+          Aucune pièce jointe. Les originaux sont conservés dans le stockage PAPOT.
         </p>
       ) : (
         <div className="entriesAttachmentList">
