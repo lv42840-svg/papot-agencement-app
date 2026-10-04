@@ -1,0 +1,31 @@
+name: Format Affaires web routes
+
+on:
+  push:
+    branches:
+      - fix/agencement-concurrent-writes
+
+permissions:
+  contents: write
+
+jobs:
+  format:
+    if: github.actor != 'github-actions[bot]'
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: true
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - run: npm ci --no-audit --no-fund
+      - run: |
+          npx prettier --write             "src/app/api/desktop/affaires/[caseId]/documents/[documentId]/route.ts"             "src/app/api/desktop/commercial/[caseId]/documents/[documentId]/route.ts"             "src/app/api/desktop/commercial/route.ts"
+      - name: Commit formatting if needed
+        run: |
+          git add             "src/app/api/desktop/affaires/[caseId]/documents/[documentId]/route.ts"             "src/app/api/desktop/commercial/[caseId]/documents/[documentId]/route.ts"             "src/app/api/desktop/commercial/route.ts"
+          if git diff --cached --quiet; then exit 0; fi
+          git -c user.name="PAPOT development" -c user.email="dev@papot.app" commit -m "style(commercial): format web routes"
+          git push origin HEAD:fix/agencement-concurrent-writes
