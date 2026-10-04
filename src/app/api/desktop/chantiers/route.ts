@@ -115,7 +115,13 @@ export async function POST(request: Request) {
   let stage = "parse-request";
 
   try {
-    const input = chantierMutationSchema.parse(await request.json());
+    const raw = (await request.json()) as Record<string, unknown>;
+    const input = chantierMutationSchema.parse(raw);
+    const expectedUpdatedAt =
+      typeof raw.expectedUpdatedAt === "string"
+        ? raw.expectedUpdatedAt.trim()
+        : "";
+    if (!expectedUpdatedAt) throw new Error("CHANTIERS_VERSION_REQUIRED");
     stage = "create-runtime";
     const context = await requireDesktopRequestContext("chantiers", "WRITE");
     const requiredSpecialPermission = chantierSpecialPermissionForMutation(input);
@@ -135,6 +141,14 @@ export async function POST(request: Request) {
 
     stage = "apply-and-save-mutation";
     const mutation = await repository.mutate((payload) => {
+      const openedChantier = payload.chantiers.find(
+        (candidate) => candidate.id === input.chantierId,
+      );
+      if (!openedChantier) throw new Error("CHANTIER_NOT_FOUND");
+      if (openedChantier.updatedAt !== expectedUpdatedAt) {
+        throw new Error("CHANTIERS_VERSION_CONFLICT");
+      }
+
       let normalizedInput = input;
 
       if (mutationNeedsCommercialOrigin(input)) {
