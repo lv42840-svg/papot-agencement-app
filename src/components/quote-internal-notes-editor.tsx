@@ -2,6 +2,7 @@
 
 import { LockKeyhole, Save } from "lucide-react";
 import { type FormEvent, useState } from "react";
+import { quoteRevisionHeaders } from "@/lib/quotes/concurrency";
 import type { NativeQuoteRecord, NativeQuotesPayload } from "@/lib/quotes/store";
 
 type NotesResponse = {
@@ -10,6 +11,8 @@ type NotesResponse = {
 };
 
 function errorLabel(code: string): string {
+  if (code === "QUOTE_VERSION_CONFLICT")
+    return "Ce devis a été modifié ailleurs. Recharge-le avant de recommencer.";
   if (code === "QUOTE_NOT_EDITABLE") return "Seul un devis brouillon peut être modifié.";
   if (code === "QUOTE_INTERNAL_NOTES_INVALID") return "Les notes sont trop longues.";
   if (code === "MODULE_FORBIDDEN") return "Ton profil n’autorise pas la modification des devis.";
@@ -40,7 +43,10 @@ export function QuoteInternalNotesEditor({
     try {
       const response = await fetch(`/api/desktop/quotes/${quote.id}/notes`, {
         method: "PATCH",
-        headers: { "Content-Type": "application/json" },
+        headers: {
+          "Content-Type": "application/json",
+          ...quoteRevisionHeaders(quote.updatedAt),
+        },
         body: JSON.stringify({ internalNotes: notes }),
       });
       const data = (await response.json()) as NotesResponse;
