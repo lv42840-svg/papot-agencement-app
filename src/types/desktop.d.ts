@@ -4,12 +4,11 @@ declare global {
   interface Window {
     papotDesktop?: {
       openBusinessFolder: (input: {
-        storagePath?: string;
-        creationYear?: number;
-        clientName?: string | null;
-        caseName?: string;
+        kind: "commercial-case";
+        storagePath: string;
       }) => Promise<{ ok: boolean; error?: string }>;
       openBusinessFile: (input: {
+        kind: "commercial-document";
         storagePath: string;
       }) => Promise<{ ok: boolean; error?: string }>;
       composeOutlookMail: (input: {
