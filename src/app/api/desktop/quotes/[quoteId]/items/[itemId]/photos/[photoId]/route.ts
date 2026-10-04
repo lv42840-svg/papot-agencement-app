@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { z } from "zod";
 import {
-  requireDesktopRequestContext,
+  requireModuleRequestContext,
   desktopRequestErrorStatus,
 } from "@/lib/desktop/request-context";
 import {
@@ -43,7 +43,7 @@ function statusFor(code: string): number {
 export async function GET(_request: Request, context: RouteContext) {
   try {
     const { quoteId, itemId, photoId } = await context.params;
-    await requireDesktopRequestContext("quotes", "READ");
+    await requireModuleRequestContext("quotes", "READ");
     const payload = await createQuotesRepository().load();
     const photo = getQuoteItemPhoto(payload, quoteId, itemId, photoId);
     const store = getServerFileStore();
@@ -66,12 +66,12 @@ export async function GET(_request: Request, context: RouteContext) {
 export async function PATCH(request: Request, context: RouteContext) {
   try {
     const { quoteId, itemId, photoId } = await context.params;
-    const requestContext = await requireDesktopRequestContext("quotes", "WRITE");
+    const requestContext = await requireModuleRequestContext("quotes", "WRITE");
     const input = visibilitySchema.parse(await request.json());
     const expectedRevision = expectedQuoteRevision(request);
     const actor = {
-      userId: requestContext.owner.userId,
-      displayName: requestContext.owner.displayName,
+      userId: requestContext.user.id,
+      displayName: requestContext.user.displayName,
     };
     const mutation = await createQuotesRepository().mutate((payload) => {
       assertQuoteRevision(payload, quoteId, expectedRevision);
@@ -97,15 +97,15 @@ export async function PATCH(request: Request, context: RouteContext) {
 export async function DELETE(request: Request, context: RouteContext) {
   try {
     const { quoteId, itemId, photoId } = await context.params;
-    const requestContext = await requireDesktopRequestContext("quotes", "WRITE");
+    const requestContext = await requireModuleRequestContext("quotes", "WRITE");
     const repository = createQuotesRepository();
     const expectedRevision = expectedQuoteRevision(request);
     const current = await repository.load();
     assertQuoteRevision(current, quoteId, expectedRevision);
     const photo = getQuoteItemPhoto(current, quoteId, itemId, photoId);
     const actor = {
-      userId: requestContext.owner.userId,
-      displayName: requestContext.owner.displayName,
+      userId: requestContext.user.id,
+      displayName: requestContext.user.displayName,
     };
     const mutation = await repository.mutate((payload) => {
       assertQuoteRevision(payload, quoteId, expectedRevision);
