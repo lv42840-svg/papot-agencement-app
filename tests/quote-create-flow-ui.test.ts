@@ -60,6 +60,6 @@ describe("quote creation flow", () => {
     expect(createWorkspace).toContain("quoteDueDate");
     expect(createPage).toContain("listCommercialAssignableUsers");
     expect(quotesRoute).toContain("startQuoteCommercialWorkflow");
-    expect(quotesRoute).toContain('requireDesktopRequestContext("commercial", "WRITE")');
+    expect(quotesRoute).toContain('requireModuleRequestContext("commercial", "WRITE")');
   });
 });
