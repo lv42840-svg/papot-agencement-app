@@ -468,8 +468,8 @@ function LaunchSheet({
         </label>
       </div>
       <p className="launchHint">
-        Les heures sont initialisées depuis la charge commerciale lorsqu&apos;elle existe.
-        Le déboursé est géré directement dans PAPOT, sans dépendance à un outil externe.
+        {"Les heures sont initialisées depuis la charge commerciale lorsqu’elle existe. "}
+        {"Le déboursé est géré directement dans PAPOT, sans dépendance à un outil externe."}
       </p>
 
       <button
