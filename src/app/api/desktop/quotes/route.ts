@@ -5,7 +5,7 @@ import { createCommercialRepository } from "@/lib/commercial/create-repository";
 import { isCommercialClosed } from "@/lib/commercial/domain";
 import {
   desktopRequestErrorStatus,
-  requireDesktopRequestContext,
+  requireModuleRequestContext,
 } from "@/lib/desktop/request-context";
 import { upsertLibraryComponent } from "@/lib/library/catalog-edit";
 import { createLibraryRepository } from "@/lib/library/create-repository";
@@ -78,7 +78,7 @@ function errorStatus(code: string): number {
 
 export async function GET() {
   try {
-    const context = await requireDesktopRequestContext("quotes", "READ");
+    const context = await requireModuleRequestContext("quotes", "READ");
     const payload = await createQuotesRepository().load();
     return noStoreJson(publicSnapshot(payload, context.moduleAccess.canWrite));
   } catch (error) {
@@ -102,12 +102,12 @@ export async function POST(request: Request) {
     const rawInput = await request.json();
     const input = quotesMutationSchema.parse(rawInput);
     const expectedRevision = input.action === "createDraft" ? null : expectedQuoteRevision(request);
-    const context = await requireDesktopRequestContext("quotes", "WRITE");
+    const context = await requireModuleRequestContext("quotes", "WRITE");
     const actor = { userId: context.user.id, displayName: context.user.displayName };
 
     if (input.action === "createDraft") {
       const workflow = quoteCommercialWorkflowSchema.parse(rawInput);
-      const commercialContext = await requireDesktopRequestContext("commercial", "WRITE");
+      const commercialContext = await requireModuleRequestContext("commercial", "WRITE");
       const commercialRepository = createCommercialRepository(commercialContext);
       const clientsRepository = await createClientsRepository(context);
       const [commercial, clients] = await Promise.all([
