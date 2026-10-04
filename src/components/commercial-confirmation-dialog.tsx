@@ -197,7 +197,6 @@ export function CommercialConfirmationDialog({
                   <div className="commercialConfirmQuoteFigures">
                     <span>{moneyLabel(summary.totalHtCents)}</span>
                     <span>{hoursLabel(summary.soldHours)}</span>
-                    <span>{moneyLabel(summary.plannedDisbursementCents)}</span>
                   </div>
                 </label>
               );
@@ -235,10 +234,6 @@ export function CommercialConfirmationDialog({
             <div>
               <span>Heures vendues</span>
               <strong>{hoursLabel(contract.soldHours)}</strong>
-            </div>
-            <div>
-              <span>Déboursé prévu</span>
-              <strong>{moneyLabel(contract.plannedDisbursementCents)}</strong>
             </div>
             <div>
               <span>Marge prévue</span>
@@ -384,7 +379,7 @@ export function CommercialConfirmationDialog({
           }
           .commercialConfirmQuoteFigures {
             display: grid;
-            grid-template-columns: repeat(3, minmax(80px, 1fr));
+            grid-template-columns: repeat(2, minmax(80px, 1fr));
             gap: 7px;
             font-size: 9px;
             font-weight: 800;
@@ -406,7 +401,7 @@ export function CommercialConfirmationDialog({
           }
           .commercialConfirmContract {
             display: grid;
-            grid-template-columns: repeat(5, minmax(110px, 1fr));
+            grid-template-columns: repeat(4, minmax(110px, 1fr));
             gap: 7px;
             padding: 10px;
             border: 1px solid #d9d0ee;
