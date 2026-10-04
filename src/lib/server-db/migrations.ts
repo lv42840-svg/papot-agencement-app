@@ -384,7 +384,7 @@ async function ensureQuoteEmailSettingsStorage(client: PoolClient): Promise<void
     ON CONFLICT (scope) DO NOTHING
   `, [
     JSON.stringify({
-      fromEmail: "noreply@papot.eu",
+      fromEmail: "noreply@papot.app",
       ccEmail: "contact@papot.eu",
       replyToEmail: "contact@papot.eu",
       subjectTemplate: "Devis {{NUM_DEVIS}} - {{AFFAIRE}}",
