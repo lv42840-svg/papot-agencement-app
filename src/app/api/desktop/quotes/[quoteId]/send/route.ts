@@ -7,9 +7,14 @@ import { applyCommercialMutation, registerCommercialDocuments } from "@/lib/comm
 import { createCompanyProfileRepository } from "@/lib/company-profile/create-repository";
 import {
   desktopRequestErrorStatus,
-  requireDesktopRequestContext,
+  requireModuleRequestContext,
 } from "@/lib/desktop/request-context";
 import { quoteWorkflowMayChangeCommercialStatus } from "@/lib/quotes/chantier";
+import {
+  assertQuoteRevision,
+  expectedQuoteRevision,
+  quoteConcurrencyStatus,
+} from "@/lib/quotes/concurrency";
 import { buildQuoteDocumentDataFromPayloads } from "@/lib/quotes/document-data-mapping";
 import { archiveFinalQuotePdf, nextFinalQuoteNumber } from "@/lib/quotes/final-pdf-archive";
 import { createQuotesRepository } from "@/lib/quotes/create-repository";
@@ -56,6 +61,8 @@ function publicSnapshot(payload: NativeQuotesPayload, canWrite: boolean, focusQu
 function errorStatus(code: string): number {
   const requestStatus = desktopRequestErrorStatus(code);
   if (requestStatus) return requestStatus;
+  const concurrencyStatus = quoteConcurrencyStatus(code);
+  if (concurrencyStatus) return concurrencyStatus;
   if (code === "QUOTE_NOT_FOUND" || code === "COMMERCIAL_CASE_NOT_FOUND") return 404;
   if (
     code === "QUOTE_NOT_EDITABLE" ||
@@ -86,19 +93,22 @@ export async function POST(request: Request, { params }: { params: Promise<{ quo
 
   try {
     const { quoteId } = await params;
+    const expectedRevision = expectedQuoteRevision(request);
     const input = sendQuoteSchema.parse(await request.json());
-    const quoteContext = await requireDesktopRequestContext("quotes", "WRITE");
-    const commercialContext = await requireDesktopRequestContext("commercial", "WRITE");
+    const quoteContext = await requireModuleRequestContext("quotes", "WRITE");
+    await requireModuleRequestContext("commercial", "WRITE");
     const actor = {
       userId: quoteContext.user.id,
       displayName: quoteContext.user.displayName,
     };
     const now = new Date();
     const quotesRepository = createQuotesRepository();
-    const commercialRepository = createCommercialRepository(commercialContext);
-    const clientsRepository = await createClientsRepository(quoteContext);
+    const commercialRepository = createCommercialRepository();
+    const clientsRepository = await createClientsRepository();
     const companyProfileRepository = createCompanyProfileRepository();
-    const transport = await createCommercialDocumentTransport(quoteContext);
+    const transport = await createCommercialDocumentTransport({
+      displayName: quoteContext.user.displayName,
+    });
     const [clients, companyProfile, template] = await Promise.all([
       clientsRepository.load(),
       companyProfileRepository.load(),
@@ -106,6 +116,7 @@ export async function POST(request: Request, { params }: { params: Promise<{ quo
     ]);
 
     const mutation = await quotesRepository.mutate(async (payload) => {
+      assertQuoteRevision(payload, quoteId, expectedRevision);
       normalizeQuotePricingAfterModelMutation(payload, quoteId);
       const quote = payload.quotes.find((candidate) => candidate.id === quoteId);
       if (!quote) throw new Error("QUOTE_NOT_FOUND");
