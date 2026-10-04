@@ -105,6 +105,12 @@ export const chantierMutationSchema = z.discriminatedUnion("action", [
     reason: z.string().trim().min(1).max(2000),
   }),
   z.object({
+    action: z.literal("cancel"),
+    chantierId: z.string().uuid(),
+    reason: z.string().trim().min(1).max(1000),
+    confirmed: z.literal(true),
+  }),
+  z.object({
     action: z.literal("reactivate"),
     chantierId: z.string().uuid(),
     reason: z.string().trim().min(1).max(2000),
@@ -374,6 +380,11 @@ export function applyChantierMutation(
   const payload = structuredClone(parseChantiersPayload(rawSource));
   const item = findChantier(payload, input.chantierId);
 
+  // Cancellation preserves the dossier but stops operational changes until reopening.
+  if (item.status === "CANCELLED" && input.action !== "reactivate" && input.action !== "archive") {
+    throw new Error("CHANTIER_CANCELLED_READ_ONLY");
+  }
+
   if (input.action === "updateDetails") {
     if (item.status === "ARCHIVED") throw new Error("CHANTIER_ARCHIVED_READ_ONLY");
     item.number = text(input.number);
@@ -640,8 +651,21 @@ export function applyChantierMutation(
     return { payload, focusChantierId: item.id };
   }
 
+  if (input.action === "cancel") {
+    if (item.status !== "ACTIVE") throw new Error("CHANTIER_NOT_ACTIVE");
+    if (input.confirmed !== true) throw new Error("CHANTIER_CANCELLATION_CONFIRMATION_REQUIRED");
+    const reason = input.reason.trim();
+    if (!reason || reason.length > 1000) throw new Error("CHANTIER_CANCELLATION_REASON_REQUIRED");
+    item.status = "CANCELLED";
+    // Do not mark unfinished work as completed and do not erase hours or quote links.
+    item.completedAt = null;
+    touch(item, actor, now);
+    history(item, actor.displayName, "CANCELLED", `Chantier annulé. Motif : ${reason}`, now);
+    return { payload, focusChantierId: item.id };
+  }
+
   if (input.action === "reactivate") {
-    if (item.status !== "DONE") throw new Error("CHANTIER_NOT_DONE");
+    if (item.status !== "DONE" && item.status !== "CANCELLED") throw new Error("CHANTIER_NOT_DONE");
     item.status = "ACTIVE";
     item.completedAt = null;
     touch(item, actor, now);
@@ -656,7 +680,7 @@ export function applyChantierMutation(
   }
 
   if (input.action === "archive") {
-    if (item.status !== "DONE") throw new Error("CHANTIER_NOT_DONE");
+    if (item.status !== "DONE" && item.status !== "CANCELLED") throw new Error("CHANTIER_NOT_DONE");
     item.status = "ARCHIVED";
     item.archivedAt = now.toISOString();
     touch(item, actor, now);
