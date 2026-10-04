@@ -15,10 +15,8 @@ type SmtpConfig = {
 
 export type QuoteEmailInput = {
   to: string;
-  recipientName: string;
-  quoteNumber: string;
-  affairName: string;
-  quoteSubject: string;
+  subject: string;
+  body: string;
   pdfFileName: string;
   pdfBytes: Uint8Array;
 };
@@ -100,7 +98,7 @@ function asciiFileName(value: string): string {
 
 export function buildQuoteEmailMessage(
   input: QuoteEmailInput,
-  policy: QuoteEmailPolicy = quoteEmailPolicyFromEnv(),
+  policy: QuoteEmailPolicy,
 ): {
   envelopeFrom: string;
   recipients: string[];
@@ -112,20 +110,12 @@ export function buildQuoteEmailMessage(
   if (!isEmail(to)) throw new Error("QUOTE_RECIPIENT_EMAIL_REQUIRED");
   if (input.pdfBytes.byteLength === 0) throw new Error("QUOTE_EMAIL_SEND_FAILED");
 
-  const greeting = input.recipientName.trim()
-    ? `Bonjour ${input.recipientName.trim()},`
-    : "Bonjour,";
-  const subject = `Devis ${input.quoteNumber} - ${input.affairName.trim() || input.quoteSubject}`;
-  const body = [
-    greeting,
-    "",
-    `Veuillez trouver ci-joint notre devis ${input.quoteNumber} concernant ${input.quoteSubject}.`,
-    "",
-    "Bien cordialement,",
-    "PAPOT AGENCEMENT",
-  ].join("\n");
+  const subject = headerValue(input.subject);
+  const body = input.body.trim();
+  if (!subject || !body) throw new Error("QUOTE_EMAIL_CONTENT_REQUIRED");
+
   const boundary = `papot-${randomUUID()}`;
-  const domain = policy.fromEmail.split("@")[1] || "papot.app";
+  const domain = policy.fromEmail.split("@")[1] || "papot.eu";
   const fileName = headerValue(input.pdfFileName);
   const fallbackFileName = asciiFileName(fileName);
 
@@ -309,9 +299,9 @@ async function sendSmtpMessage(params: {
 
 export async function sendQuoteEmail(
   input: QuoteEmailInput,
+  policy: QuoteEmailPolicy,
   env: NodeJS.ProcessEnv = process.env,
 ): Promise<void> {
-  const policy = quoteEmailPolicyFromEnv(env);
   const message = buildQuoteEmailMessage(input, policy);
   const config = smtpConfigFromEnv(env);
 
