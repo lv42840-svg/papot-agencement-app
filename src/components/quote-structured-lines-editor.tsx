@@ -1652,6 +1652,7 @@ export function QuoteStructuredLinesEditor({
         {presentationItemId === line.id ? (
           <QuoteItemPresentationPanel
             quoteId={quote!.id}
+            quoteUpdatedAt={quote!.updatedAt}
             item={line}
             editable={editable}
             onSaved={onSaved}
