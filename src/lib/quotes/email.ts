@@ -49,9 +49,7 @@ function readAddress(value: string | undefined, fallback: string): string {
 
 type QuoteEmailEnv = Record<string, string | undefined>;
 
-export function quoteEmailPolicyFromEnv(
-  env: QuoteEmailEnv = process.env,
-): QuoteEmailPolicy {
+export function quoteEmailPolicyFromEnv(env: QuoteEmailEnv = process.env): QuoteEmailPolicy {
   return {
     fromEmail: readAddress(env.PAPOT_QUOTE_FROM_EMAIL, DEFAULT_QUOTE_FROM_EMAIL),
     ccEmail: readAddress(env.PAPOT_QUOTE_CC_EMAIL, DEFAULT_QUOTE_CC_EMAIL),
@@ -83,9 +81,9 @@ function encodeHeader(value: string): string {
 }
 
 function base64Lines(value: Uint8Array | string): string {
-  const encoded = Buffer.from(value instanceof Uint8Array ? value : Buffer.from(value, "utf8")).toString(
-    "base64",
-  );
+  const encoded = Buffer.from(
+    value instanceof Uint8Array ? value : Buffer.from(value, "utf8"),
+  ).toString("base64");
   return encoded.match(/.{1,76}/g)?.join("\r\n") ?? "";
 }
 
@@ -247,9 +245,7 @@ async function smtpCommand(
 }
 
 function dotStuff(raw: string): string {
-  return raw
-    .replace(/\r?\n/g, "\r\n")
-    .replace(/(^|\r\n)\./g, "$1..");
+  return raw.replace(/\r?\n/g, "\r\n").replace(/(^|\r\n)\./g, "$1..");
 }
 
 async function sendSmtpMessage(params: {
