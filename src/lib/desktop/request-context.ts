@@ -4,7 +4,13 @@ import { getCurrentUser } from "@/lib/auth/session";
 import { hasModuleAccess, type AccessLevel } from "@/lib/auth/permissions";
 import { createDesktopSharedResourceRuntime } from "@/lib/desktop/shared-resource-runtime";
 
-export type ModuleRequestContext = {
+export type DesktopRequestContext = {
+  desktop: ReturnType<typeof createDesktopSharedResourceRuntime>;
+  owner: {
+    userId: string;
+    deviceId: string;
+    displayName: string;
+  };
   user: NonNullable<Awaited<ReturnType<typeof getCurrentUser>>>;
   moduleAccess: {
     canRead: boolean;
@@ -12,19 +18,10 @@ export type ModuleRequestContext = {
   };
 };
 
-export type DesktopRequestContext = ModuleRequestContext & {
-  desktop: ReturnType<typeof createDesktopSharedResourceRuntime>;
-  owner: {
-    userId: string;
-    deviceId: string;
-    displayName: string;
-  };
-};
-
-export async function requireModuleRequestContext(
+export async function requireDesktopRequestContext(
   moduleKey: string,
   required: AccessLevel,
-): Promise<ModuleRequestContext> {
+): Promise<DesktopRequestContext> {
   const user = await getCurrentUser();
   if (!user) throw new Error("AUTH_REQUIRED");
   if (user.mustChangePassword) throw new Error("PASSWORD_CHANGE_REQUIRED");
@@ -36,26 +33,15 @@ export async function requireModuleRequestContext(
     throw new Error("MODULE_FORBIDDEN");
   }
 
+  const desktop = createDesktopSharedResourceRuntime();
   return {
+    desktop,
     user,
     moduleAccess: { canRead, canWrite },
-  };
-}
-
-export async function requireDesktopRequestContext(
-  moduleKey: string,
-  required: AccessLevel,
-): Promise<DesktopRequestContext> {
-  const base = await requireModuleRequestContext(moduleKey, required);
-  const desktop = createDesktopSharedResourceRuntime();
-
-  return {
-    ...base,
-    desktop,
     owner: {
-      userId: base.user.id,
+      userId: user.id,
       deviceId: desktop.deviceId,
-      displayName: base.user.displayName,
+      displayName: user.displayName,
     },
   };
 }
