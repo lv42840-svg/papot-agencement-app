@@ -47,8 +47,10 @@ function readAddress(value: string | undefined, fallback: string): string {
   return normalized;
 }
 
+type QuoteEmailEnv = Record<string, string | undefined>;
+
 export function quoteEmailPolicyFromEnv(
-  env: NodeJS.ProcessEnv = process.env,
+  env: QuoteEmailEnv = process.env,
 ): QuoteEmailPolicy {
   return {
     fromEmail: readAddress(env.PAPOT_QUOTE_FROM_EMAIL, DEFAULT_QUOTE_FROM_EMAIL),
@@ -57,7 +59,7 @@ export function quoteEmailPolicyFromEnv(
   };
 }
 
-function smtpConfigFromEnv(env: NodeJS.ProcessEnv = process.env): SmtpConfig {
+function smtpConfigFromEnv(env: QuoteEmailEnv = process.env): SmtpConfig {
   const host = env.PAPOT_SMTP_HOST?.trim() ?? "";
   const user = env.PAPOT_SMTP_USER?.trim() ?? "";
   const password = env.PAPOT_SMTP_PASSWORD ?? "";
@@ -300,7 +302,7 @@ async function sendSmtpMessage(params: {
 export async function sendQuoteEmail(
   input: QuoteEmailInput,
   policy: QuoteEmailPolicy,
-  env: NodeJS.ProcessEnv = process.env,
+  env: QuoteEmailEnv = process.env,
 ): Promise<void> {
   const message = buildQuoteEmailMessage(input, policy);
   const config = smtpConfigFromEnv(env);
