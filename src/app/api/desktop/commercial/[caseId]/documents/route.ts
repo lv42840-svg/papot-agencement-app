@@ -82,11 +82,16 @@ export async function POST(request: Request, context: RouteContext) {
     const variantLabel = String(form.get("variantLabel") ?? "").trim();
     const isCurrent = String(form.get("isCurrent") ?? "1") !== "0";
     const isSignedQuote = String(form.get("isSignedQuote") ?? "0") === "1";
+    const expectedUpdatedAt = String(form.get("expectedUpdatedAt") ?? "").trim();
+    if (!expectedUpdatedAt) throw new Error("COMMERCIAL_VERSION_REQUIRED");
 
     const currentPayload = await repository.load();
     const item = currentPayload.cases.find((candidate) => candidate.id === caseId);
     if (!item) {
       return NextResponse.json({ error: "COMMERCIAL_CASE_NOT_FOUND" }, { status: 404 });
+    }
+    if (item.updatedAt !== expectedUpdatedAt) {
+      throw new Error("COMMERCIAL_VERSION_CONFLICT");
     }
 
     const creationYear = new Date(item.createdAt).getFullYear();
@@ -103,9 +108,16 @@ export async function POST(request: Request, context: RouteContext) {
         options: { category, versionLabel, variantLabel, isCurrent, isSignedQuote },
       });
 
-      const mutation = await repository.mutate((payload) =>
-        registerCommercialDocuments(payload, caseId, uploaded, actor),
-      );
+      const mutation = await repository.mutate((payload) => {
+        const current = payload.cases.find(
+          (candidate) => candidate.id === caseId,
+        );
+        if (!current) throw new Error("COMMERCIAL_CASE_NOT_FOUND");
+        if (current.updatedAt !== expectedUpdatedAt) {
+          throw new Error("COMMERCIAL_VERSION_CONFLICT");
+        }
+        return registerCommercialDocuments(payload, caseId, uploaded, actor);
+      });
 
       return NextResponse.json(await snapshot(mutation.payload, owner, user, clients, caseId), {
         headers: { "Cache-Control": "no-store" },
