@@ -31,11 +31,7 @@ import {
   type ChantiersPayload,
 } from "@/lib/chantiers/domain";
 import type { ChantierCapabilities } from "@/lib/chantiers/mutations";
-import {
-  clientDisplayName,
-  type ClientRecord,
-  type ClientsPayload,
-} from "@/lib/clients/domain";
+import { clientDisplayName, type ClientRecord, type ClientsPayload } from "@/lib/clients/domain";
 import type {
   CommercialCase,
   CommercialDocument,
@@ -415,29 +411,23 @@ function ClientTab({
     null;
   const sourceClientName = clientRecord
     ? clientDisplayName(clientRecord)
-    : chantier.clientName ?? "";
+    : (chantier.clientName ?? "");
   const sourceCompanyName =
     clientRecord && clientRecord.type !== "PARTICULIER"
       ? clientRecord.companyName
-      : chantier.companyName ?? "";
+      : (chantier.companyName ?? "");
   const sourceContactName = primaryContact
     ? [primaryContact.firstName, primaryContact.lastName].filter(Boolean).join(" ")
-    : chantier.contactName ?? "";
-  const sourcePhone =
-    primaryContact?.phone || clientRecord?.phone || chantier.contactPhone || "";
-  const sourceEmail =
-    primaryContact?.email || clientRecord?.email || chantier.contactEmail || "";
+    : (chantier.contactName ?? "");
+  const sourcePhone = primaryContact?.phone || clientRecord?.phone || chantier.contactPhone || "";
+  const sourceEmail = primaryContact?.email || clientRecord?.email || chantier.contactEmail || "";
 
   const [editing, setEditing] = useState(false);
-  const [reference, setReference] = useState(
-    chantier.reference ?? commercialCase?.name ?? "",
-  );
+  const [reference, setReference] = useState(chantier.reference ?? commercialCase?.name ?? "");
   const [name, setName] = useState(chantier.name);
   const [clientName, setClientName] = useState(sourceClientName);
   const [companyName, setCompanyName] = useState(sourceCompanyName);
-  const [siteLabel, setSiteLabel] = useState(
-    chantier.siteLabel ?? commercialCase?.siteLabel ?? "",
-  );
+  const [siteLabel, setSiteLabel] = useState(chantier.siteLabel ?? commercialCase?.siteLabel ?? "");
   const [contactName, setContactName] = useState(sourceContactName);
   const [contactPhone, setContactPhone] = useState(sourcePhone);
   const [contactEmail, setContactEmail] = useState(sourceEmail);
