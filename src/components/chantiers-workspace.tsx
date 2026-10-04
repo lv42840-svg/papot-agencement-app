@@ -49,7 +49,7 @@ const errorMessages: Record<string, string> = {
   CHANTIER_QUOTE_DECLARATION_REQUIRED: "Indique explicitement que tu n'as pas le devis client.",
   CHANTIER_SIGNED_QUOTE_DECLARATION_REQUIRED:
     "Indique explicitement que tu n'as pas le devis signé.",
-  CHANTIER_COSTING_DECLARATION_REQUIRED: "Indique explicitement que tu n'as pas le déboursé OBAT.",
+  CHANTIER_COSTING_DECLARATION_REQUIRED: "Indique explicitement que tu n'as pas le déboursé.",
 };
 
 function normalize(value: string): string {
@@ -428,7 +428,7 @@ function LaunchSheet({
           onChange={setSignedQuoteMissing}
         />
         <LaunchDocument
-          label="Déboursé OBAT"
+          label="Déboursé"
           present={costingPresent}
           checked={costingMissing}
           onChange={setCostingMissing}
@@ -469,8 +469,7 @@ function LaunchSheet({
       </div>
       <p className="launchHint">
         Les heures sont initialisées depuis la charge commerciale lorsqu&apos;elle existe.
-        L&apos;import automatique du déboursé OBAT sera raccordé au parseur dédié, sans double
-        saisie à terme.
+        Le déboursé est géré directement dans PAPOT, sans dépendance à un outil externe.
       </p>
 
       <button
