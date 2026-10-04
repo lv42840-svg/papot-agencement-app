@@ -2,8 +2,13 @@ import { NextResponse } from "next/server";
 import { z } from "zod";
 import {
   desktopRequestErrorStatus,
-  requireDesktopRequestContext,
+  requireModuleRequestContext,
 } from "@/lib/desktop/request-context";
+import {
+  assertQuoteRevision,
+  expectedQuoteRevision,
+  quoteConcurrencyStatus,
+} from "@/lib/quotes/concurrency";
 import { createQuotesRepository } from "@/lib/quotes/create-repository";
 import { createQuoteVariant, createQuoteVersion, duplicateQuote } from "@/lib/quotes/lifecycle";
 
@@ -21,6 +26,8 @@ const lifecycleSchema = z
 function statusFor(code: string): number {
   const requestStatus = desktopRequestErrorStatus(code);
   if (requestStatus) return requestStatus;
+  const concurrencyStatus = quoteConcurrencyStatus(code);
+  if (concurrencyStatus) return concurrencyStatus;
   if (code === "QUOTE_NOT_FOUND") return 404;
   if (
     code === "QUOTE_VERSION_SOURCE_OUTDATED" ||
@@ -35,14 +42,16 @@ function statusFor(code: string): number {
 export async function POST(request: Request, context: RouteContext) {
   try {
     const { quoteId } = await context.params;
-    const requestContext = await requireDesktopRequestContext("quotes", "WRITE");
+    const requestContext = await requireModuleRequestContext("quotes", "WRITE");
     const input = lifecycleSchema.parse(await request.json());
     const actor = {
-      userId: requestContext.owner.userId,
-      displayName: requestContext.owner.displayName,
+      userId: requestContext.user.id,
+      displayName: requestContext.user.displayName,
     };
     const repository = createQuotesRepository();
+    const expectedRevision = expectedQuoteRevision(request);
     const mutation = await repository.mutate((payload) => {
+      assertQuoteRevision(payload, quoteId, expectedRevision);
       if (input.action === "createVersion") return createQuoteVersion(payload, quoteId, actor);
       if (input.action === "createVariant") return createQuoteVariant(payload, quoteId, actor);
       return duplicateQuote(payload, quoteId, actor);
