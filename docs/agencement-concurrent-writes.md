@@ -144,7 +144,7 @@ Des tests reproduisent notamment les scénarios A/B suivants :
 - chantier périmé ;
 - entrée périmée ;
 - devis périmé ;
-- planning périmé ;
+- planning : contrat de révision obligatoire surveillé par un test API ;
 - préférences personnelles : contrat API/UI vérifié.
 
 Les suites PostgreSQL existantes restent utilisées pour valider les repositories et les verrous transactionnels.
