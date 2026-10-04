@@ -54,6 +54,7 @@ function adjustmentValueLabel(adjustment: QuotePricingAdjustment): string {
 }
 
 function pricingErrorLabel(code: string): string {
+  if (code === "QUOTE_VERSION_CONFLICT") return "Ce devis a été modifié ailleurs. Recharge-le avant de recommencer.";
   if (code === "QUOTE_NOT_EDITABLE") return "Seul un brouillon peut être modifié.";
   if (code === "QUOTE_OPTION_TARGET_DUPLICATE") return "Cet élément est déjà une option.";
   if (code === "QUOTE_PASS_THROUGH_PERCENT_INVALID") {
