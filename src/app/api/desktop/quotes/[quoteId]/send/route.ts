@@ -103,10 +103,12 @@ export async function POST(request: Request, { params }: { params: Promise<{ quo
     };
     const now = new Date();
     const quotesRepository = createQuotesRepository();
-    const commercialRepository = createCommercialRepository(commercialContext);
-    const clientsRepository = await createClientsRepository(quoteContext);
+    const commercialRepository = createCommercialRepository();
+    const clientsRepository = await createClientsRepository();
     const companyProfileRepository = createCompanyProfileRepository();
-    const transport = await createCommercialDocumentTransport(quoteContext);
+    const transport = await createCommercialDocumentTransport({
+      displayName: quoteContext.user.displayName,
+    });
     const [clients, companyProfile, template] = await Promise.all([
       clientsRepository.load(),
       companyProfileRepository.load(),
