@@ -1,0 +1,30 @@
+name: Chantier lifecycle verification
+on:
+  push:
+    branches: [fix/chantier-cancel-close-20261004]
+    paths: [.github/workflows/chantier-lifecycle-once.yml]
+permissions:
+  contents: read
+jobs:
+  inspect:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+      - name: Inspect existing lifecycle dependencies
+        run: |
+          git grep -n -E 'ChantierStatus|status.*(DONE|ARCHIVED)|removeFirmPlanningForChantier|restoreFirmPlanningOrderForChantier' -- src/lib/planning src/components/planning* src/lib/chantiers src/lib/auth src/components/chantiers-workspace.tsx src/components/chantier-operational-workspace.tsx src/components/dashboard-chantier-stat.tsx tests/chantier* tests/planning* || true
+          python3 - <<'PY'
+          from pathlib import Path
+          import re
+          for name in ['src/lib/planning/mutations.ts','src/lib/planning/domain.ts','src/lib/chantiers/postgres-repository.ts','tests/chantiers-domain.test.ts','tests/chantier-close-reopen-permission-ui.test.ts','tests/chantier-lifecycle-warning-ui.test.ts']:
+              text=Path(name).read_text()
+              print('\nFILE '+name)
+              if 'planning/' not in name:
+                  print(text)
+                  continue
+              for match in re.finditer(r'export function (\w+)\(',text):
+                  if match.group(1) in ['removeFirmPlanningForChantier','restoreFirmPlanningOrderForChantier','buildChantierPlanningCloseWarning','buildPlanningRows','buildFirmPlanningRows']:
+                      end=text.find('\nexport ',match.start()+1)
+                      print(text[match.start():end if end!=-1 else len(text)])
+          PY
