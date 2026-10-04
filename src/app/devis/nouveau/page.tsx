@@ -5,7 +5,7 @@ import { clientDisplayName } from "@/lib/clients/domain";
 import { createCommercialRepository } from "@/lib/commercial/create-repository";
 import { commercialParisDateKey, isCommercialClosed } from "@/lib/commercial/domain";
 import { listCommercialAssignableUsers } from "@/lib/commercial/people";
-import { requireDesktopRequestContext } from "@/lib/desktop/request-context";
+import { requireModuleRequestContext } from "@/lib/desktop/request-context";
 import { nextChantierComplementVariantName } from "@/lib/quotes/chantier";
 import { createQuotesRepository } from "@/lib/quotes/create-repository";
 
@@ -17,9 +17,9 @@ export default async function NewQuotePage({
   searchParams: Promise<{ affaire?: string; chantier?: string }>;
 }) {
   const { affaire: requestedAffairId, chantier } = await searchParams;
-  const context = await requireDesktopRequestContext("quotes", "READ");
-  const commercialRepository = createCommercialRepository(context);
-  const clientsRepository = await createClientsRepository(context);
+  const context = await requireModuleRequestContext("quotes", "READ");
+  const commercialRepository = createCommercialRepository();
+  const clientsRepository = await createClientsRepository();
   const [commercial, clients, quoteOwners, quotes] = await Promise.all([
     commercialRepository.load(),
     clientsRepository.load(),
