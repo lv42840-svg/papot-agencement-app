@@ -2,12 +2,15 @@
 
 import { CheckCircle2, FileLock2, Send } from "lucide-react";
 import { type FormEvent, useState } from "react";
+import { quoteRevisionHeaders } from "@/lib/quotes/concurrency";
 import type { NativeQuoteRecord, NativeQuotesPayload } from "@/lib/quotes/store";
 
 type ApiResponse = { payload?: NativeQuotesPayload; error?: string };
 type FinalizeMode = "VALIDATE" | "SEND";
 
 function sendErrorLabel(code?: string): string {
+  if (code === "QUOTE_VERSION_CONFLICT")
+    return "Ce devis a été modifié ailleurs. Recharge-le avant de le valider ou de l’envoyer.";
   if (code === "MODULE_FORBIDDEN") {
     return "Droit de modification Devis et Commercial requis.";
   }
@@ -92,10 +95,14 @@ async function postFinalize(
   quoteId: string,
   mode: FinalizeMode,
   followUpDate: string,
+  updatedAt: string,
 ): Promise<NativeQuotesPayload> {
   const response = await fetch(`/api/desktop/quotes/${quoteId}/send`, {
     method: "POST",
-    headers: { "Content-Type": "application/json" },
+    headers: {
+      "Content-Type": "application/json",
+      ...quoteRevisionHeaders(updatedAt),
+    },
     body: JSON.stringify(mode === "SEND" ? { mode, followUpDate } : { mode }),
   });
   const data = (await response.json()) as ApiResponse;
@@ -125,37 +132,54 @@ export function QuoteSendAction({
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
   const [outlookOpenedWithoutAttachment, setOutlookOpenedWithoutAttachment] = useState(false);
+  const [manualPdfHref, setManualPdfHref] = useState("");
 
   function startMode(nextMode: FinalizeMode) {
     setError("");
     setOutlookOpenedWithoutAttachment(false);
+    setManualPdfHref("");
     setMode(nextMode);
   }
 
   function cancel() {
     setError("");
     setOutlookOpenedWithoutAttachment(false);
+    setManualPdfHref("");
     setMode(null);
   }
 
   async function openOutlook(validatedQuote: NativeQuoteRecord) {
     if (!validatedQuote.finalPdf) throw new Error("OUTLOOK_ATTACHMENT_NOT_FOUND");
-    const compose = window.papotDesktop?.composeOutlookMail;
-    if (!compose) throw new Error("OUTLOOK_DESKTOP_REQUIRED");
 
     const quoteNumber = validatedQuote.finalPdf.quoteNumber;
     const greeting = recipientName.trim() ? `Bonjour ${recipientName.trim()},` : "Bonjour,";
+    const subject = `Devis ${quoteNumber} - ${affairName}`;
+    const body = [
+      greeting,
+      "",
+      `Veuillez trouver ci-joint notre devis ${quoteNumber} concernant ${validatedQuote.model.subject}.`,
+      "",
+      "Bien cordialement,",
+    ].join("\n");
+
+    const compose = window.papotDesktop?.composeOutlookMail;
+    if (!compose) {
+      const downloadHref =
+        `/api/desktop/commercial/${encodeURIComponent(validatedQuote.commercialCaseId)}` +
+        `/documents/${encodeURIComponent(validatedQuote.finalPdf.commercialDocumentId)}?download=1`;
+      setManualPdfHref(downloadHref);
+      const mailto =
+        `mailto:${encodeURIComponent(recipientEmail.trim())}` +
+        `?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(body)}`;
+      window.location.href = mailto;
+      return { ok: true, attachmentAttached: false };
+    }
+
     const result = await compose({
       kind: "quote-email",
       to: recipientEmail.trim(),
-      subject: `Devis ${quoteNumber} - ${affairName}`,
-      body: [
-        greeting,
-        "",
-        `Veuillez trouver ci-joint notre devis ${quoteNumber} concernant ${validatedQuote.model.subject}.`,
-        "",
-        "Bien cordialement,",
-      ].join("\n"),
+      subject,
+      body,
       storagePath: validatedQuote.finalPdf.storagePath,
     });
     if (!result.ok) throw new Error(result.error);
@@ -174,14 +198,14 @@ export function QuoteSendAction({
     setError("");
     try {
       if (mode === "VALIDATE") {
-        const payload = await postFinalize(quote.id, "VALIDATE", "");
+        const payload = await postFinalize(quote.id, "VALIDATE", "", quote.updatedAt);
         onSaved(payload);
         setMode(null);
         return;
       }
 
       if (outlookOpenedWithoutAttachment) {
-        const sentPayload = await postFinalize(quote.id, "SEND", followUpDate);
+        const sentPayload = await postFinalize(quote.id, "SEND", followUpDate, quote.updatedAt);
         onSaved(sentPayload);
         setOutlookOpenedWithoutAttachment(false);
         setMode(null);
@@ -190,7 +214,7 @@ export function QuoteSendAction({
 
       let validatedQuote = quote;
       if (quote.status === "DRAFT") {
-        const validatedPayload = await postFinalize(quote.id, "VALIDATE", "");
+        const validatedPayload = await postFinalize(quote.id, "VALIDATE", "", quote.updatedAt);
         onSaved(validatedPayload);
         const nextQuote = validatedPayload.quotes.find((candidate) => candidate.id === quote.id);
         if (!nextQuote) throw new Error("QUOTE_NOT_FOUND");
@@ -208,12 +232,19 @@ export function QuoteSendAction({
       if (!outlookResult.attachmentAttached) {
         setOutlookOpenedWithoutAttachment(true);
         setError(
-          "Outlook est ouvert, mais cette version d’Outlook ne permet pas à PAPOT de joindre automatiquement le PDF. Ajoute le PDF, envoie le mail, puis clique « J’ai envoyé ».",
+          window.papotDesktop
+            ? "Outlook est ouvert, mais cette version d’Outlook ne permet pas à PAPOT de joindre automatiquement le PDF. Ajoute le PDF, envoie le mail, puis clique « J’ai envoyé »."
+            : "Le mail est ouvert dans ton client de messagerie. Télécharge le PDF ci-dessous, joins-le au mail, envoie-le, puis clique « J’ai envoyé ».",
         );
         return;
       }
 
-      const sentPayload = await postFinalize(quote.id, "SEND", followUpDate);
+      const sentPayload = await postFinalize(
+        quote.id,
+        "SEND",
+        followUpDate,
+        validatedQuote.updatedAt,
+      );
       onSaved(sentPayload);
       setMode(null);
     } catch (caught) {
@@ -247,7 +278,7 @@ export function QuoteSendAction({
         </div>
         {canWrite ? (
           <button type="button" className="primaryButton" onClick={() => startMode("SEND")}>
-            <Send size={15} aria-hidden="true" /> Envoyer avec Outlook
+            <Send size={15} aria-hidden="true" /> Envoyer
           </button>
         ) : null}
       </div>
@@ -278,10 +309,10 @@ export function QuoteSendAction({
         {mode === "VALIDATE"
           ? "Le PDF recevra son numéro définitif et sera figé. Le devis restera non envoyé."
           : outlookOpenedWithoutAttachment
-            ? "Outlook est déjà ouvert. Après l’envoi manuel, confirme simplement dans PAPOT."
+            ? "Le mail est déjà préparé. Après l’envoi manuel, confirme simplement dans PAPOT."
             : alreadyValidated
-              ? "Le PDF est déjà figé. PAPOT va ouvrir Outlook avec le devis joint."
-              : "Le PDF sera figé puis PAPOT ouvrira Outlook avec le devis joint."}
+              ? "Le PDF est déjà figé. PAPOT va préparer le mail d’envoi."
+              : "Le PDF sera figé puis PAPOT préparera le mail d’envoi."}
       </div>
       {mode === "SEND" ? (
         <>
@@ -295,8 +326,13 @@ export function QuoteSendAction({
             />
           </label>
           <div className="quoteNotice">
-            Destinataire Outlook : {recipientEmail.trim() || "à renseigner dans Outlook"}
+            Destinataire : {recipientEmail.trim() || "à renseigner dans le client mail"}
           </div>
+          {outlookOpenedWithoutAttachment && manualPdfHref ? (
+            <a className="secondaryButton quotePdfDownload" href={manualPdfHref} download>
+              Télécharger le PDF à joindre
+            </a>
+          ) : null}
         </>
       ) : null}
       {error ? <div className="quoteFormError">{error}</div> : null}
@@ -308,14 +344,14 @@ export function QuoteSendAction({
           {saving
             ? mode === "VALIDATE"
               ? "Validation du PDF…"
-              : "Ouverture d’Outlook…"
+              : "Préparation du mail…"
             : mode === "VALIDATE"
               ? "Confirmer la validation"
               : outlookOpenedWithoutAttachment
                 ? "J’ai envoyé"
                 : alreadyValidated
-                  ? "Ouvrir Outlook"
-                  : "Valider et ouvrir Outlook"}
+                  ? "Préparer l’envoi"
+                  : "Valider et préparer l’envoi"}
         </button>
       </div>
       <style jsx>{`
@@ -325,10 +361,15 @@ export function QuoteSendAction({
           gap: 8px;
           flex-wrap: wrap;
         }
-        .quoteFinalizeRow :global(button) {
+        .quoteFinalizeRow :global(button),
+        :global(.quotePdfDownload) {
           display: inline-flex;
           align-items: center;
           gap: 6px;
+        }
+        :global(.quotePdfDownload) {
+          width: fit-content;
+          text-decoration: none;
         }
       `}</style>
     </form>
