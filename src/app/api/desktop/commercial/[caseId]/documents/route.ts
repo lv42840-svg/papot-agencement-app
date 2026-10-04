@@ -13,7 +13,11 @@ import {
   uploadCommercialDocuments,
 } from "@/lib/commercial/document-storage";
 import { commercialDocumentCategorySchema, type CommercialPayload } from "@/lib/commercial/domain";
-import { listCommercialPeople, registerCommercialDocuments } from "@/lib/commercial/mutations";
+import {
+  assertCommercialRevision,
+  listCommercialPeople,
+  registerCommercialDocuments,
+} from "@/lib/commercial/mutations";
 import {
   desktopRequestErrorStatus,
   requireDesktopRequestContext,
@@ -90,9 +94,7 @@ export async function POST(request: Request, context: RouteContext) {
     if (!item) {
       return NextResponse.json({ error: "COMMERCIAL_CASE_NOT_FOUND" }, { status: 404 });
     }
-    if (item.updatedAt !== expectedUpdatedAt) {
-      throw new Error("COMMERCIAL_VERSION_CONFLICT");
-    }
+    assertCommercialRevision(item, expectedUpdatedAt);
 
     const creationYear = new Date(item.createdAt).getFullYear();
     const actor = { userId: owner.userId, displayName: owner.displayName };
@@ -113,9 +115,7 @@ export async function POST(request: Request, context: RouteContext) {
           (candidate) => candidate.id === caseId,
         );
         if (!current) throw new Error("COMMERCIAL_CASE_NOT_FOUND");
-        if (current.updatedAt !== expectedUpdatedAt) {
-          throw new Error("COMMERCIAL_VERSION_CONFLICT");
-        }
+        assertCommercialRevision(current, expectedUpdatedAt);
         return registerCommercialDocuments(payload, caseId, uploaded, actor);
       });
 
