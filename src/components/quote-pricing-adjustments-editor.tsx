@@ -2,6 +2,7 @@
 
 import { Plus, Trash2 } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
+import { quoteRevisionHeaders } from "@/lib/quotes/concurrency";
 import {
   calculateQuoteAdjustedPricing,
   type QuotePricingAdjustment,
@@ -85,10 +86,16 @@ function pricingWarningLabel(code: string): string {
   return "Un ajustement de chiffrage nécessite une vérification.";
 }
 
-async function postPricing(body: Record<string, unknown>): Promise<NativeQuotesPayload> {
+async function postPricing(
+  body: Record<string, unknown>,
+  updatedAt: string,
+): Promise<NativeQuotesPayload> {
   const response = await fetch("/api/desktop/quotes/pricing", {
     method: "POST",
-    headers: { "Content-Type": "application/json" },
+    headers: {
+      "Content-Type": "application/json",
+      ...quoteRevisionHeaders(updatedAt),
+    },
     body: JSON.stringify(body),
   });
   const data = (await response.json()) as PricingApiResponse;
@@ -108,6 +115,8 @@ export function QuotePricingAdjustmentsEditor({
   onSaved: (payload: NativeQuotesPayload) => void;
 }) {
   const editable = canWrite && quote.status === "DRAFT";
+  const postPricingForQuote = (body: Record<string, unknown>) =>
+    postPricing(body, quote.updatedAt);
   const [kind, setKind] = useState<"PERCENTAGE" | "POSE_HOURS" | "HOTEL">("PERCENTAGE");
   const [label, setLabel] = useState("Commission architecte");
   const [value, setValue] = useState("5");
@@ -179,7 +188,7 @@ export function QuotePricingAdjustmentsEditor({
 
   async function saveAdjustment(adjustment: QuotePricingAdjustment) {
     onSaved(
-      await postPricing({
+      await postPricingForQuote({
         action: "upsertAdjustment",
         quoteId: quote.id,
         adjustment,
@@ -237,7 +246,7 @@ export function QuotePricingAdjustmentsEditor({
           ? { kind: "PERCENTAGE" as const, percent: parseNumber(discountValue) }
           : { kind: "AMOUNT" as const, amountCents: parseMoneyCents(discountValue) };
       onSaved(
-        await postPricing({
+        await postPricingForQuote({
           action: "setCustomerDiscount",
           quoteId: quote.id,
           discount,
@@ -256,7 +265,7 @@ export function QuotePricingAdjustmentsEditor({
     setSavingDiscount(true);
     try {
       onSaved(
-        await postPricing({
+        await postPricingForQuote({
           action: "clearCustomerDiscount",
           quoteId: quote.id,
         }),
@@ -283,7 +292,7 @@ export function QuotePricingAdjustmentsEditor({
     setError("");
     try {
       onSaved(
-        await postPricing({
+        await postPricingForQuote({
           action: "removeAdjustment",
           quoteId: quote.id,
           adjustmentId,
