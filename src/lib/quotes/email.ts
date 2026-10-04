@@ -50,21 +50,13 @@ export function quoteEmailPolicyFromEnv(env: QuoteEmailEnv = process.env): Quote
 
 function smtpConfigFromEnv(env: QuoteEmailEnv = process.env): SmtpConfig {
   const host = env.PAPOT_SMTP_HOST?.trim() ?? "";
-  const username =
-    env.PAPOT_SMTP_USERNAME?.trim() || env.PAPOT_SMTP_USER?.trim() || "";
+  const username = env.PAPOT_SMTP_USERNAME?.trim() || env.PAPOT_SMTP_USER?.trim() || "";
   const password = env.PAPOT_SMTP_PASSWORD ?? "";
   const portRaw = env.PAPOT_SMTP_PORT?.trim() || "587";
   const port = Number(portRaw);
   const secure = (env.PAPOT_SMTP_SECURE?.trim() || "false").toLowerCase() === "true";
 
-  if (
-    !host ||
-    !username ||
-    !password ||
-    !Number.isInteger(port) ||
-    port < 1 ||
-    port > 65535
-  ) {
+  if (!host || !username || !password || !Number.isInteger(port) || port < 1 || port > 65535) {
     throw new Error("QUOTE_EMAIL_NOT_CONFIGURED");
   }
 
@@ -191,11 +183,7 @@ function readResponse(socket: net.Socket): Promise<string> {
   });
 }
 
-async function command(
-  socket: net.Socket,
-  line: string,
-  expected: number[],
-): Promise<string> {
+async function command(socket: net.Socket, line: string, expected: number[]): Promise<string> {
   socket.write(line + "\r\n");
   const response = await readResponse(socket);
   const code = Number(response.slice(0, 3));
@@ -260,16 +248,8 @@ async function sendSmtpMessage(params: {
 
     await command(socket, "EHLO papot.app", [250]);
     await command(socket, "AUTH LOGIN", [334]);
-    await command(
-      socket,
-      Buffer.from(params.config.username, "utf8").toString("base64"),
-      [334],
-    );
-    await command(
-      socket,
-      Buffer.from(params.config.password, "utf8").toString("base64"),
-      [235],
-    );
+    await command(socket, Buffer.from(params.config.username, "utf8").toString("base64"), [334]);
+    await command(socket, Buffer.from(params.config.password, "utf8").toString("base64"), [235]);
     await command(socket, `MAIL FROM:<${params.envelopeFrom}>`, [250]);
 
     for (const recipient of params.recipients) {
