@@ -18,6 +18,15 @@ describe("Affaire to Devis web flow", () => {
     expect(newQuotePage).toContain("createClientsRepository()");
   });
 
+  it("allows explicit payment terms when the provisional client has none", () => {
+    expect(
+      readFileSync(
+        new URL("../src/components/quote-create-workspace.tsx", import.meta.url),
+        "utf-8",
+      ),
+    ).toContain("Saisir les conditions de règlement");
+  });
+
   it("preserves the displayed Affaire revision and exposes Create quote", () => {
     expect(commercialV2).toContain("expectedUpdatedAt: selected.updatedAt");
     expect(commercialV2).toContain('form.set("expectedUpdatedAt", expectedUpdatedAt)');
