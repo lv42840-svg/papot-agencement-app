@@ -4,6 +4,11 @@ import {
   desktopRequestErrorStatus,
   requireDesktopRequestContext,
 } from "@/lib/desktop/request-context";
+import {
+  assertQuoteRevision,
+  expectedQuoteRevision,
+  quoteConcurrencyStatus,
+} from "@/lib/quotes/concurrency";
 import { createQuotesRepository } from "@/lib/quotes/create-repository";
 import {
   applyQuotePricingMutation,
@@ -27,6 +32,8 @@ function publicSnapshot(payload: NativeQuotesPayload, canWrite: boolean, focusQu
 function errorStatus(code: string): number {
   const requestStatus = desktopRequestErrorStatus(code);
   if (requestStatus) return requestStatus;
+  const concurrencyStatus = quoteConcurrencyStatus(code);
+  if (concurrencyStatus) return concurrencyStatus;
   if (
     code === "QUOTE_NOT_FOUND" ||
     code === "QUOTE_LINE_NOT_FOUND" ||
@@ -44,9 +51,11 @@ export async function POST(request: Request) {
     const context = await requireDesktopRequestContext("quotes", "WRITE");
     const actor = { userId: context.user.id, displayName: context.user.displayName };
     const repository = createQuotesRepository();
-    const mutation = await repository.mutate((payload) =>
-      applyQuotePricingMutation(payload, input, actor),
-    );
+    const expectedRevision = expectedQuoteRevision(request);
+    const mutation = await repository.mutate((payload) => {
+      assertQuoteRevision(payload, input.quoteId, expectedRevision);
+      return applyQuotePricingMutation(payload, input, actor);
+    });
 
     return noStoreJson(
       publicSnapshot(mutation.payload, context.moduleAccess.canWrite, mutation.focusQuoteId),
