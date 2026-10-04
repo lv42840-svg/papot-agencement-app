@@ -6,6 +6,10 @@ import {
   DEFAULT_QUOTE_REPLY_TO_EMAIL,
   quoteEmailPolicyFromEnv,
 } from "../src/lib/quotes/email";
+import {
+  createDefaultQuoteEmailSettings,
+  renderQuoteEmailTemplate,
+} from "../src/lib/quote-email-settings/domain";
 
 describe("quote transactional email", () => {
   it("uses PAPOT noreply with contact copied and as reply-to", () => {
@@ -20,16 +24,18 @@ describe("quote transactional email", () => {
     expect(policy.replyToEmail).toBe("contact@papot.eu");
   });
 
-  it("builds a PDF email with the customer and contact copy in the envelope", () => {
-    const message = buildQuoteEmailMessage({
-      to: "client@example.com",
-      recipientName: "Mme Client",
-      quoteNumber: "D-2026-0042",
-      affairName: "Accueil mairie",
-      quoteSubject: "Agencement accueil",
-      pdfFileName: "Devis D-2026-0042.pdf",
-      pdfBytes: new Uint8Array([37, 80, 68, 70]),
-    });
+  it("builds a PDF email with edited content", () => {
+    const policy = quoteEmailPolicyFromEnv({});
+    const message = buildQuoteEmailMessage(
+      {
+        to: "client@example.com",
+        subject: "Devis D-2026-0042 - Accueil mairie",
+        body: "Bonjour Mme Client,\n\nVoici votre devis.",
+        pdfFileName: "Devis D-2026-0042.pdf",
+        pdfBytes: new Uint8Array([37, 80, 68, 70]),
+      },
+      policy,
+    );
 
     expect(message.envelopeFrom).toBe("noreply@papot.eu");
     expect(message.recipients).toEqual(["client@example.com", "contact@papot.eu"]);
@@ -40,17 +46,31 @@ describe("quote transactional email", () => {
     expect(message.raw).toContain("Content-Type: application/pdf");
   });
 
+  it("renders the shared model with quote variables", () => {
+    const settings = createDefaultQuoteEmailSettings();
+    const subject = renderQuoteEmailTemplate(settings.subjectTemplate, {
+      AFFAIRE: "Accueil mairie",
+      BONJOUR: "Bonjour Mme Client,",
+      CLIENT: "Mairie",
+      CONTACT: "Mme Client",
+      NUM_DEVIS: "D-2026-0042",
+      OBJET_DEVIS: "Agencement accueil",
+    });
+    expect(subject).toBe("Devis D-2026-0042 - Accueil mairie");
+  });
+
   it("refuses to send without a customer email", () => {
     expect(() =>
-      buildQuoteEmailMessage({
-        to: "",
-        recipientName: "",
-        quoteNumber: "D-2026-0042",
-        affairName: "Accueil mairie",
-        quoteSubject: "Agencement accueil",
-        pdfFileName: "devis.pdf",
-        pdfBytes: new Uint8Array([1]),
-      }),
+      buildQuoteEmailMessage(
+        {
+          to: "",
+          subject: "Devis",
+          body: "Bonjour",
+          pdfFileName: "devis.pdf",
+          pdfBytes: new Uint8Array([1]),
+        },
+        quoteEmailPolicyFromEnv({}),
+      ),
     ).toThrow("QUOTE_RECIPIENT_EMAIL_REQUIRED");
   });
 });
