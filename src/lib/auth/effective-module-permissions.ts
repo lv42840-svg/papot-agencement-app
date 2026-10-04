@@ -5,9 +5,7 @@ export type ModuleAccessUser = {
   modulePermissions: Record<string, AccessLevel>;
 };
 
-export function effectiveModulePermissions(
-  user: ModuleAccessUser,
-): Record<string, AccessLevel> {
+export function effectiveModulePermissions(user: ModuleAccessUser): Record<string, AccessLevel> {
   const permissions = { ...user.modulePermissions };
 
   if (user.canManagePermissions && !permissions.quotes) {
