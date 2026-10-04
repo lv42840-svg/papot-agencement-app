@@ -73,7 +73,9 @@ function errorStatus(code: string): number {
   if (code === "QUOTE_FINAL_PDF_ARCHIVE_CONFLICT") return 409;
   if (code === "SERVER_FILE_ROOT_UNAVAILABLE" || code === "QUOTE_EMAIL_NOT_CONFIGURED") return 503;
   if (code === "QUOTE_EMAIL_SEND_FAILED") return 502;
-  if (code === "QUOTE_RECIPIENT_EMAIL_REQUIRED" || code === "QUOTE_EMAIL_CONTENT_REQUIRED") return 400;
+  if (code === "QUOTE_RECIPIENT_EMAIL_REQUIRED" || code === "QUOTE_EMAIL_CONTENT_REQUIRED") {
+    return 400;
+  }
   if (
     code.startsWith("PDF_") ||
     code.startsWith("QUOTE_WORD_V2_TEMPLATE_") ||

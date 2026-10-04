@@ -2,7 +2,7 @@ import { randomUUID } from "node:crypto";
 import { once } from "node:events";
 import * as tls from "node:tls";
 
-export const DEFAULT_QUOTE_FROM_EMAIL = "noreply@papot.eu";
+export const DEFAULT_QUOTE_FROM_EMAIL = "noreply@papot.app";
 export const DEFAULT_QUOTE_CC_EMAIL = "contact@papot.eu";
 export const DEFAULT_QUOTE_REPLY_TO_EMAIL = "contact@papot.eu";
 
@@ -49,9 +49,7 @@ function readAddress(value: string | undefined, fallback: string): string {
 
 type QuoteEmailEnv = Record<string, string | undefined>;
 
-export function quoteEmailPolicyFromEnv(
-  env: QuoteEmailEnv = process.env,
-): QuoteEmailPolicy {
+export function quoteEmailPolicyFromEnv(env: QuoteEmailEnv = process.env): QuoteEmailPolicy {
   return {
     fromEmail: readAddress(env.PAPOT_QUOTE_FROM_EMAIL, DEFAULT_QUOTE_FROM_EMAIL),
     ccEmail: readAddress(env.PAPOT_QUOTE_CC_EMAIL, DEFAULT_QUOTE_CC_EMAIL),
@@ -83,9 +81,9 @@ function encodeHeader(value: string): string {
 }
 
 function base64Lines(value: Uint8Array | string): string {
-  const encoded = Buffer.from(value instanceof Uint8Array ? value : Buffer.from(value, "utf8")).toString(
-    "base64",
-  );
+  const encoded = Buffer.from(
+    value instanceof Uint8Array ? value : Buffer.from(value, "utf8"),
+  ).toString("base64");
   return encoded.match(/.{1,76}/g)?.join("\r\n") ?? "";
 }
 
@@ -117,7 +115,7 @@ export function buildQuoteEmailMessage(
   if (!subject || !body) throw new Error("QUOTE_EMAIL_CONTENT_REQUIRED");
 
   const boundary = `papot-${randomUUID()}`;
-  const domain = policy.fromEmail.split("@")[1] || "papot.eu";
+  const domain = policy.fromEmail.split("@")[1] || "papot.app";
   const fileName = headerValue(input.pdfFileName);
   const fallbackFileName = asciiFileName(fileName);
 
@@ -247,9 +245,7 @@ async function smtpCommand(
 }
 
 function dotStuff(raw: string): string {
-  return raw
-    .replace(/\r?\n/g, "\r\n")
-    .replace(/(^|\r\n)\./g, "$1..");
+  return raw.replace(/\r?\n/g, "\r\n").replace(/(^|\r\n)\./g, "$1..");
 }
 
 async function sendSmtpMessage(params: {
@@ -270,14 +266,11 @@ async function sendSmtpMessage(params: {
   try {
     await once(socket, "secureConnect");
     assertResponse(await reader.read(), [220]);
-    await smtpCommand(socket, reader, "EHLO papot.eu", [250]);
+    await smtpCommand(socket, reader, "EHLO papot.app", [250]);
     await smtpCommand(socket, reader, "AUTH LOGIN", [334]);
-    await smtpCommand(
-      socket,
-      reader,
-      Buffer.from(params.config.user, "utf8").toString("base64"),
-      [334],
-    );
+    await smtpCommand(socket, reader, Buffer.from(params.config.user, "utf8").toString("base64"), [
+      334,
+    ]);
     await smtpCommand(
       socket,
       reader,

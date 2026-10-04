@@ -19,7 +19,7 @@ describe("quote transactional email", () => {
       ccEmail: DEFAULT_QUOTE_CC_EMAIL,
       replyToEmail: DEFAULT_QUOTE_REPLY_TO_EMAIL,
     });
-    expect(policy.fromEmail).toBe("noreply@papot.eu");
+    expect(policy.fromEmail).toBe("noreply@papot.app");
     expect(policy.ccEmail).toBe("contact@papot.eu");
     expect(policy.replyToEmail).toBe("contact@papot.eu");
   });
@@ -37,9 +37,9 @@ describe("quote transactional email", () => {
       policy,
     );
 
-    expect(message.envelopeFrom).toBe("noreply@papot.eu");
+    expect(message.envelopeFrom).toBe("noreply@papot.app");
     expect(message.recipients).toEqual(["client@example.com", "contact@papot.eu"]);
-    expect(message.raw).toContain("From: PAPOT AGENCEMENT <noreply@papot.eu>");
+    expect(message.raw).toContain("From: PAPOT AGENCEMENT <noreply@papot.app>");
     expect(message.raw).toContain("To: client@example.com");
     expect(message.raw).toContain("Cc: contact@papot.eu");
     expect(message.raw).toContain("Reply-To: contact@papot.eu");
