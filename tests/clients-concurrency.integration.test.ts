@@ -116,6 +116,9 @@ describeWithPostgres("Clients PostgreSQL concurrency", () => {
       "12345678901234",
     );
     await seedRepository.mutate(input, actorA);
+    const opened = (await seedRepository.load()).clients.find(
+      (client) => client.id === input.clientId,
+    )!;
 
     const connectionIds = new Set<number>();
     const waitAtSnapshot = createTwoPartyBarrier();
@@ -124,8 +127,24 @@ describeWithPostgres("Clients PostgreSQL concurrency", () => {
     const repositoryB = createPostgresClientsRepository(synchronizedPool);
 
     const results = await Promise.allSettled([
-      repositoryA.mutate({ ...input, action: "update", companyName: "Version poste A" }, actorA),
-      repositoryB.mutate({ ...input, action: "update", companyName: "Version poste B" }, actorB),
+      repositoryA.mutate(
+        {
+          ...input,
+          action: "update",
+          expectedUpdatedAt: opened.updatedAt,
+          companyName: "Version poste A",
+        },
+        actorA,
+      ),
+      repositoryB.mutate(
+        {
+          ...input,
+          action: "update",
+          expectedUpdatedAt: opened.updatedAt,
+          companyName: "Version poste B",
+        },
+        actorB,
+      ),
     ]);
 
     const fulfilled = results.filter((result) => result.status === "fulfilled");
@@ -146,6 +165,47 @@ describeWithPostgres("Clients PostgreSQL concurrency", () => {
     expect(["Version poste A", "Version poste B"]).toContain(row.rows[0]?.company_name);
   });
 
+  it("rejects an edit submitted from a stale browser screen", async () => {
+    const repository = createPostgresClientsRepository(pool);
+    const input = clientInput(
+      "66666666-6666-4666-8666-666666666666",
+      "Client original",
+      "11112222333344",
+    );
+    await repository.mutate(input, actorA);
+    const opened = (await repository.load()).clients.find(
+      (client) => client.id === input.clientId,
+    )!;
+
+    await repository.mutate(
+      {
+        ...input,
+        action: "update",
+        expectedUpdatedAt: opened.updatedAt,
+        phone: "06 11 22 33 44",
+      },
+      actorA,
+    );
+
+    await expect(
+      repository.mutate(
+        {
+          ...input,
+          action: "update",
+          expectedUpdatedAt: opened.updatedAt,
+          addressLine1: "99 rue périmée",
+        },
+        actorB,
+      ),
+    ).rejects.toThrow("CLIENTS_VERSION_CONFLICT");
+
+    const current = (await repository.load()).clients.find(
+      (client) => client.id === input.clientId,
+    )!;
+    expect(current.phone).toBe("06 11 22 33 44");
+    expect(current.addressLine1).toBe("12 rue des Ateliers");
+  });
+
   it("allows two simultaneous edits when they target different clients", async () => {
     const seedRepository = createPostgresClientsRepository(pool);
     const inputA = clientInput(
@@ -160,6 +220,9 @@ describeWithPostgres("Clients PostgreSQL concurrency", () => {
     );
     await seedRepository.mutate(inputA, actorA);
     await seedRepository.mutate(inputB, actorB);
+    const opened = await seedRepository.load();
+    const openedA = opened.clients.find((client) => client.id === inputA.clientId)!;
+    const openedB = opened.clients.find((client) => client.id === inputB.clientId)!;
 
     const connectionIds = new Set<number>();
     const waitAtSnapshot = createTwoPartyBarrier();
@@ -168,8 +231,24 @@ describeWithPostgres("Clients PostgreSQL concurrency", () => {
     const repositoryB = createPostgresClientsRepository(synchronizedPool);
 
     const [resultA, resultB] = await Promise.all([
-      repositoryA.mutate({ ...inputA, action: "update", companyName: "Client A modifié" }, actorA),
-      repositoryB.mutate({ ...inputB, action: "update", companyName: "Client B modifié" }, actorB),
+      repositoryA.mutate(
+        {
+          ...inputA,
+          action: "update",
+          expectedUpdatedAt: openedA.updatedAt,
+          companyName: "Client A modifié",
+        },
+        actorA,
+      ),
+      repositoryB.mutate(
+        {
+          ...inputB,
+          action: "update",
+          expectedUpdatedAt: openedB.updatedAt,
+          companyName: "Client B modifié",
+        },
+        actorB,
+      ),
     ]);
 
     expect(connectionIds.size).toBe(2);
