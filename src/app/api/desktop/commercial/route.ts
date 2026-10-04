@@ -321,14 +321,7 @@ export async function POST(request: Request) {
 
     console.info("[PAPOT][Commercial] POST saved", { ms: Date.now() - startedAt });
     return noStoreJson(
-      await snapshot(
-        mutation.payload,
-        owner,
-        true,
-        context.user,
-        clients,
-        mutation.focusCaseId,
-      ),
+      await snapshot(mutation.payload, owner, true, context.user, clients, mutation.focusCaseId),
     );
   } catch (error) {
     const code =
