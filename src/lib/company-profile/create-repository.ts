@@ -23,8 +23,14 @@ export function createCompanyProfileRepository(): CompanyProfileRepository {
     async load() {
       return (await initialize()).load();
     },
+    async loadSnapshot() {
+      return (await initialize()).loadSnapshot();
+    },
     async replace(profile) {
       return (await initialize()).replace(profile);
+    },
+    async replaceIfVersion(profile, expectedVersion) {
+      return (await initialize()).replaceIfVersion(profile, expectedVersion);
     },
   };
 }
