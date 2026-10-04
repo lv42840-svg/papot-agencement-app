@@ -21,11 +21,11 @@ describe("quote final PDF action visibility", () => {
     expect(sendAction).toContain('quote.status === "FROZEN"');
     expect(sendAction).toContain("PDF validé");
     expect(sendAction).toContain("> Envoyer");
-    expect(sendAction).toContain("composeOutlookMail");
-    expect(sendAction).toContain("Valider et préparer l’envoi");
-    expect(sendAction).toContain("attachmentAttached");
-    expect(sendAction).toContain("Télécharger le PDF à joindre");
-    expect(sendAction).toContain("mailto:");
+    expect(sendAction).toContain("Valider et envoyer");
+    expect(sendAction).toContain("Envoi du devis…");
+    expect(sendAction).toContain("noreply@papot.eu");
+    expect(sendAction).toContain("contact@papot.eu");
+    expect(sendAction).not.toContain("mailto:");
   });
 
   it("n'attribue pas une erreur PDF inconnue a la date de relance", () => {
