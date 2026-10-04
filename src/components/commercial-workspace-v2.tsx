@@ -202,6 +202,7 @@ function useCommercial() {
       files: File[],
       category: CommercialDocumentCategory,
       expectedUpdatedAt: string,
+      isSignedQuote = false,
     ) => {
       if (!files.length) return null;
       setBusy(true);
@@ -212,7 +213,7 @@ function useCommercial() {
         files.forEach((file) => form.append("files", file));
         form.set("category", category);
         form.set("isCurrent", "1");
-        form.set("isSignedQuote", "0");
+        form.set("isSignedQuote", isSignedQuote ? "1" : "0");
         form.set("expectedUpdatedAt", expectedUpdatedAt);
         const response = await fetch(`/api/desktop/commercial/${caseId}/documents`, {
           method: "POST",
@@ -324,8 +325,8 @@ export function CommercialWorkspaceV2({ affairId }: { affairId?: string }) {
               mutate={(body, success) =>
                 mutate({ ...body, expectedUpdatedAt: selected.updatedAt }, success)
               }
-              upload={(caseId, files, category) =>
-                upload(caseId, files, category, selected.updatedAt)
+              upload={(caseId, files, category, isSignedQuote) =>
+                upload(caseId, files, category, selected.updatedAt, isSignedQuote)
               }
             />
           </main>
@@ -696,6 +697,7 @@ function AffairDetail({
     caseId: string,
     files: File[],
     category: CommercialDocumentCategory,
+    isSignedQuote?: boolean,
   ) => Promise<Snapshot | null>;
 }) {
   const [tab, setTab] = useState<DetailTab>("affair");
@@ -1133,12 +1135,14 @@ function Documents({
     caseId: string,
     files: File[],
     category: CommercialDocumentCategory,
+    isSignedQuote?: boolean,
   ) => Promise<Snapshot | null>;
 }) {
   const inputRef = useRef<HTMLInputElement>(null);
   const dragDepth = useRef(0);
   const [category, setCategory] = useState<CommercialDocumentCategory>("RECEIVED");
   const [filter, setFilter] = useState<CommercialDocumentFilter>("ALL");
+  const [isSignedQuote, setIsSignedQuote] = useState(false);
   const [dragging, setDragging] = useState(false);
   const [previewDocumentId, setPreviewDocumentId] = useState<string | null>(null);
   const categoryLabel = COMMERCIAL_DOCUMENT_CATEGORY_LABELS[category];
@@ -1146,7 +1150,7 @@ function Documents({
 
   function uploadFiles(files: File[]) {
     if (busy || files.length === 0) return;
-    void upload(item.id, files, category);
+    void upload(item.id, files, category, category === "QUOTE" && isSignedQuote);
   }
 
   function togglePreview(documentId: string) {
@@ -1174,7 +1178,11 @@ function Documents({
               <span>Classer dans</span>
               <select
                 value={category}
-                onChange={(event) => setCategory(event.target.value as CommercialDocumentCategory)}
+                onChange={(event) => {
+                  const nextCategory = event.target.value as CommercialDocumentCategory;
+                  setCategory(nextCategory);
+                  if (nextCategory !== "QUOTE") setIsSignedQuote(false);
+                }}
                 disabled={busy}
               >
                 {Object.entries(COMMERCIAL_DOCUMENT_CATEGORY_LABELS).map(([value, label]) => (
@@ -1184,6 +1192,19 @@ function Documents({
                 ))}
               </select>
             </label>
+            {category === "QUOTE" ? (
+              <label className="commercialV2UploadCategory">
+                <span>Type de devis</span>
+                <select
+                  value={isSignedQuote ? "SIGNED" : "UNSIGNED"}
+                  onChange={(event) => setIsSignedQuote(event.target.value === "SIGNED")}
+                  disabled={busy}
+                >
+                  <option value="UNSIGNED">Devis</option>
+                  <option value="SIGNED">Devis signé</option>
+                </select>
+              </label>
+            ) : null}
             <input
               ref={inputRef}
               type="file"
