@@ -19,6 +19,7 @@ import {
 } from "@/lib/commercial/domain";
 import {
   applyCommercialMutation,
+  assertCommercialRevision,
   commercialMutationSchema,
   listCommercialPeople,
   type CommercialMutation,
@@ -247,9 +248,7 @@ export async function POST(request: Request) {
           (candidate) => candidate.id === input.caseId,
         );
         if (!current) throw new Error("COMMERCIAL_CASE_NOT_FOUND");
-        if (current.updatedAt !== expectedUpdatedAt) {
-          throw new Error("COMMERCIAL_VERSION_CONFLICT");
-        }
+        assertCommercialRevision(current, expectedUpdatedAt!);
       }
 
       if (confirmationRequested(input)) {
