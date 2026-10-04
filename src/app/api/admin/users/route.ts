@@ -33,11 +33,13 @@ const mutationSchema = z.discriminatedUnion("action", [
     userId: z.string().uuid(),
     displayName: z.string().trim().min(1).max(160),
     email: z.string().trim().email().max(240),
+    expectedRevision: z.string().length(64),
   }),
   z.object({
     action: z.literal("setActive"),
     userId: z.string().uuid(),
     isActive: z.boolean(),
+    expectedRevision: z.string().length(64),
   }),
   z.object({
     action: z.literal("replacePermissions"),
@@ -46,6 +48,7 @@ const mutationSchema = z.discriminatedUnion("action", [
       z.object({ moduleKey: moduleKeySchema, accessLevel: z.enum(["READ", "WRITE"]) }),
     ),
     specialPermissions: z.array(specialKeySchema),
+    expectedRevision: z.string().length(64),
   }),
   z.object({
     action: z.literal("resetPassword"),
