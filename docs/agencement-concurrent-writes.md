@@ -12,6 +12,7 @@ Le principe utilisé est la concurrence optimiste :
 4. si l'état a changé depuis l'ouverture de l'écran, l'écriture est refusée avec un conflit au lieu de remplacer la donnée récente.
 
 Cette protection est distincte :
+
 - de l'idempotence universelle des créations ;
 - de l'atomicité PostgreSQL + système de fichiers ;
 - d'une recette manuelle à deux postes sur la version installée.
@@ -21,6 +22,7 @@ Cette protection est distincte :
 ### Clients
 
 Les mutations suivantes transportent le `updatedAt` de la fiche réellement ouverte :
+
 - modification complète ;
 - TVA par défaut ;
 - archivage ;
@@ -51,6 +53,7 @@ Le lancement d'un chantier depuis une affaire est une création métier. Les pro
 Les modifications d'une entrée existante utilisent une révision stable de l'entrée affichée.
 
 La protection est appliquée :
+
 - à la modification de l'entrée ;
 - à l'enregistrement d'une pièce jointe ;
 - aux différents adapters de stockage concernés.
@@ -62,6 +65,7 @@ La capture d'une nouvelle entrée reste append-only.
 Le devis entier est la frontière de concurrence.
 
 Toutes les mutations d'un devis existant exigent son `updatedAt` affiché :
+
 - lignes, titres, sous-titres et réordonnancement ;
 - duplication / suppression d'éléments ;
 - informations générales ;
@@ -86,6 +90,7 @@ Les mutations de charge, capacité, absences, ordre des chantiers et potentiel d
 ### Profil société
 
 Le profil société possède désormais un contrat de version cohérent sur :
+
 - repository PostgreSQL ;
 - repository local ;
 - API admin ;
@@ -98,6 +103,7 @@ Une ancienne fiche ne peut plus remplacer le profil récent.
 Les fiches utilisateurs admin exposent une empreinte de révision.
 
 Elle protège :
+
 - nom / e-mail ;
 - activation / désactivation ;
 - permissions modules ;
@@ -108,6 +114,7 @@ Les actions « réinitialiser le mot de passe » et « révoquer une session » 
 ### Préférences personnelles
 
 Les préférences légères sont aussi protégées :
+
 - couleur d'accent ;
 - état replié / déplié du bloc POTENTIEL du planning.
 
@@ -116,6 +123,7 @@ L'ancienne valeur affichée est envoyée avec la nouvelle. Si la valeur stockée
 ### Ressources partagées
 
 Le mécanisme `shared-resource` possédait déjà :
+
 - bail / lease ;
 - `expectedVersion` ;
 - réponse de conflit.
@@ -127,6 +135,7 @@ Il est conservé tel quel.
 Les routes API AGENCEMENT ont été parcourues sur le head de la branche.
 
 Les routes de modification de ressources existantes sont classées dans l'une des catégories suivantes :
+
 - version / révision affichée obligatoire ;
 - mécanisme `shared-resource` déjà versionné ;
 - action explicite ne remplaçant pas une fiche complète ;
@@ -138,6 +147,7 @@ Les créations append-only ne constituent pas un écrasement d'une ancienne fich
 ## Tests de concurrence
 
 Des tests reproduisent notamment les scénarios A/B suivants :
+
 - deux écrans ouvrent le même client, A sauvegarde, B tente une ancienne modification : B est refusé ;
 - deux écritures réellement simultanées sur un client : une seule version gagne sans perte silencieuse ;
 - affaire commerciale périmée ;
@@ -181,6 +191,7 @@ Sur une base de recette :
 6. vérifier que la saisie de B n'a pas écrasé la base.
 
 À répéter au minimum pour :
+
 - Client ;
 - Commercial ;
 - Chantier ;
