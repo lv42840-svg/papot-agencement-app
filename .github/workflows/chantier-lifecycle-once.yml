@@ -19,7 +19,17 @@ jobs:
           node-version: 22
           cache: npm
       - name: Apply checked lifecycle changes
-        run: python3 .github/chantier-lifecycle-patch.py
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+          path = Path('.github/chantier-lifecycle-patch.py')
+          patch = path.read_text()
+          before = '''edit(p, '  DONE: "Terminé",', '  DONE: "Terminé",\\n  CANCELLED: "Annulé",')'''
+          after = '''edit(p, '  ACTIVE: "Actif",\\n  DONE: "Terminé",', '  ACTIVE: "Actif",\\n  DONE: "Terminé",\\n  CANCELLED: "Annulé",')'''
+          assert patch.count(before) == 1
+          patch = patch.replace(before, after)
+          exec(compile(patch, str(path), 'exec'))
+          PY
       - run: npm ci
       - name: Run installed formatter and validate full repository
         run: |
