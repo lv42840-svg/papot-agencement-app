@@ -345,7 +345,7 @@ export function launchChantierFromCommercial(
   const absent = [
     !quotePresent ? "devis client" : null,
     !signedQuotePresent ? "devis signé" : null,
-    !costingPresent ? "déboursé OBAT" : null,
+    !costingPresent ? "déboursé" : null,
   ].filter(Boolean);
   history(
     item,
