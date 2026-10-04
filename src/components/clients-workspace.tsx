@@ -247,6 +247,7 @@ export function ClientsWorkspace() {
         const client = result.payload.clients.find((item) => item.id === result.focusClientId);
         if (client) setDraft(clientToDraft(client));
       }
+      setEditingUpdatedAt(null);
       setMode("view");
       setNotice(successMessage);
       return result;
@@ -349,6 +350,10 @@ export function ClientsWorkspace() {
       return;
     }
     if (mode === "edit" && selectedClient) {
+      if (!editingUpdatedAt) {
+        setError("La version ouverte de cette fiche est introuvable. Rouvre la fiche avant de modifier.");
+        return;
+      }
       await mutate(
         {
           action: "update",
