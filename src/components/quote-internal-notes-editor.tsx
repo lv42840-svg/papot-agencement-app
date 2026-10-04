@@ -2,6 +2,7 @@
 
 import { LockKeyhole, Save } from "lucide-react";
 import { type FormEvent, useState } from "react";
+import { quoteRevisionHeaders } from "@/lib/quotes/concurrency";
 import type { NativeQuoteRecord, NativeQuotesPayload } from "@/lib/quotes/store";
 
 type NotesResponse = {
@@ -40,7 +41,10 @@ export function QuoteInternalNotesEditor({
     try {
       const response = await fetch(`/api/desktop/quotes/${quote.id}/notes`, {
         method: "PATCH",
-        headers: { "Content-Type": "application/json" },
+        headers: {
+          "Content-Type": "application/json",
+          ...quoteRevisionHeaders(quote.updatedAt),
+        },
         body: JSON.stringify({ internalNotes: notes }),
       });
       const data = (await response.json()) as NotesResponse;
