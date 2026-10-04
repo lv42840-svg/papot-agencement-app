@@ -297,7 +297,10 @@ export function GrandPlanningWorkspace({
     const response = await fetch("/api/me/planning-preferences", {
       method: "PATCH",
       headers: { "content-type": "application/json" },
-      body: JSON.stringify({ planningPotentialCollapsed: next }),
+      body: JSON.stringify({
+        planningPotentialCollapsed: next,
+        expectedPlanningPotentialCollapsed: potentialCollapsed,
+      }),
     });
     if (!response.ok) {
       setPotentialCollapsed(!next);
