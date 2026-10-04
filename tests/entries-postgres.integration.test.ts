@@ -9,7 +9,11 @@ vi.mock("server-only", () => ({}));
 import { ensureEntryAttachmentFilesCutover } from "../src/lib/entries/attachment-file-cutover";
 import { entriesPayloadHash, ensureEntriesPostgresCutover } from "../src/lib/entries/cutover";
 import { createInitialEntriesPayload } from "../src/lib/entries/domain";
-import { applyEntriesMutation, registerEntryAttachments } from "../src/lib/entries/mutations";
+import {
+  applyEntriesMutation,
+  entryRevision,
+  registerEntryAttachments,
+} from "../src/lib/entries/mutations";
 import { createPostgresEntriesRepository } from "../src/lib/entries/postgres-repository";
 import { runServerDbMigrations } from "../src/lib/server-db/migrations";
 import { closeServerDbPool, getServerDbPool } from "../src/lib/server-db/pool";
@@ -179,6 +183,56 @@ describeWithPostgres("Entries PostgreSQL cutover", () => {
     expect(row.rows[0]?.version).toBe(3);
     expect(entry?.attachments).toHaveLength(1);
     expect(entry?.attachments[0]?.fileName).toBe("plan.pdf");
+  });
+
+  it("rejects a stale entry edit and preserves the winning qualification", async () => {
+    await ensureEntriesPostgresCutover({
+      pool,
+      acquireSource: async () => ({
+        payload: createInitialEntriesPayload(),
+        release: async () => undefined,
+      }),
+    });
+
+    const repository = createPostgresEntriesRepository(pool);
+    const entryId = "45454545-4545-4545-8545-454545454545";
+    await repository.mutate(createInput(entryId, "Entrée partagée"), actor);
+    const opened = (await repository.load()).entries.find(
+      (entry) => entry.id === entryId,
+    )!;
+    const expectedRevision = entryRevision(opened);
+
+    await repository.mutate(
+      {
+        action: "qualifyDraft",
+        entryId,
+        description: "Qualification Nadia",
+        nextAction: "Appeler le client",
+        tagIds: ["contact"],
+      },
+      actor,
+      expectedRevision,
+    );
+
+    await expect(
+      repository.mutate(
+        {
+          action: "qualifyDone",
+          entryId,
+          result: "Ancienne saisie Lucien",
+          tagIds: ["contact"],
+        },
+        actor,
+        expectedRevision,
+      ),
+    ).rejects.toThrow("ENTRIES_VERSION_CONFLICT");
+
+    const current = (await repository.load()).entries.find(
+      (entry) => entry.id === entryId,
+    )!;
+    expect(current.structuredDescription).toBe("Qualification Nadia");
+    expect(current.nextAction).toBe("Appeler le client");
+    expect(current.status).toBe("TO_QUALIFY");
   });
 
   it("serializes concurrent mutations without losing either entry", async () => {
