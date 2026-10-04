@@ -1,5 +1,6 @@
 import { randomUUID } from "node:crypto";
 import { once } from "node:events";
+import * as net from "node:net";
 import * as tls from "node:tls";
 
 export const DEFAULT_QUOTE_FROM_EMAIL = "noreply@papot.app";
@@ -9,7 +10,8 @@ export const DEFAULT_QUOTE_REPLY_TO_EMAIL = "contact@papot.eu";
 type SmtpConfig = {
   host: string;
   port: number;
-  user: string;
+  secure: boolean;
+  username: string;
   password: string;
 };
 
@@ -59,16 +61,25 @@ export function quoteEmailPolicyFromEnv(env: QuoteEmailEnv = process.env): Quote
 
 function smtpConfigFromEnv(env: QuoteEmailEnv = process.env): SmtpConfig {
   const host = env.PAPOT_SMTP_HOST?.trim() ?? "";
-  const user = env.PAPOT_SMTP_USER?.trim() ?? "";
+  const username =
+    env.PAPOT_SMTP_USERNAME?.trim() || env.PAPOT_SMTP_USER?.trim() || "";
   const password = env.PAPOT_SMTP_PASSWORD ?? "";
-  const portRaw = env.PAPOT_SMTP_PORT?.trim() || "465";
+  const portRaw = env.PAPOT_SMTP_PORT?.trim() || "587";
   const port = Number(portRaw);
+  const secure = (env.PAPOT_SMTP_SECURE?.trim() || "false").toLowerCase() === "true";
 
-  if (!host || !user || !password || !Number.isInteger(port) || port < 1 || port > 65535) {
+  if (
+    !host ||
+    !username ||
+    !password ||
+    !Number.isInteger(port) ||
+    port < 1 ||
+    port > 65535
+  ) {
     throw new Error("QUOTE_EMAIL_NOT_CONFIGURED");
   }
 
-  return { host, port, user, password };
+  return { host, port, secure, username, password };
 }
 
 function headerValue(value: string): string {
@@ -166,9 +177,9 @@ class SmtpResponseReader {
   private waiters: ResponseWaiter[] = [];
   private failure: Error | null = null;
 
-  constructor(private readonly socket: tls.TLSSocket) {
+  constructor(private readonly socket: net.Socket) {
     socket.setEncoding("utf8");
-    socket.on("data", (chunk: string) => this.consume(chunk));
+    socket.on("data", (chunk: string | Buffer) => this.consume(String(chunk)));
     socket.on("error", (error) => this.fail(error instanceof Error ? error : new Error("SMTP")));
     socket.on("timeout", () => socket.destroy(new Error("SMTP_TIMEOUT")));
     socket.on("close", () => {
@@ -228,12 +239,12 @@ function assertResponse(response: SmtpResponse, expected: readonly number[]) {
   if (!expected.includes(response.code)) throw new Error(`SMTP_RESPONSE_${response.code}`);
 }
 
-async function writeSocket(socket: tls.TLSSocket, value: string) {
+async function writeSocket(socket: net.Socket, value: string) {
   if (!socket.write(value, "utf8")) await once(socket, "drain");
 }
 
 async function smtpCommand(
-  socket: tls.TLSSocket,
+  socket: net.Socket,
   reader: SmtpResponseReader,
   command: string,
   expected: readonly number[],
@@ -248,29 +259,60 @@ function dotStuff(raw: string): string {
   return raw.replace(/\r?\n/g, "\r\n").replace(/(^|\r\n)\./g, "$1..");
 }
 
+async function connectSmtp(config: SmtpConfig): Promise<{
+  socket: net.Socket;
+  reader: SmtpResponseReader;
+}> {
+  if (config.secure) {
+    const socket = tls.connect({
+      host: config.host,
+      port: config.port,
+      servername: config.host,
+      rejectUnauthorized: true,
+    });
+    socket.setTimeout(20_000);
+    const reader = new SmtpResponseReader(socket);
+    await once(socket, "secureConnect");
+    assertResponse(await reader.read(), [220]);
+    return { socket, reader };
+  }
+
+  const plain = net.connect({ host: config.host, port: config.port });
+  plain.setTimeout(20_000);
+  const plainReader = new SmtpResponseReader(plain);
+  await once(plain, "connect");
+  assertResponse(await plainReader.read(), [220]);
+  await smtpCommand(plain, plainReader, "EHLO papot.app", [250]);
+  await smtpCommand(plain, plainReader, "STARTTLS", [220]);
+
+  const socket = tls.connect({
+    socket: plain,
+    servername: config.host,
+    rejectUnauthorized: true,
+  });
+  socket.setTimeout(20_000);
+  const reader = new SmtpResponseReader(socket);
+  await once(socket, "secureConnect");
+  return { socket, reader };
+}
+
 async function sendSmtpMessage(params: {
   config: SmtpConfig;
   envelopeFrom: string;
   recipients: string[];
   raw: string;
 }) {
-  const socket = tls.connect({
-    host: params.config.host,
-    port: params.config.port,
-    servername: params.config.host,
-    rejectUnauthorized: true,
-  });
-  socket.setTimeout(20_000);
-  const reader = new SmtpResponseReader(socket);
+  const { socket, reader } = await connectSmtp(params.config);
 
   try {
-    await once(socket, "secureConnect");
-    assertResponse(await reader.read(), [220]);
     await smtpCommand(socket, reader, "EHLO papot.app", [250]);
     await smtpCommand(socket, reader, "AUTH LOGIN", [334]);
-    await smtpCommand(socket, reader, Buffer.from(params.config.user, "utf8").toString("base64"), [
-      334,
-    ]);
+    await smtpCommand(
+      socket,
+      reader,
+      Buffer.from(params.config.username, "utf8").toString("base64"),
+      [334],
+    );
     await smtpCommand(
       socket,
       reader,
