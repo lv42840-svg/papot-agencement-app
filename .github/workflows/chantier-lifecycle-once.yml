@@ -28,6 +28,7 @@ jobs:
           after = '''edit(p, '  ACTIVE: "Actif",\\n  DONE: "Terminé",', '  ACTIVE: "Actif",\\n  DONE: "Terminé",\\n  CANCELLED: "Annulé",')'''
           assert patch.count(before) == 1
           patch = patch.replace(before, after)
+          patch = patch.replace('mode === "ARCHIVED" ? "isActive" : undefined', 'mode === "ARCHIVED" ? "isActive" : ""')
           exec(compile(patch, str(path), 'exec'))
           PY
       - run: npm ci
