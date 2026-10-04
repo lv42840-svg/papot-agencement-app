@@ -12,7 +12,7 @@ Ce dossier constitue le socle de déploiement de PAPOT AGENCEMENT sur `agencemen
 - documents techniques sous `/srv/papot/agencement` et fichiers métier AGENCEMENT sous `/srv/agencement` ;
 - le code Electron/desktop reste présent pendant la migration mais n'est pas utilisé par ce déploiement ;
 - le VPS utilise `PAPOT_STORAGE_MODE=postgres` ;
-- une base neuve utilise `PAPOT_POSTGRES_BOOTSTRAP_MODE=fresh` afin d'initialiser les états métier sans contacter Nextcloud ;
+- une base neuve utilise `PAPOT_POSTGRES_BOOTSTRAP_MODE=fresh` afin d'initialiser directement les états métier dans PostgreSQL ;
 - `PAPOT_SERVER_FILES_ROOT=/srv/agencement` rend les pièces jointes et documents indépendants du runtime desktop.
 
 ## Préparation VPS
@@ -63,6 +63,6 @@ La cible finale est :
 
 `https://agencement.papot.app`
 
-## Migration progressive
+## Architecture cible
 
-Ce socle n'impose pas de suppression immédiate d'Electron, du stockage local ou des anciennes briques Nextcloud. La migration vers le web doit rester progressive afin de réutiliser les modules métier AGENCEMENT déjà développés et testés.
+Le déploiement web utilise PostgreSQL et le stockage serveur PAPOT. Electron reste une enveloppe locale optionnelle pour les fonctions Windows utiles.
