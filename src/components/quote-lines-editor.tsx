@@ -8,6 +8,7 @@ import {
   parseLibraryPayload,
   type LibraryPayload,
 } from "@/lib/library/storage";
+import { quoteRevisionHeaders } from "@/lib/quotes/concurrency";
 import { parseQuoteQuantityInput } from "@/lib/quotes/domain";
 import { publishQuoteOuvrageToLibrary } from "@/lib/quotes/library-publish";
 import {
@@ -251,7 +252,10 @@ function normalizeSearch(value: string): string {
 async function postLibrary(body: Record<string, unknown>) {
   const response = await fetch("/api/desktop/library", {
     method: "POST",
-    headers: { "Content-Type": "application/json" },
+    headers: {
+          "Content-Type": "application/json",
+          ...quoteRevisionHeaders(quote.updatedAt),
+        },
     body: JSON.stringify(body),
   });
   const data = (await response.json()) as LibraryOpenResponse | LibrarySaveResponse;
