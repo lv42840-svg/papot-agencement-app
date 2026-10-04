@@ -4,6 +4,7 @@ import Link from "next/link";
 import {
   Archive,
   BadgeEuro,
+  Ban,
   BriefcaseBusiness,
   CalendarClock,
   CheckCircle2,
@@ -71,7 +72,11 @@ const errorMessages: Record<string, string> = {
     "Ce chantier est archivé. Réactive-le avant de modifier ses données.",
   CHANTIER_HOURS_UNCHANGED: "Aucune heure prévisionnelle n'a changé.",
   CHANTIER_NOT_ACTIVE: "Seul un chantier actif peut être marqué Terminé.",
-  CHANTIER_NOT_DONE: "Cette action nécessite un chantier au statut Terminé.",
+  CHANTIER_NOT_DONE: "Cette action nécessite un chantier terminé ou annulé.",
+  CHANTIER_CANCELLED_READ_ONLY: "Ce chantier est annulé. Rouvre-le avant de modifier ses données.",
+  CHANTIERS_VERSION_REQUIRED:
+    "La version du chantier manque. Actualise la fiche avant de réessayer.",
+  CHANTIERS_REQUEST_INVALID: "Vérifie le motif et la confirmation de l’action.",
   CHANTIER_NOT_ARCHIVED: "Ce chantier n'est pas archivé.",
   CHANTIER_BE_ITEM_NOT_FOUND: "L'élément BE n'existe plus.",
   CHANTIER_WORKSHOP_ITEM_NOT_FOUND: "L'élément Atelier n'existe plus.",
@@ -118,6 +123,7 @@ function documentHref(
 
 function statusTone(item: ChantierRecord): string {
   if (item.status === "DONE") return "done";
+  if (item.status === "CANCELLED") return "cancelled";
   if (item.status === "ARCHIVED") return "archived";
   return "active";
 }
@@ -215,30 +221,40 @@ export function ChantierWorkspace({ chantierId }: { chantierId: string }) {
     }
   }, []);
 
-  const mutate = useCallback(async (body: MutationBody, successMessage: string) => {
-    setBusy(true);
-    setError(null);
-    setNotice(null);
-    try {
-      const response = await fetch("/api/desktop/chantiers", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(body),
-      });
-      const result = (await response.json()) as ChantiersSnapshot & { error?: string };
-      if (!response.ok) throw new Error(result.error ?? "CHANTIERS_MUTATION_FAILED");
-      setChantiersSnapshot(result);
-      setNotice(successMessage);
-      return true;
-    } catch (mutationError) {
-      const code =
-        mutationError instanceof Error ? mutationError.message : "CHANTIERS_MUTATION_FAILED";
-      setError(errorMessages[code] ?? "La modification du chantier a échoué.");
-      return false;
-    } finally {
-      setBusy(false);
-    }
-  }, []);
+  const mutate = useCallback(
+    async (body: MutationBody, successMessage: string) => {
+      setBusy(true);
+      setError(null);
+      setNotice(null);
+      try {
+        const current = chantiersSnapshot?.payload.chantiers.find(
+          (item) => item.id === body.chantierId,
+        );
+        if (!current) throw new Error("CHANTIER_NOT_FOUND");
+        const response = await fetch("/api/desktop/chantiers", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            ...body,
+            expectedUpdatedAt: body.expectedUpdatedAt ?? current.updatedAt,
+          }),
+        });
+        const result = (await response.json()) as ChantiersSnapshot & { error?: string };
+        if (!response.ok) throw new Error(result.error ?? "CHANTIERS_MUTATION_FAILED");
+        setChantiersSnapshot(result);
+        setNotice(successMessage);
+        return true;
+      } catch (mutationError) {
+        const code =
+          mutationError instanceof Error ? mutationError.message : "CHANTIERS_MUTATION_FAILED";
+        setError(errorMessages[code] ?? "La modification du chantier a échoué.");
+        return false;
+      } finally {
+        setBusy(false);
+      }
+    },
+    [chantiersSnapshot],
+  );
 
   if (loading && !chantiersSnapshot) {
     return (
@@ -340,12 +356,17 @@ export function ChantierWorkspace({ chantierId }: { chantierId: string }) {
             clientRecord={clientRecord}
             commercialCase={commercialCase}
             busy={busy}
-            canModify={chantiersSnapshot.capabilities.canModify && chantier.status !== "ARCHIVED"}
+            canModify={
+              chantiersSnapshot.capabilities.canModify &&
+              chantier.status !== "ARCHIVED" &&
+              chantier.status !== "CANCELLED"
+            }
             mutate={mutate}
           />
         ) : null}
         {activeTab === "lifecycle" ? (
           <LifecycleTab
+            key={`${chantier.id}:${chantier.updatedAt}`}
             chantier={chantier}
             busy={busy}
             capabilities={chantiersSnapshot.capabilities}
@@ -371,7 +392,11 @@ export function ChantierWorkspace({ chantierId }: { chantierId: string }) {
           <CapacityTab
             chantier={chantier}
             busy={busy}
-            canModify={chantiersSnapshot.capabilities.canModify && chantier.status !== "ARCHIVED"}
+            canModify={
+              chantiersSnapshot.capabilities.canModify &&
+              chantier.status !== "ARCHIVED" &&
+              chantier.status !== "CANCELLED"
+            }
             mutate={mutate}
           />
         ) : null}
@@ -603,7 +628,8 @@ function ClientTab({
           </div>
           {!canModify ? (
             <p className="chantierHint">
-              Chantier archivé : consultation uniquement tant qu&apos;il n&apos;est pas réactivé.
+              Consultation uniquement. Les modifications nécessitent les droits adaptés et un
+              chantier non annulé, non archivé.
             </p>
           ) : null}
         </>
@@ -643,6 +669,9 @@ function LifecycleTab({
   closeWarning: ChantierPlanningCloseWarning | null;
   mutate: (body: MutationBody, message: string) => Promise<boolean>;
 }) {
+  const [closingAction, setClosingAction] = useState<"close" | "cancel" | null>(null);
+  const [cancelReason, setCancelReason] = useState("");
+  const [cancelConfirmed, setCancelConfirmed] = useState(false);
   const [closeReason, setCloseReason] = useState("");
   const [reactivateReason, setReactivateReason] = useState("");
   const [archiveReviewed, setArchiveReviewed] = useState(false);
@@ -682,40 +711,156 @@ function LifecycleTab({
       {chantier.status === "ACTIVE" && capabilities.canCloseReopen ? (
         <div className="chantierLifecycleAction">
           <p>
-            Le statut Terminé signifie que les travaux principaux sont finis. Les documents,
-            factures, réserves et SAV pourront continuer à évoluer.
+            Clôturer indique que les travaux principaux sont terminés. Annuler indique que le
+            chantier est abandonné ou a été lancé par erreur. Aucun dossier n’est supprimé.
           </p>
-          {closeWarning?.hasRemainingCharge ? (
-            <div className="chantierLifecycleWarning">
-              <strong>Attention, il reste de la charge dans le Grand planning.</strong>
-              <span>
-                {closeWarningParts.join(" · ")}. Le passage à Terminé retirera ces charges du
-                planning actif et libérera la capacité.
-              </span>
+          <div className="chantierLifecycleChoices">
+            <button
+              type="button"
+              className="secondaryButton"
+              aria-pressed={closingAction === "close"}
+              disabled={busy}
+              onClick={() => {
+                setClosingAction("close");
+                setCancelConfirmed(false);
+              }}
+            >
+              <CheckCircle2 size={15} /> Clôturer le chantier
+            </button>
+            <button
+              type="button"
+              className="chantierArchiveButton"
+              aria-pressed={closingAction === "cancel"}
+              disabled={busy}
+              onClick={() => {
+                setClosingAction("cancel");
+                setCancelConfirmed(false);
+              }}
+            >
+              <Ban size={15} /> Annuler le chantier
+            </button>
+          </div>
+          {closingAction ? (
+            <div className="chantierLifecycleConfirmation">
+              <strong>
+                {closingAction === "cancel" ? "Confirmer l’annulation" : "Confirmer la clôture"}
+              </strong>
+              {closeWarning?.hasRemainingCharge ? (
+                <div className="chantierLifecycleWarning">
+                  <strong>Attention, il reste de la charge dans le Grand planning.</strong>
+                  <span>
+                    {closeWarningParts.join(" · ")}. Cette action retirera le chantier du planning
+                    actif et libérera sa capacité. Les heures déjà réalisées restent conservées.
+                  </span>
+                </div>
+              ) : null}
+              {closingAction === "close" ? (
+                <>
+                  <label className="chantierField">
+                    <span>Motif de clôture</span>
+                    <input
+                      value={closeReason}
+                      onChange={(event) => setCloseReason(event.target.value)}
+                      maxLength={1000}
+                      disabled={busy}
+                      placeholder="Motif obligatoire de fermeture"
+                    />
+                  </label>
+                  <button
+                    type="button"
+                    className="primaryButton chantierFitButton"
+                    disabled={busy || !closeReason.trim()}
+                    onClick={() =>
+                      void mutate(
+                        {
+                          action: "markDone",
+                          chantierId: chantier.id,
+                          expectedUpdatedAt: chantier.updatedAt,
+                          reason: closeReason,
+                        },
+                        "Chantier clôturé : statut Terminé.",
+                      )
+                    }
+                  >
+                    <CheckCircle2 size={15} /> Confirmer la clôture
+                  </button>
+                </>
+              ) : (
+                <>
+                  <p>
+                    Les devis, documents, heures réalisées et historique sont conservés. Le chantier
+                    sera classé dans « Annulés », pas dans « Terminés ».
+                  </p>
+                  <label className="chantierField">
+                    <span>Motif d’annulation</span>
+                    <input
+                      value={cancelReason}
+                      onChange={(event) => setCancelReason(event.target.value)}
+                      maxLength={1000}
+                      disabled={busy}
+                      placeholder="Ex. abandon du client, chantier de test, lancement par erreur…"
+                    />
+                  </label>
+                  <label className="chantierArchiveCheck">
+                    <input
+                      type="checkbox"
+                      checked={cancelConfirmed}
+                      disabled={busy}
+                      onChange={(event) => setCancelConfirmed(event.target.checked)}
+                    />
+                    Je confirme l’annulation de ce chantier et son retrait du planning actif.
+                  </label>
+                  <button
+                    type="button"
+                    className="chantierArchiveButton"
+                    disabled={busy || !cancelReason.trim() || !cancelConfirmed}
+                    onClick={() =>
+                      void mutate(
+                        {
+                          action: "cancel",
+                          chantierId: chantier.id,
+                          expectedUpdatedAt: chantier.updatedAt,
+                          reason: cancelReason,
+                          confirmed: true,
+                        },
+                        "Chantier annulé. Documents et heures réalisées conservés.",
+                      )
+                    }
+                  >
+                    <Ban size={15} /> Confirmer l’annulation
+                  </button>
+                </>
+              )}
+              <button
+                type="button"
+                className="secondaryButton chantierFitButton"
+                disabled={busy}
+                onClick={() => {
+                  setClosingAction(null);
+                  setCancelConfirmed(false);
+                }}
+              >
+                Retour sans modifier
+              </button>
             </div>
           ) : null}
-          <input
-            value={closeReason}
-            onChange={(event) => setCloseReason(event.target.value)}
-            placeholder="Motif obligatoire de fermeture"
-          />
-          <button
-            type="button"
-            className="secondaryButton"
-            disabled={busy || !closeReason.trim()}
-            onClick={() =>
-              void mutate(
-                { action: "markDone", chantierId: chantier.id, reason: closeReason },
-                "Chantier passé à Terminé.",
-              )
-            }
-          >
-            <CheckCircle2 size={15} /> Marquer Terminé
-          </button>
         </div>
       ) : null}
 
-      {chantier.status === "DONE" && canManageDoneLifecycle ? (
+      {chantier.status === "CANCELLED" ? (
+        <div className="chantierLifecycleWarning" role="status">
+          <strong>Chantier annulé</strong>
+          <span>
+            {[...chantier.history].reverse().find((event) => event.type === "CANCELLED")?.summary}
+          </span>
+          <span>
+            Le dossier reste consultable. Une réouverture remettra le chantier en Actif, avec des
+            semaines à replanifier.
+          </span>
+        </div>
+      ) : null}
+
+      {(chantier.status === "DONE" || chantier.status === "CANCELLED") && canManageDoneLifecycle ? (
         <div className="chantierLifecycleAction chantierLifecycleSplit">
           {capabilities.canCloseReopen ? (
             <div>
@@ -827,7 +972,9 @@ function FollowTab({
       commercialCase={commercialCase}
       quotes={quotes}
       busy={busy}
-      canModify={capabilities.canModify && chantier.status !== "ARCHIVED"}
+      canModify={
+        capabilities.canModify && chantier.status !== "ARCHIVED" && chantier.status !== "CANCELLED"
+      }
       mutate={mutate}
       mutateCommercial={mutateCommercial}
     />
@@ -1172,6 +1319,33 @@ function ChantierStyles() {
         border-radius: 999px;
         font-size: 11px;
         font-weight: 800;
+      }
+      .chantierLifecycle-cancelled {
+        background: #fff0ec;
+        color: #a3493a;
+      }
+      .chantierLifecycleChoices {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 10px;
+      }
+      .chantierLifecycleChoices button,
+      .chantierLifecycleConfirmation button {
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        gap: 6px;
+        min-height: 38px;
+      }
+      .chantierLifecycleConfirmation {
+        display: grid;
+        gap: 12px;
+        border-top: 1px solid #e9e5f0;
+        padding-top: 14px;
+      }
+      .chantierLifecycleAction .chantierArchiveCheck input {
+        width: auto;
+        flex: 0 0 auto;
       }
       .chantierLifecycle-active {
         background: #e9f7ee;

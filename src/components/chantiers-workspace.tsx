@@ -35,7 +35,7 @@ type CommercialSnapshot = {
   payload: CommercialPayload;
 };
 
-type ViewMode = "ACTIVE" | "DONE" | "ARCHIVED";
+type ViewMode = "ACTIVE" | "DONE" | "CANCELLED" | "ARCHIVED";
 
 const errorMessages: Record<string, string> = {
   DESKTOP_RUNTIME_NOT_CONFIGURED: "Le poste PAPOT n'est pas configuré.",
@@ -73,6 +73,7 @@ function matches(item: ChantierRecord, query: string): boolean {
 
 function statusClass(item: ChantierRecord): string {
   if (item.status === "DONE") return "done";
+  if (item.status === "CANCELLED") return "cancelled";
   if (item.status === "ARCHIVED") return "archived";
   return "active";
 }
@@ -143,6 +144,7 @@ export function ChantiersWorkspace() {
     active: chantiers.filter((item) => item.status === "ACTIVE").length,
     done: chantiers.filter((item) => item.status === "DONE").length,
     archived: chantiers.filter((item) => item.status === "ARCHIVED").length,
+    cancelled: chantiers.filter((item) => item.status === "CANCELLED").length,
   };
 
   async function launch(body: {
@@ -179,7 +181,7 @@ export function ChantiersWorkspace() {
       <section className="chantiersHeading">
         <div>
           <h1>Chantiers</h1>
-          <p>Affaires lancées, suivi opérationnel et cycle Actif → Terminé → Archivé.</p>
+          <p>Affaires lancées, suivi opérationnel, clôture, annulation et archives.</p>
         </div>
         <button
           className="chantiersRefresh"
@@ -263,6 +265,13 @@ export function ChantiersWorkspace() {
             onClick={() => setMode("DONE")}
           >
             Terminés
+          </button>
+          <button
+            className={mode === "CANCELLED" ? "isActive" : undefined}
+            type="button"
+            onClick={() => setMode("CANCELLED")}
+          >
+            Annulés ({counts.cancelled})
           </button>
           <button
             className={mode === "ARCHIVED" ? "isActive" : ""}
@@ -480,6 +489,10 @@ function LaunchDocument({
 function ChantiersStyles() {
   return (
     <style jsx global>{`
+      .chantierStatus-cancelled {
+        background: #fff0ec;
+        color: #a3493a;
+      }
       .chantiersWorkspace {
         display: grid;
         gap: 15px;

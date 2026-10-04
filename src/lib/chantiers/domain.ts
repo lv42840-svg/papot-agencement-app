@@ -4,7 +4,7 @@ const isoDateTimeSchema = z.string().datetime({ offset: true });
 const dateOnlySchema = z.string().regex(/^\d{4}-\d{2}-\d{2}$/);
 const nullableText = (max: number) => z.string().trim().max(max).nullable();
 
-export const chantierStatusSchema = z.enum(["ACTIVE", "DONE", "ARCHIVED"]);
+export const chantierStatusSchema = z.enum(["ACTIVE", "DONE", "CANCELLED", "ARCHIVED"]);
 export const launchDocumentStateSchema = z.enum(["PRESENT", "MISSING_DECLARED"]);
 export const technicalOriginSchema = z.enum(["QUOTE_LINE", "TS"]);
 export const beItemStatusSchema = z.enum(["TODO", "DRAW", "VALIDATION", "VALIDATED"]);
@@ -120,6 +120,7 @@ export const chantierHistoryEventSchema = z.object({
     "OPERATIONAL_STATUS_UPDATED",
     "OPERATIONAL_SPACE_STATE_UPDATED",
     "MARKED_DONE",
+    "CANCELLED",
     "REACTIVATED",
     "ARCHIVED",
     "UNARCHIVED",
@@ -193,6 +194,7 @@ export type ChantiersPayload = z.infer<typeof chantiersPayloadSchema>;
 export const CHANTIER_STATUS_LABELS: Record<ChantierStatus, string> = {
   ACTIVE: "Actif",
   DONE: "Terminé",
+  CANCELLED: "Annulé",
   ARCHIVED: "Archivé",
 };
 

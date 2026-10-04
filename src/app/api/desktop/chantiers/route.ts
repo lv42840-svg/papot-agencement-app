@@ -205,12 +205,13 @@ export async function POST(request: Request) {
 
     if (
       input.action === "markDone" ||
+      input.action === "cancel" ||
       input.action === "reactivate" ||
       input.action === "unarchive"
     ) {
       stage = "sync-planning-lifecycle";
       await createPlanningRepository().mutate((payload) => {
-        if (input.action === "markDone") {
+        if (input.action === "markDone" || input.action === "cancel") {
           return removeFirmPlanningForChantier(payload, input.chantierId);
         }
         return restoreFirmPlanningOrderForChantier(payload, input.chantierId);
