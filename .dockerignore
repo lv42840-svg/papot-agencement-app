@@ -7,3 +7,11 @@ release
 !.env.example
 desktop
 build
+tests
+coverage
+tmp
+.github
+README.md
+docs/*
+!docs/templates
+!docs/templates/**
