@@ -96,7 +96,7 @@ export async function POST(request: Request, { params }: { params: Promise<{ quo
     const expectedRevision = expectedQuoteRevision(request);
     const input = sendQuoteSchema.parse(await request.json());
     const quoteContext = await requireModuleRequestContext("quotes", "WRITE");
-    const commercialContext = await requireModuleRequestContext("commercial", "WRITE");
+    await requireModuleRequestContext("commercial", "WRITE");
     const actor = {
       userId: quoteContext.user.id,
       displayName: quoteContext.user.displayName,
