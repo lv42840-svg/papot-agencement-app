@@ -221,6 +221,11 @@ export async function POST(request: Request) {
   try {
     const raw = (await request.json()) as RawRequest;
     const input = commercialMutationSchema.parse(raw);
+    const expectedUpdatedAt =
+      input.action === "create" ? null : rawString(raw, "expectedUpdatedAt");
+    if (input.action !== "create" && !expectedUpdatedAt) {
+      throw new Error("COMMERCIAL_VERSION_REQUIRED");
+    }
     stage = "create-runtime";
     const context = await requireDesktopRequestContext("commercial", "WRITE");
     const requiredSpecialPermission = commercialSpecialPermissionForMutation(input);
@@ -237,6 +242,16 @@ export async function POST(request: Request) {
       source: CommercialPayload,
       isRetry: boolean,
     ): Promise<CommercialMutationResult> => {
+      if (input.action !== "create") {
+        const current = source.cases.find(
+          (candidate) => candidate.id === input.caseId,
+        );
+        if (!current) throw new Error("COMMERCIAL_CASE_NOT_FOUND");
+        if (current.updatedAt !== expectedUpdatedAt) {
+          throw new Error("COMMERCIAL_VERSION_CONFLICT");
+        }
+      }
+
       if (confirmationRequested(input)) {
         const caseId = caseIdForMutation(input);
         const item = caseId ? source.cases.find((candidate) => candidate.id === caseId) : null;
