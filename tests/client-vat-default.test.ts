@@ -44,6 +44,7 @@ describe("client default VAT", () => {
       {
         action: "updateVat",
         clientId: legacyClient.id,
+        expectedUpdatedAt: legacyClient.updatedAt,
         defaultVatRatePercent: 10,
       },
       actor,
@@ -74,6 +75,7 @@ describe("client default VAT", () => {
       {
         action: "update",
         clientId: client.id,
+        expectedUpdatedAt: client.updatedAt,
         type: client.type,
         companyName: client.companyName,
         firstName: client.firstName,
@@ -104,6 +106,7 @@ describe("client default VAT", () => {
         {
           action: "updateVat",
           clientId: legacyClient.id,
+          expectedUpdatedAt: legacyClient.updatedAt,
           defaultVatRatePercent: 120,
         },
         actor,
