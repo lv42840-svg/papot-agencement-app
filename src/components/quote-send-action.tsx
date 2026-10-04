@@ -2,6 +2,7 @@
 
 import { CheckCircle2, FileLock2, Send } from "lucide-react";
 import { type FormEvent, useState } from "react";
+import { quoteRevisionHeaders } from "@/lib/quotes/concurrency";
 import type { NativeQuoteRecord, NativeQuotesPayload } from "@/lib/quotes/store";
 
 type ApiResponse = { payload?: NativeQuotesPayload; error?: string };
@@ -92,10 +93,14 @@ async function postFinalize(
   quoteId: string,
   mode: FinalizeMode,
   followUpDate: string,
+  updatedAt: string,
 ): Promise<NativeQuotesPayload> {
   const response = await fetch(`/api/desktop/quotes/${quoteId}/send`, {
     method: "POST",
-    headers: { "Content-Type": "application/json" },
+    headers: {
+      "Content-Type": "application/json",
+      ...quoteRevisionHeaders(updatedAt),
+    },
     body: JSON.stringify(mode === "SEND" ? { mode, followUpDate } : { mode }),
   });
   const data = (await response.json()) as ApiResponse;
