@@ -2,7 +2,7 @@ import { NextResponse } from "next/server";
 import { createCommercialRepository } from "@/lib/commercial/create-repository";
 import {
   desktopRequestErrorStatus,
-  requireDesktopRequestContext,
+  requireModuleRequestContext,
 } from "@/lib/desktop/request-context";
 
 export const runtime = "nodejs";
@@ -20,8 +20,8 @@ function statusFor(code: string): number {
 export async function GET(_request: Request, context: RouteContext) {
   try {
     const { caseId } = await context.params;
-    const requestContext = await requireDesktopRequestContext("commercial", "READ");
-    const repository = createCommercialRepository(requestContext);
+    const requestContext = await requireModuleRequestContext("commercial", "READ");
+    const repository = createCommercialRepository();
     const payload = await repository.load();
     const item = payload.cases.find((candidate) => candidate.id === caseId);
     if (!item) throw new Error("COMMERCIAL_CASE_NOT_FOUND");
