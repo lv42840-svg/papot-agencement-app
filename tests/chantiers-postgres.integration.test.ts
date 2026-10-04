@@ -10,6 +10,7 @@ import {
   parseChantiersPayload,
   type ChantiersPayload,
 } from "../src/lib/chantiers/domain";
+import { assertChantierRevision } from "../src/lib/chantiers/mutations";
 import { createPostgresChantiersRepository } from "../src/lib/chantiers/postgres-repository";
 import { runServerDbMigrations } from "../src/lib/server-db/migrations";
 import { closeServerDbPool, getServerDbPool } from "../src/lib/server-db/pool";
@@ -175,6 +176,46 @@ describeWithPostgres("Chantiers PostgreSQL cutover", () => {
     expect(loaded.chantiers.map((item) => item.name)).toEqual(
       expect.arrayContaining(["Chantier poste A", "Chantier poste B"]),
     );
+  });
+
+  it("rejects a stale browser edit of the same chantier", async () => {
+    const source = appendChantier(createInitialChantiersPayload(), "Chantier partagé");
+    await ensureChantiersPostgresCutover({
+      pool,
+      acquireSource: async () => ({
+        payload: source,
+        release: async () => undefined,
+      }),
+    });
+
+    const repository = createPostgresChantiersRepository(pool);
+    const opened = (await repository.load()).chantiers[0];
+
+    await repository.mutate((payload) => {
+      const current = payload.chantiers.find((item) => item.id === opened.id);
+      if (!current) throw new Error("CHANTIER_NOT_FOUND");
+      assertChantierRevision(current, opened.updatedAt);
+      const next = structuredClone(payload);
+      const changed = next.chantiers.find((item) => item.id === opened.id);
+      if (!changed) throw new Error("CHANTIER_NOT_FOUND");
+      changed.description = "Modification poste A";
+      changed.updatedAt = "2026-09-14T11:00:00.000Z";
+      changed.updatedByName = "Poste A";
+      return { payload: next, focusChantierId: opened.id };
+    });
+
+    await expect(
+      repository.mutate((payload) => {
+        const current = payload.chantiers.find((item) => item.id === opened.id);
+        if (!current) throw new Error("CHANTIER_NOT_FOUND");
+        assertChantierRevision(current, opened.updatedAt);
+        return { payload, focusChantierId: opened.id };
+      }),
+    ).rejects.toThrow("CHANTIERS_VERSION_CONFLICT");
+
+    const current = (await repository.load()).chantiers[0];
+    expect(current.description).toBe("Modification poste A");
+    expect(current.updatedByName).toBe("Poste A");
   });
 
   it("does not increment the version for a no-op mutation", async () => {
