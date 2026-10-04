@@ -182,7 +182,10 @@ export function ChantierWorkspace({ chantierId }: { chantierId: string }) {
       const response = await fetch("/api/desktop/commercial", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(body),
+        body: JSON.stringify({
+          ...body,
+          expectedUpdatedAt: commercialCase?.updatedAt,
+        }),
       });
       const result = (await response.json()) as CommercialSnapshot & { error?: string };
       if (!response.ok) throw new Error(result.error ?? "COMMERCIAL_MUTATION_FAILED");
@@ -197,7 +200,7 @@ export function ChantierWorkspace({ chantierId }: { chantierId: string }) {
     } finally {
       setBusy(false);
     }
-  }, []);
+  }, [commercialCase?.updatedAt]);
 
   const mutate = useCallback(async (body: MutationBody, successMessage: string) => {
     setBusy(true);
@@ -207,7 +210,10 @@ export function ChantierWorkspace({ chantierId }: { chantierId: string }) {
       const response = await fetch("/api/desktop/chantiers", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(body),
+        body: JSON.stringify({
+          ...body,
+          expectedUpdatedAt: chantier?.updatedAt,
+        }),
       });
       const result = (await response.json()) as ChantiersSnapshot & { error?: string };
       if (!response.ok) throw new Error(result.error ?? "CHANTIERS_MUTATION_FAILED");
@@ -222,7 +228,7 @@ export function ChantierWorkspace({ chantierId }: { chantierId: string }) {
     } finally {
       setBusy(false);
     }
-  }, []);
+  }, [chantier?.updatedAt]);
 
   if (loading && !chantiersSnapshot) {
     return (
