@@ -99,9 +99,10 @@ async function postCommercial(body: Record<string, unknown>): Promise<Commercial
 async function uploadCommercialDocument(
   caseId: string,
   files: File[],
+  expectedUpdatedAt: string,
   options: { category: "QUOTE" | "COSTING"; versionLabel?: string; isSignedQuote?: boolean },
-): Promise<void> {
-  if (files.length === 0) return;
+): Promise<CommercialSnapshot> {
+  if (files.length === 0) throw new Error("COMMERCIAL_DOCUMENTS_REQUIRED");
   const form = new FormData();
   files.forEach((file) => form.append("files", file));
   form.set("category", options.category);
@@ -109,12 +110,14 @@ async function uploadCommercialDocument(
   form.set("variantLabel", "");
   form.set("isCurrent", "1");
   form.set("isSignedQuote", options.isSignedQuote ? "1" : "0");
+  form.set("expectedUpdatedAt", expectedUpdatedAt);
   const response = await fetch(`/api/desktop/commercial/${caseId}/documents`, {
     method: "POST",
     body: form,
   });
-  const result = (await response.json()) as { error?: string };
+  const result = (await response.json()) as CommercialSnapshot & { error?: string };
   if (!response.ok) throw new Error(result.error ?? "COMMERCIAL_DOCUMENT_UPLOAD_FAILED");
+  return result;
 }
 
 export function ChantiersWorkspaceObat() {
@@ -455,6 +458,7 @@ function LaunchSheet({
   const [uploadedCosting, setUploadedCosting] = useState(false);
   const [uploadedSigned, setUploadedSigned] = useState(false);
   const [analysisApplied, setAnalysisApplied] = useState(false);
+  const [commercialUpdatedAt, setCommercialUpdatedAt] = useState(item.updatedAt);
 
   const stagedQuote = analysis?.files.some((file) => file.kind === "QUOTE") ?? false;
   const stagedCosting = analysis?.files.some((file) => file.kind === "COSTING") ?? false;
@@ -494,10 +498,13 @@ function LaunchSheet({
   }
 
   async function applyPendingDocuments(): Promise<void> {
+    let currentUpdatedAt = commercialUpdatedAt;
+
     if (analysis && !analysisApplied) {
       const details = await postCommercial({
         action: "updateDetails",
         caseId: item.id,
+        expectedUpdatedAt: currentUpdatedAt,
         name: analysis.projectName || item.name,
         clientName: analysis.clientName || item.clientName || "",
         siteLabel: analysis.projectName || item.siteLabel || "",
@@ -508,45 +515,74 @@ function LaunchSheet({
         nextAction: item.nextAction || "",
       });
       const updated = details.payload.cases.find((candidate) => candidate.id === item.id) ?? item;
+      currentUpdatedAt = updated.updatedAt;
+      setCommercialUpdatedAt(currentUpdatedAt);
       if (
         analysis.hours.be !== null ||
         analysis.hours.workshop !== null ||
         analysis.hours.install !== null
       ) {
-        await postCommercial({
+        const provision = await postCommercial({
           action: "updateProvision",
           caseId: item.id,
+          expectedUpdatedAt: currentUpdatedAt,
           be: analysis.hours.be ?? updated.provisionHours.be,
           workshop: analysis.hours.workshop ?? updated.provisionHours.workshop,
           install: analysis.hours.install ?? updated.provisionHours.install,
         });
+        const provisioned =
+          provision.payload.cases.find((candidate) => candidate.id === item.id) ?? updated;
+        currentUpdatedAt = provisioned.updatedAt;
+        setCommercialUpdatedAt(currentUpdatedAt);
       }
 
       const quotes = obatFiles.filter((file) => obatKindForFile(file, analysis) === "QUOTE");
       const costings = obatFiles.filter((file) => obatKindForFile(file, analysis) === "COSTING");
       if (quotes.length > 0 && !uploadedQuote) {
-        await uploadCommercialDocument(item.id, quotes, {
+        const uploaded = await uploadCommercialDocument(item.id, quotes, currentUpdatedAt, {
           category: "QUOTE",
           versionLabel: analysis.quoteNumber ?? "",
         });
+        const refreshed =
+          uploaded.payload.cases.find((candidate) => candidate.id === item.id) ?? updated;
+        currentUpdatedAt = refreshed.updatedAt;
+        setCommercialUpdatedAt(currentUpdatedAt);
         setUploadedQuote(true);
       }
       if (costings.length > 0 && !uploadedCosting) {
-        await uploadCommercialDocument(item.id, costings, {
-          category: "COSTING",
-          versionLabel: analysis.quoteNumber ?? "",
-        });
+        const uploaded = await uploadCommercialDocument(
+          item.id,
+          costings,
+          currentUpdatedAt,
+          {
+            category: "COSTING",
+            versionLabel: analysis.quoteNumber ?? "",
+          },
+        );
+        const refreshed =
+          uploaded.payload.cases.find((candidate) => candidate.id === item.id) ?? updated;
+        currentUpdatedAt = refreshed.updatedAt;
+        setCommercialUpdatedAt(currentUpdatedAt);
         setUploadedCosting(true);
       }
       setAnalysisApplied(true);
     }
 
     if (signedFile && !uploadedSigned) {
-      await uploadCommercialDocument(item.id, [signedFile], {
-        category: "QUOTE",
-        versionLabel: analysis?.quoteNumber ?? "",
-        isSignedQuote: true,
-      });
+      const uploaded = await uploadCommercialDocument(
+        item.id,
+        [signedFile],
+        currentUpdatedAt,
+        {
+          category: "QUOTE",
+          versionLabel: analysis?.quoteNumber ?? "",
+          isSignedQuote: true,
+        },
+      );
+      const refreshed =
+        uploaded.payload.cases.find((candidate) => candidate.id === item.id) ?? item;
+      currentUpdatedAt = refreshed.updatedAt;
+      setCommercialUpdatedAt(currentUpdatedAt);
       setUploadedSigned(true);
     }
   }
