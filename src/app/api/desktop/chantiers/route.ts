@@ -11,6 +11,7 @@ import {
 import { createCommercialRepository } from "@/lib/commercial/create-repository";
 import {
   applyChantierMutation,
+  assertChantierRevision,
   chantierCapabilities,
   chantierMutationSchema,
 } from "@/lib/chantiers/mutations";
@@ -145,9 +146,7 @@ export async function POST(request: Request) {
         (candidate) => candidate.id === input.chantierId,
       );
       if (!openedChantier) throw new Error("CHANTIER_NOT_FOUND");
-      if (openedChantier.updatedAt !== expectedUpdatedAt) {
-        throw new Error("CHANTIERS_VERSION_CONFLICT");
-      }
+      assertChantierRevision(openedChantier, expectedUpdatedAt);
 
       let normalizedInput = input;
 
