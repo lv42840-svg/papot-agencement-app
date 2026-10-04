@@ -1,3 +1,4 @@
+import { createHash } from "node:crypto";
 import { NextResponse } from "next/server";
 import { ZodError, z } from "zod";
 import { hasEffectiveSpecialPermission, requireSpecialPermission } from "@/lib/auth/permissions";
@@ -20,6 +21,7 @@ import {
   buildFirmGrandPlanningRows,
   PLANNING_ABSENCE_TYPE_LABELS,
   planningYearWeekIds,
+  type PlanningPayload,
 } from "@/lib/planning/domain";
 import { assertPlanningWeekEditable, isPlanningWeekPast } from "@/lib/planning/time-markers";
 import {
@@ -40,6 +42,12 @@ export const dynamic = "force-dynamic";
 
 const yearSchema = z.coerce.number().int().min(2020).max(2100);
 
+function planningRevision(payload: PlanningPayload): string {
+  return createHash("sha256")
+    .update(JSON.stringify(payload))
+    .digest("hex");
+}
+
 function noStoreJson(body: unknown, init?: ResponseInit) {
   const response = NextResponse.json(body, init);
   response.headers.set("Cache-Control", "no-store");
@@ -55,6 +63,7 @@ function statusFor(code: string): number {
     code === "PLANNING_USER_NOT_ACTIVE"
   )
     return 409;
+  if (code === "PLANNING_VERSION_REQUIRED") return 428;
   if (code.includes("VERSION_CONFLICT")) return 409;
   if (code.includes("INVALID")) return 400;
   return 400;
@@ -119,6 +128,7 @@ async function snapshot(
 
   return {
     year,
+    revision: planningRevision(planning),
     weeks,
     rows,
     provisionalRows,
@@ -168,11 +178,27 @@ export async function GET(request: Request) {
 
 export async function POST(request: Request) {
   try {
-    const body = await request.json();
+    const body = (await request.json()) as Record<string, unknown>;
     const year = yearSchema.parse(body.year ?? new Date().getFullYear());
     const input = planningMutationSchema.parse(body);
+    const expectedRevision =
+      typeof body.expectedRevision === "string"
+        ? body.expectedRevision.trim()
+        : "";
+    if (!expectedRevision) throw new Error("PLANNING_VERSION_REQUIRED");
     const context = await requireDesktopRequestContext("planning", "WRITE");
     const planningRepository = createPlanningRepository();
+    const mutatePlanning = async (
+      transform: (
+        payload: PlanningPayload,
+      ) => PlanningPayload | Promise<PlanningPayload>,
+    ) =>
+      planningRepository.mutate(async (payload) => {
+        if (planningRevision(payload) !== expectedRevision) {
+          throw new Error("PLANNING_VERSION_CONFLICT");
+        }
+        return transform(payload);
+      });
 
     if (input.action === "setMacroHours") {
       await requireSpecialPermission(context.user, "planning.edit_macro");
@@ -183,7 +209,7 @@ export async function POST(request: Request) {
           .filter((chantier) => chantier.status === "ACTIVE")
           .map((chantier) => chantier.id),
       );
-      await planningRepository.mutate((payload) =>
+      await mutatePlanning((payload) =>
         applyPlanningMacroMutation(payload, input, activeChantierIds),
       );
     } else if (input.action === "setActualHours") {
@@ -201,7 +227,7 @@ export async function POST(request: Request) {
       const activeUserIds = new Set(
         auth.users.filter((candidate) => candidate.isActive).map((candidate) => candidate.id),
       );
-      await planningRepository.mutate((payload) =>
+      await mutatePlanning((payload) =>
         applyPlanningActualHoursMutation(payload, input, activeChantierIds, activeUserIds),
       );
     } else if (input.action === "setChantierOrder") {
@@ -212,7 +238,7 @@ export async function POST(request: Request) {
           .filter((chantier) => chantier.status === "ACTIVE")
           .map((chantier) => chantier.id),
       );
-      await planningRepository.mutate((payload) =>
+      await mutatePlanning((payload) =>
         applyPlanningChantierOrderMutation(payload, input, activeChantierIds),
       );
     } else if (input.action === "setProvisionHours") {
@@ -222,7 +248,7 @@ export async function POST(request: Request) {
       const activeCommercialCaseIds = new Set(
         commercial.cases.filter(isCommercialActive).map((item) => item.id),
       );
-      await planningRepository.mutate((payload) =>
+      await mutatePlanning((payload) =>
         applyPlanningProvisionalMutation(payload, input, activeCommercialCaseIds),
       );
     } else if (input.action === "setPotentialOrder") {
@@ -240,7 +266,7 @@ export async function POST(request: Request) {
           )
           .map((item) => item.id),
       );
-      await planningRepository.mutate((payload) => {
+      await mutatePlanning((payload) => {
         const activePotentialCaseIds = new Set(referenceCaseIds);
         for (const allocation of payload.provisionalAllocations) {
           if (activeCaseIds.has(allocation.caseId)) activePotentialCaseIds.add(allocation.caseId);
@@ -255,19 +281,19 @@ export async function POST(request: Request) {
       );
 
       if (input.action === "setPersonCapacity") {
-        await planningRepository.mutate((payload) =>
+        await mutatePlanning((payload) =>
           applyPlanningPersonCapacityMutation(payload, input, activeUserIds),
         );
       } else if (input.action === "setAbsence") {
-        await planningRepository.mutate((payload) =>
+        await mutatePlanning((payload) =>
           applyPlanningAbsenceMutation(payload, input, activeUserIds),
         );
       } else if (input.action === "setFullWeekAbsence") {
-        await planningRepository.mutate((payload) =>
+        await mutatePlanning((payload) =>
           applyPlanningFullWeekAbsenceMutation(payload, input, activeUserIds),
         );
       } else {
-        await planningRepository.mutate((payload) =>
+        await mutatePlanning((payload) =>
           applyPlanningDeleteAbsenceMutation(payload, input),
         );
       }
