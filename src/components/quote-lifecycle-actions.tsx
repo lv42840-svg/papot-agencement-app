@@ -3,6 +3,7 @@
 import { Copy, GitBranch, History } from "lucide-react";
 import { useState } from "react";
 import { quoteHref } from "@/lib/quotes/navigation";
+import { quoteRevisionHeaders } from "@/lib/quotes/concurrency";
 import type { NativeQuoteRecord, NativeQuotesPayload } from "@/lib/quotes/store";
 
 type LifecycleAction = "createVersion" | "createVariant" | "duplicateQuote";
@@ -42,7 +43,10 @@ export function QuoteLifecycleActions({
     try {
       const response = await fetch(`/api/desktop/quotes/${quote.id}/lifecycle`, {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers: {
+          "Content-Type": "application/json",
+          ...quoteRevisionHeaders(quote.updatedAt),
+        },
         body: JSON.stringify({ action }),
       });
       const data = (await response.json()) as LifecycleResponse;
