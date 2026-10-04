@@ -2,6 +2,7 @@
 
 import { Check, LockKeyhole, Pencil, X } from "lucide-react";
 import { type FormEvent, useState } from "react";
+import { quoteRevisionHeaders } from "@/lib/quotes/concurrency";
 import type { NativeQuoteRecord, NativeQuotesPayload } from "@/lib/quotes/store";
 
 type QuoteDetailsResponse = {
@@ -72,7 +73,10 @@ export function QuoteGeneralInfoEditor({
     try {
       const response = await fetch(`/api/desktop/quotes/${quote.id}/details`, {
         method: "PATCH",
-        headers: { "Content-Type": "application/json" },
+        headers: {
+          "Content-Type": "application/json",
+          ...quoteRevisionHeaders(quote.updatedAt),
+        },
         body: JSON.stringify({
           subject,
           issueDate,
