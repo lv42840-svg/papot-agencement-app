@@ -2,58 +2,49 @@
 
 Application interne PAPOT AGENCEMENT, V1 en développement.
 
-Le cahier des charges officiel Google Drive reste la source de vérité fonctionnelle. Le dépôt Git contient le code correspondant à l'état réellement développé ainsi que des notes techniques datées. En cas de contradiction, les décisions AGE les plus récentes du cahier des charges priment.
+Le cahier des charges officiel reste la source de vérité fonctionnelle. Le dépôt Git contient le code correspondant à l'état réellement développé ainsi que les notes techniques utiles au déploiement.
 
-## État actuel du socle
+## Architecture actuelle
 
-Le projet comprend désormais :
+Le socle principal est désormais :
 
-- application Next.js / React / TypeScript ;
-- application Windows Electron avec installeur NSIS ;
-- Nextcloud comme stockage partagé de l'application et des documents ;
-- ressources JSON versionnées avec ETag, verrous et reprise de conflit pour les données partagées ;
-- SQLite local uniquement pour cache, configuration, état appareil et travaux locaux de synchronisation ;
+- application web Next.js / React / TypeScript ;
+- PostgreSQL comme base de données métier ;
+- stockage serveur pour les documents et pièces jointes ;
 - authentification PAPOT par session serveur ;
-- utilisateurs, droits READ / WRITE, droits spéciaux et sessions stockés dans l'état partagé Nextcloud ;
-- shell desktop lavande avec navigation latérale ;
-- premiers modules Entrées, Commercial, Chantiers et Planning en phase de reprise/audit métier.
+- utilisateurs, droits READ / WRITE et droits spéciaux stockés côté serveur ;
+- génération documentaire Word vers PDF ;
+- déploiement Docker sur le VPS PAPOT ;
+- application Windows Electron conservée comme enveloppe locale optionnelle.
 
-## Architecture retenue
+Le web et le VPS ne dépendent d'aucun stockage tiers pour fonctionner.
 
-PAPOT AGENCEMENT ne dépend pas de PostgreSQL.
+## Modules raccordés
 
-Nextcloud est l'autorité partagée pour les données de l'application et les documents. Les ressources métier sont stockées sous forme d'états versionnés ; les écritures utilisent les mécanismes WebDAV, ETag, verrouillage et détection de conflits du socle de synchronisation.
-
-Chaque poste Windows possède un `device_id` stable. L'identité métier vient du **vrai utilisateur PAPOT connecté**, jamais d'un utilisateur codé dans la configuration du poste.
-
-Le premier lancement demande uniquement les informations nécessaires au poste, au dossier partagé et au compte technique Nextcloud. Le premier administrateur PAPOT est ensuite créé dans l'application. Les utilisateurs suivants sont créés par un administrateur.
-
-## Modules actuellement raccordés
-
-- **Entrées** : stockage partagé Nextcloud, capture rapide, qualification, affectation, historique et pièces jointes ;
-- **Commercial** : clients/affaires dans l'état partagé Nextcloud, documents dans Nextcloud ;
-- **Chantiers** : ressources partagées Nextcloud et lancement depuis une affaire ;
-- **Utilisateurs et droits** : comptes PAPOT, sessions, READ / WRITE et droits spéciaux dans Nextcloud ;
-- **Planning** : socle de ressource partagée déjà présent, reprise fonctionnelle encore en cours.
+- **Entrées** : capture, qualification, affectation, historique et pièces jointes ;
+- **Clients** : fiches clients, contacts, TVA et conditions de paiement ;
+- **Commercial** : affaires, suivi, documents et passage vers devis / chantier ;
+- **Devis** : chiffrage natif PAPOT, bibliothèque, PDF, validation et envoi ;
+- **Chantiers** : lancement depuis une affaire, suivi opérationnel et rentabilité ;
+- **Planning** : charge, capacités, absences et heures ;
+- **Utilisateurs et droits** : comptes PAPOT, sessions et permissions.
 
 L'ancienne route `/capture` redirige vers le module Entrées afin de conserver une seule entrée canonique.
 
-## Devis / facturation natifs
-
-Le flux cible est désormais :
+## Flux métier cible
 
 `Capture -> Client -> Affaire -> Chiffrage -> Devis -> Confirmation -> Chantier -> Production -> TS -> Facture -> Paiement`
 
-OBAT n'est plus une dépendance centrale pour les nouveaux devis/factures PAPOT. Les anciens documents OBAT restent historiques.
-
-Le moteur documentaire Word -> données -> PDF a été validé en preuve de concept avec de vrais devis/factures. Son intégration production sera faite au moment où la reprise des modules arrivera naturellement au module Devis.
+Les devis sont générés directement par PAPOT à partir des données de l'application. Le PDF final est archivé dans le stockage serveur de PAPOT.
 
 ## Stack technique
 
 - Next.js App Router + React + TypeScript strict
-- Electron + electron-builder / NSIS
-- Nextcloud WebDAV / OCS pour données partagées, fichiers et synchronisation
-- SQLite local pour état non métier partagé
+- PostgreSQL
+- Docker
+- stockage de fichiers serveur
+- Electron + electron-builder / NSIS pour l'enveloppe Windows
+- SQLite local uniquement pour le mode local de développement / secours
 - authentification par mot de passe `scrypt` et session en cookie HttpOnly
 - Zod pour les validations d'entrée
 - Vitest pour les tests
@@ -100,8 +91,7 @@ Le workflow `.github/workflows/ci.yml` rejoue ces contrôles sur les Pull Reques
 - aucun secret dans le dépôt ;
 - mots de passe hachés avec `scrypt` et sel aléatoire ;
 - cookies de session HttpOnly, SameSite=Lax et Secure en production ;
-- sessions stockées sous forme de hash de jeton dans l'état partagé ;
+- sessions stockées sous forme de hash de jeton ;
 - validation des entrées API ;
 - contrôles de droits côté serveur obligatoires ;
-- secret technique Nextcloud stocké localement via le coffre sécurisé Windows ;
-- ressource `AUTH` réservée au serveur et non modifiable via l'API générique de ressources partagées.
+- secrets de production stockés uniquement dans l'environnement du VPS.

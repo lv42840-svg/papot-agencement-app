@@ -126,7 +126,7 @@ describe("server file storage", () => {
     process.env.PAPOT_STORAGE_MODE = "server";
     process.env.PAPOT_DESKTOP_CONFIG_JSON = JSON.stringify({
       shared_data_path: root,
-      nextcloud_base_url: "https://unused.example.test",
+      legacy_cloud_base_url: "https://unused.example.test",
     });
 
     const store = getServerFileStore();

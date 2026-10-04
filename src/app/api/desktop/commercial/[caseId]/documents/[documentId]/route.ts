@@ -37,7 +37,9 @@ export async function GET(request: Request, context: RouteContext) {
       return NextResponse.json({ error: "COMMERCIAL_DOCUMENT_NOT_FOUND" }, { status: 404 });
     }
 
-    const transport = await createCommercialDocumentTransport({ displayName: requestContext.user.displayName });
+    const transport = await createCommercialDocumentTransport({
+      displayName: requestContext.user.displayName,
+    });
     const bytes = await readCommercialDocument(transport, document);
     const download = new URL(request.url).searchParams.get("download") === "1";
     const canInline =

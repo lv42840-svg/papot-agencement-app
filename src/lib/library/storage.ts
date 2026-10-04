@@ -1,6 +1,4 @@
 import { z } from "zod";
-import type { SharedResourceEnvelope } from "../sync/resource-lock";
-import type { SaveSharedResourceResult, SharedResourceActor } from "../sync/resource-state-store";
 import { libraryComponentSchema, parseLibraryComponent, type LibraryComponent } from "./component";
 import { libraryOuvrageSchema, parseLibraryOuvrage, type LibraryOuvrage } from "./ouvrage";
 
@@ -23,21 +21,6 @@ export type LibraryPayload = z.infer<typeof libraryPayloadSchema>;
 export type LibrarySnapshot = {
   version: number;
   payload: LibraryPayload;
-};
-
-export type SaveLibraryResult =
-  | { status: "saved"; library: LibrarySnapshot }
-  | { status: "conflict"; current: LibrarySnapshot | null };
-
-type LibraryResourceStore = {
-  get(resource: typeof LIBRARY_RESOURCE_REF): Promise<SharedResourceEnvelope | null>;
-  save(params: {
-    resource: typeof LIBRARY_RESOURCE_REF;
-    expectedVersion: number;
-    payload: unknown;
-    actor: SharedResourceActor;
-    now?: Date;
-  }): Promise<SaveSharedResourceResult>;
 };
 
 export function createInitialLibraryPayload(): LibraryPayload {
@@ -85,62 +68,3 @@ export function parseLibraryPayload(value: unknown): LibraryPayload {
 
   return parsed.data;
 }
-
-function snapshotFromEnvelope(envelope: SharedResourceEnvelope): LibrarySnapshot {
-  if (
-    envelope.resource.resource_type !== LIBRARY_RESOURCE_REF.resource_type ||
-    envelope.resource.resource_id !== LIBRARY_RESOURCE_REF.resource_id
-  ) {
-    throw new Error("LIBRARY_RESOURCE_MISMATCH");
-  }
-
-  return {
-    version: envelope.version,
-    payload: parseLibraryPayload(envelope.payload),
-  };
-}
-
-export class SharedResourceLibraryStore {
-  constructor(private readonly resources: LibraryResourceStore) {}
-
-  async get(): Promise<LibrarySnapshot> {
-    const envelope = await this.resources.get(LIBRARY_RESOURCE_REF);
-    if (!envelope) {
-      return {
-        version: 0,
-        payload: createInitialLibraryPayload(),
-      };
-    }
-    return snapshotFromEnvelope(envelope);
-  }
-
-  async save(params: {
-    expectedVersion: number;
-    payload: unknown;
-    actor: SharedResourceActor;
-    now?: Date;
-  }): Promise<SaveLibraryResult> {
-    const payload = parseLibraryPayload(params.payload);
-    const result = await this.resources.save({
-      resource: LIBRARY_RESOURCE_REF,
-      expectedVersion: params.expectedVersion,
-      payload,
-      actor: params.actor,
-      now: params.now,
-    });
-
-    if (result.status === "saved") {
-      return {
-        status: "saved",
-        library: snapshotFromEnvelope(result.resource),
-      };
-    }
-
-    return {
-      status: "conflict",
-      current: result.current ? snapshotFromEnvelope(result.current) : null,
-    };
-  }
-}
-
-export { SharedResourceLibraryStore as NextcloudLibraryStore };

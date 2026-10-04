@@ -155,6 +155,12 @@ function findChantier(payload: ChantiersPayload, chantierId: string): ChantierRe
   return item;
 }
 
+export function assertChantierRevision(item: ChantierRecord, expectedUpdatedAt: string): void {
+  if (item.updatedAt !== expectedUpdatedAt) {
+    throw new Error("CHANTIERS_VERSION_CONFLICT");
+  }
+}
+
 function history(
   item: ChantierRecord,
   actorName: string,
@@ -345,7 +351,7 @@ export function launchChantierFromCommercial(
   const absent = [
     !quotePresent ? "devis client" : null,
     !signedQuotePresent ? "devis signé" : null,
-    !costingPresent ? "déboursé OBAT" : null,
+    !costingPresent ? "déboursé" : null,
   ].filter(Boolean);
   history(
     item,

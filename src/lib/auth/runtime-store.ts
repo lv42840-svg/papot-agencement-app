@@ -1,11 +1,8 @@
 import "server-only";
 
-import { createDesktopSharedResourceRuntime } from "../desktop/shared-resource-runtime";
 import { isLocalStorageMode, mutateLocalSnapshot, readLocalSnapshot } from "../local-db/runtime";
 import { getServerDbPool, runServerDbMigrations } from "../server-db";
-import { ensureAuthPostgresCutover } from "./cutover";
 import { parseAuthPayload, pruneExpiredSessions, type AuthPayload } from "./domain";
-import { acquireNextcloudAuthSnapshot } from "./nextcloud-source";
 import { createPostgresAuthRepository, type PostgresAuthRepository } from "./postgres-repository";
 
 const LOCAL_AUTH_RESOURCE = "auth";
@@ -14,21 +11,6 @@ let repositoryPromise: Promise<PostgresAuthRepository> | undefined;
 async function initializeAuthRepository(): Promise<PostgresAuthRepository> {
   const pool = getServerDbPool();
   await runServerDbMigrations(pool);
-  await ensureAuthPostgresCutover({
-    pool,
-    acquireSource: async () => {
-      const desktop = createDesktopSharedResourceRuntime();
-      return acquireNextcloudAuthSnapshot({
-        states: desktop.states,
-        locks: desktop.locks,
-        owner: {
-          userId: desktop.nextcloudUserId,
-          deviceId: desktop.deviceId,
-          displayName: "PAPOT Auth cutover",
-        },
-      });
-    },
-  });
   return createPostgresAuthRepository(pool);
 }
 

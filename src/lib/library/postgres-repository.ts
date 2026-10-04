@@ -4,22 +4,20 @@ import type { Pool, PoolClient } from "pg";
 
 import { getServerDbPool } from "../server-db/pool";
 import { withServerDbTransaction } from "../server-db/transaction";
-import type { OpenSharedResourceResult } from "../sync/resource-edit-coordinator";
 import {
-  createResourceLock,
-  isResourceLockExpired,
-  isResourceLockOwnedBy,
-  nextSharedResourceVersion,
-  renewResourceLock,
-  sharedResourceEnvelopeSchema,
-  sharedResourceLockSchema,
-  type ResourceLockOwner,
-  type SharedResourceEnvelope,
-  type SharedResourceLock,
-} from "../sync/resource-lock";
-import type { SaveSharedResourceResult } from "../sync/resource-state-store";
+  createLibraryLock,
+  isLibraryLockExpired,
+  isLibraryLockOwnedBy,
+  libraryEditLockSchema,
+  renewLibraryLock,
+  type LibraryEditLock,
+  type LibraryEnvelope,
+  type LibraryLockOwner,
+  type OpenLibraryResult,
+  type SaveLibraryEditResult,
+} from "./edit-lock";
 import type { LibraryRepository } from "./repository";
-import { LIBRARY_RESOURCE_REF, parseLibraryPayload, type LibrarySnapshot } from "./storage";
+import { parseLibraryPayload, type LibrarySnapshot } from "./storage";
 
 type LibraryStateRow = {
   version: number;
@@ -40,20 +38,11 @@ type RepositoryOptions = {
   ttlMs?: number;
 };
 
-function isoDate(value: Date | string): string {
-  return (value instanceof Date ? value : new Date(value)).toISOString();
-}
-
-function envelopeFromRow(row: LibraryStateRow): SharedResourceEnvelope {
-  return sharedResourceEnvelopeSchema.parse({
-    schema_version: 1,
-    resource: LIBRARY_RESOURCE_REF,
+function envelopeFromRow(row: LibraryStateRow): LibraryEnvelope {
+  return {
     version: row.version,
-    updated_at: isoDate(row.updated_at),
-    updated_by_user_id: row.updated_by_user_id,
-    updated_by_device_id: row.updated_by_device_id,
     payload: parseLibraryPayload(row.payload),
-  });
+  };
 }
 
 function snapshotFromRow(row: LibraryStateRow): LibrarySnapshot {
@@ -77,7 +66,7 @@ async function loadState(queryable: Queryable, forUpdate = false): Promise<Libra
   return row;
 }
 
-async function loadLock(client: PoolClient): Promise<SharedResourceLock | null> {
+async function loadLock(client: PoolClient): Promise<LibraryEditLock | null> {
   const result = await client.query<LibraryLockRow>(
     `
       SELECT lock_data
@@ -87,10 +76,10 @@ async function loadLock(client: PoolClient): Promise<SharedResourceLock | null> 
     `,
   );
   const row = result.rows[0];
-  return row ? sharedResourceLockSchema.parse(row.lock_data) : null;
+  return row ? libraryEditLockSchema.parse(row.lock_data) : null;
 }
 
-async function storeLock(client: PoolClient, lock: SharedResourceLock): Promise<void> {
+async function storeLock(client: PoolClient, lock: LibraryEditLock): Promise<void> {
   await client.query(
     `
       INSERT INTO papot_library_edit_lock (scope, lock_data)
@@ -102,7 +91,7 @@ async function storeLock(client: PoolClient, lock: SharedResourceLock): Promise<
 }
 
 export function createPostgresLibraryRepository(
-  owner: ResourceLockOwner,
+  owner: LibraryLockOwner,
   pool: Pool = getServerDbPool(),
   options: RepositoryOptions = {},
 ): LibraryRepository {
@@ -113,14 +102,14 @@ export function createPostgresLibraryRepository(
       return snapshotFromRow(await loadState(pool));
     },
 
-    async open(leaseId: string): Promise<OpenSharedResourceResult> {
+    async open(leaseId: string): Promise<OpenLibraryResult> {
       return withServerDbTransaction(async (client) => {
         const state = await loadState(client, true);
         const resource = envelopeFromRow(state);
         const now = clock();
         let currentLock = await loadLock(client);
 
-        if (currentLock && isResourceLockExpired(currentLock, now)) {
+        if (currentLock && isLibraryLockExpired(currentLock, now)) {
           await client.query("DELETE FROM papot_library_edit_lock WHERE scope = 'catalog'");
           currentLock = null;
         }
@@ -134,8 +123,7 @@ export function createPostgresLibraryRepository(
           };
         }
 
-        const lock = createResourceLock({
-          resource: LIBRARY_RESOURCE_REF,
+        const lock = createLibraryLock({
           leaseId,
           owner,
           baseVersion: state.version,
@@ -153,7 +141,7 @@ export function createPostgresLibraryRepository(
       }, pool);
     },
 
-    async save(input): Promise<SaveSharedResourceResult> {
+    async save(input): Promise<SaveLibraryEditResult> {
       if (!Number.isInteger(input.expectedVersion) || input.expectedVersion < 0) {
         throw new Error("EXPECTED_VERSION_INVALID");
       }
@@ -165,7 +153,7 @@ export function createPostgresLibraryRepository(
         if (!currentLock) throw new Error("LOCK_NOT_FOUND");
 
         const now = clock();
-        const renewed = renewResourceLock({
+        const renewed = renewLibraryLock({
           current: currentLock,
           leaseId: input.leaseId,
           owner,
@@ -181,7 +169,7 @@ export function createPostgresLibraryRepository(
           };
         }
 
-        const nextVersion = nextSharedResourceVersion(state.version);
+        const nextVersion = state.version + 1;
         const saved = await client.query<LibraryStateRow>(
           `
             UPDATE papot_library_state
@@ -205,12 +193,12 @@ export function createPostgresLibraryRepository(
       }, pool);
     },
 
-    async renew(leaseId: string): Promise<SharedResourceLock> {
+    async renew(leaseId: string): Promise<LibraryEditLock> {
       return withServerDbTransaction(async (client) => {
         const currentLock = await loadLock(client);
         if (!currentLock) throw new Error("LOCK_NOT_FOUND");
 
-        const renewed = renewResourceLock({
+        const renewed = renewLibraryLock({
           current: currentLock,
           leaseId,
           owner,
@@ -226,7 +214,7 @@ export function createPostgresLibraryRepository(
       return withServerDbTransaction(async (client) => {
         const currentLock = await loadLock(client);
         if (!currentLock) return false;
-        if (!isResourceLockOwnedBy(currentLock, leaseId, owner)) {
+        if (!isLibraryLockOwnedBy(currentLock, leaseId, owner)) {
           throw new Error("LOCK_NOT_OWNED");
         }
 

@@ -1,4 +1,4 @@
-import { ChantiersWorkspaceObat } from "@/components/chantiers-workspace-obat";
+import { ChantiersWorkspace } from "@/components/chantiers-workspace";
 import { DesktopAppShell } from "@/components/desktop-app-shell";
 
 export const dynamic = "force-dynamic";
@@ -6,7 +6,7 @@ export const dynamic = "force-dynamic";
 export default function ChantiersPage() {
   return (
     <DesktopAppShell>
-      <ChantiersWorkspaceObat />
+      <ChantiersWorkspace />
     </DesktopAppShell>
   );
 }

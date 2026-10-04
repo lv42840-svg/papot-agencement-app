@@ -2,7 +2,6 @@ import "server-only";
 
 import { randomUUID } from "node:crypto";
 import type { ServerFileStore } from "@/lib/server-files/storage";
-import type { NextcloudDavClient } from "@/lib/sync/nextcloud-dav";
 import type { EntryAttachment } from "./domain";
 
 export const MAX_ENTRY_ATTACHMENTS_PER_UPLOAD = 12;
@@ -11,12 +10,6 @@ export const MAX_ENTRY_ATTACHMENT_BYTES = 100 * 1024 * 1024;
 export type EntryAttachmentTransport = {
   store: ServerFileStore;
   displayName: string;
-};
-
-export type LegacyEntryAttachmentTransport = {
-  dav: NextcloudDavClient;
-  nextcloudUserId: string;
-  syncRoot: string;
 };
 
 function safeFileName(value: string): string {
@@ -97,17 +90,6 @@ export async function readEntryAttachment(
     throw new Error("ENTRY_ATTACHMENT_INTEGRITY_MISMATCH");
   }
   return bytes;
-}
-
-export async function readLegacyEntryAttachmentBytes(
-  transport: LegacyEntryAttachmentTransport,
-  attachment: EntryAttachment,
-): Promise<Buffer> {
-  const segments = validateAttachmentPath(attachment);
-  let url = transport.dav.filesRoot(transport.nextcloudUserId);
-  url = transport.dav.childUrl(url, transport.syncRoot);
-  for (const segment of segments) url = transport.dav.childUrl(url, segment);
-  return transport.dav.getBytes(url);
 }
 
 export async function cleanupEntryAttachments(

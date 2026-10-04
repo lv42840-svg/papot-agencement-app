@@ -12,7 +12,7 @@ const uiSource = readFileSync(
 
 describe("grand planning commercial provision bridge", () => {
   it("loads commercial provisions into the planning snapshot without storing totals in planning", () => {
-    expect(apiSource).toContain("createCommercialRepository(context).load()");
+    expect(apiSource).toContain("createCommercialRepository().load()");
     expect(apiSource).toContain("buildCommercialProvisionRows(commercial, planning, year)");
     expect(apiSource).toContain("provisionalRows");
   });

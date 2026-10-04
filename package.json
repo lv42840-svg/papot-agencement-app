@@ -16,8 +16,7 @@
     "format": "prettier --write .",
     "format:check": "prettier --check .",
     "typecheck": "tsc --noEmit",
-    "test": "vitest run",
-    "nextcloud:probe": "tsx scripts/nextcloud-probe.ts"
+    "test": "vitest run"
   },
   "dependencies": {
     "lucide-react": "0.468.0",

@@ -4,8 +4,6 @@ import { fileURLToPath } from "node:url";
 import { describe, expect, it } from "vitest";
 
 const desktopApiRoot = fileURLToPath(new URL("../src/app/api/desktop", import.meta.url));
-const legacyDesktopOnlyRoutes = new Set(["shared-resource/route.ts"]);
-
 function routeFiles(dir: string): string[] {
   return readdirSync(dir, { withFileTypes: true }).flatMap((entry) => {
     const fullPath = join(dir, entry.name);
@@ -18,8 +16,6 @@ describe("web runtime isolation from desktop runtime", () => {
   it("keeps every web-used desktop-prefixed API route free of DesktopRequestContext", () => {
     for (const file of routeFiles(desktopApiRoot)) {
       const routePath = relative(desktopApiRoot, file).replaceAll("\\", "/");
-      if (legacyDesktopOnlyRoutes.has(routePath)) continue;
-
       const source = readFileSync(file, "utf-8");
       expect(source, routePath).not.toContain("requireDesktopRequestContext");
       expect(source, routePath).not.toContain("createDesktopSharedResourceRuntime");

@@ -1,17 +1,10 @@
-import type { DesktopRequestContext } from "@/lib/desktop/request-context";
 import { isLocalStorageMode } from "@/lib/local-db/runtime";
 import { getServerDbPool, runServerDbMigrations } from "@/lib/server-db";
-import { ensureCommercialPostgresCutover } from "./cutover";
 import { createLocalCommercialRepository } from "./local-repository";
-import { acquireNextcloudCommercialSnapshot } from "./nextcloud-repository";
 import { createPostgresCommercialRepository } from "./postgres-repository";
 import type { CommercialRepository } from "./repository";
 
-type LegacyCommercialCutoverContext = Pick<DesktopRequestContext, "desktop" | "owner">;
-
-export function createCommercialRepository(
-  context?: LegacyCommercialCutoverContext,
-): CommercialRepository {
+export function createCommercialRepository(): CommercialRepository {
   if (isLocalStorageMode()) return createLocalCommercialRepository();
 
   let repositoryPromise: Promise<CommercialRepository> | null = null;
@@ -20,16 +13,6 @@ export function createCommercialRepository(
     repositoryPromise ??= (async () => {
       const pool = getServerDbPool();
       await runServerDbMigrations(pool);
-      await ensureCommercialPostgresCutover({
-        pool,
-        acquireSource: () => {
-          if (!context) throw new Error("COMMERCIAL_LEGACY_CUTOVER_CONTEXT_REQUIRED");
-          return acquireNextcloudCommercialSnapshot({
-            desktop: context.desktop,
-            owner: context.owner,
-          });
-        },
-      });
       return createPostgresCommercialRepository(pool);
     })();
     return repositoryPromise;

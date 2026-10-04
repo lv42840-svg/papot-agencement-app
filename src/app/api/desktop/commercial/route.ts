@@ -18,6 +18,7 @@ import {
 } from "@/lib/commercial/domain";
 import {
   applyCommercialMutation,
+  assertCommercialRevision,
   commercialMutationSchema,
   listCommercialPeople,
   type CommercialMutation,
@@ -225,6 +226,11 @@ export async function POST(request: Request) {
   try {
     const raw = (await request.json()) as RawRequest;
     const input = commercialMutationSchema.parse(raw);
+    const expectedUpdatedAt =
+      input.action === "create" ? null : rawString(raw, "expectedUpdatedAt");
+    if (input.action !== "create" && !expectedUpdatedAt) {
+      throw new Error("COMMERCIAL_VERSION_REQUIRED");
+    }
     stage = "create-runtime";
     const context = await requireModuleRequestContext("commercial", "WRITE");
     const requiredSpecialPermission = commercialSpecialPermissionForMutation(input);
@@ -246,6 +252,12 @@ export async function POST(request: Request) {
       source: CommercialPayload,
       isRetry: boolean,
     ): Promise<CommercialMutationResult> => {
+      if (input.action !== "create") {
+        const current = source.cases.find((candidate) => candidate.id === input.caseId);
+        if (!current) throw new Error("COMMERCIAL_CASE_NOT_FOUND");
+        assertCommercialRevision(current, expectedUpdatedAt!);
+      }
+
       if (confirmationRequested(input)) {
         const caseId = caseIdForMutation(input);
         const item = caseId ? source.cases.find((candidate) => candidate.id === caseId) : null;
@@ -307,14 +319,7 @@ export async function POST(request: Request) {
 
     console.info("[PAPOT][Commercial] POST saved", { ms: Date.now() - startedAt });
     return noStoreJson(
-      await snapshot(
-        mutation.payload,
-        owner,
-        true,
-        context.user,
-        clients,
-        mutation.focusCaseId,
-      ),
+      await snapshot(mutation.payload, owner, true, context.user, clients, mutation.focusCaseId),
     );
   } catch (error) {
     const code =

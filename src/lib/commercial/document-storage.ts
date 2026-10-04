@@ -2,7 +2,6 @@ import "server-only";
 
 import { randomUUID } from "node:crypto";
 import type { ServerFileStore } from "@/lib/server-files/storage";
-import type { NextcloudDavClient } from "@/lib/sync/nextcloud-dav";
 import {
   commercialDocumentCategorySchema,
   type CommercialDocument,
@@ -16,12 +15,6 @@ export const MAX_COMMERCIAL_DOCUMENT_BYTES = 100 * 1024 * 1024;
 export type CommercialDocumentTransport = {
   store: ServerFileStore;
   displayName: string;
-};
-
-export type LegacyCommercialDocumentTransport = {
-  dav: NextcloudDavClient;
-  nextcloudUserId: string;
-  syncRoot: string;
 };
 
 export type CommercialDocumentUploadOptions = {
@@ -125,24 +118,6 @@ export async function readCommercialDocument(
     throw new Error("COMMERCIAL_DOCUMENT_INTEGRITY_MISMATCH");
   }
   return bytes;
-}
-
-export function commercialDocumentUrl(
-  transport: LegacyCommercialDocumentTransport,
-  document: CommercialDocument,
-): string {
-  const segments = validateDocumentPath(document);
-  let url = transport.dav.filesRoot(transport.nextcloudUserId);
-  url = transport.dav.childUrl(url, transport.syncRoot);
-  for (const segment of segments) url = transport.dav.childUrl(url, segment);
-  return url;
-}
-
-export async function readLegacyCommercialDocumentBytes(
-  transport: LegacyCommercialDocumentTransport,
-  document: CommercialDocument,
-): Promise<Buffer> {
-  return transport.dav.getBytes(commercialDocumentUrl(transport, document));
 }
 
 export async function cleanupCommercialDocuments(

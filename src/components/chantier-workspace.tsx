@@ -778,7 +778,7 @@ function DocumentsTab({
           </strong>
         </div>
         <div>
-          <span>Déboursé OBAT</span>
+          <span>Déboursé</span>
           <strong>
             {chantier.launchDocuments.costing === "PRESENT"
               ? "Présent au lancement"

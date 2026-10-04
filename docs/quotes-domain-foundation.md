@@ -13,4 +13,4 @@ Elle couvre :
 - calcul HT, TVA et TTC ;
 - statuts métier de base `DRAFT`, `SENT`, `ACCEPTED`, `REJECTED`, `CANCELLED`.
 
-Cette brique ne crée pas encore l'écran Devis et n'ajoute aucun écran mobile. Le stockage Nextcloud et l'API Devis seront ajoutés dans la tranche suivante.
+Cette note décrit une étape historique du domaine Devis. Le stockage et les API actifs sont désormais gérés directement par PAPOT côté serveur.

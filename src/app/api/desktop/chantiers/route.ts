@@ -11,6 +11,7 @@ import {
 import { createCommercialRepository } from "@/lib/commercial/create-repository";
 import {
   applyChantierMutation,
+  assertChantierRevision,
   chantierCapabilities,
   chantierMutationSchema,
 } from "@/lib/chantiers/mutations";
@@ -100,15 +101,13 @@ export async function GET() {
     const context = await requireModuleRequestContext("chantiers", "READ");
     const repository = createChantiersRepository(context);
     const payload = await repository.load();
+
     const owner = {
       userId: context.user.id,
       deviceId: context.user.id,
       displayName: context.user.displayName,
     };
-
-    return noStoreJson(
-      await snapshot(payload, owner, context.user, context.moduleAccess.canWrite),
-    );
+    return noStoreJson(await snapshot(payload, owner, context.user, context.moduleAccess.canWrite));
   } catch (error) {
     const code = error instanceof Error ? error.message : "CHANTIERS_LOAD_FAILED";
     return noStoreJson({ error: code }, { status: statusFor(code) });
@@ -120,7 +119,11 @@ export async function POST(request: Request) {
   let stage = "parse-request";
 
   try {
-    const input = chantierMutationSchema.parse(await request.json());
+    const raw = (await request.json()) as Record<string, unknown>;
+    const input = chantierMutationSchema.parse(raw);
+    const expectedUpdatedAt =
+      typeof raw.expectedUpdatedAt === "string" ? raw.expectedUpdatedAt.trim() : "";
+    if (!expectedUpdatedAt) throw new Error("CHANTIERS_VERSION_REQUIRED");
     stage = "create-runtime";
     const context = await requireModuleRequestContext("chantiers", "WRITE");
     const requiredSpecialPermission = chantierSpecialPermissionForMutation(input);
@@ -145,6 +148,12 @@ export async function POST(request: Request) {
 
     stage = "apply-and-save-mutation";
     const mutation = await repository.mutate((payload) => {
+      const openedChantier = payload.chantiers.find(
+        (candidate) => candidate.id === input.chantierId,
+      );
+      if (!openedChantier) throw new Error("CHANTIER_NOT_FOUND");
+      assertChantierRevision(openedChantier, expectedUpdatedAt);
+
       let normalizedInput = input;
 
       if (mutationNeedsCommercialOrigin(input)) {

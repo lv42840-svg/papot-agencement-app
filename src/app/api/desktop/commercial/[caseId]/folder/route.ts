@@ -20,7 +20,7 @@ function statusFor(code: string): number {
 export async function GET(_request: Request, context: RouteContext) {
   try {
     const { caseId } = await context.params;
-    const requestContext = await requireModuleRequestContext("commercial", "READ");
+    await requireModuleRequestContext("commercial", "READ");
     const repository = createCommercialRepository();
     const payload = await repository.load();
     const item = payload.cases.find((candidate) => candidate.id === caseId);

@@ -70,9 +70,7 @@ describe("entries assigned actions and reassignment", () => {
     expect(parent?.completedAt).toBeNull();
     expect(parent?.derivedEntryIds).toHaveLength(2);
 
-    const children = result.payload.entries.filter(
-      (entry) => entry.parentEntryId === parent?.id,
-    );
+    const children = result.payload.entries.filter((entry) => entry.parentEntryId === parent?.id);
     expect(children).toHaveLength(2);
     expect(children.map((entry) => entry.rawText)).toEqual(
       expect.arrayContaining(["Appeler le client", "Préparer le devis"]),

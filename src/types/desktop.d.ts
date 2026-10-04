@@ -3,47 +3,26 @@ export {};
 declare global {
   interface Window {
     papotDesktop?: {
-      saveSetup: (input: {
-        sharedDataPath: string;
-        nextcloudBaseUrl: string;
-        nextcloudLogin: string;
-        nextcloudAppPassword: string;
-        deviceLabel: string;
-      }) => Promise<
-        | {
-            ok: true;
-            config: {
-              deviceId: string;
-              deviceLabel: string;
-              nextcloudUserId: string;
-              sharedDataPath: string;
-            };
-          }
-        | { ok: false; error: string }
-      >;
-      finishSetup: () => Promise<{ ok: boolean }>;
       openBusinessFolder: (input: {
         kind: "commercial-case";
         storagePath: string;
-      }) => Promise<{ ok: true } | { ok: false; error: string }>;
+      }) => Promise<{ ok: boolean; error?: string }>;
       openBusinessFile: (input: {
         kind: "commercial-document";
         storagePath: string;
-      }) => Promise<{ ok: true } | { ok: false; error: string }>;
+      }) => Promise<{ ok: boolean; error?: string }>;
       composeOutlookMail: (input: {
         kind: "quote-email";
         to: string;
         subject: string;
         body: string;
         storagePath: string;
-      }) => Promise<
-        | {
-            ok: true;
-            method: "CLASSIC_OUTLOOK" | "OUTLOOK_PROTOCOL";
-            attachmentAttached: boolean;
-          }
-        | { ok: false; error: string }
-      >;
+      }) => Promise<{
+        ok: boolean;
+        error?: string;
+        method: "CLASSIC_OUTLOOK" | "OUTLOOK_PROTOCOL";
+        attachmentAttached?: boolean;
+      }>;
     };
   }
 }

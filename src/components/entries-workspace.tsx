@@ -1069,7 +1069,8 @@ function EntryDetail({
                           busy ||
                           actionDrafts.length === 0 ||
                           actionDrafts.some(
-                            (item) => !item.text.trim() || !item.assigneeName.trim() || !item.dueDate,
+                            (item) =>
+                              !item.text.trim() || !item.assigneeName.trim() || !item.dueDate,
                           )
                         }
                         onClick={() =>
@@ -1271,7 +1272,7 @@ function EntryAttachments({
       </div>
       {entry.attachments.length === 0 ? (
         <p className="entriesAttachmentEmpty">
-          Aucune pièce jointe. Les originaux ajoutés ici sont conservés dans Nextcloud.
+          Aucune pièce jointe. Les originaux sont conservés dans le stockage PAPOT.
         </p>
       ) : (
         <div className="entriesAttachmentList">

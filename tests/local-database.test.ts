@@ -75,7 +75,7 @@ describe("embedded local database", () => {
   it("refuses settings whose key indicates a secret", () => {
     const database = localDatabase.openLocalDatabase(makeTempDirectory());
     expect(() =>
-      localDatabase.setLocalSetting(database, "nextcloud_app_password", "forbidden"),
+      localDatabase.setLocalSetting(database, "legacy_cloud_password", "forbidden"),
     ).toThrow("LOCAL_SETTING_SECRET_FORBIDDEN");
     database.close();
   });
