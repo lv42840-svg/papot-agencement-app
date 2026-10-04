@@ -13,7 +13,11 @@ import {
   uploadCommercialDocuments,
 } from "@/lib/commercial/document-storage";
 import { commercialDocumentCategorySchema, type CommercialPayload } from "@/lib/commercial/domain";
-import { listCommercialPeople, registerCommercialDocuments } from "@/lib/commercial/mutations";
+import {
+  assertCommercialRevision,
+  listCommercialPeople,
+  registerCommercialDocuments,
+} from "@/lib/commercial/mutations";
 import {
   desktopRequestErrorStatus,
   requireModuleRequestContext,
@@ -73,7 +77,11 @@ export async function POST(request: Request, context: RouteContext) {
     const { caseId } = await context.params;
     const requestContext = await requireModuleRequestContext("commercial", "WRITE");
     const { user } = requestContext;
-    const owner = { userId: user.id, deviceId: user.id, displayName: user.displayName };
+    const owner = {
+      userId: user.id,
+      deviceId: user.id,
+      displayName: user.displayName,
+    };
     const repository = createCommercialRepository();
     const clients = await createClientsRepository();
     const form = await request.formData();
@@ -83,16 +91,21 @@ export async function POST(request: Request, context: RouteContext) {
     const variantLabel = String(form.get("variantLabel") ?? "").trim();
     const isCurrent = String(form.get("isCurrent") ?? "1") !== "0";
     const isSignedQuote = String(form.get("isSignedQuote") ?? "0") === "1";
+    const expectedUpdatedAt = String(form.get("expectedUpdatedAt") ?? "").trim();
+    if (!expectedUpdatedAt) throw new Error("COMMERCIAL_VERSION_REQUIRED");
 
     const currentPayload = await repository.load();
     const item = currentPayload.cases.find((candidate) => candidate.id === caseId);
     if (!item) {
       return NextResponse.json({ error: "COMMERCIAL_CASE_NOT_FOUND" }, { status: 404 });
     }
+    assertCommercialRevision(item, expectedUpdatedAt);
 
     const creationYear = new Date(item.createdAt).getFullYear();
     const actor = { userId: owner.userId, displayName: owner.displayName };
-    const transport = await createCommercialDocumentTransport({ displayName: requestContext.user.displayName });
+    const transport = await createCommercialDocumentTransport({
+      displayName: user.displayName,
+    });
 
     let uploaded = [] as Awaited<ReturnType<typeof uploadCommercialDocuments>>;
     try {
@@ -104,9 +117,12 @@ export async function POST(request: Request, context: RouteContext) {
         options: { category, versionLabel, variantLabel, isCurrent, isSignedQuote },
       });
 
-      const mutation = await repository.mutate((payload) =>
-        registerCommercialDocuments(payload, caseId, uploaded, actor),
-      );
+      const mutation = await repository.mutate((payload) => {
+        const current = payload.cases.find((candidate) => candidate.id === caseId);
+        if (!current) throw new Error("COMMERCIAL_CASE_NOT_FOUND");
+        assertCommercialRevision(current, expectedUpdatedAt);
+        return registerCommercialDocuments(payload, caseId, uploaded, actor);
+      });
 
       return NextResponse.json(await snapshot(mutation.payload, owner, user, clients, caseId), {
         headers: { "Cache-Control": "no-store" },
