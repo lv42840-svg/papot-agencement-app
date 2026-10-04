@@ -215,8 +215,8 @@ class SmtpResponseReader {
 
     if (match[2] !== " ") return;
 
-    const response = {
-      code: this.currentCode,
+    const response: SmtpResponse = {
+      code: this.currentCode ?? code,
       lines: this.currentLines.slice(),
     };
     this.currentCode = null;
