@@ -15,9 +15,11 @@ import {
   History,
   Image as ImageIcon,
   Paperclip,
+  Pencil,
   RefreshCw,
   RotateCcw,
   Save,
+  X,
 } from "lucide-react";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { ChantierOperationalWorkspace } from "@/components/chantier-operational-workspace";
@@ -383,7 +385,7 @@ function ClientTab({
   canModify: boolean;
   mutate: (body: MutationBody, message: string) => Promise<boolean>;
 }) {
-  const [number, setNumber] = useState(chantier.number ?? "");
+  const [editing, setEditing] = useState(false);
   const [reference, setReference] = useState(chantier.reference ?? "");
   const [name, setName] = useState(chantier.name);
   const [clientName, setClientName] = useState(chantier.clientName ?? "");
@@ -395,131 +397,183 @@ function ClientTab({
   const [description, setDescription] = useState(chantier.description ?? "");
   const [nextAction, setNextAction] = useState(chantier.nextAction ?? "");
 
+  function resetForm() {
+    setReference(chantier.reference ?? "");
+    setName(chantier.name);
+    setClientName(chantier.clientName ?? "");
+    setCompanyName(chantier.companyName ?? "");
+    setSiteLabel(chantier.siteLabel ?? "");
+    setContactName(chantier.contactName ?? "");
+    setContactPhone(chantier.contactPhone ?? "");
+    setContactEmail(chantier.contactEmail ?? "");
+    setDescription(chantier.description ?? "");
+    setNextAction(chantier.nextAction ?? "");
+  }
+
+  async function save() {
+    const saved = await mutate(
+      {
+        action: "updateDetails",
+        chantierId: chantier.id,
+        number: chantier.number ?? "",
+        reference,
+        name,
+        clientName,
+        companyName,
+        siteLabel,
+        contactName,
+        contactPhone,
+        contactEmail,
+        description,
+        nextAction,
+      },
+      "Informations du chantier enregistrées.",
+    );
+    if (saved) setEditing(false);
+  }
+
   return (
-    <section className="chantierCard">
-      <div className="chantierSectionTitle">
-        <BriefcaseBusiness size={17} /> Client / chantier
+    <section className="chantierCard chantierIdentityCard">
+      <div className="chantierSectionHeader">
+        <div className="chantierSectionTitle">
+          <BriefcaseBusiness size={17} /> Client / chantier
+        </div>
+        {canModify ? (
+          editing ? (
+            <div className="chantierEditActions">
+              <button
+                type="button"
+                className="secondaryButton"
+                disabled={busy}
+                onClick={() => {
+                  resetForm();
+                  setEditing(false);
+                }}
+              >
+                <X size={14} /> Annuler
+              </button>
+              <button
+                type="button"
+                className="primaryButton"
+                disabled={busy || !name.trim()}
+                onClick={() => void save()}
+              >
+                <Save size={14} /> Enregistrer
+              </button>
+            </div>
+          ) : (
+            <button
+              type="button"
+              className="secondaryButton chantierEditButton"
+              disabled={busy}
+              onClick={() => setEditing(true)}
+            >
+              <Pencil size={14} /> Modifier
+            </button>
+          )
+        ) : null}
       </div>
-      <div className="chantierGrid2">
-        <Field label="N° chantier">
-          <input
-            value={number}
-            onChange={(event) => setNumber(event.target.value)}
-            disabled={!canModify}
-            placeholder="Facultatif tant que le format n'est pas défini"
-          />
-        </Field>
-        <Field label="Référence chantier">
-          <input
-            value={reference}
-            onChange={(event) => setReference(event.target.value)}
-            disabled={!canModify}
-          />
-        </Field>
-        <Field label="Nom du chantier">
-          <input
-            value={name}
-            onChange={(event) => setName(event.target.value)}
-            disabled={!canModify}
-          />
-        </Field>
-        <Field label="Client">
-          <input
-            value={clientName}
-            onChange={(event) => setClientName(event.target.value)}
-            disabled={!canModify}
-          />
-        </Field>
-        <Field label="Société">
-          <input
-            value={companyName}
-            onChange={(event) => setCompanyName(event.target.value)}
-            disabled={!canModify}
-          />
-        </Field>
-        <Field label="Lieu chantier">
-          <input
-            value={siteLabel}
-            onChange={(event) => setSiteLabel(event.target.value)}
-            disabled={!canModify}
-          />
-        </Field>
-        <Field label="Contact">
-          <input
-            value={contactName}
-            onChange={(event) => setContactName(event.target.value)}
-            disabled={!canModify}
-          />
-        </Field>
-        <Field label="Téléphone">
-          <input
-            value={contactPhone}
-            onChange={(event) => setContactPhone(event.target.value)}
-            disabled={!canModify}
-          />
-        </Field>
-        <Field label="E-mail">
-          <input
-            type="email"
-            value={contactEmail}
-            onChange={(event) => setContactEmail(event.target.value)}
-            disabled={!canModify}
-          />
-        </Field>
-        <Field label="Pose prévisionnelle">
-          <input value={formatDateOnly(chantier.plannedInstallDate)} disabled />
-        </Field>
-      </div>
-      <Field label="C'est quoi ?">
-        <textarea
-          rows={3}
-          value={description}
-          onChange={(event) => setDescription(event.target.value)}
-          disabled={!canModify}
-        />
-      </Field>
-      <Field label="J'en fais quoi ?">
-        <textarea
-          rows={2}
-          value={nextAction}
-          onChange={(event) => setNextAction(event.target.value)}
-          disabled={!canModify}
-        />
-      </Field>
-      {canModify ? (
-        <button
-          type="button"
-          className="primaryButton chantierFitButton"
-          disabled={busy || !name.trim()}
-          onClick={() =>
-            void mutate(
-              {
-                action: "updateDetails",
-                chantierId: chantier.id,
-                number,
-                reference,
-                name,
-                clientName,
-                companyName,
-                siteLabel,
-                contactName,
-                contactPhone,
-                contactEmail,
-                description,
-                nextAction,
-              },
-              "Informations du chantier enregistrées.",
-            )
-          }
-        >
-          <Save size={15} /> Enregistrer
-        </button>
+
+      {editing ? (
+        <>
+          <div className="chantierGrid2">
+            <Field label="N° chantier">
+              <input value={chantier.number ?? ""} disabled />
+            </Field>
+            <Field label="Référence chantier">
+              <input value={reference} onChange={(event) => setReference(event.target.value)} />
+            </Field>
+            <Field label="Nom du chantier">
+              <input value={name} onChange={(event) => setName(event.target.value)} />
+            </Field>
+            <Field label="Client">
+              <input value={clientName} onChange={(event) => setClientName(event.target.value)} />
+            </Field>
+            <Field label="Société">
+              <input value={companyName} onChange={(event) => setCompanyName(event.target.value)} />
+            </Field>
+            <Field label="Lieu chantier">
+              <input value={siteLabel} onChange={(event) => setSiteLabel(event.target.value)} />
+            </Field>
+            <Field label="Contact">
+              <input value={contactName} onChange={(event) => setContactName(event.target.value)} />
+            </Field>
+            <Field label="Téléphone">
+              <input
+                value={contactPhone}
+                onChange={(event) => setContactPhone(event.target.value)}
+              />
+            </Field>
+            <Field label="E-mail">
+              <input
+                type="email"
+                value={contactEmail}
+                onChange={(event) => setContactEmail(event.target.value)}
+              />
+            </Field>
+            <Field label="Pose prévisionnelle">
+              <input value={formatDateOnly(chantier.plannedInstallDate)} disabled />
+            </Field>
+          </div>
+          <Field label="C'est quoi ?">
+            <textarea
+              rows={3}
+              value={description}
+              onChange={(event) => setDescription(event.target.value)}
+            />
+          </Field>
+          <Field label="J'en fais quoi ?">
+            <textarea
+              rows={2}
+              value={nextAction}
+              onChange={(event) => setNextAction(event.target.value)}
+            />
+          </Field>
+        </>
       ) : (
-        <p className="chantierHint">
-          Chantier archivé : consultation uniquement tant qu&apos;il n&apos;est pas réactivé.
-        </p>
+        <>
+          <div className="chantierIdentityGrid">
+            <InfoCell label="N° chantier" value={chantier.number} strong />
+            <InfoCell label="Référence" value={chantier.reference} strong />
+            <InfoCell label="Nom du chantier" value={chantier.name} />
+            <InfoCell label="Client" value={chantier.clientName} />
+            <InfoCell label="Société" value={chantier.companyName} />
+            <InfoCell label="Lieu chantier" value={chantier.siteLabel} />
+            <InfoCell label="Contact" value={chantier.contactName} />
+            <InfoCell label="Téléphone" value={chantier.contactPhone} />
+            <InfoCell label="E-mail" value={chantier.contactEmail} />
+            <InfoCell label="Pose prévisionnelle" value={formatDateOnly(chantier.plannedInstallDate)} />
+          </div>
+          <div className="chantierIdentityNotes">
+            <InfoCell label="C'est quoi ?" value={chantier.description} />
+            <InfoCell label="J'en fais quoi ?" value={chantier.nextAction} />
+          </div>
+          {!canModify ? (
+            <p className="chantierHint">
+              Chantier archivé : consultation uniquement tant qu&apos;il n&apos;est pas réactivé.
+            </p>
+          ) : null}
+        </>
       )}
     </section>
+  );
+}
+
+function InfoCell({
+  label,
+  value,
+  strong = false,
+}: {
+  label: string;
+  value: string | null | undefined;
+  strong?: boolean;
+}) {
+  const display = value?.trim() || "Non renseigné";
+  return (
+    <div className={`chantierInfoCell${strong ? " isStrong" : ""}`}>
+      <span>{label}</span>
+      <strong>{display}</strong>
+    </div>
   );
 }
 
@@ -1156,6 +1210,67 @@ function ChantierStyles() {
         color: #514c59;
         font-size: 15px;
         font-weight: 800;
+      }
+      .chantierSectionHeader {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 12px;
+      }
+      .chantierEditActions {
+        display: flex;
+        align-items: center;
+        gap: 7px;
+      }
+      .chantierEditButton,
+      .chantierEditActions .secondaryButton,
+      .chantierEditActions .primaryButton {
+        min-height: 34px;
+        display: inline-flex;
+        align-items: center;
+        gap: 6px;
+      }
+      .chantierIdentityGrid {
+        display: grid;
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+        gap: 8px;
+      }
+      .chantierIdentityNotes {
+        display: grid;
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+        gap: 8px;
+      }
+      .chantierInfoCell {
+        min-height: 62px;
+        padding: 10px 12px;
+        display: grid;
+        align-content: center;
+        gap: 4px;
+        border: 1px solid #ece8f2;
+        border-radius: 9px;
+        background: #fbfaff;
+      }
+      .chantierInfoCell > span {
+        color: #81798c;
+        font-size: 10px;
+        font-weight: 750;
+        text-transform: uppercase;
+        letter-spacing: 0.02em;
+      }
+      .chantierInfoCell > strong {
+        color: #494452;
+        font-size: 13px;
+        font-weight: 650;
+        white-space: pre-wrap;
+      }
+      .chantierInfoCell.isStrong {
+        border-color: #ddd4f4;
+        background: #f7f4ff;
+      }
+      .chantierInfoCell.isStrong > strong {
+        color: #5f4fc3;
+        font-size: 14px;
+        font-weight: 850;
       }
       .chantierCountPill {
         background: #eeeaf6;
