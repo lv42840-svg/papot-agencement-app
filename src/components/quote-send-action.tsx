@@ -108,9 +108,7 @@ async function postFinalize(
 export function QuoteSendAction({
   quote,
   canWrite,
-  affairName,
   recipientEmail,
-  recipientName,
   onSaved,
 }: {
   quote: NativeQuoteRecord;
@@ -267,4 +265,6 @@ export function QuoteSendAction({
         }
       `}</style>
     </form>
-  );}
+  );
+}
+
