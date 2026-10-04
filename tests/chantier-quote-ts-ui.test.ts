@@ -19,11 +19,11 @@ const createQuote = readFileSync(
 );
 
 describe("chantier native quote and TS bridge", () => {
-  it("uses native quote structures instead of reparsing Obat PDFs", () => {
+  it("uses native quote structures without reparsing legacy PDFs", () => {
     expect(operational).toContain("retainedChantierQuotes");
-    expect(operational).not.toContain("requestObatAnalysis");
-    expect(operational).not.toContain("ObatQuoteLine");
-    expect(operational).not.toContain("Lecture automatique des lignes des devis OBAT");
+    expect(operational).not.toContain("requestLegacyQuoteAnalysis");
+    expect(operational).not.toContain("LegacyQuoteLine");
+    expect(operational).not.toContain("Lecture automatique des lignes des anciens devis");
   });
 
   it("persists durable quote-line identifiers and validates retained sources", () => {
