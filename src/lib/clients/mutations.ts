@@ -18,6 +18,8 @@ const optionalSiretSchema = z
   .transform((value) => value.replace(/\s+/g, ""))
   .refine((value) => value === "" || /^\d{14}$/.test(value), "CLIENT_SIRET_INVALID");
 
+const expectedUpdatedAtSchema = z.string().datetime({ offset: true });
+
 const contactInputSchema = z.object({
   id: z.string().uuid().optional(),
   firstName: z.string().trim().max(120).default(""),
@@ -56,15 +58,25 @@ export const clientsMutationSchema = z.discriminatedUnion("action", [
   z.object({
     action: z.literal("update"),
     clientId: z.string().uuid(),
+    expectedUpdatedAt: expectedUpdatedAtSchema,
     ...writableClientFields,
   }),
   z.object({
     action: z.literal("updateVat"),
     clientId: z.string().uuid(),
+    expectedUpdatedAt: expectedUpdatedAtSchema,
     defaultVatRatePercent: vatRatePercentSchema,
   }),
-  z.object({ action: z.literal("archive"), clientId: z.string().uuid() }),
-  z.object({ action: z.literal("reactivate"), clientId: z.string().uuid() }),
+  z.object({
+    action: z.literal("archive"),
+    clientId: z.string().uuid(),
+    expectedUpdatedAt: expectedUpdatedAtSchema,
+  }),
+  z.object({
+    action: z.literal("reactivate"),
+    clientId: z.string().uuid(),
+    expectedUpdatedAt: expectedUpdatedAtSchema,
+  }),
 ]);
 
 export type ClientsMutation = z.infer<typeof clientsMutationSchema>;
@@ -162,6 +174,9 @@ export function applyClientsMutation(
   }
 
   const client = findClient(payload, input.clientId);
+  if (client.updatedAt !== input.expectedUpdatedAt) {
+    throw new Error("CLIENTS_VERSION_CONFLICT");
+  }
 
   if (input.action === "update") {
     if (client.isArchived) throw new Error("CLIENT_ARCHIVED");
