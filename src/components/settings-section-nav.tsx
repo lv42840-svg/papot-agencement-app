@@ -2,7 +2,11 @@
 
 import Link from "next/link";
 
-export function SettingsSectionNav({ active }: { active: "company" | "users" | "entries" | "emails" }) {
+export function SettingsSectionNav({
+  active,
+}: {
+  active: "company" | "users" | "entries" | "emails";
+}) {
   return (
     <nav className="settingsSectionNav" aria-label="Paramètres">
       <Link className={active === "company" ? "isActive" : undefined} href="/settings/company">
