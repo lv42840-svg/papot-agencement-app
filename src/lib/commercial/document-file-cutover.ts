@@ -121,7 +121,7 @@ async function copyLegacyDocument(
 export async function ensureCommercialDocumentFilesCutover(params: {
   pool?: Pool;
   store: ServerFileStore;
-  readLegacy: LegacyCommercialDocumentReader;
+  readLegacy?: LegacyCommercialDocumentReader;
 }): Promise<void> {
   const pool = params.pool ?? getServerDbPool();
   if (await findCutoverMarker(pool)) return;
@@ -138,6 +138,10 @@ export async function ensureCommercialDocumentFilesCutover(params: {
     const sourceHash = commercialDocumentManifestHash(manifest);
 
     for (const { document } of manifest) {
+      if (await verifyServerCopy(params.store, document)) continue;
+      if (!params.readLegacy) {
+        throw new Error("COMMERCIAL_DOCUMENT_LEGACY_SOURCE_REQUIRED");
+      }
       await copyLegacyDocument(params.store, document, params.readLegacy);
     }
 
