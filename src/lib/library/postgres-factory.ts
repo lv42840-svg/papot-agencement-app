@@ -1,7 +1,4 @@
-import type {
-  DesktopRequestContext,
-  ModuleRequestContext,
-} from "@/lib/desktop/request-context";
+import type { DesktopRequestContext, ModuleRequestContext } from "@/lib/desktop/request-context";
 import { getServerDbPool, runServerDbMigrations } from "@/lib/server-db";
 import { ensureLibraryPostgresCutover } from "./cutover";
 import { acquireNextcloudLibrarySnapshot } from "./legacy-snapshot";
