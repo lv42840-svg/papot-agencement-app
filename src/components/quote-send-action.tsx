@@ -48,6 +48,18 @@ function sendErrorLabel(code?: string): string {
   if (code?.startsWith("QUOTE_WORD_V2_TEMPLATE_")) {
     return "Le modèle Word du devis est indisponible.";
   }
+  if (code === "PDF_CONVERTER_UNAVAILABLE") {
+    return "Aucun moteur PDF n’est disponible sur ce poste. Installe LibreOffice ou Microsoft Word puis relance PAPOT.";
+  }
+  if (code?.startsWith("PDF_WINDOWS_CONVERTER_FAILED:")) {
+    return "LibreOffice est indisponible et Microsoft Word n’a pas réussi à convertir le devis en PDF.";
+  }
+  if (
+    code?.startsWith("PDF_CONVERSION_FAILED:") ||
+    code?.startsWith("PDF_CONVERSION_OUTPUT_MISSING:")
+  ) {
+    return "LibreOffice a été trouvé mais n’a pas réussi à convertir le devis en PDF.";
+  }
   if (code === "SERVER_FILE_ROOT_UNAVAILABLE") {
     return "Le dossier d’archivage PAPOT est inaccessible.";
   }
@@ -66,7 +78,9 @@ function sendErrorLabel(code?: string): string {
   if (code?.startsWith("PDF_")) {
     return "La génération du PDF a échoué avant l’archivage.";
   }
-  return code ? `Impossible d’envoyer le devis (${code}).` : "Impossible d’envoyer le devis.";
+  return code
+    ? `Impossible d’envoyer le devis (${code}). La date de relance n’est pas forcément en cause.`
+    : "Impossible d’envoyer le devis.";
 }
 
 async function postFinalize(
@@ -244,6 +258,22 @@ export function QuoteSendAction({
   }
 
   if (!canWrite) return null;
+
+  if (quote.status === "FROZEN" && !mode) {
+    return (
+      <div className="quoteFinalizeRow">
+        <div className="quoteNotice">
+          <FileLock2 size={14} aria-hidden="true" /> {quote.finalPdf?.quoteNumber} · PDF validé,
+          pas encore envoyé
+        </div>
+        <button type="button" className="primaryButton" onClick={() => startMode("SEND")}>
+          <Send size={15} aria-hidden="true" /> Envoyer
+        </button>
+      </div>
+    );
+  }
+
+  if (quote.status !== "DRAFT" && quote.status !== "FROZEN") return null;
 
   if (!mode) {
     return (
