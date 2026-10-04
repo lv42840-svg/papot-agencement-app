@@ -6,6 +6,10 @@ import { PwaRegister } from "@/components/pwa-register";
 export const metadata: Metadata = {
   title: "PAPOT AGENCEMENT",
   description: "Application interne PAPOT AGENCEMENT",
+  icons: {
+    icon: "/papot-icon.svg",
+    shortcut: "/papot-icon.svg",
+  },
 };
 
 export default function RootLayout({ children }: Readonly<{ children: React.ReactNode }>) {
