@@ -430,6 +430,7 @@ export function GrandPlanningWorkspace({
       body: JSON.stringify({
         action: "setMacroHours",
         year: snapshot.year,
+        expectedRevision: snapshot.revision,
         chantierId,
         activity,
         week,
@@ -492,6 +493,7 @@ export function GrandPlanningWorkspace({
       body: JSON.stringify({
         action: "setProvisionHours",
         year: snapshot.year,
+        expectedRevision: snapshot.revision,
         caseId,
         activity,
         week,
