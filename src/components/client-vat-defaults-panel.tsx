@@ -28,6 +28,11 @@ export function ClientVatDefaultsPanel() {
   const [error, setError] = useState("");
   const [notice, setNotice] = useState("");
 
+  const selectedClient = useMemo(
+    () => snapshot?.payload.clients.find((client) => client.id === selectedId) ?? null,
+    [selectedId, snapshot?.payload.clients],
+  );
+
   useEffect(() => {
     let cancelled = false;
     async function load() {
@@ -73,7 +78,7 @@ export function ClientVatDefaultsPanel() {
   }
 
   async function save() {
-    if (!snapshot?.canWrite || !selectedId || busy) return;
+    if (!snapshot?.canWrite || !selectedId || !selectedClient || busy) return;
     const parsed = parseRate(rate);
     if (parsed === null) {
       setError("Le taux de TVA doit être compris entre 0 et 100 %.");
@@ -90,6 +95,7 @@ export function ClientVatDefaultsPanel() {
         body: JSON.stringify({
           action: "updateVat",
           clientId: selectedId,
+          expectedUpdatedAt: selectedClient.updatedAt,
           defaultVatRatePercent: parsed,
         }),
       });
@@ -99,8 +105,12 @@ export function ClientVatDefaultsPanel() {
       const saved = body.payload.clients.find((client) => client.id === selectedId);
       if (saved) setRate(rateInput(saved.defaultVatRatePercent));
       setNotice("TVA par défaut enregistrée pour cette fiche client.");
-    } catch {
-      setError("Le taux de TVA n’a pas pu être enregistré.");
+    } catch (saveError) {
+      if (saveError instanceof Error && saveError.message === "CLIENTS_VERSION_CONFLICT") {
+        setError("Cette fiche client a été modifiée ailleurs. Recharge les taux avant de recommencer.");
+      } else {
+        setError("Le taux de TVA n’a pas pu être enregistré.");
+      }
     } finally {
       setBusy(false);
     }
