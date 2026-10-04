@@ -35,7 +35,7 @@ export function createPostgresBackedLibraryRepository(
           ? context.owner
           : {
               userId: context.user.id,
-              deviceId: "web",
+              deviceId: context.user.id,
               displayName: context.user.displayName,
             };
       return createPostgresLibraryRepository(owner, pool);
