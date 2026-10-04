@@ -37,22 +37,6 @@ function ensureLocalSchema(target: DatabaseSync): void {
       payload_json TEXT NOT NULL,
       updated_at TEXT NOT NULL
     ) STRICT;
-
-    CREATE TABLE IF NOT EXISTS local_shared_resource_states (
-      resource_type TEXT NOT NULL,
-      resource_id TEXT NOT NULL,
-      envelope_json TEXT NOT NULL,
-      updated_at TEXT NOT NULL,
-      PRIMARY KEY (resource_type, resource_id)
-    ) STRICT;
-
-    CREATE TABLE IF NOT EXISTS local_shared_resource_locks (
-      resource_type TEXT NOT NULL,
-      resource_id TEXT NOT NULL,
-      lock_json TEXT NOT NULL,
-      updated_at TEXT NOT NULL,
-      PRIMARY KEY (resource_type, resource_id)
-    ) STRICT;
   `);
 }
 
