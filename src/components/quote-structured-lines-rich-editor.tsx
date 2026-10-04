@@ -4,6 +4,7 @@ import { type ReactNode, useEffect, useMemo, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import { QuoteRichTextEditor } from "@/components/quote-rich-text-editor";
 import { QuoteStructuredLinesEditor } from "@/components/quote-structured-lines-editor";
+import { quoteRevisionHeaders } from "@/lib/quotes/concurrency";
 import type { QuoteItem, QuoteRichText } from "@/lib/quotes/model";
 import { buildQuoteItemNumbers } from "@/lib/quotes/numbering";
 import {
@@ -248,7 +249,10 @@ export function QuoteStructuredLinesRichEditor({ quote, canWrite, onSaved, heade
         `/api/desktop/quotes/${updatedQuote.id}/items/${target.id}/rich-text`,
         {
           method: "POST",
-          headers: { "Content-Type": "application/json" },
+          headers: {
+            "Content-Type": "application/json",
+            ...quoteRevisionHeaders(updatedQuote.updatedAt),
+          },
           body: JSON.stringify({ text: plainText, richText: pending.richText }),
         },
       );
