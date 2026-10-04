@@ -11,6 +11,7 @@ type NotesResponse = {
 };
 
 function errorLabel(code: string): string {
+  if (code === "QUOTE_VERSION_CONFLICT") return "Ce devis a été modifié ailleurs. Recharge-le avant de recommencer.";
   if (code === "QUOTE_NOT_EDITABLE") return "Seul un devis brouillon peut être modifié.";
   if (code === "QUOTE_INTERNAL_NOTES_INVALID") return "Les notes sont trop longues.";
   if (code === "MODULE_FORBIDDEN") return "Ton profil n’autorise pas la modification des devis.";
