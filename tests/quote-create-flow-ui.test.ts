@@ -42,9 +42,11 @@ describe("quote creation flow", () => {
     expect(createWorkspace).not.toMatch(/<span>Variante<\/span>\s*<input/);
   });
 
-  it("utilise les conditions de reglement en liste controlee", () => {
-    expect(createWorkspace).toMatch(/<span>Conditions de règlement<\/span>\s*<select/);
+  it("utilise les conditions connues ou autorise une saisie explicite si le client est provisoire", () => {
+    expect(createWorkspace).toContain("availablePaymentTerms.length > 0");
     expect(createWorkspace).toContain("availablePaymentTerms.map");
+    expect(createWorkspace).toContain("Saisir les conditions de règlement");
+    expect(createWorkspace).toContain("!paymentTerms.trim()");
     expect(createPage).toContain("clients.clients");
   });
 
