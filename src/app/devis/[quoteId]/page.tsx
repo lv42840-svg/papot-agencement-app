@@ -4,7 +4,7 @@ import { QuoteDirectEditor } from "@/components/quote-direct-editor";
 import { createClientsRepository } from "@/lib/clients/create-repository";
 import { clientDisplayName } from "@/lib/clients/domain";
 import { createCommercialRepository } from "@/lib/commercial/create-repository";
-import { requireModuleRequestContext } from "@/lib/desktop/request-context";
+import { requireDesktopRequestContext } from "@/lib/desktop/request-context";
 import { createQuotesRepository } from "@/lib/quotes/create-repository";
 import { quoteContractSelectionState } from "@/lib/quotes/retention";
 
@@ -12,9 +12,9 @@ export const dynamic = "force-dynamic";
 
 export default async function QuotePage({ params }: { params: Promise<{ quoteId: string }> }) {
   const { quoteId } = await params;
-  const context = await requireModuleRequestContext("quotes", "READ");
-  const commercialRepository = createCommercialRepository();
-  const clientsRepository = await createClientsRepository();
+  const context = await requireDesktopRequestContext("quotes", "READ");
+  const commercialRepository = createCommercialRepository(context);
+  const clientsRepository = await createClientsRepository(context);
   const [payload, commercial, clients] = await Promise.all([
     createQuotesRepository().load(),
     commercialRepository.load(),
