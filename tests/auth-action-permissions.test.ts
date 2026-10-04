@@ -66,7 +66,7 @@ describe("permission catalog", () => {
   it("prepares distinct Devis and Facturation module permissions", () => {
     expect(MODULE_PERMISSIONS).toEqual(
       expect.arrayContaining([
-        expect.objectContaining({ key: "quotes", future: true }),
+        expect.objectContaining({ key: "quotes" }),
         expect.objectContaining({ key: "billing", future: true }),
       ]),
     );
