@@ -33,27 +33,20 @@ import { loadQuoteWordV2Template } from "@/lib/quotes/word-v2-template-runtime";
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
-const sendQuoteSchema = z
-  .union([
-    z.object({
-      mode: z.literal("VALIDATE"),
+const sendQuoteSchema = z.discriminatedUnion("mode", [
+  z.object({
+    mode: z.literal("VALIDATE"),
+  }),
+  z.object({
+    mode: z.literal("SEND"),
+    followUpDate: z.string().regex(/^\d{4}-\d{2}-\d{2}$/),
+    email: z.object({
+      to: z.string().trim().email().max(240),
+      subject: z.string().trim().min(1).max(500),
+      body: z.string().trim().min(1).max(10_000),
     }),
-    z.object({
-      mode: z.literal("SEND"),
-      followUpDate: z.string().regex(/^\d{4}-\d{2}-\d{2}$/),
-      email: z.object({
-        to: z.string().trim().email().max(240),
-        subject: z.string().trim().min(1).max(500),
-        body: z.string().trim().min(1).max(10_000),
-      }),
-    }),
-    z.object({
-      followUpDate: z.string().regex(/^\d{4}-\d{2}-\d{2}$/),
-    }),
-  ])
-  .transform((input) =>
-    "mode" in input ? input : { mode: "SEND" as const, followUpDate: input.followUpDate },
-  );
+  }),
+]);
 
 function noStoreJson(body: unknown, init?: ResponseInit) {
   const response = NextResponse.json(body, init);
