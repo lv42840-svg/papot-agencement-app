@@ -141,6 +141,15 @@ function findCase(payload: CommercialPayload, caseId: string): CommercialCase {
   return item;
 }
 
+export function assertCommercialRevision(
+  item: CommercialCase,
+  expectedUpdatedAt: string,
+): void {
+  if (item.updatedAt !== expectedUpdatedAt) {
+    throw new Error("COMMERCIAL_VERSION_CONFLICT");
+  }
+}
+
 function history(
   item: CommercialCase,
   actorName: string,
