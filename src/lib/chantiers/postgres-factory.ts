@@ -1,12 +1,19 @@
-import type { DesktopRequestContext } from "@/lib/desktop/request-context";
+import type {
+  DesktopRequestContext,
+  ModuleRequestContext,
+} from "@/lib/desktop/request-context";
 import { getServerDbPool, runServerDbMigrations } from "@/lib/server-db";
 import { ensureChantiersPostgresCutover } from "./cutover";
 import { acquireNextcloudChantiersSnapshot } from "./legacy-snapshot";
 import { createPostgresChantiersRepository } from "./postgres-repository";
 import type { ChantiersRepository } from "./repository";
 
+type PostgresChantiersContext =
+  | Pick<DesktopRequestContext, "desktop" | "owner">
+  | ModuleRequestContext;
+
 export function createPostgresBackedChantiersRepository(
-  context: Pick<DesktopRequestContext, "desktop" | "owner">,
+  context: PostgresChantiersContext,
 ): ChantiersRepository {
   let repositoryPromise: Promise<ChantiersRepository> | null = null;
 
@@ -16,11 +23,15 @@ export function createPostgresBackedChantiersRepository(
       await runServerDbMigrations(pool);
       await ensureChantiersPostgresCutover({
         pool,
-        acquireSource: () =>
-          acquireNextcloudChantiersSnapshot({
+        acquireSource: () => {
+          if (!("desktop" in context)) {
+            throw new Error("CHANTIERS_LEGACY_CUTOVER_CONTEXT_REQUIRED");
+          }
+          return acquireNextcloudChantiersSnapshot({
             desktop: context.desktop,
             owner: context.owner,
-          }),
+          });
+        },
       });
       return createPostgresChantiersRepository(pool);
     })();
