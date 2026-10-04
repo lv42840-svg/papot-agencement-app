@@ -253,10 +253,7 @@ function normalizeSearch(value: string): string {
 async function postLibrary(body: Record<string, unknown>) {
   const response = await fetch("/api/desktop/library", {
     method: "POST",
-    headers: {
-          "Content-Type": "application/json",
-          ...quoteRevisionHeaders(quote.updatedAt),
-        },
+    headers: { "Content-Type": "application/json" },
     body: JSON.stringify(body),
   });
   const data = (await response.json()) as LibraryOpenResponse | LibrarySaveResponse;
@@ -456,7 +453,10 @@ export function QuoteLinesEditor({
     try {
       const response = await fetch("/api/desktop/quotes", {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers: {
+          "Content-Type": "application/json",
+          ...quoteRevisionHeaders(quote.updatedAt),
+        },
         body: JSON.stringify({
           action: "upsertOuvrage",
           quoteId: quote.id,
