@@ -22,6 +22,7 @@ type ManagedUser = {
   modulePermissions: Record<string, AccessLevel>;
   specialPermissions: string[];
   sessions: UserSession[];
+  revision: string;
 };
 type Snapshot = {
   users: ManagedUser[];
@@ -34,6 +35,9 @@ function errorMessage(code: string) {
   if (code === "USER_EMAIL_EXISTS") return "Cette adresse e-mail est déjà utilisée.";
   if (code === "CANNOT_DISABLE_SELF") return "Vous ne pouvez pas désactiver votre propre compte.";
   if (code === "USER_NOT_FOUND") return "Utilisateur introuvable.";
+  if (code === "USER_VERSION_CONFLICT") {
+    return "Cet utilisateur a été modifié ailleurs. Recharge la page avant de recommencer.";
+  }
   if (code === "ADMIN_FORBIDDEN") return "Administration des utilisateurs non autorisée.";
   if (code === "USER_ADMIN_REQUEST_INVALID") return "Certaines informations sont invalides.";
   return code || "Une erreur est survenue.";
@@ -366,12 +370,19 @@ function UserAdminCard({
         .filter(([, access]) => access !== "NONE")
         .map(([moduleKey, accessLevel]) => ({ moduleKey, accessLevel })),
       specialPermissions: Array.from(specials),
+      expectedRevision: user.revision,
     });
   }
 
   async function saveProfile(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
-    await mutate({ action: "updateProfile", userId: user.id, displayName, email });
+    await mutate({
+      action: "updateProfile",
+      userId: user.id,
+      displayName,
+      email,
+      expectedRevision: user.revision,
+    });
   }
 
   async function resetPassword(event: FormEvent<HTMLFormElement>) {
@@ -424,7 +435,12 @@ function UserAdminCard({
           type="button"
           disabled={busy || (user.id === actorUserId && user.isActive)}
           onClick={() =>
-            void mutate({ action: "setActive", userId: user.id, isActive: !user.isActive })
+            void mutate({
+              action: "setActive",
+              userId: user.id,
+              isActive: !user.isActive,
+              expectedRevision: user.revision,
+            })
           }
         >
           {user.isActive ? "Désactiver le compte" : "Réactiver le compte"}
