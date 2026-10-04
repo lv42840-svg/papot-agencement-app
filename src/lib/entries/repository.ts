@@ -3,10 +3,15 @@ import type { EntriesActor, EntriesMutation, EntriesMutationResult } from "./mut
 
 export interface EntriesRepository {
   load(): Promise<EntriesPayload>;
-  mutate(input: EntriesMutation, actor: EntriesActor): Promise<EntriesMutationResult>;
+  mutate(
+    input: EntriesMutation,
+    actor: EntriesActor,
+    expectedRevision?: string,
+  ): Promise<EntriesMutationResult>;
   registerAttachments(
     entryId: string,
     attachments: EntryAttachment[],
     actor: EntriesActor,
+    expectedRevision?: string,
   ): Promise<EntriesMutationResult>;
 }
