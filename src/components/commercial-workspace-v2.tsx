@@ -8,6 +8,7 @@ import {
   CheckCircle2,
   Clock3,
   ExternalLink,
+  FilePlus2,
   FileText,
   History,
   Paperclip,
@@ -198,7 +199,12 @@ function useCommercial() {
   }, []);
 
   const upload = useCallback(
-    async (caseId: string, files: File[], category: CommercialDocumentCategory) => {
+    async (
+      caseId: string,
+      files: File[],
+      category: CommercialDocumentCategory,
+      expectedUpdatedAt: string,
+    ) => {
       if (!files.length) return null;
       setBusy(true);
       setError(null);
@@ -209,6 +215,7 @@ function useCommercial() {
         form.set("category", category);
         form.set("isCurrent", "1");
         form.set("isSignedQuote", "0");
+        form.set("expectedUpdatedAt", expectedUpdatedAt);
         const response = await fetch(`/api/desktop/commercial/${caseId}/documents`, {
           method: "POST",
           body: form,
@@ -316,8 +323,12 @@ export function CommercialWorkspaceV2({ affairId }: { affairId?: string }) {
               busy={busy}
               canModify={snapshot.capabilities.canModify}
               canConfirm={snapshot.capabilities.canConfirm}
-              mutate={mutate}
-              upload={upload}
+              mutate={(body, success) =>
+                mutate({ ...body, expectedUpdatedAt: selected.updatedAt }, success)
+              }
+              upload={(caseId, files, category) =>
+                upload(caseId, files, category, selected.updatedAt)
+              }
             />
           </main>
         ) : (
