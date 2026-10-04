@@ -46,6 +46,7 @@ type PlanningAbsence = {
 };
 type PlanningSnapshot = {
   year: number;
+  revision: string;
   weeks: string[];
   rows: GrandPlanningChantierRow[];
   provisionalRows: GrandPlanningProvisionRow[];
@@ -246,6 +247,7 @@ export function GrandPlanningWorkspace({
       body: JSON.stringify({
         action: "setPersonCapacity",
         year: snapshot.year,
+        expectedRevision: snapshot.revision,
         userId: person.userId,
         countsInMacroCapacity: person.countsInMacroCapacity,
         weeklySchedule: person.weeklySchedule,
@@ -269,7 +271,11 @@ export function GrandPlanningWorkspace({
     const response = await fetch("/api/desktop/planning", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ ...body, year: snapshot.year }),
+      body: JSON.stringify({
+        ...body,
+        year: snapshot.year,
+        expectedRevision: snapshot.revision,
+      }),
     });
     const result = (await response.json()) as PlanningSnapshot & { error?: string };
     if (!response.ok) {
