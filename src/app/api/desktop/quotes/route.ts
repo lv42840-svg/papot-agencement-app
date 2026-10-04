@@ -5,7 +5,7 @@ import { createCommercialRepository } from "@/lib/commercial/create-repository";
 import { isCommercialClosed } from "@/lib/commercial/domain";
 import {
   desktopRequestErrorStatus,
-  requireDesktopRequestContext,
+  requireModuleRequestContext,
 } from "@/lib/desktop/request-context";
 import { upsertLibraryComponent } from "@/lib/library/catalog-edit";
 import { createLibraryRepository } from "@/lib/library/create-repository";
@@ -16,6 +16,11 @@ import {
   type LibraryPayload,
 } from "@/lib/library/storage";
 import { quoteWorkflowMayChangeCommercialStatus } from "@/lib/quotes/chantier";
+import {
+  assertQuoteRevision,
+  expectedQuoteRevision,
+  quoteConcurrencyStatus,
+} from "@/lib/quotes/concurrency";
 import { startQuoteCommercialWorkflow } from "@/lib/quotes/commercial-bridge";
 import { createQuotesRepository } from "@/lib/quotes/create-repository";
 import { initializeQuoteVatFromClient } from "@/lib/quotes/legal-details";
@@ -46,6 +51,8 @@ function publicSnapshot(payload: NativeQuotesPayload, canWrite: boolean, focusQu
 function errorStatus(code: string): number {
   const requestStatus = desktopRequestErrorStatus(code);
   if (requestStatus) return requestStatus;
+  const concurrencyStatus = quoteConcurrencyStatus(code);
+  if (concurrencyStatus) return concurrencyStatus;
   if (
     code === "QUOTE_AFFAIR_NOT_FOUND" ||
     code === "QUOTE_CLIENT_NOT_FOUND" ||
@@ -71,7 +78,7 @@ function errorStatus(code: string): number {
 
 export async function GET() {
   try {
-    const context = await requireDesktopRequestContext("quotes", "READ");
+    const context = await requireModuleRequestContext("quotes", "READ");
     const payload = await createQuotesRepository().load();
     return noStoreJson(publicSnapshot(payload, context.moduleAccess.canWrite));
   } catch (error) {
@@ -94,14 +101,15 @@ export async function POST(request: Request) {
   try {
     const rawInput = await request.json();
     const input = quotesMutationSchema.parse(rawInput);
-    const context = await requireDesktopRequestContext("quotes", "WRITE");
+    const expectedRevision = input.action === "createDraft" ? null : expectedQuoteRevision(request);
+    const context = await requireModuleRequestContext("quotes", "WRITE");
     const actor = { userId: context.user.id, displayName: context.user.displayName };
 
     if (input.action === "createDraft") {
       const workflow = quoteCommercialWorkflowSchema.parse(rawInput);
-      const commercialContext = await requireDesktopRequestContext("commercial", "WRITE");
-      const commercialRepository = createCommercialRepository(commercialContext);
-      const clientsRepository = await createClientsRepository(context);
+      await requireModuleRequestContext("commercial", "WRITE");
+      const commercialRepository = createCommercialRepository();
+      const clientsRepository = await createClientsRepository();
       const [commercial, clients] = await Promise.all([
         commercialRepository.load(),
         clientsRepository.load(),
@@ -215,6 +223,7 @@ export async function POST(request: Request) {
 
     const repository = createQuotesRepository();
     const mutation = await repository.mutate(async (payload) => {
+      assertQuoteRevision(payload, input.quoteId, expectedRevision!);
       const result = applyQuotesMutation(
         payload,
         input,
