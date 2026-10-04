@@ -11,7 +11,10 @@ import {
   createInitialCommercialPayload,
   parseCommercialPayload,
 } from "../src/lib/commercial/domain";
-import { applyCommercialMutation } from "../src/lib/commercial/mutations";
+import {
+  applyCommercialMutation,
+  assertCommercialRevision,
+} from "../src/lib/commercial/mutations";
 import { createPostgresCommercialRepository } from "../src/lib/commercial/postgres-repository";
 import { runServerDbMigrations } from "../src/lib/server-db/migrations";
 import { closeServerDbPool, getServerDbPool } from "../src/lib/server-db/pool";
@@ -155,6 +158,49 @@ describeWithPostgres("Commercial PostgreSQL cutover", () => {
     expect(loaded.cases.map((item) => item.name)).toEqual(
       expect.arrayContaining(["Affaire poste A", "Affaire poste B"]),
     );
+  });
+
+  it("rejects a stale browser edit of the same affair", async () => {
+    const source = createCase(createInitialCommercialPayload(), "Affaire partagée");
+    await ensureCommercialPostgresCutover({
+      pool,
+      acquireSource: async () => ({
+        payload: source,
+        release: async () => undefined,
+      }),
+    });
+
+    const repository = createPostgresCommercialRepository(pool);
+    const opened = (await repository.load()).cases[0];
+
+    await repository.mutate((payload) => {
+      const current = payload.cases.find((item) => item.id === opened.id);
+      if (!current) throw new Error("COMMERCIAL_CASE_NOT_FOUND");
+      assertCommercialRevision(current, opened.updatedAt);
+      return applyCommercialMutation(
+        payload,
+        {
+          action: "updateNotes",
+          caseId: opened.id,
+          quoteNotes: "Note enregistrée par le poste A",
+        },
+        { userId: actor.userId, displayName: "Poste A" },
+        new Date("2026-09-14T11:00:00.000Z"),
+      );
+    });
+
+    await expect(
+      repository.mutate((payload) => {
+        const current = payload.cases.find((item) => item.id === opened.id);
+        if (!current) throw new Error("COMMERCIAL_CASE_NOT_FOUND");
+        assertCommercialRevision(current, opened.updatedAt);
+        return { payload, focusCaseId: opened.id };
+      }),
+    ).rejects.toThrow("COMMERCIAL_VERSION_CONFLICT");
+
+    const current = (await repository.load()).cases[0];
+    expect(current.quoteNotes).toBe("Note enregistrée par le poste A");
+    expect(current.updatedByName).toBe("Poste A");
   });
 
   it("does not increment the version for a no-op mutation", async () => {
