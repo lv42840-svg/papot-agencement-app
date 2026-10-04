@@ -37,7 +37,8 @@ export async function POST(request: Request) {
         : error instanceof Error
           ? error.message
           : "QUOTE_EMAIL_SETTINGS_SAVE_FAILED";
-    const status = code === "QUOTE_EMAIL_SETTINGS_REQUEST_INVALID" ? 400 : userAdminErrorStatus(code);
+    const status =
+      code === "QUOTE_EMAIL_SETTINGS_REQUEST_INVALID" ? 400 : userAdminErrorStatus(code);
     return noStoreJson({ error: code }, { status });
   }
 }
