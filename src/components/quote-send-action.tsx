@@ -1,25 +1,29 @@
 "use client";
 
 import { FileLock2, Send } from "lucide-react";
-import { type FormEvent, useState } from "react";
+import { type FormEvent, useMemo, useState } from "react";
+import {
+  renderQuoteEmailTemplate,
+  type QuoteEmailSettings,
+} from "@/lib/quote-email-settings/domain";
 import { quoteRevisionHeaders } from "@/lib/quotes/concurrency";
 import type { NativeQuoteRecord, NativeQuotesPayload } from "@/lib/quotes/store";
 
 type ApiResponse = { payload?: NativeQuotesPayload; error?: string };
 type FinalizeMode = "VALIDATE" | "SEND";
 
+type EmailDraft = {
+  to: string;
+  subject: string;
+  body: string;
+};
+
 function sendErrorLabel(code?: string): string {
   if (code === "QUOTE_VERSION_CONFLICT")
     return "Ce devis a été modifié ailleurs. Recharge-le avant de le valider ou de l’envoyer.";
-  if (code === "MODULE_FORBIDDEN") {
-    return "Droit de modification Devis et Commercial requis.";
-  }
-  if (code === "QUOTE_FOLLOW_UP_DATE_REQUIRED") {
-    return "Choisis une date de relance valide.";
-  }
-  if (code === "QUOTE_SEND_REQUEST_INVALID") {
-    return "Vérifie l’action demandée et la date de relance.";
-  }
+  if (code === "MODULE_FORBIDDEN") return "Droit de modification Devis et Commercial requis.";
+  if (code === "QUOTE_FOLLOW_UP_DATE_REQUIRED") return "Choisis une date de relance valide.";
+  if (code === "QUOTE_SEND_REQUEST_INVALID") return "Vérifie le mail et la date de relance.";
   if (code === "QUOTE_PRICING_REVIEW_REQUIRED" || code === "QUOTE_DOCUMENT_PRICING_WARNING") {
     return "Vérifie les ajustements de chiffrage signalés avant de figer le devis.";
   }
@@ -29,7 +33,7 @@ function sendErrorLabel(code?: string): string {
   if (code === "QUOTE_NOT_EDITABLE") return "Ce devis n’est plus modifiable.";
   if (code === "QUOTE_NOT_FROZEN") return "Ce devis n’est pas encore validé.";
   if (code === "QUOTE_FINAL_PDF_ARCHIVE_CONFLICT") {
-    return "Un PDF différent existe déjà pour ce numéro, cette variante et cette version. Aucun fichier n’a été écrasé.";
+    return "Un PDF différent existe déjà pour ce numéro, cette variante et cette version.";
   }
   if (
     code?.startsWith("QUOTE_WORD_V2_PDF_REQUIRED_FIELDS:") ||
@@ -41,47 +45,28 @@ function sendErrorLabel(code?: string): string {
   if (code === "QUOTE_DOCUMENT_COMPANY_REQUIRED") {
     return "Renseigne les informations de PAPOT nécessaires au devis dans les paramètres société.";
   }
-  if (
-    code === "QUOTE_DOCUMENT_CLIENT_NOT_FOUND" ||
-    code === "QUOTE_DOCUMENT_AFFAIR_NOT_FOUND" ||
-    code === "QUOTE_DOCUMENT_CLIENT_MISMATCH" ||
-    code === "QUOTE_DOCUMENT_AFFAIR_CLIENT_MISMATCH"
-  ) {
-    return "Le client ou l’affaire du devis n’est pas correctement rattaché. Vérifie la fiche affaire.";
-  }
   if (code?.startsWith("QUOTE_WORD_V2_TEMPLATE_")) {
     return "Le modèle Word du devis est indisponible.";
   }
-  if (code === "PDF_CONVERTER_UNAVAILABLE") {
-    return "Aucun moteur PDF n’est disponible sur ce poste. Installe LibreOffice ou Microsoft Word puis relance PAPOT.";
-  }
-  if (code?.startsWith("PDF_WINDOWS_CONVERTER_FAILED:")) {
-    return "LibreOffice est indisponible et Microsoft Word n’a pas réussi à convertir le devis en PDF.";
-  }
-  if (
-    code?.startsWith("PDF_CONVERSION_FAILED:") ||
-    code?.startsWith("PDF_CONVERSION_OUTPUT_MISSING:")
-  ) {
-    return "LibreOffice a été trouvé mais n’a pas réussi à convertir le devis en PDF.";
-  }
   if (code === "SERVER_FILE_ROOT_UNAVAILABLE") {
-    return "Le dossier d’archivage PAPOT est inaccessible ou non modifiable sur ce poste.";
+    return "Le dossier d’archivage PAPOT est inaccessible.";
   }
   if (code === "QUOTE_RECIPIENT_EMAIL_REQUIRED") {
-    return "Renseigne une adresse e-mail pour le client avant l’envoi.";
+    return "Renseigne une adresse e-mail destinataire.";
+  }
+  if (code === "QUOTE_EMAIL_CONTENT_REQUIRED") {
+    return "L’objet et le message de l’e-mail sont obligatoires.";
   }
   if (code === "QUOTE_EMAIL_NOT_CONFIGURED") {
     return "L’envoi automatique des devis n’est pas encore configuré sur le serveur.";
   }
   if (code === "QUOTE_EMAIL_SEND_FAILED") {
-    return "Le serveur n’a pas réussi à envoyer le devis. Le devis n’a pas été marqué comme envoyé.";
+    return "Le serveur n’a pas réussi à envoyer le devis. Il n’a pas été marqué comme envoyé.";
   }
   if (code?.startsWith("PDF_")) {
-    return "La génération du PDF a échoué avant l’archivage. Rien n’a été figé.";
+    return "La génération du PDF a échoué avant l’archivage.";
   }
-  return code
-    ? `La génération du PDF a échoué (${code}). La date de relance n’est pas forcément en cause.`
-    : "Impossible de générer et figer le PDF du devis.";
+  return code ? `Impossible d’envoyer le devis (${code}).` : "Impossible d’envoyer le devis.";
 }
 
 async function postFinalize(
@@ -89,6 +74,7 @@ async function postFinalize(
   mode: FinalizeMode,
   followUpDate: string,
   updatedAt: string,
+  email?: EmailDraft,
 ): Promise<NativeQuotesPayload> {
   const response = await fetch(`/api/desktop/quotes/${quoteId}/send`, {
     method: "POST",
@@ -96,61 +82,150 @@ async function postFinalize(
       "Content-Type": "application/json",
       ...quoteRevisionHeaders(updatedAt),
     },
-    body: JSON.stringify(mode === "SEND" ? { mode, followUpDate } : { mode }),
+    body: JSON.stringify(
+      mode === "SEND" ? { mode, followUpDate, email } : { mode },
+    ),
   });
   const data = (await response.json()) as ApiResponse;
-  if (!response.ok || !data.payload) {
-    throw new Error(data.error ?? "QUOTE_SEND_FAILED");
-  }
+  if (!response.ok || !data.payload) throw new Error(data.error ?? "QUOTE_SEND_FAILED");
   return data.payload;
+}
+
+function buildEmailDraft(params: {
+  quote: NativeQuoteRecord;
+  settings: QuoteEmailSettings;
+  recipientEmail: string;
+  recipientName: string;
+  clientName: string;
+  affairName: string;
+}): EmailDraft {
+  const quoteNumber = params.quote.finalPdf?.quoteNumber ?? "";
+  const greeting = params.recipientName.trim()
+    ? `Bonjour ${params.recipientName.trim()},`
+    : "Bonjour,";
+  const values = {
+    AFFAIRE: params.affairName,
+    BONJOUR: greeting,
+    CLIENT: params.clientName,
+    CONTACT: params.recipientName,
+    NUM_DEVIS: quoteNumber,
+    OBJET_DEVIS: params.quote.model.subject,
+  };
+
+  return {
+    to: params.recipientEmail,
+    subject: renderQuoteEmailTemplate(params.settings.subjectTemplate, values),
+    body: renderQuoteEmailTemplate(params.settings.bodyTemplate, values),
+  };
 }
 
 export function QuoteSendAction({
   quote,
   canWrite,
+  clientName,
+  affairName,
   recipientEmail,
+  recipientName,
+  emailSettings,
   onSaved,
 }: {
   quote: NativeQuoteRecord;
   canWrite: boolean;
+  clientName: string;
   affairName: string;
   recipientEmail: string;
   recipientName: string;
+  emailSettings: QuoteEmailSettings;
   onSaved: (payload: NativeQuotesPayload) => void;
 }) {
   const [mode, setMode] = useState<FinalizeMode | null>(null);
   const [followUpDate, setFollowUpDate] = useState("");
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
+  const [emailDraft, setEmailDraft] = useState<EmailDraft | null>(null);
+
+  const defaultFrozenDraft = useMemo(
+    () =>
+      quote.status === "FROZEN"
+        ? buildEmailDraft({
+            quote,
+            settings: emailSettings,
+            recipientEmail,
+            recipientName,
+            clientName,
+            affairName,
+          })
+        : null,
+    [affairName, clientName, emailSettings, quote, recipientEmail, recipientName],
+  );
 
   function startMode(nextMode: FinalizeMode) {
     setError("");
     setMode(nextMode);
+    setEmailDraft(nextMode === "SEND" ? defaultFrozenDraft : null);
   }
 
   function cancel() {
     setError("");
     setMode(null);
+    setEmailDraft(null);
   }
 
   async function submit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     if (!mode) return;
-    if (mode === "SEND" && !/^\d{4}-\d{2}-\d{2}$/.test(followUpDate)) {
-      setError("Choisis une date de relance valide.");
-      return;
-    }
-    if (mode === "SEND" && !recipientEmail.trim()) {
-      setError("Renseigne une adresse e-mail pour le client avant l’envoi.");
-      return;
-    }
 
     setSaving(true);
     setError("");
     try {
-      const payload = await postFinalize(quote.id, mode, followUpDate, quote.updatedAt);
+      if (mode === "VALIDATE") {
+        const payload = await postFinalize(quote.id, "VALIDATE", "", quote.updatedAt);
+        onSaved(payload);
+        setMode(null);
+        return;
+      }
+
+      if (!emailDraft) {
+        const payload = await postFinalize(quote.id, "VALIDATE", "", quote.updatedAt);
+        onSaved(payload);
+        const frozen = payload.quotes.find((candidate) => candidate.id === quote.id);
+        if (!frozen) throw new Error("QUOTE_NOT_FOUND");
+        setEmailDraft(
+          buildEmailDraft({
+            quote: frozen,
+            settings: emailSettings,
+            recipientEmail,
+            recipientName,
+            clientName,
+            affairName,
+          }),
+        );
+        return;
+      }
+
+      if (!/^\d{4}-\d{2}-\d{2}$/.test(followUpDate)) {
+        setError("Choisis une date de relance valide.");
+        return;
+      }
+      if (!emailDraft.to.trim()) {
+        setError("Renseigne une adresse e-mail destinataire.");
+        return;
+      }
+      if (!emailDraft.subject.trim() || !emailDraft.body.trim()) {
+        setError("L’objet et le message de l’e-mail sont obligatoires.");
+        return;
+      }
+
+      const payload = await postFinalize(
+        quote.id,
+        "SEND",
+        followUpDate,
+        quote.updatedAt,
+        emailDraft,
+      );
       onSaved(payload);
       setMode(null);
+      setEmailDraft(null);
     } catch (caught) {
       setError(sendErrorLabel(caught instanceof Error ? caught.message : ""));
     } finally {
@@ -159,36 +234,15 @@ export function QuoteSendAction({
   }
 
   if (quote.status === "SENT" || quote.status === "ACCEPTED" || quote.status === "REJECTED") {
-    if (!quote.finalPdf) {
-      return quote.followUpDate ? (
-        <div className="quoteNotice">Envoyé · relance prévue le {quote.followUpDate}</div>
-      ) : null;
-    }
-    return (
+    return quote.finalPdf ? (
       <div className="quoteNotice">
         <FileLock2 size={14} aria-hidden="true" /> {quote.finalPdf.quoteNumber} · PDF figé ·{" "}
         {quote.variantName} V{quote.version}
         {quote.followUpDate ? ` · relance prévue le ${quote.followUpDate}` : ""}
       </div>
-    );
+    ) : null;
   }
 
-  if (quote.status === "FROZEN" && !mode) {
-    return (
-      <div className="quoteFinalizeRow">
-        <div className="quoteNotice">
-          {quote.finalPdf?.quoteNumber} · PDF validé, pas encore envoyé
-        </div>
-        {canWrite ? (
-          <button type="button" className="primaryButton" onClick={() => startMode("SEND")}>
-            <Send size={15} aria-hidden="true" /> Envoyer
-          </button>
-        ) : null}
-      </div>
-    );
-  }
-
-  if (quote.status !== "DRAFT" && quote.status !== "FROZEN") return null;
   if (!canWrite) return null;
 
   if (!mode) {
@@ -204,19 +258,54 @@ export function QuoteSendAction({
     );
   }
 
-  const alreadyValidated = quote.status === "FROZEN";
-
   return (
-    <form className="quoteDraftForm" onSubmit={submit}>
+    <form className="quoteDraftForm quoteEmailCompose" onSubmit={submit}>
       <div className="quoteNotice">
         {mode === "VALIDATE"
           ? "Le PDF recevra son numéro définitif et sera figé. Le devis restera non envoyé."
-          : alreadyValidated
-            ? "Le PDF est déjà figé. PAPOT va l’envoyer automatiquement par e-mail."
-            : "Le PDF sera figé puis envoyé automatiquement par e-mail."}
+          : emailDraft
+            ? "Vérifie ou modifie le mail avant l’envoi, comme pour les bons de commande PAPOT CONCEPT."
+            : "PAPOT va d’abord figer le PDF et attribuer le numéro définitif, puis ouvrir le mail modifiable."}
       </div>
-      {mode === "SEND" ? (
+
+      {mode === "SEND" && emailDraft ? (
         <>
+          <label className="quoteField">
+            <span>Destinataire</span>
+            <input
+              type="email"
+              value={emailDraft.to}
+              onChange={(event) =>
+                setEmailDraft((current) => current ? { ...current, to: event.target.value } : current)
+              }
+              required
+            />
+          </label>
+          <label className="quoteField">
+            <span>Objet</span>
+            <input
+              value={emailDraft.subject}
+              onChange={(event) =>
+                setEmailDraft((current) =>
+                  current ? { ...current, subject: event.target.value } : current,
+                )
+              }
+              required
+            />
+          </label>
+          <label className="quoteField">
+            <span>Message</span>
+            <textarea
+              rows={9}
+              value={emailDraft.body}
+              onChange={(event) =>
+                setEmailDraft((current) =>
+                  current ? { ...current, body: event.target.value } : current,
+                )
+              }
+              required
+            />
+          </label>
           <label className="quoteField">
             <span>Date de relance obligatoire</span>
             <input
@@ -227,14 +316,14 @@ export function QuoteSendAction({
             />
           </label>
           <div className="quoteNotice">
-            Destinataire : {recipientEmail.trim() || "adresse e-mail client manquante"}
-          </div>
-          <div className="quoteNotice">
-            Envoi depuis noreply@papot.eu · copie contact@papot.eu · réponses vers contact@papot.eu
+            De : {emailSettings.fromEmail} · copie : {emailSettings.ccEmail} · réponses :{" "}
+            {emailSettings.replyToEmail}
           </div>
         </>
       ) : null}
+
       {error ? <div className="quoteFormError">{error}</div> : null}
+
       <div className="quoteDraftActions">
         <button type="button" className="secondaryButton" onClick={cancel}>
           Annuler
@@ -243,14 +332,17 @@ export function QuoteSendAction({
           {saving
             ? mode === "VALIDATE"
               ? "Validation du PDF…"
-              : "Envoi du devis…"
+              : emailDraft
+                ? "Envoi du devis…"
+                : "Préparation du mail…"
             : mode === "VALIDATE"
               ? "Confirmer la validation"
-              : alreadyValidated
+              : emailDraft
                 ? "Envoyer le devis"
-                : "Valider et envoyer"}
+                : "Valider le PDF et préparer le mail"}
         </button>
       </div>
+
       <style jsx>{`
         .quoteFinalizeRow {
           display: flex;
@@ -263,8 +355,15 @@ export function QuoteSendAction({
           align-items: center;
           gap: 6px;
         }
+        .quoteEmailCompose {
+          display: grid;
+          gap: 10px;
+        }
+        .quoteEmailCompose textarea {
+          width: 100%;
+          resize: vertical;
+        }
       `}</style>
     </form>
   );
 }
-
