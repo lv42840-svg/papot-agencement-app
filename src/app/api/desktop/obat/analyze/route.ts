@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { requireDesktopRequestContext } from "@/lib/desktop/request-context";
+import { requireModuleRequestContext } from "@/lib/desktop/request-context";
 import { analyzeObatFiles } from "@/lib/obat/parser";
 
 export const runtime = "nodejs";
@@ -18,7 +18,7 @@ function statusFor(code: string): number {
 
 export async function POST(request: Request) {
   try {
-    await requireDesktopRequestContext("commercial", "WRITE");
+    await requireModuleRequestContext("commercial", "WRITE");
     const form = await request.formData();
     const files = form.getAll("files").filter((value): value is File => value instanceof File);
     const analysis = await analyzeObatFiles(files);
