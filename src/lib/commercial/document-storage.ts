@@ -17,7 +17,6 @@ export type CommercialDocumentTransport = {
   displayName: string;
 };
 
-
 export type CommercialDocumentUploadOptions = {
   category: CommercialDocumentCategory;
   versionLabel?: string | null;
@@ -120,7 +119,6 @@ export async function readCommercialDocument(
   }
   return bytes;
 }
-
 
 export async function cleanupCommercialDocuments(
   transport: Pick<CommercialDocumentTransport, "store">,
