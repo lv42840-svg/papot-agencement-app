@@ -386,9 +386,7 @@ function LaunchSheet({
   const [quoteMissing, setQuoteMissing] = useState(false);
   const [signedQuoteMissing, setSignedQuoteMissing] = useState(false);
 
-  const declarationsOk =
-    (quotePresent || quoteMissing) &&
-    (signedQuotePresent || signedQuoteMissing);
+  const declarationsOk = (quotePresent || quoteMissing) && (signedQuotePresent || signedQuoteMissing);
 
   return (
     <div className="launchSheet">
