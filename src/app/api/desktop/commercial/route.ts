@@ -27,7 +27,7 @@ import {
 import { CommercialRepositoryError, type CommercialRepository } from "@/lib/commercial/repository";
 import {
   desktopRequestErrorStatus,
-  requireDesktopRequestContext,
+  requireModuleRequestContext,
 } from "@/lib/desktop/request-context";
 import { createPlanningRepository } from "@/lib/planning/create-repository";
 import {
@@ -194,9 +194,9 @@ async function persistAutomaticTransitions(
 
 export async function GET() {
   try {
-    const context = await requireDesktopRequestContext("commercial", "READ");
-    const repository = await createCommercialRepository(context);
-    const clients = await createClientsRepository(context);
+    const context = await requireModuleRequestContext("commercial", "READ");
+    const repository = createCommercialRepository();
+    const clients = await createClientsRepository();
     const parsed = await repository.load();
     const transition = applyCommercialAutomaticTransitions(parsed);
 
@@ -205,8 +205,13 @@ export async function GET() {
         ? await persistAutomaticTransitions(repository)
         : transition.payload;
 
+    const owner = {
+      userId: context.user.id,
+      deviceId: context.user.id,
+      displayName: context.user.displayName,
+    };
     return noStoreJson(
-      await snapshot(payload, context.owner, context.moduleAccess.canWrite, context.user, clients),
+      await snapshot(payload, owner, context.moduleAccess.canWrite, context.user, clients),
     );
   } catch (error) {
     const code = error instanceof Error ? error.message : "COMMERCIAL_LOAD_FAILED";
@@ -222,15 +227,20 @@ export async function POST(request: Request) {
     const raw = (await request.json()) as RawRequest;
     const input = commercialMutationSchema.parse(raw);
     stage = "create-runtime";
-    const context = await requireDesktopRequestContext("commercial", "WRITE");
+    const context = await requireModuleRequestContext("commercial", "WRITE");
     const requiredSpecialPermission = commercialSpecialPermissionForMutation(input);
     if (requiredSpecialPermission) {
       await requireSpecialPermission(context.user, requiredSpecialPermission);
     }
 
-    const repository = await createCommercialRepository(context);
-    const clients = await createClientsRepository(context);
-    const actor = { userId: context.owner.userId, displayName: context.owner.displayName };
+    const repository = createCommercialRepository();
+    const clients = await createClientsRepository();
+    const owner = {
+      userId: context.user.id,
+      deviceId: context.user.id,
+      displayName: context.user.displayName,
+    };
+    const actor = { userId: owner.userId, displayName: owner.displayName };
     let resolvedClient: ResolvedCommercialClient | null = null;
 
     const buildMutation = async (
@@ -301,7 +311,7 @@ export async function POST(request: Request) {
     return noStoreJson(
       await snapshot(
         mutation.payload,
-        context.owner,
+        owner,
         true,
         context.user,
         clients,
