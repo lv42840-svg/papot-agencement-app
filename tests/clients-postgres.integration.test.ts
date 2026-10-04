@@ -126,10 +126,14 @@ describeWithPostgres("Clients PostgreSQL cutover", () => {
       "98765432109876",
     );
     await repository.mutate(createdInput, actor);
+    const opened = (await repository.load()).clients.find(
+      (client) => client.id === createdInput.clientId,
+    )!;
     await repository.mutate(
       {
         ...createdInput,
         action: "update",
+        expectedUpdatedAt: opened.updatedAt,
         companyName: "Nouveau client modifié",
       },
       actor,
