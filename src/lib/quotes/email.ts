@@ -2,7 +2,7 @@ import { randomUUID } from "node:crypto";
 import { once } from "node:events";
 import * as tls from "node:tls";
 
-export const DEFAULT_QUOTE_FROM_EMAIL = "noreply@papot.eu";
+export const DEFAULT_QUOTE_FROM_EMAIL = "noreply@papot.app";
 export const DEFAULT_QUOTE_CC_EMAIL = "contact@papot.eu";
 export const DEFAULT_QUOTE_REPLY_TO_EMAIL = "contact@papot.eu";
 
@@ -117,7 +117,7 @@ export function buildQuoteEmailMessage(
   if (!subject || !body) throw new Error("QUOTE_EMAIL_CONTENT_REQUIRED");
 
   const boundary = `papot-${randomUUID()}`;
-  const domain = policy.fromEmail.split("@")[1] || "papot.eu";
+  const domain = policy.fromEmail.split("@")[1] || "papot.app";
   const fileName = headerValue(input.pdfFileName);
   const fallbackFileName = asciiFileName(fileName);
 
@@ -270,7 +270,7 @@ async function sendSmtpMessage(params: {
   try {
     await once(socket, "secureConnect");
     assertResponse(await reader.read(), [220]);
-    await smtpCommand(socket, reader, "EHLO papot.eu", [250]);
+    await smtpCommand(socket, reader, "EHLO papot.app", [250]);
     await smtpCommand(socket, reader, "AUTH LOGIN", [334]);
     await smtpCommand(
       socket,
