@@ -3,6 +3,9 @@ import { describe, expect, it } from "vitest";
 
 const files = [
   "../src/app/devis/page.tsx",
+  "../src/app/devis/nouveau/page.tsx",
+  "../src/app/devis/[quoteId]/page.tsx",
+  "../src/app/devis/bibliotheque/page.tsx",
   "../src/app/api/desktop/quotes/route.ts",
   "../src/app/api/desktop/quotes/pricing/route.ts",
   "../src/app/api/desktop/quotes/[quoteId]/details/route.ts",
