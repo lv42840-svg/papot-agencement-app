@@ -47,6 +47,15 @@ export async function POST(request: Request, context: RouteContext) {
     const repository = await createEntriesRepository();
     const form = await request.formData();
     const files = form.getAll("files").filter((value): value is File => value instanceof File);
+    const expectedEntryRevision = String(
+      form.get("expectedEntryRevision") ?? "",
+    ).trim();
+    if (!expectedEntryRevision) {
+      return NextResponse.json(
+        { error: "ENTRIES_VERSION_REQUIRED" },
+        { status: 428 },
+      );
+    }
     if (files.length === 0) {
       return NextResponse.json({ error: "ENTRY_ATTACHMENTS_REQUIRED" }, { status: 400 });
     }
@@ -62,7 +71,12 @@ export async function POST(request: Request, context: RouteContext) {
     let uploaded = [] as Awaited<ReturnType<typeof uploadEntryAttachments>>;
     try {
       uploaded = await uploadEntryAttachments(transport, entryId, files);
-      const mutation = await repository.registerAttachments(entryId, uploaded, actor);
+      const mutation = await repository.registerAttachments(
+        entryId,
+        uploaded,
+        actor,
+        expectedEntryRevision,
+      );
       return NextResponse.json(snapshot(mutation.payload, actor, mutation.focusEntryId), {
         headers: { "Cache-Control": "no-store" },
       });
