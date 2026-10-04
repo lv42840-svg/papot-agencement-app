@@ -1,6 +1,7 @@
 import "server-only";
 
 import { createHash, randomUUID } from "node:crypto";
+import { effectiveModulePermissions } from "@/lib/auth/effective-module-permissions";
 import { hashPassword } from "@/lib/auth/password";
 import { getCurrentUser, type CurrentUser } from "@/lib/auth/session";
 import type { AccessLevel } from "@/lib/auth/permissions";
@@ -112,7 +113,7 @@ export async function listAdminUsers(): Promise<AdminUserSnapshot[]> {
       isActive: user.isActive,
       canManagePermissions: user.canManagePermissions,
       mustChangePassword: user.mustChangePassword,
-      modulePermissions: { ...user.modulePermissions },
+      modulePermissions: effectiveModulePermissions(user),
       specialPermissions: [...user.specialPermissions].sort(),
       revision: managedUserRevision(user),
       sessions: payload.sessions
