@@ -132,37 +132,54 @@ export function QuoteSendAction({
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
   const [outlookOpenedWithoutAttachment, setOutlookOpenedWithoutAttachment] = useState(false);
+  const [manualPdfHref, setManualPdfHref] = useState("");
 
   function startMode(nextMode: FinalizeMode) {
     setError("");
     setOutlookOpenedWithoutAttachment(false);
+    setManualPdfHref("");
     setMode(nextMode);
   }
 
   function cancel() {
     setError("");
     setOutlookOpenedWithoutAttachment(false);
+    setManualPdfHref("");
     setMode(null);
   }
 
   async function openOutlook(validatedQuote: NativeQuoteRecord) {
     if (!validatedQuote.finalPdf) throw new Error("OUTLOOK_ATTACHMENT_NOT_FOUND");
-    const compose = window.papotDesktop?.composeOutlookMail;
-    if (!compose) throw new Error("OUTLOOK_DESKTOP_REQUIRED");
 
     const quoteNumber = validatedQuote.finalPdf.quoteNumber;
     const greeting = recipientName.trim() ? `Bonjour ${recipientName.trim()},` : "Bonjour,";
+    const subject = `Devis ${quoteNumber} - ${affairName}`;
+    const body = [
+      greeting,
+      "",
+      `Veuillez trouver ci-joint notre devis ${quoteNumber} concernant ${validatedQuote.model.subject}.`,
+      "",
+      "Bien cordialement,",
+    ].join("\n");
+
+    const compose = window.papotDesktop?.composeOutlookMail;
+    if (!compose) {
+      const downloadHref =
+        `/api/desktop/commercial/${encodeURIComponent(validatedQuote.commercialCaseId)}` +
+        `/documents/${encodeURIComponent(validatedQuote.finalPdf.commercialDocumentId)}?download=1`;
+      setManualPdfHref(downloadHref);
+      const mailto =
+        `mailto:${encodeURIComponent(recipientEmail.trim())}` +
+        `?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(body)}`;
+      window.location.href = mailto;
+      return { ok: true, attachmentAttached: false };
+    }
+
     const result = await compose({
       kind: "quote-email",
       to: recipientEmail.trim(),
-      subject: `Devis ${quoteNumber} - ${affairName}`,
-      body: [
-        greeting,
-        "",
-        `Veuillez trouver ci-joint notre devis ${quoteNumber} concernant ${validatedQuote.model.subject}.`,
-        "",
-        "Bien cordialement,",
-      ].join("\n"),
+      subject,
+      body,
       storagePath: validatedQuote.finalPdf.storagePath,
     });
     if (!result.ok) throw new Error(result.error);
@@ -215,7 +232,9 @@ export function QuoteSendAction({
       if (!outlookResult.attachmentAttached) {
         setOutlookOpenedWithoutAttachment(true);
         setError(
-          "Outlook est ouvert, mais cette version d’Outlook ne permet pas à PAPOT de joindre automatiquement le PDF. Ajoute le PDF, envoie le mail, puis clique « J’ai envoyé ».",
+          window.papotDesktop
+            ? "Outlook est ouvert, mais cette version d’Outlook ne permet pas à PAPOT de joindre automatiquement le PDF. Ajoute le PDF, envoie le mail, puis clique « J’ai envoyé »."
+            : "Le mail est ouvert dans ton client de messagerie. Télécharge le PDF ci-dessous, joins-le au mail, envoie-le, puis clique « J’ai envoyé ».",
         );
         return;
       }
@@ -307,8 +326,13 @@ export function QuoteSendAction({
             />
           </label>
           <div className="quoteNotice">
-            Destinataire Outlook : {recipientEmail.trim() || "à renseigner dans Outlook"}
+            Destinataire : {recipientEmail.trim() || "à renseigner dans le client mail"}
           </div>
+          {outlookOpenedWithoutAttachment && manualPdfHref ? (
+            <a className="secondaryButton quotePdfDownload" href={manualPdfHref} download>
+              Télécharger le PDF à joindre
+            </a>
+          ) : null}
         </>
       ) : null}
       {error ? <div className="quoteFormError">{error}</div> : null}
@@ -337,10 +361,15 @@ export function QuoteSendAction({
           gap: 8px;
           flex-wrap: wrap;
         }
-        .quoteFinalizeRow :global(button) {
+        .quoteFinalizeRow :global(button),
+        :global(.quotePdfDownload) {
           display: inline-flex;
           align-items: center;
           gap: 6px;
+        }
+        :global(.quotePdfDownload) {
+          width: fit-content;
+          text-decoration: none;
         }
       `}</style>
     </form>
