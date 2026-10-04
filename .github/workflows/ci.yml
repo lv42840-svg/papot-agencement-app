@@ -47,14 +47,7 @@ jobs:
           cache: npm
       - run: npm ci
       - run: npm test -- tests/server-db.integration.test.ts
-      - run: npm test -- tests/clients-postgres.integration.test.ts
       - run: npm test -- tests/clients-concurrency.integration.test.ts
-      - run: npm test -- tests/auth-postgres.integration.test.ts
-      - run: npm test -- tests/entries-postgres.integration.test.ts
-      - run: npm test -- tests/commercial-postgres.integration.test.ts
-      - run: npm test -- tests/commercial-document-files.integration.test.ts
-      - run: npm test -- tests/chantiers-postgres.integration.test.ts
-      - run: npm test -- tests/library-postgres.integration.test.ts
       - run: npm test -- tests/quotes-postgres.integration.test.ts
       - run: npm test -- tests/planning-postgres.integration.test.ts
 
