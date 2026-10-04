@@ -98,12 +98,14 @@ describe("clients domain", () => {
       actor,
     );
     const clientId = created.payload.clients[0].id;
+    const expectedUpdatedAt = created.payload.clients[0].updatedAt;
 
     const updated = applyClientsMutation(
       created.payload,
       {
         action: "update",
         clientId,
+        expectedUpdatedAt,
         ...baseFields,
         paymentTerms: "30 jours date de facture",
         contacts: [
@@ -153,10 +155,11 @@ describe("clients domain", () => {
       actor,
     );
     const clientId = created.payload.clients[0].id;
+    const createdUpdatedAt = created.payload.clients[0].updatedAt;
 
     const archived = applyClientsMutation(
       created.payload,
-      { action: "archive", clientId },
+      { action: "archive", clientId, expectedUpdatedAt: createdUpdatedAt },
       actor,
       new Date("2026-09-13T18:00:00.000Z"),
     );
@@ -165,7 +168,11 @@ describe("clients domain", () => {
 
     const reactivated = applyClientsMutation(
       archived.payload,
-      { action: "reactivate", clientId },
+      {
+        action: "reactivate",
+        clientId,
+        expectedUpdatedAt: archived.payload.clients[0].updatedAt,
+      },
       actor,
     );
     expect(reactivated.payload.clients).toHaveLength(1);
