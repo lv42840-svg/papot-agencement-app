@@ -25,7 +25,7 @@ describe("web quote reactivation", () => {
   it("sends the quote from PAPOT instead of delegating to the browser mail client", () => {
     expect(sendSource).toContain("Valider et envoyer");
     expect(sendSource).toContain("Envoi du devis…");
-    expect(emailSettingsSource).toContain("noreply@papot.eu");
+    expect(emailSettingsSource).toContain("noreply@papot.app");
     expect(emailSettingsSource).toContain("contact@papot.eu");
     expect(sendSource).not.toContain("mailto:");
     expect(sendSource).not.toContain("composeOutlookMail");
