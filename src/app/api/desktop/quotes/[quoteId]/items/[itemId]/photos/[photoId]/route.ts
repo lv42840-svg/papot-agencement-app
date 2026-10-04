@@ -4,6 +4,11 @@ import {
   requireDesktopRequestContext,
   desktopRequestErrorStatus,
 } from "@/lib/desktop/request-context";
+import {
+  assertQuoteRevision,
+  expectedQuoteRevision,
+  quoteConcurrencyStatus,
+} from "@/lib/quotes/concurrency";
 import { createQuotesRepository } from "@/lib/quotes/create-repository";
 import {
   getQuoteItemPhoto,
@@ -21,6 +26,8 @@ const visibilitySchema = z.object({ clientVisible: z.boolean() }).strict();
 function statusFor(code: string): number {
   const requestStatus = desktopRequestErrorStatus(code);
   if (requestStatus) return requestStatus;
+  const concurrencyStatus = quoteConcurrencyStatus(code);
+  if (concurrencyStatus) return concurrencyStatus;
   if (
     code === "QUOTE_NOT_FOUND" ||
     code === "QUOTE_ITEM_NOT_FOUND" ||
@@ -61,13 +68,22 @@ export async function PATCH(request: Request, context: RouteContext) {
     const { quoteId, itemId, photoId } = await context.params;
     const requestContext = await requireDesktopRequestContext("quotes", "WRITE");
     const input = visibilitySchema.parse(await request.json());
+    const expectedRevision = expectedQuoteRevision(request);
     const actor = {
       userId: requestContext.owner.userId,
       displayName: requestContext.owner.displayName,
     };
-    const mutation = await createQuotesRepository().mutate((payload) =>
-      setQuoteItemPhotoVisibility(payload, quoteId, itemId, photoId, input.clientVisible, actor),
-    );
+    const mutation = await createQuotesRepository().mutate((payload) => {
+      assertQuoteRevision(payload, quoteId, expectedRevision);
+      return setQuoteItemPhotoVisibility(
+        payload,
+        quoteId,
+        itemId,
+        photoId,
+        input.clientVisible,
+        actor,
+      );
+    });
     return NextResponse.json(
       { payload: mutation.payload },
       { headers: { "Cache-Control": "no-store" } },
@@ -78,20 +94,23 @@ export async function PATCH(request: Request, context: RouteContext) {
   }
 }
 
-export async function DELETE(_request: Request, context: RouteContext) {
+export async function DELETE(request: Request, context: RouteContext) {
   try {
     const { quoteId, itemId, photoId } = await context.params;
     const requestContext = await requireDesktopRequestContext("quotes", "WRITE");
     const repository = createQuotesRepository();
+    const expectedRevision = expectedQuoteRevision(request);
     const current = await repository.load();
+    assertQuoteRevision(current, quoteId, expectedRevision);
     const photo = getQuoteItemPhoto(current, quoteId, itemId, photoId);
     const actor = {
       userId: requestContext.owner.userId,
       displayName: requestContext.owner.displayName,
     };
-    const mutation = await repository.mutate((payload) =>
-      removeQuoteItemPhoto(payload, quoteId, itemId, photoId, actor),
-    );
+    const mutation = await repository.mutate((payload) => {
+      assertQuoteRevision(payload, quoteId, expectedRevision);
+      return removeQuoteItemPhoto(payload, quoteId, itemId, photoId, actor);
+    });
     const stillReferenced = mutation.payload.quotes.some((quote) =>
       quote.model.items.some((item) =>
         item.presentation?.photos.some((candidate) => candidate.storagePath === photo.storagePath),
