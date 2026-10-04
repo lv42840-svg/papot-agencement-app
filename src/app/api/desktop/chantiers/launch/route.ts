@@ -12,7 +12,7 @@ import { ChantiersRepositoryError } from "@/lib/chantiers/repository";
 import { createCommercialRepository } from "@/lib/commercial/create-repository";
 import {
   desktopRequestErrorStatus,
-  requireDesktopRequestContext,
+  requireModuleRequestContext,
 } from "@/lib/desktop/request-context";
 import { createPlanningRepository } from "@/lib/planning/create-repository";
 import { convertPlanningProvisionToFirm } from "@/lib/planning/mutations";
@@ -44,11 +44,11 @@ export async function POST(request: Request) {
   try {
     const input = launchChantierFromAffairSchema.parse(await request.json());
     stage = "create-runtime";
-    const context = await requireDesktopRequestContext("chantiers", "WRITE");
+    const context = await requireModuleRequestContext("chantiers", "WRITE");
     await requireSpecialPermission(context.user, "commercial.confirm_launch");
-    const commercialRepository = await createCommercialRepository(context);
+    const commercialRepository = createCommercialRepository();
     const chantiersRepository = createChantiersRepository(context);
-    const actor = { userId: context.owner.userId, displayName: context.owner.displayName };
+    const actor = { userId: context.user.id, displayName: context.user.displayName };
 
     stage = "read-affair";
     const commercial = await commercialRepository.load();
