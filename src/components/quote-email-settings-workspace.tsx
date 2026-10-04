@@ -139,12 +139,7 @@ export function QuoteEmailSettingsWorkspace() {
       </article>
 
       <div className="companyProfileActions">
-        <button
-          className="primaryButton"
-          type="button"
-          onClick={() => void save()}
-          disabled={busy}
-        >
+        <button className="primaryButton" type="button" onClick={() => void save()} disabled={busy}>
           {busy ? "Enregistrement…" : "Enregistrer le modèle d’e-mail"}
         </button>
       </div>
@@ -243,11 +238,7 @@ function Field({
   return (
     <label className="companyField">
       {label}
-      <input
-        type={type}
-        value={value}
-        onChange={(event) => onChange(event.target.value)}
-      />
+      <input type={type} value={value} onChange={(event) => onChange(event.target.value)} />
     </label>
   );
 }

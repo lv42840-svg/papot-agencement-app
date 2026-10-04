@@ -261,8 +261,8 @@ export function QuoteSendAction({
     return (
       <div className="quoteFinalizeRow">
         <div className="quoteNotice">
-          <FileLock2 size={14} aria-hidden="true" /> {quote.finalPdf?.quoteNumber} · PDF validé,
-          pas encore envoyé
+          <FileLock2 size={14} aria-hidden="true" /> {quote.finalPdf?.quoteNumber} · PDF validé, pas
+          encore envoyé
         </div>
         <button type="button" className="primaryButton" onClick={() => startMode("SEND")}>
           <Send size={15} aria-hidden="true" /> Envoyer

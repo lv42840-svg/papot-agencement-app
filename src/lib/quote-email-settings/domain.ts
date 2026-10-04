@@ -36,12 +36,7 @@ export const quoteEmailSettingsSchema = z
     fromEmail: z.string().trim().email().max(240).default("noreply@papot.app"),
     ccEmail: z.string().trim().email().max(240).default("contact@papot.eu"),
     replyToEmail: z.string().trim().email().max(240).default("contact@papot.eu"),
-    subjectTemplate: z
-      .string()
-      .trim()
-      .min(1)
-      .max(500)
-      .default("Devis {{NUM_DEVIS}} - {{AFFAIRE}}"),
+    subjectTemplate: z.string().trim().min(1).max(500).default("Devis {{NUM_DEVIS}} - {{AFFAIRE}}"),
     bodyTemplate: z
       .string()
       .min(1)

@@ -268,12 +268,9 @@ async function sendSmtpMessage(params: {
     assertResponse(await reader.read(), [220]);
     await smtpCommand(socket, reader, "EHLO papot.app", [250]);
     await smtpCommand(socket, reader, "AUTH LOGIN", [334]);
-    await smtpCommand(
-      socket,
-      reader,
-      Buffer.from(params.config.user, "utf8").toString("base64"),
-      [334],
-    );
+    await smtpCommand(socket, reader, Buffer.from(params.config.user, "utf8").toString("base64"), [
+      334,
+    ]);
     await smtpCommand(
       socket,
       reader,
