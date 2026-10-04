@@ -286,18 +286,29 @@ export function QuoteCreateWorkspace({
 
             <label className="quoteField quoteFieldWide">
               <span>Conditions de règlement</span>
-              <select
-                value={paymentTerms}
-                onChange={(event) => setPaymentTerms(event.target.value)}
-                required
-                disabled={saving || availablePaymentTerms.length === 0}
-              >
-                {availablePaymentTerms.map((terms) => (
-                  <option key={terms} value={terms}>
-                    {terms}
-                  </option>
-                ))}
-              </select>
+              {availablePaymentTerms.length > 0 ? (
+                <select
+                  value={paymentTerms}
+                  onChange={(event) => setPaymentTerms(event.target.value)}
+                  required
+                  disabled={saving}
+                >
+                  {!paymentTerms ? <option value="">Choisir…</option> : null}
+                  {availablePaymentTerms.map((terms) => (
+                    <option key={terms} value={terms}>
+                      {terms}
+                    </option>
+                  ))}
+                </select>
+              ) : (
+                <input
+                  value={paymentTerms}
+                  onChange={(event) => setPaymentTerms(event.target.value)}
+                  placeholder="Saisir les conditions de règlement"
+                  required
+                  disabled={saving}
+                />
+              )}
             </label>
 
             <div className="quoteCreateFixed quoteFieldWide">
@@ -315,7 +326,7 @@ export function QuoteCreateWorkspace({
                 type="submit"
                 disabled={
                   saving ||
-                  availablePaymentTerms.length === 0 ||
+                  !paymentTerms.trim() ||
                   !quoteOwnerName.trim() ||
                   !quoteDueDate
                 }
