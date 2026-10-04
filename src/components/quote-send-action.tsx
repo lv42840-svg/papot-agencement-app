@@ -96,9 +96,7 @@ async function postFinalize(
       "Content-Type": "application/json",
       ...quoteRevisionHeaders(updatedAt),
     },
-    body: JSON.stringify(
-      mode === "SEND" ? { mode, followUpDate, email } : { mode },
-    ),
+    body: JSON.stringify(mode === "SEND" ? { mode, followUpDate, email } : { mode }),
   });
   const data = (await response.json()) as ApiResponse;
   if (!response.ok || !data.payload) throw new Error(data.error ?? "QUOTE_SEND_FAILED");
@@ -306,7 +304,9 @@ export function QuoteSendAction({
               type="email"
               value={emailDraft.to}
               onChange={(event) =>
-                setEmailDraft((current) => current ? { ...current, to: event.target.value } : current)
+                setEmailDraft((current) =>
+                  current ? { ...current, to: event.target.value } : current,
+                )
               }
               required
             />
