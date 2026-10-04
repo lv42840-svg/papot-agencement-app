@@ -205,6 +205,7 @@ function useCommercialData() {
         isCurrent: boolean;
         isSignedQuote: boolean;
       },
+      expectedUpdatedAt: string,
     ) => {
       if (files.length === 0) return null;
       setBusy(true);
@@ -218,6 +219,7 @@ function useCommercialData() {
         form.set("variantLabel", options.variantLabel);
         form.set("isCurrent", options.isCurrent ? "1" : "0");
         form.set("isSignedQuote", options.isSignedQuote ? "1" : "0");
+        form.set("expectedUpdatedAt", expectedUpdatedAt);
         const response = await fetch(`/api/desktop/commercial/${caseId}/documents`, {
           method: "POST",
           body: form,
@@ -432,8 +434,15 @@ export function CommercialWorkspace() {
                 busy={busy}
                 capabilities={snapshot.capabilities}
                 suggestedPeople={snapshot.suggestedPeople}
-                mutate={mutate}
-                uploadDocuments={uploadDocuments}
+                mutate={(body, successMessage) =>
+                  mutate(
+                    { ...body, expectedUpdatedAt: selected.updatedAt },
+                    successMessage,
+                  )
+                }
+                uploadDocuments={(caseId, files, options) =>
+                  uploadDocuments(caseId, files, options, selected.updatedAt)
+                }
               />
             ) : (
               <div className="commercialNoSelection">
