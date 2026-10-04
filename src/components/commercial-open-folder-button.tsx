@@ -60,7 +60,8 @@ export function CommercialOpenFolderButton({
       });
       if (!result.ok) {
         setFolderError(
-          folderErrors[result.error] ?? folderErrors.DESKTOP_BUSINESS_FOLDER_OPEN_FAILED,
+          (result.error ? folderErrors[result.error] : undefined) ??
+            folderErrors.DESKTOP_BUSINESS_FOLDER_OPEN_FAILED,
         );
       }
     } catch (openError) {
@@ -134,7 +135,10 @@ export function CommercialDocumentActions({
         storagePath: document.storagePath,
       });
       if (!result.ok) {
-        setFileError(fileErrors[result.error] ?? fileErrors.DESKTOP_BUSINESS_FILE_OPEN_FAILED);
+        setFileError(
+          (result.error ? fileErrors[result.error] : undefined) ??
+            fileErrors.DESKTOP_BUSINESS_FILE_OPEN_FAILED,
+        );
       }
     } finally {
       setFileBusy(false);
