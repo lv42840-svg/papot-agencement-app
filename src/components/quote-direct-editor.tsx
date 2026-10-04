@@ -18,6 +18,7 @@ import {
   quoteContractSelectionLabel,
   type QuoteContractSelectionState,
 } from "@/lib/quotes/retention";
+import type { QuoteEmailSettings } from "@/lib/quote-email-settings/domain";
 import type { NativeQuoteRecord, NativeQuotesPayload } from "@/lib/quotes/store";
 
 function quoteWithAdjustedDisplayPrices(quote: NativeQuoteRecord): NativeQuoteRecord {
@@ -52,6 +53,7 @@ export function QuoteDirectEditor({
   affairName,
   recipientEmail,
   recipientName,
+  emailSettings,
   paymentTermOptions,
   contractState,
 }: {
@@ -62,6 +64,7 @@ export function QuoteDirectEditor({
   affairName: string;
   recipientEmail: string;
   recipientName: string;
+  emailSettings: QuoteEmailSettings;
   paymentTermOptions: string[];
   contractState: QuoteContractSelectionState;
 }) {
@@ -97,9 +100,11 @@ export function QuoteDirectEditor({
       <QuoteSendAction
         quote={quote}
         canWrite={canWrite}
+        clientName={clientName}
         affairName={affairName}
         recipientEmail={recipientEmail}
         recipientName={recipientName}
+        emailSettings={emailSettings}
         onSaved={setPayload}
       />
 

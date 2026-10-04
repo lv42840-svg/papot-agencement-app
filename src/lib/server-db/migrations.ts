@@ -25,6 +25,8 @@ const PLANNING_STORAGE_VERSION = 10;
 const PLANNING_STORAGE_NAME = "planning_postgres_storage";
 const USER_UI_PREFERENCES_VERSION = 11;
 const USER_UI_PREFERENCES_NAME = "user_ui_preferences";
+const QUOTE_EMAIL_SETTINGS_VERSION = 12;
+const QUOTE_EMAIL_SETTINGS_NAME = "quote_email_settings";
 
 const FRESH_WEB_SOURCE = "fresh:web";
 const FRESH_WEB_HASH = "fresh-empty-v1";
@@ -362,6 +364,36 @@ async function ensurePlanningStorage(client: PoolClient): Promise<void> {
   `);
 }
 
+async function ensureQuoteEmailSettingsStorage(client: PoolClient): Promise<void> {
+  await client.query(`
+    CREATE TABLE IF NOT EXISTS papot_quote_email_settings (
+      scope TEXT PRIMARY KEY CHECK (scope = 'global'),
+      version INTEGER NOT NULL DEFAULT 1 CHECK (version > 0),
+      payload JSONB NOT NULL CHECK (jsonb_typeof(payload) = 'object'),
+      updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+    )
+  `);
+
+  await client.query(`
+    INSERT INTO papot_quote_email_settings (scope, version, payload)
+    VALUES (
+      'global',
+      1,
+      $1::jsonb
+    )
+    ON CONFLICT (scope) DO NOTHING
+  `, [
+    JSON.stringify({
+      fromEmail: "noreply@papot.eu",
+      ccEmail: "contact@papot.eu",
+      replyToEmail: "contact@papot.eu",
+      subjectTemplate: "Devis {{NUM_DEVIS}} - {{AFFAIRE}}",
+      bodyTemplate:
+        "{{BONJOUR}}\n\nVeuillez trouver ci-joint notre devis {{NUM_DEVIS}} concernant {{OBJET_DEVIS}}.\n\nBien cordialement,\nPAPOT AGENCEMENT",
+    }),
+  ]);
+}
+
 async function ensureCompanyProfileStorage(client: PoolClient): Promise<void> {
   await client.query(`
     CREATE TABLE IF NOT EXISTS papot_company_profile (
@@ -496,6 +528,16 @@ export async function runServerDbMigrations(
         ON CONFLICT (version) DO NOTHING
       `,
       [USER_UI_PREFERENCES_VERSION, USER_UI_PREFERENCES_NAME],
+    );
+
+    await ensureQuoteEmailSettingsStorage(client);
+    await client.query(
+      `
+        INSERT INTO papot_schema_migrations (version, name)
+        VALUES ($1, $2)
+        ON CONFLICT (version) DO NOTHING
+      `,
+      [QUOTE_EMAIL_SETTINGS_VERSION, QUOTE_EMAIL_SETTINGS_NAME],
     );
 
     if (freshWebBootstrapEnabled(env)) {

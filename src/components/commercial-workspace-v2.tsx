@@ -67,8 +67,6 @@ const errors: Record<string, string> = {
   COMMERCIAL_CASE_NOT_FOUND: "Cette affaire n’existe plus.",
   COMMERCIAL_CLIENT_NOT_FOUND: "Ce client n’existe plus.",
   COMMERCIAL_CLIENT_REQUIRED: "Choisis ou crée un client avant de continuer.",
-  COMMERCIAL_CLIENT_INCOMPLETE:
-    "Le devis est validé : complète la fiche client (identité, adresse, code postal, ville, conditions de règlement et SIRET si professionnel) avant de confirmer l’affaire.",
   CLIENTS_LOCKED:
     "Le fichier clients est modifié sur un autre poste. Réessaie dans quelques secondes.",
   CLIENTS_VERSION_CONFLICT: "Le fichier clients a changé sur un autre poste. Réessaie.",

@@ -11,6 +11,11 @@ const sendAction = readFileSync(
   "utf-8",
 );
 
+const emailSettings = readFileSync(
+  new URL("../src/lib/quote-email-settings/domain.ts", import.meta.url),
+  "utf-8",
+);
+
 describe("quote final PDF action visibility", () => {
   it("expose l'action de génération et gel dans l'interface active du devis", () => {
     expect(directEditor).toContain("QuoteSendAction");
@@ -21,11 +26,11 @@ describe("quote final PDF action visibility", () => {
     expect(sendAction).toContain('quote.status === "FROZEN"');
     expect(sendAction).toContain("PDF validé");
     expect(sendAction).toContain("> Envoyer");
-    expect(sendAction).toContain("composeOutlookMail");
-    expect(sendAction).toContain("Valider et préparer l’envoi");
-    expect(sendAction).toContain("attachmentAttached");
-    expect(sendAction).toContain("Télécharger le PDF à joindre");
-    expect(sendAction).toContain("mailto:");
+    expect(sendAction).toContain("Valider et envoyer");
+    expect(sendAction).toContain("Envoi du devis…");
+    expect(emailSettings).toContain("noreply@papot.eu");
+    expect(emailSettings).toContain("contact@papot.eu");
+    expect(sendAction).not.toContain("mailto:");
   });
 
   it("n'attribue pas une erreur PDF inconnue a la date de relance", () => {

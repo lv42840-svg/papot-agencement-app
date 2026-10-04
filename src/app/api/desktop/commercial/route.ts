@@ -6,7 +6,6 @@ import { hasEffectiveSpecialPermission, requireSpecialPermission } from "@/lib/a
 import { createClientsRepository } from "@/lib/clients/create-repository";
 import type { ClientsRepository } from "@/lib/clients/repository";
 import {
-  assertCommercialClientReadyForConfirmation,
   hydrateCommercialPayloadWithCanonicalClients,
   listCanonicalCommercialClients,
   resolveCommercialClient,
@@ -251,7 +250,6 @@ export async function POST(request: Request) {
         const caseId = caseIdForMutation(input);
         const item = caseId ? source.cases.find((candidate) => candidate.id === caseId) : null;
         if (!item) throw new Error("COMMERCIAL_CASE_NOT_FOUND");
-        await assertCommercialClientReadyForConfirmation(clients, item.clientId);
         await validateConfirmationQuoteSelection(input);
       }
       if (input.action === "retainAdditionalQuote") {

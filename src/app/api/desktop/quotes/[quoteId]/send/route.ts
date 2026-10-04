@@ -18,6 +18,8 @@ import {
 import { buildQuoteDocumentDataFromPayloads } from "@/lib/quotes/document-data-mapping";
 import { archiveFinalQuotePdf, nextFinalQuoteNumber } from "@/lib/quotes/final-pdf-archive";
 import { createQuotesRepository } from "@/lib/quotes/create-repository";
+import { createQuoteEmailSettingsRepository } from "@/lib/quote-email-settings/create-repository";
+import { sendQuoteEmail } from "@/lib/quotes/email";
 import { normalizeQuotePricingAfterModelMutation } from "@/lib/quotes/pricing-integrity";
 import {
   markFrozenNativeQuoteSent,
@@ -31,22 +33,20 @@ import { loadQuoteWordV2Template } from "@/lib/quotes/word-v2-template-runtime";
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
-const sendQuoteSchema = z
-  .union([
-    z.object({
-      mode: z.literal("VALIDATE"),
+const sendQuoteSchema = z.discriminatedUnion("mode", [
+  z.object({
+    mode: z.literal("VALIDATE"),
+  }),
+  z.object({
+    mode: z.literal("SEND"),
+    followUpDate: z.string().regex(/^\d{4}-\d{2}-\d{2}$/),
+    email: z.object({
+      to: z.string().trim().email().max(240),
+      subject: z.string().trim().min(1).max(500),
+      body: z.string().trim().min(1).max(10_000),
     }),
-    z.object({
-      mode: z.literal("SEND"),
-      followUpDate: z.string().regex(/^\d{4}-\d{2}-\d{2}$/),
-    }),
-    z.object({
-      followUpDate: z.string().regex(/^\d{4}-\d{2}-\d{2}$/),
-    }),
-  ])
-  .transform((input) =>
-    "mode" in input ? input : { mode: "SEND" as const, followUpDate: input.followUpDate },
-  );
+  }),
+]);
 
 function noStoreJson(body: unknown, init?: ResponseInit) {
   const response = NextResponse.json(body, init);
@@ -71,7 +71,9 @@ function errorStatus(code: string): number {
   )
     return 409;
   if (code === "QUOTE_FINAL_PDF_ARCHIVE_CONFLICT") return 409;
-  if (code === "SERVER_FILE_ROOT_UNAVAILABLE") return 503;
+  if (code === "SERVER_FILE_ROOT_UNAVAILABLE" || code === "QUOTE_EMAIL_NOT_CONFIGURED") return 503;
+  if (code === "QUOTE_EMAIL_SEND_FAILED") return 502;
+  if (code === "QUOTE_RECIPIENT_EMAIL_REQUIRED" || code === "QUOTE_EMAIL_CONTENT_REQUIRED") return 400;
   if (
     code.startsWith("PDF_") ||
     code.startsWith("QUOTE_WORD_V2_TEMPLATE_") ||
@@ -106,13 +108,15 @@ export async function POST(request: Request, { params }: { params: Promise<{ quo
     const commercialRepository = createCommercialRepository();
     const clientsRepository = await createClientsRepository();
     const companyProfileRepository = createCompanyProfileRepository();
+    const emailSettingsRepository = createQuoteEmailSettingsRepository();
     const transport = await createCommercialDocumentTransport({
       displayName: quoteContext.user.displayName,
     });
-    const [clients, companyProfile, template] = await Promise.all([
+    const [clients, companyProfile, template, emailSettings] = await Promise.all([
       clientsRepository.load(),
       companyProfileRepository.load(),
       loadQuoteWordV2Template(),
+      emailSettingsRepository.load(),
     ]);
 
     const mutation = await quotesRepository.mutate(async (payload) => {
@@ -129,6 +133,25 @@ export async function POST(request: Request, { params }: { params: Promise<{ quo
 
       if (quote.status === "FROZEN") {
         if (input.mode !== "SEND") throw new Error("QUOTE_NOT_EDITABLE");
+        if (!quote.finalPdf) throw new Error("QUOTE_NOT_FROZEN");
+        const pdfBytes = await transport.store.readBytes(
+          quote.finalPdf.storagePath,
+          quote.finalPdf.sha256,
+        );
+        await sendQuoteEmail(
+          {
+            to: input.email.to,
+            subject: input.email.subject,
+            body: input.email.body,
+            pdfFileName: quote.finalPdf.fileName,
+            pdfBytes,
+          },
+          {
+            fromEmail: emailSettings.fromEmail,
+            ccEmail: emailSettings.ccEmail,
+            replyToEmail: emailSettings.replyToEmail,
+          },
+        );
         const sent = markFrozenNativeQuoteSent(payload, quoteId, input.followUpDate, actor, now);
 
         await commercialRepository.mutate((commercialPayload) => {
@@ -185,6 +208,23 @@ export async function POST(request: Request, { params }: { params: Promise<{ quo
           storagePath: archive.finalPdf.storagePath,
           deleteFile: (storagePath) => transport.store.deleteFile(storagePath),
         };
+      }
+
+      if (input.mode === "SEND") {
+        await sendQuoteEmail(
+          {
+            to: input.email.to,
+            subject: input.email.subject,
+            body: input.email.body,
+            pdfFileName: archive.finalPdf.fileName,
+            pdfBytes: generated.pdf,
+          },
+          {
+            fromEmail: emailSettings.fromEmail,
+            ccEmail: emailSettings.ccEmail,
+            replyToEmail: emailSettings.replyToEmail,
+          },
+        );
       }
 
       const finalized =
