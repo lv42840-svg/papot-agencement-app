@@ -7,7 +7,7 @@ import { createCommercialRepository } from "@/lib/commercial/create-repository";
 import { isCommercialActive } from "@/lib/commercial/domain";
 import {
   desktopRequestErrorStatus,
-  requireDesktopRequestContext,
+  requireModuleRequestContext,
 } from "@/lib/desktop/request-context";
 import {
   buildWeeklyCapacityIndicators,
@@ -81,13 +81,13 @@ async function snapshot(
   year: number,
   canWrite: boolean,
   user: { id: string },
-  context: Awaited<ReturnType<typeof requireDesktopRequestContext>>,
+  context: Awaited<ReturnType<typeof requireModuleRequestContext>>,
 ) {
   const [planning, chantiers, commercial, auth, canEditMacro, canManageSchedules] =
     await Promise.all([
       createPlanningRepository().load(),
       createChantiersRepository(context).load(),
-      createCommercialRepository(context).load(),
+      createCommercialRepository().load(),
       readAuthPayload(),
       hasEffectiveSpecialPermission(user, "planning.edit_macro"),
       hasEffectiveSpecialPermission(user, "planning.manage_schedules"),
@@ -151,7 +151,7 @@ async function snapshot(
 
 export async function GET(request: Request) {
   try {
-    const context = await requireDesktopRequestContext("planning", "READ");
+    const context = await requireModuleRequestContext("planning", "READ");
     const url = new URL(request.url);
     const year = yearSchema.parse(url.searchParams.get("year") ?? new Date().getFullYear());
     return noStoreJson(await snapshot(year, context.moduleAccess.canWrite, context.user, context));
@@ -171,7 +171,7 @@ export async function POST(request: Request) {
     const body = await request.json();
     const year = yearSchema.parse(body.year ?? new Date().getFullYear());
     const input = planningMutationSchema.parse(body);
-    const context = await requireDesktopRequestContext("planning", "WRITE");
+    const context = await requireModuleRequestContext("planning", "WRITE");
     const planningRepository = createPlanningRepository();
 
     if (input.action === "setMacroHours") {
@@ -218,7 +218,7 @@ export async function POST(request: Request) {
     } else if (input.action === "setProvisionHours") {
       await requireSpecialPermission(context.user, "planning.edit_macro");
       assertPlanningWeekEditable(input.week);
-      const commercial = await createCommercialRepository(context).load();
+      const commercial = await createCommercialRepository().load();
       const activeCommercialCaseIds = new Set(
         commercial.cases.filter(isCommercialActive).map((item) => item.id),
       );
@@ -227,7 +227,7 @@ export async function POST(request: Request) {
       );
     } else if (input.action === "setPotentialOrder") {
       await requireSpecialPermission(context.user, "planning.edit_macro");
-      const commercial = await createCommercialRepository(context).load();
+      const commercial = await createCommercialRepository().load();
       const activeCases = commercial.cases.filter(isCommercialActive);
       const activeCaseIds = new Set(activeCases.map((item) => item.id));
       const referenceCaseIds = new Set(

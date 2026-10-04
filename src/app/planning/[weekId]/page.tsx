@@ -1,5 +1,4 @@
-import { PlanningWeekEditor } from "@/components/planning-week-editor";
-import { DesktopAppShell } from "@/components/desktop-app-shell";
+import { redirect } from "next/navigation";
 
 export default async function PlanningWeekPage({
   params,
@@ -7,15 +6,6 @@ export default async function PlanningWeekPage({
   params: Promise<{ weekId: string }>;
 }) {
   const { weekId } = await params;
-  return (
-    <DesktopAppShell>
-      <div className="pageHeader">
-        <div>
-          <p className="eyebrow">Planning partagé</p>
-          <h1>Grand planning hebdomadaire</h1>
-        </div>
-      </div>
-      <PlanningWeekEditor weekId={weekId} />
-    </DesktopAppShell>
-  );
+  const year = /^\d{4}/.exec(weekId)?.[0];
+  redirect(year ? `/planning?year=${year}` : "/planning");
 }

@@ -2,7 +2,7 @@ import { NextResponse } from "next/server";
 import { createCommercialRepository } from "@/lib/commercial/create-repository";
 import { createCommercialDocumentTransport } from "@/lib/commercial/document-file-runtime";
 import { readCommercialDocument } from "@/lib/commercial/document-storage";
-import { requireDesktopRequestContext } from "@/lib/desktop/request-context";
+import { requireModuleRequestContext } from "@/lib/desktop/request-context";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -25,8 +25,8 @@ function statusFor(code: string): number {
 export async function GET(request: Request, context: RouteContext) {
   try {
     const { caseId, documentId } = await context.params;
-    const requestContext = await requireDesktopRequestContext("commercial", "READ");
-    const repository = createCommercialRepository(requestContext);
+    const requestContext = await requireModuleRequestContext("commercial", "READ");
+    const repository = createCommercialRepository();
     const payload = await repository.load();
     const item = payload.cases.find((candidate) => candidate.id === caseId);
     if (!item) {
@@ -37,7 +37,7 @@ export async function GET(request: Request, context: RouteContext) {
       return NextResponse.json({ error: "COMMERCIAL_DOCUMENT_NOT_FOUND" }, { status: 404 });
     }
 
-    const transport = await createCommercialDocumentTransport(requestContext);
+    const transport = await createCommercialDocumentTransport({ displayName: requestContext.user.displayName });
     const bytes = await readCommercialDocument(transport, document);
     const download = new URL(request.url).searchParams.get("download") === "1";
     const canInline =

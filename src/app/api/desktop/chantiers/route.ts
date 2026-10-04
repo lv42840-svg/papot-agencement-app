@@ -17,7 +17,7 @@ import {
 import { ChantiersRepositoryError } from "@/lib/chantiers/repository";
 import {
   desktopRequestErrorStatus,
-  requireDesktopRequestContext,
+  requireModuleRequestContext,
 } from "@/lib/desktop/request-context";
 import { createPlanningRepository } from "@/lib/planning/create-repository";
 import { buildChantierPlanningCloseWarning } from "@/lib/planning/domain";
@@ -97,12 +97,17 @@ function statusFor(code: string): number {
 
 export async function GET() {
   try {
-    const context = await requireDesktopRequestContext("chantiers", "READ");
+    const context = await requireModuleRequestContext("chantiers", "READ");
     const repository = createChantiersRepository(context);
     const payload = await repository.load();
+    const owner = {
+      userId: context.user.id,
+      deviceId: context.user.id,
+      displayName: context.user.displayName,
+    };
 
     return noStoreJson(
-      await snapshot(payload, context.owner, context.user, context.moduleAccess.canWrite),
+      await snapshot(payload, owner, context.user, context.moduleAccess.canWrite),
     );
   } catch (error) {
     const code = error instanceof Error ? error.message : "CHANTIERS_LOAD_FAILED";
@@ -117,16 +122,21 @@ export async function POST(request: Request) {
   try {
     const input = chantierMutationSchema.parse(await request.json());
     stage = "create-runtime";
-    const context = await requireDesktopRequestContext("chantiers", "WRITE");
+    const context = await requireModuleRequestContext("chantiers", "WRITE");
     const requiredSpecialPermission = chantierSpecialPermissionForMutation(input);
     if (requiredSpecialPermission) {
       await requireSpecialPermission(context.user, requiredSpecialPermission);
     }
 
     const repository = createChantiersRepository(context);
-    const actor = { userId: context.owner.userId, displayName: context.owner.displayName };
+    const owner = {
+      userId: context.user.id,
+      deviceId: context.user.id,
+      displayName: context.user.displayName,
+    };
+    const actor = { userId: owner.userId, displayName: owner.displayName };
     const commercialRepository = mutationNeedsCommercialOrigin(input)
-      ? await createCommercialRepository(context)
+      ? createCommercialRepository()
       : null;
     const commercial = commercialRepository ? await commercialRepository.load() : null;
     const quotes = mutationNeedsCommercialOrigin(input)
@@ -200,7 +210,7 @@ export async function POST(request: Request) {
 
     console.info("[PAPOT][Chantiers] POST saved", { ms: Date.now() - startedAt });
     return noStoreJson(
-      await snapshot(mutation.payload, context.owner, context.user, true, mutation.focusChantierId),
+      await snapshot(mutation.payload, owner, context.user, true, mutation.focusChantierId),
     );
   } catch (error) {
     const code =
