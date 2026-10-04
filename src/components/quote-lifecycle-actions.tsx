@@ -3,6 +3,7 @@
 import { Copy, GitBranch, History } from "lucide-react";
 import { useState } from "react";
 import { quoteHref } from "@/lib/quotes/navigation";
+import { quoteRevisionHeaders } from "@/lib/quotes/concurrency";
 import type { NativeQuoteRecord, NativeQuotesPayload } from "@/lib/quotes/store";
 
 type LifecycleAction = "createVersion" | "createVariant" | "duplicateQuote";
@@ -14,6 +15,8 @@ type LifecycleResponse = {
 };
 
 function errorLabel(code: string): string {
+  if (code === "QUOTE_VERSION_CONFLICT")
+    return "Ce devis a été modifié ailleurs. Recharge-le avant de recommencer.";
   if (code === "QUOTE_VERSION_SOURCE_OUTDATED") {
     return "Cette version n’est plus la version courante. Ouvre la dernière version pour continuer.";
   }
@@ -42,7 +45,10 @@ export function QuoteLifecycleActions({
     try {
       const response = await fetch(`/api/desktop/quotes/${quote.id}/lifecycle`, {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers: {
+          "Content-Type": "application/json",
+          ...quoteRevisionHeaders(quote.updatedAt),
+        },
         body: JSON.stringify({ action }),
       });
       const data = (await response.json()) as LifecycleResponse;
