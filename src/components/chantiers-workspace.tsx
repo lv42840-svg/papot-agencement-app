@@ -49,7 +49,6 @@ const errorMessages: Record<string, string> = {
   CHANTIER_QUOTE_DECLARATION_REQUIRED: "Indique explicitement que tu n'as pas le devis client.",
   CHANTIER_SIGNED_QUOTE_DECLARATION_REQUIRED:
     "Indique explicitement que tu n'as pas le devis signé.",
-  CHANTIER_COSTING_DECLARATION_REQUIRED: "Indique explicitement que tu n'as pas le déboursé.",
 };
 
 function normalize(value: string): string {
@@ -150,7 +149,6 @@ export function ChantiersWorkspace() {
     commercialCaseId: string;
     quoteMissingDeclared: boolean;
     signedQuoteMissingDeclared: boolean;
-    costingMissingDeclared: boolean;
     be: number;
     workshop: number;
     install: number;
@@ -374,7 +372,6 @@ function LaunchSheet({
     commercialCaseId: string;
     quoteMissingDeclared: boolean;
     signedQuoteMissingDeclared: boolean;
-    costingMissingDeclared: boolean;
     be: number;
     workshop: number;
     install: number;
@@ -386,18 +383,12 @@ function LaunchSheet({
   const signedQuotePresent = item.documents.some(
     (document) => document.category === "QUOTE" && document.isSignedQuote,
   );
-  const costingPresent = item.documents.some((document) => document.category === "COSTING");
   const [quoteMissing, setQuoteMissing] = useState(false);
   const [signedQuoteMissing, setSignedQuoteMissing] = useState(false);
-  const [costingMissing, setCostingMissing] = useState(false);
-  const [be, setBe] = useState(String(item.provisionHours.be));
-  const [workshop, setWorkshop] = useState(String(item.provisionHours.workshop));
-  const [install, setInstall] = useState(String(item.provisionHours.install));
 
   const declarationsOk =
     (quotePresent || quoteMissing) &&
-    (signedQuotePresent || signedQuoteMissing) &&
-    (costingPresent || costingMissing);
+    (signedQuotePresent || signedQuoteMissing);
 
   return (
     <div className="launchSheet">
@@ -427,49 +418,11 @@ function LaunchSheet({
           checked={signedQuoteMissing}
           onChange={setSignedQuoteMissing}
         />
-        <LaunchDocument
-          label="Déboursé"
-          present={costingPresent}
-          checked={costingMissing}
-          onChange={setCostingMissing}
-        />
       </div>
 
-      <div className="launchHours">
-        <label>
-          <span>BE (h)</span>
-          <input
-            type="number"
-            min="0"
-            step="0.5"
-            value={be}
-            onChange={(event) => setBe(event.target.value)}
-          />
-        </label>
-        <label>
-          <span>Atelier (h)</span>
-          <input
-            type="number"
-            min="0"
-            step="0.5"
-            value={workshop}
-            onChange={(event) => setWorkshop(event.target.value)}
-          />
-        </label>
-        <label>
-          <span>Pose (h)</span>
-          <input
-            type="number"
-            min="0"
-            step="0.5"
-            value={install}
-            onChange={(event) => setInstall(event.target.value)}
-          />
-        </label>
-      </div>
       <p className="launchHint">
-        {"Les heures sont initialisées depuis la charge commerciale lorsqu’elle existe. "}
-        {"Le déboursé est géré directement dans PAPOT, sans dépendance à un outil externe."}
+        Les heures BE, Atelier et Pose sont reprises automatiquement depuis le ou les devis retenus.
+        S’il n’y a aucun devis retenu, PAPOT conserve la charge commerciale déjà renseignée.
       </p>
 
       <button
@@ -481,10 +434,9 @@ function LaunchSheet({
             commercialCaseId: item.id,
             quoteMissingDeclared: !quotePresent && quoteMissing,
             signedQuoteMissingDeclared: !signedQuotePresent && signedQuoteMissing,
-            costingMissingDeclared: !costingPresent && costingMissing,
-            be: Number(be || 0),
-            workshop: Number(workshop || 0),
-            install: Number(install || 0),
+            be: 0,
+            workshop: 0,
+            install: 0,
           })
         }
       >
