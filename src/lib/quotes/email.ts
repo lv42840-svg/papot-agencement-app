@@ -1,5 +1,4 @@
 import { randomUUID } from "node:crypto";
-import { once } from "node:events";
 import * as net from "node:net";
 import * as tls from "node:tls";
 
@@ -27,16 +26,6 @@ export type QuoteEmailPolicy = {
   fromEmail: string;
   ccEmail: string;
   replyToEmail: string;
-};
-
-type SmtpResponse = {
-  code: number;
-  lines: string[];
-};
-
-type ResponseWaiter = {
-  resolve: (response: SmtpResponse) => void;
-  reject: (error: Error) => void;
 };
 
 function isEmail(value: string): boolean {
@@ -169,131 +158,93 @@ export function buildQuoteEmailMessage(
   };
 }
 
-class SmtpResponseReader {
-  private buffer = "";
-  private currentCode: number | null = null;
-  private currentLines: string[] = [];
-  private responses: SmtpResponse[] = [];
-  private waiters: ResponseWaiter[] = [];
-  private failure: Error | null = null;
-
-  constructor(private readonly socket: net.Socket) {
-    socket.setEncoding("utf8");
-    socket.on("data", (chunk: string | Buffer) => this.consume(String(chunk)));
-    socket.on("error", (error) => this.fail(error instanceof Error ? error : new Error("SMTP")));
-    socket.on("timeout", () => socket.destroy(new Error("SMTP_TIMEOUT")));
-    socket.on("close", () => {
-      if (this.waiters.length > 0) this.fail(new Error("SMTP_CONNECTION_CLOSED"));
-    });
-  }
-
-  read(): Promise<SmtpResponse> {
-    if (this.responses.length > 0) return Promise.resolve(this.responses.shift()!);
-    if (this.failure) return Promise.reject(this.failure);
-    return new Promise<SmtpResponse>((resolve, reject) => {
-      this.waiters.push({ resolve, reject });
-    });
-  }
-
-  private consume(chunk: string) {
-    this.buffer += chunk;
-    while (true) {
-      const lineEnd = this.buffer.indexOf("\n");
-      if (lineEnd < 0) return;
-      const line = this.buffer.slice(0, lineEnd).replace(/\r$/, "");
-      this.buffer = this.buffer.slice(lineEnd + 1);
-      this.consumeLine(line);
-    }
-  }
-
-  private consumeLine(line: string) {
-    const match = /^(\d{3})([ -])(.*)$/.exec(line);
-    if (!match) return;
-
-    const code = Number(match[1]);
-    if (this.currentCode === null) this.currentCode = code;
-    this.currentLines.push(line);
-
-    if (match[2] !== " ") return;
-
-    const response: SmtpResponse = {
-      code: this.currentCode ?? code,
-      lines: this.currentLines.slice(),
-    };
-    this.currentCode = null;
-    this.currentLines = [];
-
-    const waiter = this.waiters.shift();
-    if (waiter) waiter.resolve(response);
-    else this.responses.push(response);
-  }
-
-  private fail(error: Error) {
-    if (this.failure) return;
-    this.failure = error;
-    for (const waiter of this.waiters.splice(0)) waiter.reject(error);
-  }
-}
-
-function assertResponse(response: SmtpResponse, expected: readonly number[]) {
-  if (!expected.includes(response.code)) throw new Error(`SMTP_RESPONSE_${response.code}`);
-}
-
-async function writeSocket(socket: net.Socket, value: string) {
-  if (!socket.write(value, "utf8")) await once(socket, "drain");
-}
-
-async function smtpCommand(
-  socket: net.Socket,
-  reader: SmtpResponseReader,
-  command: string,
-  expected: readonly number[],
-) {
-  await writeSocket(socket, `${command}\r\n`);
-  const response = await reader.read();
-  assertResponse(response, expected);
-  return response;
-}
-
 function dotStuff(raw: string): string {
   return raw.replace(/\r?\n/g, "\r\n").replace(/(^|\r\n)\./g, "$1..");
 }
 
-async function connectSmtp(config: SmtpConfig): Promise<{
-  socket: net.Socket;
-  reader: SmtpResponseReader;
-}> {
+function readResponse(socket: net.Socket): Promise<string> {
+  return new Promise((resolve, reject) => {
+    let buffer = "";
+
+    const onData = (chunk: Buffer) => {
+      buffer += chunk.toString("utf8");
+      const lines = buffer.split("\r\n").filter(Boolean);
+      const last = lines[lines.length - 1] ?? "";
+      if (/^\d{3} /.test(last)) {
+        cleanup();
+        resolve(buffer);
+      }
+    };
+
+    const onError = (error: Error) => {
+      cleanup();
+      reject(error);
+    };
+
+    const cleanup = () => {
+      socket.off("data", onData);
+      socket.off("error", onError);
+    };
+
+    socket.on("data", onData);
+    socket.on("error", onError);
+  });
+}
+
+async function command(
+  socket: net.Socket,
+  line: string,
+  expected: number[],
+): Promise<string> {
+  socket.write(line + "\r\n");
+  const response = await readResponse(socket);
+  const code = Number(response.slice(0, 3));
+  if (!expected.includes(code)) throw new Error(`SMTP_${code}_${response.trim()}`);
+  return response;
+}
+
+async function connectSocket(config: SmtpConfig): Promise<net.Socket> {
   if (config.secure) {
-    const socket = tls.connect({
-      host: config.host,
-      port: config.port,
-      servername: config.host,
-      rejectUnauthorized: true,
+    return await new Promise((resolve, reject) => {
+      const socket = tls.connect(
+        {
+          host: config.host,
+          port: config.port,
+          servername: config.host,
+          rejectUnauthorized: true,
+        },
+        () => resolve(socket),
+      );
+      socket.setTimeout(20_000);
+      socket.once("error", reject);
+      socket.once("timeout", () => socket.destroy(new Error("SMTP_TIMEOUT")));
     });
-    socket.setTimeout(20_000);
-    const reader = new SmtpResponseReader(socket);
-    await once(socket, "secureConnect");
-    assertResponse(await reader.read(), [220]);
-    return { socket, reader };
   }
 
-  const plain = net.connect({ host: config.host, port: config.port });
-  plain.setTimeout(20_000);
-  const plainReader = new SmtpResponseReader(plain);
-  await once(plain, "connect");
-  assertResponse(await plainReader.read(), [220]);
-  await smtpCommand(plain, plainReader, "EHLO papot.app", [250]);
-  await smtpCommand(plain, plainReader, "STARTTLS", [220]);
-
-  const socket = tls.connect({
-    socket: plain,
-    servername: config.host,
-    rejectUnauthorized: true,
+  const plain = await new Promise<net.Socket>((resolve, reject) => {
+    const socket = net.connect({ host: config.host, port: config.port }, () => resolve(socket));
+    socket.setTimeout(20_000);
+    socket.once("error", reject);
+    socket.once("timeout", () => socket.destroy(new Error("SMTP_TIMEOUT")));
   });
-  socket.setTimeout(20_000);
-  const reader = new SmtpResponseReader(socket);
-  await once(socket, "secureConnect");
-  return { socket, reader };
+
+  await readResponse(plain);
+  await command(plain, "EHLO papot.app", [250]);
+  await command(plain, "STARTTLS", [220]);
+
+  return await new Promise((resolve, reject) => {
+    const secure = tls.connect(
+      {
+        socket: plain,
+        servername: config.host,
+        rejectUnauthorized: true,
+      },
+      () => resolve(secure),
+    );
+    secure.setTimeout(20_000);
+    secure.once("error", reject);
+    secure.once("timeout", () => secure.destroy(new Error("SMTP_TIMEOUT")));
+  });
 }
 
 async function sendSmtpMessage(params: {
@@ -302,33 +253,36 @@ async function sendSmtpMessage(params: {
   recipients: string[];
   raw: string;
 }) {
-  const { socket, reader } = await connectSmtp(params.config);
+  const socket = await connectSocket(params.config);
 
   try {
-    await smtpCommand(socket, reader, "EHLO papot.app", [250]);
-    await smtpCommand(socket, reader, "AUTH LOGIN", [334]);
-    await smtpCommand(
+    if (params.config.secure) await readResponse(socket);
+
+    await command(socket, "EHLO papot.app", [250]);
+    await command(socket, "AUTH LOGIN", [334]);
+    await command(
       socket,
-      reader,
       Buffer.from(params.config.username, "utf8").toString("base64"),
       [334],
     );
-    await smtpCommand(
+    await command(
       socket,
-      reader,
       Buffer.from(params.config.password, "utf8").toString("base64"),
       [235],
     );
-    await smtpCommand(socket, reader, `MAIL FROM:<${params.envelopeFrom}>`, [250]);
+    await command(socket, `MAIL FROM:<${params.envelopeFrom}>`, [250]);
 
     for (const recipient of params.recipients) {
-      await smtpCommand(socket, reader, `RCPT TO:<${recipient}>`, [250, 251]);
+      await command(socket, `RCPT TO:<${recipient}>`, [250, 251]);
     }
 
-    await smtpCommand(socket, reader, "DATA", [354]);
-    await writeSocket(socket, `${dotStuff(params.raw)}\r\n.\r\n`);
-    assertResponse(await reader.read(), [250]);
-    await smtpCommand(socket, reader, "QUIT", [221]).catch(() => undefined);
+    await command(socket, "DATA", [354]);
+    socket.write(dotStuff(params.raw) + "\r\n.\r\n");
+    const sent = await readResponse(socket);
+    const code = Number(sent.slice(0, 3));
+    if (code !== 250) throw new Error(`SMTP_${code}_${sent.trim()}`);
+
+    await command(socket, "QUIT", [221]).catch(() => undefined);
   } finally {
     socket.end();
   }
