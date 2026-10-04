@@ -23,6 +23,7 @@ import {
   X,
 } from "lucide-react";
 import { TaskCommercialBridge } from "@/components/task-commercial-bridge";
+import { entryRevision } from "@/lib/entries/mutations";
 import {
   isAssignedOverdue,
   isQualificationAttentionDue,
@@ -50,7 +51,11 @@ type MutationFn = (
   body: MutationBody,
   successMessage?: string,
 ) => Promise<EntriesApiSnapshot | null>;
-type UploadFn = (entryId: string, files: File[]) => Promise<boolean>;
+type UploadFn = (
+  entryId: string,
+  files: File[],
+  expectedEntryRevision?: string,
+) => Promise<boolean>;
 type NextActionDraft = {
   id: string;
   text: string;
@@ -61,7 +66,10 @@ type NextActionDraft = {
 const errorMessages: Record<string, string> = {
   DESKTOP_RUNTIME_NOT_CONFIGURED: "Le poste PAPOT n'est pas configuré.",
   ENTRIES_LOCKED: "Les entrées sont modifiées sur un autre poste. Réessaie dans quelques secondes.",
-  ENTRIES_VERSION_CONFLICT: "Les entrées ont changé sur un autre poste. La liste a été rechargée.",
+  ENTRIES_VERSION_CONFLICT:
+    "Cette entrée a été modifiée ailleurs. Ta saisie n'a pas été appliquée.",
+  ENTRIES_VERSION_REQUIRED:
+    "La version ouverte de cette entrée est introuvable. Rouvre la fiche avant de modifier.",
   ENTRIES_REQUEST_INVALID: "Les informations envoyées sont incomplètes ou invalides.",
   QUALIFICATION_FORBIDDEN: "Tu n’as pas le droit de qualifier cette entrée.",
   TAG_ADMIN_FORBIDDEN: "Tu n’as pas le droit de gérer les tags.",
@@ -174,7 +182,8 @@ export function EntriesWorkspace() {
     [load],
   );
 
-  const uploadAttachments = useCallback<UploadFn>(async (entryId, files) => {
+  const uploadAttachments = useCallback<UploadFn>(
+    async (entryId, files, expectedEntryRevision) => {
     if (files.length === 0) return true;
     setBusy(true);
     setError(null);
@@ -182,6 +191,9 @@ export function EntriesWorkspace() {
     try {
       const form = new FormData();
       files.forEach((file) => form.append("files", file));
+      if (expectedEntryRevision) {
+        form.set("expectedEntryRevision", expectedEntryRevision);
+      }
       const response = await fetch(`/api/desktop/entries/${entryId}/attachments`, {
         method: "POST",
         body: form,
@@ -206,7 +218,9 @@ export function EntriesWorkspace() {
     } finally {
       setBusy(false);
     }
-  }, []);
+    },
+    [],
+  );
 
   const payload = snapshot?.payload;
   const now = useMemo(() => new Date(snapshot?.serverNow ?? Date.now()), [snapshot?.serverNow]);
@@ -517,6 +531,27 @@ function EntryDetail({
   uploadAttachments: UploadFn;
   onOpenEntry: (entryId: string) => void;
 }) {
+  const revisionRef = useRef(entryRevision(entry));
+  const mutateEntry = useCallback<MutationFn>(
+    async (body, successMessage) => {
+      const result = await mutate(
+        {
+          ...body,
+          expectedEntryRevision: revisionRef.current,
+        },
+        successMessage,
+      );
+      if (result) {
+        const current = result.payload.entries.find(
+          (candidate) => candidate.id === entry.id,
+        );
+        if (current) revisionRef.current = entryRevision(current);
+      }
+      return result;
+    },
+    [entry.id, mutate],
+  );
+
   const [description, setDescription] = useState(entry.structuredDescription ?? entry.rawText);
   const nextAction = entry.nextAction ?? "";
   const [tagIds, setTagIds] = useState(entry.tagIds);
@@ -669,7 +704,7 @@ function EntryDetail({
                       className="secondaryButton entriesSaveDraft"
                       disabled={busy}
                       onClick={() =>
-                        void mutate(
+                        void mutateEntry(
                           {
                             action: "qualifyDraft",
                             entryId: entry.id,
@@ -805,7 +840,7 @@ function EntryDetail({
                         )
                       }
                       onClick={() =>
-                        void mutate(
+                        void mutateEntry(
                           {
                             action: "qualifyActions",
                             entryId: entry.id,
@@ -838,7 +873,7 @@ function EntryDetail({
                     className="secondaryButton"
                     disabled={busy}
                     onClick={() =>
-                      void mutate(
+                      void mutateEntry(
                         { action: "qualifyDone", entryId: entry.id, result, tagIds },
                         "Entrée traitée et terminée.",
                       )
@@ -880,7 +915,7 @@ function EntryDetail({
                     className="secondaryButton"
                     disabled={busy || !snoozeDate || !snoozeReason.trim()}
                     onClick={() =>
-                      void mutate(
+                      void mutateEntry(
                         {
                           action: "snooze",
                           entryId: entry.id,
@@ -912,7 +947,7 @@ function EntryDetail({
                     className="secondaryButton"
                     disabled={busy || !derivedText.trim()}
                     onClick={() =>
-                      void mutate(
+                      void mutateEntry(
                         { action: "derive", entryId: entry.id, rawText: derivedText },
                         "Entrée liée créée.",
                       )
@@ -1073,7 +1108,7 @@ function EntryDetail({
                           )
                         }
                         onClick={() =>
-                          void mutate(
+                          void mutateEntry(
                             {
                               action: "assignedActions",
                               entryId: entry.id,
@@ -1116,7 +1151,7 @@ function EntryDetail({
                     className="primaryButton"
                     disabled={busy}
                     onClick={() =>
-                      void mutate(
+                      void mutateEntry(
                         { action: "complete", entryId: entry.id, result },
                         "Action terminée.",
                       )
@@ -1147,7 +1182,7 @@ function EntryDetail({
                     className="secondaryButton"
                     disabled={busy || !postponeDate || !postponeReason.trim()}
                     onClick={() =>
-                      void mutate(
+                      void mutateEntry(
                         {
                           action: "postpone",
                           entryId: entry.id,
@@ -1188,7 +1223,7 @@ function EntryDetail({
                     className="secondaryButton"
                     disabled={busy || !newAssignee.trim() || !reassignReason.trim()}
                     onClick={() =>
-                      void mutate(
+                      void mutateEntry(
                         {
                           action: "reassign",
                           entryId: entry.id,
@@ -1301,7 +1336,11 @@ function EntryAttachments({
             className="primaryButton"
             disabled={busy}
             onClick={() =>
-              void uploadAttachments(entry.id, pending).then((ok) => {
+              void uploadAttachments(
+                entry.id,
+                pending,
+                entryRevision(entry),
+              ).then((ok) => {
                 if (ok) setPending([]);
               })
             }
