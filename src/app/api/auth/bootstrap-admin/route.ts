@@ -8,6 +8,12 @@ import { authHasUsers, mutateAuthPayload } from "@/lib/auth/store";
 
 const schema = z.object({
   bootstrapToken: z.string().min(1).max(512),
+  username: z
+    .string()
+    .trim()
+    .min(3)
+    .max(80)
+    .regex(/^[A-Za-z0-9._-]+$/),
   displayName: z.string().trim().min(1).max(160),
   email: z.string().trim().email().max(240),
   password: z.string().min(12).max(512),
@@ -19,7 +25,7 @@ export async function POST(request: Request) {
     return NextResponse.json(
       {
         error:
-          "Nom, e-mail ou mot de passe invalide. Le mot de passe doit contenir au moins 12 caractères.",
+          "Identifiant, nom, e-mail ou mot de passe invalide. Le mot de passe doit contenir au moins 12 caractères.",
       },
       { status: 400 },
     );
@@ -39,6 +45,7 @@ export async function POST(request: Request) {
     if (payload.users.length > 0) throw new Error("INITIAL_ADMIN_ALREADY_EXISTS");
     payload.users.push({
       id,
+      username: parsed.data.username.toLowerCase(),
       displayName: parsed.data.displayName,
       email: parsed.data.email.toLowerCase(),
       passwordHash,
