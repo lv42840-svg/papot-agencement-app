@@ -53,7 +53,7 @@ describe("Concept-style Agencement authentication", () => {
     expect(loginBlock(state, firstStart + 10_000)).toBe("temporary");
     expect(state.requiresAdminReset).toBe(false);
 
-    const secondStart = firstStart + LOGIN_WINDOW_MS + 1000;
+    const secondStart = firstStart + LOGIN_WINDOW_MS + LOGIN_MAX_FAILURES * 1000 + 1000;
     for (let index = 0; index < LOGIN_MAX_FAILURES; index += 1) {
       state = failedLogin(state, secondStart + index * 1000);
     }
