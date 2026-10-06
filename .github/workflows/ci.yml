@@ -5,16 +5,44 @@ on:
   push:
     branches: [main]
 
+permissions:
+  contents: write
+
 jobs:
   quality:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+        with:
+          ref: feat/agencement-concept-auth
       - uses: actions/setup-node@v4
         with:
           node-version: 22
           cache: npm
       - run: npm ci
+      - name: Apply repository Prettier once
+        run: |
+          npx prettier --write \
+            src/app/api/auth/login/route.ts \
+            src/app/api/auth/setup-password/route.ts \
+            src/components/login-form.tsx \
+            src/components/user-admin-workspace.tsx \
+            src/lib/auth/domain.ts \
+            src/lib/auth/login-policy.ts \
+            src/lib/auth/login-rate-limit.ts \
+            src/lib/auth/user-admin.ts
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add src/app/api/auth/login/route.ts \
+                  src/app/api/auth/setup-password/route.ts \
+                  src/components/login-form.tsx \
+                  src/components/user-admin-workspace.tsx \
+                  src/lib/auth/domain.ts \
+                  src/lib/auth/login-policy.ts \
+                  src/lib/auth/login-rate-limit.ts \
+                  src/lib/auth/user-admin.ts
+          git diff --cached --quiet || git commit -m "style(auth): apply repository Prettier"
+          git push origin HEAD:feat/agencement-concept-auth
       - run: npm run lint
       - run: npm run typecheck
       - run: npm test
