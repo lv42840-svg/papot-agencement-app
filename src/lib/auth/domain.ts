@@ -5,8 +5,9 @@ import { MODULE_PERMISSIONS } from "./permission-catalog";
 export type AccessLevel = "READ" | "WRITE";
 
 const accessLevelSchema = z.enum(["READ", "WRITE"]);
-const userSchema = z.object({
+const storedUserSchema = z.object({
   id: z.string().uuid(),
+  username: z.string().trim().min(3).max(80).regex(/^[A-Za-z0-9._-]+$/).optional(),
   displayName: z.string().min(1),
   email: z.string().email(),
   passwordHash: z.string().min(1),
@@ -27,18 +28,50 @@ const sessionSchema = z.object({
   createdAt: z.string().datetime({ offset: true }),
   expiresAt: z.string().datetime({ offset: true }),
 });
-const authPayloadSchema = z.object({
+const storedAuthPayloadSchema = z.object({
   schemaVersion: z.literal(1),
-  users: z.array(userSchema),
+  users: z.array(storedUserSchema),
   sessions: z.array(sessionSchema),
 });
 
-export type AuthUserRecord = z.infer<typeof userSchema>;
+export type AuthUserRecord = Omit<z.infer<typeof storedUserSchema>, "username"> & {
+  username: string;
+};
 export type AuthSessionRecord = z.infer<typeof sessionSchema>;
-export type AuthPayload = z.infer<typeof authPayloadSchema>;
+export type AuthPayload = {
+  schemaVersion: 1;
+  users: AuthUserRecord[];
+  sessions: AuthSessionRecord[];
+};
 
 export function emptyAuthPayload(): AuthPayload {
   return { schemaVersion: 1, users: [], sessions: [] };
+}
+
+function normalizedUsernameBase(email: string, id: string): string {
+  const local = email.split("@")[0]?.toLowerCase() ?? "";
+  const cleaned = local.replace(/[^a-z0-9._-]/g, "").replace(/^[._-]+|[._-]+$/g, "");
+  if (cleaned.length >= 3) return cleaned.slice(0, 70);
+  return `user-${id.replace(/-/g, "").slice(0, 8)}`;
+}
+
+function ensureUsernames(users: Array<z.infer<typeof storedUserSchema>>): AuthUserRecord[] {
+  const used = new Set<string>();
+  return users.map((user) => {
+    const requested = user.username?.toLowerCase();
+    const base =
+      requested && requested.length >= 3
+        ? requested
+        : normalizedUsernameBase(user.email, user.id);
+    let username = base;
+    let suffix = 2;
+    while (used.has(username.toLowerCase())) {
+      username = `${base.slice(0, Math.max(3, 78 - String(suffix).length))}-${suffix}`;
+      suffix += 1;
+    }
+    used.add(username.toLowerCase());
+    return { ...user, username };
+  });
 }
 
 function preserveLegacyFullAccess(payload: AuthPayload): void {
@@ -57,10 +90,15 @@ function preserveLegacyFullAccess(payload: AuthPayload): void {
 
 export function parseAuthPayload(value: unknown): AuthPayload {
   if (value == null) return emptyAuthPayload();
-  const parsed = authPayloadSchema.safeParse(value);
+  const parsed = storedAuthPayloadSchema.safeParse(value);
   if (!parsed.success) throw new Error("AUTH_STORE_INVALID");
-  preserveLegacyFullAccess(parsed.data);
-  return parsed.data;
+  const payload: AuthPayload = {
+    schemaVersion: 1,
+    users: ensureUsernames(parsed.data.users),
+    sessions: parsed.data.sessions,
+  };
+  preserveLegacyFullAccess(payload);
+  return payload;
 }
 
 export function pruneExpiredSessions(payload: AuthPayload, now = new Date()): void {
