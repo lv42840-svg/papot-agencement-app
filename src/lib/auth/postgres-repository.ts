@@ -18,6 +18,7 @@ type AuthQueryable = Pool | PoolClient;
 
 type UserRow = {
   id: string;
+  username: string;
   display_name: string;
   email: string;
   password_hash: string;
@@ -47,6 +48,7 @@ function isoTimestamp(value: Date | string): string {
 function rowToUser(row: UserRow): AuthUserRecord {
   return {
     id: row.id,
+    username: row.username,
     displayName: row.display_name,
     email: row.email,
     passwordHash: row.password_hash,
@@ -82,6 +84,7 @@ async function insertUser(
       INSERT INTO papot_auth_users (
         id,
         version,
+        username,
         display_name,
         email,
         password_hash,
@@ -93,11 +96,12 @@ async function insertUser(
         module_permissions,
         special_permissions
       )
-      VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11::jsonb, $12::jsonb)
+      VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12::jsonb, $13::jsonb)
     `,
     [
       user.id,
       version,
+      user.username,
       user.displayName,
       user.email,
       user.passwordHash,
@@ -142,6 +146,7 @@ export async function loadAuthPayloadFromQueryable(queryable: AuthQueryable): Pr
   const usersResult = await queryable.query<UserRow>(`
     SELECT
       id,
+      username,
       display_name,
       email,
       password_hash,
