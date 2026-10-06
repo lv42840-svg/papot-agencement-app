@@ -1,0 +1,30 @@
+name: Auth Prettier once
+on:
+  push:
+    branches: [feat/agencement-concept-auth]
+    paths: [.github/workflows/auth-prettier-once.yml]
+permissions:
+  contents: write
+jobs:
+  format:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: feat/agencement-concept-auth
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - name: Run repository Prettier
+        run: |
+          npx prettier --write             src/app/api/auth/login/route.ts             src/app/api/auth/setup-password/route.ts             src/components/login-form.tsx             src/components/user-admin-workspace.tsx             src/lib/auth/domain.ts             src/lib/auth/login-policy.ts             src/lib/auth/login-rate-limit.ts             src/lib/auth/user-admin.ts
+      - name: Commit formatted files
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add src/app/api/auth/login/route.ts                   src/app/api/auth/setup-password/route.ts                   src/components/login-form.tsx                   src/components/user-admin-workspace.tsx                   src/lib/auth/domain.ts                   src/lib/auth/login-policy.ts                   src/lib/auth/login-rate-limit.ts                   src/lib/auth/user-admin.ts
+          git diff --cached --quiet || git commit -m "style(auth): apply repository Prettier"
+          git push origin HEAD:feat/agencement-concept-auth
