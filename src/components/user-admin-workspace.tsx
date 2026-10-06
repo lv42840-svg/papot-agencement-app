@@ -164,7 +164,7 @@ export function UserAdminWorkspace() {
           </p>
           <div className="adminSetupLinkRow">
             <input
-              value={new URL(setupLink, typeof window === "undefined" ? "https://agencement.papot.app" : window.location.origin).toString()}
+              value={setupLink}
               readOnly
               aria-label="Lien d’activation ou de réinitialisation"
             />
