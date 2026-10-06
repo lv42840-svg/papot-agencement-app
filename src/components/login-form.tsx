@@ -16,7 +16,7 @@ export function LoginForm() {
     const response = await fetch("/api/auth/login", {
       method: "POST",
       headers: { "content-type": "application/json" },
-      body: JSON.stringify({ email: data.get("email"), password: data.get("password") }),
+      body: JSON.stringify({ username: data.get("username"), password: data.get("password") }),
     });
     if (!response.ok) {
       const body = (await response.json().catch(() => null)) as { error?: string } | null;
@@ -24,16 +24,16 @@ export function LoginForm() {
       setBusy(false);
       return;
     }
-    const body = (await response.json()) as { mustChangePassword?: boolean };
-    router.replace(body.mustChangePassword ? "/change-password" : "/");
+    await response.json();
+    router.replace("/");
     router.refresh();
   }
 
   return (
     <form className="loginForm" onSubmit={submit}>
       <label>
-        Adresse e-mail
-        <input name="email" type="email" autoComplete="username" required />
+        Identifiant
+        <input name="username" autoComplete="username" minLength={3} maxLength={80} required />
       </label>
       <label>
         Mot de passe

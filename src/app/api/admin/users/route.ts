@@ -24,13 +24,24 @@ const specialKeySchema = z.string().refine((value) => specialKeys.has(value));
 const mutationSchema = z.discriminatedUnion("action", [
   z.object({
     action: z.literal("create"),
+    username: z
+      .string()
+      .trim()
+      .min(3)
+      .max(80)
+      .regex(/^[A-Za-z0-9._-]+$/),
     displayName: z.string().trim().min(1).max(160),
     email: z.string().trim().email().max(240),
-    temporaryPassword: z.string().min(12).max(512),
   }),
   z.object({
     action: z.literal("updateProfile"),
     userId: z.string().uuid(),
+    username: z
+      .string()
+      .trim()
+      .min(3)
+      .max(80)
+      .regex(/^[A-Za-z0-9._-]+$/),
     displayName: z.string().trim().min(1).max(160),
     email: z.string().trim().email().max(240),
   }),
@@ -50,7 +61,6 @@ const mutationSchema = z.discriminatedUnion("action", [
   z.object({
     action: z.literal("resetPassword"),
     userId: z.string().uuid(),
-    temporaryPassword: z.string().min(12).max(512),
   }),
   z.object({
     action: z.literal("revokeSession"),
@@ -89,10 +99,13 @@ export async function POST(request: Request) {
     const actor = await requirePermissionAdministrator();
     const input = mutationSchema.parse(await request.json().catch(() => null));
 
+    let setup: { setupUrl: string; expiresAt: string } | null = null;
     switch (input.action) {
-      case "create":
-        await createManagedUser(input);
+      case "create": {
+        const created = await createManagedUser(input);
+        setup = { setupUrl: created.setupUrl, expiresAt: created.expiresAt };
         break;
+      }
       case "updateProfile":
         await updateManagedUserProfile(input);
         break;
@@ -103,14 +116,14 @@ export async function POST(request: Request) {
         await replaceManagedUserPermissions(input);
         break;
       case "resetPassword":
-        await resetManagedUserPassword(input);
+        setup = await resetManagedUserPassword(input);
         break;
       case "revokeSession":
         await revokeManagedUserSession(input);
         break;
     }
 
-    return noStoreJson(await snapshot(actor.id));
+    return noStoreJson({ ...(await snapshot(actor.id)), ...(setup ?? {}) });
   } catch (error) {
     const code =
       error instanceof z.ZodError

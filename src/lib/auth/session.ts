@@ -1,12 +1,12 @@
 import "server-only";
 
-import { createHash, randomBytes, randomUUID } from "node:crypto";
+import { createHash, randomUUID } from "node:crypto";
 import { cookies } from "next/headers";
 import { redirect } from "next/navigation";
 import { mutateAuthPayload, readAuthPayload } from "@/lib/auth/store";
+import { newSessionToken } from "@/lib/auth/session-token";
 
 const cookieName = process.env.SESSION_COOKIE_NAME ?? "papot_session";
-const ttlHours = Number(process.env.SESSION_TTL_HOURS ?? "12");
 
 function tokenHash(token: string) {
   return createHash("sha256").update(token).digest("hex");
@@ -29,6 +29,7 @@ function desktopDeviceIdentity(): { deviceId: string | null; deviceLabel: string
 
 export type CurrentUser = {
   id: string;
+  username: string;
   displayName: string;
   email: string;
   accentKey: string;
@@ -37,26 +38,7 @@ export type CurrentUser = {
   mustChangePassword: boolean;
 };
 
-export async function createSession(userId: string) {
-  const token = randomBytes(32).toString("base64url");
-  const now = new Date();
-  const expiresAt = new Date(now.getTime() + ttlHours * 60 * 60 * 1000);
-  const device = desktopDeviceIdentity();
-
-  await mutateAuthPayload(userId, (payload) => {
-    const user = payload.users.find((candidate) => candidate.id === userId && candidate.isActive);
-    if (!user) throw new Error("AUTH_USER_NOT_FOUND");
-    payload.sessions.push({
-      id: randomUUID(),
-      tokenHash: tokenHash(token),
-      userId,
-      deviceId: device.deviceId,
-      deviceLabel: device.deviceLabel,
-      createdAt: now.toISOString(),
-      expiresAt: expiresAt.toISOString(),
-    });
-  });
-
+export async function setSessionCookie(token: string, expiresAt: Date) {
   const store = await cookies();
   store.set(cookieName, token, {
     httpOnly: true,
@@ -65,6 +47,27 @@ export async function createSession(userId: string) {
     path: "/",
     expires: expiresAt,
   });
+}
+
+export async function createSession(userId: string) {
+  const session = newSessionToken();
+  const device = desktopDeviceIdentity();
+
+  await mutateAuthPayload(userId, (payload) => {
+    const user = payload.users.find((candidate) => candidate.id === userId && candidate.isActive);
+    if (!user) throw new Error("AUTH_USER_NOT_FOUND");
+    payload.sessions.push({
+      id: randomUUID(),
+      tokenHash: session.tokenHash,
+      userId,
+      deviceId: device.deviceId,
+      deviceLabel: device.deviceLabel,
+      createdAt: session.createdAt.toISOString(),
+      expiresAt: session.expiresAt.toISOString(),
+    });
+  });
+
+  await setSessionCookie(session.token, session.expiresAt);
 }
 
 export async function destroySession() {
@@ -104,6 +107,7 @@ export async function getCurrentUser(): Promise<CurrentUser | null> {
   if (!user) return null;
   return {
     id: user.id,
+    username: user.username,
     displayName: user.displayName,
     email: user.email,
     accentKey: user.accentKey,

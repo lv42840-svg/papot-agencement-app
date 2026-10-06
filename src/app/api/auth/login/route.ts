@@ -1,11 +1,11 @@
 import { NextResponse } from "next/server";
 import { z } from "zod";
-import { verifyPassword } from "@/lib/auth/password";
-import { createSession } from "@/lib/auth/session";
-import { readAuthPayload } from "@/lib/auth/store";
+
+import { authenticateLogin } from "@/lib/auth/login-rate-limit";
+import { createSession, setSessionCookie } from "@/lib/auth/session";
 
 const schema = z.object({
-  email: z.string().trim().email(),
+  username: z.string().trim().min(1).max(80),
   password: z.string().min(1).max(512),
 });
 
@@ -15,19 +15,36 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: "Identifiants invalides." }, { status: 400 });
   }
 
-  const payload = await readAuthPayload();
-  const email = parsed.data.email.trim().toLowerCase();
-  const user = payload.users.find(
-    (candidate) => candidate.isActive && candidate.email.trim().toLowerCase() === email,
-  );
+  const result = await authenticateLogin({
+    username: parsed.data.username,
+    password: parsed.data.password,
+    request,
+  });
 
-  if (!user || !(await verifyPassword(parsed.data.password, user.passwordHash))) {
+  if (result.state === "authenticated") {
+    if (result.token && result.expiresAt) {
+      await setSessionCookie(result.token, result.expiresAt);
+    } else {
+      await createSession(result.userId);
+    }
+    return NextResponse.json({ ok: true });
+  }
+
+  if (result.state === "admin_reset_required") {
     return NextResponse.json(
-      { error: "Adresse e-mail ou mot de passe incorrect." },
-      { status: 401 },
+      { error: "Compte verrouillé. Demandez à un administrateur de réinitialiser votre accès." },
+      { status: 423 },
     );
   }
 
-  await createSession(user.id);
-  return NextResponse.json({ ok: true, mustChangePassword: user.mustChangePassword });
+  if (result.state === "temporary") {
+    const response = NextResponse.json(
+      { error: "Trop de tentatives. Réessayez dans quelques minutes." },
+      { status: 429 },
+    );
+    response.headers.set("Retry-After", String(result.retryAfter));
+    return response;
+  }
+
+  return NextResponse.json({ error: "Identifiant ou mot de passe incorrect." }, { status: 401 });
 }

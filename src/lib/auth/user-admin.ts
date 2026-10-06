@@ -1,7 +1,8 @@
 import "server-only";
 
-import { randomUUID } from "node:crypto";
+import { randomBytes, randomUUID } from "node:crypto";
 import { hashPassword } from "@/lib/auth/password";
+import { createPasswordSetupToken, newPasswordSetupToken } from "@/lib/auth/password-setup";
 import { getCurrentUser, type CurrentUser } from "@/lib/auth/session";
 import type { AccessLevel } from "@/lib/auth/permissions";
 import { mutateAuthPayload, readAuthPayload } from "@/lib/auth/store";
@@ -16,6 +17,7 @@ export type AdminUserSession = {
 
 export type AdminUserSnapshot = {
   id: string;
+  username: string;
   displayName: string;
   email: string;
   isActive: boolean;
@@ -38,7 +40,12 @@ export function userAdminErrorStatus(code: string): number {
   if (code === "AUTH_REQUIRED") return 401;
   if (code === "PASSWORD_CHANGE_REQUIRED" || code === "ADMIN_FORBIDDEN") return 403;
   if (code === "USER_NOT_FOUND") return 404;
-  if (code === "USER_EMAIL_EXISTS" || code === "CANNOT_DISABLE_SELF") return 409;
+  if (
+    code === "USER_EMAIL_EXISTS" ||
+    code === "USERNAME_ALREADY_EXISTS" ||
+    code === "CANNOT_DISABLE_SELF"
+  )
+    return 409;
   return 400;
 }
 
@@ -55,6 +62,23 @@ function assertEmailAvailable(
   }
 }
 
+function normalizeUsername(value: string): string {
+  return value.trim().toLowerCase();
+}
+
+function assertUsernameAvailable(
+  users: Array<{ id: string; username: string }>,
+  username: string,
+  exceptUserId?: string,
+) {
+  const normalized = normalizeUsername(username);
+  if (
+    users.some((user) => user.id !== exceptUserId && user.username.toLowerCase() === normalized)
+  ) {
+    throw new Error("USERNAME_ALREADY_EXISTS");
+  }
+}
+
 export async function listAdminUsers(): Promise<AdminUserSnapshot[]> {
   const payload = await readAuthPayload();
   return [...payload.users]
@@ -64,6 +88,7 @@ export async function listAdminUsers(): Promise<AdminUserSnapshot[]> {
     })
     .map((user) => ({
       id: user.id,
+      username: user.username,
       displayName: user.displayName,
       email: user.email,
       isActive: user.isActive,
@@ -85,22 +110,25 @@ export async function listAdminUsers(): Promise<AdminUserSnapshot[]> {
 }
 
 export async function createManagedUser(input: {
+  username: string;
   displayName: string;
   email: string;
-  temporaryPassword: string;
 }) {
   const id = randomUUID();
-  const passwordHash = await hashPassword(input.temporaryPassword);
+  const username = normalizeUsername(input.username);
   const email = input.email.trim().toLowerCase();
+  const placeholderPasswordHash = await hashPassword(randomBytes(48).toString("base64url"));
   const actor = await requirePermissionAdministrator();
 
   await mutateAuthPayload(actor.id, (payload) => {
+    assertUsernameAvailable(payload.users, username);
     assertEmailAvailable(payload.users, email);
     payload.users.push({
       id,
+      username,
       displayName: input.displayName.trim(),
       email,
-      passwordHash,
+      passwordHash: placeholderPasswordHash,
       isActive: true,
       canManagePermissions: false,
       mustChangePassword: true,
@@ -109,20 +137,37 @@ export async function createManagedUser(input: {
       specialPermissions: [],
     });
   });
-  return id;
+
+  const setup = newPasswordSetupToken(60);
+  await createPasswordSetupToken({
+    userId: id,
+    tokenHash: setup.tokenHash,
+    purpose: "first_setup",
+    createdByUserId: actor.id,
+    expiresAt: setup.expiresAt,
+  });
+  return {
+    id,
+    setupUrl: `/setup-password?token=${encodeURIComponent(setup.token)}`,
+    expiresAt: setup.expiresAt.toISOString(),
+  };
 }
 
 export async function updateManagedUserProfile(input: {
   userId: string;
+  username: string;
   displayName: string;
   email: string;
 }) {
   const actor = await requirePermissionAdministrator();
+  const username = normalizeUsername(input.username);
   const email = input.email.trim().toLowerCase();
   await mutateAuthPayload(actor.id, (payload) => {
+    assertUsernameAvailable(payload.users, username, input.userId);
     assertEmailAvailable(payload.users, email, input.userId);
     const user = payload.users.find((candidate) => candidate.id === input.userId);
     if (!user) throw new Error("USER_NOT_FOUND");
+    user.username = username;
     user.displayName = input.displayName.trim();
     user.email = email;
   });
@@ -160,19 +205,26 @@ export async function replaceManagedUserPermissions(input: {
   });
 }
 
-export async function resetManagedUserPassword(input: {
-  userId: string;
-  temporaryPassword: string;
-}) {
+export async function resetManagedUserPassword(input: { userId: string }) {
   const actor = await requirePermissionAdministrator();
-  const passwordHash = await hashPassword(input.temporaryPassword);
-  await mutateAuthPayload(actor.id, (payload) => {
-    const user = payload.users.find((candidate) => candidate.id === input.userId);
-    if (!user) throw new Error("USER_NOT_FOUND");
-    user.passwordHash = passwordHash;
-    user.mustChangePassword = true;
-    payload.sessions = payload.sessions.filter((session) => session.userId !== input.userId);
+  const payload = await readAuthPayload();
+  const user = payload.users.find(
+    (candidate) => candidate.id === input.userId && candidate.isActive,
+  );
+  if (!user) throw new Error("USER_NOT_FOUND");
+
+  const setup = newPasswordSetupToken(60);
+  await createPasswordSetupToken({
+    userId: user.id,
+    tokenHash: setup.tokenHash,
+    purpose: "admin_reset",
+    createdByUserId: actor.id,
+    expiresAt: setup.expiresAt,
   });
+  return {
+    setupUrl: `/setup-password?token=${encodeURIComponent(setup.token)}`,
+    expiresAt: setup.expiresAt.toISOString(),
+  };
 }
 
 export async function revokeManagedUserSession(input: { userId: string; sessionId: string }) {

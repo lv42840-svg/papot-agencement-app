@@ -18,6 +18,7 @@ type AuthQueryable = Pool | PoolClient;
 
 type UserRow = {
   id: string;
+  username: string;
   display_name: string;
   email: string;
   password_hash: string;
@@ -47,6 +48,7 @@ function isoTimestamp(value: Date | string): string {
 function rowToUser(row: UserRow): AuthUserRecord {
   return {
     id: row.id,
+    username: row.username,
     displayName: row.display_name,
     email: row.email,
     passwordHash: row.password_hash,
@@ -82,6 +84,7 @@ async function insertUser(
       INSERT INTO papot_auth_users (
         id,
         version,
+        username,
         display_name,
         email,
         password_hash,
@@ -93,11 +96,67 @@ async function insertUser(
         module_permissions,
         special_permissions
       )
-      VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11::jsonb, $12::jsonb)
+      VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12::jsonb, $13::jsonb)
     `,
     [
       user.id,
       version,
+      user.username,
+      user.displayName,
+      user.email,
+      user.passwordHash,
+      user.isActive,
+      user.canManagePermissions,
+      user.mustChangePassword,
+      user.accentKey,
+      user.planningPotentialCollapsed ?? false,
+      JSON.stringify(user.modulePermissions),
+      JSON.stringify(user.specialPermissions),
+    ],
+  );
+}
+
+async function upsertUser(
+  client: PoolClient,
+  user: AuthUserRecord,
+  version: number,
+): Promise<void> {
+  await client.query(
+    `
+      INSERT INTO papot_auth_users (
+        id,
+        version,
+        username,
+        display_name,
+        email,
+        password_hash,
+        is_active,
+        can_manage_permissions,
+        must_change_password,
+        accent_key,
+        planning_potential_collapsed,
+        module_permissions,
+        special_permissions
+      )
+      VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12::jsonb, $13::jsonb)
+      ON CONFLICT (id) DO UPDATE SET
+        version = EXCLUDED.version,
+        username = EXCLUDED.username,
+        display_name = EXCLUDED.display_name,
+        email = EXCLUDED.email,
+        password_hash = EXCLUDED.password_hash,
+        is_active = EXCLUDED.is_active,
+        can_manage_permissions = EXCLUDED.can_manage_permissions,
+        must_change_password = EXCLUDED.must_change_password,
+        accent_key = EXCLUDED.accent_key,
+        planning_potential_collapsed = EXCLUDED.planning_potential_collapsed,
+        module_permissions = EXCLUDED.module_permissions,
+        special_permissions = EXCLUDED.special_permissions
+    `,
+    [
+      user.id,
+      version,
+      user.username,
       user.displayName,
       user.email,
       user.passwordHash,
@@ -142,6 +201,7 @@ export async function loadAuthPayloadFromQueryable(queryable: AuthQueryable): Pr
   const usersResult = await queryable.query<UserRow>(`
     SELECT
       id,
+      username,
       display_name,
       email,
       password_hash,
@@ -202,11 +262,19 @@ async function replaceMutatedSnapshotOnClient(
   const previousVersions = new Map(versionsResult.rows.map((row) => [row.id, row.version]));
 
   await client.query("DELETE FROM papot_auth_sessions");
-  await client.query("DELETE FROM papot_auth_users");
 
   for (const user of validated.users) {
-    await insertUser(client, user, (previousVersions.get(user.id) ?? 0) + 1);
+    await upsertUser(client, user, (previousVersions.get(user.id) ?? 0) + 1);
   }
+
+  if (validated.users.length === 0) {
+    await client.query("DELETE FROM papot_auth_users");
+  } else {
+    await client.query("DELETE FROM papot_auth_users WHERE NOT (id = ANY($1::uuid[]))", [
+      validated.users.map((user) => user.id),
+    ]);
+  }
+
   for (const session of validated.sessions) {
     await insertSession(client, session);
   }
