@@ -27,6 +27,8 @@ const USER_UI_PREFERENCES_VERSION = 11;
 const USER_UI_PREFERENCES_NAME = "user_ui_preferences";
 const QUOTE_EMAIL_SETTINGS_VERSION = 12;
 const QUOTE_EMAIL_SETTINGS_NAME = "quote_email_settings";
+const AUTH_CONCEPT_SECURITY_VERSION = 13;
+const AUTH_CONCEPT_SECURITY_NAME = "auth_concept_security";
 
 const FRESH_WEB_SOURCE = "fresh:web";
 const FRESH_WEB_HASH = "fresh-empty-v1";
@@ -269,6 +271,87 @@ async function ensureAuthStorage(client: PoolClient): Promise<void> {
   await client.query(`
     CREATE INDEX IF NOT EXISTS papot_auth_sessions_expires_at_index
     ON papot_auth_sessions (expires_at)
+  `);
+}
+
+async function ensureAuthConceptSecurity(client: PoolClient): Promise<void> {
+  await client.query(`
+    ALTER TABLE papot_auth_users
+    ADD COLUMN IF NOT EXISTS username TEXT
+  `);
+
+  const existing = await client.query<{ id: string; email: string; username: string | null }>(`
+    SELECT id, email, username
+    FROM papot_auth_users
+    ORDER BY id
+  `);
+  const used = new Set(
+    existing.rows
+      .map((row) => row.username?.trim().toLowerCase())
+      .filter((value): value is string => Boolean(value)),
+  );
+  for (const row of existing.rows) {
+    if (row.username?.trim()) continue;
+    const local = row.email.split("@")[0]?.toLowerCase() ?? "";
+    const cleaned = local.replace(/[^a-z0-9._-]/g, "").replace(/^[._-]+|[._-]+$/g, "");
+    const fallback = `user-${row.id.replace(/-/g, "").slice(0, 8)}`;
+    const base = (cleaned.length >= 3 ? cleaned : fallback).slice(0, 70);
+    let username = base;
+    let suffix = 2;
+    while (used.has(username.toLowerCase())) {
+      username = `${base.slice(0, Math.max(3, 78 - String(suffix).length))}-${suffix}`;
+      suffix += 1;
+    }
+    used.add(username.toLowerCase());
+    await client.query("UPDATE papot_auth_users SET username = $2 WHERE id = $1", [
+      row.id,
+      username,
+    ]);
+  }
+
+  await client.query(`
+    ALTER TABLE papot_auth_users
+    ALTER COLUMN username SET NOT NULL
+  `);
+  await client.query(`
+    CREATE UNIQUE INDEX IF NOT EXISTS papot_auth_users_username_unique
+    ON papot_auth_users (LOWER(username))
+  `);
+
+  await client.query(`
+    CREATE TABLE IF NOT EXISTS papot_auth_password_setup_tokens (
+      id UUID PRIMARY KEY,
+      user_id UUID NOT NULL REFERENCES papot_auth_users(id) ON DELETE CASCADE,
+      token_hash TEXT NOT NULL UNIQUE,
+      purpose TEXT NOT NULL CHECK (purpose IN ('first_setup', 'admin_reset')),
+      created_by_user_id UUID REFERENCES papot_auth_users(id) ON DELETE SET NULL,
+      created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+      expires_at TIMESTAMPTZ NOT NULL,
+      used_at TIMESTAMPTZ
+    )
+  `);
+  await client.query(`
+    CREATE INDEX IF NOT EXISTS papot_auth_password_setup_tokens_user_index
+    ON papot_auth_password_setup_tokens (user_id, expires_at)
+  `);
+
+  await client.query(`
+    CREATE TABLE IF NOT EXISTS papot_auth_account_lock_state (
+      account_hash TEXT PRIMARY KEY,
+      failures INTEGER NOT NULL DEFAULT 0,
+      first_failure_at TIMESTAMPTZ,
+      blocked_until TIMESTAMPTZ,
+      lock_cycles INTEGER NOT NULL DEFAULT 0,
+      requires_admin_reset BOOLEAN NOT NULL DEFAULT FALSE,
+      updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+    )
+  `);
+  await client.query(`
+    CREATE TABLE IF NOT EXISTS papot_auth_ip_attempts (
+      ip_hash TEXT PRIMARY KEY,
+      attempts INTEGER NOT NULL DEFAULT 0,
+      window_started_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+    )
   `);
 }
 
@@ -541,6 +624,16 @@ export async function runServerDbMigrations(
         ON CONFLICT (version) DO NOTHING
       `,
       [QUOTE_EMAIL_SETTINGS_VERSION, QUOTE_EMAIL_SETTINGS_NAME],
+    );
+
+    await ensureAuthConceptSecurity(client);
+    await client.query(
+      `
+        INSERT INTO papot_schema_migrations (version, name)
+        VALUES ($1, $2)
+        ON CONFLICT (version) DO NOTHING
+      `,
+      [AUTH_CONCEPT_SECURITY_VERSION, AUTH_CONCEPT_SECURITY_NAME],
     );
 
     if (freshWebBootstrapEnabled(env)) {
