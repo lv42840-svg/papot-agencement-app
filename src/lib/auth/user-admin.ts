@@ -2,10 +2,7 @@ import "server-only";
 
 import { randomBytes, randomUUID } from "node:crypto";
 import { hashPassword } from "@/lib/auth/password";
-import {
-  createPasswordSetupToken,
-  newPasswordSetupToken,
-} from "@/lib/auth/password-setup";
+import { createPasswordSetupToken, newPasswordSetupToken } from "@/lib/auth/password-setup";
 import { getCurrentUser, type CurrentUser } from "@/lib/auth/session";
 import type { AccessLevel } from "@/lib/auth/permissions";
 import { mutateAuthPayload, readAuthPayload } from "@/lib/auth/store";
@@ -75,7 +72,9 @@ function assertUsernameAvailable(
   exceptUserId?: string,
 ) {
   const normalized = normalizeUsername(username);
-  if (users.some((user) => user.id !== exceptUserId && user.username.toLowerCase() === normalized)) {
+  if (
+    users.some((user) => user.id !== exceptUserId && user.username.toLowerCase() === normalized)
+  ) {
     throw new Error("USERNAME_ALREADY_EXISTS");
   }
 }
@@ -209,7 +208,9 @@ export async function replaceManagedUserPermissions(input: {
 export async function resetManagedUserPassword(input: { userId: string }) {
   const actor = await requirePermissionAdministrator();
   const payload = await readAuthPayload();
-  const user = payload.users.find((candidate) => candidate.id === input.userId && candidate.isActive);
+  const user = payload.users.find(
+    (candidate) => candidate.id === input.userId && candidate.isActive,
+  );
   if (!user) throw new Error("USER_NOT_FOUND");
 
   const setup = newPasswordSetupToken(60);

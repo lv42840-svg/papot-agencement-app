@@ -46,8 +46,5 @@ export async function POST(request: Request) {
     return response;
   }
 
-  return NextResponse.json(
-    { error: "Identifiant ou mot de passe incorrect." },
-    { status: 401 },
-  );
+  return NextResponse.json({ error: "Identifiant ou mot de passe incorrect." }, { status: 401 });
 }

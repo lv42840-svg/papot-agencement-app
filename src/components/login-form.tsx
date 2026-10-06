@@ -33,13 +33,7 @@ export function LoginForm() {
     <form className="loginForm" onSubmit={submit}>
       <label>
         Identifiant
-        <input
-          name="username"
-          autoComplete="username"
-          minLength={3}
-          maxLength={80}
-          required
-        />
+        <input name="username" autoComplete="username" minLength={3} maxLength={80} required />
       </label>
       <label>
         Mot de passe

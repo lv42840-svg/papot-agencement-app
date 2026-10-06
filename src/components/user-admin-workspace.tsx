@@ -459,7 +459,9 @@ function UserAdminCard({
       <div className="adminUserHeader">
         <div>
           <h2>{user.displayName}</h2>
-          <p className="muted">@{user.username} · {user.email}</p>
+          <p className="muted">
+            @{user.username} · {user.email}
+          </p>
         </div>
         <div className="adminBadges">
           <span className={`adminBadge${user.isActive ? "" : " isInactive"}`}>

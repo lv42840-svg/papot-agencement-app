@@ -7,7 +7,13 @@ export type AccessLevel = "READ" | "WRITE";
 const accessLevelSchema = z.enum(["READ", "WRITE"]);
 const storedUserSchema = z.object({
   id: z.string().uuid(),
-  username: z.string().trim().min(3).max(80).regex(/^[A-Za-z0-9._-]+$/).optional(),
+  username: z
+    .string()
+    .trim()
+    .min(3)
+    .max(80)
+    .regex(/^[A-Za-z0-9._-]+$/)
+    .optional(),
   displayName: z.string().min(1),
   email: z.string().email(),
   passwordHash: z.string().min(1),
@@ -60,9 +66,7 @@ function ensureUsernames(users: Array<z.infer<typeof storedUserSchema>>): AuthUs
   return users.map((user) => {
     const requested = user.username?.toLowerCase();
     const base =
-      requested && requested.length >= 3
-        ? requested
-        : normalizedUsernameBase(user.email, user.id);
+      requested && requested.length >= 3 ? requested : normalizedUsernameBase(user.email, user.id);
     let username = base;
     let suffix = 2;
     while (used.has(username.toLowerCase())) {

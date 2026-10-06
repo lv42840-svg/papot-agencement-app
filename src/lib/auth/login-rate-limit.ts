@@ -62,7 +62,8 @@ export function loginClientIp(request: Request): string {
   if (process.env.PAPOT_TRUST_PROXY_HEADERS !== "true") return "unknown";
   const value = request.headers.get("x-papot-client-ip")?.trim() ?? "";
   if (!isIP(value)) return "unknown";
-  if (value.toLowerCase().startsWith("::ffff:") && isIP(value.slice(7)) === 4) return value.slice(7);
+  if (value.toLowerCase().startsWith("::ffff:") && isIP(value.slice(7)) === 4)
+    return value.slice(7);
   if (isIP(value) === 6) return new URL(`http://[${value}]/`).hostname;
   return value;
 }

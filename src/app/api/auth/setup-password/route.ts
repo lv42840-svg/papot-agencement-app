@@ -2,10 +2,7 @@ import { NextResponse } from "next/server";
 import { z } from "zod";
 
 import { clearAdminResetRequirement } from "@/lib/auth/login-rate-limit";
-import {
-  consumePasswordSetupToken,
-  passwordSetupTokenHash,
-} from "@/lib/auth/password-setup";
+import { consumePasswordSetupToken, passwordSetupTokenHash } from "@/lib/auth/password-setup";
 
 const schema = z
   .object({
