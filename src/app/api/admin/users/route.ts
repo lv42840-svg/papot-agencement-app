@@ -30,18 +30,18 @@ const mutationSchema = z.discriminatedUnion("action", [
       .min(3)
       .max(80)
       .regex(/^[A-Za-z0-9._-]+$/),
-    username: z
-      .string()
-      .trim()
-      .min(3)
-      .max(80)
-      .regex(/^[A-Za-z0-9._-]+$/),
     displayName: z.string().trim().min(1).max(160),
     email: z.string().trim().email().max(240),
   }),
   z.object({
     action: z.literal("updateProfile"),
     userId: z.string().uuid(),
+    username: z
+      .string()
+      .trim()
+      .min(3)
+      .max(80)
+      .regex(/^[A-Za-z0-9._-]+$/),
     displayName: z.string().trim().min(1).max(160),
     email: z.string().trim().email().max(240),
   }),
@@ -61,7 +61,6 @@ const mutationSchema = z.discriminatedUnion("action", [
   z.object({
     action: z.literal("resetPassword"),
     userId: z.string().uuid(),
-
   }),
   z.object({
     action: z.literal("revokeSession"),
