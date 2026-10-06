@@ -14,6 +14,7 @@ type UserSession = {
 };
 type ManagedUser = {
   id: string;
+  username: string;
   displayName: string;
   email: string;
   isActive: boolean;
@@ -29,9 +30,15 @@ type Snapshot = {
   specialPermissions: SpecialDescriptor[];
   actorUserId: string;
 };
+type MutationResponse = Snapshot & {
+  setupUrl?: string;
+  expiresAt?: string;
+  error?: string;
+};
 
 function errorMessage(code: string) {
   if (code === "USER_EMAIL_EXISTS") return "Cette adresse e-mail est déjà utilisée.";
+  if (code === "USERNAME_ALREADY_EXISTS") return "Cet identifiant est déjà utilisé.";
   if (code === "CANNOT_DISABLE_SELF") return "Vous ne pouvez pas désactiver votre propre compte.";
   if (code === "USER_NOT_FOUND") return "Utilisateur introuvable.";
   if (code === "ADMIN_FORBIDDEN") return "Administration des utilisateurs non autorisée.";
@@ -50,6 +57,8 @@ export function UserAdminWorkspace() {
   const [snapshot, setSnapshot] = useState<Snapshot | null>(null);
   const [error, setError] = useState("");
   const [busy, setBusy] = useState(false);
+  const [setupLink, setSetupLink] = useState("");
+  const [setupExpiresAt, setSetupExpiresAt] = useState("");
 
   async function load() {
     setError("");
@@ -68,7 +77,7 @@ export function UserAdminWorkspace() {
     void load();
   }, []);
 
-  async function mutate(input: Record<string, unknown>) {
+  async function mutate(input: Record<string, unknown>): Promise<MutationResponse | null> {
     setBusy(true);
     setError("");
     try {
@@ -77,15 +86,13 @@ export function UserAdminWorkspace() {
         headers: { "content-type": "application/json" },
         body: JSON.stringify(input),
       });
-      const body = (await response.json().catch(() => null)) as
-        | (Snapshot & { error?: string })
-        | null;
+      const body = (await response.json().catch(() => null)) as MutationResponse | null;
       if (!response.ok || !body) {
         setError(errorMessage(body?.error ?? "Modification impossible."));
-        return false;
+        return null;
       }
       setSnapshot(body);
-      return true;
+      return body;
     } finally {
       setBusy(false);
     }
@@ -95,13 +102,29 @@ export function UserAdminWorkspace() {
     event.preventDefault();
     const form = event.currentTarget;
     const data = new FormData(form);
-    const ok = await mutate({
+    const result = await mutate({
       action: "create",
+      username: data.get("username"),
       displayName: data.get("displayName"),
       email: data.get("email"),
-      temporaryPassword: data.get("temporaryPassword"),
     });
-    if (ok) form.reset();
+    if (result?.setupUrl) {
+      setSetupLink(result.setupUrl);
+      setSetupExpiresAt(result.expiresAt ?? "");
+      form.reset();
+    }
+  }
+
+  async function copySetupLink() {
+    if (!setupLink) return;
+    const absolute = new URL(setupLink, window.location.origin).toString();
+    await navigator.clipboard.writeText(absolute);
+  }
+
+  function showSetupLink(url: string, expiresAt?: string) {
+    setSetupLink(url);
+    setSetupExpiresAt(expiresAt ?? "");
+    window.scrollTo({ top: 0, behavior: "smooth" });
   }
 
   if (!snapshot) {
@@ -133,13 +156,46 @@ export function UserAdminWorkspace() {
         </p>
       )}
 
+      {setupLink ? (
+        <article className="adminPanel adminSetupLink">
+          <h2>Lien personnel de mot de passe</h2>
+          <p className="muted">
+            Usage unique. Le lien expire dans une heure et un nouveau lien invalide l’ancien.
+          </p>
+          <div className="adminSetupLinkRow">
+            <input
+              value={new URL(setupLink, typeof window === "undefined" ? "https://agencement.papot.app" : window.location.origin).toString()}
+              readOnly
+              aria-label="Lien d’activation ou de réinitialisation"
+            />
+            <button className="secondaryButton" type="button" onClick={() => void copySetupLink()}>
+              Copier le lien
+            </button>
+          </div>
+          {setupExpiresAt ? (
+            <p className="muted">Valable jusqu’au {dateTime(setupExpiresAt)}.</p>
+          ) : null}
+        </article>
+      ) : null}
+
       <article className="adminPanel">
         <h2>Ajouter un utilisateur</h2>
         <p className="muted">
-          Le mot de passe saisi est temporaire. L’utilisateur devra en choisir un nouveau à sa
-          première connexion.
+          Créez le compte avec un identifiant court. PAPOT génère ensuite un lien personnel à usage
+          unique pour que l’utilisateur choisisse lui-même son mot de passe.
         </p>
         <form className="adminCreateGrid" onSubmit={createUser}>
+          <label>
+            Identifiant
+            <input
+              name="username"
+              required
+              minLength={3}
+              maxLength={80}
+              pattern="[A-Za-z0-9._-]+"
+              placeholder="prenom"
+            />
+          </label>
           <label>
             Nom affiché
             <input name="displayName" required maxLength={160} />
@@ -147,10 +203,6 @@ export function UserAdminWorkspace() {
           <label>
             Adresse e-mail
             <input name="email" type="email" required maxLength={240} />
-          </label>
-          <label>
-            Mot de passe temporaire
-            <input name="temporaryPassword" type="password" minLength={12} required />
           </label>
           <button className="primaryButton" type="submit" disabled={busy}>
             Créer l’utilisateur
@@ -168,6 +220,7 @@ export function UserAdminWorkspace() {
             specialPermissions={snapshot.specialPermissions}
             busy={busy}
             mutate={mutate}
+            onSetupLink={showSetupLink}
           />
         ))}
       </div>
@@ -184,6 +237,21 @@ export function UserAdminWorkspace() {
           border-radius: 16px;
           box-shadow: 0 5px 18px rgb(55 39 112 / 0.06);
           padding: 18px;
+        }
+        .adminSetupLinkRow {
+          display: flex;
+          gap: 10px;
+          align-items: center;
+          margin-top: 12px;
+        }
+        .adminSetupLinkRow input {
+          min-width: 0;
+          flex: 1;
+          min-height: 40px;
+          border: 1px solid #dcd6eb;
+          border-radius: 10px;
+          padding: 8px 10px;
+          background: #faf9fd;
         }
         .adminPanel h2,
         .adminUserCard h2,
@@ -324,20 +392,24 @@ function UserAdminCard({
   specialPermissions,
   busy,
   mutate,
+  onSetupLink,
 }: {
   user: ManagedUser;
   actorUserId: string;
   modules: ModuleDescriptor[];
   specialPermissions: SpecialDescriptor[];
   busy: boolean;
-  mutate: (input: Record<string, unknown>) => Promise<boolean>;
+  mutate: (input: Record<string, unknown>) => Promise<MutationResponse | null>;
+  onSetupLink: (url: string, expiresAt?: string) => void;
 }) {
+  const [username, setUsername] = useState(user.username);
   const [displayName, setDisplayName] = useState(user.displayName);
   const [email, setEmail] = useState(user.email);
   const [moduleAccess, setModuleAccess] = useState<Record<string, "NONE" | AccessLevel>>({});
   const [specials, setSpecials] = useState<Set<string>>(new Set());
 
   useEffect(() => {
+    setUsername(user.username);
     setDisplayName(user.displayName);
     setEmail(user.email);
     setModuleAccess(
@@ -371,19 +443,15 @@ function UserAdminCard({
 
   async function saveProfile(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
-    await mutate({ action: "updateProfile", userId: user.id, displayName, email });
+    await mutate({ action: "updateProfile", userId: user.id, username, displayName, email });
   }
 
-  async function resetPassword(event: FormEvent<HTMLFormElement>) {
-    event.preventDefault();
-    const form = event.currentTarget;
-    const data = new FormData(form);
-    const ok = await mutate({
+  async function resetPassword() {
+    const result = await mutate({
       action: "resetPassword",
       userId: user.id,
-      temporaryPassword: data.get("temporaryPassword"),
     });
-    if (ok) form.reset();
+    if (result?.setupUrl) onSetupLink(result.setupUrl, result.expiresAt);
   }
 
   return (
@@ -391,7 +459,7 @@ function UserAdminCard({
       <div className="adminUserHeader">
         <div>
           <h2>{user.displayName}</h2>
-          <p className="muted">{user.email}</p>
+          <p className="muted">@{user.username} · {user.email}</p>
         </div>
         <div className="adminBadges">
           <span className={`adminBadge${user.isActive ? "" : " isInactive"}`}>
@@ -405,6 +473,16 @@ function UserAdminCard({
       </div>
 
       <form className="adminProfileGrid" onSubmit={saveProfile}>
+        <label>
+          Identifiant
+          <input
+            value={username}
+            minLength={3}
+            maxLength={80}
+            pattern="[A-Za-z0-9._-]+"
+            onChange={(event) => setUsername(event.target.value)}
+          />
+        </label>
         <label>
           Nom affiché
           <input value={displayName} onChange={(event) => setDisplayName(event.target.value)} />
@@ -503,15 +581,18 @@ function UserAdminCard({
 
       <section className="adminSection">
         <h3>Réinitialisation du mot de passe</h3>
-        <form className="adminResetForm" onSubmit={resetPassword}>
-          <label>
-            Nouveau mot de passe temporaire
-            <input name="temporaryPassword" type="password" minLength={12} required />
-          </label>
-          <button className="secondaryButton" type="submit" disabled={busy}>
-            Forcer la réinitialisation
-          </button>
-        </form>
+        <p className="muted">
+          Génère un nouveau lien personnel valable une heure. Les sessions actuelles sont révoquées
+          et l’ancien lien devient inutilisable.
+        </p>
+        <button
+          className="secondaryButton"
+          type="button"
+          disabled={busy || !user.isActive}
+          onClick={() => void resetPassword()}
+        >
+          Générer un lien de réinitialisation
+        </button>
       </section>
 
       <section className="adminSection">
