@@ -364,7 +364,9 @@ export function buildFirmGrandPlanningRows(
           activity,
           label: PLANNING_ACTIVITY_LABELS[activity],
           plannedHours,
-          actualHours: [...actualByWeek.values()].reduce((sum, hours) => sum + hours, 0),
+          actualHours: planningPayload.actualHours
+            .filter((entry) => entry.chantierId === chantier.id && entry.activity === activity)
+            .reduce((sum, entry) => sum + entry.hours, 0),
           allocatedHours,
           remainingHours: plannedHours - allocatedHours,
           weeklyHours,
