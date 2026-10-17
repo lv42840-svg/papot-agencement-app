@@ -3,6 +3,16 @@
 import { TrendingUp } from "lucide-react";
 import { useEffect, useState } from "react";
 import type { DashboardSoldSummary } from "@/lib/dashboard/sold-summary";
+import type { IndirectLaborCostsPeriod } from "@/lib/payroll/indirect-labor-cost";
+
+type FinanceSnapshot = DashboardSoldSummary & {
+  indirect: null | {
+    yearly: IndirectLaborCostsPeriod;
+    monthly: IndirectLaborCostsPeriod;
+    indicativeYearlyMarginCents: number | null;
+    indicativeMonthlyMarginCents: number | null;
+  };
+};
 
 const euro = new Intl.NumberFormat("fr-FR", {
   style: "currency",
@@ -15,7 +25,7 @@ function money(cents: number | null): string {
 }
 
 export function DashboardSoldMarginStat() {
-  const [snapshot, setSnapshot] = useState<DashboardSoldSummary | null>(null);
+  const [snapshot, setSnapshot] = useState<FinanceSnapshot | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
 
@@ -29,7 +39,7 @@ export function DashboardSoldMarginStat() {
         });
         if (response.status === 403) throw new Error("Accès réservé au pilotage global.");
         if (!response.ok) throw new Error("Indicateurs momentanément indisponibles.");
-        const value = (await response.json()) as DashboardSoldSummary;
+        const value = (await response.json()) as FinanceSnapshot;
         if (!controller.signal.aborted) setSnapshot(value);
       } catch (cause) {
         if (!controller.signal.aborted) {
@@ -65,13 +75,37 @@ export function DashboardSoldMarginStat() {
               <span>Marge prévue {snapshot.year}</span>
               <strong>{money(snapshot.yearly.plannedMarginCents)}</strong>
             </div>
+            {snapshot.indirect ? (
+              <>
+                <div className="dashboardSoldLine">
+                  <span>Heures SAV / an ({snapshot.indirect.yearly.savHours} h)</span>
+                  <strong>{money(snapshot.indirect.yearly.savCostCents)}</strong>
+                </div>
+                <div className="dashboardSoldLine">
+                  <span>Frais généraux / an ({snapshot.indirect.yearly.generalHours} h)</span>
+                  <strong>{money(snapshot.indirect.yearly.generalCostCents)}</strong>
+                </div>
+                <div className="dashboardSoldLine">
+                  <span>Marge globale indicative {snapshot.year}</span>
+                  <strong>{money(snapshot.indirect.indicativeYearlyMarginCents)}</strong>
+                </div>
+                <small className="dashboardSoldWarning">
+                  La marge indicative déduit SAV et frais généraux valorisés de la marge
+                  prévisionnelle des affaires confirmées. Ce n’est pas le résultat réel :
+                  factures, achats et autres charges manquent.
+                </small>
+              </>
+            ) : (
+              <small>Coûts SAV et frais généraux : droit Paie en lecture requis.</small>
+            )}
             {snapshot.yearly.incompleteCases > 0 ? (
               <small>{snapshot.yearly.incompleteCases} affaire(s) sans devis natif complet.</small>
             ) : null}
           </>
         ) : null}
         <small className="dashboardSoldWarning">
-          Commandes confirmées HT, pas CA facturé. Marge réelle en attente des achats.
+          Commandes confirmées HT, pas CA facturé. Les coûts SAV et frais généraux ne
+          diminuent jamais la rentabilité d’un chantier.
         </small>
       </div>
       <style jsx>{`
