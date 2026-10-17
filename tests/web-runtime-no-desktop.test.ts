@@ -22,13 +22,14 @@ describe("web runtime isolation from desktop runtime", () => {
     }
   });
 
-  it("redirects the legacy weekly planning page to the PostgreSQL web planning", () => {
+  it("runs the real weekly planning page against PostgreSQL-backed web APIs", () => {
     const source = readFileSync(
       new URL("../src/app/planning/[weekId]/page.tsx", import.meta.url),
       "utf-8",
     );
 
-    expect(source).toContain('redirect(year ? `/planning?year=${year}` : "/planning")');
+    expect(source).toContain("<WeeklyTeamBoard");
+    expect(source).toContain("weeklyBoardWeekSchema.safeParse");
     expect(source).not.toContain("PlanningWeekEditor");
     expect(source).not.toContain("useSharedResourceEditor");
   });
