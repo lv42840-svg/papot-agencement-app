@@ -152,6 +152,7 @@ describe("weekly team board", () => {
         date: "2026-10-19",
         chantierId,
         label: "Pralus Chambéry",
+        activity: "INSTALL",
       },
     ];
     const created = applyPlanningStaffMutation(
