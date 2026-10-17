@@ -23,7 +23,6 @@ function readDesktopDeviceIdentity(): DesktopDeviceIdentity {
   } catch {
     return {
       deviceLabel: "Poste PAPOT",
-      configured: false,
     };
   }
 }
