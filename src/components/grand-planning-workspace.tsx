@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 import { PlanningExcelGrid } from "./planning-excel-grid";
+import { frenchNationalPublicHolidays } from "@/lib/planning/capacity";
 import type { PlanningClipboardUpdate } from "@/lib/planning/clipboard";
 import { useCallback, useEffect, useMemo, useRef, useState, type FormEvent } from "react";
 import type {
@@ -114,6 +115,7 @@ export function GrandPlanningWorkspace({
   const [hiddenUnallocated, setHiddenUnallocated] = useState(false);
   const [hiddenProvisional, setHiddenProvisional] = useState(false);
   const [activeTab, setActiveTab] = useState<"planning" | "personnel">("planning");
+  const [holidayYear, setHolidayYear] = useState(initialYear);
   const [message, setMessage] = useState("Chargement du planning…");
   const [drafts, setDrafts] = useState<Record<string, string>>({});
   const [savingKey, setSavingKey] = useState<string | null>(null);
@@ -1045,6 +1047,65 @@ export function GrandPlanningWorkspace({
           ) : null}
 
           {snapshot ? (
+            <section className="planningHolidayPanel" aria-label="Jours fériés nationaux">
+              <div className="planningCapacitySettingsHeader">
+                <div>
+                  <p className="eyebrow">Calendrier</p>
+                  <h2>Jours fériés français</h2>
+                  <p className="planningHolidayExplanation">
+                    Déjà exclus automatiquement des disponibilités lorsque la journée est normalement travaillée.
+                    Les jours fériés tombant le week-end n'enlèvent pas d'heures supplémentaires.
+                  </p>
+                </div>
+                <label className="planningHolidayYearSelector">
+                  Année
+                  <select
+                    value={Math.min(Math.max(holidayYear, snapshot.year), snapshot.endYear)}
+                    onChange={(event) => setHolidayYear(Number(event.target.value))}
+                    aria-label="Année des jours fériés"
+                  >
+                    {Array.from(
+                      { length: snapshot.endYear - snapshot.year + 1 },
+                      (_, index) => snapshot.year + index,
+                    ).map((year) => (
+                      <option key={year} value={year}>{year}</option>
+                    ))}
+                  </select>
+                </label>
+              </div>
+              <div className="planningHolidayList">
+                {frenchNationalPublicHolidays(
+                  Math.min(Math.max(holidayYear, snapshot.year), snapshot.endYear),
+                ).map((holiday) => {
+                  const day = new Date(`${holiday.date}T12:00:00Z`);
+                  const weekend = [0, 6].includes(day.getUTCDay());
+                  return (
+                    <div
+                      key={holiday.date}
+                      className={weekend ? "planningHolidayItem isWeekend" : "planningHolidayItem"}
+                    >
+                      <strong>
+                        {day.toLocaleDateString("fr-FR", {
+                          day: "2-digit",
+                          month: "2-digit",
+                          timeZone: "UTC",
+                        })}
+                      </strong>
+                      <span>{holiday.label}</span>
+                      <small>
+                        {weekend ? "Week-end" : day.toLocaleDateString("fr-FR", {
+                          weekday: "short",
+                          timeZone: "UTC",
+                        })}
+                      </small>
+                    </div>
+                  );
+                })}
+              </div>
+            </section>
+          ) : null}
+
+          {snapshot ? (
             <section className="planningAbsenceSettings">
               <div className="planningCapacitySettingsHeader">
                 <div>
@@ -1326,6 +1387,75 @@ export function GrandPlanningWorkspace({
           border-radius: 5px;
           border: 1px solid #ddd5ee;
           font-size: 10px;
+        }
+        .excelWeekHeading.excelHasHoliday {
+          background: #fdf1d6 !important;
+        }
+        .excelWeekHeading.excelHasHoliday strong {
+          display: flex;
+          justify-content: center;
+          gap: 7px;
+          align-items: center;
+        }
+        .excelHolidayBadge {
+          border-radius: 4px;
+          padding: 1px 4px;
+          background: #ffe1a1;
+          color: #785000;
+          font-size: 9px;
+          font-weight: 800;
+        }
+        .planningHolidayPanel {
+          margin-bottom: 12px;
+          padding: 14px 16px;
+          border: 1px solid #e3dced;
+          border-radius: 8px;
+          background: white;
+        }
+        .planningHolidayExplanation {
+          margin: 6px 0 0;
+          color: #706885;
+          font-size: 11px;
+          font-weight: 400;
+        }
+        .planningHolidayYearSelector {
+          display: grid;
+          gap: 4px;
+          font-size: 11px;
+          font-weight: 700;
+        }
+        .planningHolidayYearSelector select {
+          padding: 5px 9px;
+          border: 1px solid #d6ceeb;
+          border-radius: 5px;
+          background: white;
+        }
+        .planningHolidayList {
+          display: grid;
+          grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+          gap: 6px;
+          margin-top: 12px;
+        }
+        .planningHolidayItem {
+          display: flex;
+          align-items: center;
+          gap: 9px;
+          padding: 8px;
+          border-radius: 6px;
+          background: #fbf4df;
+          color: #473b2a;
+          font-size: 11px;
+        }
+        .planningHolidayItem strong {
+          font-variant-numeric: tabular-nums;
+        }
+        .planningHolidayItem small {
+          margin-left: auto;
+          font-size: 10px;
+        }
+        .planningHolidayItem.isWeekend {
+          background: #f3f2f5;
+          color: #86818b;
         }
         .planningPersonnelContent {
           max-width: 1500px;
