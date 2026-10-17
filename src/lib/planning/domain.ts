@@ -37,6 +37,16 @@ export const planningProvisionalAllocationSchema = z.object({
   hours: z.number().finite().nonnegative(),
 });
 
+// Day-by-day team board is distinct from sold/allocated weekly activity hours.
+// A blank assignment is represented by no record.
+export const planningDailyAssignmentSchema = z.object({
+  userId: z.string().uuid(),
+  date: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, "PLANNING_DAY_INVALID"),
+  chantierId: z.string().uuid().nullable(),
+  label: z.string().trim().min(1).max(160),
+});
+export type PlanningDailyAssignment = z.infer<typeof planningDailyAssignmentSchema>;
+
 export const planningActualHoursSchema = z.object({
   chantierId: z.string().uuid(),
   userId: z.string().uuid(),
@@ -82,6 +92,7 @@ export const planningPayloadSchema = z
     chantierOrder: z.array(z.string().uuid()),
     provisionalOrder: z.array(z.string().uuid()).default([]),
     peopleCapacity: z.array(planningPersonCapacitySchema).default([]),
+    dailyAssignments: z.array(planningDailyAssignmentSchema).default([]),
     staff: z.array(planningStaffSchema).default([]),
     absences: z.array(planningAbsenceSchema).default([]),
   })
@@ -146,6 +157,19 @@ export const planningPayloadSchema = z
         }
         linkedUsers.add(person.linkedUserId);
       }
+    });
+
+    const dailyKeys = new Set<string>();
+    value.dailyAssignments.forEach((assignment, index) => {
+      const key = `${assignment.userId}:${assignment.date}`;
+      if (dailyKeys.has(key)) {
+        context.addIssue({
+          code: z.ZodIssueCode.custom,
+          path: ["dailyAssignments", index],
+          message: "PLANNING_DAILY_DUPLICATE",
+        });
+      }
+      dailyKeys.add(key);
     });
 
     const absenceKeys = new Set<string>();
@@ -234,6 +258,7 @@ export function createInitialPlanningPayload(): PlanningPayload {
     chantierOrder: [],
     provisionalOrder: [],
     peopleCapacity: [],
+    dailyAssignments: [],
     staff: [],
     absences: [],
   };
