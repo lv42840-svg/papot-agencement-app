@@ -109,15 +109,17 @@ function parseHours(value: string): number | null {
 export function GrandPlanningWorkspace({
   initialYear,
   initialPotentialCollapsed,
+  initialTab = "planning",
 }: {
   initialYear: number;
   initialPotentialCollapsed: boolean;
+  initialTab?: "planning" | "personnel";
 }) {
   const [snapshot, setSnapshot] = useState<PlanningSnapshot | null>(null);
   const [loadingNextYear, setLoadingNextYear] = useState(false);
   const [hiddenUnallocated, setHiddenUnallocated] = useState(false);
   const [hiddenProvisional, setHiddenProvisional] = useState(false);
-  const [activeTab, setActiveTab] = useState<"planning" | "personnel">("planning");
+  const [activeTab, setActiveTab] = useState<"planning" | "personnel">(initialTab);
   const [message, setMessage] = useState("Chargement du planning…");
   const [drafts, setDrafts] = useState<Record<string, string>>({});
   const [savingKey, setSavingKey] = useState<string | null>(null);
@@ -752,6 +754,7 @@ export function GrandPlanningWorkspace({
         >
           Grand planning
         </button>
+        <Link href={`/planning/${currentWeek}`}>Petit planning</Link>
         <button
           type="button"
           className={activeTab === "personnel" ? "isActive" : ""}
@@ -1394,7 +1397,8 @@ export function GrandPlanningWorkspace({
           margin: 0 0 14px;
           border-bottom: 1px solid #ddd5ee;
         }
-        .planningMainTabs button {
+        .planningMainTabs button,
+        .planningMainTabs a {
           border: 1px solid transparent;
           border-bottom: 3px solid transparent;
           background: transparent;
@@ -1403,7 +1407,8 @@ export function GrandPlanningWorkspace({
           color: #766a91;
           border-radius: 8px 8px 0 0;
         }
-        .planningMainTabs button.isActive {
+        .planningMainTabs button.isActive,
+        .planningMainTabs a.isActive {
           color: #6450ad;
           border-bottom-color: #7666d6;
           background: #eeeafb;
