@@ -1,6 +1,6 @@
 import type { CommercialCase } from "./domain";
 import { calculateCommercialQuoteSummary } from "../quotes/commercial-summary";
-import type { NativeQuoteRecord } from "@/lib/quotes/store";
+import type { NativeQuoteRecord } from "../quotes/store";
 
 export type ForecastActivityHours = { be: number; workshop: number; install: number };
 
