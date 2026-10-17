@@ -21,11 +21,12 @@ describe("desktop navigation", () => {
     });
   });
 
-  it("exposes one Planning entry instead of separate grand and petit planning entries", () => {
+  it("exposes grand/petit via Planning and a distinct real-hours screen", () => {
     const planningEntries = desktopNavigation.filter((item) => item.moduleKey === "planning");
 
     expect(planningEntries).toEqual([
       expect.objectContaining({ label: "Planning", href: "/planning" }),
+      expect.objectContaining({ label: "Heures", href: "/heures", moduleKey: "planning" }),
     ]);
     expect(desktopNavigation.some((item) => item.label === "Grand planning")).toBe(false);
     expect(desktopNavigation.some((item) => item.label === "Petit planning")).toBe(false);

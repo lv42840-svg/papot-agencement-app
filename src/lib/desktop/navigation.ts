@@ -28,7 +28,7 @@ export const desktopNavigation: DesktopNavigationItem[] = [
   { label: "Devis", icon: "file", href: "/devis", moduleKey: "quotes" },
   { label: "Chantiers", icon: "folder", href: "/chantiers", moduleKey: "chantiers" },
   { label: "Planning", icon: "calendar", href: "/planning", moduleKey: "planning" },
-  { label: "Heures", icon: "clock", moduleKey: "hours" },
+  { label: "Heures", icon: "clock", href: "/heures", moduleKey: "planning" },
   { label: "Achats", icon: "cart", moduleKey: "purchases" },
   { label: "Facturation", icon: "file", moduleKey: "billing" },
   { label: "Trésorerie", icon: "landmark", moduleKey: "treasury" },

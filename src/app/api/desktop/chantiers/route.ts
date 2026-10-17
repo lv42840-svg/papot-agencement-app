@@ -21,6 +21,7 @@ import {
   requireModuleRequestContext,
 } from "@/lib/desktop/request-context";
 import { createPlanningRepository } from "@/lib/planning/create-repository";
+import { actualHoursByActivity } from "@/lib/planning/actual-hours";
 import { buildChantierPlanningCloseWarning } from "@/lib/planning/domain";
 import {
   removeFirmPlanningForChantier,
@@ -64,8 +65,23 @@ async function snapshot(
     hasEffectiveSpecialPermission(user, "chantiers.close_reopen"),
     hasEffectiveSpecialPermission(user, "chantiers.archive_reactivate"),
   ]);
+  // Reconcile the chantier's read-only production metrics from the real hours register.
+  // Do not write the projection into the chantier repository: the planning ledger is the source.
+  const realizedChantierIds = new Set(planningPayload.actualHours.map((entry) => entry.chantierId));
+  const viewPayload: ChantiersPayload = {
+    ...payload,
+    chantiers: payload.chantiers.map((chantier) => {
+      if (!realizedChantierIds.has(chantier.id)) return chantier;
+      return {
+        ...chantier,
+        actualHours: actualHoursByActivity(
+          planningPayload.actualHours.filter((entry) => entry.chantierId === chantier.id),
+        ),
+      };
+    }),
+  };
   return {
-    payload,
+    payload: viewPayload,
     actor,
     capabilities: {
       ...baseCapabilities,
