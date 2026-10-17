@@ -1,0 +1,28 @@
+name: Format weekly board branch
+on:
+  push:
+    branches: [feat/planning-weekly-team-board-20261017]
+permissions:
+  contents: write
+jobs:
+  formatter:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - name: Format weekly board sources
+        run: |
+          npx --no-install prettier --write src/lib/planning/domain.ts src/lib/planning/personnel.ts src/lib/planning/weekly-board.ts src/app/api/desktop/planning/weekly-board/route.ts src/components/weekly-team-board.tsx src/app/planning/'[weekId]'/page.tsx src/app/planning/page.tsx src/components/grand-planning-workspace.tsx tests/planning-domain.test.ts tests/planning-postgres.integration.test.ts tests/planning-weekly-board.test.ts tests/planning-weekly-board-ui.test.ts
+      - name: Commit formatted sources
+        run: |
+          if [ -n "$(git status --porcelain)" ]; then
+            git config user.name "github-actions[bot]"
+            git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+            git add src/lib/planning/domain.ts src/lib/planning/personnel.ts src/lib/planning/weekly-board.ts src/app/api/desktop/planning/weekly-board/route.ts src/components/weekly-team-board.tsx src/app/planning/'[weekId]'/page.tsx src/app/planning/page.tsx src/components/grand-planning-workspace.tsx tests/planning-domain.test.ts tests/planning-postgres.integration.test.ts tests/planning-weekly-board.test.ts tests/planning-weekly-board-ui.test.ts
+            git commit -m 'chore(planning): format weekly team board'
+            git push origin HEAD:feat/planning-weekly-team-board-20261017
+          fi
