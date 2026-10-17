@@ -213,6 +213,9 @@ export function WeeklyTeamBoard({ week }: { week: string }) {
 
   return (
     <div className="weeklyBoard">
+      <div className="weeklyBoardPrintWeek" aria-hidden="true">
+        S{week.slice(-2)} · {week.slice(0, 4)}
+      </div>
       <div className="weeklyBoardTop">
         <div>
           <p className="eyebrow">PLANNING · ÉQUIPE</p>
@@ -497,92 +500,6 @@ export function WeeklyTeamBoard({ week }: { week: string }) {
           border-radius: 4px;
           font-size: 9px;
           cursor: pointer;
-        }
-        @page {
-          size: A4 landscape;
-          margin: 8mm;
-        }
-        @media print {
-          body * {
-            visibility: hidden !important;
-          }
-          .weeklyBoard,
-          .weeklyBoard * {
-            visibility: visible !important;
-          }
-          .weeklyBoard {
-            position: absolute;
-            top: 0;
-            left: 0;
-            width: 100%;
-            padding: 0;
-            background: white !important;
-            print-color-adjust: exact;
-            -webkit-print-color-adjust: exact;
-          }
-          .weeklyBoardControls,
-          .weeklyBoardTabs,
-          .weeklyBoardDayClipboard,
-          .weeklyBoardAddEntry,
-          .weeklyBoardEntryActions,
-          .weeklyBoardEditForm,
-          .weeklyBoardFooter,
-          .weeklyBoardMessage {
-            display: none !important;
-          }
-          .weeklyBoardTop {
-            margin-bottom: 5mm;
-          }
-          .weeklyBoardTopline {
-            display: flex !important;
-            margin-bottom: 4mm;
-          }
-          .weeklyBoardIntro {
-            min-width: 120px;
-            padding: 6px !important;
-          }
-          .weeklyBoardHours {
-            width: 70% !important;
-            min-width: 0 !important;
-            max-width: none !important;
-            padding: 6px !important;
-          }
-          .weeklyBoardChantierScroll {
-            overflow: visible !important;
-            max-height: none !important;
-          }
-          .weeklyBoardTableScroll {
-            overflow: visible !important;
-            width: 100% !important;
-          }
-          .weeklyBoardTable {
-            width: 100% !important;
-            min-width: 0 !important;
-            font-size: 9px !important;
-          }
-          .weeklyBoardNameHead {
-            width: 120px !important;
-          }
-          .weeklyBoardCell {
-            padding: 3px !important;
-            height: auto !important;
-          }
-          .weeklyBoardDayHead {
-            font-size: 11px !important;
-          }
-          .weeklyBoardEntry {
-            padding: 3px 4px !important;
-            break-inside: avoid;
-          }
-          .weeklyBoardEntryInfo strong {
-            font-size: 9px !important;
-          }
-          .weeklyBoardPerson strong {
-            font-size: 10px !important;
-          }
-          .weeklyBoardTable tr {
-            break-inside: avoid;
-          }
         }
         .weeklyBoard {
           padding: 0 0 30px;
@@ -1058,6 +975,137 @@ export function WeeklyTeamBoard({ week }: { week: string }) {
         .weeklyBoardCell {
           vertical-align: top;
           min-height: 80px;
+        }
+        /* Paper version: just the ISO week and the five-day people grid. */
+        .weeklyBoardPrintWeek {
+          display: none;
+        }
+        @page {
+          size: A4 landscape;
+          margin: 5mm;
+        }
+        @media print {
+          body * {
+            visibility: hidden !important;
+          }
+          .weeklyBoard,
+          .weeklyBoard * {
+            visibility: visible !important;
+          }
+          .weeklyBoard {
+            position: absolute !important;
+            top: 0 !important;
+            left: 0 !important;
+            width: 100% !important;
+            margin: 0 !important;
+            padding: 0 !important;
+            background: white !important;
+            color: #181818 !important;
+            print-color-adjust: exact !important;
+            -webkit-print-color-adjust: exact !important;
+          }
+          .weeklyBoardPrintWeek {
+            display: block !important;
+            font-size: 10pt !important;
+            font-weight: 750 !important;
+            margin: 0 0 3mm !important;
+            line-height: 1.1 !important;
+          }
+          .weeklyBoardTop,
+          .weeklyBoardTabs,
+          .weeklyBoardTopline,
+          .weeklyBoardDayClipboard,
+          .weeklyBoardAddEntry,
+          .weeklyBoardEntryActions,
+          .weeklyBoardEditForm,
+          .weeklyBoardFooter,
+          .weeklyBoardMessage {
+            display: none !important;
+          }
+          .weeklyBoardTableScroll {
+            display: block !important;
+            overflow: visible !important;
+            width: 100% !important;
+            border: 0 !important;
+            border-radius: 0 !important;
+          }
+          .weeklyBoardTable {
+            width: 100% !important;
+            min-width: 0 !important;
+            table-layout: fixed !important;
+            border-collapse: collapse !important;
+            border-spacing: 0 !important;
+            font-size: 8pt !important;
+          }
+          .weeklyBoardTable thead {
+            display: table-header-group !important;
+          }
+          .weeklyBoardTable tr {
+            break-inside: avoid !important;
+            page-break-inside: avoid !important;
+          }
+          .weeklyBoardTable th,
+          .weeklyBoardTable td {
+            border: 0.5pt solid #777 !important;
+          }
+          .weeklyBoardNameHead {
+            width: 31mm !important;
+            padding: 3px 4px !important;
+            font-size: 8pt !important;
+          }
+          .weeklyBoardDayHead {
+            padding: 3px 2px !important;
+            font-size: 8pt !important;
+            line-height: 1.15 !important;
+          }
+          .weeklyBoardDayHead small {
+            margin-top: 1px !important;
+            font-size: 7pt !important;
+          }
+          .weeklyBoardPerson {
+            padding: 3px 4px !important;
+            vertical-align: middle !important;
+          }
+          .weeklyBoardPerson strong {
+            font-size: 8pt !important;
+            line-height: 1.15 !important;
+          }
+          .weeklyBoardPerson small {
+            display: none !important;
+          }
+          .weeklyBoardCell {
+            height: auto !important;
+            min-height: 0 !important;
+            padding: 2px 3px !important;
+            vertical-align: top !important;
+          }
+          .weeklyBoardDayContent {
+            gap: 2px !important;
+            height: auto !important;
+          }
+          .weeklyBoardEntry {
+            padding: 2px 3px !important;
+            border-left-width: 3px !important;
+            border-radius: 2px !important;
+            gap: 2px !important;
+            break-inside: avoid !important;
+          }
+          .weeklyBoardEntryInfo strong {
+            display: block !important;
+            font-size: 7pt !important;
+            line-height: 1.1 !important;
+          }
+          .weeklyBoardEntryInfo small {
+            margin-top: 1px !important;
+            font-size: 6pt !important;
+            line-height: 1 !important;
+          }
+          .weeklyBoardAbsence,
+          .weeklyBoardDayOff,
+          .weeklyBoardHolidayFlag {
+            font-size: 7pt !important;
+            padding: 1px !important;
+          }
         }
         @media (max-width: 850px) {
           .weeklyBoardTopline {
