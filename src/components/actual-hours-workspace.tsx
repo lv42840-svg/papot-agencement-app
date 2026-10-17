@@ -83,7 +83,9 @@ export function ActualHoursWorkspace() {
   const [extraChoice, setExtraChoice] = useState("");
   const [showAdd, setShowAdd] = useState(false);
   const [drafts, setDrafts] = useState<Record<string, string>>({});
-  const [indirectDrafts, setIndirectDrafts] = useState<Partial<Record<IndirectCategory, string>>>({});
+  const [indirectDrafts, setIndirectDrafts] = useState<Partial<Record<IndirectCategory, string>>>(
+    {},
+  );
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState<string | null>(null);
   const [message, setMessage] = useState("");
@@ -596,16 +598,16 @@ export function ActualHoursWorkspace() {
               })}
             </div>
             <p className="actualHoursHint">
-              Total heures hors chantier : {formatHours(totalIndirectWeek)} h.
-              Ces heures sont valorisées avec le coût employeur mensuel et diminuent
-              la rentabilité globale, pas celle d’un chantier.
+              Total heures hors chantier : {formatHours(totalIndirectWeek)} h. Ces heures sont
+              valorisées avec le coût employeur mensuel et diminuent la rentabilité globale, pas
+              celle d’un chantier.
             </p>
           </section>
 
           {totalForWeek > 168 ? (
             <p className="actualHoursNotice" role="alert">
-              Le total chantiers + SAV + frais généraux dépasse 168 h pour cette semaine.
-              Corrige les valeurs avant de les enregistrer.
+              Le total chantiers + SAV + frais généraux dépasse 168 h pour cette semaine. Corrige
+              les valeurs avant de les enregistrer.
             </p>
           ) : null}
           <p className="actualHoursHint">

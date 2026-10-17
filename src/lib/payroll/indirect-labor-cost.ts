@@ -31,9 +31,7 @@ export function calculateIndirectLaborCostsForPeriod(
   const byPersonMonth = new Map(
     records.map((record) => [record.personId + ":" + record.month, record]),
   );
-  const schedules = new Map(
-    peopleCapacity.map((person) => [person.userId, person.weeklySchedule]),
-  );
+  const schedules = new Map(peopleCapacity.map((person) => [person.userId, person.weeklySchedule]));
   const buckets: Record<PlanningIndirectHours["category"], InternalBucket> = {
     SAV: { hours: 0, costCents: 0, complete: true },
     GENERAL: { hours: 0, costCents: 0, complete: true },
@@ -64,9 +62,7 @@ export function calculateIndirectLaborCostsForPeriod(
     savCostCents,
     generalCostCents,
     totalCostCents:
-      savCostCents === null || generalCostCents === null
-        ? null
-        : savCostCents + generalCostCents,
+      savCostCents === null || generalCostCents === null ? null : savCostCents + generalCostCents,
   };
 }
 

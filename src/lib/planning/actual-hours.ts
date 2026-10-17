@@ -58,7 +58,11 @@ export const indirectHoursRowSchema = z.object({
 
 export type IndirectHoursRowInput = z.infer<typeof indirectHoursRowSchema>;
 
-export function assertCombinedPersonWeekLimit(payload: PlanningPayload, userId: string, week: string): void {
+export function assertCombinedPersonWeekLimit(
+  payload: PlanningPayload,
+  userId: string,
+  week: string,
+): void {
   const direct = payload.actualHours
     .filter((row) => row.userId === userId && row.week === week)
     .reduce((sum, row) => sum + row.hours, 0);

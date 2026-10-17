@@ -2,7 +2,10 @@ import { NextResponse } from "next/server";
 import { hasModuleAccess, requireSpecialPermission } from "@/lib/auth/permissions";
 import { createCommercialRepository } from "@/lib/commercial/create-repository";
 import { calculateDashboardSoldSummary } from "@/lib/dashboard/sold-summary";
-import { calculateIndicativeCompanyMarginCents, calculateIndirectLaborCostsForPeriod } from "@/lib/payroll/indirect-labor-cost";
+import {
+  calculateIndicativeCompanyMarginCents,
+  calculateIndirectLaborCostsForPeriod,
+} from "@/lib/payroll/indirect-labor-cost";
 import { readMonthlyLaborCosts } from "@/lib/payroll/monthly-labor-costs-repository";
 import { createPlanningRepository } from "@/lib/planning/create-repository";
 import {
@@ -32,19 +35,28 @@ export async function GET() {
     // Do not expose salary-derived SAV / overhead costs to users without Paie access.
     const canReadPayroll = await hasModuleAccess(context.user.id, "payroll", "READ");
     if (!canReadPayroll) {
-      return NextResponse.json({ ...sales, indirect: null }, {
-        headers: { "Cache-Control": "no-store" },
-      });
+      return NextResponse.json(
+        { ...sales, indirect: null },
+        {
+          headers: { "Cache-Control": "no-store" },
+        },
+      );
     }
     const [planning, payroll] = await Promise.all([
       createPlanningRepository().load(),
       readMonthlyLaborCosts(),
     ]);
     const yearly = calculateIndirectLaborCostsForPeriod(
-      sales.year, planning.indirectHours, payroll.records, planning.peopleCapacity,
+      sales.year,
+      planning.indirectHours,
+      payroll.records,
+      planning.peopleCapacity,
     );
     const monthly = calculateIndirectLaborCostsForPeriod(
-      sales.month, planning.indirectHours, payroll.records, planning.peopleCapacity,
+      sales.month,
+      planning.indirectHours,
+      payroll.records,
+      planning.peopleCapacity,
     );
     return NextResponse.json(
       {
@@ -53,10 +65,12 @@ export async function GET() {
           yearly,
           monthly,
           indicativeYearlyMarginCents: calculateIndicativeCompanyMarginCents(
-            sales.yearly.plannedMarginCents, yearly,
+            sales.yearly.plannedMarginCents,
+            yearly,
           ),
           indicativeMonthlyMarginCents: calculateIndicativeCompanyMarginCents(
-            sales.monthly.plannedMarginCents, monthly,
+            sales.monthly.plannedMarginCents,
+            monthly,
           ),
         },
       },

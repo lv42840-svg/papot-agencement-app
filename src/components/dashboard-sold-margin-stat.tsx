@@ -91,8 +91,8 @@ export function DashboardSoldMarginStat() {
                 </div>
                 <small className="dashboardSoldWarning">
                   La marge indicative déduit SAV et frais généraux valorisés de la marge
-                  prévisionnelle des affaires confirmées. Ce n’est pas le résultat réel :
-                  factures, achats et autres charges manquent.
+                  prévisionnelle des affaires confirmées. Ce n’est pas le résultat réel : factures,
+                  achats et autres charges manquent.
                 </small>
               </>
             ) : (
@@ -104,8 +104,8 @@ export function DashboardSoldMarginStat() {
           </>
         ) : null}
         <small className="dashboardSoldWarning">
-          Commandes confirmées HT, pas CA facturé. Les coûts SAV et frais généraux ne
-          diminuent jamais la rentabilité d’un chantier.
+          Commandes confirmées HT, pas CA facturé. Les coûts SAV et frais généraux ne diminuent
+          jamais la rentabilité d’un chantier.
         </small>
       </div>
       <style jsx>{`
