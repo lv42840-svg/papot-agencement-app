@@ -4,6 +4,7 @@ import { hasEffectiveSpecialPermission, requireSpecialPermission } from "@/lib/a
 import { readAuthPayload } from "@/lib/auth/store";
 import { createChantiersRepository } from "@/lib/chantiers/create-repository";
 import { createCommercialRepository } from "@/lib/commercial/create-repository";
+import { createQuotesRepository } from "@/lib/quotes/create-repository";
 import { isCommercialActive } from "@/lib/commercial/domain";
 import {
   desktopRequestErrorStatus,
@@ -93,18 +94,19 @@ async function snapshot(
   user: { id: string },
   context: Awaited<ReturnType<typeof requireModuleRequestContext>>,
 ) {
-  const [planning, chantiers, commercial, auth, canEditMacro, canManageSchedules] =
+  const [planning, chantiers, commercial, quotes, auth, canEditMacro, canManageSchedules] =
     await Promise.all([
       createPlanningRepository().load(),
       createChantiersRepository(context).load(),
       createCommercialRepository().load(),
+      createQuotesRepository().load(),
       readAuthPayload(),
       hasEffectiveSpecialPermission(user, "planning.edit_macro"),
       hasEffectiveSpecialPermission(user, "planning.manage_schedules"),
     ]);
   const weeks = planningYearWeekIdsRange(year, endYear);
   const rows = buildFirmGrandPlanningRows(chantiers, planning, year, endYear);
-  const provisionalRows = buildCommercialProvisionRows(commercial, planning, year, endYear);
+  const provisionalRows = buildCommercialProvisionRows(commercial, planning, year, endYear, quotes.quotes);
   const firmLoadByWeek = new Map<string, number>();
   const provisionalLoadByWeek = new Map<string, number>();
 
