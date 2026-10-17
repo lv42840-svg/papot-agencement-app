@@ -5,55 +5,53 @@ const apiSource = readFileSync(
   new URL("../src/app/api/desktop/planning/route.ts", import.meta.url),
   "utf-8",
 );
-const uiSource = readFileSync(
+const workspaceSource = readFileSync(
   new URL("../src/components/grand-planning-workspace.tsx", import.meta.url),
+  "utf-8",
+);
+const gridSource = readFileSync(
+  new URL("../src/components/planning-excel-grid.tsx", import.meta.url),
   "utf-8",
 );
 
 describe("grand planning commercial provision bridge", () => {
-  it("loads commercial provisions into the planning snapshot without storing totals in planning", () => {
+  it("loads provisional cases and retains firm versus provisional fields", () => {
     expect(apiSource).toContain("createCommercialRepository().load()");
     expect(apiSource).toContain("buildCommercialProvisionRows(commercial, planning, year)");
     expect(apiSource).toContain("provisionalRows");
   });
 
-  it("shows a separate unallocated provision panel and keeps it distinct from firm load", () => {
-    expect(uiSource).toContain("Charges commerciales à répartir");
-    expect(uiSource).toContain("Affaires non confirmées");
-    expect(uiSource).toContain("Ces heures ne sont pas comptées dans la charge ferme.");
-    expect(uiSource).toContain("provisionalUnallocated");
-    expect(uiSource).toContain("activity.remainingHours");
+  it("keeps the unallocated provisional section separate from firm work", () => {
+    expect(workspaceSource).toContain("Charges commerciales à répartir");
+    expect(workspaceSource).toContain("Ces heures ne sont pas comptées dans la charge ferme.");
+    expect(workspaceSource).toContain("provisionalUnallocated");
   });
 
-  it("shows separate weekly firm and provisional availability indicators", () => {
+  it("displays distinct firm and provisional capacity indicators", () => {
     expect(apiSource).toContain("provisionalLoadByWeek");
-    expect(uiSource).toContain("provisionalLoadHours");
-    expect(uiSource).toContain("availableWithProvisionHours");
-    expect(uiSource).toContain("Ferme");
-    expect(uiSource).toContain("Prov.");
-    expect(uiSource).toContain("Dispo F");
-    expect(uiSource).toContain("Dispo +P");
+    expect(gridSource).toContain("firmAvailableHours");
+    expect(gridSource).toContain("availableWithProvisionHours");
+    expect(gridSource).toContain("Disponible ferme");
+    expect(gridSource).toContain("Disponible avec potentiel");
   });
 
-  it("separates firm work from the potential block explicitly", () => {
-    expect(uiSource).toContain("planningPotentialDivider");
-    expect(uiSource).toContain("POTENTIEL");
-    expect(uiSource).toContain("snapshot.provisionalRows.length > 0");
+  it("keeps potential affairs visibly separated, with collapsible rows", () => {
+    expect(gridSource).toContain("excelPotentialDivider");
+    expect(gridSource).toContain("CHARGES PROVISIONNELLES");
+    expect(gridSource).toContain("!potentialCollapsed && snapshot.provisionalRows.map");
   });
 
-  it("allows authorized users to reorder potential affairs inside their shared block", () => {
+  it("allows authorized reordering of provisioned cases", () => {
     expect(apiSource).toContain('input.action === "setPotentialOrder"');
-    expect(uiSource).toContain('action: "setPotentialOrder"');
-    expect(uiSource).toContain("movePotential");
-    expect(uiSource).toContain("Monter ${item.name} dans le potentiel");
-    expect(uiSource).toContain("Descendre ${item.name} dans le potentiel");
+    expect(workspaceSource).toContain('action: "setPotentialOrder"');
+    expect(gridSource).toContain("onMoveProvision(item.caseId, -1)");
+    expect(gridSource).toContain("onMoveProvision(item.caseId, 1)");
   });
 
-  it("edits provisional hours in the same annual table with a lighter visual treatment", () => {
+  it("edits provisional hours in the same Excel grid with a lighter visual treatment", () => {
     expect(apiSource).toContain('input.action === "setProvisionHours"');
-    expect(uiSource).toContain('action: "setProvisionHours"');
-    expect(uiSource).toContain("planningProvisionRow");
-    expect(uiSource).toContain("planningProvisionCaseCell");
-    expect(uiSource).toContain("Provisionnel · {item.statusLabel}");
+    expect(workspaceSource).toContain('action: "setProvisionHours"');
+    expect(gridSource).toContain('hoursInput("provisional"');
+    expect(workspaceSource).toContain(".excelProvisionalRow .excelWeekCell");
   });
 });
