@@ -79,9 +79,7 @@ export function BillingWorkspace({
   }
   const cumulativeLinesCents = (active?.lines ?? []).reduce((sum, line) => {
     const percent = Number((lineValues[line.lineId] ?? "0").replace(",", "."));
-    return sum + (Number.isFinite(percent)
-      ? Math.round((line.amountHtCents * percent) / 100)
-      : 0);
+    return sum + (Number.isFinite(percent) ? Math.round((line.amountHtCents * percent) / 100) : 0);
   }, 0);
   async function write(body: Record<string, unknown>, success: string) {
     setBusy(true);
@@ -126,8 +124,10 @@ export function BillingWorkspace({
         lineId: line.lineId,
         percent: Number((lineValues[line.lineId] ?? "").replace(",", ".")),
       }));
-      if (rows.length === 0 || rows.some((row) =>
-        !Number.isFinite(row.percent) || row.percent < 0 || row.percent > 100)) {
+      if (
+        rows.length === 0 ||
+        rows.some((row) => !Number.isFinite(row.percent) || row.percent < 0 || row.percent > 100)
+      ) {
         setError("Renseigne un avancement entre 0 et 100 % pour chaque ligne.");
         return;
       }
@@ -253,16 +253,21 @@ export function BillingWorkspace({
                   )}
                   {type === "PROGRESS" && mode === "LINES" && active?.lines?.length ? (
                     <div style={{ display: "grid", gap: 9 }}>
-                      <p>Indique l'avancement <strong>cumulé</strong> de chaque ligne.
-                        PAPOT soustraira les projets précédents, y compris les acomptes.</p>
+                      <p>
+                        Indique l'avancement <strong>cumulé</strong> de chaque ligne. PAPOT
+                        soustraira les projets précédents, y compris les acomptes.
+                      </p>
                       <div style={{ overflowX: "auto" }}>
                         <table style={{ width: "100%", borderCollapse: "collapse", minWidth: 550 }}>
-                          <thead><tr>
-                            <th style={{ textAlign: "left" }}>Ligne du devis</th>
-                            <th>Montant HT</th><th>Avancement précédent</th>
-                            <th>Nouvel avancement %</th>
-                            <th>Cumul HT</th>
-                          </tr></thead>
+                          <thead>
+                            <tr>
+                              <th style={{ textAlign: "left" }}>Ligne du devis</th>
+                              <th>Montant HT</th>
+                              <th>Avancement précédent</th>
+                              <th>Nouvel avancement %</th>
+                              <th>Cumul HT</th>
+                            </tr>
+                          </thead>
                           <tbody>
                             {active.lines.map((line) => {
                               const previous = Number(previousPercents(active)[line.lineId] ?? "0");
@@ -273,29 +278,45 @@ export function BillingWorkspace({
                                 : 0;
                               return (
                                 <tr key={line.lineId}>
-                                  <td style={{ padding: 8, borderBottom: "1px solid #eee" }}>{line.description}</td>
-                                  <td style={{ textAlign: "right", padding: 8 }}>{money(line.amountHtCents)}</td>
+                                  <td style={{ padding: 8, borderBottom: "1px solid #eee" }}>
+                                    {line.description}
+                                  </td>
+                                  <td style={{ textAlign: "right", padding: 8 }}>
+                                    {money(line.amountHtCents)}
+                                  </td>
                                   <td style={{ textAlign: "center", padding: 8 }}>{previous} %</td>
                                   <td style={{ textAlign: "center", padding: 8 }}>
-                                    <input aria-label={`Avancement ${line.description}`}
+                                    <input
+                                      aria-label={`Avancement ${line.description}`}
                                       style={{ maxWidth: 95, padding: 8 }}
-                                      inputMode="decimal" value={entered}
-                                      onChange={(e) => setLineValues((current) => ({
-                                        ...current, [line.lineId]: e.target.value,
-                                      }))} />
+                                      inputMode="decimal"
+                                      value={entered}
+                                      onChange={(e) =>
+                                        setLineValues((current) => ({
+                                          ...current,
+                                          [line.lineId]: e.target.value,
+                                        }))
+                                      }
+                                    />
                                   </td>
-                                  <td style={{ textAlign: "right", padding: 8 }}>{money(cumulative)}</td>
+                                  <td style={{ textAlign: "right", padding: 8 }}>
+                                    {money(cumulative)}
+                                  </td>
                                 </tr>
                               );
                             })}
                           </tbody>
                         </table>
                       </div>
-                      <p><strong>Avancement cumulé : {money(cumulativeLinesCents)} HT.</strong>
-                        {" "}Déjà préparé : {money(used)} HT.
-                        {" "}Projet complémentaire estimé : {money(cumulativeLinesCents - used)} HT.</p>
-                      <small>Les retours en arrière et les répartitions de TVA incompatibles
-                        avec les acomptes antérieurs sont bloqués.</small>
+                      <p>
+                        <strong>Avancement cumulé : {money(cumulativeLinesCents)} HT.</strong> Déjà
+                        préparé : {money(used)} HT. Projet complémentaire estimé :{" "}
+                        {money(cumulativeLinesCents - used)} HT.
+                      </p>
+                      <small>
+                        Les retours en arrière et les répartitions de TVA incompatibles avec les
+                        acomptes antérieurs sont bloqués.
+                      </small>
                     </div>
                   ) : null}
                 </>
@@ -349,8 +370,10 @@ export function BillingWorkspace({
                     <ul>
                       {d.lineProgress.map((row) => (
                         <li key={row.lineId}>
-                          {d.lines?.find((line) => line.lineId === row.lineId)?.description ?? "Ligne"}
-                          {" : "}{row.percent} % · {money(row.cumulativeHtCents)} HT cumulés
+                          {d.lines?.find((line) => line.lineId === row.lineId)?.description ??
+                            "Ligne"}
+                          {" : "}
+                          {row.percent} % · {money(row.cumulativeHtCents)} HT cumulés
                         </li>
                       ))}
                     </ul>

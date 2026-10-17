@@ -98,7 +98,8 @@ function assertSource(source: BillingSource): BillingSource {
       throw new Error("BILLING_SOURCE_LINES_DUPLICATE");
     }
     for (const group of valid.contractTaxGroups) {
-      const fromLines = valid.lines.filter((line) => line.vatRatePercent === group.ratePercent)
+      const fromLines = valid.lines
+        .filter((line) => line.vatRatePercent === group.ratePercent)
         .reduce((sum, line) => sum + line.amountHtCents, 0);
       if (fromLines !== group.baseHtCents) throw new Error("BILLING_SOURCE_TAX_MISMATCH");
     }
@@ -191,33 +192,43 @@ export function createBillingDraft(
 ): BillingDraft {
   const validSource = assertSource(source);
   const alreadyPreparedCents = preparedHtCents(payload, source.quoteId);
-  if (input.linePercentages && (input.type !== "PROGRESS" ||
-    input.amountHtCents !== undefined || input.cumulativePercent !== undefined)) {
+  if (
+    input.linePercentages &&
+    (input.type !== "PROGRESS" ||
+      input.amountHtCents !== undefined ||
+      input.cumulativePercent !== undefined)
+  ) {
     throw new Error("BILLING_PROGRESS_INPUT_CONFLICT");
   }
-  const hasLineHistory = payload.drafts.some((draft) =>
-    draft.quoteId === source.quoteId && draft.type === "PROGRESS" &&
-    Boolean(draft.lineProgress?.length));
+  const hasLineHistory = payload.drafts.some(
+    (draft) =>
+      draft.quoteId === source.quoteId &&
+      draft.type === "PROGRESS" &&
+      Boolean(draft.lineProgress?.length),
+  );
   if (hasLineHistory && input.type === "PROGRESS" && input.amountHtCents !== undefined) {
     throw new Error("BILLING_PROGRESS_AMOUNT_AFTER_LINES_FORBIDDEN");
   }
-  const linePercentages = input.type === "PROGRESS"
-    ? input.linePercentages ??
-      (input.cumulativePercent !== undefined && validSource.lines?.length
-        ? validSource.lines.map((line) => ({
-            lineId: line.lineId,
-            percent: input.cumulativePercent!,
-          }))
-        : null)
-    : null;
+  const linePercentages =
+    input.type === "PROGRESS"
+      ? (input.linePercentages ??
+        (input.cumulativePercent !== undefined && validSource.lines?.length
+          ? validSource.lines.map((line) => ({
+              lineId: line.lineId,
+              percent: input.cumulativePercent!,
+            }))
+          : null))
+      : null;
   const lineResult = linePercentages
     ? calculateLineProgress(payload, validSource, linePercentages)
     : null;
-  const amountHtCents = lineResult?.amountHtCents ?? resolveBillingAmount({
-    ...input,
-    contractHtCents: validSource.contractHtCents,
-    alreadyPreparedCents,
-  });
+  const amountHtCents =
+    lineResult?.amountHtCents ??
+    resolveBillingAmount({
+      ...input,
+      contractHtCents: validSource.contractHtCents,
+      alreadyPreparedCents,
+    });
   const tax = lineResult?.tax ?? distributeBillingTax(validSource.contractTaxGroups, amountHtCents);
   const typeLabel: Record<BillingType, string> = {
     STANDARD: "Facture classique",
@@ -274,8 +285,11 @@ export function updateBillingDraft(
   }
   if (amountHtCents !== draft.amountHtCents) {
     const draftIndex = payload.drafts.findIndex((item) => item.id === draftId);
-    if (payload.drafts.slice(draftIndex + 1).some((item) =>
-      item.quoteId === draft.quoteId && item.type === "PROGRESS")) {
+    if (
+      payload.drafts
+        .slice(draftIndex + 1)
+        .some((item) => item.quoteId === draft.quoteId && item.type === "PROGRESS")
+    ) {
       throw new Error("BILLING_DRAFT_HAS_DEPENDENTS");
     }
   }

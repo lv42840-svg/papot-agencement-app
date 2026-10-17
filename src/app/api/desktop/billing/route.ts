@@ -22,10 +22,17 @@ const billingMutationSchema = z.discriminatedUnion("action", [
       type: billingTypeSchema,
       amountHtCents: z.number().int().positive().safe().optional(),
       cumulativePercent: z.number().finite().gt(0).max(100).optional(),
-      linePercentages: z.array(z.object({
-        lineId: z.string().uuid(),
-        percent: z.number().finite().min(0).max(100),
-      }).strict()).max(1000).optional(),
+      linePercentages: z
+        .array(
+          z
+            .object({
+              lineId: z.string().uuid(),
+              percent: z.number().finite().min(0).max(100),
+            })
+            .strict(),
+        )
+        .max(1000)
+        .optional(),
     })
     .strict(),
   z
@@ -107,8 +114,11 @@ export async function POST(request: Request) {
         if (drafts[index].updatedAt !== input.expectedUpdatedAt) {
           throw new Error("BILLING_VERSION_CONFLICT");
         }
-        if (drafts.slice(index + 1).some((draft) =>
-          draft.quoteId === drafts[index].quoteId && draft.type === "PROGRESS")) {
+        if (
+          drafts
+            .slice(index + 1)
+            .some((draft) => draft.quoteId === drafts[index].quoteId && draft.type === "PROGRESS")
+        ) {
           throw new Error("BILLING_DRAFT_HAS_DEPENDENTS");
         }
         drafts.splice(index, 1);

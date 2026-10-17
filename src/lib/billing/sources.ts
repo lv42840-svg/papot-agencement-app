@@ -8,7 +8,12 @@ import { calculateQuoteAdjustedPricing } from "@/lib/quotes/adjustments";
 import { createQuotesRepository } from "@/lib/quotes/create-repository";
 import { quoteCanBeRetained } from "@/lib/quotes/retention";
 import type { NativeQuoteRecord } from "@/lib/quotes/store";
-import { billingSourceSchema, type BillingSource, type BillingTaxGroup, type BillingSourceLine } from "./domain";
+import {
+  billingSourceSchema,
+  type BillingSource,
+  type BillingTaxGroup,
+  type BillingSourceLine,
+} from "./domain";
 
 function quoteContractData(quote: NativeQuoteRecord): {
   taxGroups: BillingTaxGroup[];
@@ -29,8 +34,7 @@ function quoteContractData(quote: NativeQuoteRecord): {
     }));
   const byRate = new Map<number, number>();
   for (const line of lines) {
-    byRate.set(line.vatRatePercent,
-      (byRate.get(line.vatRatePercent) ?? 0) + line.amountHtCents);
+    byRate.set(line.vatRatePercent, (byRate.get(line.vatRatePercent) ?? 0) + line.amountHtCents);
   }
   const total = [...byRate.values()].reduce((sum, amount) => sum + amount, 0);
   if (total <= 0 || total !== price.totalSaleCents) {

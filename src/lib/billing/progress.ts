@@ -1,9 +1,4 @@
-import type {
-  BillingDraft,
-  BillingLineProgress,
-  BillingPayload,
-  BillingSource,
-} from "./domain";
+import type { BillingDraft, BillingLineProgress, BillingPayload, BillingSource } from "./domain";
 
 export type LineProgressInput = { lineId: string; percent: number };
 
@@ -28,8 +23,12 @@ export function calculateLineProgress(
 
   const inputById = new Map<string, number>();
   for (const row of percentages) {
-    if (inputById.has(row.lineId) ||
-        !Number.isFinite(row.percent) || row.percent < 0 || row.percent > 100) {
+    if (
+      inputById.has(row.lineId) ||
+      !Number.isFinite(row.percent) ||
+      row.percent < 0 ||
+      row.percent > 100
+    ) {
       throw new Error("BILLING_PROGRESS_PERCENT_INVALID");
     }
     inputById.set(row.lineId, row.percent);
