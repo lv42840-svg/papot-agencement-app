@@ -6,7 +6,7 @@ import {
   type CommercialStatus,
 } from "../commercial/domain";
 import type { ChantierRecord, ChantiersPayload } from "@/lib/chantiers/domain";
-import { effectiveCommercialForecastHours } from "@/lib/commercial/forecast-quotes";
+import { effectiveCommercialForecastHours } from "../commercial/forecast-quotes";
 import type { NativeQuoteRecord } from "@/lib/quotes/store";
 import { planningPersonCapacitySchema } from "./capacity";
 
