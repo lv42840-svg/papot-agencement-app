@@ -1,4 +1,4 @@
-import type { CommercialCase } from "@/lib/commercial/domain";
+import type { CommercialCase } from "./domain";
 import { calculateCommercialQuoteSummary } from "@/lib/quotes/commercial-summary";
 import type { NativeQuoteRecord } from "@/lib/quotes/store";
 
