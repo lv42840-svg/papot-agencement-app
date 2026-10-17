@@ -99,7 +99,16 @@ export function applyPlanningStaffMutation(
     // Existing account schedules and absences must never disappear after linking.
     const legacyCapacity = payload.peopleCapacity.find((entry) => entry.userId === accountId);
     const staffCapacity = payload.peopleCapacity.find((entry) => entry.userId === person.id);
-    if (legacyCapacity && staffCapacity) {
+    const untouchedNewStaffSchedule =
+      staffCapacity &&
+      !staffCapacity.countsInMacroCapacity &&
+      Object.entries(NEW_STAFF_WEEKLY_SCHEDULE).every(
+        ([day, hours]) =>
+          staffCapacity.weeklySchedule[
+            day as keyof typeof NEW_STAFF_WEEKLY_SCHEDULE
+          ] === hours,
+      );
+    if (legacyCapacity && staffCapacity && !untouchedNewStaffSchedule) {
       throw new Error("PLANNING_STAFF_CAPACITY_CONFLICT");
     }
     const staffAbsenceDays = new Set(
@@ -114,7 +123,15 @@ export function applyPlanningStaffMutation(
     )
       throw new Error("PLANNING_STAFF_ABSENCE_CONFLICT");
 
-    if (legacyCapacity) legacyCapacity.userId = person.id;
+    if (legacyCapacity && staffCapacity) {
+      // The newly created untouched default must not block association with
+      // an older account: move the existing account schedule to the staff ID.
+      staffCapacity.countsInMacroCapacity = legacyCapacity.countsInMacroCapacity;
+      staffCapacity.weeklySchedule = { ...legacyCapacity.weeklySchedule };
+      payload.peopleCapacity = payload.peopleCapacity.filter((entry) => entry !== legacyCapacity);
+    } else if (legacyCapacity) {
+      legacyCapacity.userId = person.id;
+    }
     for (const absence of payload.absences) {
       if (absence.userId === accountId) absence.userId = person.id;
     }
