@@ -47,6 +47,7 @@ type PlanningAbsence = {
 };
 type PlanningSnapshot = {
   year: number;
+  endYear: number;
   weeks: string[];
   rows: GrandPlanningChantierRow[];
   provisionalRows: GrandPlanningProvisionRow[];
@@ -103,6 +104,9 @@ export function GrandPlanningWorkspace({
   initialPotentialCollapsed: boolean;
 }) {
   const [snapshot, setSnapshot] = useState<PlanningSnapshot | null>(null);
+  const [loadingNextYear, setLoadingNextYear] = useState(false);
+  const [hiddenUnallocated, setHiddenUnallocated] = useState(false);
+  const [hiddenProvisional, setHiddenProvisional] = useState(false);
   const [activeTab, setActiveTab] = useState<"planning" | "personnel">("planning");
   const [message, setMessage] = useState("Chargement du planning…");
   const [drafts, setDrafts] = useState<Record<string, string>>({});
@@ -117,13 +121,36 @@ export function GrandPlanningWorkspace({
   const [potentialCollapsed, setPotentialCollapsed] = useState(initialPotentialCollapsed);
   const [potentialPreferenceSaving, setPotentialPreferenceSaving] = useState(false);
   const planningScrollerRef = useRef<HTMLDivElement | null>(null);
+  const scrolledToCurrentRef = useRef(false);
+  const extendingRef = useRef(false);
+  const restoreScrollRef = useRef<number | null>(null);
   const currentWeek = useMemo(() => isoWeekKey(new Date()), []);
+
+  useEffect(() => {
+    setHiddenUnallocated(window.sessionStorage.getItem("papot.planning.hide-unallocated") === "1");
+    setHiddenProvisional(window.sessionStorage.getItem("papot.planning.hide-provisional") === "1");
+  }, []);
+
+  function toggleUnallocated(hidden: boolean) {
+    setHiddenUnallocated(hidden);
+    if (hidden) window.sessionStorage.setItem("papot.planning.hide-unallocated", "1");
+    else window.sessionStorage.removeItem("papot.planning.hide-unallocated");
+  }
+
+  function toggleProvisional(hidden: boolean) {
+    setHiddenProvisional(hidden);
+    if (hidden) window.sessionStorage.setItem("papot.planning.hide-provisional", "1");
+    else window.sessionStorage.removeItem("papot.planning.hide-provisional");
+  }
 
   const load = useCallback(async () => {
     setMessage("Chargement du planning…");
-    const response = await fetch(`/api/desktop/planning?year=${initialYear}`, {
-      cache: "no-store",
-    });
+    const response = await fetch(
+      `/api/desktop/planning?year=${initialYear}&endYear=${Math.min(2100, initialYear + 1)}`,
+      {
+        cache: "no-store",
+      },
+    );
     const result = (await response.json()) as PlanningSnapshot & { error?: string };
     if (!response.ok) {
       setMessage(result.error ?? "Impossible de charger le planning.");
@@ -155,16 +182,61 @@ export function GrandPlanningWorkspace({
 
   useEffect(() => {
     const scroller = planningScrollerRef.current;
-    if (!snapshot || !scroller || !snapshot.weeks.includes(currentWeek)) return;
-
+    if (!snapshot || !scroller) return;
+    if (restoreScrollRef.current != null) {
+      scroller.scrollLeft = restoreScrollRef.current;
+      restoreScrollRef.current = null;
+      return;
+    }
+    if (scrolledToCurrentRef.current || !snapshot.weeks.includes(currentWeek)) return;
     const currentHeader = scroller.querySelector<HTMLElement>(
       `[data-planning-week="${currentWeek}"]`,
     );
     if (!currentHeader) return;
-
     const stickyColumnsWidth = 655;
     scroller.scrollLeft = Math.max(0, currentHeader.offsetLeft - stickyColumnsWidth - 12);
+    scrolledToCurrentRef.current = true;
   }, [currentWeek, snapshot]);
+
+  async function extendPlanning() {
+    if (!snapshot || extendingRef.current || snapshot.endYear >= 2100 || savingKey !== null) return;
+    extendingRef.current = true;
+    setLoadingNextYear(true);
+    const nextEndYear = snapshot.endYear + 1;
+    // Keep at most three years rendered; older years remain accessible via annual navigation.
+    const nextStartYear = Math.max(snapshot.year, nextEndYear - 2);
+    const removedWeeks = snapshot.weeks.filter(
+      (week) => Number(week.slice(0, 4)) < nextStartYear,
+    ).length;
+    const previousScrollLeft = planningScrollerRef.current?.scrollLeft ?? 0;
+    try {
+      const response = await fetch(
+        `/api/desktop/planning?year=${nextStartYear}&endYear=${nextEndYear}`,
+        { cache: "no-store" },
+      );
+      const result = (await response.json()) as PlanningSnapshot & { error?: string };
+      if (!response.ok) {
+        setMessage(result.error ?? "Impossible de charger la suite du planning.");
+        return;
+      }
+      restoreScrollRef.current = Math.max(0, previousScrollLeft - removedWeeks * 150);
+      setSnapshot(result);
+      setMessage("");
+    } catch {
+      setMessage("Impossible de charger la suite du planning.");
+    } finally {
+      extendingRef.current = false;
+      setLoadingNextYear(false);
+    }
+  }
+
+  function handlePlanningScroll() {
+    const scroller = planningScrollerRef.current;
+    if (!scroller || !snapshot || snapshot.endYear >= 2100) return;
+    if (scroller.scrollLeft + scroller.clientWidth >= scroller.scrollWidth - 450) {
+      void extendPlanning();
+    }
+  }
 
   function weekClassName(week: string) {
     const meta = weekMetaByWeek.get(week);
@@ -248,6 +320,7 @@ export function GrandPlanningWorkspace({
       body: JSON.stringify({
         action: "setPersonCapacity",
         year: snapshot.year,
+        endYear: snapshot.endYear,
         userId: person.userId,
         countsInMacroCapacity: person.countsInMacroCapacity,
         weeklySchedule: person.weeklySchedule,
@@ -426,6 +499,7 @@ export function GrandPlanningWorkspace({
       body: JSON.stringify({
         action: "setMacroHours",
         year: snapshot.year,
+        endYear: snapshot.endYear,
         chantierId,
         activity,
         week,
@@ -488,6 +562,7 @@ export function GrandPlanningWorkspace({
       body: JSON.stringify({
         action: "setProvisionHours",
         year: snapshot.year,
+        endYear: snapshot.endYear,
         caseId,
         activity,
         week,
@@ -517,7 +592,9 @@ export function GrandPlanningWorkspace({
       <div className="pageHeader grandPlanningHeader">
         <div>
           <p className="eyebrow">Planning</p>
-          <h1>Grand planning {initialYear}</h1>
+          <h1>
+            Grand planning {snapshot ? `${snapshot.year} → ${snapshot.endYear}` : initialYear}
+          </h1>
           <p className="muted">
             Charges fermes et provisionnelles · BE / Atelier / Pose · saisie directe par semaine
           </p>
@@ -551,7 +628,16 @@ export function GrandPlanningWorkspace({
 
       {activeTab === "planning" ? (
         <div className="planningUnallocatedArea">
-          {unallocated.length > 0 ? (
+          {unallocated.length > 0 && hiddenUnallocated ? (
+            <button
+              type="button"
+              className="secondaryButton planningReopenPanel"
+              onClick={() => toggleUnallocated(false)}
+            >
+              Afficher les charges à répartir
+            </button>
+          ) : null}
+          {unallocated.length > 0 && !hiddenUnallocated ? (
             <section className="planningUnallocatedPanel" aria-label="Heures à répartir">
               <div className="planningUnallocatedHeader">
                 <div>
@@ -573,6 +659,14 @@ export function GrandPlanningWorkspace({
                   h
                 </strong>
               </div>
+              <button
+                type="button"
+                className="planningDismissButton"
+                aria-label="Masquer les charges à répartir"
+                onClick={() => toggleUnallocated(true)}
+              >
+                ✕
+              </button>
               <div className="planningUnallocatedList">
                 {unallocated.map((chantier) => (
                   <div className="planningUnallocatedRow" key={chantier.chantierId}>
@@ -597,7 +691,16 @@ export function GrandPlanningWorkspace({
             </section>
           ) : null}
 
-          {provisionalUnallocated.length > 0 ? (
+          {provisionalUnallocated.length > 0 && hiddenProvisional ? (
+            <button
+              type="button"
+              className="secondaryButton planningReopenPanel"
+              onClick={() => toggleProvisional(false)}
+            >
+              Afficher les charges provisionnelles à répartir
+            </button>
+          ) : null}
+          {provisionalUnallocated.length > 0 && !hiddenProvisional ? (
             <section
               className="planningUnallocatedPanel planningProvisionUnallocatedPanel"
               aria-label="Charges provisionnelles à répartir"
@@ -625,6 +728,14 @@ export function GrandPlanningWorkspace({
                   h
                 </strong>
               </div>
+              <button
+                type="button"
+                className="planningDismissButton"
+                aria-label="Masquer les charges provisionnelles"
+                onClick={() => toggleProvisional(true)}
+              >
+                ✕
+              </button>
               <div className="planningUnallocatedList">
                 {provisionalUnallocated.map((item) => (
                   <div className="planningUnallocatedRow" key={item.caseId}>
@@ -914,30 +1025,49 @@ export function GrandPlanningWorkspace({
           {message ? <p className="planningMessage">{message}</p> : null}
 
           {snapshot ? (
-            <div className="grandPlanningScroller" ref={planningScrollerRef}>
-              <PlanningExcelGrid
-                snapshot={snapshot}
-                drafts={drafts}
-                savingKey={savingKey}
-                potentialCollapsed={potentialCollapsed}
-                potentialPreferenceSaving={potentialPreferenceSaving}
-                onDraftChange={(key, value) =>
-                  setDrafts((current) => ({ ...current, [key]: value }))
-                }
-                onDraftClear={(key) =>
-                  setDrafts((current) => {
-                    const next = { ...current };
-                    delete next[key];
-                    return next;
-                  })
-                }
-                onSaveFirm={saveCell}
-                onSaveProvision={saveProvisionalCell}
-                onMoveFirm={moveFirm}
-                onMoveProvision={movePotential}
-                onTogglePotential={togglePotentialCollapsed}
-              />
-            </div>
+            <>
+              <div
+                className="grandPlanningScroller"
+                ref={planningScrollerRef}
+                onScroll={handlePlanningScroll}
+              >
+                <PlanningExcelGrid
+                  snapshot={snapshot}
+                  drafts={drafts}
+                  savingKey={savingKey}
+                  potentialCollapsed={potentialCollapsed}
+                  potentialPreferenceSaving={potentialPreferenceSaving}
+                  onDraftChange={(key, value) =>
+                    setDrafts((current) => ({ ...current, [key]: value }))
+                  }
+                  onDraftClear={(key) =>
+                    setDrafts((current) => {
+                      const next = { ...current };
+                      delete next[key];
+                      return next;
+                    })
+                  }
+                  onSaveFirm={saveCell}
+                  onSaveProvision={saveProvisionalCell}
+                  onMoveFirm={moveFirm}
+                  onMoveProvision={movePotential}
+                  onTogglePotential={togglePotentialCollapsed}
+                />
+              </div>
+              {snapshot.endYear < 2100 ? (
+                <div className="planningLoadMore">
+                  <button
+                    type="button"
+                    className="secondaryButton"
+                    disabled={loadingNextYear || savingKey !== null}
+                    onClick={() => void extendPlanning()}
+                  >
+                    {loadingNextYear ? "Chargement…" : `Afficher ${snapshot.endYear + 1} →`}
+                  </button>
+                  <span>Le planning se prolonge en faisant défiler vers la droite.</span>
+                </div>
+              ) : null}
+            </>
           ) : null}
         </section>
       ) : null}
@@ -1229,6 +1359,40 @@ export function GrandPlanningWorkspace({
           }
         }
 
+        .planningDismissButton {
+          position: absolute;
+          top: 10px;
+          right: 12px;
+          border: 0;
+          border-radius: 5px;
+          background: transparent;
+          color: #876d4b;
+          padding: 3px 7px;
+          font-size: 18px;
+          font-weight: 800;
+        }
+        .planningDismissButton:hover {
+          background: rgb(120 90 40 / 0.08);
+        }
+        .planningUnallocatedPanel {
+          position: relative;
+        }
+        .planningUnallocatedHeader {
+          padding-right: 38px;
+        }
+        .planningReopenPanel {
+          margin-bottom: 14px;
+        }
+        .planningLoadMore {
+          display: flex;
+          flex-wrap: wrap;
+          align-items: center;
+          gap: 12px;
+          padding: 9px 14px;
+          color: var(--muted);
+          font-size: 11px;
+          border-top: 1px solid var(--border);
+        }
         .grandPlanningWorkspace {
           min-width: 0;
         }
