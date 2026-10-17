@@ -151,6 +151,7 @@ export type GrandPlanningActivityRow = {
   activity: PlanningActivity;
   label: string;
   plannedHours: number;
+  actualHours: number;
   allocatedHours: number;
   remainingHours: number;
   weeklyHours: Record<string, number>;
@@ -363,6 +364,7 @@ export function buildFirmGrandPlanningRows(
           activity,
           label: PLANNING_ACTIVITY_LABELS[activity],
           plannedHours,
+          actualHours: [...actualByWeek.values()].reduce((sum, hours) => sum + hours, 0),
           allocatedHours,
           remainingHours: plannedHours - allocatedHours,
           weeklyHours,
