@@ -22,6 +22,17 @@ const billingMutationSchema = z.discriminatedUnion("action", [
       type: billingTypeSchema,
       amountHtCents: z.number().int().positive().safe().optional(),
       cumulativePercent: z.number().finite().gt(0).max(100).optional(),
+      linePercentages: z
+        .array(
+          z
+            .object({
+              lineId: z.string().uuid(),
+              percent: z.number().finite().min(0).max(100),
+            })
+            .strict(),
+        )
+        .max(1000)
+        .optional(),
     })
     .strict(),
   z
@@ -54,7 +65,10 @@ function statusFor(code: string): number {
   if (
     code === "BILLING_VERSION_CONFLICT" ||
     code === "BILLING_AMOUNT_EXCEEDS_CONTRACT" ||
-    code === "BILLING_CONTRACT_ALREADY_PREPARED"
+    code === "BILLING_CONTRACT_ALREADY_PREPARED" ||
+    code === "BILLING_PROGRESS_CANNOT_DECREASE" ||
+    code === "BILLING_PROGRESS_TAX_ALLOCATION_UNAVAILABLE" ||
+    code === "BILLING_DRAFT_HAS_DEPENDENTS"
   )
     return 409;
   return 400;
@@ -99,6 +113,13 @@ export async function POST(request: Request) {
         if (index < 0) throw new Error("BILLING_DRAFT_NOT_FOUND");
         if (drafts[index].updatedAt !== input.expectedUpdatedAt) {
           throw new Error("BILLING_VERSION_CONFLICT");
+        }
+        if (
+          drafts
+            .slice(index + 1)
+            .some((draft) => draft.quoteId === drafts[index].quoteId && draft.type === "PROGRESS")
+        ) {
+          throw new Error("BILLING_DRAFT_HAS_DEPENDENTS");
         }
         drafts.splice(index, 1);
       }

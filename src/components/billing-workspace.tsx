@@ -33,7 +33,8 @@ export function BillingWorkspace({
   const [busy, setBusy] = useState(false);
   const [selection, setSelection] = useState(quoteId ?? "");
   const [type, setType] = useState<BillingType>("DEPOSIT");
-  const [mode, setMode] = useState<"AMOUNT" | "PERCENT">("AMOUNT");
+  const [mode, setMode] = useState<"AMOUNT" | "PERCENT" | "LINES">("AMOUNT");
+  const [lineValues, setLineValues] = useState<Record<string, string>>({});
   const [value, setValue] = useState("");
   const [edit, setEdit] = useState<BillingDraft | null>(null);
   const [label, setLabel] = useState("");
@@ -60,6 +61,26 @@ export function BillingWorkspace({
         .reduce((n, d) => n + d.amountHtCents, 0)
     : 0;
   const remaining = Math.max(0, (active?.contractHtCents ?? 0) - used);
+  function previousPercents(source: BillingSource): Record<string, string> {
+    const latest = (data?.payload.drafts ?? [])
+      .filter((draft) => draft.quoteId === source.quoteId && draft.type === "PROGRESS")
+      .sort((a, b) => a.createdAt.localeCompare(b.createdAt))
+      .at(-1);
+    return Object.fromEntries(
+      (source.lines ?? []).map((line) => [
+        line.lineId,
+        String(
+          latest?.lineProgress?.find((progress) => progress.lineId === line.lineId)?.percent ??
+            latest?.cumulativePercent ??
+            0,
+        ),
+      ]),
+    );
+  }
+  const cumulativeLinesCents = (active?.lines ?? []).reduce((sum, line) => {
+    const percent = Number((lineValues[line.lineId] ?? "0").replace(",", "."));
+    return sum + (Number.isFinite(percent) ? Math.round((line.amountHtCents * percent) / 100) : 0);
+  }, 0);
   async function write(body: Record<string, unknown>, success: string) {
     setBusy(true);
     setError("");
@@ -84,9 +105,10 @@ export function BillingWorkspace({
   }
   async function create() {
     if (!active) return;
+    const linesMode = type === "PROGRESS" && mode === "LINES";
     const percentMode = mode === "PERCENT" && (type === "PROGRESS" || type === "DEPOSIT");
     const numeric = percentMode ? Number(value.replace(",", ".")) : parseMoney(value);
-    if (type !== "STANDARD" && type !== "FINAL" && !Number.isFinite(numeric)) {
+    if (!linesMode && type !== "STANDARD" && type !== "FINAL" && !Number.isFinite(numeric)) {
       setError("Montant invalide.");
       return;
     }
@@ -97,7 +119,20 @@ export function BillingWorkspace({
       chantierId: active.chantierId,
       type,
     };
-    if (percentMode) payload.cumulativePercent = numeric;
+    if (linesMode) {
+      const rows = (active.lines ?? []).map((line) => ({
+        lineId: line.lineId,
+        percent: Number((lineValues[line.lineId] ?? "").replace(",", ".")),
+      }));
+      if (
+        rows.length === 0 ||
+        rows.some((row) => !Number.isFinite(row.percent) || row.percent < 0 || row.percent > 100)
+      ) {
+        setError("Renseigne un avancement entre 0 et 100 % pour chaque ligne.");
+        return;
+      }
+      payload.linePercentages = rows;
+    } else if (percentMode) payload.cumulativePercent = numeric;
     else if (type !== "STANDARD" && type !== "FINAL") payload.amountHtCents = numeric;
     if (await write(payload, "Projet enregistré. Aucune facture officielle émise.")) setValue("");
   }
@@ -146,7 +181,11 @@ export function BillingWorkspace({
                 <select
                   style={{ width: "100%", padding: 9 }}
                   value={active?.quoteId ?? ""}
-                  onChange={(e) => setSelection(e.target.value)}
+                  onChange={(e) => {
+                    setSelection(e.target.value);
+                    const source = sources.find((item) => item.quoteId === e.target.value);
+                    if (source) setLineValues(previousPercents(source));
+                  }}
                 >
                   {sources.map((s) => (
                     <option key={s.quoteId} value={s.quoteId}>
@@ -164,7 +203,10 @@ export function BillingWorkspace({
                 <select
                   style={{ padding: 9 }}
                   value={type}
-                  onChange={(e) => setType(e.target.value as BillingType)}
+                  onChange={(e) => {
+                    setType(e.target.value as BillingType);
+                    setMode("AMOUNT");
+                  }}
                 >
                   {options.map((o) => (
                     <option key={o.value} value={o.value}>
@@ -180,24 +222,103 @@ export function BillingWorkspace({
                     <select
                       style={{ padding: 9 }}
                       value={mode}
-                      onChange={(e) => setMode(e.target.value as "AMOUNT" | "PERCENT")}
+                      onChange={(e) => {
+                        const next = e.target.value as "AMOUNT" | "PERCENT" | "LINES";
+                        setMode(next);
+                        if (next === "LINES" && active) {
+                          setLineValues(previousPercents(active));
+                        }
+                      }}
                     >
                       <option value="AMOUNT">Montant HT en €</option>
                       <option value="PERCENT">
-                        {type === "PROGRESS" ? "Avancement cumulé %" : "Acompte %"}
+                        {type === "PROGRESS" ? "Avancement global cumulé %" : "Acompte %"}
                       </option>
+                      {type === "PROGRESS" && (active?.lines?.length ?? 0) > 0 ? (
+                        <option value="LINES">Avancement par ligne (%)</option>
+                      ) : null}
                     </select>
                   </label>
-                  <label>
-                    {mode === "PERCENT" ? "Pourcentage" : "Montant HT"}{" "}
-                    <input
-                      style={{ padding: 9 }}
-                      inputMode="decimal"
-                      value={value}
-                      onChange={(e) => setValue(e.target.value)}
-                      placeholder={mode === "PERCENT" ? "30" : "2500,00"}
-                    />
-                  </label>
+                  {mode !== "LINES" && (
+                    <label>
+                      {mode === "PERCENT" ? "Pourcentage" : "Montant HT"}{" "}
+                      <input
+                        style={{ padding: 9 }}
+                        inputMode="decimal"
+                        value={value}
+                        onChange={(e) => setValue(e.target.value)}
+                        placeholder={mode === "PERCENT" ? "30" : "2500,00"}
+                      />
+                    </label>
+                  )}
+                  {type === "PROGRESS" && mode === "LINES" && active?.lines?.length ? (
+                    <div style={{ display: "grid", gap: 9 }}>
+                      <p>
+                        Indique l&apos;avancement <strong>cumulé</strong> de chaque ligne. PAPOT
+                        soustraira les projets précédents, y compris les acomptes.
+                      </p>
+                      <div style={{ overflowX: "auto" }}>
+                        <table style={{ width: "100%", borderCollapse: "collapse", minWidth: 550 }}>
+                          <thead>
+                            <tr>
+                              <th style={{ textAlign: "left" }}>Ligne du devis</th>
+                              <th>Montant HT</th>
+                              <th>Avancement précédent</th>
+                              <th>Nouvel avancement %</th>
+                              <th>Cumul HT</th>
+                            </tr>
+                          </thead>
+                          <tbody>
+                            {active.lines.map((line) => {
+                              const previous = Number(previousPercents(active)[line.lineId] ?? "0");
+                              const entered = lineValues[line.lineId] ?? String(previous);
+                              const percent = Number(entered.replace(",", "."));
+                              const cumulative = Number.isFinite(percent)
+                                ? Math.round((line.amountHtCents * percent) / 100)
+                                : 0;
+                              return (
+                                <tr key={line.lineId}>
+                                  <td style={{ padding: 8, borderBottom: "1px solid #eee" }}>
+                                    {line.description}
+                                  </td>
+                                  <td style={{ textAlign: "right", padding: 8 }}>
+                                    {money(line.amountHtCents)}
+                                  </td>
+                                  <td style={{ textAlign: "center", padding: 8 }}>{previous} %</td>
+                                  <td style={{ textAlign: "center", padding: 8 }}>
+                                    <input
+                                      aria-label={`Avancement ${line.description}`}
+                                      style={{ maxWidth: 95, padding: 8 }}
+                                      inputMode="decimal"
+                                      value={entered}
+                                      onChange={(e) =>
+                                        setLineValues((current) => ({
+                                          ...current,
+                                          [line.lineId]: e.target.value,
+                                        }))
+                                      }
+                                    />
+                                  </td>
+                                  <td style={{ textAlign: "right", padding: 8 }}>
+                                    {money(cumulative)}
+                                  </td>
+                                </tr>
+                              );
+                            })}
+                          </tbody>
+                        </table>
+                      </div>
+                      <p>
+                        <strong>Avancement cumulé : {money(cumulativeLinesCents)} HT.</strong> Déjà
+                        préparé : {money(used)} HT. Projet complémentaire estimé :{" "}
+                        {money(cumulativeLinesCents - used)} HT.
+                      </p>
+                      <small>
+                        Les retours en arrière et les répartitions de TVA incompatibles avec les
+                        acomptes antérieurs sont bloqués.
+                      </small>
+                    </div>
+                  ) : null}
                 </>
               ) : (
                 <p>Le projet sera égal au montant disponible : {money(remaining)} HT.</p>
@@ -243,6 +364,21 @@ export function BillingWorkspace({
                   <b>HT : {money(d.amountHtCents)}</b> · TVA : {money(d.vatCents)} ·{" "}
                   <b>TTC : {money(d.totalTtcCents)}</b>
                 </p>
+                {d.lineProgress?.length ? (
+                  <details>
+                    <summary>Avancement cumulé par ligne</summary>
+                    <ul>
+                      {d.lineProgress.map((row) => (
+                        <li key={row.lineId}>
+                          {d.lines?.find((line) => line.lineId === row.lineId)?.description ??
+                            "Ligne"}
+                          {" : "}
+                          {row.percent} % · {money(row.cumulativeHtCents)} HT cumulés
+                        </li>
+                      ))}
+                    </ul>
+                  </details>
+                ) : null}
                 {edit?.id === d.id ? (
                   <div style={{ display: "grid", gap: 8 }}>
                     <label>
