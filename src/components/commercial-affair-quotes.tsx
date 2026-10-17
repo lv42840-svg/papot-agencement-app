@@ -3,7 +3,8 @@
 import Link from "next/link";
 import { FilePlus2, FileText, RefreshCw } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
-import type { CommercialCase } from "@/lib/commercial/domain";
+import { isCommercialClosed, type CommercialCase } from "@/lib/commercial/domain";
+import { effectiveCommercialForecastHours } from "@/lib/commercial/forecast-quotes";
 import {
   COMMERCIAL_QUOTE_STATUS_LABELS,
   commercialQuoteDisplayStatus,
@@ -59,7 +60,12 @@ function statusTone(status: CommercialQuoteDisplayStatus): string {
   return "draft";
 }
 
-export function CommercialAffairQuotes({ item }: { item: CommercialCase }) {
+export function CommercialAffairQuotes({ item, busy, canProvision, mutate }: {
+  item: CommercialCase;
+  busy: boolean;
+  canProvision: boolean;
+  mutate: (body: Record<string, unknown> & { action: string }, success: string) => Promise<unknown>;
+}) {
   const [payload, setPayload] = useState<NativeQuotesPayload | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
@@ -112,6 +118,21 @@ export function CommercialAffairQuotes({ item }: { item: CommercialCase }) {
     [quotes],
   );
   const retainedIds = useMemo(() => new Set(item.retainedQuoteIds), [item.retainedQuoteIds]);
+  const forecastIds = useMemo(() => new Set(item.forecastQuoteIds ?? []), [item.forecastQuoteIds]);
+  const forecastHours = useMemo(() => effectiveCommercialForecastHours(item, quotes), [item, quotes]);
+  const forecastLocked = !canProvision || busy || isCommercialClosed(item) || item.status === "CONFIRMED";
+
+  async function toggleForecastQuote(quoteId: string, checked: boolean) {
+    if (forecastLocked) return;
+    const ids = new Set(item.forecastQuoteIds ?? []);
+    if (checked) ids.add(quoteId);
+    else ids.delete(quoteId);
+    await mutate(
+      { action: "setForecastQuotes", caseId: item.id, quoteIds: [...ids] },
+      "Sélection des devis prévisionnels enregistrée.",
+    );
+  }
+
   const contract = useMemo(
     () => calculateCommercialContractSummary(quotes, item.retainedQuoteIds),
     [item.retainedQuoteIds, quotes],
@@ -215,15 +236,50 @@ export function CommercialAffairQuotes({ item }: { item: CommercialCase }) {
             </div>
           )}
 
+          {item.status !== "CONFIRMED" && !isCommercialClosed(item) ? (
+            <div className="commercialAffairForecastOverview" aria-label="Heures du planning prévisionnel">
+              <div>
+                <strong>Devis comptés dans le prévisionnel</strong>
+                <span>
+                  {item.forecastQuoteIds == null
+                    ? "Charge manuelle actuelle : coche un devis pour utiliser ses heures."
+                    : `${forecastIds.size} devis coché(s) · les autres sont exclus.`}
+                </span>
+              </div>
+              <strong>
+                BE {hoursLabel(forecastHours.be)} · Atelier {hoursLabel(forecastHours.workshop)} · Pose {hoursLabel(forecastHours.install)}
+              </strong>
+              {item.forecastQuoteIds != null && canProvision ? (
+                <button type="button" className="commercialForecastManualButton" disabled={busy}
+                  onClick={() => void mutate(
+                    { action: "useManualProvision", caseId: item.id },
+                    "Retour à la charge prévisionnelle manuelle.",
+                  )}>
+                  Revenir aux heures manuelles
+                </button>
+              ) : null}
+            </div>
+          ) : null}
+
           <div className="commercialAffairQuotesList">
             {quotes.map((quote) => {
               const displayStatus = commercialQuoteDisplayStatus(quote.status, quote.followUpDate);
               const summary = calculateCommercialQuoteSummary(quote);
               return (
-                <button
-                  type="button"
-                  key={quote.id}
-                  className="commercialAffairQuoteRow"
+                <div key={quote.id} className="commercialAffairQuoteEntry">
+                  {item.status !== "CONFIRMED" && !isCommercialClosed(item) ? (
+                    <label className="commercialForecastToggle">
+                      <input
+                        type="checkbox"
+                        aria-label={`Compter le devis ${quote.variantName} V${quote.version} dans le prévisionnel`}
+                        checked={forecastIds.has(quote.id)}
+                        disabled={forecastLocked}
+                        onChange={(event) => void toggleForecastQuote(quote.id, event.target.checked)}
+                      />
+                      <span>Prévisionnel</span>
+                    </label>
+                  ) : null}
+                  <button type="button" className="commercialAffairQuoteRow"
                   onDoubleClick={() => window.location.assign(quoteEditorHref(quote.id))}
                   onKeyDown={(event) => {
                     if (event.key === "Enter") window.location.assign(quoteEditorHref(quote.id));
@@ -280,6 +336,7 @@ export function CommercialAffairQuotes({ item }: { item: CommercialCase }) {
                     </span>
                   </div>
                 </button>
+                </div>
               );
             })}
           </div>
@@ -424,6 +481,57 @@ export function CommercialAffairQuotes({ item }: { item: CommercialCase }) {
           color: #756b82;
           font-size: 9px;
         }
+        .commercialAffairQuoteEntry {
+          display: flex;
+          align-items: stretch;
+          border-bottom: 1px solid #eeeaf2;
+        }
+        .commercialForecastToggle {
+          display: flex;
+          min-width: 104px;
+          align-items: center;
+          gap: 6px;
+          padding: 8px 10px;
+          background: #f6f2ff;
+          color: #57409a;
+          font-size: 9px;
+          font-weight: 800;
+          cursor: pointer;
+        }
+        .commercialForecastToggle input {
+          width: 15px;
+          height: 15px;
+          flex: 0 0 auto;
+          accent-color: #7765cc;
+        }
+        .commercialAffairForecastOverview {
+          display: flex;
+          flex-wrap: wrap;
+          align-items: center;
+          gap: 12px;
+          margin-bottom: 8px;
+          border: 1px solid #dcd3f5;
+          border-radius: 8px;
+          background: #f7f3ff;
+          padding: 10px;
+          color: #4e4090;
+          font-size: 10px;
+        }
+        .commercialAffairForecastOverview > div {
+          display: grid;
+          gap: 4px;
+        }
+        .commercialAffairForecastOverview > div span {
+          color: #74698c;
+          font-size: 9px;
+        }
+        .commercialForecastManualButton {
+          border: 1px solid #b6a9da;
+          border-radius: 5px;
+          padding: 6px;
+          background: white;
+          font-size: 9px;
+        }
         .commercialAffairQuotesList {
           display: grid;
           border: 1px solid #ebe6f0;
@@ -436,7 +544,7 @@ export function CommercialAffairQuotes({ item }: { item: CommercialCase }) {
           min-height: 56px;
           padding: 9px 10px;
           border: 0;
-          border-bottom: 1px solid #eeeaf2;
+          border-bottom: 0;
           border-radius: 0;
           background: white;
           color: inherit;
@@ -567,6 +675,9 @@ export function CommercialAffairQuotes({ item }: { item: CommercialCase }) {
           }
           .commercialAffairQuotesOverview > p {
             grid-column: 1 / -1;
+          }
+          .commercialAffairQuoteEntry {
+            flex-direction: column;
           }
           .commercialAffairQuoteRow {
             grid-template-columns: 1fr;
