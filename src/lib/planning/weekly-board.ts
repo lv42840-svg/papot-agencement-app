@@ -89,6 +89,52 @@ export const weeklyBoardEntrySchema = z.discriminatedUnion("action", [
 
 export type WeeklyBoardEntryInput = z.infer<typeof weeklyBoardEntrySchema>;
 
+export const weeklyBoardPasteSchema = z.object({
+  action: z.literal("pasteDailyEntries"),
+  week: weeklyBoardWeekSchema,
+  userId: z.string().uuid(),
+  date: z.string().regex(/^\d{4}-\d{2}-\d{2}$/),
+  entries: z.array(z.object({
+    label: z.string().trim().min(1).max(160),
+    activity: planningDailyActivitySchema,
+  })).min(1).max(20),
+});
+export type WeeklyBoardPasteInput = z.infer<typeof weeklyBoardPasteSchema>;
+
+export function applyWeeklyBoardPaste(
+  source: PlanningPayload,
+  input: WeeklyBoardPasteInput,
+  activePersonIds: ReadonlySet<string>,
+  sites: readonly { id: string; name: string }[],
+): PlanningPayload {
+  weeklyBoardPasteSchema.parse(input);
+  if (!activePersonIds.has(input.userId)) throw new Error("PLANNING_USER_NOT_ACTIVE");
+  if (!workingDaysOfWeek(input.week).includes(input.date)) {
+    throw new Error("PLANNING_DAY_OUTSIDE_WEEK");
+  }
+  const payload = structuredClone(parsePlanningPayload(source));
+  const existing = payload.dailyAssignments.filter(
+    (row) => row.userId === input.userId && row.date === input.date,
+  ).length;
+  if (existing + input.entries.length > 20) throw new Error("PLANNING_DAILY_LIMIT");
+  for (const entry of input.entries) {
+    const site = sites.find((candidate) =>
+      candidate.name.trim().toLocaleLowerCase("fr-FR") === entry.label.trim().toLocaleLowerCase("fr-FR"),
+    );
+    payload.dailyAssignments.push({
+      id: crypto.randomUUID(),
+      userId: input.userId,
+      date: input.date,
+      chantierId: site?.id ?? null,
+      label: site?.name ?? entry.label.trim(),
+      activity: entry.activity,
+    });
+  }
+  return parsePlanningPayload(payload);
+}
+
+
+
 export function applyWeeklyBoardEntry(
   source: PlanningPayload,
   input: WeeklyBoardEntryInput,
