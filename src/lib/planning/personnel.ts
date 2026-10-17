@@ -131,8 +131,8 @@ export function applyPlanningStaffMutation(
         .map((assignment) => assignment.date),
     );
     if (
-      payload.dailyAssignments.some((assignment) =>
-        assignment.userId === accountId && staffAssignedDates.has(assignment.date),
+      payload.dailyAssignments.some(
+        (assignment) => assignment.userId === accountId && staffAssignedDates.has(assignment.date),
       )
     ) {
       throw new Error("PLANNING_STAFF_DAILY_ASSIGNMENT_CONFLICT");

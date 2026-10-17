@@ -1,6 +1,9 @@
 import { NextResponse } from "next/server";
 import { z, ZodError } from "zod";
-import { requireModuleRequestContext, desktopRequestErrorStatus } from "@/lib/desktop/request-context";
+import {
+  requireModuleRequestContext,
+  desktopRequestErrorStatus,
+} from "@/lib/desktop/request-context";
 import { hasEffectiveSpecialPermission, requireSpecialPermission } from "@/lib/auth/permissions";
 import { readAuthPayload } from "@/lib/auth/store";
 import { createPlanningRepository } from "@/lib/planning/create-repository";
@@ -33,9 +36,14 @@ function noStoreJson(value: unknown, init?: ResponseInit) {
 }
 
 function sendError(error: unknown) {
-  const code = error instanceof ZodError ? "PLANNING_WEEK_REQUEST_INVALID" :
-    error instanceof Error ? error.message : "PLANNING_WEEK_FAILED";
-  const status = desktopRequestErrorStatus(code) ??
+  const code =
+    error instanceof ZodError
+      ? "PLANNING_WEEK_REQUEST_INVALID"
+      : error instanceof Error
+        ? error.message
+        : "PLANNING_WEEK_FAILED";
+  const status =
+    desktopRequestErrorStatus(code) ??
     (code.includes("NOT_ACTIVE") || code.includes("CONFLICT") ? 409 : 400);
   return noStoreJson({ error: code }, { status });
 }
@@ -54,7 +62,13 @@ async function weeklySnapshot(
   ]);
   const year = Number(week.slice(0, 4));
   const firmRows = buildFirmGrandPlanningRows(chantiers, planning, year);
-  const potentialRows = buildCommercialProvisionRows(commercial, planning, year, year, quotes.quotes);
+  const potentialRows = buildCommercialProvisionRows(
+    commercial,
+    planning,
+    year,
+    year,
+    quotes.quotes,
+  );
   // The small board must display the exact totals used in the grand planning.
   const firm = weekActivityHours(firmRows, week);
   const provisional = weekActivityHours(potentialRows, week);
@@ -62,18 +76,24 @@ async function weeklySnapshot(
   const dates = workingDaysOfWeek(week);
   const allSiteNames = new Map(chantiers.chantiers.map((site) => [site.id, site.name]));
   const assignments = planning.dailyAssignments
-    .filter((row) => dates.includes(row.date) && people.some((person) => person.userId === row.userId))
+    .filter(
+      (row) => dates.includes(row.date) && people.some((person) => person.userId === row.userId),
+    )
     .map((row) => ({
       ...row,
       label: row.chantierId ? (allSiteNames.get(row.chantierId) ?? row.label) : row.label,
     }));
-  const absences = planning.absences.filter((row) => dates.includes(row.date))
+  const absences = planning.absences
+    .filter((row) => dates.includes(row.date))
     .map((row) => ({
       ...row,
       typeLabel: PLANNING_ABSENCE_TYPE_LABELS[row.type],
     }));
   const capacity = buildWeeklyCapacityIndicators(
-    [week], people, new Map([[week, firm.total]]), planning.absences,
+    [week],
+    people,
+    new Map([[week, firm.total]]),
+    planning.absences,
     new Map([[week, provisional.total]]),
   )[0];
   return {
@@ -124,7 +144,10 @@ export async function POST(request: Request) {
     await createPlanningRepository().mutate((payload) => {
       const people = effectivePlanningPeople(payload, auth.users);
       return applyDailyAssignment(
-        payload, input, new Set(people.map((person) => person.userId)), activeSites,
+        payload,
+        input,
+        new Set(people.map((person) => person.userId)),
+        activeSites,
       );
     });
     return noStoreJson(await weeklySnapshot(input.week, context));
