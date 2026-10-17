@@ -62,6 +62,21 @@ describe("grand planning time markers", () => {
     ).not.toThrow();
   });
 
+  it("labels January 2027 with its actual calendar year after December 2026", () => {
+    const meta = buildGrandPlanningWeekMeta(
+      ["2026-W53", "2027-W01", "2027-W02"],
+      new Date(2026, 11, 28, 12),
+    );
+    expect(groupGrandPlanningMonths(meta).map((group) => ({
+      label: group.label,
+      year: group.year,
+      span: group.span,
+    }))).toEqual([
+      { label: "DÉCEMBRE", year: 2026, span: 1 },
+      { label: "JANVIER", year: 2027, span: 2 },
+    ]);
+  });
+
   it("groups consecutive weekly columns under their French month label", () => {
     const meta = buildGrandPlanningWeekMeta(
       ["2026-W39", "2026-W40", "2026-W41", "2026-W42", "2026-W43", "2026-W44"],
