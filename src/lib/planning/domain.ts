@@ -85,6 +85,18 @@ export const planningStaffSchema = z.object({
   firstName: z.string().trim().min(1).max(100),
   lastName: z.string().trim().min(1).max(100),
   linkedUserId: z.string().uuid().nullable(),
+  // End date is inclusive: a future date can be added later during notice.
+  endDate: z
+    .string()
+    .regex(/^\d{4}-\d{2}-\d{2}$/)
+    .nullable()
+    .default(null),
+  // Deactivation takes effect on this date, without erasing past weeks.
+  inactiveSince: z
+    .string()
+    .regex(/^\d{4}-\d{2}-\d{2}$/)
+    .nullable()
+    .default(null),
 });
 
 export type PlanningStaff = z.infer<typeof planningStaffSchema>;
@@ -100,6 +112,7 @@ export const planningPayloadSchema = z
     peopleCapacity: z.array(planningPersonCapacitySchema).default([]),
     dailyAssignments: z.array(planningDailyAssignmentSchema).default([]),
     staff: z.array(planningStaffSchema).default([]),
+    hiddenPersonIds: z.array(z.string().uuid()).default([]),
     absences: z.array(planningAbsenceSchema).default([]),
   })
   .superRefine((value, context) => {
@@ -278,6 +291,7 @@ export function createInitialPlanningPayload(): PlanningPayload {
     peopleCapacity: [],
     dailyAssignments: [],
     staff: [],
+    hiddenPersonIds: [],
     absences: [],
   };
 }

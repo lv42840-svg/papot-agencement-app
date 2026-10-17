@@ -289,7 +289,15 @@ export async function POST(request: Request) {
     } else {
       await requireSpecialPermission(context.user, "planning.manage_schedules");
       const auth = await readAuthPayload();
-      if (input.action === "saveStaff" || input.action === "linkStaffAccount") {
+      if (
+        input.action === "saveStaff" ||
+        input.action === "linkStaffAccount" ||
+        input.action === "setPersonHidden" ||
+        input.action === "setStaffEndDate" ||
+        input.action === "deactivateStaff" ||
+        input.action === "reactivateStaff" ||
+        input.action === "deleteStaff"
+      ) {
         const activeAccounts = new Set(
           auth.users.filter((candidate) => candidate.isActive).map((candidate) => candidate.id),
         );

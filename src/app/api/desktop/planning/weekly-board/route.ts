@@ -7,7 +7,7 @@ import {
 import { hasEffectiveSpecialPermission, requireSpecialPermission } from "@/lib/auth/permissions";
 import { readAuthPayload } from "@/lib/auth/store";
 import { createPlanningRepository } from "@/lib/planning/create-repository";
-import { effectivePlanningPeople } from "@/lib/planning/personnel";
+import { effectivePlanningPeople, personPresentOnDate } from "@/lib/planning/personnel";
 import {
   buildWeeklyCapacityIndicators,
   frenchNationalPublicHolidayLabels,
@@ -24,7 +24,9 @@ import { createQuotesRepository } from "@/lib/quotes/create-repository";
 import {
   weeklyBoardAssignmentSchema,
   weeklyBoardEntrySchema,
+  weeklyBoardPasteSchema,
   applyWeeklyBoardEntry,
+  applyWeeklyBoardPaste,
   weeklyChantierHours,
   weeklyBoardWeekSchema,
   workingDaysOfWeek,
@@ -87,8 +89,17 @@ async function weeklySnapshot(
     id: potentialRows[index].caseId,
     name: potentialRows[index].name,
   }));
-  const people = effectivePlanningPeople(planning, auth.users);
+  const allPeople = effectivePlanningPeople(planning, auth.users);
   const dates = workingDaysOfWeek(week);
+  const people = allPeople.filter(
+    (person) =>
+      !person.hiddenInWeeklyBoard &&
+      (dates.some((date) => personPresentOnDate(person, date)) ||
+        planning.dailyAssignments.some(
+          (row) => row.userId === person.userId && dates.includes(row.date),
+        ) ||
+        planning.absences.some((row) => row.userId === person.userId && dates.includes(row.date))),
+  );
   const holidays = dates.map((date) => ({
     date,
     label: frenchNationalPublicHolidayLabels(Number(date.slice(0, 4))).get(date) ?? null,
@@ -110,7 +121,7 @@ async function weeklySnapshot(
     }));
   const capacity = buildWeeklyCapacityIndicators(
     [week],
-    people,
+    allPeople,
     new Map([[week, firm.total]]),
     planning.absences,
     new Map([[week, provisional.total]]),
@@ -123,6 +134,8 @@ async function weeklySnapshot(
       displayName: person.displayName,
       countsInMacroCapacity: person.countsInMacroCapacity,
       weeklySchedule: person.weeklySchedule,
+      endDate: person.endDate,
+      inactiveSince: person.inactiveSince,
     })),
     sites: chantiers.chantiers
       .filter((site) => site.status === "ACTIVE")
@@ -155,7 +168,7 @@ export async function POST(request: Request) {
     const context = await requireModuleRequestContext("planning", "WRITE");
     await requireSpecialPermission(context.user, "planning.manage_schedules");
     const input = z
-      .union([weeklyBoardAssignmentSchema, weeklyBoardEntrySchema])
+      .union([weeklyBoardAssignmentSchema, weeklyBoardEntrySchema, weeklyBoardPasteSchema])
       .parse(await request.json());
     assertPlanningWeekEditable(input.week);
     const [auth, chantiers] = await Promise.all([
@@ -167,6 +180,28 @@ export async function POST(request: Request) {
       .map((site) => ({ id: site.id, name: site.name }));
     await createPlanningRepository().mutate((payload) => {
       const people = effectivePlanningPeople(payload, auth.users);
+      const selectedPerson = people.find((person) => person.userId === input.userId);
+      if (!selectedPerson) throw new Error("PLANNING_USER_NOT_ACTIVE");
+      if (input.action !== "deleteDailyEntry" && !personPresentOnDate(selectedPerson, input.date))
+        throw new Error("PLANNING_PERSON_NOT_PRESENT");
+      if (input.action === "pasteDailyEntries") {
+        const scheduled = scheduleHoursForDate(
+          selectedPerson.weeklySchedule,
+          new Date(input.date + "T12:00:00Z"),
+        );
+        const absence = payload.absences.find(
+          (row) => row.userId === input.userId && row.date === input.date,
+        );
+        if (absence && scheduled > 0 && absence.hours >= scheduled) {
+          throw new Error("PLANNING_DAY_PERSON_ABSENT");
+        }
+        return applyWeeklyBoardPaste(
+          payload,
+          input,
+          new Set(people.map((person) => person.userId)),
+          activeSites,
+        );
+      }
       if (input.action !== "setDailyAssignment") {
         // The full-day absence rule is enforced server-side, not only by hiding the UI.
         const person = people.find((person) => person.userId === input.userId);
