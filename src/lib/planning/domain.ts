@@ -7,7 +7,7 @@ import {
 } from "../commercial/domain";
 import type { ChantierRecord, ChantiersPayload } from "@/lib/chantiers/domain";
 import { effectiveCommercialForecastHours } from "../commercial/forecast-quotes";
-import type { NativeQuoteRecord } from "@/lib/quotes/store";
+import type { NativeQuoteRecord } from "../quotes/store";
 import { planningPersonCapacitySchema } from "./capacity";
 
 export const planningActivitySchema = z.enum(["BE", "WORKSHOP", "INSTALL"]);
