@@ -58,6 +58,7 @@ export function BillingDocumentEditor({ draftId }: { draftId: string }) {
   const [draft, setDraft] = useState<BillingDraft | null>(null);
   const [canWrite, setCanWrite] = useState(false);
   const [rows, setRows] = useState<EditableRow[]>([]);
+  const [initialRows, setInitialRows] = useState<EditableRow[]>([]);
   const [label, setLabel] = useState("");
   const [notes, setNotes] = useState("");
   const [busy, setBusy] = useState(false);
@@ -76,7 +77,9 @@ export function BillingDocumentEditor({ draftId }: { draftId: string }) {
     setCanWrite(json.canWrite);
     setLabel(selected.label);
     setNotes(selected.notes);
-    setRows((selected.documentLines ?? buildInvoiceDocumentLines(selected,json.payload)).map(editable));
+    const original = (selected.documentLines ?? buildInvoiceDocumentLines(selected,json.payload)).map(editable);
+    setRows(original);
+    setInitialRows(original);
     setDirty(false);
   }
   useEffect(() => {
@@ -176,7 +179,9 @@ export function BillingDocumentEditor({ draftId }: { draftId: string }) {
       const saved = json.payload.drafts.find((item) => item.id === draft.id);
       if (!saved) throw new Error("Projet introuvable après enregistrement");
       setDraft(saved);
-      setRows((saved.documentLines ?? []).map(editable));
+      const original = (saved.documentLines ?? []).map(editable);
+      setRows(original);
+      setInitialRows(original);
       setDirty(false);
       setNotice(preview.amountHtCents !== previous
         ? "Projet enregistré et totaux recalculés. Aucune facture officielle émise."
@@ -329,7 +334,7 @@ export function BillingDocumentEditor({ draftId }: { draftId: string }) {
       <div className="invoiceFooterActions">
         <button className="secondaryButton" type="button" onClick={() => {
           if (dirty && !window.confirm("Abandonner les modifications non enregistrées ?")) return;
-          setRows((draft.documentLines ?? []).map(editable));
+          setRows(initialRows.map((row) => ({ ...row })));
           setLabel(draft.label); setNotes(draft.notes);
           setDirty(false); setError("");
         }}>Annuler les modifications</button>
