@@ -1,6 +1,7 @@
 "use client";
 
 import Link from "next/link";
+import { PlanningExcelGrid } from "./planning-excel-grid";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type {
   GrandPlanningChantierRow,
@@ -102,6 +103,7 @@ export function GrandPlanningWorkspace({
   initialPotentialCollapsed: boolean;
 }) {
   const [snapshot, setSnapshot] = useState<PlanningSnapshot | null>(null);
+  const [activeTab, setActiveTab] = useState<"planning" | "personnel">("planning");
   const [message, setMessage] = useState("Chargement du planning…");
   const [drafts, setDrafts] = useState<Record<string, string>>({});
   const [savingKey, setSavingKey] = useState<string | null>(null);
@@ -160,7 +162,7 @@ export function GrandPlanningWorkspace({
     );
     if (!currentHeader) return;
 
-    const stickyColumnsWidth = 408;
+    const stickyColumnsWidth = 520;
     scroller.scrollLeft = Math.max(0, currentHeader.offsetLeft - stickyColumnsWidth - 12);
   }, [currentWeek, snapshot]);
 
@@ -530,682 +532,699 @@ export function GrandPlanningWorkspace({
         </div>
       </div>
 
-      {unallocated.length > 0 ? (
-        <section className="planningUnallocatedPanel" aria-label="Heures à répartir">
-          <div className="planningUnallocatedHeader">
-            <div>
-              <p className="eyebrow">À répartir</p>
-              <h2>Charges fermes non étalées</h2>
-            </div>
-            <strong>
-              {formatHours(
-                unallocated.reduce(
-                  (total, chantier) =>
-                    total +
-                    chantier.activities.reduce(
-                      (subtotal, activity) => subtotal + activity.remainingHours,
-                      0,
-                    ),
-                  0,
-                ),
-              )}{" "}
-              h
-            </strong>
-          </div>
-          <div className="planningUnallocatedList">
-            {unallocated.map((chantier) => (
-              <div className="planningUnallocatedRow" key={chantier.chantierId}>
-                <strong>{chantier.name}</strong>
-                <div>
-                  {chantier.activities.map((activity) => (
-                    <span
-                      className={
-                        activity.remainingHours > 0
-                          ? "planningRemainingPositive"
-                          : "planningRemainingNegative"
-                      }
-                      key={activity.activity}
-                    >
-                      {activity.label} {formatHours(activity.remainingHours)} h
-                    </span>
-                  ))}
-                </div>
-              </div>
-            ))}
-          </div>
-        </section>
-      ) : null}
-
-      {provisionalUnallocated.length > 0 ? (
-        <section
-          className="planningUnallocatedPanel planningProvisionUnallocatedPanel"
-          aria-label="Charges provisionnelles à répartir"
+      <nav className="planningMainTabs" aria-label="Modules du planning">
+        <button
+          type="button"
+          className={activeTab === "planning" ? "isActive" : ""}
+          onClick={() => setActiveTab("planning")}
         >
-          <div className="planningUnallocatedHeader">
-            <div>
-              <p className="eyebrow">Provisionnel</p>
-              <h2>Charges commerciales à répartir</h2>
-              <p className="muted">
-                Affaires non confirmées. Ces heures ne sont pas comptées dans la charge ferme.
-              </p>
-            </div>
-            <strong>
-              {formatHours(
-                provisionalUnallocated.reduce(
-                  (total, item) =>
-                    total +
-                    item.activities.reduce(
-                      (subtotal, activity) => subtotal + activity.remainingHours,
+          Grand planning
+        </button>
+        <button
+          type="button"
+          className={activeTab === "personnel" ? "isActive" : ""}
+          onClick={() => setActiveTab("personnel")}
+        >
+          Gestion du personnel
+        </button>
+      </nav>
+
+      {activeTab === "planning" ? (
+        <div className="planningUnallocatedArea">
+          {unallocated.length > 0 ? (
+            <section className="planningUnallocatedPanel" aria-label="Heures à répartir">
+              <div className="planningUnallocatedHeader">
+                <div>
+                  <p className="eyebrow">À répartir</p>
+                  <h2>Charges fermes non étalées</h2>
+                </div>
+                <strong>
+                  {formatHours(
+                    unallocated.reduce(
+                      (total, chantier) =>
+                        total +
+                        chantier.activities.reduce(
+                          (subtotal, activity) => subtotal + activity.remainingHours,
+                          0,
+                        ),
                       0,
                     ),
-                  0,
-                ),
-              )}{" "}
-              h
-            </strong>
-          </div>
-          <div className="planningUnallocatedList">
-            {provisionalUnallocated.map((item) => (
-              <div className="planningUnallocatedRow" key={item.caseId}>
-                <div className="planningProvisionCaseMeta">
-                  <strong>{item.name}</strong>
-                  <span>{item.statusLabel}</span>
-                  {item.expectedConfirmationDate ? (
-                    <small>Confirmation prévue {item.expectedConfirmationDate}</small>
-                  ) : null}
-                </div>
-                <div>
-                  {item.activities.map((activity) => (
-                    <span key={activity.activity}>
-                      {activity.label} {formatHours(activity.remainingHours)} h
-                    </span>
-                  ))}
-                </div>
+                  )}{" "}
+                  h
+                </strong>
               </div>
-            ))}
-          </div>
-        </section>
-      ) : null}
-
-      {snapshot ? (
-        <section className="planningCapacitySettings">
-          <div className="planningCapacitySettingsHeader">
-            <div>
-              <p className="eyebrow">Capacité équipe</p>
-              <h2>Personnes comptées dans le grand planning</h2>
-            </div>
-            {!snapshot.capabilities.canManageSchedules ? (
-              <span className="planningReadOnly">Lecture seule</span>
-            ) : null}
-          </div>
-          <div className="planningScheduleTableWrap">
-            <table className="planningScheduleTable">
-              <thead>
-                <tr>
-                  <th>Personne</th>
-                  <th>Capacité</th>
-                  {WEEKDAYS.map(([, label]) => (
-                    <th key={label}>{label}</th>
-                  ))}
-                  <th>Total</th>
-                </tr>
-              </thead>
-              <tbody>
-                {snapshot.peopleCapacity.map((person) => (
-                  <tr key={person.userId}>
-                    <th scope="row">{person.displayName}</th>
-                    <td>
-                      <label className="planningCapacityToggle">
-                        <input
-                          type="checkbox"
-                          checked={person.countsInMacroCapacity}
-                          disabled={
-                            !snapshot.capabilities.canManageSchedules ||
-                            savingKey === `capacity:${person.userId}`
+              <div className="planningUnallocatedList">
+                {unallocated.map((chantier) => (
+                  <div className="planningUnallocatedRow" key={chantier.chantierId}>
+                    <strong>{chantier.name}</strong>
+                    <div>
+                      {chantier.activities.map((activity) => (
+                        <span
+                          className={
+                            activity.remainingHours > 0
+                              ? "planningRemainingPositive"
+                              : "planningRemainingNegative"
                           }
-                          onChange={(event) =>
-                            void savePersonCapacity({
-                              ...person,
-                              countsInMacroCapacity: event.target.checked,
-                            })
-                          }
-                        />
-                        <span>{person.countsInMacroCapacity ? "Oui" : "Non"}</span>
-                      </label>
-                    </td>
-                    {WEEKDAYS.map(([day, label]) => {
-                      const key = scheduleDraftKey(person.userId, day);
-                      return (
-                        <td key={day}>
-                          <input
-                            aria-label={`${person.displayName} ${label}`}
-                            className="planningScheduleHours"
-                            disabled={
-                              !snapshot.capabilities.canManageSchedules ||
-                              savingKey === `capacity:${person.userId}`
-                            }
-                            inputMode="decimal"
-                            value={scheduleDrafts[key] ?? formatHours(person.weeklySchedule[day])}
-                            onChange={(event) =>
-                              setScheduleDrafts((current) => ({
-                                ...current,
-                                [key]: event.target.value,
-                              }))
-                            }
-                            onBlur={() => void saveScheduleDay(person, day)}
-                            onKeyDown={(event) => {
-                              if (event.key === "Enter") event.currentTarget.blur();
-                              if (event.key === "Escape") {
-                                setScheduleDrafts((current) => {
-                                  const next = { ...current };
-                                  delete next[key];
-                                  return next;
-                                });
-                                event.currentTarget.blur();
-                              }
-                            }}
-                          />
-                        </td>
-                      );
-                    })}
-                    <td className="planningScheduleTotal">
-                      {formatHours(
-                        Object.values(person.weeklySchedule).reduce((sum, hours) => sum + hours, 0),
-                      )}{" "}
-                      h
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-        </section>
-      ) : null}
-
-      {snapshot ? (
-        <section className="planningAbsenceSettings">
-          <div className="planningCapacitySettingsHeader">
-            <div>
-              <p className="eyebrow">Indisponibilités</p>
-              <h2>Congés, arrêts et autres absences</h2>
-            </div>
-            {!snapshot.capabilities.canManageSchedules ? (
-              <span className="planningReadOnly">Lecture seule</span>
-            ) : null}
-          </div>
-
-          <div className="planningAbsenceForm">
-            <label>
-              Personne
-              <select
-                value={absenceUserId}
-                disabled={!snapshot.capabilities.canManageSchedules}
-                onChange={(event) => setAbsenceUserId(event.target.value)}
-              >
-                {snapshot.peopleCapacity.map((person) => (
-                  <option key={person.userId} value={person.userId}>
-                    {person.displayName}
-                  </option>
-                ))}
-              </select>
-            </label>
-            <label>
-              Type
-              <select
-                value={absenceType}
-                disabled={!snapshot.capabilities.canManageSchedules}
-                onChange={(event) => setAbsenceType(event.target.value as PlanningAbsence["type"])}
-              >
-                <option value="VACATION">Congés</option>
-                <option value="SICK">Arrêt</option>
-                <option value="OTHER">Autre</option>
-              </select>
-            </label>
-            <label>
-              Date
-              <input
-                type="date"
-                value={absenceDate}
-                disabled={!snapshot.capabilities.canManageSchedules}
-                onChange={(event) => setAbsenceDate(event.target.value)}
-              />
-            </label>
-            <label>
-              Heures
-              <input
-                className="planningAbsenceHours"
-                inputMode="decimal"
-                value={absenceHours}
-                disabled={!snapshot.capabilities.canManageSchedules}
-                onChange={(event) => setAbsenceHours(event.target.value)}
-              />
-            </label>
-            <button
-              className="secondaryButton"
-              type="button"
-              disabled={
-                !snapshot.capabilities.canManageSchedules || savingKey === "planning-mutation"
-              }
-              onClick={() => void saveAbsence()}
-            >
-              {absenceEditId ? "Modifier l’absence" : "Ajouter l’absence"}
-            </button>
-            {absenceEditId ? (
-              <button
-                className="secondaryButton"
-                type="button"
-                onClick={() => setAbsenceEditId(null)}
-              >
-                Annuler
-              </button>
-            ) : null}
-          </div>
-
-          <div className="planningFullWeekForm">
-            <label>
-              Semaine complète
-              <input
-                type="week"
-                value={absenceWeek}
-                disabled={!snapshot.capabilities.canManageSchedules}
-                onChange={(event) => setAbsenceWeek(event.target.value)}
-              />
-            </label>
-            <button
-              className="secondaryButton"
-              type="button"
-              disabled={
-                !snapshot.capabilities.canManageSchedules || savingKey === "planning-mutation"
-              }
-              onClick={() => void saveFullWeekAbsence()}
-            >
-              Mettre toute la semaine en absence
-            </button>
-          </div>
-
-          <div className="planningAbsenceList">
-            {snapshot.absences.length === 0 ? (
-              <p className="muted">Aucune absence enregistrée sur {snapshot.year}.</p>
-            ) : (
-              snapshot.absences.map((absence) => (
-                <div className="planningAbsenceRow" key={absence.id}>
-                  <div>
-                    <strong>{absence.displayName}</strong>
-                    <span>{absence.date}</span>
-                    <span>{absence.typeLabel}</span>
-                    <span>{formatHours(absence.hours)} h</span>
-                  </div>
-                  {snapshot.capabilities.canManageSchedules ? (
-                    <div className="planningAbsenceActions">
-                      <button
-                        className="secondaryButton"
-                        type="button"
-                        onClick={() => editAbsence(absence)}
-                      >
-                        Modifier
-                      </button>
-                      <button
-                        className="secondaryButton"
-                        type="button"
-                        onClick={() => void deleteAbsence(absence.id)}
-                      >
-                        Supprimer
-                      </button>
+                          key={activity.activity}
+                        >
+                          {activity.label} {formatHours(activity.remainingHours)} h
+                        </span>
+                      ))}
                     </div>
-                  ) : null}
-                </div>
-              ))
-            )}
-          </div>
-        </section>
-      ) : null}
+                  </div>
+                ))}
+              </div>
+            </section>
+          ) : null}
 
-      <section className="panel grandPlanningPanel">
-        <div className="grandPlanningLegend">
-          <span>
-            <strong>Prévu</strong> = volume chantier
-          </span>
-          <span>
-            <strong>À répartir</strong> = volume de référence − semaines déjà positionnées
-          </span>
-          <span>
-            <strong>Provisionnel</strong> = affaire non confirmée, affichée plus claire
-          </span>
-          {!snapshot?.capabilities.canEditMacro ? (
-            <span className="planningReadOnly">Lecture seule</span>
+          {provisionalUnallocated.length > 0 ? (
+            <section
+              className="planningUnallocatedPanel planningProvisionUnallocatedPanel"
+              aria-label="Charges provisionnelles à répartir"
+            >
+              <div className="planningUnallocatedHeader">
+                <div>
+                  <p className="eyebrow">Provisionnel</p>
+                  <h2>Charges commerciales à répartir</h2>
+                  <p className="muted">
+                    Affaires non confirmées. Ces heures ne sont pas comptées dans la charge ferme.
+                  </p>
+                </div>
+                <strong>
+                  {formatHours(
+                    provisionalUnallocated.reduce(
+                      (total, item) =>
+                        total +
+                        item.activities.reduce(
+                          (subtotal, activity) => subtotal + activity.remainingHours,
+                          0,
+                        ),
+                      0,
+                    ),
+                  )}{" "}
+                  h
+                </strong>
+              </div>
+              <div className="planningUnallocatedList">
+                {provisionalUnallocated.map((item) => (
+                  <div className="planningUnallocatedRow" key={item.caseId}>
+                    <div className="planningProvisionCaseMeta">
+                      <strong>{item.name}</strong>
+                      <span>{item.statusLabel}</span>
+                      {item.expectedConfirmationDate ? (
+                        <small>Confirmation prévue {item.expectedConfirmationDate}</small>
+                      ) : null}
+                    </div>
+                    <div>
+                      {item.activities.map((activity) => (
+                        <span key={activity.activity}>
+                          {activity.label} {formatHours(activity.remainingHours)} h
+                        </span>
+                      ))}
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </section>
           ) : null}
         </div>
+      ) : null}
 
-        {message ? <p className="planningMessage">{message}</p> : null}
+      {activeTab === "personnel" ? (
+        <div className="planningPersonnelContent">
+          {snapshot ? (
+            <section className="planningCapacitySettings">
+              <div className="planningCapacitySettingsHeader">
+                <div>
+                  <p className="eyebrow">Capacité équipe</p>
+                  <h2>Personnes comptées dans le grand planning</h2>
+                </div>
+                {!snapshot.capabilities.canManageSchedules ? (
+                  <span className="planningReadOnly">Lecture seule</span>
+                ) : null}
+              </div>
+              <div className="planningScheduleTableWrap">
+                <table className="planningScheduleTable">
+                  <thead>
+                    <tr>
+                      <th>Personne</th>
+                      <th>Capacité</th>
+                      {WEEKDAYS.map(([, label]) => (
+                        <th key={label}>{label}</th>
+                      ))}
+                      <th>Total</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {snapshot.peopleCapacity.map((person) => (
+                      <tr key={person.userId}>
+                        <th scope="row">{person.displayName}</th>
+                        <td>
+                          <label className="planningCapacityToggle">
+                            <input
+                              type="checkbox"
+                              checked={person.countsInMacroCapacity}
+                              disabled={
+                                !snapshot.capabilities.canManageSchedules ||
+                                savingKey === `capacity:${person.userId}`
+                              }
+                              onChange={(event) =>
+                                void savePersonCapacity({
+                                  ...person,
+                                  countsInMacroCapacity: event.target.checked,
+                                })
+                              }
+                            />
+                            <span>{person.countsInMacroCapacity ? "Oui" : "Non"}</span>
+                          </label>
+                        </td>
+                        {WEEKDAYS.map(([day, label]) => {
+                          const key = scheduleDraftKey(person.userId, day);
+                          return (
+                            <td key={day}>
+                              <input
+                                aria-label={`${person.displayName} ${label}`}
+                                className="planningScheduleHours"
+                                disabled={
+                                  !snapshot.capabilities.canManageSchedules ||
+                                  savingKey === `capacity:${person.userId}`
+                                }
+                                inputMode="decimal"
+                                value={
+                                  scheduleDrafts[key] ?? formatHours(person.weeklySchedule[day])
+                                }
+                                onChange={(event) =>
+                                  setScheduleDrafts((current) => ({
+                                    ...current,
+                                    [key]: event.target.value,
+                                  }))
+                                }
+                                onBlur={() => void saveScheduleDay(person, day)}
+                                onKeyDown={(event) => {
+                                  if (event.key === "Enter") event.currentTarget.blur();
+                                  if (event.key === "Escape") {
+                                    setScheduleDrafts((current) => {
+                                      const next = { ...current };
+                                      delete next[key];
+                                      return next;
+                                    });
+                                    event.currentTarget.blur();
+                                  }
+                                }}
+                              />
+                            </td>
+                          );
+                        })}
+                        <td className="planningScheduleTotal">
+                          {formatHours(
+                            Object.values(person.weeklySchedule).reduce(
+                              (sum, hours) => sum + hours,
+                              0,
+                            ),
+                          )}{" "}
+                          h
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            </section>
+          ) : null}
 
-        {snapshot ? (
-          <div className="grandPlanningScroller" ref={planningScrollerRef}>
-            <table className="grandPlanningTable">
-              <thead>
-                <tr className="planningMonthRow">
-                  <th className="planningSticky planningChantierColumn" rowSpan={2}>
-                    Chantier
-                  </th>
-                  <th className="planningSticky planningActivityColumn" rowSpan={2}>
-                    Activité
-                  </th>
-                  <th className="planningSticky planningMetricColumn" rowSpan={2}>
-                    Prévu
-                  </th>
-                  <th
-                    className="planningSticky planningMetricColumn planningRemainingColumn"
-                    rowSpan={2}
+          {snapshot ? (
+            <section className="planningAbsenceSettings">
+              <div className="planningCapacitySettingsHeader">
+                <div>
+                  <p className="eyebrow">Indisponibilités</p>
+                  <h2>Congés, arrêts et autres absences</h2>
+                </div>
+                {!snapshot.capabilities.canManageSchedules ? (
+                  <span className="planningReadOnly">Lecture seule</span>
+                ) : null}
+              </div>
+
+              <div className="planningAbsenceForm">
+                <label>
+                  Personne
+                  <select
+                    value={absenceUserId}
+                    disabled={!snapshot.capabilities.canManageSchedules}
+                    onChange={(event) => setAbsenceUserId(event.target.value)}
                   >
-                    À répartir
-                  </th>
-                  {monthGroups.map((group, index) => (
-                    <th
-                      className={`planningMonthHead ${index > 0 ? "planningMonthStart" : ""}`}
-                      colSpan={group.span}
-                      key={group.key}
-                    >
-                      {group.label}
-                    </th>
-                  ))}
-                </tr>
-                <tr className="planningWeekRow">
-                  {weekMeta.map((meta) => {
-                    const week = meta.week;
-                    const capacity = capacityByWeek.get(week);
-                    return (
-                      <th
-                        className={`planningWeekHead ${weekClassName(week)}`}
-                        data-planning-week={week}
-                        key={week}
-                        title={`${weekLabel(week)} · ${meta.dateRangeLabel}`}
-                      >
-                        <strong>{weekLabel(week)}</strong>
-                        <span>Cap. {formatHours(capacity?.totalCapacityHours ?? 0)}</span>
-                        <span>Ferme {formatHours(capacity?.firmLoadHours ?? 0)}</span>
-                        <span className="planningWeekProvisional">
-                          Prov. {formatHours(capacity?.provisionalLoadHours ?? 0)}
-                        </span>
-                        <span
-                          className={
-                            (capacity?.firmAvailableHours ?? 0) < 0
-                              ? "planningWeekAvailable isNegative"
-                              : "planningWeekAvailable"
-                          }
-                          title="Disponible ferme"
-                        >
-                          Dispo F {formatHours(capacity?.firmAvailableHours ?? 0)}
-                        </span>
-                        <span
-                          className={
-                            (capacity?.availableWithProvisionHours ?? 0) < 0
-                              ? "planningWeekAvailable planningWeekWithProvision isNegative"
-                              : "planningWeekAvailable planningWeekWithProvision"
-                          }
-                          title="Disponible avec provisionnel"
-                        >
-                          Dispo +P {formatHours(capacity?.availableWithProvisionHours ?? 0)}
-                        </span>
-                      </th>
-                    );
-                  })}
-                </tr>
-              </thead>
-              <tbody>
-                {snapshot.rows.length === 0 && snapshot.provisionalRows.length === 0 ? (
-                  <tr>
-                    <td className="planningEmpty" colSpan={snapshot.weeks.length + 4}>
-                      Aucun chantier ou affaire provisionnelle à planifier.
-                    </td>
-                  </tr>
+                    {snapshot.peopleCapacity.map((person) => (
+                      <option key={person.userId} value={person.userId}>
+                        {person.displayName}
+                      </option>
+                    ))}
+                  </select>
+                </label>
+                <label>
+                  Type
+                  <select
+                    value={absenceType}
+                    disabled={!snapshot.capabilities.canManageSchedules}
+                    onChange={(event) =>
+                      setAbsenceType(event.target.value as PlanningAbsence["type"])
+                    }
+                  >
+                    <option value="VACATION">Congés</option>
+                    <option value="SICK">Arrêt</option>
+                    <option value="OTHER">Autre</option>
+                  </select>
+                </label>
+                <label>
+                  Date
+                  <input
+                    type="date"
+                    value={absenceDate}
+                    disabled={!snapshot.capabilities.canManageSchedules}
+                    onChange={(event) => setAbsenceDate(event.target.value)}
+                  />
+                </label>
+                <label>
+                  Heures
+                  <input
+                    className="planningAbsenceHours"
+                    inputMode="decimal"
+                    value={absenceHours}
+                    disabled={!snapshot.capabilities.canManageSchedules}
+                    onChange={(event) => setAbsenceHours(event.target.value)}
+                  />
+                </label>
+                <button
+                  className="secondaryButton"
+                  type="button"
+                  disabled={
+                    !snapshot.capabilities.canManageSchedules || savingKey === "planning-mutation"
+                  }
+                  onClick={() => void saveAbsence()}
+                >
+                  {absenceEditId ? "Modifier l’absence" : "Ajouter l’absence"}
+                </button>
+                {absenceEditId ? (
+                  <button
+                    className="secondaryButton"
+                    type="button"
+                    onClick={() => setAbsenceEditId(null)}
+                  >
+                    Annuler
+                  </button>
                 ) : null}
+              </div>
 
-                {snapshot.rows.flatMap((chantier, chantierIndex) =>
-                  chantier.activities.map((activity, activityIndex) => (
-                    <tr
-                      className={activityIndex === 0 ? "planningChantierStart" : undefined}
-                      key={`firm:${chantier.chantierId}:${activity.activity}`}
-                    >
-                      {activityIndex === 0 ? (
-                        <th
-                          className="planningSticky planningChantierCell"
-                          rowSpan={3}
-                          scope="rowgroup"
-                        >
-                          <div className="planningFirmCaseHeader">
-                            <strong>{chantier.name}</strong>
-                            <span className="planningFirmOrderActions">
-                              <button
-                                aria-label={`Monter ${chantier.name} dans les chantiers fermes`}
-                                className="secondary"
-                                disabled={
-                                  !snapshot.capabilities.canEditMacro ||
-                                  savingKey === "planning-mutation" ||
-                                  chantierIndex === 0
-                                }
-                                onClick={() => void moveFirm(chantier.chantierId, -1)}
-                                type="button"
-                              >
-                                ↑
-                              </button>
-                              <button
-                                aria-label={`Descendre ${chantier.name} dans les chantiers fermes`}
-                                className="secondary"
-                                disabled={
-                                  !snapshot.capabilities.canEditMacro ||
-                                  savingKey === "planning-mutation" ||
-                                  chantierIndex === snapshot.rows.length - 1
-                                }
-                                onClick={() => void moveFirm(chantier.chantierId, 1)}
-                                type="button"
-                              >
-                                ↓
-                              </button>
-                            </span>
-                          </div>
-                          {chantier.reference ? <span>{chantier.reference}</span> : null}
-                          <small>Pose prévue {chantier.plannedInstallDate}</small>
-                        </th>
+              <div className="planningFullWeekForm">
+                <label>
+                  Semaine complète
+                  <input
+                    type="week"
+                    value={absenceWeek}
+                    disabled={!snapshot.capabilities.canManageSchedules}
+                    onChange={(event) => setAbsenceWeek(event.target.value)}
+                  />
+                </label>
+                <button
+                  className="secondaryButton"
+                  type="button"
+                  disabled={
+                    !snapshot.capabilities.canManageSchedules || savingKey === "planning-mutation"
+                  }
+                  onClick={() => void saveFullWeekAbsence()}
+                >
+                  Mettre toute la semaine en absence
+                </button>
+              </div>
+
+              <div className="planningAbsenceList">
+                {snapshot.absences.length === 0 ? (
+                  <p className="muted">Aucune absence enregistrée sur {snapshot.year}.</p>
+                ) : (
+                  snapshot.absences.map((absence) => (
+                    <div className="planningAbsenceRow" key={absence.id}>
+                      <div>
+                        <strong>{absence.displayName}</strong>
+                        <span>{absence.date}</span>
+                        <span>{absence.typeLabel}</span>
+                        <span>{formatHours(absence.hours)} h</span>
+                      </div>
+                      {snapshot.capabilities.canManageSchedules ? (
+                        <div className="planningAbsenceActions">
+                          <button
+                            className="secondaryButton"
+                            type="button"
+                            onClick={() => editAbsence(absence)}
+                          >
+                            Modifier
+                          </button>
+                          <button
+                            className="secondaryButton"
+                            type="button"
+                            onClick={() => void deleteAbsence(absence.id)}
+                          >
+                            Supprimer
+                          </button>
+                        </div>
                       ) : null}
-                      <th className="planningSticky planningActivityCell" scope="row">
-                        {activity.label}
-                      </th>
-                      <td className="planningSticky planningMetricCell">
-                        {formatHours(activity.plannedHours)}
-                      </td>
-                      <td
-                        className={`planningSticky planningMetricCell planningRemainingCell ${
-                          activity.remainingHours > 0
-                            ? "isPositive"
-                            : activity.remainingHours < 0
-                              ? "isNegative"
-                              : "isZero"
-                        }`}
-                      >
-                        {formatHours(activity.remainingHours)}
-                      </td>
-                      {snapshot.weeks.map((week) => {
-                        const current = activity.weeklyHours[week] ?? 0;
-                        const key = cellKey("firm", chantier.chantierId, activity.activity, week);
-                        return (
-                          <td className={`planningWeekCell ${weekClassName(week)}`} key={week}>
-                            <input
-                              aria-label={`${chantier.name} ${activity.label} ${week}`}
-                              className={savingKey === key ? "isSaving" : undefined}
-                              disabled={
-                                !snapshot.capabilities.canEditMacro ||
-                                weekMetaByWeek.get(week)?.isPast ||
-                                savingKey === key
-                              }
-                              inputMode="decimal"
-                              value={drafts[key] ?? (current === 0 ? "" : formatHours(current))}
-                              onChange={(event) =>
-                                setDrafts((currentDrafts) => ({
-                                  ...currentDrafts,
-                                  [key]: event.target.value,
-                                }))
-                              }
-                              onBlur={() =>
-                                void saveCell(chantier.chantierId, activity.activity, week, current)
-                              }
-                              onKeyDown={(event) => {
-                                if (event.key === "Enter") event.currentTarget.blur();
-                                if (event.key === "Escape") {
-                                  setDrafts((currentDrafts) => {
-                                    const next = { ...currentDrafts };
-                                    delete next[key];
-                                    return next;
-                                  });
-                                  event.currentTarget.blur();
-                                }
-                              }}
-                            />
-                          </td>
-                        );
-                      })}
-                    </tr>
-                  )),
+                    </div>
+                  ))
                 )}
+              </div>
+            </section>
+          ) : null}
+        </div>
+      ) : null}
 
-                {snapshot.provisionalRows.length > 0 ? (
-                  <tr className="planningPotentialDivider">
-                    <th colSpan={snapshot.weeks.length + 4} scope="rowgroup">
-                      <button
-                        aria-expanded={!potentialCollapsed}
-                        className="planningPotentialToggle"
-                        disabled={potentialPreferenceSaving}
-                        onClick={() => void togglePotentialCollapsed()}
-                        type="button"
-                      >
-                        <span>{potentialCollapsed ? "▶" : "▼"}</span>
-                        <strong>POTENTIEL</strong>
-                        <small>{snapshot.provisionalRows.length} affaire(s)</small>
-                      </button>
-                    </th>
-                  </tr>
-                ) : null}
-
-                {snapshot.provisionalRows.flatMap((item, itemIndex) =>
-                  item.activities.map((activity, activityIndex) => (
-                    <tr
-                      className={`planningProvisionRow ${
-                        activityIndex === 0 ? "planningProvisionStart" : ""
-                      } ${potentialCollapsed ? "isCollapsed" : ""}`}
-                      key={`provisional:${item.caseId}:${activity.activity}`}
-                    >
-                      {activityIndex === 0 ? (
-                        <th
-                          className="planningSticky planningChantierCell planningProvisionCaseCell"
-                          rowSpan={3}
-                          scope="rowgroup"
-                        >
-                          <div className="planningPotentialCaseHeader">
-                            <strong>{item.name}</strong>
-                            <span className="planningPotentialOrderActions">
-                              <button
-                                aria-label={`Monter ${item.name} dans le potentiel`}
-                                className="secondary"
-                                disabled={
-                                  !snapshot.capabilities.canEditMacro ||
-                                  savingKey === "planning-mutation" ||
-                                  itemIndex === 0
-                                }
-                                onClick={() => void movePotential(item.caseId, -1)}
-                                type="button"
-                              >
-                                ↑
-                              </button>
-                              <button
-                                aria-label={`Descendre ${item.name} dans le potentiel`}
-                                className="secondary"
-                                disabled={
-                                  !snapshot.capabilities.canEditMacro ||
-                                  savingKey === "planning-mutation" ||
-                                  itemIndex === snapshot.provisionalRows.length - 1
-                                }
-                                onClick={() => void movePotential(item.caseId, 1)}
-                                type="button"
-                              >
-                                ↓
-                              </button>
-                            </span>
-                          </div>
-                          <span>Provisionnel · {item.statusLabel}</span>
-                          {item.expectedConfirmationDate ? (
-                            <small>Confirmation prévue {item.expectedConfirmationDate}</small>
-                          ) : null}
-                        </th>
-                      ) : null}
-                      <th className="planningSticky planningActivityCell" scope="row">
-                        {activity.label}
-                      </th>
-                      <td className="planningSticky planningMetricCell">
-                        {formatHours(activity.provisionHours)}
-                      </td>
-                      <td
-                        className={`planningSticky planningMetricCell planningRemainingCell ${
-                          activity.remainingHours > 0
-                            ? "isPositive"
-                            : activity.remainingHours < 0
-                              ? "isNegative"
-                              : "isZero"
-                        }`}
-                      >
-                        {formatHours(activity.remainingHours)}
-                      </td>
-                      {snapshot.weeks.map((week) => {
-                        const current = activity.weeklyHours[week] ?? 0;
-                        const key = cellKey("provisional", item.caseId, activity.activity, week);
-                        return (
-                          <td className={`planningWeekCell ${weekClassName(week)}`} key={week}>
-                            <input
-                              aria-label={`${item.name} provisionnel ${activity.label} ${week}`}
-                              className={savingKey === key ? "isSaving" : undefined}
-                              disabled={
-                                !snapshot.capabilities.canEditMacro ||
-                                weekMetaByWeek.get(week)?.isPast ||
-                                savingKey === key
-                              }
-                              inputMode="decimal"
-                              value={drafts[key] ?? (current === 0 ? "" : formatHours(current))}
-                              onChange={(event) =>
-                                setDrafts((currentDrafts) => ({
-                                  ...currentDrafts,
-                                  [key]: event.target.value,
-                                }))
-                              }
-                              onBlur={() =>
-                                void saveProvisionalCell(
-                                  item.caseId,
-                                  activity.activity,
-                                  week,
-                                  current,
-                                )
-                              }
-                              onKeyDown={(event) => {
-                                if (event.key === "Enter") event.currentTarget.blur();
-                                if (event.key === "Escape") {
-                                  setDrafts((currentDrafts) => {
-                                    const next = { ...currentDrafts };
-                                    delete next[key];
-                                    return next;
-                                  });
-                                  event.currentTarget.blur();
-                                }
-                              }}
-                            />
-                          </td>
-                        );
-                      })}
-                    </tr>
-                  )),
-                )}
-              </tbody>
-            </table>
+      {activeTab === "planning" ? (
+        <section className="panel grandPlanningPanel">
+          <div className="grandPlanningLegend">
+            <span>
+              <strong>Prévu</strong> = volume chantier
+            </span>
+            <span>
+              <strong>À répartir</strong> = volume de référence − semaines déjà positionnées
+            </span>
+            <span>
+              <strong>Provisionnel</strong> = affaire non confirmée, affichée plus claire
+            </span>
+            {!snapshot?.capabilities.canEditMacro ? (
+              <span className="planningReadOnly">Lecture seule</span>
+            ) : null}
           </div>
-        ) : null}
-      </section>
+
+          {message ? <p className="planningMessage">{message}</p> : null}
+
+          {snapshot ? (
+            <div className="grandPlanningScroller" ref={planningScrollerRef}>
+              <PlanningExcelGrid
+                snapshot={snapshot}
+                drafts={drafts}
+                savingKey={savingKey}
+                potentialCollapsed={potentialCollapsed}
+                potentialPreferenceSaving={potentialPreferenceSaving}
+                onDraftChange={(key, value) =>
+                  setDrafts((current) => ({ ...current, [key]: value }))
+                }
+                onDraftClear={(key) =>
+                  setDrafts((current) => {
+                    const next = { ...current };
+                    delete next[key];
+                    return next;
+                  })
+                }
+                onSaveFirm={saveCell}
+                onSaveProvision={saveProvisionalCell}
+                onMoveFirm={moveFirm}
+                onMoveProvision={movePotential}
+                onTogglePotential={togglePotentialCollapsed}
+              />
+            </div>
+          ) : null}
+        </section>
+      ) : null}
 
       <style jsx global>{`
+        .planningMainTabs {
+          display: flex;
+          gap: 6px;
+          margin: 0 0 14px;
+          border-bottom: 1px solid #ddd5ee;
+        }
+        .planningMainTabs button {
+          border: 1px solid transparent;
+          border-bottom: 3px solid transparent;
+          background: transparent;
+          padding: 12px 19px;
+          font-weight: 800;
+          color: #766a91;
+          border-radius: 8px 8px 0 0;
+        }
+        .planningMainTabs button.isActive {
+          color: #6450ad;
+          border-bottom-color: #7666d6;
+          background: #eeeafb;
+        }
+        .planningPersonnelContent {
+          max-width: 1500px;
+        }
+        .excelPlanningTable {
+          width: max-content;
+          min-width: 100%;
+          border-collapse: separate;
+          border-spacing: 0;
+          table-layout: fixed;
+          font-size: 11px;
+        }
+        .excelPlanningTable th,
+        .excelPlanningTable td {
+          padding: 0;
+          border-bottom: 1px solid #d7dce9;
+          border-right: 1px solid #d7dce9;
+          text-align: center;
+          background: #eef2fa;
+        }
+        .excelPlanningTable thead th {
+          position: sticky;
+          z-index: 7;
+          color: #4e4288;
+        }
+        .excelMonthRow th {
+          top: 0;
+          height: 31px;
+          background: #e8e1f7;
+        }
+        .excelMonthRow .excelMonthHeading {
+          background: #d9d0f0;
+          font-size: 13px;
+          text-transform: uppercase;
+        }
+        .excelWeekRow th {
+          top: 31px;
+          height: 41px;
+          background: #ece8f8;
+        }
+        .excelWeekHeading {
+          min-width: 100px;
+          width: 100px;
+        }
+        .excelWeekHeading strong {
+          display: block;
+          font-size: 12px;
+          padding: 3px 0;
+        }
+        .excelWeekActivityLabels {
+          background: #f9f8fd;
+          font-size: 10px;
+        }
+        .excelTriple {
+          display: grid;
+          grid-template-columns: repeat(3, minmax(0, 1fr));
+        }
+        .excelTriple > span,
+        .excelTriple > input {
+          min-width: 0;
+          width: 100%;
+          height: 30px;
+          border: 0;
+          border-right: 1px solid #dae0e9;
+          border-radius: 0;
+          background: transparent;
+          color: inherit;
+          text-align: center;
+          font-size: 11px;
+          font-weight: 650;
+        }
+        .excelTriple > :last-child {
+          border-right: 0;
+        }
+        .excelTripleValues > span {
+          height: 36px;
+          display: grid;
+          place-items: center;
+        }
+        .excelTriple > input:focus {
+          outline: 2px solid #7666d6;
+          outline-offset: -2px;
+          background: white;
+        }
+        .excelTriple > input:disabled {
+          cursor: default;
+        }
+        .excelWeekCell {
+          width: 100px;
+          min-width: 100px;
+          height: 39px;
+        }
+        .excelWeekCell:has(input:not(:placeholder-shown)) {
+          background: #e3ebf8;
+        }
+        .excelWeekCell .excelTriple {
+          min-height: 36px;
+          align-items: center;
+        }
+        .excelWeekCell input:not(:disabled):hover {
+          background: #fefeff;
+        }
+        .excelFixed {
+          position: sticky !important;
+          z-index: 5;
+          background: #fff !important;
+        }
+        .excelPlanningTable thead .excelFixed {
+          z-index: 15;
+          background: #f3effc !important;
+        }
+        .excelFixedName {
+          left: 0;
+          min-width: 205px;
+          width: 205px;
+          max-width: 205px;
+        }
+        .excelFixedPlan {
+          left: 205px;
+          min-width: 105px;
+          width: 105px;
+        }
+        .excelFixedActual {
+          left: 310px;
+          min-width: 105px;
+          width: 105px;
+        }
+        .excelFixedRemaining {
+          left: 415px;
+          min-width: 105px;
+          width: 105px;
+        }
+        .excelFixed small {
+          display: block;
+          font-size: 9px;
+          color: #737482;
+          font-weight: 550;
+        }
+        .excelChantierName {
+          text-align: left !important;
+          padding: 5px 9px !important;
+          background: #dfe9f9 !important;
+        }
+        .excelChantierName strong {
+          font-size: 12px;
+          overflow-wrap: anywhere;
+        }
+        .excelChantierTitle {
+          display: flex;
+          align-items: center;
+          justify-content: space-between;
+          gap: 4px;
+        }
+        .excelRowControls {
+          display: flex;
+          gap: 2px;
+        }
+        .excelRowControls button {
+          padding: 0;
+          width: 18px;
+          height: 19px;
+          font-size: 11px;
+          background: #fff;
+          border: 1px solid #d7d2ea;
+          border-radius: 3px;
+        }
+        .excelMetricCell {
+          background: #f2f4fb !important;
+        }
+        .excelActivityTotalRow .excelFixedName {
+          background: #eee9f8 !important;
+          color: #4c3b87;
+          font-weight: 900;
+          text-align: left !important;
+          padding: 7px 9px !important;
+          border-top: 2px solid #c4b9df;
+        }
+        .excelActivityTotalRow .excelMetricCell,
+        .excelActivityTotalCell {
+          background: #e1e9f5 !important;
+          font-weight: 800;
+          border-top: 2px solid #c4b9df;
+        }
+        .excelSummaryRow th {
+          text-align: left !important;
+          font-weight: 800;
+          padding: 7px 9px !important;
+          height: 31px;
+        }
+        .excelSummaryRow td {
+          background: #fff;
+          font-weight: 800;
+          font-size: 13px;
+        }
+        .excelSummaryRow .excelSummarySpacer {
+          background: #fff !important;
+        }
+        .excelSummaryCell.excelAvailable {
+          background: #37a667;
+          color: #fff;
+        }
+        .excelSummaryCell.excelTight {
+          background: #f7b650;
+          color: #553313;
+        }
+        .excelSummaryCell.excelUnavailable {
+          background: #cf5959;
+          color: #fff;
+        }
+        .excelCurrentWeek {
+          box-shadow:
+            inset 2px 0 0 #7666d6,
+            inset -2px 0 0 #7666d6;
+        }
+        .excelMonthStart {
+          border-left: 2px solid #b0a2d1 !important;
+        }
+        .excelPastWeek:not(.excelFixed) {
+          background-color: #f4f3f8;
+        }
+        .excelPotentialDivider th {
+          text-align: left;
+          background: #eee9fb !important;
+        }
+        .excelPotentialDivider button {
+          width: 100%;
+          display: flex;
+          gap: 12px;
+          align-items: center;
+          padding: 9px 12px;
+          border: 0;
+          background: transparent;
+          color: #6551a8;
+        }
+        .excelPotentialDivider small {
+          margin-left: auto;
+        }
+        .excelProvisionalRow .excelChantierName {
+          background: #f0e9fc !important;
+        }
+        .excelProvisionalRow .excelWeekCell {
+          background: #f7f2ff;
+        }
+        .excelEmpty {
+          height: 90px;
+        }
+        @media (max-width: 900px) {
+          .excelFixedName {
+            width: 160px;
+            min-width: 160px;
+            max-width: 160px;
+          }
+          .excelFixedPlan {
+            left: 160px;
+          }
+          .excelFixedActual {
+            left: 265px;
+          }
+          .excelFixedRemaining {
+            left: 370px;
+          }
+        }
+
         .grandPlanningWorkspace {
           min-width: 0;
         }
