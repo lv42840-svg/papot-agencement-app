@@ -15,6 +15,7 @@ import type {
   GrandPlanningProvisionRow,
   PlanningActivity,
 } from "@/lib/planning/domain";
+import { frenchPublicHolidaysForIsoWeek } from "@/lib/planning/capacity";
 import { buildGrandPlanningWeekMeta, groupGrandPlanningMonths } from "@/lib/planning/time-markers";
 
 type WeekCapacity = {
@@ -169,6 +170,7 @@ export function PlanningExcelGrid({
 
   const weekMeta = buildGrandPlanningWeekMeta(snapshot.weeks);
   const monthGroups = groupGrandPlanningMonths(weekMeta);
+  const holidaysByWeek = new Map(snapshot.weeks.map((week) => [week, frenchPublicHolidaysForIsoWeek(week)]));
   const capacityByWeek = new Map(
     snapshot.weeklyCapacity.map((capacity) => [capacity.week, capacity]),
   );
@@ -295,21 +297,30 @@ export function PlanningExcelGrid({
           ))}
         </tr>
         <tr className="excelWeekRow">
-          {weekMeta.map((meta) => (
+          {weekMeta.map((meta) => {
+            const holidays = holidaysByWeek.get(meta.week) ?? [];
+            const holidayDescription = holidays.map((holiday) =>
+              `${holiday.date.slice(8, 10)}/${holiday.date.slice(5, 7)} : ${holiday.label}`,
+            ).join(" · ");
+            return (
             <th
               key={meta.week}
-              className={["excelWeekHeading", weekClass(meta.week)].join(" ")}
+              className={["excelWeekHeading", weekClass(meta.week), holidays.length ? "excelHasHoliday" : ""].filter(Boolean).join(" ")}
               data-planning-week={meta.week}
-              title={meta.dateRangeLabel}
+              title={[meta.dateRangeLabel, holidayDescription].filter(Boolean).join(" · ")}
             >
-              <strong>{"S" + meta.week.slice(-2)}</strong>
+              <strong>
+                {"S" + meta.week.slice(-2)}
+                {holidays.length > 0 ? <span className="excelHolidayBadge">Férié</span> : null}
+              </strong>
               <div className="excelTriple excelWeekActivityLabels">
                 {ACTIVITY_LABELS.map((label) => (
                   <span key={label}>{label}</span>
                 ))}
               </div>
             </th>
-          ))}
+            );
+          })}
         </tr>
       </thead>
       <tbody>
