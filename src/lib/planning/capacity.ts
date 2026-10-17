@@ -143,7 +143,7 @@ export function suggestedAbsenceHoursForDate(
   schedule: PlanningPersonCapacity["weeklySchedule"],
   dateId: string,
 ): number {
-  if (!/^\\d{4}-\\d{2}-\\d{2}$/.test(dateId)) return 0;
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(dateId)) return 0;
   const day = new Date(`${dateId}T12:00:00Z`);
   if (Number.isNaN(day.getTime()) || day.toISOString().slice(0, 10) !== dateId) return 0;
   return scheduleHoursForDate(schedule, day);
