@@ -497,7 +497,7 @@ export function BillingDocumentEditor({ draftId }: { draftId: string }) {
         </div>
         {draft.type === "PROGRESS" && draft.lineProgress?.length ? (
           <details className="invoiceProgress">
-            <summary>Historique des avancements du devis</summary>
+            <summary>Avancement cumulé par ligne du devis</summary>
             <p>
               Ces pourcentages restent les valeurs enregistrées lors de la création de la situation.
               Modifier les montants ici n&apos;altère pas le devis ni les pourcentages déjà validés.
