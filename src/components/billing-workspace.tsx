@@ -138,7 +138,7 @@ export function BillingWorkspace({
     else if (type !== "STANDARD" && type !== "FINAL") payload.amountHtCents = numeric;
     const result = await write(
       payload,
-      "Projet enregistré. Ouvre son éditeur pour personnaliser les lignes.",
+      "Projet enregistré. Aucune facture officielle émise. Ouvre son éditeur pour personnaliser les lignes.",
     );
     const created = result?.drafts.find((draft) => draft.requestId === payload.requestId);
     if (created) router.push(`/facturation/${encodeURIComponent(created.id)}`);
