@@ -1,0 +1,28 @@
+name: Format dashboard sales tracking
+on:
+  push:
+    branches: [feat/accueil-suivi-vendu-marge-20261017]
+permissions:
+  contents: write
+jobs:
+  formatter:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - name: Format changed dashboard files
+        run: |
+          npx --no-install prettier --write src/app/api/desktop/dashboard/sold-summary/route.ts src/components/dashboard-sold-margin-stat.tsx tests/dashboard-sold-ui.test.ts
+      - name: Commit formatting
+        run: |
+          if [ -n "$(git status --porcelain)" ]; then
+            git config user.name "github-actions[bot]"
+            git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+            git add src/app/api/desktop/dashboard/sold-summary/route.ts src/components/dashboard-sold-margin-stat.tsx tests/dashboard-sold-ui.test.ts
+            git commit -m 'chore(dashboard): format sales KPI module'
+            git push origin HEAD:feat/accueil-suivi-vendu-marge-20261017
+          fi
