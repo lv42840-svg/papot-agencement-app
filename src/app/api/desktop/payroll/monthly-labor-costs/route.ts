@@ -20,7 +20,7 @@ function failure(error: unknown) {
   return NextResponse.json({ error: code }, { status: desktopRequestErrorStatus(code) ?? (code.includes("NOT_FOUND") ? 404 : code.includes("NOT_CLOSED") ? 409 : 400) });
 }
 
-async function snapshot(month: string) {
+async function snapshot(month: string, editable: boolean) {
   const [planning, auth, ledger] = await Promise.all([
     createPlanningRepository().load(), readAuthPayload(), readMonthlyLaborCosts(),
   ]);
@@ -31,6 +31,7 @@ async function snapshot(month: string) {
   for (const staff of planning.staff) if (registeredIds.has(staff.id) && !byId.has(staff.id)) byId.set(staff.id, staff.firstName + " " + staff.lastName);
   return {
     month,
+    editable,
     people: [...byId].map(([id, name]) => ({ id, name })).sort((a,b) => a.name.localeCompare(b.name, "fr")),
     records: ledger.records.filter((row) => row.month === month).map((row) => ({
       ...row, hourlyRateEuro: monthlyHourlyRateEuro(row),
@@ -40,10 +41,10 @@ async function snapshot(month: string) {
 
 export async function GET(request: Request) {
   try {
-    await requireModuleRequestContext("payroll", "READ");
+    const ctx = await requireModuleRequestContext("payroll", "READ");
     const month = new URL(request.url).searchParams.get("month") ?? "";
     assertClosedMonth(month);
-    return NextResponse.json(await snapshot(month), { headers: { "Cache-Control": "no-store" } });
+    return NextResponse.json(await snapshot(month, ctx.moduleAccess.canWrite), { headers: { "Cache-Control": "no-store" } });
   } catch (error) { return failure(error); }
 }
 
@@ -58,6 +59,6 @@ export async function POST(request: Request) {
     const historical = await readMonthlyLaborCosts();
     for (const record of historical.records) ids.add(record.personId);
     await mutateMonthlyLaborCosts((source) => saveMonthlyLaborCost(source, input, ids, ctx.user.displayName));
-    return NextResponse.json(await snapshot(input.month), { headers: { "Cache-Control": "no-store" } });
+    return NextResponse.json(await snapshot(input.month, true), { headers: { "Cache-Control": "no-store" } });
   } catch (error) { return failure(error); }
 }
