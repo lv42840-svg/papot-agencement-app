@@ -83,9 +83,12 @@ export function applyPlanningStaffMutation(
   const accountId = input.linkedUserId;
   if (accountId !== null) {
     if (!activeAccounts.has(accountId)) throw new Error("PLANNING_ACCOUNT_NOT_ACTIVE");
-    if (payload.staff.some((candidate) =>
-      candidate.id !== person.id && candidate.linkedUserId === accountId
-    )) throw new Error("PLANNING_ACCOUNT_ALREADY_LINKED");
+    if (
+      payload.staff.some(
+        (candidate) => candidate.id !== person.id && candidate.linkedUserId === accountId,
+      )
+    )
+      throw new Error("PLANNING_ACCOUNT_ALREADY_LINKED");
 
     // Existing account schedules and absences must never disappear after linking.
     const legacyCapacity = payload.peopleCapacity.find((entry) => entry.userId === accountId);
@@ -94,11 +97,16 @@ export function applyPlanningStaffMutation(
       throw new Error("PLANNING_STAFF_CAPACITY_CONFLICT");
     }
     const staffAbsenceDays = new Set(
-      payload.absences.filter((absence) => absence.userId === person.id).map((absence) => absence.date),
+      payload.absences
+        .filter((absence) => absence.userId === person.id)
+        .map((absence) => absence.date),
     );
-    if (payload.absences.some((absence) =>
-      absence.userId === accountId && staffAbsenceDays.has(absence.date)
-    )) throw new Error("PLANNING_STAFF_ABSENCE_CONFLICT");
+    if (
+      payload.absences.some(
+        (absence) => absence.userId === accountId && staffAbsenceDays.has(absence.date),
+      )
+    )
+      throw new Error("PLANNING_STAFF_ABSENCE_CONFLICT");
 
     if (legacyCapacity) legacyCapacity.userId = person.id;
     for (const absence of payload.absences) {
@@ -109,9 +117,6 @@ export function applyPlanningStaffMutation(
   return parsePlanningPayload(payload);
 }
 
-export function staffIdentityExists(
-  staff: readonly PlanningStaff[],
-  personId: string,
-): boolean {
+export function staffIdentityExists(staff: readonly PlanningStaff[], personId: string): boolean {
   return staff.some((person) => person.id === personId);
 }

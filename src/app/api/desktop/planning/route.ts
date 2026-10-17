@@ -113,8 +113,12 @@ async function snapshot(
   }
 
   const peopleCapacity = effectivePlanningPeople(planning, auth.users);
-  const personNameById = new Map(peopleCapacity.map((person) => [person.userId, person.displayName]));
-  const accountNameById = new Map(auth.users.map((candidate) => [candidate.id, candidate.displayName]));
+  const personNameById = new Map(
+    peopleCapacity.map((person) => [person.userId, person.displayName]),
+  );
+  const accountNameById = new Map(
+    auth.users.map((candidate) => [candidate.id, candidate.displayName]),
+  );
 
   return {
     year,
@@ -136,15 +140,18 @@ async function snapshot(
       )
       .map((absence) => ({
         ...absence,
-        displayName: personNameById.get(absence.userId) ?? accountNameById.get(absence.userId) ?? "Personnel",
+        displayName:
+          personNameById.get(absence.userId) ?? accountNameById.get(absence.userId) ?? "Personnel",
         typeLabel: PLANNING_ABSENCE_TYPE_LABELS[absence.type],
       }))
       .sort((left, right) => left.date.localeCompare(right.date)),
     peopleCapacity,
-    availableAccounts: canWrite && canManageSchedules
-      ? auth.users.filter((candidate) => candidate.isActive)
-        .map((candidate) => ({ id: candidate.id, displayName: candidate.displayName }))
-      : [],
+    availableAccounts:
+      canWrite && canManageSchedules
+        ? auth.users
+            .filter((candidate) => candidate.isActive)
+            .map((candidate) => ({ id: candidate.id, displayName: candidate.displayName }))
+        : [],
     capabilities: {
       canRead: true,
       canEditMacro: canWrite && canEditMacro,
@@ -291,16 +298,26 @@ export async function POST(request: Request) {
       } else if (input.action === "setPersonCapacity") {
         await planningRepository.mutate((payload) =>
           applyPlanningPersonCapacityMutation(
-            payload, input, new Set(effectivePlanningPeople(payload, auth.users).map((person) => person.userId)),
+            payload,
+            input,
+            new Set(effectivePlanningPeople(payload, auth.users).map((person) => person.userId)),
           ),
         );
       } else if (input.action === "setAbsence") {
         await planningRepository.mutate((payload) =>
-          applyPlanningAbsenceMutation(payload, input, new Set(effectivePlanningPeople(payload, auth.users).map((person) => person.userId))),
+          applyPlanningAbsenceMutation(
+            payload,
+            input,
+            new Set(effectivePlanningPeople(payload, auth.users).map((person) => person.userId)),
+          ),
         );
       } else if (input.action === "setFullWeekAbsence") {
         await planningRepository.mutate((payload) =>
-          applyPlanningFullWeekAbsenceMutation(payload, input, new Set(effectivePlanningPeople(payload, auth.users).map((person) => person.userId))),
+          applyPlanningFullWeekAbsenceMutation(
+            payload,
+            input,
+            new Set(effectivePlanningPeople(payload, auth.users).map((person) => person.userId)),
+          ),
         );
       } else {
         await planningRepository.mutate((payload) =>

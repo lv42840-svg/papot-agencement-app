@@ -878,18 +878,23 @@ export function GrandPlanningWorkspace({
                     {editingStaffId ? "Enregistrer la fiche" : "+ Ajouter une personne"}
                   </button>
                   {editingStaffId ? (
-                    <button type="button" className="secondaryButton" onClick={() => {
-                      setEditingStaffId(null);
-                      setStaffFirstName("");
-                      setStaffLastName("");
-                    }}>
+                    <button
+                      type="button"
+                      className="secondaryButton"
+                      onClick={() => {
+                        setEditingStaffId(null);
+                        setStaffFirstName("");
+                        setStaffLastName("");
+                      }}
+                    >
                       Annuler
                     </button>
                   ) : null}
                 </form>
               ) : null}
               <p className="planningStaffHint">
-                Une personne peut figurer au planning sans compte de connexion. Le rattachement reste facultatif.
+                Une personne peut figurer au planning sans compte de connexion. Le rattachement
+                reste facultatif.
               </p>
               <div className="planningScheduleTableWrap">
                 <table className="planningScheduleTable">
@@ -927,14 +932,19 @@ export function GrandPlanningWorkspace({
                                       Modifier
                                     </button>
                                     <label>
-                                      <span className="sr-only">Rattacher un compte à {person.displayName}</span>
+                                      <span className="sr-only">
+                                        Rattacher un compte à {person.displayName}
+                                      </span>
                                       <select
                                         aria-label={`Compte PAPOT associé à ${person.displayName}`}
                                         value={person.linkedUserId ?? ""}
                                         disabled={savingKey !== null}
-                                        onChange={(event) => void linkStaffAccount(
-                                          person.userId, event.target.value || null,
-                                        )}
+                                        onChange={(event) =>
+                                          void linkStaffAccount(
+                                            person.userId,
+                                            event.target.value || null,
+                                          )
+                                        }
                                       >
                                         <option value="">Aucun compte</option>
                                         {snapshot.availableAccounts.map((account) => (
@@ -942,7 +952,8 @@ export function GrandPlanningWorkspace({
                                             key={account.id}
                                             value={account.id}
                                             disabled={snapshot.peopleCapacity.some(
-                                              (other) => other.kind === "staff" &&
+                                              (other) =>
+                                                other.kind === "staff" &&
                                                 other.userId !== person.userId &&
                                                 other.linkedUserId === account.id,
                                             )}

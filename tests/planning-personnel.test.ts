@@ -1,9 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { createInitialPlanningPayload, parsePlanningPayload } from "../src/lib/planning/domain";
-import {
-  applyPlanningStaffMutation,
-  effectivePlanningPeople,
-} from "../src/lib/planning/personnel";
+import { applyPlanningStaffMutation, effectivePlanningPeople } from "../src/lib/planning/personnel";
 import {
   applyPlanningAbsenceMutation,
   applyPlanningPersonCapacityMutation,
@@ -51,8 +48,10 @@ describe("planning independent personnel", () => {
     const counted = applyPlanningPersonCapacityMutation(
       saved,
       {
-        action: "setPersonCapacity", userId: id,
-        countsInMacroCapacity: true, weeklySchedule: DEFAULT_WEEKLY_SCHEDULE,
+        action: "setPersonCapacity",
+        userId: id,
+        countsInMacroCapacity: true,
+        weeklySchedule: DEFAULT_WEEKLY_SCHEDULE,
       },
       new Set(effectivePlanningPeople(saved, accounts).map((person) => person.userId)),
     );
@@ -60,12 +59,17 @@ describe("planning independent personnel", () => {
       counted,
       {
         action: "setAbsence",
-        userId: id, type: "VACATION", date: "2026-10-19", hours: 7.8,
+        userId: id,
+        type: "VACATION",
+        date: "2026-10-19",
+        hours: 7.8,
       },
       new Set(effectivePlanningPeople(counted, accounts).map((person) => person.userId)),
     );
     const indicators = buildWeeklyCapacityIndicators(
-      ["2026-W43"], effectivePlanningPeople(absent, accounts), new Map(),
+      ["2026-W43"],
+      effectivePlanningPeople(absent, accounts),
+      new Map(),
       absent.absences,
     );
     expect(indicators[0].totalCapacityHours).toBeCloseTo(31.2);
@@ -78,21 +82,28 @@ describe("planning independent personnel", () => {
     const withLegacy = applyPlanningPersonCapacityMutation(
       created,
       {
-        action: "setPersonCapacity", userId: accountId,
-        countsInMacroCapacity: true, weeklySchedule: DEFAULT_WEEKLY_SCHEDULE,
+        action: "setPersonCapacity",
+        userId: accountId,
+        countsInMacroCapacity: true,
+        weeklySchedule: DEFAULT_WEEKLY_SCHEDULE,
       },
       active,
     );
     const absent = applyPlanningAbsenceMutation(
       withLegacy,
       {
-        action: "setAbsence", userId: accountId,
-        type: "VACATION", date: "2026-10-19", hours: 7.8,
+        action: "setAbsence",
+        userId: accountId,
+        type: "VACATION",
+        date: "2026-10-19",
+        hours: 7.8,
       },
       active,
     );
     const linked = applyPlanningStaffMutation(
-      absent, { action: "linkStaffAccount", id: personId, linkedUserId: accountId }, active,
+      absent,
+      { action: "linkStaffAccount", id: personId, linkedUserId: accountId },
+      active,
     );
     const people = effectivePlanningPeople(linked, accounts);
     expect(people).toHaveLength(2);
@@ -106,17 +117,39 @@ describe("planning independent personnel", () => {
   it("supports renaming and unlinking while keeping staff schedules and absences", () => {
     const created = addStaff();
     const id = created.staff[0].id;
-    const linked = applyPlanningStaffMutation(created, {
-      action: "linkStaffAccount", id, linkedUserId: accountId,
-    }, active);
-    const renamed = applyPlanningStaffMutation(linked, {
-      action: "saveStaff", id, firstName: "Alex", lastName: "Martin",
-    }, active);
-    const unlinked = applyPlanningStaffMutation(renamed, {
-      action: "linkStaffAccount", id, linkedUserId: null,
-    }, active);
+    const linked = applyPlanningStaffMutation(
+      created,
+      {
+        action: "linkStaffAccount",
+        id,
+        linkedUserId: accountId,
+      },
+      active,
+    );
+    const renamed = applyPlanningStaffMutation(
+      linked,
+      {
+        action: "saveStaff",
+        id,
+        firstName: "Alex",
+        lastName: "Martin",
+      },
+      active,
+    );
+    const unlinked = applyPlanningStaffMutation(
+      renamed,
+      {
+        action: "linkStaffAccount",
+        id,
+        linkedUserId: null,
+      },
+      active,
+    );
     expect(unlinked.staff[0]).toMatchObject({
-      id, firstName: "Alex", lastName: "Martin", linkedUserId: null,
+      id,
+      firstName: "Alex",
+      lastName: "Martin",
+      linkedUserId: null,
     });
     expect(effectivePlanningPeople(unlinked, accounts)).toHaveLength(3);
   });
@@ -124,37 +157,90 @@ describe("planning independent personnel", () => {
   it("refuses a duplicate account link, a disabled account, and missing staff", () => {
     const first = addStaff();
     const second = applyPlanningStaffMutation(
-      first, { action: "saveStaff", firstName: "Sam", lastName: "Leroy" }, active,
+      first,
+      { action: "saveStaff", firstName: "Sam", lastName: "Leroy" },
+      active,
     );
-    const linked = applyPlanningStaffMutation(second, {
-      action: "linkStaffAccount", id: first.staff[0].id, linkedUserId: accountId,
-    }, active);
-    expect(() => applyPlanningStaffMutation(linked, {
-      action: "linkStaffAccount", id: second.staff[1].id, linkedUserId: accountId,
-    }, active)).toThrow("PLANNING_ACCOUNT_ALREADY_LINKED");
-    expect(() => applyPlanningStaffMutation(first, {
-      action: "linkStaffAccount", id: first.staff[0].id, linkedUserId: secondAccountId,
-    }, new Set([accountId]))).toThrow("PLANNING_ACCOUNT_NOT_ACTIVE");
-    expect(() => applyPlanningStaffMutation(first, {
-      action: "saveStaff", id: accountId, firstName: "X", lastName: "Y",
-    }, active)).toThrow("PLANNING_STAFF_NOT_FOUND");
+    const linked = applyPlanningStaffMutation(
+      second,
+      {
+        action: "linkStaffAccount",
+        id: first.staff[0].id,
+        linkedUserId: accountId,
+      },
+      active,
+    );
+    expect(() =>
+      applyPlanningStaffMutation(
+        linked,
+        {
+          action: "linkStaffAccount",
+          id: second.staff[1].id,
+          linkedUserId: accountId,
+        },
+        active,
+      ),
+    ).toThrow("PLANNING_ACCOUNT_ALREADY_LINKED");
+    expect(() =>
+      applyPlanningStaffMutation(
+        first,
+        {
+          action: "linkStaffAccount",
+          id: first.staff[0].id,
+          linkedUserId: secondAccountId,
+        },
+        new Set([accountId]),
+      ),
+    ).toThrow("PLANNING_ACCOUNT_NOT_ACTIVE");
+    expect(() =>
+      applyPlanningStaffMutation(
+        first,
+        {
+          action: "saveStaff",
+          id: accountId,
+          firstName: "X",
+          lastName: "Y",
+        },
+        active,
+      ),
+    ).toThrow("PLANNING_STAFF_NOT_FOUND");
   });
 
   it("blocks linking when both existing schedules conflict, never silently drops absence data", () => {
     const created = addStaff();
     const personId = created.staff[0].id;
-    const config = { action: "setPersonCapacity" as const,
-      countsInMacroCapacity: true, weeklySchedule: DEFAULT_WEEKLY_SCHEDULE,
+    const config = {
+      action: "setPersonCapacity" as const,
+      countsInMacroCapacity: true,
+      weeklySchedule: DEFAULT_WEEKLY_SCHEDULE,
     };
-    const staffScheduled = applyPlanningPersonCapacityMutation(created, {
-      ...config, userId: personId,
-    }, new Set([personId]));
-    const both = applyPlanningPersonCapacityMutation(staffScheduled, {
-      ...config, userId: accountId,
-    }, active);
-    expect(() => applyPlanningStaffMutation(both, {
-      action: "linkStaffAccount", id: personId, linkedUserId: accountId,
-    }, active)).toThrow("PLANNING_STAFF_CAPACITY_CONFLICT");
+    const staffScheduled = applyPlanningPersonCapacityMutation(
+      created,
+      {
+        ...config,
+        userId: personId,
+      },
+      new Set([personId]),
+    );
+    const both = applyPlanningPersonCapacityMutation(
+      staffScheduled,
+      {
+        ...config,
+        userId: accountId,
+      },
+      active,
+    );
+    expect(() =>
+      applyPlanningStaffMutation(
+        both,
+        {
+          action: "linkStaffAccount",
+          id: personId,
+          linkedUserId: accountId,
+        },
+        active,
+      ),
+    ).toThrow("PLANNING_STAFF_CAPACITY_CONFLICT");
     expect(both.peopleCapacity).toHaveLength(2);
   });
 });
