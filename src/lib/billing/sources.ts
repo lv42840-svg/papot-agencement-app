@@ -6,6 +6,7 @@ import { clientDisplayName } from "@/lib/clients/domain";
 import { createCommercialRepository } from "@/lib/commercial/create-repository";
 import { calculateQuoteAdjustedPricing } from "@/lib/quotes/adjustments";
 import { createQuotesRepository } from "@/lib/quotes/create-repository";
+import { quoteCanBeRetained } from "@/lib/quotes/retention";
 import type { NativeQuoteRecord } from "@/lib/quotes/store";
 import { billingSourceSchema, type BillingSource, type BillingTaxGroup } from "./domain";
 
@@ -46,14 +47,12 @@ export async function loadBillingSources(): Promise<BillingSource[]> {
   return quotes.quotes
     .flatMap((quote): BillingSource[] => {
       const affair = byAffair.get(quote.commercialCaseId);
-      if (!affair || !affair.retainedQuoteIds.includes(quote.id)) return [];
       if (
-        quote.status === "DRAFT" ||
-        quote.status === "CANCELLED" ||
-        quote.status === "REJECTED" ||
-        quote.status === "SUPERSEDED"
-      )
-        return [];
+        !affair ||
+        affair.status !== "CONFIRMED" ||
+        !affair.retainedQuoteIds.includes(quote.id) ||
+        !quoteCanBeRetained(quote)
+      ) return [];
       if (!affair.clientId || affair.clientId !== quote.model.clientId) return [];
       const client = byClient.get(affair.clientId);
       if (!client) return [];
