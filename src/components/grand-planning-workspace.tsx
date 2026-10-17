@@ -622,7 +622,12 @@ export function GrandPlanningWorkspace({
 
       {activeTab === "planning" ? (
         <div className="planningUnallocatedArea">
-          {unallocated.length > 0 ? (
+          {unallocated.length > 0 && hiddenUnallocated ? (
+        <button type="button" className="secondaryButton planningReopenPanel" onClick={() => toggleUnallocated(false)}>
+          Afficher les charges à répartir
+        </button>
+      ) : null}
+      {unallocated.length > 0 && !hiddenUnallocated ? (
             <section className="planningUnallocatedPanel" aria-label="Heures à répartir">
               <div className="planningUnallocatedHeader">
                 <div>
@@ -644,7 +649,10 @@ export function GrandPlanningWorkspace({
                   h
                 </strong>
               </div>
-              <div className="planningUnallocatedList">
+              <button type="button" className="planningDismissButton" aria-label="Masquer les charges à répartir" onClick={() => toggleUnallocated(true)}>
+            ✕
+          </button>
+          <div className="planningUnallocatedList">
                 {unallocated.map((chantier) => (
                   <div className="planningUnallocatedRow" key={chantier.chantierId}>
                     <strong>{chantier.name}</strong>
@@ -668,7 +676,12 @@ export function GrandPlanningWorkspace({
             </section>
           ) : null}
 
-          {provisionalUnallocated.length > 0 ? (
+          {provisionalUnallocated.length > 0 && hiddenProvisional ? (
+        <button type="button" className="secondaryButton planningReopenPanel" onClick={() => toggleProvisional(false)}>
+          Afficher les charges provisionnelles à répartir
+        </button>
+      ) : null}
+      {provisionalUnallocated.length > 0 && !hiddenProvisional ? (
             <section
               className="planningUnallocatedPanel planningProvisionUnallocatedPanel"
               aria-label="Charges provisionnelles à répartir"
@@ -696,7 +709,10 @@ export function GrandPlanningWorkspace({
                   h
                 </strong>
               </div>
-              <div className="planningUnallocatedList">
+              <button type="button" className="planningDismissButton" aria-label="Masquer les charges provisionnelles" onClick={() => toggleProvisional(true)}>
+            ✕
+          </button>
+          <div className="planningUnallocatedList">
                 {provisionalUnallocated.map((item) => (
                   <div className="planningUnallocatedRow" key={item.caseId}>
                     <div className="planningProvisionCaseMeta">
@@ -985,7 +1001,7 @@ export function GrandPlanningWorkspace({
           {message ? <p className="planningMessage">{message}</p> : null}
 
           {snapshot ? (
-            <div className="grandPlanningScroller" ref={planningScrollerRef}>
+            <div className="grandPlanningScroller" ref={planningScrollerRef} onScroll={handlePlanningScroll}>
               <PlanningExcelGrid
                 snapshot={snapshot}
                 drafts={drafts}
@@ -1009,6 +1025,19 @@ export function GrandPlanningWorkspace({
                 onTogglePotential={togglePotentialCollapsed}
               />
             </div>
+            {snapshot.endYear < 2100 ? (
+              <div className="planningLoadMore">
+                <button
+                  type="button"
+                  className="secondaryButton"
+                  disabled={loadingNextYear || savingKey !== null}
+                  onClick={() => void extendPlanning()}
+                >
+                  {loadingNextYear ? "Chargement…" : `Afficher ${snapshot.endYear + 1} →`}
+                </button>
+                <span>Le planning se prolonge en faisant défiler vers la droite.</span>
+              </div>
+            ) : null}
           ) : null}
         </section>
       ) : null}
@@ -1300,6 +1329,34 @@ export function GrandPlanningWorkspace({
           }
         }
 
+        .planningDismissButton {
+          float: right;
+          margin-top: -30px;
+          margin-right: 0;
+          border: 0;
+          border-radius: 5px;
+          background: transparent;
+          color: #876d4b;
+          padding: 3px 7px;
+          font-size: 18px;
+          font-weight: 800;
+        }
+        .planningDismissButton:hover {
+          background: rgb(120 90 40 / 0.08);
+        }
+        .planningReopenPanel {
+          margin-bottom: 14px;
+        }
+        .planningLoadMore {
+          display: flex;
+          flex-wrap: wrap;
+          align-items: center;
+          gap: 12px;
+          padding: 9px 14px;
+          color: var(--muted);
+          font-size: 11px;
+          border-top: 1px solid var(--border);
+        }
         .grandPlanningWorkspace {
           min-width: 0;
         }
