@@ -616,6 +616,11 @@ export function BillingDocumentEditor({ draftId }: { draftId: string }) {
               setRows(initialRows.map((row) => ({ ...row })));
               setLabel(draft.label);
               setNotes(draft.notes);
+              setProgressValues(Object.fromEntries((draft.lines ?? []).map((line) =>
+                [line.lineId, decimal(draft.lineProgress?.find((row) => row.lineId === line.lineId)?.percent
+                  ?? draft.cumulativePercent ?? 0)],
+              )));
+              setPendingPercentages(null);
               setDirty(false);
               setError("");
             }}
