@@ -1001,7 +1001,8 @@ export function GrandPlanningWorkspace({
           {message ? <p className="planningMessage">{message}</p> : null}
 
           {snapshot ? (
-            <div className="grandPlanningScroller" ref={planningScrollerRef} onScroll={handlePlanningScroll}>
+            <>
+              <div className="grandPlanningScroller" ref={planningScrollerRef} onScroll={handlePlanningScroll}>
               <PlanningExcelGrid
                 snapshot={snapshot}
                 drafts={drafts}
@@ -1038,6 +1039,7 @@ export function GrandPlanningWorkspace({
                 <span>Le planning se prolonge en faisant défiler vers la droite.</span>
               </div>
             ) : null}
+            </>
           ) : null}
         </section>
       ) : null}
