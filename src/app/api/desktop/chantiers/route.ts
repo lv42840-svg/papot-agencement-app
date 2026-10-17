@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { ZodError } from "zod";
 import { chantierSpecialPermissionForMutation } from "@/lib/auth/action-permissions";
-import { hasEffectiveSpecialPermission, requireSpecialPermission } from "@/lib/auth/permissions";
+import { hasEffectiveSpecialPermission, hasModuleAccess, requireSpecialPermission } from "@/lib/auth/permissions";
 import { createChantiersRepository } from "@/lib/chantiers/create-repository";
 import type { ChantiersPayload } from "@/lib/chantiers/domain";
 import {
@@ -62,7 +62,8 @@ async function snapshot(
   const baseCapabilities = chantierCapabilities(actor);
   const planningPayload = await createPlanningRepository().load();
   const now = new Date();
-  const monthlyCosts = await readMonthlyLaborCosts();
+  const canViewLaborCosts = await hasModuleAccess(user.id, "payroll", "READ");
+  const monthlyCosts = canViewLaborCosts ? await readMonthlyLaborCosts() : null;
   const [canLaunchSpecial, canCloseReopenSpecial, canArchiveSpecial] = await Promise.all([
     hasEffectiveSpecialPermission(user, "commercial.confirm_launch"),
     hasEffectiveSpecialPermission(user, "chantiers.close_reopen"),
@@ -88,12 +89,12 @@ async function snapshot(
     actualLaborCostsByChantier: Object.fromEntries(
       payload.chantiers.map((chantier) => [
         chantier.id,
-        calculateChantierLaborCostCents(
+        monthlyCosts ? calculateChantierLaborCostCents(
           chantier.id,
           planningPayload.actualHours,
           monthlyCosts.records,
           planningPayload.peopleCapacity,
-        ),
+        ) : null,
       ]),
     ),
     actor,
