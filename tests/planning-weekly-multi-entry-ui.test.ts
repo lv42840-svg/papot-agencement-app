@@ -1,9 +1,18 @@
 import { readFileSync } from "node:fs";
 import { describe, expect, it } from "vitest";
 
-const board = readFileSync(new URL("../src/components/weekly-team-board.tsx", import.meta.url), "utf8");
-const cell = readFileSync(new URL("../src/components/weekly-board-day-cell.tsx", import.meta.url), "utf8");
-const route = readFileSync(new URL("../src/app/api/desktop/planning/weekly-board/route.ts", import.meta.url), "utf8");
+const board = readFileSync(
+  new URL("../src/components/weekly-team-board.tsx", import.meta.url),
+  "utf8",
+);
+const cell = readFileSync(
+  new URL("../src/components/weekly-board-day-cell.tsx", import.meta.url),
+  "utf8",
+);
+const route = readFileSync(
+  new URL("../src/app/api/desktop/planning/weekly-board/route.ts", import.meta.url),
+  "utf8",
+);
 
 describe("weekly team board extended UI", () => {
   it("can add, edit and delete multiple categorized assignments within the same day", () => {

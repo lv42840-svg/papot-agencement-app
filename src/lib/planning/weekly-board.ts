@@ -107,13 +107,13 @@ export function applyWeeklyBoardEntry(
   const index = input.id
     ? current.findIndex((row) => row.id === input.id)
     : input.legacy
-      ? current.findIndex((row) => !row.id && row.userId === input.userId && row.date === input.date)
+      ? current.findIndex(
+          (row) => !row.id && row.userId === input.userId && row.date === input.date,
+        )
       : -1;
   if ((input.id || input.legacy) && index < 0) throw new Error("PLANNING_DAILY_NOT_FOUND");
-  if (
-    index >= 0 &&
-    (current[index].userId !== input.userId || current[index].date !== input.date)
-  ) throw new Error("PLANNING_DAILY_TARGET_INVALID");
+  if (index >= 0 && (current[index].userId !== input.userId || current[index].date !== input.date))
+    throw new Error("PLANNING_DAILY_TARGET_INVALID");
 
   if (input.action === "deleteDailyEntry") {
     if (index < 0) throw new Error("PLANNING_DAILY_NOT_FOUND");
@@ -122,8 +122,8 @@ export function applyWeeklyBoardEntry(
   }
 
   const normalized = input.label.trim();
-  const chantier = activeChantiers.find((site) =>
-    site.name.trim().toLocaleLowerCase("fr-FR") === normalized.toLocaleLowerCase("fr-FR"),
+  const chantier = activeChantiers.find(
+    (site) => site.name.trim().toLocaleLowerCase("fr-FR") === normalized.toLocaleLowerCase("fr-FR"),
   );
   const newEntry = {
     id: input.id ?? crypto.randomUUID(),
@@ -136,7 +136,9 @@ export function applyWeeklyBoardEntry(
 
   if (index >= 0) current[index] = newEntry;
   else {
-    if (current.filter((row) => row.userId === input.userId && row.date === input.date).length >= 20) {
+    if (
+      current.filter((row) => row.userId === input.userId && row.date === input.date).length >= 20
+    ) {
       throw new Error("PLANNING_DAILY_LIMIT");
     }
     current.push(newEntry);
@@ -165,11 +167,13 @@ export function weeklyChantierHours(
   category: "firm" | "provisional",
   nameAndId: (index: number) => { id: string; name: string },
 ): WeeklyBoardChantierLine[] {
-  return rows.map((row, index) => {
-    const hours = weekActivityHours([row], week);
-    const identity = nameAndId(index);
-    return { ...identity, category, ...hours };
-  }).filter((line) => line.total !== 0);
+  return rows
+    .map((row, index) => {
+      const hours = weekActivityHours([row], week);
+      const identity = nameAndId(index);
+      return { ...identity, category, ...hours };
+    })
+    .filter((line) => line.total !== 0);
 }
 
 export type WeeklyBoardActivitySummary = {

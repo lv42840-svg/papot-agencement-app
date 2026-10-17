@@ -3,10 +3,18 @@
 import Link from "next/link";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { isoWeekMonday, weekDateRangeLabel } from "@/lib/planning/time-markers";
-import { WeeklyBoardDayCell, type BoardEntry, type BoardEntryMutation } from "./weekly-board-day-cell";
+import {
+  WeeklyBoardDayCell,
+  type BoardEntry,
+  type BoardEntryMutation,
+} from "./weekly-board-day-cell";
 
 type WeeklySummary = { be: number; workshop: number; install: number; total: number };
-type WeeklyChantierLine = WeeklySummary & { id: string; name: string; category: "firm" | "provisional" };
+type WeeklyChantierLine = WeeklySummary & {
+  id: string;
+  name: string;
+  category: "firm" | "provisional";
+};
 type WeekData = {
   week: string;
   dates: string[];
@@ -121,7 +129,9 @@ export function WeeklyTeamBoard({ week }: { week: string }) {
       const json = (await response.json()) as WeekData & { error?: string };
       if (!response.ok) throw new Error(json.error ?? "Enregistrement impossible.");
       setData(json);
-      setMessage(input.action === "deleteDailyEntry" ? "Affectation supprimée." : "Affectation enregistrée.");
+      setMessage(
+        input.action === "deleteDailyEntry" ? "Affectation supprimée." : "Affectation enregistrée.",
+      );
       return true;
     } catch (cause) {
       setMessage(cause instanceof Error ? cause.message : "Enregistrement impossible.");
@@ -190,7 +200,10 @@ export function WeeklyTeamBoard({ week }: { week: string }) {
                 {totalPeople} personne{totalPeople > 1 ? "s" : ""} · lundi à vendredi
               </small>
             </div>
-            <aside className="weeklyBoardHours" aria-label="Extrait du grand planning pour la semaine">
+            <aside
+              className="weeklyBoardHours"
+              aria-label="Extrait du grand planning pour la semaine"
+            >
               <div className="weeklyBoardHoursHeading">
                 <strong>Extrait du grand planning · S{week.slice(-2)}</strong>
                 <span>Heures prévues cette semaine</span>
@@ -213,41 +226,57 @@ export function WeeklyTeamBoard({ week }: { week: string }) {
                         <td>{formatHours(row.be)}</td>
                         <td>{formatHours(row.workshop)}</td>
                         <td>{formatHours(row.install)}</td>
-                        <td><strong>{formatHours(row.total)}</strong></td>
+                        <td>
+                          <strong>{formatHours(row.total)}</strong>
+                        </td>
                       </tr>
                     ))}
                     {data.provisionalChantiers.map((row) => (
                       <tr className="isProvisional" key={`provisional:${row.id}`}>
-                        <th scope="row">{row.name} <small>Provisionnel</small></th>
+                        <th scope="row">
+                          {row.name} <small>Provisionnel</small>
+                        </th>
                         <td>{formatHours(row.be)}</td>
                         <td>{formatHours(row.workshop)}</td>
                         <td>{formatHours(row.install)}</td>
-                        <td><strong>{formatHours(row.total)}</strong></td>
+                        <td>
+                          <strong>{formatHours(row.total)}</strong>
+                        </td>
                       </tr>
                     ))}
                     {data.firmChantiers.length + data.provisionalChantiers.length === 0 ? (
-                      <tr><td colSpan={5}>Aucune heure positionnée cette semaine.</td></tr>
+                      <tr>
+                        <td colSpan={5}>Aucune heure positionnée cette semaine.</td>
+                      </tr>
                     ) : null}
                     <tr className="weeklyBoardTotalRow">
                       <th scope="row">Total ferme</th>
                       <td>{formatHours(data.firm.be)}</td>
                       <td>{formatHours(data.firm.workshop)}</td>
                       <td>{formatHours(data.firm.install)}</td>
-                      <td><strong>{formatHours(data.firm.total)}</strong></td>
+                      <td>
+                        <strong>{formatHours(data.firm.total)}</strong>
+                      </td>
                     </tr>
                     <tr className="weeklyBoardTotalRow isProvisional">
                       <th scope="row">Total provisionnel</th>
                       <td>{formatHours(data.provisional.be)}</td>
                       <td>{formatHours(data.provisional.workshop)}</td>
                       <td>{formatHours(data.provisional.install)}</td>
-                      <td><strong>{formatHours(data.provisional.total)}</strong></td>
+                      <td>
+                        <strong>{formatHours(data.provisional.total)}</strong>
+                      </td>
                     </tr>
                   </tbody>
                 </table>
               </div>
               <div className="weeklyBoardAvailable">
-                <span>Disponible ferme <b>{formatHours(data.capacity.firmAvailableHours)} h</b></span>
-                <span>Avec potentiel <b>{formatHours(data.capacity.availableWithProvisionHours)} h</b></span>
+                <span>
+                  Disponible ferme <b>{formatHours(data.capacity.firmAvailableHours)} h</b>
+                </span>
+                <span>
+                  Avec potentiel <b>{formatHours(data.capacity.availableWithProvisionHours)} h</b>
+                </span>
               </div>
             </aside>
           </div>
@@ -270,7 +299,9 @@ export function WeeklyTeamBoard({ week }: { week: string }) {
                       >
                         {WEEKDAY_NAMES[index]}
                         <small>{dayLabel(date)}</small>
-                        {holiday ? <small className="weeklyBoardHolidayHeader">Jour férié</small> : null}
+                        {holiday ? (
+                          <small className="weeklyBoardHolidayHeader">Jour férié</small>
+                        ) : null}
                       </th>
                     );
                   })}
@@ -346,10 +377,18 @@ export function WeeklyTeamBoard({ week }: { week: string }) {
             <span>
               <i className="weeklyLegendChip isSick" /> Arrêt
             </span>
-            <span><i className="weeklyLegendChip isBE" /> BE</span>
-            <span><i className="weeklyLegendChip isWorkshop" /> Atelier</span>
-            <span><i className="weeklyLegendChip isInstall" /> Pose</span>
-            <span><i className="weeklyLegendChip isHoliday" /> Jour férié</span>
+            <span>
+              <i className="weeklyLegendChip isBE" /> BE
+            </span>
+            <span>
+              <i className="weeklyLegendChip isWorkshop" /> Atelier
+            </span>
+            <span>
+              <i className="weeklyLegendChip isInstall" /> Pose
+            </span>
+            <span>
+              <i className="weeklyLegendChip isHoliday" /> Jour férié
+            </span>
             <span>Les affectations ne modifient pas les heures du grand planning.</span>
           </div>
           {!data.editable ? (
@@ -665,43 +704,182 @@ export function WeeklyTeamBoard({ week }: { week: string }) {
           color: #796f91;
         }
 
-        .weeklyBoardHours { width: min(100%, 730px); max-width: 730px; }
-        .weeklyBoardChantierScroll { max-height: 265px; overflow: auto; }
-        .weeklyBoardChantierTable { width: 100%; border-collapse: collapse; font-size: 10px; }
-        .weeklyBoardChantierTable th { text-align: left; }
-        .weeklyBoardChantierTable thead th { position: sticky; top: 0; background: #ede7fb; z-index: 1; }
-        .weeklyBoardChantierTable td, .weeklyBoardChantierTable th { padding: 6px 8px; border-bottom: 1px solid #eee9f4; }
-        .weeklyBoardChantierTable td { text-align: right; font-variant-numeric: tabular-nums; }
-        .weeklyBoardChantierTable tbody th { font-weight: 650; }
-        .weeklyBoardChantierTable small { font-size: 9px; color: #7a7392; }
-        .weeklyBoardChantierTable tr.isProvisional { background: #faf8ff; color: #857ba0; }
-        .weeklyBoardChantierTable .weeklyBoardTotalRow { background: #eae5f6; font-weight: 800; }
-        .weeklyBoardDayHead.isHoliday { background: #f9dfbc; color: #875514; }
-        .weeklyBoardHolidayHeader { color: #935814 !important; font-weight: 850 !important; }
-        .weeklyBoardCell.isHoliday { background: #fff0dc !important; }
-        .weeklyBoardDayContent { display: grid; align-content: start; gap: 6px; height: 100%; }
-        .weeklyBoardHolidayFlag { text-align: center; font-size: 10px; font-weight: 800; color: #98601c; }
-        .weeklyBoardEntry { border-left: 4px solid; border-radius: 6px; padding: 6px 7px; display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 4px; }
-        .weeklyBoardEntry.isBE { background: #dceafd; border-color: #3d7ed2; color: #234e85; }
-        .weeklyBoardEntry.isWorkshop { background: #fff0cc; border-color: #e5a636; color: #8c561b; }
-        .weeklyBoardEntry.isInstall { background: #dff1df; border-color: #5aab63; color: #285b35; }
-        .weeklyBoardEntry.isNote { background: #f1eef5; border-color: #9d94ad; color: #514c61; }
-        .weeklyBoardEntryInfo { min-width: 0; overflow-wrap: anywhere; }
-        .weeklyBoardEntryInfo strong { display: block; font-size: 11px; }
-        .weeklyBoardEntryInfo small { display: block; margin-top: 3px; font-size: 9px; }
-        .weeklyBoardEntryActions { display: flex; align-items: flex-start; }
-        .weeklyBoardEntryActions button { border: none; background: transparent; color: inherit; font-size: 14px; cursor: pointer; padding: 0 3px; }
-        .weeklyBoardEditForm { display: grid; gap: 5px; grid-column: 1 / -1; }
-        .weeklyBoardEditForm input, .weeklyBoardEditForm select { width: 100%; min-width: 0; min-height: 30px; padding: 5px; border: 1px solid #a99fc2; border-radius: 5px; font-size: 11px; background: white; }
-        .weeklyBoardEditActions { display: flex; gap: 5px; }
-        .weeklyBoardEditActions button, .weeklyBoardAddEntry { border: 1px solid #c6b9da; border-radius: 5px; padding: 5px 7px; color: #59469a; background: #fff; font-weight: 750; font-size: 10px; cursor: pointer; }
-        .weeklyBoardAddEntry { width: 100%; background: rgb(255 255 255 / 0.72); }
-        .weeklyBoardLegendChip.isBE { background: #3d7ed2; }
-        .weeklyLegendChip.isBE { background: #3d7ed2; }
-        .weeklyLegendChip.isWorkshop { background: #e5a636; }
-        .weeklyLegendChip.isInstall { background: #5aab63; }
-        .weeklyLegendChip.isHoliday { background: #f9dfbc; }
-        .weeklyBoardCell { vertical-align: top; min-height: 80px; }
+        .weeklyBoardHours {
+          width: min(100%, 730px);
+          max-width: 730px;
+        }
+        .weeklyBoardChantierScroll {
+          max-height: 265px;
+          overflow: auto;
+        }
+        .weeklyBoardChantierTable {
+          width: 100%;
+          border-collapse: collapse;
+          font-size: 10px;
+        }
+        .weeklyBoardChantierTable th {
+          text-align: left;
+        }
+        .weeklyBoardChantierTable thead th {
+          position: sticky;
+          top: 0;
+          background: #ede7fb;
+          z-index: 1;
+        }
+        .weeklyBoardChantierTable td,
+        .weeklyBoardChantierTable th {
+          padding: 6px 8px;
+          border-bottom: 1px solid #eee9f4;
+        }
+        .weeklyBoardChantierTable td {
+          text-align: right;
+          font-variant-numeric: tabular-nums;
+        }
+        .weeklyBoardChantierTable tbody th {
+          font-weight: 650;
+        }
+        .weeklyBoardChantierTable small {
+          font-size: 9px;
+          color: #7a7392;
+        }
+        .weeklyBoardChantierTable tr.isProvisional {
+          background: #faf8ff;
+          color: #857ba0;
+        }
+        .weeklyBoardChantierTable .weeklyBoardTotalRow {
+          background: #eae5f6;
+          font-weight: 800;
+        }
+        .weeklyBoardDayHead.isHoliday {
+          background: #f9dfbc;
+          color: #875514;
+        }
+        .weeklyBoardHolidayHeader {
+          color: #935814 !important;
+          font-weight: 850 !important;
+        }
+        .weeklyBoardCell.isHoliday {
+          background: #fff0dc !important;
+        }
+        .weeklyBoardDayContent {
+          display: grid;
+          align-content: start;
+          gap: 6px;
+          height: 100%;
+        }
+        .weeklyBoardHolidayFlag {
+          text-align: center;
+          font-size: 10px;
+          font-weight: 800;
+          color: #98601c;
+        }
+        .weeklyBoardEntry {
+          border-left: 4px solid;
+          border-radius: 6px;
+          padding: 6px 7px;
+          display: grid;
+          grid-template-columns: minmax(0, 1fr) auto;
+          gap: 4px;
+        }
+        .weeklyBoardEntry.isBE {
+          background: #dceafd;
+          border-color: #3d7ed2;
+          color: #234e85;
+        }
+        .weeklyBoardEntry.isWorkshop {
+          background: #fff0cc;
+          border-color: #e5a636;
+          color: #8c561b;
+        }
+        .weeklyBoardEntry.isInstall {
+          background: #dff1df;
+          border-color: #5aab63;
+          color: #285b35;
+        }
+        .weeklyBoardEntry.isNote {
+          background: #f1eef5;
+          border-color: #9d94ad;
+          color: #514c61;
+        }
+        .weeklyBoardEntryInfo {
+          min-width: 0;
+          overflow-wrap: anywhere;
+        }
+        .weeklyBoardEntryInfo strong {
+          display: block;
+          font-size: 11px;
+        }
+        .weeklyBoardEntryInfo small {
+          display: block;
+          margin-top: 3px;
+          font-size: 9px;
+        }
+        .weeklyBoardEntryActions {
+          display: flex;
+          align-items: flex-start;
+        }
+        .weeklyBoardEntryActions button {
+          border: none;
+          background: transparent;
+          color: inherit;
+          font-size: 14px;
+          cursor: pointer;
+          padding: 0 3px;
+        }
+        .weeklyBoardEditForm {
+          display: grid;
+          gap: 5px;
+          grid-column: 1 / -1;
+        }
+        .weeklyBoardEditForm input,
+        .weeklyBoardEditForm select {
+          width: 100%;
+          min-width: 0;
+          min-height: 30px;
+          padding: 5px;
+          border: 1px solid #a99fc2;
+          border-radius: 5px;
+          font-size: 11px;
+          background: white;
+        }
+        .weeklyBoardEditActions {
+          display: flex;
+          gap: 5px;
+        }
+        .weeklyBoardEditActions button,
+        .weeklyBoardAddEntry {
+          border: 1px solid #c6b9da;
+          border-radius: 5px;
+          padding: 5px 7px;
+          color: #59469a;
+          background: #fff;
+          font-weight: 750;
+          font-size: 10px;
+          cursor: pointer;
+        }
+        .weeklyBoardAddEntry {
+          width: 100%;
+          background: rgb(255 255 255 / 0.72);
+        }
+        .weeklyBoardLegendChip.isBE {
+          background: #3d7ed2;
+        }
+        .weeklyLegendChip.isBE {
+          background: #3d7ed2;
+        }
+        .weeklyLegendChip.isWorkshop {
+          background: #e5a636;
+        }
+        .weeklyLegendChip.isInstall {
+          background: #5aab63;
+        }
+        .weeklyLegendChip.isHoliday {
+          background: #f9dfbc;
+        }
+        .weeklyBoardCell {
+          vertical-align: top;
+          min-height: 80px;
+        }
         @media (max-width: 850px) {
           .weeklyBoardTopline {
             display: block;

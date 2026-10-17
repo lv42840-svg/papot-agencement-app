@@ -118,14 +118,18 @@ export function frenchNationalPublicHolidayIds(year: number): Set<string> {
 export function frenchNationalPublicHolidayLabels(year: number): Map<string, string> {
   const easter = easterSunday(year);
   const fixed: Array<[number, number, string]> = [
-    [1, 1, "Jour de l'An"], [5, 1, "Fête du Travail"],
-    [5, 8, "Victoire du 8 mai"], [7, 14, "Fête nationale"],
-    [8, 15, "Assomption"], [11, 1, "Toussaint"],
-    [11, 11, "Armistice"], [12, 25, "Noël"],
+    [1, 1, "Jour de l'An"],
+    [5, 1, "Fête du Travail"],
+    [5, 8, "Victoire du 8 mai"],
+    [7, 14, "Fête nationale"],
+    [8, 15, "Assomption"],
+    [11, 1, "Toussaint"],
+    [11, 11, "Armistice"],
+    [12, 25, "Noël"],
   ];
-  const holidays = new Map<string, string>(fixed.map(([month, day, label]) =>
-    [dateId(new Date(Date.UTC(year, month - 1, day))), label],
-  ));
+  const holidays = new Map<string, string>(
+    fixed.map(([month, day, label]) => [dateId(new Date(Date.UTC(year, month - 1, day))), label]),
+  );
   holidays.set(dateId(addUtcDays(easter, 1)), "Lundi de Pâques");
   holidays.set(dateId(addUtcDays(easter, 39)), "Ascension");
   holidays.set(dateId(addUtcDays(easter, 50)), "Lundi de Pentecôte");

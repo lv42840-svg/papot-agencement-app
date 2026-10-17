@@ -63,7 +63,7 @@ export function WeeklyBoardDayCell({
   const [draftActivity, setDraftActivity] = useState<BoardActivity>("NOTE");
 
   function edit(row?: BoardEntry) {
-    setEditing(row ? row.id ?? "legacy" : "new");
+    setEditing(row ? (row.id ?? "legacy") : "new");
     setDraftLabel(row?.label ?? "");
     setDraftActivity(row?.activity ?? "NOTE");
   }
@@ -71,9 +71,7 @@ export function WeeklyBoardDayCell({
   async function submit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     if (busy || !draftLabel.trim()) return;
-    const row = rows.find((candidate) =>
-      (candidate.id ?? "legacy") === editing,
-    );
+    const row = rows.find((candidate) => (candidate.id ?? "legacy") === editing);
     const ok = await onChange({
       action: "saveDailyEntry",
       userId,
@@ -101,7 +99,9 @@ export function WeeklyBoardDayCell({
   return (
     <div className={["weeklyBoardDayContent", holiday ? "isHoliday" : ""].join(" ")}>
       {holiday ? (
-        <span className="weeklyBoardHolidayFlag" title={holiday}>Férié · {holiday}</span>
+        <span className="weeklyBoardHolidayFlag" title={holiday}>
+          Férié · {holiday}
+        </span>
       ) : null}
       {absence ? (
         <span className="weeklyBoardAbsence">
@@ -119,8 +119,22 @@ export function WeeklyBoardDayCell({
             </div>
             {editable && !isAbsent ? (
               <div className="weeklyBoardEntryActions">
-                <button type="button" disabled={busy} aria-label={`Modifier ${row.label}`} onClick={() => edit(row)}>✎</button>
-                <button type="button" disabled={busy} aria-label={`Supprimer ${row.label}`} onClick={() => void remove(row)}>×</button>
+                <button
+                  type="button"
+                  disabled={busy}
+                  aria-label={`Modifier ${row.label}`}
+                  onClick={() => edit(row)}
+                >
+                  ✎
+                </button>
+                <button
+                  type="button"
+                  disabled={busy}
+                  aria-label={`Supprimer ${row.label}`}
+                  onClick={() => void remove(row)}
+                >
+                  ×
+                </button>
               </div>
             ) : null}
             {isEditing ? (
@@ -134,14 +148,24 @@ export function WeeklyBoardDayCell({
                   required
                   autoFocus
                 />
-                <select aria-label="Activité" value={draftActivity} onChange={(event) => setDraftActivity(event.target.value as BoardActivity)}>
+                <select
+                  aria-label="Activité"
+                  value={draftActivity}
+                  onChange={(event) => setDraftActivity(event.target.value as BoardActivity)}
+                >
                   {Object.entries(activityLabels).map(([value, label]) => (
-                    <option key={value} value={value}>{label}</option>
+                    <option key={value} value={value}>
+                      {label}
+                    </option>
                   ))}
                 </select>
                 <div className="weeklyBoardEditActions">
-                  <button type="submit" disabled={busy || !draftLabel.trim()}>Enregistrer</button>
-                  <button type="button" disabled={busy} onClick={() => setEditing(null)}>Annuler</button>
+                  <button type="submit" disabled={busy || !draftLabel.trim()}>
+                    Enregistrer
+                  </button>
+                  <button type="button" disabled={busy} onClick={() => setEditing(null)}>
+                    Annuler
+                  </button>
                 </div>
               </form>
             ) : null}
@@ -160,21 +184,36 @@ export function WeeklyBoardDayCell({
             required
             autoFocus
           />
-          <select aria-label="Type d'activité" value={draftActivity} onChange={(event) => setDraftActivity(event.target.value as BoardActivity)}>
+          <select
+            aria-label="Type d'activité"
+            value={draftActivity}
+            onChange={(event) => setDraftActivity(event.target.value as BoardActivity)}
+          >
             {Object.entries(activityLabels).map(([value, label]) => (
-              <option key={value} value={value}>{label}</option>
+              <option key={value} value={value}>
+                {label}
+              </option>
             ))}
           </select>
           <div className="weeklyBoardEditActions">
-            <button type="submit" disabled={busy || !draftLabel.trim()}>Ajouter</button>
-            <button type="button" disabled={busy} onClick={() => setEditing(null)}>Annuler</button>
+            <button type="submit" disabled={busy || !draftLabel.trim()}>
+              Ajouter
+            </button>
+            <button type="button" disabled={busy} onClick={() => setEditing(null)}>
+              Annuler
+            </button>
           </div>
         </form>
       ) : null}
       {isAbsent ? (
         <span className="weeklyBoardDayOff">Indisponible</span>
       ) : editable && editing !== "new" && rows.length < 20 ? (
-        <button className="weeklyBoardAddEntry" type="button" disabled={busy} onClick={() => edit()}>
+        <button
+          className="weeklyBoardAddEntry"
+          type="button"
+          disabled={busy}
+          onClick={() => edit()}
+        >
           + Ajouter
         </button>
       ) : null}

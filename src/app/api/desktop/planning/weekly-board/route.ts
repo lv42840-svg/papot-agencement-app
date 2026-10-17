@@ -8,7 +8,11 @@ import { hasEffectiveSpecialPermission, requireSpecialPermission } from "@/lib/a
 import { readAuthPayload } from "@/lib/auth/store";
 import { createPlanningRepository } from "@/lib/planning/create-repository";
 import { effectivePlanningPeople } from "@/lib/planning/personnel";
-import { buildWeeklyCapacityIndicators, frenchNationalPublicHolidayLabels, scheduleHoursForDate } from "@/lib/planning/capacity";
+import {
+  buildWeeklyCapacityIndicators,
+  frenchNationalPublicHolidayLabels,
+  scheduleHoursForDate,
+} from "@/lib/planning/capacity";
 import {
   buildFirmGrandPlanningRows,
   buildCommercialProvisionRows,
@@ -74,12 +78,21 @@ async function weeklySnapshot(
   );
   // The small board must display the exact totals used in the grand planning.
   const firm = weekActivityHours(firmRows, week);
-  const firmChantiers = weeklyChantierHours(firmRows, week, "firm", (index) => ({ id: firmRows[index].chantierId, name: firmRows[index].name }));
+  const firmChantiers = weeklyChantierHours(firmRows, week, "firm", (index) => ({
+    id: firmRows[index].chantierId,
+    name: firmRows[index].name,
+  }));
   const provisional = weekActivityHours(potentialRows, week);
-  const provisionalChantiers = weeklyChantierHours(potentialRows, week, "provisional", (index) => ({ id: potentialRows[index].caseId, name: potentialRows[index].name }));
+  const provisionalChantiers = weeklyChantierHours(potentialRows, week, "provisional", (index) => ({
+    id: potentialRows[index].caseId,
+    name: potentialRows[index].name,
+  }));
   const people = effectivePlanningPeople(planning, auth.users);
   const dates = workingDaysOfWeek(week);
-  const holidays = dates.map((date) => ({ date, label: frenchNationalPublicHolidayLabels(Number(date.slice(0, 4))).get(date) ?? null }));
+  const holidays = dates.map((date) => ({
+    date,
+    label: frenchNationalPublicHolidayLabels(Number(date.slice(0, 4))).get(date) ?? null,
+  }));
   const allSiteNames = new Map(chantiers.chantiers.map((site) => [site.id, site.name]));
   const assignments = planning.dailyAssignments
     .filter(
@@ -141,7 +154,9 @@ export async function POST(request: Request) {
   try {
     const context = await requireModuleRequestContext("planning", "WRITE");
     await requireSpecialPermission(context.user, "planning.manage_schedules");
-    const input = z.union([weeklyBoardAssignmentSchema, weeklyBoardEntrySchema]).parse(await request.json());
+    const input = z
+      .union([weeklyBoardAssignmentSchema, weeklyBoardEntrySchema])
+      .parse(await request.json());
     assertPlanningWeekEditable(input.week);
     const [auth, chantiers] = await Promise.all([
       readAuthPayload(),
@@ -159,18 +174,26 @@ export async function POST(request: Request) {
           (row) => row.userId === input.userId && row.date === input.date,
         );
         if (
-          input.action === "saveDailyEntry" && person && absence &&
-          absence.hours >= scheduleHoursForDate(
-            person.weeklySchedule, new Date(input.date + "T12:00:00Z"),
-          ) &&
+          input.action === "saveDailyEntry" &&
+          person &&
+          absence &&
+          absence.hours >=
+            scheduleHoursForDate(person.weeklySchedule, new Date(input.date + "T12:00:00Z")) &&
           scheduleHoursForDate(person.weeklySchedule, new Date(input.date + "T12:00:00Z")) > 0
-        ) throw new Error("PLANNING_DAY_PERSON_ABSENT");
+        )
+          throw new Error("PLANNING_DAY_PERSON_ABSENT");
         return applyWeeklyBoardEntry(
-          payload, input, new Set(people.map((person) => person.userId)), activeSites,
+          payload,
+          input,
+          new Set(people.map((person) => person.userId)),
+          activeSites,
         );
       }
       return applyDailyAssignment(
-        payload, input, new Set(people.map((person) => person.userId)), activeSites,
+        payload,
+        input,
+        new Set(people.map((person) => person.userId)),
+        activeSites,
       );
     });
     return noStoreJson(await weeklySnapshot(input.week, context));
