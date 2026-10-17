@@ -38,7 +38,7 @@ describe("grand planning commercial provision bridge", () => {
   it("keeps potential affairs visibly separated, with collapsible rows", () => {
     expect(gridSource).toContain("excelPotentialDivider");
     expect(gridSource).toContain("CHARGES PROVISIONNELLES");
-    expect(gridSource).toContain("!potentialCollapsed && snapshot.provisionalRows.map");
+    expect(gridSource).toMatch(/!potentialCollapsed\s*&&\s*snapshot\.provisionalRows\.map/);
   });
 
   it("allows authorized reordering of provisioned cases", () => {
@@ -51,7 +51,7 @@ describe("grand planning commercial provision bridge", () => {
   it("edits provisional hours in the same Excel grid with a lighter visual treatment", () => {
     expect(apiSource).toContain('input.action === "setProvisionHours"');
     expect(workspaceSource).toContain('action: "setProvisionHours"');
-    expect(gridSource).toContain('hoursInput("provisional"');
+    expect(gridSource).toMatch(/hoursInput\(\s*"provisional"/);
     expect(workspaceSource).toContain(".excelProvisionalRow .excelWeekCell");
   });
 });
