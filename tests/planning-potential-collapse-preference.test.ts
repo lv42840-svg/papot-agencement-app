@@ -25,7 +25,7 @@ describe("planning potential collapse preference", () => {
   it("keeps the potential divider visible while hiding only its rows", () => {
     expect(gridSource).toContain("excelPotentialDivider");
     expect(gridSource).toContain("aria-expanded={!potentialCollapsed}");
-    expect(gridSource).toContain("!potentialCollapsed && snapshot.provisionalRows.map");
+    expect(gridSource).toMatch(/!potentialCollapsed\s*&&\s*snapshot\.provisionalRows\.map/);
     expect(gridSource).toContain("CHARGES PROVISIONNELLES");
   });
 
