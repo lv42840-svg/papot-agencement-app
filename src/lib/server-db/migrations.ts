@@ -29,6 +29,8 @@ const QUOTE_EMAIL_SETTINGS_VERSION = 12;
 const QUOTE_EMAIL_SETTINGS_NAME = "quote_email_settings";
 const AUTH_CONCEPT_SECURITY_VERSION = 13;
 const AUTH_CONCEPT_SECURITY_NAME = "auth_concept_security";
+const MONTHLY_LABOR_COSTS_STORAGE_VERSION = 14;
+const MONTHLY_LABOR_COSTS_STORAGE_NAME = "monthly_labor_costs_storage";
 
 const FRESH_WEB_SOURCE = "fresh:web";
 const FRESH_WEB_HASH = "fresh-empty-v1";
@@ -426,6 +428,22 @@ async function ensureQuotesStorage(client: PoolClient): Promise<void> {
   `);
 }
 
+async function ensureMonthlyLaborCostsStorage(client: PoolClient): Promise<void> {
+  await client.query(`
+    CREATE TABLE IF NOT EXISTS papot_monthly_labor_costs_state (
+      scope TEXT PRIMARY KEY CHECK (scope = 'global'),
+      version INTEGER NOT NULL DEFAULT 1 CHECK (version > 0),
+      payload JSONB NOT NULL CHECK (jsonb_typeof(payload) = 'object'),
+      updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+    )
+  `);
+  await client.query(`
+    INSERT INTO papot_monthly_labor_costs_state (scope, version, payload)
+    VALUES ('global', 1, '{"schemaVersion":1,"records":[]}'::jsonb)
+    ON CONFLICT (scope) DO NOTHING
+  `);
+}
+
 async function ensurePlanningStorage(client: PoolClient): Promise<void> {
   await client.query(`
     CREATE TABLE IF NOT EXISTS papot_planning_state (
@@ -634,6 +652,16 @@ export async function runServerDbMigrations(
         ON CONFLICT (version) DO NOTHING
       `,
       [AUTH_CONCEPT_SECURITY_VERSION, AUTH_CONCEPT_SECURITY_NAME],
+    );
+
+    await ensureMonthlyLaborCostsStorage(client);
+    await client.query(
+      `
+        INSERT INTO papot_schema_migrations (version, name)
+        VALUES ($1, $2)
+        ON CONFLICT (version) DO NOTHING
+      `,
+      [MONTHLY_LABOR_COSTS_STORAGE_VERSION, MONTHLY_LABOR_COSTS_STORAGE_NAME],
     );
 
     if (freshWebBootstrapEnabled(env)) {

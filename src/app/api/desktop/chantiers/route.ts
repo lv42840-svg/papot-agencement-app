@@ -1,7 +1,11 @@
 import { NextResponse } from "next/server";
 import { ZodError } from "zod";
 import { chantierSpecialPermissionForMutation } from "@/lib/auth/action-permissions";
-import { hasEffectiveSpecialPermission, requireSpecialPermission } from "@/lib/auth/permissions";
+import {
+  hasEffectiveSpecialPermission,
+  hasModuleAccess,
+  requireSpecialPermission,
+} from "@/lib/auth/permissions";
 import { createChantiersRepository } from "@/lib/chantiers/create-repository";
 import type { ChantiersPayload } from "@/lib/chantiers/domain";
 import {
@@ -28,6 +32,8 @@ import {
   restoreFirmPlanningOrderForChantier,
 } from "@/lib/planning/mutations";
 import { createQuotesRepository } from "@/lib/quotes/create-repository";
+import { readMonthlyLaborCosts } from "@/lib/payroll/monthly-labor-costs-repository";
+import { calculateChantierLaborCostCents } from "@/lib/payroll/chantier-labor-cost";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -60,6 +66,8 @@ async function snapshot(
   const baseCapabilities = chantierCapabilities(actor);
   const planningPayload = await createPlanningRepository().load();
   const now = new Date();
+  const canViewLaborCosts = await hasModuleAccess(user.id, "payroll", "READ");
+  const monthlyCosts = canViewLaborCosts ? await readMonthlyLaborCosts() : null;
   const [canLaunchSpecial, canCloseReopenSpecial, canArchiveSpecial] = await Promise.all([
     hasEffectiveSpecialPermission(user, "commercial.confirm_launch"),
     hasEffectiveSpecialPermission(user, "chantiers.close_reopen"),
@@ -82,6 +90,19 @@ async function snapshot(
   };
   return {
     payload: viewPayload,
+    actualLaborCostsByChantier: Object.fromEntries(
+      payload.chantiers.map((chantier) => [
+        chantier.id,
+        monthlyCosts
+          ? calculateChantierLaborCostCents(
+              chantier.id,
+              planningPayload.actualHours,
+              monthlyCosts.records,
+              planningPayload.peopleCapacity,
+            )
+          : null,
+      ]),
+    ),
     actor,
     capabilities: {
       ...baseCapabilities,
