@@ -28,7 +28,9 @@ describe("continuous grand planning", () => {
   it("renders a single totals row with three activity values per week", () => {
     expect(grid.match(/className="excelActivityTotalRow"/g)).toHaveLength(1);
     expect(grid).toContain("TOTAL CHANTIERS");
-    expect(grid).toContain('tripleValues(ACTIVITIES.map((activity) => weeklyTotalFor(activity, week)))');
+    expect(grid).toContain(
+      "tripleValues(ACTIVITIES.map((activity) => weeklyTotalFor(activity, week)))",
+    );
     expect(grid).toContain("month.key.slice(0, 4)");
   });
 
