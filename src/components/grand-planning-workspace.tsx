@@ -1330,9 +1330,9 @@ export function GrandPlanningWorkspace({
         }
 
         .planningDismissButton {
-          float: right;
-          margin-top: -30px;
-          margin-right: 0;
+          position: absolute;
+          top: 10px;
+          right: 12px;
           border: 0;
           border-radius: 5px;
           background: transparent;
@@ -1343,6 +1343,12 @@ export function GrandPlanningWorkspace({
         }
         .planningDismissButton:hover {
           background: rgb(120 90 40 / 0.08);
+        }
+        .planningUnallocatedPanel {
+          position: relative;
+        }
+        .planningUnallocatedHeader {
+          padding-right: 38px;
         }
         .planningReopenPanel {
           margin-bottom: 14px;
