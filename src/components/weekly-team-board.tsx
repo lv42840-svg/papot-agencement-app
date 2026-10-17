@@ -3,8 +3,10 @@
 import Link from "next/link";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { isoWeekMonday, weekDateRangeLabel } from "@/lib/planning/time-markers";
+import { WeeklyBoardDayCell, type BoardEntry, type BoardEntryMutation } from "./weekly-board-day-cell";
 
 type WeeklySummary = { be: number; workshop: number; install: number; total: number };
+type WeeklyChantierLine = WeeklySummary & { id: string; name: string; category: "firm" | "provisional" };
 type WeekData = {
   week: string;
   dates: string[];
@@ -15,7 +17,10 @@ type WeekData = {
     weeklySchedule: Record<string, number>;
   }[];
   sites: { id: string; name: string }[];
-  assignments: { userId: string; date: string; chantierId: string | null; label: string }[];
+  assignments: BoardEntry[];
+  holidays: { date: string; label: string | null }[];
+  firmChantiers: WeeklyChantierLine[];
+  provisionalChantiers: WeeklyChantierLine[];
   absences: {
     userId: string;
     date: string;
@@ -57,7 +62,6 @@ export function WeeklyTeamBoard({ week }: { week: string }) {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
   const [message, setMessage] = useState("");
-  const [drafts, setDrafts] = useState<Record<string, string>>({});
   const [saving, setSaving] = useState<string | null>(null);
 
   const load = useCallback(async () => {
@@ -69,7 +73,6 @@ export function WeeklyTeamBoard({ week }: { week: string }) {
       const json = (await response.json()) as WeekData & { error?: string };
       if (!response.ok) throw new Error(json.error ?? "Impossible de charger le petit planning.");
       setData(json);
-      setDrafts({});
       setError("");
     } catch (cause) {
       setError(cause instanceof Error ? cause.message : "Impossible de charger le petit planning.");
@@ -82,52 +85,47 @@ export function WeeklyTeamBoard({ week }: { week: string }) {
     void load();
   }, [load]);
 
-  const saved = useMemo(
-    () =>
-      new Map((data?.assignments ?? []).map((row) => [cellKey(row.userId, row.date), row.label])),
-    [data?.assignments],
-  );
+  const assignments = useMemo(() => {
+    const byDay = new Map<string, BoardEntry[]>();
+    for (const row of data?.assignments ?? []) {
+      const key = cellKey(row.userId, row.date);
+      const existing = byDay.get(key) ?? [];
+      existing.push(row);
+      byDay.set(key, existing);
+    }
+    return byDay;
+  }, [data?.assignments]);
   const absences = useMemo(
     () => new Map((data?.absences ?? []).map((row) => [cellKey(row.userId, row.date), row])),
     [data?.absences],
+  );
+  const holidays = useMemo(
+    () => new Map((data?.holidays ?? []).map((row) => [row.date, row.label])),
+    [data?.holidays],
   );
   const dayLabel = (date: string) => {
     const [, month, day] = date.split("-");
     return day + "/" + month;
   };
 
-  async function saveCell(userId: string, date: string, value: string) {
-    if (!data?.editable || saving) return;
-    const key = cellKey(userId, date);
-    const oldValue = saved.get(key) ?? "";
-    const next = value.trim();
-    if (next === oldValue) {
-      setDrafts((current) => {
-        const copy = { ...current };
-        delete copy[key];
-        return copy;
-      });
-      return;
-    }
-    setSaving(key);
+  async function changeEntry(input: BoardEntryMutation): Promise<boolean> {
+    if (!data?.editable || saving) return false;
+    setSaving(cellKey(input.userId, input.date));
     setMessage("");
     try {
       const response = await fetch("/api/desktop/planning/weekly-board", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ action: "setDailyAssignment", week, userId, date, label: next }),
+        body: JSON.stringify({ ...input, week }),
       });
       const json = (await response.json()) as WeekData & { error?: string };
       if (!response.ok) throw new Error(json.error ?? "Enregistrement impossible.");
       setData(json);
-      setDrafts((current) => {
-        const copy = { ...current };
-        delete copy[key];
-        return copy;
-      });
-      setMessage("Affectation enregistrée.");
+      setMessage(input.action === "deleteDailyEntry" ? "Affectation supprimée." : "Affectation enregistrée.");
+      return true;
     } catch (cause) {
       setMessage(cause instanceof Error ? cause.message : "Enregistrement impossible.");
+      return false;
     } finally {
       setSaving(null);
     }
@@ -192,44 +190,64 @@ export function WeeklyTeamBoard({ week }: { week: string }) {
                 {totalPeople} personne{totalPeople > 1 ? "s" : ""} · lundi à vendredi
               </small>
             </div>
-            <aside
-              className="weeklyBoardHours"
-              aria-label="Heures du grand planning pour la semaine"
-            >
+            <aside className="weeklyBoardHours" aria-label="Extrait du grand planning pour la semaine">
               <div className="weeklyBoardHoursHeading">
-                <strong>Heures du grand planning</strong>
-                <span>S{week.slice(-2)}</span>
+                <strong>Extrait du grand planning · S{week.slice(-2)}</strong>
+                <span>Heures prévues cette semaine</span>
               </div>
-              <div className="weeklyBoardHoursGrid">
-                <div>
-                  <small>Activité</small>
-                  <b>Étude</b>
-                  <b>Atelier</b>
-                  <b>Pose</b>
-                  <b>Total</b>
-                </div>
-                <div>
-                  <small>Ferme</small>
-                  <span>{formatHours(data.firm.be)} h</span>
-                  <span>{formatHours(data.firm.workshop)} h</span>
-                  <span>{formatHours(data.firm.install)} h</span>
-                  <strong>{formatHours(data.firm.total)} h</strong>
-                </div>
-                <div>
-                  <small>Potentiel</small>
-                  <span>{formatHours(data.provisional.be)} h</span>
-                  <span>{formatHours(data.provisional.workshop)} h</span>
-                  <span>{formatHours(data.provisional.install)} h</span>
-                  <strong>{formatHours(data.provisional.total)} h</strong>
-                </div>
+              <div className="weeklyBoardChantierScroll">
+                <table className="weeklyBoardChantierTable">
+                  <thead>
+                    <tr>
+                      <th scope="col">Chantier / affaire</th>
+                      <th scope="col">BE</th>
+                      <th scope="col">Atelier</th>
+                      <th scope="col">Pose</th>
+                      <th scope="col">Total</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {data.firmChantiers.map((row) => (
+                      <tr key={`firm:${row.id}`}>
+                        <th scope="row">{row.name}</th>
+                        <td>{formatHours(row.be)}</td>
+                        <td>{formatHours(row.workshop)}</td>
+                        <td>{formatHours(row.install)}</td>
+                        <td><strong>{formatHours(row.total)}</strong></td>
+                      </tr>
+                    ))}
+                    {data.provisionalChantiers.map((row) => (
+                      <tr className="isProvisional" key={`provisional:${row.id}`}>
+                        <th scope="row">{row.name} <small>Provisionnel</small></th>
+                        <td>{formatHours(row.be)}</td>
+                        <td>{formatHours(row.workshop)}</td>
+                        <td>{formatHours(row.install)}</td>
+                        <td><strong>{formatHours(row.total)}</strong></td>
+                      </tr>
+                    ))}
+                    {data.firmChantiers.length + data.provisionalChantiers.length === 0 ? (
+                      <tr><td colSpan={5}>Aucune heure positionnée cette semaine.</td></tr>
+                    ) : null}
+                    <tr className="weeklyBoardTotalRow">
+                      <th scope="row">Total ferme</th>
+                      <td>{formatHours(data.firm.be)}</td>
+                      <td>{formatHours(data.firm.workshop)}</td>
+                      <td>{formatHours(data.firm.install)}</td>
+                      <td><strong>{formatHours(data.firm.total)}</strong></td>
+                    </tr>
+                    <tr className="weeklyBoardTotalRow isProvisional">
+                      <th scope="row">Total provisionnel</th>
+                      <td>{formatHours(data.provisional.be)}</td>
+                      <td>{formatHours(data.provisional.workshop)}</td>
+                      <td>{formatHours(data.provisional.install)}</td>
+                      <td><strong>{formatHours(data.provisional.total)}</strong></td>
+                    </tr>
+                  </tbody>
+                </table>
               </div>
               <div className="weeklyBoardAvailable">
-                <span>
-                  Disponibilité ferme <b>{formatHours(data.capacity.firmAvailableHours)} h</b>
-                </span>
-                <span>
-                  Avec potentiel <b>{formatHours(data.capacity.availableWithProvisionHours)} h</b>
-                </span>
+                <span>Disponible ferme <b>{formatHours(data.capacity.firmAvailableHours)} h</b></span>
+                <span>Avec potentiel <b>{formatHours(data.capacity.availableWithProvisionHours)} h</b></span>
               </div>
             </aside>
           </div>
@@ -241,12 +259,21 @@ export function WeeklyTeamBoard({ week }: { week: string }) {
                   <th scope="col" className="weeklyBoardNameHead">
                     Personnel
                   </th>
-                  {data.dates.map((date, index) => (
-                    <th key={date} scope="col" className="weeklyBoardDayHead">
-                      {WEEKDAY_NAMES[index]}
-                      <small>{dayLabel(date)}</small>
-                    </th>
-                  ))}
+                  {data.dates.map((date, index) => {
+                    const holiday = holidays.get(date);
+                    return (
+                      <th
+                        key={date}
+                        scope="col"
+                        title={holiday ?? undefined}
+                        className={holiday ? "weeklyBoardDayHead isHoliday" : "weeklyBoardDayHead"}
+                      >
+                        {WEEKDAY_NAMES[index]}
+                        <small>{dayLabel(date)}</small>
+                        {holiday ? <small className="weeklyBoardHolidayHeader">Jour férié</small> : null}
+                      </th>
+                    );
+                  })}
                 </tr>
               </thead>
               <tbody>
@@ -275,61 +302,26 @@ export function WeeklyTeamBoard({ week }: { week: string }) {
                       {data.dates.map((date, dayIndex) => {
                         const key = cellKey(person.userId, date);
                         const absence = absences.get(key);
-                        const value = drafts[key] ?? saved.get(key) ?? "";
                         const schedule = person.weeklySchedule[WEEKDAY_KEYS[dayIndex]] ?? 0;
                         const dayOff = absence != null && absence.hours >= schedule && schedule > 0;
+                        const holiday = holidays.get(date) ?? null;
                         return (
                           <td
                             key={date}
-                            className={[
-                              "weeklyBoardCell",
-                              absence?.type === "VACATION" ? "hasVacation" : "",
-                              absence?.type === "SICK" ? "hasSick" : "",
-                              absence?.type === "OTHER" ? "hasOtherAbsence" : "",
-                              saving === key ? "isSaving" : "",
-                            ]
-                              .filter(Boolean)
-                              .join(" ")}
+                            className={["weeklyBoardCell", holiday ? "isHoliday" : ""].join(" ")}
                           >
-                            {absence ? (
-                              <span className="weeklyBoardAbsence">
-                                {absence.typeLabel} · {formatHours(absence.hours)} h
-                              </span>
-                            ) : null}
-                            {dayOff ? (
-                              <span
-                                className="weeklyBoardDayOff"
-                                title="Retire l'absence dans Gestion du personnel pour affecter ce jour."
-                              >
-                                Indisponible
-                              </span>
-                            ) : (
-                              <input
-                                aria-label={`${person.displayName}, ${WEEKDAY_NAMES[dayIndex]} ${dayLabel(date)}`}
-                                list="weekly-board-site-suggestions"
-                                maxLength={160}
-                                placeholder={data.editable ? "Chantier / activité" : "Non affecté"}
-                                value={value}
-                                readOnly={!data.editable || saving !== null}
-                                onChange={(event) =>
-                                  setDrafts((current) => ({
-                                    ...current,
-                                    [key]: event.target.value,
-                                  }))
-                                }
-                                onBlur={() => void saveCell(person.userId, date, value)}
-                                onKeyDown={(event) => {
-                                  if (event.key === "Enter") event.currentTarget.blur();
-                                  if (event.key === "Escape") {
-                                    setDrafts((current) => {
-                                      const copy = { ...current };
-                                      delete copy[key];
-                                      return copy;
-                                    });
-                                  }
-                                }}
-                              />
-                            )}
+                            <WeeklyBoardDayCell
+                              userId={person.userId}
+                              date={date}
+                              name={person.displayName}
+                              rows={assignments.get(key) ?? []}
+                              holiday={holiday}
+                              absence={absence}
+                              isAbsent={dayOff}
+                              editable={data.editable}
+                              busy={saving !== null}
+                              onChange={changeEntry}
+                            />
                           </td>
                         );
                       })}
@@ -354,6 +346,10 @@ export function WeeklyTeamBoard({ week }: { week: string }) {
             <span>
               <i className="weeklyLegendChip isSick" /> Arrêt
             </span>
+            <span><i className="weeklyLegendChip isBE" /> BE</span>
+            <span><i className="weeklyLegendChip isWorkshop" /> Atelier</span>
+            <span><i className="weeklyLegendChip isInstall" /> Pose</span>
+            <span><i className="weeklyLegendChip isHoliday" /> Jour férié</span>
             <span>Les affectations ne modifient pas les heures du grand planning.</span>
           </div>
           {!data.editable ? (
@@ -668,6 +664,44 @@ export function WeeklyTeamBoard({ week }: { week: string }) {
           text-align: center;
           color: #796f91;
         }
+
+        .weeklyBoardHours { width: min(100%, 730px); max-width: 730px; }
+        .weeklyBoardChantierScroll { max-height: 265px; overflow: auto; }
+        .weeklyBoardChantierTable { width: 100%; border-collapse: collapse; font-size: 10px; }
+        .weeklyBoardChantierTable th { text-align: left; }
+        .weeklyBoardChantierTable thead th { position: sticky; top: 0; background: #ede7fb; z-index: 1; }
+        .weeklyBoardChantierTable td, .weeklyBoardChantierTable th { padding: 6px 8px; border-bottom: 1px solid #eee9f4; }
+        .weeklyBoardChantierTable td { text-align: right; font-variant-numeric: tabular-nums; }
+        .weeklyBoardChantierTable tbody th { font-weight: 650; }
+        .weeklyBoardChantierTable small { font-size: 9px; color: #7a7392; }
+        .weeklyBoardChantierTable tr.isProvisional { background: #faf8ff; color: #857ba0; }
+        .weeklyBoardChantierTable .weeklyBoardTotalRow { background: #eae5f6; font-weight: 800; }
+        .weeklyBoardDayHead.isHoliday { background: #f9dfbc; color: #875514; }
+        .weeklyBoardHolidayHeader { color: #935814 !important; font-weight: 850 !important; }
+        .weeklyBoardCell.isHoliday { background: #fff0dc !important; }
+        .weeklyBoardDayContent { display: grid; align-content: start; gap: 6px; height: 100%; }
+        .weeklyBoardHolidayFlag { text-align: center; font-size: 10px; font-weight: 800; color: #98601c; }
+        .weeklyBoardEntry { border-left: 4px solid; border-radius: 6px; padding: 6px 7px; display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 4px; }
+        .weeklyBoardEntry.isBE { background: #dceafd; border-color: #3d7ed2; color: #234e85; }
+        .weeklyBoardEntry.isWorkshop { background: #fff0cc; border-color: #e5a636; color: #8c561b; }
+        .weeklyBoardEntry.isInstall { background: #dff1df; border-color: #5aab63; color: #285b35; }
+        .weeklyBoardEntry.isNote { background: #f1eef5; border-color: #9d94ad; color: #514c61; }
+        .weeklyBoardEntryInfo { min-width: 0; overflow-wrap: anywhere; }
+        .weeklyBoardEntryInfo strong { display: block; font-size: 11px; }
+        .weeklyBoardEntryInfo small { display: block; margin-top: 3px; font-size: 9px; }
+        .weeklyBoardEntryActions { display: flex; align-items: flex-start; }
+        .weeklyBoardEntryActions button { border: none; background: transparent; color: inherit; font-size: 14px; cursor: pointer; padding: 0 3px; }
+        .weeklyBoardEditForm { display: grid; gap: 5px; grid-column: 1 / -1; }
+        .weeklyBoardEditForm input, .weeklyBoardEditForm select { width: 100%; min-width: 0; min-height: 30px; padding: 5px; border: 1px solid #a99fc2; border-radius: 5px; font-size: 11px; background: white; }
+        .weeklyBoardEditActions { display: flex; gap: 5px; }
+        .weeklyBoardEditActions button, .weeklyBoardAddEntry { border: 1px solid #c6b9da; border-radius: 5px; padding: 5px 7px; color: #59469a; background: #fff; font-weight: 750; font-size: 10px; cursor: pointer; }
+        .weeklyBoardAddEntry { width: 100%; background: rgb(255 255 255 / 0.72); }
+        .weeklyBoardLegendChip.isBE { background: #3d7ed2; }
+        .weeklyLegendChip.isBE { background: #3d7ed2; }
+        .weeklyLegendChip.isWorkshop { background: #e5a636; }
+        .weeklyLegendChip.isInstall { background: #5aab63; }
+        .weeklyLegendChip.isHoliday { background: #f9dfbc; }
+        .weeklyBoardCell { vertical-align: top; min-height: 80px; }
         @media (max-width: 850px) {
           .weeklyBoardTopline {
             display: block;
