@@ -1,0 +1,31 @@
+name: Temporary Invoice Editor Formatter
+on:
+  push:
+    branches: [feat/billing-full-editor-20261017]
+permissions:
+  contents: write
+jobs:
+  format:
+    if: github.actor != 'github-actions[bot]'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: feat/billing-full-editor-20261017
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - name: Format invoice editor files
+        run: |
+          npx prettier --write src/lib/billing/document-lines.ts src/lib/billing/domain.ts src/lib/billing/sources.ts src/app/api/desktop/billing/route.ts src/components/billing-workspace.tsx src/components/billing-document-editor.tsx src/app/facturation/'[draftId]'/page.tsx tests/billing-document-editor.test.ts tests/billing-document-editor-ui.test.ts
+      - name: Commit formatting
+        run: |
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add src/lib/billing/document-lines.ts src/lib/billing/domain.ts src/lib/billing/sources.ts src/app/api/desktop/billing/route.ts src/components/billing-workspace.tsx src/components/billing-document-editor.tsx src/app/facturation/'[draftId]'/page.tsx tests/billing-document-editor.test.ts tests/billing-document-editor-ui.test.ts
+          if ! git diff --cached --quiet; then
+            git commit -m 'style(billing): format invoice editor'
+            git push origin HEAD:refs/heads/feat/billing-full-editor-20261017
+          fi
