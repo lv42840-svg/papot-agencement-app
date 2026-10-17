@@ -59,10 +59,17 @@ const billingMutationSchema = z.discriminatedUnion("action", [
       label: z.string().trim().min(1).max(240),
       notes: z.string().trim().max(4000),
       documentLines: z.array(billingDocumentLineSchema).min(1).max(1000),
-      linePercentages: z.array(z.object({
-        lineId: z.string().uuid(),
-        percent: z.number().finite().min(0).max(100),
-      }).strict()).max(1000).optional(),
+      linePercentages: z
+        .array(
+          z
+            .object({
+              lineId: z.string().uuid(),
+              percent: z.number().finite().min(0).max(100),
+            })
+            .strict(),
+        )
+        .max(1000)
+        .optional(),
     })
     .strict(),
   z

@@ -404,18 +404,17 @@ export function updateBillingDocument(
   const totals = calculateInvoiceDocumentTotals(documentLines);
   const priorDrafts = payload.drafts.slice(0, index);
   const recalculatedProgress = input.linePercentages
-    ? calculateLineProgress(
-        { schemaVersion: 1, drafts: priorDrafts },
-        draft,
-        input.linePercentages,
-      )
+    ? calculateLineProgress({ schemaVersion: 1, drafts: priorDrafts }, draft, input.linePercentages)
     : null;
   if (recalculatedProgress && draft.type !== "PROGRESS") {
     throw new Error("BILLING_PROGRESS_INPUT_CONFLICT");
   }
-  const progressChanged = recalculatedProgress?.lineProgress.some((row) =>
-    row.percent !== draft.lineProgress?.find((previous) => previous.lineId === row.lineId)?.percent
-  ) ?? false;
+  const progressChanged =
+    recalculatedProgress?.lineProgress.some(
+      (row) =>
+        row.percent !==
+        draft.lineProgress?.find((previous) => previous.lineId === row.lineId)?.percent,
+    ) ?? false;
   const priorCents = preparedHtCents(payload, draft.quoteId, draft.id);
   if (totals.amountHtCents + priorCents > draft.contractHtCents) {
     throw new Error("BILLING_AMOUNT_EXCEEDS_CONTRACT");

@@ -71,8 +71,10 @@ const serverErrors: Record<string, string> = {
   BILLING_DOCUMENT_VAT_OUTSIDE_CONTRACT:
     "Le taux de TVA doit correspondre à un taux du devis retenu.",
   BILLING_DOCUMENT_SOURCE_LINE_INVALID: "La référence à une ligne du devis est incorrecte.",
-  BILLING_PROGRESS_CANNOT_DECREASE: "Un avancement ne peut pas être inférieur à la situation précédente.",
-  BILLING_PROGRESS_TAX_ALLOCATION_UNAVAILABLE: "La TVA est incompatible avec les acomptes déjà préparés.",
+  BILLING_PROGRESS_CANNOT_DECREASE:
+    "Un avancement ne peut pas être inférieur à la situation précédente.",
+  BILLING_PROGRESS_TAX_ALLOCATION_UNAVAILABLE:
+    "La TVA est incompatible avec les acomptes déjà préparés.",
 };
 
 export function BillingDocumentEditor({ draftId }: { draftId: string }) {
@@ -101,10 +103,18 @@ export function BillingDocumentEditor({ draftId }: { draftId: string }) {
     setDraft(selected);
     setPayload(json.payload);
     setCanWrite(json.canWrite);
-    setProgressValues(Object.fromEntries((selected.lines ?? []).map((line) =>
-      [line.lineId, decimal(selected.lineProgress?.find((row) => row.lineId === line.lineId)?.percent
-        ?? selected.cumulativePercent ?? 0)],
-    )));
+    setProgressValues(
+      Object.fromEntries(
+        (selected.lines ?? []).map((line) => [
+          line.lineId,
+          decimal(
+            selected.lineProgress?.find((row) => row.lineId === line.lineId)?.percent ??
+              selected.cumulativePercent ??
+              0,
+          ),
+        ]),
+      ),
+    );
     setPendingPercentages(null);
     setLabel(selected.label);
     setNotes(selected.notes);
@@ -202,27 +212,40 @@ export function BillingDocumentEditor({ draftId }: { draftId: string }) {
       lineId: line.lineId,
       percent: Number((progressValues[line.lineId] ?? "").replace(",", ".")),
     }));
-    if (percentages.some((row) => !Number.isFinite(row.percent) ||
-      row.percent < 0 || row.percent > 100)) {
+    if (
+      percentages.some(
+        (row) => !Number.isFinite(row.percent) || row.percent < 0 || row.percent > 100,
+      )
+    ) {
       setError("L'avancement de chaque ligne doit être compris entre 0 et 100 %.");
       return;
     }
-    if (dirty && !window.confirm(
-      "Recalculer les lignes du devis ? Les lignes ajoutées restent, mais les prix modifiés sur les lignes du devis seront recalculés."
-    )) return;
+    if (
+      dirty &&
+      !window.confirm(
+        "Recalculer les lignes du devis ? Les lignes ajoutées restent, mais les prix modifiés sur les lignes du devis seront recalculés.",
+      )
+    )
+      return;
     try {
       const index = payload.drafts.findIndex((row) => row.id === draft.id);
       const previous = { schemaVersion: 1 as const, drafts: payload.drafts.slice(0, index) };
       const result = calculateLineProgress(previous, draft, percentages);
       const recalculated: BillingDraft = {
-        ...draft, lineProgress: result.lineProgress, cumulativePercent: null,
-        amountHtCents: result.amountHtCents, taxGroups: result.tax.groups,
-        vatCents: result.tax.vatCents, totalTtcCents: result.tax.ttcCents,
+        ...draft,
+        lineProgress: result.lineProgress,
+        cumulativePercent: null,
+        amountHtCents: result.amountHtCents,
+        taxGroups: result.tax.groups,
+        vatCents: result.tax.vatCents,
+        totalTtcCents: result.tax.ttcCents,
       };
       const custom = rows.filter((row) => row.origin !== "QUOTE");
       setRows([...buildInvoiceDocumentLines(recalculated, previous).map(editable), ...custom]);
       setPendingPercentages(percentages);
-      setDirty(true); setError(""); setNotice("");
+      setDirty(true);
+      setError("");
+      setNotice("");
     } catch (caught) {
       const code = caught instanceof Error ? caught.message : "";
       setError(serverErrors[code] ?? code ?? "Avancement invalide");
@@ -272,10 +295,18 @@ export function BillingDocumentEditor({ draftId }: { draftId: string }) {
       setDraft(saved);
       setPayload(json.payload);
       setPendingPercentages(null);
-      setProgressValues(Object.fromEntries((saved.lines ?? []).map((line) =>
-        [line.lineId, decimal(saved.lineProgress?.find((row) => row.lineId === line.lineId)?.percent
-          ?? saved.cumulativePercent ?? 0)],
-      )));
+      setProgressValues(
+        Object.fromEntries(
+          (saved.lines ?? []).map((line) => [
+            line.lineId,
+            decimal(
+              saved.lineProgress?.find((row) => row.lineId === line.lineId)?.percent ??
+                saved.cumulativePercent ??
+                0,
+            ),
+          ]),
+        ),
+      );
       const original = (saved.documentLines ?? []).map(editable);
       setRows(original);
       setInitialRows(original);
@@ -549,26 +580,47 @@ export function BillingDocumentEditor({ draftId }: { draftId: string }) {
         {draft.type === "PROGRESS" && draft.lines?.length ? (
           <details className="invoiceProgress" open>
             <summary>Avancement cumulé par ligne du devis</summary>
-            <p>Tu peux corriger les pourcentages de cette situation.
-              Recalcule les lignes puis enregistre le projet. Les avancements antérieurs restent protégés.</p>
+            <p>
+              Tu peux corriger les pourcentages de cette situation. Recalcule les lignes puis
+              enregistre le projet. Les avancements antérieurs restent protégés.
+            </p>
             <div className="invoiceScroll">
               <table className="invoiceTable">
-                <thead><tr><th>Prestation du devis</th><th>Avancement cumulé (%)</th></tr></thead>
-                <tbody>{draft.lines.map((line) => (
-                  <tr key={line.lineId}>
-                    <td>{line.description}</td>
-                    <td><input aria-label={`Avancement cumulé de ${line.description}`}
-                      inputMode="decimal" disabled={!canWrite || busy}
-                      value={progressValues[line.lineId] ?? "0"}
-                      onChange={(event) => setProgressValues((old) => ({
-                        ...old, [line.lineId]: event.target.value,
-                      }))} /></td>
+                <thead>
+                  <tr>
+                    <th>Prestation du devis</th>
+                    <th>Avancement cumulé (%)</th>
                   </tr>
-                ))}</tbody>
+                </thead>
+                <tbody>
+                  {draft.lines.map((line) => (
+                    <tr key={line.lineId}>
+                      <td>{line.description}</td>
+                      <td>
+                        <input
+                          aria-label={`Avancement cumulé de ${line.description}`}
+                          inputMode="decimal"
+                          disabled={!canWrite || busy}
+                          value={progressValues[line.lineId] ?? "0"}
+                          onChange={(event) =>
+                            setProgressValues((old) => ({
+                              ...old,
+                              [line.lineId]: event.target.value,
+                            }))
+                          }
+                        />
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
               </table>
             </div>
-            <button type="button" className="secondaryButton"
-              disabled={!canWrite || busy} onClick={applyProgress}>
+            <button
+              type="button"
+              className="secondaryButton"
+              disabled={!canWrite || busy}
+              onClick={applyProgress}
+            >
               Recalculer les lignes depuis les pourcentages
             </button>
             {pendingPercentages && <p>Avancements recalculés, enregistrement nécessaire.</p>}
@@ -616,10 +668,18 @@ export function BillingDocumentEditor({ draftId }: { draftId: string }) {
               setRows(initialRows.map((row) => ({ ...row })));
               setLabel(draft.label);
               setNotes(draft.notes);
-              setProgressValues(Object.fromEntries((draft.lines ?? []).map((line) =>
-                [line.lineId, decimal(draft.lineProgress?.find((row) => row.lineId === line.lineId)?.percent
-                  ?? draft.cumulativePercent ?? 0)],
-              )));
+              setProgressValues(
+                Object.fromEntries(
+                  (draft.lines ?? []).map((line) => [
+                    line.lineId,
+                    decimal(
+                      draft.lineProgress?.find((row) => row.lineId === line.lineId)?.percent ??
+                        draft.cumulativePercent ??
+                        0,
+                    ),
+                  ]),
+                ),
+              );
               setPendingPercentages(null);
               setDirty(false);
               setError("");
