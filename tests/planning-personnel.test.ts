@@ -8,6 +8,9 @@ import {
 import {
   buildWeeklyCapacityIndicators,
   DEFAULT_WEEKLY_SCHEDULE,
+  NEW_STAFF_WEEKLY_SCHEDULE,
+  suggestedAbsenceHoursForDate,
+  weeklyScheduleHours,
 } from "../src/lib/planning/capacity";
 
 const accountId = "11111111-1111-4111-8111-111111111111";
@@ -37,9 +40,40 @@ describe("planning independent personnel", () => {
       kind: "staff",
       linkedUserId: null,
       countsInMacroCapacity: false,
-      weeklySchedule: DEFAULT_WEEKLY_SCHEDULE,
+      weeklySchedule: NEW_STAFF_WEEKLY_SCHEDULE,
     });
     expect(saved.staff[0].id).not.toBe(accountId);
+  });
+
+  it("gives newly created staff exactly 38.5 weekly hours without changing legacy accounts", () => {
+    const created = addStaff();
+    const personId = created.staff[0].id;
+    const savedSchedule = created.peopleCapacity.find((entry) => entry.userId === personId);
+    expect(savedSchedule?.weeklySchedule).toEqual({
+      monday: 8.5,
+      tuesday: 8.5,
+      wednesday: 8.5,
+      thursday: 8.5,
+      friday: 4.5,
+      saturday: 0,
+      sunday: 0,
+    });
+    expect(savedSchedule?.countsInMacroCapacity).toBe(false);
+    expect(weeklyScheduleHours(savedSchedule!.weeklySchedule)).toBe(38.5);
+    expect(effectivePlanningPeople(created, accounts)[0].weeklySchedule).toEqual(
+      DEFAULT_WEEKLY_SCHEDULE,
+    );
+  });
+
+  it("proposes absence hours for the selected date, including Friday, weekends and holidays", () => {
+    const schedule = NEW_STAFF_WEEKLY_SCHEDULE;
+    expect(suggestedAbsenceHoursForDate(schedule, "2026-10-19")).toBe(8.5);
+    expect(suggestedAbsenceHoursForDate(schedule, "2026-10-23")).toBe(4.5);
+    expect(suggestedAbsenceHoursForDate(schedule, "2026-10-24")).toBe(0);
+    expect(suggestedAbsenceHoursForDate(schedule, "2026-11-11")).toBe(0);
+    expect(suggestedAbsenceHoursForDate(schedule, "2027-01-01")).toBe(0);
+    expect(suggestedAbsenceHoursForDate(schedule, "2026-13-51")).toBe(0);
+    expect(suggestedAbsenceHoursForDate(schedule, "")).toBe(0);
   });
 
   it("allows independent staff to count toward capacity, with absence tracked by staff ID", () => {
@@ -112,6 +146,8 @@ describe("planning independent personnel", () => {
     expect(linked.absences[0].userId).toBe(personId);
     expect(linked.peopleCapacity[0].userId).toBe(personId);
     expect(linked.staff[0].id).toBe(personId);
+    expect(linked.peopleCapacity).toHaveLength(1);
+    expect(linked.peopleCapacity[0].weeklySchedule).toEqual(DEFAULT_WEEKLY_SCHEDULE);
   });
 
   it("supports renaming and unlinking while keeping staff schedules and absences", () => {
