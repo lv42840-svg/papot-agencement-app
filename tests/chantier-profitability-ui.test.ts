@@ -32,7 +32,7 @@ describe("chantier profitability UI", () => {
   });
 
   it("does not invent actual costs while their source modules are absent", () => {
-    expect(panel).toContain("Module Heures / coûts mensuels non raccordé");
+    expect(panel).toContain("Coût mensuel employeur manquant pour une ou plusieurs périodes");
     expect(panel).toContain("Module Achats / commandes non raccordé");
     expect(engine).toContain("laborCostCents: null");
     expect(engine).toContain("purchaseCostCents: null");
