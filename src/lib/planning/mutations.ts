@@ -177,7 +177,7 @@ export function applyPlanningHoursBatchMutation(
   }
 
   const payload = structuredClone(parsePlanningPayload(source));
-  const firm = new Map(payload.macroAllocations.map((item) => [
+  const firm = new Map<string, PlanningPayload["macroAllocations"][number]>(payload.macroAllocations.map((item) => [
     allocationKey(item.chantierId, item.activity, item.week), item,
   ]));
   const provisional = new Map(payload.provisionalAllocations.map((item) => [
