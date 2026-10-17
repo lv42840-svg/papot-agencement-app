@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, type ClipboardEvent } from "react";
 import {
   formatPlanningSelection,
   planPlanningPaste,
@@ -128,7 +128,7 @@ export function PlanningExcelGrid({
     }
   }
 
-  function handleCopy(event: React.ClipboardEvent<HTMLTableElement>) {
+  function handleCopy(event: ClipboardEvent<HTMLTableElement>) {
     if (!(event.target instanceof HTMLInputElement) || !selection) return;
     try {
       const value = formatPlanningSelection(
@@ -143,7 +143,7 @@ export function PlanningExcelGrid({
     }
   }
 
-  function handlePaste(event: React.ClipboardEvent<HTMLTableElement>) {
+  function handlePaste(event: ClipboardEvent<HTMLTableElement>) {
     if (!(event.target instanceof HTMLInputElement) || !selection) return;
     event.preventDefault();
     if (!snapshot.capabilities.canEditMacro || savingKey !== null) {
