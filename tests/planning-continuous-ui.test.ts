@@ -31,7 +31,7 @@ describe("continuous grand planning", () => {
     expect(grid).toContain(
       "tripleValues(ACTIVITIES.map((activity) => weeklyTotalFor(activity, week)))",
     );
-    expect(grid).toContain("month.key.slice(0, 4)");
+    expect(grid).toContain("month.year");
   });
 
   it("lets the user dismiss and reopen each pending-hours alert without deleting work", () => {

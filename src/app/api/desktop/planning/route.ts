@@ -29,6 +29,7 @@ import {
   applyPlanningDeleteAbsenceMutation,
   applyPlanningFullWeekAbsenceMutation,
   applyPlanningMacroMutation,
+  applyPlanningHoursBatchMutation,
   applyPlanningPersonCapacityMutation,
   applyPlanningPotentialOrderMutation,
   applyPlanningProvisionalMutation,
@@ -202,6 +203,29 @@ export async function POST(request: Request) {
       );
       await planningRepository.mutate((payload) =>
         applyPlanningMacroMutation(payload, input, activeChantierIds),
+      );
+    } else if (input.action === "setHoursBatch") {
+      await requireSpecialPermission(context.user, "planning.edit_macro");
+      for (const update of input.updates) {
+        assertPlanningWeekEditable(update.week);
+        if (!planningYearWeekIdsRange(year, endYear).includes(update.week)) {
+          throw new Error("PLANNING_BATCH_WEEK_INVALID");
+        }
+      }
+      const [chantiers, commercial] = await Promise.all([
+        createChantiersRepository(context).load(),
+        createCommercialRepository().load(),
+      ]);
+      const activeChantierIds = new Set(
+        chantiers.chantiers
+          .filter((chantier) => chantier.status === "ACTIVE")
+          .map((chantier) => chantier.id),
+      );
+      const activeCommercialCaseIds = new Set(
+        commercial.cases.filter(isCommercialActive).map((item) => item.id),
+      );
+      await planningRepository.mutate((payload) =>
+        applyPlanningHoursBatchMutation(payload, input, activeChantierIds, activeCommercialCaseIds),
       );
     } else if (input.action === "setActualHours") {
       await requireSpecialPermission(context.user, "planning.enter_actual_hours");

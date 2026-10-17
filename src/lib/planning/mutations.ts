@@ -31,6 +31,21 @@ export const planningMutationSchema = z.discriminatedUnion("action", [
     hours: z.number().finite().nonnegative().max(10_000),
   }),
   z.object({
+    action: z.literal("setHoursBatch"),
+    updates: z
+      .array(
+        z.object({
+          kind: z.enum(["firm", "provisional"]),
+          id: z.string().uuid(),
+          activity: planningActivitySchema,
+          week: weekSchema,
+          hours: z.number().finite().nonnegative().max(10_000),
+        }),
+      )
+      .min(1)
+      .max(200),
+  }),
+  z.object({
     action: z.literal("setActualHours"),
     chantierId: z.string().uuid(),
     userId: z.string().uuid(),
@@ -82,6 +97,7 @@ export const planningMutationSchema = z.discriminatedUnion("action", [
 export const planningMacroMutationSchema = planningMutationSchema.options[0];
 export type PlanningMutation = z.infer<typeof planningMutationSchema>;
 export type PlanningMacroMutation = Extract<PlanningMutation, { action: "setMacroHours" }>;
+export type PlanningHoursBatchMutation = Extract<PlanningMutation, { action: "setHoursBatch" }>;
 export type PlanningActualHoursMutation = Extract<PlanningMutation, { action: "setActualHours" }>;
 export type PlanningChantierOrderMutation = Extract<
   PlanningMutation,
@@ -137,6 +153,73 @@ export function applyPlanningMacroMutation(
   if (index >= 0) payload.macroAllocations[index] = next;
   else payload.macroAllocations.push(next);
 
+  return parsePlanningPayload(payload);
+}
+
+export function applyPlanningHoursBatchMutation(
+  source: PlanningPayload,
+  input: PlanningHoursBatchMutation,
+  activeChantierIds: ReadonlySet<string>,
+  activeCommercialCaseIds: ReadonlySet<string>,
+): PlanningPayload {
+  // Check every cell before changing anything. The repository commits this payload atomically.
+  const seen = new Set<string>();
+  for (const update of input.updates) {
+    const key = [update.kind, update.id, update.activity, update.week].join(":");
+    if (seen.has(key)) throw new Error("PLANNING_BATCH_DUPLICATE_INVALID");
+    seen.add(key);
+    if (update.kind === "firm" && !activeChantierIds.has(update.id)) {
+      throw new Error("PLANNING_CHANTIER_NOT_ACTIVE");
+    }
+    if (update.kind === "provisional" && !activeCommercialCaseIds.has(update.id)) {
+      throw new Error("PLANNING_COMMERCIAL_CASE_NOT_ACTIVE");
+    }
+  }
+
+  const payload = structuredClone(parsePlanningPayload(source));
+  const firm = new Map<string, PlanningPayload["macroAllocations"][number]>(
+    payload.macroAllocations.map((item) => [
+      allocationKey(item.chantierId, item.activity, item.week),
+      item,
+    ]),
+  );
+  const provisional = new Map<string, PlanningPayload["provisionalAllocations"][number]>(
+    payload.provisionalAllocations.map((item) => [
+      provisionalAllocationKey(item.caseId, item.activity, item.week),
+      item,
+    ]),
+  );
+
+  for (const update of input.updates) {
+    if (update.kind === "firm") {
+      const key = allocationKey(update.id, update.activity, update.week);
+      if (update.hours === 0) firm.delete(key);
+      else
+        firm.set(key, {
+          chantierId: update.id,
+          activity: update.activity,
+          week: update.week,
+          hours: update.hours,
+        });
+    } else {
+      const key = provisionalAllocationKey(update.id, update.activity, update.week);
+      if (update.hours === 0) provisional.delete(key);
+      else {
+        provisional.set(key, {
+          caseId: update.id,
+          activity: update.activity,
+          week: update.week,
+          hours: update.hours,
+        });
+        if (!payload.provisionalOrder.includes(update.id)) {
+          payload.provisionalOrder.unshift(update.id);
+        }
+      }
+    }
+  }
+
+  payload.macroAllocations = [...firm.values()];
+  payload.provisionalAllocations = [...provisional.values()];
   return parsePlanningPayload(payload);
 }
 
