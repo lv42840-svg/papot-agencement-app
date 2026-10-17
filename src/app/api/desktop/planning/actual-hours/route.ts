@@ -12,6 +12,8 @@ import {
   actualHoursRowSchema,
   actualHoursWeekSchema,
   applyActualHoursRow,
+  applyIndirectHoursRow,
+  indirectHoursRowSchema,
 } from "@/lib/planning/actual-hours";
 import { createPlanningRepository } from "@/lib/planning/create-repository";
 import { scheduledChantiersByPerson } from "@/lib/planning/actual-hours-suggestions";
@@ -67,7 +69,10 @@ async function snapshot(
   for (const account of auth.users) {
     if (!byId.has(account.id)) byId.set(account.id, account.displayName);
   }
-  const storedPeople = new Set(planning.actualHours.map((entry) => entry.userId));
+  const storedPeople = new Set([
+    ...planning.actualHours.map((entry) => entry.userId),
+    ...planning.indirectHours.map((entry) => entry.userId),
+  ]);
   const personnel = [
     ...people.map((person) => ({
       id: person.userId,
@@ -129,6 +134,7 @@ async function snapshot(
     records: recorded
       .filter((entry) => chantierIds.has(entry.chantierId))
       .map((entry) => ({ ...entry, personName: byId.get(entry.userId) ?? "Personnel" })),
+    indirectRecords: planning.indirectHours.filter((entry) => entry.week === week),
   };
 }
 
@@ -146,7 +152,11 @@ export async function POST(request: Request) {
   try {
     const context = await requireModuleRequestContext("planning", "WRITE");
     await requireSpecialPermission(context.user, "planning.enter_actual_hours");
-    const input = actualHoursRowSchema.parse(await request.json());
+    const raw = await request.json();
+    const input =
+      raw?.action === "saveIndirectHoursRow"
+        ? indirectHoursRowSchema.parse(raw)
+        : actualHoursRowSchema.parse(raw);
     if (!isPlanningWeekPast(input.week)) throw new Error("PLANNING_ACTUAL_HOURS_WEEK_NOT_PAST");
 
     const [chantiers, auth] = await Promise.all([
@@ -163,14 +173,20 @@ export async function POST(request: Request) {
       const ids = new Set(people.map((person) => person.userId));
       // Allow correcting historical entries of employees whose old login was disabled.
       const recordedIds = new Set(
-        payload.actualHours
-          .filter((entry) => entry.chantierId === input.chantierId && entry.week === input.week)
-          .map((entry) => entry.userId),
+        input.action === "saveActualHoursRow"
+          ? payload.actualHours
+              .filter((entry) => entry.chantierId === input.chantierId && entry.week === input.week)
+              .map((entry) => entry.userId)
+          : payload.indirectHours
+              .filter((entry) => entry.category === input.category && entry.week === input.week)
+              .map((entry) => entry.userId),
       );
       for (const user of auth.users) {
         if (recordedIds.has(user.id)) ids.add(user.id);
       }
-      return applyActualHoursRow(payload, input, chantierIds, ids);
+      return input.action === "saveIndirectHoursRow"
+        ? applyIndirectHoursRow(payload, input, ids)
+        : applyActualHoursRow(payload, input, chantierIds, ids);
     });
     return noStoreJson(await snapshot(input.week, context));
   } catch (error) {
