@@ -32,6 +32,7 @@ type HoursSnapshot = {
   people: Person[];
   chantiers: Chantier[];
   records: RecordRow[];
+  suggestedChantierIds: Record<string, string[]>;
 };
 
 function relativeWeek(week: string, offset: number): string {
@@ -59,12 +60,16 @@ function parseHours(value: string): number | null {
   return Number.isFinite(parsed) && parsed >= 0 && parsed <= 168 ? parsed : null;
 }
 
-const keyFor = (personId: string, activity: Activity) => personId + ":" + activity;
+const keyFor = (chantierId: string, activity: Activity) => chantierId + ":" + activity;
+const ACTIVITIES = ["BE", "WORKSHOP", "INSTALL"] as const;
 
 export function ActualHoursWorkspace() {
   const [week, setWeek] = useState(lastCompletedWeek);
   const [data, setData] = useState<HoursSnapshot | null>(null);
-  const [chantierId, setChantierId] = useState("");
+  const [personId, setPersonId] = useState("");
+  const [extraIds, setExtraIds] = useState<string[]>([]);
+  const [extraChoice, setExtraChoice] = useState("");
+  const [showAdd, setShowAdd] = useState(false);
   const [drafts, setDrafts] = useState<Record<string, string>>({});
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState<string | null>(null);
@@ -84,15 +89,12 @@ export function ActualHoursWorkspace() {
       if (!response.ok) throw new Error(json.error ?? "Impossible de charger les heures.");
       setData(json);
       setDrafts({});
-      setChantierId((old) =>
-        json.chantiers.some((item) => item.id === old)
-          ? old
-          : (json.chantiers.find((item) =>
-              json.records.some((record) => record.chantierId === item.id),
-            )?.id ??
-            json.chantiers[0]?.id ??
-            ""),
+      setPersonId((old) =>
+        json.people.some((person) => person.id === old) ? old : (json.people[0]?.id ?? ""),
       );
+      setExtraIds([]);
+      setExtraChoice("");
+      setShowAdd(false);
       setError("");
     } catch (cause) {
       setData(null);
@@ -106,44 +108,80 @@ export function ActualHoursWorkspace() {
     void load();
   }, [load]);
 
-  const chantier = useMemo(
-    () => data?.chantiers.find((item) => item.id === chantierId) ?? null,
-    [data, chantierId],
+  const selectedPerson = data?.people.find((person) => person.id === personId);
+  const suggestedIds = data?.suggestedChantierIds?.[personId] ?? [];
+  const plannedIds = new Set(suggestedIds);
+  const recordedIds = useMemo(
+    () =>
+      new Set(
+        data?.records
+          .filter((entry) => entry.userId === personId)
+          .map((entry) => entry.chantierId) ?? [],
+      ),
+    [data?.records, personId],
   );
-  const currentRecords = useMemo(() => {
-    const index = new Map<string, number>();
-    for (const row of data?.records ?? []) {
-      if (row.chantierId === chantierId) index.set(keyFor(row.userId, row.activity), row.hours);
+  const visibleIds = new Set([...suggestedIds, ...recordedIds, ...extraIds]);
+  const displayedChantiers =
+    data?.chantiers.filter((chantier) => visibleIds.has(chantier.id)) ?? [];
+  const availableChantiers =
+    data?.chantiers.filter((chantier) => !visibleIds.has(chantier.id)) ?? [];
+  const savedHours = useMemo(() => {
+    const found = new Map<string, number>();
+    for (const entry of data?.records ?? []) {
+      if (entry.userId === personId) {
+        found.set(keyFor(entry.chantierId, entry.activity), entry.hours);
+      }
     }
-    return index;
-  }, [data?.records, chantierId]);
+    return found;
+  }, [data?.records, personId]);
 
-  function valueFor(personId: string, activity: Activity): string {
-    const key = keyFor(personId, activity);
-    return drafts[key] ?? inputHours(currentRecords.get(key) ?? 0);
+  function cellValue(chantierId: string, activity: Activity): string {
+    const key = keyFor(chantierId, activity);
+    return drafts[key] ?? inputHours(savedHours.get(key) ?? 0);
   }
-  function rowTotals(personId: string) {
-    const be = parseHours(valueFor(personId, "BE")) ?? 0;
-    const workshop = parseHours(valueFor(personId, "WORKSHOP")) ?? 0;
-    const install = parseHours(valueFor(personId, "INSTALL")) ?? 0;
-    return be + workshop + install;
+  function cellHours(chantierId: string, activity: Activity): number {
+    return parseHours(cellValue(chantierId, activity)) ?? 0;
+  }
+  function totalForSite(chantierId: string): number {
+    return ACTIVITIES.reduce((sum, activity) => sum + cellHours(chantierId, activity), 0);
+  }
+  const totalForWeek = displayedChantiers.reduce(
+    (sum, chantier) => sum + totalForSite(chantier.id),
+    0,
+  );
+
+  function choosePerson(nextId: string) {
+    setPersonId(nextId);
+    setDrafts({});
+    setExtraIds([]);
+    setExtraChoice("");
+    setShowAdd(false);
+    setMessage("");
   }
 
-  async function savePerson(personId: string) {
-    if (!data?.editable || saving || !chantier) return;
-    const be = parseHours(valueFor(personId, "BE"));
-    const workshop = parseHours(valueFor(personId, "WORKSHOP"));
-    const install = parseHours(valueFor(personId, "INSTALL"));
-    if ([be, workshop, install].some((value) => value === null)) {
-      setMessage("Saisis des heures positives, au maximum deux décimales (ex. 7,5).");
+  function addChantier() {
+    if (!extraChoice || visibleIds.has(extraChoice)) return;
+    setExtraIds((previous) => [...previous, extraChoice]);
+    setExtraChoice("");
+    setShowAdd(false);
+  }
+
+  async function saveChantier(chantierId: string) {
+    if (!data?.editable || !personId || saving) return;
+    const be = parseHours(cellValue(chantierId, "BE"));
+    const workshop = parseHours(cellValue(chantierId, "WORKSHOP"));
+    const install = parseHours(cellValue(chantierId, "INSTALL"));
+    if (be === null || workshop === null || install === null) {
+      setMessage(
+        "Heures invalides : utilise un nombre positif avec deux décimales maximum (ex. 7,5).",
+      );
       return;
     }
-    const hours = { be: be!, workshop: workshop!, install: install! };
-    if (hours.be + hours.workshop + hours.install > 168) {
-      setMessage("Le total d'une personne ne peut pas dépasser 168 h par semaine.");
+    if (be + workshop + install > 168) {
+      setMessage("Une personne ne peut pas dépasser 168 h par chantier et par semaine.");
       return;
     }
-    setSaving(personId);
+    setSaving(chantierId);
     setMessage("");
     try {
       const response = await fetch("/api/desktop/planning/actual-hours", {
@@ -152,39 +190,28 @@ export function ActualHoursWorkspace() {
         body: JSON.stringify({
           action: "saveActualHoursRow",
           week,
-          chantierId,
           userId: personId,
-          ...hours,
+          chantierId,
+          be,
+          workshop,
+          install,
         }),
       });
       const json = (await response.json()) as HoursSnapshot & { error?: string };
       if (!response.ok) throw new Error(json.error ?? "Enregistrement impossible.");
       setData(json);
       setDrafts((old) => {
-        const copy = { ...old };
-        for (const activity of ["BE", "WORKSHOP", "INSTALL"] as const) {
-          delete copy[keyFor(personId, activity)];
-        }
-        return copy;
+        const next = { ...old };
+        for (const activity of ACTIVITIES) delete next[keyFor(chantierId, activity)];
+        return next;
       });
-      setMessage("Heures réelles enregistrées pour cette personne et ce chantier.");
+      setMessage("Heures enregistrées pour ce salarié et ce chantier.");
     } catch (cause) {
       setMessage(cause instanceof Error ? cause.message : "Enregistrement impossible.");
     } finally {
       setSaving(null);
     }
   }
-
-  const activeTotals = data?.people.reduce(
-    (acc, person) => {
-      const byPerson = ["BE", "WORKSHOP", "INSTALL"] as const;
-      for (const activity of byPerson) {
-        acc[activity] += parseHours(valueFor(person.id, activity)) ?? 0;
-      }
-      return acc;
-    },
-    { BE: 0, WORKSHOP: 0, INSTALL: 0 },
-  ) ?? { BE: 0, WORKSHOP: 0, INSTALL: 0 };
 
   return (
     <section className="papotActualHours">
@@ -193,8 +220,8 @@ export function ActualHoursWorkspace() {
           <p className="eyebrow">PAPOT AGENCEMENT · PRODUCTION</p>
           <h1>Saisie des heures réelles</h1>
           <p>
-            Chaque semaine écoulée, renseigne les heures par chantier et par personne, puis
-            répartis-les entre BE, Atelier et Pose.
+            Choisis une personne, puis retrouve ses chantiers de la semaine. Tu peux aussi ajouter
+            un chantier absent du petit planning.
           </p>
         </div>
         <div className="actualHoursActions">
@@ -209,19 +236,37 @@ export function ActualHoursWorkspace() {
 
       <div className="actualHoursFilters">
         <label>
-          Semaine écoulée
+          1 · Salarié
+          <select
+            aria-label="Salarié concerné"
+            value={personId}
+            disabled={loading || !data?.people.length || saving !== null}
+            onChange={(event) => choosePerson(event.target.value)}
+          >
+            {!data?.people.length ? <option value="">Aucun salarié</option> : null}
+            {data?.people.map((person) => (
+              <option key={person.id} value={person.id}>
+                {person.name}
+              </option>
+            ))}
+          </select>
+        </label>
+        <label>
+          2 · Semaine écoulée
           <div className="actualHoursWeekControls">
             <button
               type="button"
               className="secondaryButton"
+              disabled={saving !== null}
               onClick={() => setWeek(relativeWeek(week, -1))}
             >
               ←
             </button>
             <input
-              aria-label="Semaine de saisie"
               type="week"
+              aria-label="Semaine de saisie"
               value={week}
+              disabled={saving !== null}
               onChange={(event) => {
                 if (/^\d{4}-W\d{2}$/.test(event.target.value)) setWeek(event.target.value);
               }}
@@ -229,7 +274,7 @@ export function ActualHoursWorkspace() {
             <button
               type="button"
               className="secondaryButton"
-              disabled={relativeWeek(week, 1) === isoWeekKey(new Date())}
+              disabled={saving !== null || relativeWeek(week, 1) >= isoWeekKey(new Date())}
               onClick={() => setWeek(relativeWeek(week, 1))}
             >
               →
@@ -237,37 +282,9 @@ export function ActualHoursWorkspace() {
           </div>
           <small>{weekDateRangeLabel(week)}</small>
         </label>
-        <label>
-          Chantier
-          <select
-            value={chantierId}
-            onChange={(event) => {
-              setChantierId(event.target.value);
-              setDrafts({});
-            }}
-            disabled={loading || !data || data.chantiers.length === 0}
-          >
-            {data?.chantiers.length === 0 ? <option value="">Aucun chantier</option> : null}
-            {data?.chantiers.map((item) => (
-              <option key={item.id} value={item.id}>
-                {item.reference ? item.reference + " · " : ""}
-                {item.name}
-              </option>
-            ))}
-          </select>
-          <small>
-            {chantier?.status === "ACTIVE"
-              ? "En cours"
-              : chantier?.status === "DONE"
-                ? "Terminé (corrections possibles)"
-                : chantier?.status === "ARCHIVED"
-                  ? "Archivé (historique)"
-                  : ""}
-          </small>
-        </label>
       </div>
 
-      {loading ? <p className="actualHoursNotice">Chargement des heures…</p> : null}
+      {loading ? <p className="actualHoursNotice">Chargement…</p> : null}
       {error ? (
         <p className="actualHoursNotice" role="alert">
           {error}{" "}
@@ -276,63 +293,37 @@ export function ActualHoursWorkspace() {
           </button>
         </p>
       ) : null}
-      {data && chantier && !loading ? (
+
+      {data && !loading && selectedPerson ? (
         <>
           {!data.weekIsPast ? (
             <p className="actualHoursNotice">
-              Cette semaine n&apos;est pas terminée. Sélectionne une semaine écoulée pour saisir du
-              réalisé.
+              Cette semaine n&apos;est pas terminée. Choisis une semaine écoulée pour saisir les
+              heures réelles.
             </p>
           ) : null}
-          {!data.editable && data.weekIsPast ? (
+          {data.weekIsPast && !data.editable ? (
             <p className="actualHoursNotice">
-              Lecture seule. La permission « Saisir les heures passées » est nécessaire pour
-              modifier.
+              Lecture seule : le droit « Saisir les heures passées » est requis.
             </p>
           ) : null}
 
           <div className="actualHoursMetrics">
             <div>
-              <small>Prévu chantier</small>
-              <strong>
-                {formatHours(
-                  chantier.plannedHours.be +
-                    chantier.plannedHours.workshop +
-                    chantier.plannedHours.install,
-                )}{" "}
-                h
-              </strong>
+              <small>Salarié</small>
+              <strong>{selectedPerson.name}</strong>
             </div>
             <div>
-              <small>Réalisé cumulé</small>
-              <strong>
-                {formatHours(
-                  chantier.actualHours.be +
-                    chantier.actualHours.workshop +
-                    chantier.actualHours.install,
-                )}{" "}
-                h
-              </strong>
+              <small>Chantiers prévus cette semaine</small>
+              <strong>{suggestedIds.length}</strong>
             </div>
             <div>
-              <small>Reste à faire estimé</small>
-              <strong>
-                {formatHours(
-                  chantier.remainingHours.be +
-                    chantier.remainingHours.workshop +
-                    chantier.remainingHours.install,
-                )}{" "}
-                h
-              </strong>
+              <small>Chantiers avec heures enregistrées</small>
+              <strong>{recordedIds.size}</strong>
             </div>
             <div>
-              <small>Semaine {week.slice(-2)}</small>
-              <strong>
-                {formatHours(
-                  chantier.weekHours.be + chantier.weekHours.workshop + chantier.weekHours.install,
-                )}{" "}
-                h
-              </strong>
+              <small>Total salarié / semaine</small>
+              <strong>{formatHours(totalForWeek)} h</strong>
             </div>
           </div>
 
@@ -340,7 +331,7 @@ export function ActualHoursWorkspace() {
             <table className="actualHoursTable">
               <thead>
                 <tr>
-                  <th scope="col">Personnel</th>
+                  <th scope="col">Chantier</th>
                   <th scope="col">BE (h)</th>
                   <th scope="col">Atelier (h)</th>
                   <th scope="col">Pose (h)</th>
@@ -349,144 +340,150 @@ export function ActualHoursWorkspace() {
                 </tr>
               </thead>
               <tbody>
-                {data.people.map((person) => {
-                  const dirty = (["BE", "WORKSHOP", "INSTALL"] as const).some(
-                    (activity) => drafts[keyFor(person.id, activity)] !== undefined,
+                {displayedChantiers.map((chantier) => {
+                  const dirty = ACTIVITIES.some(
+                    (activity) => drafts[keyFor(chantier.id, activity)] !== undefined,
                   );
                   return (
-                    <tr key={person.id}>
-                      <th scope="row">{person.name}</th>
-                      {(["BE", "WORKSHOP", "INSTALL"] as const).map((activity) => (
+                    <tr key={chantier.id}>
+                      <th scope="row">
+                        {chantier.reference ? chantier.reference + " · " : ""}
+                        {chantier.name}
+                        <small className="actualHoursSiteSource">
+                          {plannedIds.has(chantier.id)
+                            ? "Prévu au petit planning"
+                            : recordedIds.has(chantier.id)
+                              ? "Heures déjà enregistrées"
+                              : "Ajout manuel"}
+                        </small>
+                      </th>
+                      {ACTIVITIES.map((activity) => (
                         <td key={activity}>
                           <input
                             type="text"
                             inputMode="decimal"
-                            aria-label={`${person.name} ${activity}`}
-                            value={valueFor(person.id, activity)}
+                            aria-label={chantier.name + " " + activity}
+                            value={cellValue(chantier.id, activity)}
                             placeholder="0"
                             disabled={!data.editable || saving !== null}
                             onChange={(event) =>
                               setDrafts((current) => ({
                                 ...current,
-                                [keyFor(person.id, activity)]: event.target.value,
+                                [keyFor(chantier.id, activity)]: event.target.value,
                               }))
                             }
                             onKeyDown={(event) => {
                               if (event.key === "Enter") {
                                 event.preventDefault();
-                                void savePerson(person.id);
+                                void saveChantier(chantier.id);
                               }
                             }}
                           />
                         </td>
                       ))}
-                      <td className="actualHoursTotal">{formatHours(rowTotals(person.id))}</td>
+                      <td className="actualHoursTotal">
+                        {formatHours(totalForSite(chantier.id))} h
+                      </td>
                       <td>
                         <button
-                          type="button"
                           className="secondaryButton"
+                          type="button"
                           disabled={!data.editable || saving !== null || !dirty}
-                          onClick={() => void savePerson(person.id)}
+                          onClick={() => void saveChantier(chantier.id)}
                         >
-                          {saving === person.id ? "Enregistrement…" : "Enregistrer"}
+                          {saving === chantier.id ? "Enregistrement…" : "Enregistrer"}
                         </button>
                       </td>
                     </tr>
                   );
                 })}
-                {data.people.length === 0 ? (
+                {displayedChantiers.length === 0 ? (
                   <tr>
                     <td colSpan={6}>
-                      Ajoute une personne dans Gestion du personnel pour saisir ses heures.
+                      Aucun chantier prévu pour cette personne cette semaine. Utilise « + Ajouter un
+                      chantier » pour saisir du réalisé.
                     </td>
                   </tr>
                 ) : null}
               </tbody>
               <tfoot>
                 <tr>
-                  <th>Total semaine / chantier</th>
-                  <td>{formatHours(activeTotals.BE)} h</td>
-                  <td>{formatHours(activeTotals.WORKSHOP)} h</td>
-                  <td>{formatHours(activeTotals.INSTALL)} h</td>
-                  <td>
-                    {formatHours(activeTotals.BE + activeTotals.WORKSHOP + activeTotals.INSTALL)} h
-                  </td>
+                  <th>Total salarié / semaine</th>
+                  {ACTIVITIES.map((activity) => (
+                    <td key={activity}>
+                      {formatHours(
+                        displayedChantiers.reduce(
+                          (sum, chantier) => sum + cellHours(chantier.id, activity),
+                          0,
+                        ),
+                      )}{" "}
+                      h
+                    </td>
+                  ))}
+                  <td>{formatHours(totalForWeek)} h</td>
                   <td />
                 </tr>
               </tfoot>
             </table>
           </div>
-          <p className="actualHoursHint">
-            Une ligne est enregistrée en une seule opération. Laisse un champ vide pour 0 h.
-            Corriger des heures remplace le total de cette personne, activité, chantier et semaine,
-            sans créer de doublon.
-          </p>
 
-          <div className="actualHoursBreakdown">
-            <h2>Suivi du chantier · prévu / réalisé / restant</h2>
-            <table>
-              <thead>
-                <tr>
-                  <th>Activité</th>
-                  <th>Prévu</th>
-                  <th>Réalisé</th>
-                  <th>Reste</th>
-                </tr>
-              </thead>
-              <tbody>
-                {(
-                  [
-                    ["BE", "be"],
-                    ["Atelier", "workshop"],
-                    ["Pose", "install"],
-                  ] as const
-                ).map(([label, key]) => (
-                  <tr key={key}>
-                    <th>{label}</th>
-                    <td>{formatHours(chantier.plannedHours[key])} h</td>
-                    <td>{formatHours(chantier.actualHours[key])} h</td>
-                    <td>{formatHours(chantier.remainingHours[key])} h</td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-
-          <div className="actualHoursOtherSites">
-            <h2>Autres chantiers avec du réalisé sur la semaine</h2>
-            <div className="actualHoursSiteChips">
-              {data.chantiers
-                .filter(
-                  (item) =>
-                    item.weekHours.be + item.weekHours.workshop + item.weekHours.install > 0,
-                )
-                .map((item) => (
-                  <button
-                    type="button"
-                    key={item.id}
-                    className={item.id === chantierId ? "isSelected" : ""}
-                    onClick={() => {
-                      setChantierId(item.id);
-                      setDrafts({});
-                    }}
+          <div className="actualHoursAddSite">
+            {!showAdd ? (
+              <button
+                type="button"
+                className="secondaryButton"
+                disabled={!data.editable || saving !== null || availableChantiers.length === 0}
+                onClick={() => setShowAdd(true)}
+              >
+                + Ajouter un chantier
+              </button>
+            ) : (
+              <>
+                <label>
+                  Chantier supplémentaire
+                  <select
+                    aria-label="Chantier à ajouter"
+                    value={extraChoice}
+                    onChange={(event) => setExtraChoice(event.target.value)}
                   >
-                    {item.name} ·{" "}
-                    {formatHours(
-                      item.weekHours.be + item.weekHours.workshop + item.weekHours.install,
-                    )}{" "}
-                    h
-                  </button>
-                ))}
-              {data.chantiers.every(
-                (item) =>
-                  item.weekHours.be + item.weekHours.workshop + item.weekHours.install === 0,
-              ) ? (
-                <p className="muted">Aucune heure réelle enregistrée pour cette semaine.</p>
-              ) : null}
-            </div>
+                    <option value="">Choisir un chantier…</option>
+                    {availableChantiers.map((chantier) => (
+                      <option key={chantier.id} value={chantier.id}>
+                        {chantier.reference ? chantier.reference + " · " : ""}
+                        {chantier.name}
+                      </option>
+                    ))}
+                  </select>
+                </label>
+                <button
+                  type="button"
+                  className="secondaryButton"
+                  disabled={!extraChoice}
+                  onClick={addChantier}
+                >
+                  Ajouter
+                </button>
+                <button
+                  type="button"
+                  className="secondaryButton"
+                  onClick={() => {
+                    setExtraChoice("");
+                    setShowAdd(false);
+                  }}
+                >
+                  Annuler
+                </button>
+              </>
+            )}
           </div>
+          <p className="actualHoursHint">
+            Les chantiers proposés viennent du petit planning. Les chantiers avec des heures déjà
+            enregistrées restent visibles. Tu peux ajouter un chantier non prévu. Les heures réelles
+            ne modifient pas les affectations du petit planning.
+          </p>
         </>
       ) : null}
+
       {message ? (
         <p className="actualHoursNotice" role="status">
           {message}
@@ -603,6 +600,34 @@ export function ActualHoursWorkspace() {
         }
         .actualHoursTable tbody tr:nth-child(even) {
           background: #fcfaff;
+        }
+        .actualHoursSiteSource {
+          display: block;
+          color: #786d8a;
+          font-weight: 500;
+          font-size: 10px;
+          margin-top: 4px;
+        }
+        .actualHoursAddSite {
+          display: flex;
+          align-items: end;
+          gap: 9px;
+          flex-wrap: wrap;
+        }
+        .actualHoursAddSite label {
+          display: grid;
+          gap: 5px;
+          min-width: 285px;
+          font-size: 12px;
+          font-weight: 750;
+        }
+        .actualHoursAddSite select {
+          min-width: 0;
+          width: 100%;
+          padding: 9px;
+          border: 1px solid #cec4dd;
+          border-radius: 6px;
+          background: white;
         }
         .actualHoursTable input {
           width: 92px;

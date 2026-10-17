@@ -25,16 +25,18 @@ describe("actual hours interface and chantier bridge", () => {
     expect(workspace).toContain('type="week"');
   });
 
-  it("gives three manually editable activity fields per person and one atomic save", () => {
-    expect(workspace).toContain('["BE", "WORKSHOP", "INSTALL"]');
-    expect(workspace).toContain("data.people.map((person)");
-    expect(workspace).toContain("Semaine écoulée");
-    expect(workspace).toContain("Chantier");
+  it("chooses the employee first and shows weekly chantiers with 3-hour fields", () => {
+    expect(workspace).toContain("1 · Salarié");
+    expect(workspace).toContain("2 · Semaine écoulée");
+    expect(workspace).toContain("data?.people.map((person)");
+    expect(workspace).toContain("suggestedChantierIds");
+    expect(workspace).toContain("Prévu au petit planning");
+    expect(workspace).toContain("Heures déjà enregistrées");
+    expect(workspace).toContain("+ Ajouter un chantier");
+    expect(workspace).toContain("Choisir un chantier…");
+    expect(workspace).toContain("ACTIVITIES");
     expect(workspace).toContain('action: "saveActualHoursRow"');
     expect(workspace).toContain("Enregistrer");
-    expect(workspace).toContain("Prévu chantier");
-    expect(workspace).toContain("Réalisé cumulé");
-    expect(workspace).toContain("Reste à faire estimé");
   });
 
   it("requires the individual actual-hours permission on past weeks only", () => {
@@ -53,5 +55,6 @@ describe("actual hours interface and chantier bridge", () => {
     expect(chantiers).toContain("actualHoursByActivity");
     expect(chantiers).toContain("payload: viewPayload");
     expect(route).toContain("actualHoursByActivity");
+    expect(route).toContain("scheduledChantiersByPerson");
   });
 });
