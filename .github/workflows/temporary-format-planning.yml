@@ -7,7 +7,6 @@ permissions:
   contents: write
 jobs:
   format-planning:
-    if: github.event.head_commit.message != 'chore(planning): apply Prettier'
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
