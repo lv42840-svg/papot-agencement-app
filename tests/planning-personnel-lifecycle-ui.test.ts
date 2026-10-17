@@ -42,7 +42,7 @@ describe("personnel notice, copy and printable weekly board UI", () => {
 
   it("prints the weekly staff assignments with landscape headers, chantier extract and color", () => {
     expect(board).toContain("window.print()");
-    expect(board).toContain("@page { size: A4 landscape");
+    expect(board).toMatch(/@page\\s*\\{\\s*size:\\s*A4 landscape/);
     expect(board).toContain("print-color-adjust: exact");
     expect(board).toContain("weeklyBoardChantierScroll");
     expect(board).toContain("weeklyBoardTable");
