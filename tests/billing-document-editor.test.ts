@@ -62,7 +62,7 @@ describe("éditeur de facture autonome", () => {
     const rows = deposit.documentLines!.map((line) => ({ ...line }));
     const first = rows[0];
     rows[0] = { ...first, description: "Pose et fourniture modifiées", quantity: 1,
-      unit: "forfait", unitPriceCents: first.unitPriceCents - 10_000 };
+      unit: "forfait", unitPriceCents: Math.round(first.quantity * first.unitPriceCents) - 10_000 };
     rows.push({ id: crypto.randomUUID(), origin: "FREE", sourceLineId: null,
       description: "Transport complémentaire", quantity: 2, unit: "h", unitPriceCents: 5_000,
       vatRatePercent: first.vatRatePercent });
@@ -133,7 +133,7 @@ describe("éditeur de facture autonome", () => {
     expect(situation.amountHtCents).toBe(1_550_000);
     expect(situation.documentLines?.map((line) => line.sourceLineId)).toEqual([A,B,C]);
     expect(situation.documentLines?.map((line) => line.unitPriceCents))
-      .toEqual([1_400_000, 200_000, 0]);
+      .toEqual([1_400_000, 150_000, 0]);
     // The editor's persisted line snapshot must exactly match the analytic situation.
     const totals = calculateInvoiceDocumentTotals(situation.documentLines!);
     expect(totals.amountHtCents).toBe(situation.amountHtCents);
