@@ -497,7 +497,10 @@ export function GrandPlanningWorkspace({
       },
       "Semaine d’absence enregistrée.",
     );
-    if (saved) setAbsenceEditId(null);
+    if (saved) {
+      setAbsenceEditId(null);
+      setAbsenceHours(null);
+    }
   }
 
   async function deleteAbsence(absenceId: string) {
@@ -1139,7 +1142,10 @@ export function GrandPlanningWorkspace({
                   <button
                     className="secondaryButton"
                     type="button"
-                    onClick={() => setAbsenceEditId(null)}
+                    onClick={() => {
+                      setAbsenceEditId(null);
+                      setAbsenceHours(null);
+                    }}
                   >
                     Annuler
                   </button>
