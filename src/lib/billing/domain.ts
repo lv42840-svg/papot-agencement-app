@@ -1,3 +1,4 @@
+import { calculateLineProgress } from "./progress";
 import { z } from "zod";
 
 const centsSchema = z.number().int().nonnegative().safe();
@@ -12,6 +13,21 @@ export const billingTaxGroupSchema = z.object({
 });
 export type BillingTaxGroup = z.infer<typeof billingTaxGroupSchema>;
 
+export const billingSourceLineSchema = z.object({
+  lineId: z.string().uuid(),
+  description: z.string().min(1).max(4000),
+  amountHtCents: centsSchema,
+  vatRatePercent: z.number().finite().min(0).max(100),
+});
+export type BillingSourceLine = z.infer<typeof billingSourceLineSchema>;
+
+export const billingLineProgressSchema = z.object({
+  lineId: z.string().uuid(),
+  percent: z.number().finite().min(0).max(100),
+  cumulativeHtCents: centsSchema,
+});
+export type BillingLineProgress = z.infer<typeof billingLineProgressSchema>;
+
 export const billingSourceSchema = z.object({
   quoteId: z.string().uuid(),
   commercialCaseId: z.string().uuid(),
@@ -22,6 +38,7 @@ export const billingSourceSchema = z.object({
   quoteLabel: z.string().min(1),
   contractHtCents: centsSchema.positive(),
   contractTaxGroups: z.array(billingTaxGroupSchema).min(1),
+  lines: z.array(billingSourceLineSchema).max(1000).optional(),
 });
 export type BillingSource = z.infer<typeof billingSourceSchema>;
 
@@ -37,6 +54,7 @@ export const billingDraftSchema = billingSourceSchema.extend({
   vatCents: centsSchema,
   totalTtcCents: centsSchema.positive(),
   cumulativePercent: z.number().finite().min(0).max(100).nullable(),
+  lineProgress: z.array(billingLineProgressSchema).max(1000).optional(),
   createdAt: dateTimeSchema,
   createdByName: z.string().trim().min(1),
   updatedAt: dateTimeSchema,
@@ -72,6 +90,18 @@ function assertSource(source: BillingSource): BillingSource {
     valid.contractHtCents
   ) {
     throw new Error("BILLING_SOURCE_TOTAL_MISMATCH");
+  }
+  if (valid.lines?.length) {
+    const lineTotal = valid.lines.reduce((sum, line) => sum + line.amountHtCents, 0);
+    if (lineTotal !== valid.contractHtCents) throw new Error("BILLING_SOURCE_LINES_MISMATCH");
+    if (new Set(valid.lines.map((line) => line.lineId)).size !== valid.lines.length) {
+      throw new Error("BILLING_SOURCE_LINES_DUPLICATE");
+    }
+    for (const group of valid.contractTaxGroups) {
+      const fromLines = valid.lines.filter((line) => line.vatRatePercent === group.ratePercent)
+        .reduce((sum, line) => sum + line.amountHtCents, 0);
+      if (fromLines !== group.baseHtCents) throw new Error("BILLING_SOURCE_TAX_MISMATCH");
+    }
   }
   return valid;
 }
@@ -154,18 +184,41 @@ export function createBillingDraft(
     type: BillingType;
     amountHtCents?: number;
     cumulativePercent?: number;
+    linePercentages?: Array<{ lineId: string; percent: number }>;
   },
   actorName: string,
   now = new Date(),
 ): BillingDraft {
   const validSource = assertSource(source);
   const alreadyPreparedCents = preparedHtCents(payload, source.quoteId);
-  const amountHtCents = resolveBillingAmount({
+  if (input.linePercentages && (input.type !== "PROGRESS" ||
+    input.amountHtCents !== undefined || input.cumulativePercent !== undefined)) {
+    throw new Error("BILLING_PROGRESS_INPUT_CONFLICT");
+  }
+  const hasLineHistory = payload.drafts.some((draft) =>
+    draft.quoteId === source.quoteId && draft.type === "PROGRESS" &&
+    Boolean(draft.lineProgress?.length));
+  if (hasLineHistory && input.type === "PROGRESS" && input.amountHtCents !== undefined) {
+    throw new Error("BILLING_PROGRESS_AMOUNT_AFTER_LINES_FORBIDDEN");
+  }
+  const linePercentages = input.type === "PROGRESS"
+    ? input.linePercentages ??
+      (input.cumulativePercent !== undefined && validSource.lines?.length
+        ? validSource.lines.map((line) => ({
+            lineId: line.lineId,
+            percent: input.cumulativePercent!,
+          }))
+        : null)
+    : null;
+  const lineResult = linePercentages
+    ? calculateLineProgress(payload, validSource, linePercentages)
+    : null;
+  const amountHtCents = lineResult?.amountHtCents ?? resolveBillingAmount({
     ...input,
     contractHtCents: validSource.contractHtCents,
     alreadyPreparedCents,
   });
-  const tax = distributeBillingTax(validSource.contractTaxGroups, amountHtCents);
+  const tax = lineResult?.tax ?? distributeBillingTax(validSource.contractTaxGroups, amountHtCents);
   const typeLabel: Record<BillingType, string> = {
     STANDARD: "Facture classique",
     DEPOSIT: "Facture d'acompte",
@@ -185,6 +238,7 @@ export function createBillingDraft(
     vatCents: tax.vatCents,
     totalTtcCents: tax.ttcCents,
     cumulativePercent: input.cumulativePercent ?? null,
+    ...(lineResult ? { lineProgress: lineResult.lineProgress } : {}),
     createdAt: now.toISOString(),
     createdByName: actorName,
     updatedAt: now.toISOString(),
@@ -214,6 +268,16 @@ export function updateBillingDraft(
       : (input.amountHtCents ?? draft.amountHtCents);
   if (amountHtCents + alreadyPreparedCents > draft.contractHtCents) {
     throw new Error("BILLING_AMOUNT_EXCEEDS_CONTRACT");
+  }
+  if (draft.lineProgress?.length && amountHtCents !== draft.amountHtCents) {
+    throw new Error("BILLING_LINE_PROGRESS_EDIT_FORBIDDEN");
+  }
+  if (amountHtCents !== draft.amountHtCents) {
+    const draftIndex = payload.drafts.findIndex((item) => item.id === draftId);
+    if (payload.drafts.slice(draftIndex + 1).some((item) =>
+      item.quoteId === draft.quoteId && item.type === "PROGRESS")) {
+      throw new Error("BILLING_DRAFT_HAS_DEPENDENTS");
+    }
   }
   const tax = distributeBillingTax(draft.contractTaxGroups, amountHtCents);
   return billingDraftSchema.parse({

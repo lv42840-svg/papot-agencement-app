@@ -8,27 +8,40 @@ import { calculateQuoteAdjustedPricing } from "@/lib/quotes/adjustments";
 import { createQuotesRepository } from "@/lib/quotes/create-repository";
 import { quoteCanBeRetained } from "@/lib/quotes/retention";
 import type { NativeQuoteRecord } from "@/lib/quotes/store";
-import { billingSourceSchema, type BillingSource, type BillingTaxGroup } from "./domain";
+import { billingSourceSchema, type BillingSource, type BillingTaxGroup, type BillingSourceLine } from "./domain";
 
-function quoteContractTaxGroups(quote: NativeQuoteRecord): BillingTaxGroup[] {
+function quoteContractData(quote: NativeQuoteRecord): {
+  taxGroups: BillingTaxGroup[];
+  lines: BillingSourceLine[];
+} {
   const price = calculateQuoteAdjustedPricing(quote.model.items, quote.pricingConfig);
   if (price.warnings.length > 0) throw new Error("BILLING_QUOTE_PRICING_REVIEW_REQUIRED");
   const rates = new Map(
     quote.taxConfig.lineOverrides.map((item) => [item.lineId, item.ratePercent]),
   );
+  const lines: BillingSourceLine[] = price.lines
+    .filter((line) => line.optionStatus !== "PENDING" && line.optionStatus !== "REJECTED")
+    .map((line) => ({
+      lineId: line.lineId,
+      description: line.description,
+      amountHtCents: line.saleCents,
+      vatRatePercent: rates.get(line.lineId) ?? quote.taxConfig.defaultRatePercent,
+    }));
   const byRate = new Map<number, number>();
-  for (const line of price.lines) {
-    if (line.optionStatus === "PENDING" || line.optionStatus === "REJECTED") continue;
-    const ratePercent = rates.get(line.lineId) ?? quote.taxConfig.defaultRatePercent;
-    byRate.set(ratePercent, (byRate.get(ratePercent) ?? 0) + line.saleCents);
+  for (const line of lines) {
+    byRate.set(line.vatRatePercent,
+      (byRate.get(line.vatRatePercent) ?? 0) + line.amountHtCents);
   }
   const total = [...byRate.values()].reduce((sum, amount) => sum + amount, 0);
   if (total <= 0 || total !== price.totalSaleCents) {
     throw new Error("BILLING_QUOTE_PRICING_MISMATCH");
   }
-  return [...byRate.entries()]
-    .map(([ratePercent, baseHtCents]) => ({ ratePercent, baseHtCents }))
-    .sort((a, b) => a.ratePercent - b.ratePercent);
+  return {
+    lines,
+    taxGroups: [...byRate.entries()]
+      .map(([ratePercent, baseHtCents]) => ({ ratePercent, baseHtCents }))
+      .sort((a, b) => a.ratePercent - b.ratePercent),
+  };
 }
 
 export async function loadBillingSources(): Promise<BillingSource[]> {
@@ -59,7 +72,7 @@ export async function loadBillingSources(): Promise<BillingSource[]> {
       if (!client) return [];
 
       try {
-        const taxGroups = quoteContractTaxGroups(quote);
+        const { taxGroups, lines } = quoteContractData(quote);
         const chantier = byAffairChantier.get(affair.id) ?? null;
         return [
           billingSourceSchema.parse({
@@ -73,6 +86,7 @@ export async function loadBillingSources(): Promise<BillingSource[]> {
               quote.finalPdf?.quoteNumber ?? `${quote.variantName} · version ${quote.version}`,
             contractHtCents: taxGroups.reduce((sum, group) => sum + group.baseHtCents, 0),
             contractTaxGroups: taxGroups,
+            lines,
           }),
         ];
       } catch {
