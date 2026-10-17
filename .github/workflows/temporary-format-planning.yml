@@ -1,0 +1,32 @@
+name: Format planning feature
+on:
+  push:
+    branches:
+      - feat/planning-excel-personnel-20261017
+permissions:
+  contents: write
+jobs:
+  format-planning:
+    if: github.event.head_commit.message != 'chore(planning): apply Prettier'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: true
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - name: Format changed planning files
+        run: |
+          npx --no-install prettier --write src/components/planning-excel-grid.tsx src/components/grand-planning-workspace.tsx src/lib/planning/domain.ts tests/planning-firm-order-ui.test.ts tests/planning-commercial-provision-ui.test.ts tests/planning-potential-collapse-preference.test.ts tests/planning-time-markers-ui.test.ts
+      - name: Commit formatted sources
+        run: |
+          if [ -n "$(git status --porcelain)" ]; then
+            git config user.name "github-actions[bot]"
+            git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+            git add src/components/planning-excel-grid.tsx src/components/grand-planning-workspace.tsx src/lib/planning/domain.ts tests/planning-firm-order-ui.test.ts tests/planning-commercial-provision-ui.test.ts tests/planning-potential-collapse-preference.test.ts tests/planning-time-markers-ui.test.ts
+            git commit -m 'chore(planning): apply Prettier'
+            git push origin HEAD:feat/planning-excel-personnel-20261017
+          fi
