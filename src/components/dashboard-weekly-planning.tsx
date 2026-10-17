@@ -108,7 +108,8 @@ export function DashboardWeeklyPlanning({ initialWeek }: { initialWeek: string }
         <div>
           <h2>Planning de la semaine</h2>
           <p>
-            S{week.slice(-2)} · Du {weekDateRangeLabel(week)} · affectations réelles de l&apos;équipe
+            S{week.slice(-2)} · Du {weekDateRangeLabel(week)} · affectations réelles de
+            l&apos;équipe
           </p>
         </div>
         <div className="dashboardWeeklyControls">
@@ -146,7 +147,9 @@ export function DashboardWeeklyPlanning({ initialWeek }: { initialWeek: string }
       </div>
 
       {loading ? (
-        <p className="dashboardWeeklyMessage" role="status">Chargement du planning…</p>
+        <p className="dashboardWeeklyMessage" role="status">
+          Chargement du planning…
+        </p>
       ) : null}
       {error && !loading ? (
         <div className="dashboardWeeklyMessage" role="alert">
@@ -166,7 +169,9 @@ export function DashboardWeeklyPlanning({ initialWeek }: { initialWeek: string }
                 {data.dates.map((date, index) => (
                   <th key={date} scope="col" title={holidaysByDate.get(date) ?? undefined}>
                     {DAYS[index] ?? "Jour"}
-                    <small>{date.slice(8, 10)}/{date.slice(5, 7)}</small>
+                    <small>
+                      {date.slice(8, 10)}/{date.slice(5, 7)}
+                    </small>
                   </th>
                 ))}
               </tr>
@@ -174,7 +179,9 @@ export function DashboardWeeklyPlanning({ initialWeek }: { initialWeek: string }
             <tbody>
               {data.people.map((person) => (
                 <tr key={person.userId}>
-                  <th scope="row" className="dashboardWeeklyPerson">{person.displayName}</th>
+                  <th scope="row" className="dashboardWeeklyPerson">
+                    {person.displayName}
+                  </th>
                   {data.dates.map((date) => {
                     const rows = entriesByCell.get(cellKey(person.userId, date)) ?? [];
                     const absence = absencesByCell.get(cellKey(person.userId, date));
@@ -184,7 +191,9 @@ export function DashboardWeeklyPlanning({ initialWeek }: { initialWeek: string }
                       (!person.inactiveSince || date < person.inactiveSince);
                     return (
                       <td key={date} className={holiday ? "dashboardWeeklyHoliday" : undefined}>
-                        {holiday ? <span className="dashboardWeeklyFlag">Férié · {holiday}</span> : null}
+                        {holiday ? (
+                          <span className="dashboardWeeklyFlag">Férié · {holiday}</span>
+                        ) : null}
                         {absence ? (
                           <span className="dashboardWeeklyAbsence">
                             {absence.typeLabel} · {absence.hours.toLocaleString("fr-FR")} h
@@ -222,64 +231,212 @@ export function DashboardWeeklyPlanning({ initialWeek }: { initialWeek: string }
         </div>
       ) : null}
       <style jsx global>{`
-        .dashboardWeeklyPlanning { grid-column: 1 / -1; min-height: 220px; }
-        .dashboardWeeklyHeader { align-items: center; flex-wrap: wrap; }
-        .dashboardWeeklyHeader h2 { font-size: 17px; }
-        .dashboardWeeklyHeader p { font-size: 12px; }
-        .dashboardWeeklyControls { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
-        .dashboardWeeklyArrow,.dashboardWeeklyCurrent {
-          display: inline-flex; justify-content: center; align-items: center;
-          min-height: 34px; border: 1px solid #ded5eb; background: #f7f3fc;
-          border-radius: 8px; color: #65469d; cursor: pointer; font-weight: 700;
+        .dashboardWeeklyPlanning {
+          grid-column: 1 / -1;
+          min-height: 220px;
         }
-        .dashboardWeeklyArrow { width: 36px; }
-        .dashboardWeeklyCurrent { padding: 0 11px; font-size: 12px; }
+        .dashboardWeeklyHeader {
+          align-items: center;
+          flex-wrap: wrap;
+        }
+        .dashboardWeeklyHeader h2 {
+          font-size: 17px;
+        }
+        .dashboardWeeklyHeader p {
+          font-size: 12px;
+        }
+        .dashboardWeeklyControls {
+          display: flex;
+          align-items: center;
+          gap: 8px;
+          flex-wrap: wrap;
+        }
+        .dashboardWeeklyArrow,
+        .dashboardWeeklyCurrent {
+          display: inline-flex;
+          justify-content: center;
+          align-items: center;
+          min-height: 34px;
+          border: 1px solid #ded5eb;
+          background: #f7f3fc;
+          border-radius: 8px;
+          color: #65469d;
+          cursor: pointer;
+          font-weight: 700;
+        }
+        .dashboardWeeklyArrow {
+          width: 36px;
+        }
+        .dashboardWeeklyCurrent {
+          padding: 0 11px;
+          font-size: 12px;
+        }
         .dashboardWeeklyOpen {
-          display: inline-flex; align-items: center; color: #65469d;
-          font-size: 12px; font-weight: 800; padding: 7px 3px; text-decoration: none;
+          display: inline-flex;
+          align-items: center;
+          color: #65469d;
+          font-size: 12px;
+          font-weight: 800;
+          padding: 7px 3px;
+          text-decoration: none;
         }
-        .dashboardWeeklyArrow:focus-visible,.dashboardWeeklyCurrent:focus-visible,
-        .dashboardWeeklyOpen:focus-visible { outline: 3px solid #bba8e4; outline-offset: 2px; }
-        .dashboardWeeklyMessage { margin: 16px 0 0; background: #f7f3fc; padding: 15px;
-          border-radius: 8px; color: #654b86; font-size: 13px; }
-        .dashboardWeeklyMessage button { border: 0; background: transparent; color: #65469d;
-          cursor: pointer; display: inline-flex; gap: 5px; align-items: center; font-weight: 800; }
-        .dashboardWeeklyScroll { width: 100%; max-height: 480px; overflow: auto;
-          border: 1px solid #e7e0ee; border-radius: 9px; margin-top: 16px; }
-        .dashboardWeeklyTable { border-collapse: separate; border-spacing: 0; width: 100%;
-          min-width: 720px; table-layout: fixed; }
-        .dashboardWeeklyTable th,.dashboardWeeklyTable td { border-right: 1px solid #e8e1f0;
-          border-bottom: 1px solid #e8e1f0; padding: 8px; vertical-align: top; }
-        .dashboardWeeklyTable thead th { position: sticky; top: 0; z-index: 2;
-          background: #eee8f8; color: #554376; font-size: 11px; text-align: left; }
-        .dashboardWeeklyTable thead th:first-child { width: 175px; }
-        .dashboardWeeklyTable thead small { display: block; font-weight: 500;
-          margin-top: 2px; font-size: 10px; }
-        .dashboardWeeklyPerson { position: sticky; left: 0; z-index: 1; background: #faf8fd;
-          font-size: 12px; color: #43365f; text-align: left; width: 175px; }
-        .dashboardWeeklyTable tbody tr:nth-child(even) .dashboardWeeklyPerson { background: #f3eff9; }
-        .dashboardWeeklyTable tbody td { min-width: 112px; background: white; }
-        .dashboardWeeklyTable tbody tr:nth-child(even) td { background: #fdfbff; }
-        .dashboardWeeklyTable tbody td.dashboardWeeklyHoliday { background: #fcf9eb; }
-        .dashboardWeeklyEntry { padding: 5px 7px; margin-bottom: 4px; border-radius: 5px;
-          border-left: 3px solid #9e8ac1; background: #f2eef9; color: #493962; }
-        .dashboardWeeklyEntry strong { display: block; overflow-wrap: anywhere;
-          font-size: 11px; line-height: 1.25; }
-        .dashboardWeeklyEntry small { display: block; font-size: 9px; opacity: .8; margin-top: 3px; }
-        .dashboardWeeklyEntry.isBE { border-left-color: #6e74cc; background: #eeefff; }
-        .dashboardWeeklyEntry.isWorkshop { border-left-color: #ce924b; background: #fff5e7; }
-        .dashboardWeeklyEntry.isInstall { border-left-color: #54a58e; background: #eaf8f1; }
-        .dashboardWeeklyEntry.isNote { border-left-color: #a68ac2; background: #f3eefe; }
-        .dashboardWeeklyAbsence,.dashboardWeeklyFlag { display: block; padding: 4px 5px;
-          margin-bottom: 4px; border-radius: 4px; font-size: 10px; line-height: 1.3; }
-        .dashboardWeeklyAbsence { background: #fff0f0; color: #a34c4c; }
-        .dashboardWeeklyFlag { background: #f7efc7; color: #786518; }
-        .dashboardWeeklyMuted { color: #a19aaa; font-size: 10px; }
-        .dashboardWeeklyNoPeople { padding: 25px !important; color: #766885;
-          text-align: center; font-size: 13px; }
+        .dashboardWeeklyArrow:focus-visible,
+        .dashboardWeeklyCurrent:focus-visible,
+        .dashboardWeeklyOpen:focus-visible {
+          outline: 3px solid #bba8e4;
+          outline-offset: 2px;
+        }
+        .dashboardWeeklyMessage {
+          margin: 16px 0 0;
+          background: #f7f3fc;
+          padding: 15px;
+          border-radius: 8px;
+          color: #654b86;
+          font-size: 13px;
+        }
+        .dashboardWeeklyMessage button {
+          border: 0;
+          background: transparent;
+          color: #65469d;
+          cursor: pointer;
+          display: inline-flex;
+          gap: 5px;
+          align-items: center;
+          font-weight: 800;
+        }
+        .dashboardWeeklyScroll {
+          width: 100%;
+          max-height: 480px;
+          overflow: auto;
+          border: 1px solid #e7e0ee;
+          border-radius: 9px;
+          margin-top: 16px;
+        }
+        .dashboardWeeklyTable {
+          border-collapse: separate;
+          border-spacing: 0;
+          width: 100%;
+          min-width: 720px;
+          table-layout: fixed;
+        }
+        .dashboardWeeklyTable th,
+        .dashboardWeeklyTable td {
+          border-right: 1px solid #e8e1f0;
+          border-bottom: 1px solid #e8e1f0;
+          padding: 8px;
+          vertical-align: top;
+        }
+        .dashboardWeeklyTable thead th {
+          position: sticky;
+          top: 0;
+          z-index: 2;
+          background: #eee8f8;
+          color: #554376;
+          font-size: 11px;
+          text-align: left;
+        }
+        .dashboardWeeklyTable thead th:first-child {
+          width: 175px;
+        }
+        .dashboardWeeklyTable thead small {
+          display: block;
+          font-weight: 500;
+          margin-top: 2px;
+          font-size: 10px;
+        }
+        .dashboardWeeklyPerson {
+          position: sticky;
+          left: 0;
+          z-index: 1;
+          background: #faf8fd;
+          font-size: 12px;
+          color: #43365f;
+          text-align: left;
+          width: 175px;
+        }
+        .dashboardWeeklyTable tbody tr:nth-child(even) .dashboardWeeklyPerson {
+          background: #f3eff9;
+        }
+        .dashboardWeeklyTable tbody td {
+          min-width: 112px;
+          background: white;
+        }
+        .dashboardWeeklyTable tbody tr:nth-child(even) td {
+          background: #fdfbff;
+        }
+        .dashboardWeeklyTable tbody td.dashboardWeeklyHoliday {
+          background: #fcf9eb;
+        }
+        .dashboardWeeklyEntry {
+          padding: 5px 7px;
+          margin-bottom: 4px;
+          border-radius: 5px;
+          border-left: 3px solid #9e8ac1;
+          background: #f2eef9;
+          color: #493962;
+        }
+        .dashboardWeeklyEntry strong {
+          display: block;
+          overflow-wrap: anywhere;
+          font-size: 11px;
+          line-height: 1.25;
+        }
+        .dashboardWeeklyEntry small {
+          display: block;
+          font-size: 9px;
+          opacity: 0.8;
+          margin-top: 3px;
+        }
+        .dashboardWeeklyEntry.isBE {
+          border-left-color: #6e74cc;
+          background: #eeefff;
+        }
+        .dashboardWeeklyEntry.isWorkshop {
+          border-left-color: #ce924b;
+          background: #fff5e7;
+        }
+        .dashboardWeeklyEntry.isInstall {
+          border-left-color: #54a58e;
+          background: #eaf8f1;
+        }
+        .dashboardWeeklyEntry.isNote {
+          border-left-color: #a68ac2;
+          background: #f3eefe;
+        }
+        .dashboardWeeklyAbsence,
+        .dashboardWeeklyFlag {
+          display: block;
+          padding: 4px 5px;
+          margin-bottom: 4px;
+          border-radius: 4px;
+          font-size: 10px;
+          line-height: 1.3;
+        }
+        .dashboardWeeklyAbsence {
+          background: #fff0f0;
+          color: #a34c4c;
+        }
+        .dashboardWeeklyFlag {
+          background: #f7efc7;
+          color: #786518;
+        }
+        .dashboardWeeklyMuted {
+          color: #a19aaa;
+          font-size: 10px;
+        }
+        .dashboardWeeklyNoPeople {
+          padding: 25px !important;
+          color: #766885;
+          text-align: center;
+          font-size: 13px;
+        }
         @media (max-width: 850px) {
-          .dashboardWeeklyControls { width: 100%; }
-          .dashboardWeeklyTable { min-width: 720px; }
+          .dashboardWeeklyControls {
+            width: 100%;
+          }
+          .dashboardWeeklyTable {
+            min-width: 720px;
+          }
         }
       `}</style>
     </article>

@@ -15,7 +15,7 @@ describe("dashboard real weekly planning preview", () => {
   it("replaces the fictitious calendar and stale fixed-week links", () => {
     expect(home).toContain("<DashboardWeeklyPlanning initialWeek={currentWeek} />");
     expect(home).toContain("currentDashboardPlanningWeek()");
-    expect(home).toContain('href={\`/planning/\${currentWeek}\`}');
+    expect(home).toContain("href={\`/planning/\${currentWeek}\`}");
     expect(home).not.toContain("CalendarPreview");
     expect(home).not.toContain("/planning/2026-S38");
     expect(home).not.toContain("Le vrai planning sera construit ici");

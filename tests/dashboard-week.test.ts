@@ -1,5 +1,8 @@
 import { describe, expect, it } from "vitest";
-import { currentDashboardPlanningWeek, shiftDashboardPlanningWeek } from "../src/lib/planning/dashboard-week";
+import {
+  currentDashboardPlanningWeek,
+  shiftDashboardPlanningWeek,
+} from "../src/lib/planning/dashboard-week";
 
 describe("dashboard planning week navigation", () => {
   it("starts with the actual week in Europe/Paris", () => {
