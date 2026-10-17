@@ -7,7 +7,7 @@ export const MODULE_PERMISSIONS = [
   { key: "planning", label: "Planning" },
   { key: "hours", label: "Heures" },
   { key: "purchases", label: "Achats" },
-  { key: "billing", label: "Facturation", future: true },
+  { key: "billing", label: "Facturation" },
   { key: "treasury", label: "Trésorerie / Banque" },
   { key: "team", label: "Équipe" },
   { key: "payroll", label: "Paie" },

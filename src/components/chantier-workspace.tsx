@@ -317,6 +317,11 @@ export function ChantierWorkspace({ chantierId }: { chantierId: string }) {
           </p>
         </div>
         <div className="chantierHeadingActions">
+          {commercialCase && commercialCase.retainedQuoteIds.length > 0 ? (
+            <Link className="primaryButton" href={`/facturation?chantierId=${encodeURIComponent(chantier.id)}`}>
+              Facturer ce chantier
+            </Link>
+          ) : null}
           {commercialCase ? (
             <Link className="secondaryButton" href={`/commercial?focus=${commercialCase.id}`}>
               Ouvrir le commercial

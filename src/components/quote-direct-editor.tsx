@@ -96,6 +96,13 @@ export function QuoteDirectEditor({
           </span>
         </div>
       ) : null}
+      {contractState === "RETAINED" && quote.status !== "DRAFT" ? (
+        <div className="quoteDirectActions">
+          <Link className="secondaryButton" href={`/facturation?quoteId=${encodeURIComponent(quote.id)}`}>
+            Préparer une facture depuis ce devis
+          </Link>
+        </div>
+      ) : null}
       <QuoteLifecycleActions quote={quote} canWrite={canWrite} />
       <QuoteSendAction
         quote={quote}
