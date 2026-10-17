@@ -196,6 +196,38 @@ export function BillingDocumentEditor({ draftId }: { draftId: string }) {
     setDirty(true);
     setNotice("");
   }
+  function applyProgress() {
+    if (!draft || !payload || draft.type !== "PROGRESS" || !draft.lines?.length) return;
+    const percentages = draft.lines.map((line) => ({
+      lineId: line.lineId,
+      percent: Number((progressValues[line.lineId] ?? "").replace(",", ".")),
+    }));
+    if (percentages.some((row) => !Number.isFinite(row.percent) ||
+      row.percent < 0 || row.percent > 100)) {
+      setError("L'avancement de chaque ligne doit être compris entre 0 et 100 %.");
+      return;
+    }
+    if (dirty && !window.confirm(
+      "Recalculer les lignes du devis ? Les lignes ajoutées restent, mais les prix modifiés sur les lignes du devis seront recalculés."
+    )) return;
+    try {
+      const index = payload.drafts.findIndex((row) => row.id === draft.id);
+      const previous = { schemaVersion: 1 as const, drafts: payload.drafts.slice(0, index) };
+      const result = calculateLineProgress(previous, draft, percentages);
+      const recalculated: BillingDraft = {
+        ...draft, lineProgress: result.lineProgress, cumulativePercent: null,
+        amountHtCents: result.amountHtCents, taxGroups: result.tax.groups,
+        vatCents: result.tax.vatCents, totalTtcCents: result.tax.ttcCents,
+      };
+      const custom = rows.filter((row) => row.origin !== "QUOTE");
+      setRows([...buildInvoiceDocumentLines(recalculated, previous).map(editable), ...custom]);
+      setPendingPercentages(percentages);
+      setDirty(true); setError(""); setNotice("");
+    } catch (caught) {
+      const code = caught instanceof Error ? caught.message : "";
+      setError(serverErrors[code] ?? code ?? "Avancement invalide");
+    }
+  }
   function goBack() {
     if (dirty && !window.confirm("Des modifications ne sont pas enregistrées. Quitter ?")) return;
     router.push(
@@ -230,6 +262,7 @@ export function BillingDocumentEditor({ draftId }: { draftId: string }) {
           label: label.trim(),
           notes,
           documentLines: parsedRows,
+          ...(pendingPercentages ? { linePercentages: pendingPercentages } : {}),
         }),
       });
       const json = (await response.json()) as ApiSnapshot;
@@ -237,6 +270,12 @@ export function BillingDocumentEditor({ draftId }: { draftId: string }) {
       const saved = json.payload.drafts.find((item) => item.id === draft.id);
       if (!saved) throw new Error("Projet introuvable après enregistrement");
       setDraft(saved);
+      setPayload(json.payload);
+      setPendingPercentages(null);
+      setProgressValues(Object.fromEntries((saved.lines ?? []).map((line) =>
+        [line.lineId, decimal(saved.lineProgress?.find((row) => row.lineId === line.lineId)?.percent
+          ?? saved.cumulativePercent ?? 0)],
+      )));
       const original = (saved.documentLines ?? []).map(editable);
       setRows(original);
       setInitialRows(original);
