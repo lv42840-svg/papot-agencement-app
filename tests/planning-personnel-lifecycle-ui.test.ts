@@ -1,15 +1,27 @@
 import { readFileSync } from "node:fs";
 import { describe, expect, it } from "vitest";
 
-const workspace = readFileSync(new URL("../src/components/grand-planning-workspace.tsx", import.meta.url), "utf8");
-const board = readFileSync(new URL("../src/components/weekly-team-board.tsx", import.meta.url), "utf8");
-const cell = readFileSync(new URL("../src/components/weekly-board-day-cell.tsx", import.meta.url), "utf8");
-const api = readFileSync(new URL("../src/app/api/desktop/planning/weekly-board/route.ts", import.meta.url), "utf8");
+const workspace = readFileSync(
+  new URL("../src/components/grand-planning-workspace.tsx", import.meta.url),
+  "utf8",
+);
+const board = readFileSync(
+  new URL("../src/components/weekly-team-board.tsx", import.meta.url),
+  "utf8",
+);
+const cell = readFileSync(
+  new URL("../src/components/weekly-board-day-cell.tsx", import.meta.url),
+  "utf8",
+);
+const api = readFileSync(
+  new URL("../src/app/api/desktop/planning/weekly-board/route.ts", import.meta.url),
+  "utf8",
+);
 
 describe("personnel notice, copy and printable weekly board UI", () => {
   it("can add a date of departure to an existing member and hide/deactivate/reactivate/delete safely", () => {
     expect(workspace).toContain('action: "setStaffEndDate"');
-    expect(workspace).toContain('event.target.value || null');
+    expect(workspace).toContain("event.target.value || null");
     expect(workspace).toContain('action: "setPersonHidden"');
     expect(workspace).toContain("deactivateStaff");
     expect(workspace).toContain("reactivateStaff");

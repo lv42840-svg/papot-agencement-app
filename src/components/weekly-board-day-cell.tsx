@@ -182,13 +182,21 @@ export function WeeklyBoardDayCell({
       })}
       <div className="weeklyBoardDayClipboard">
         {rows.length > 0 ? (
-          <button type="button" onClick={onCopyDay} title="Copier toutes les affectations de cette journée">
+          <button
+            type="button"
+            onClick={onCopyDay}
+            title="Copier toutes les affectations de cette journée"
+          >
             Copier jour
           </button>
         ) : null}
         {editable && !isAbsent && isPresent && canPaste ? (
-          <button type="button" disabled={busy} onClick={onPasteDay}
-            title="Ajouter les affectations copiées sans remplacer cette journée">
+          <button
+            type="button"
+            disabled={busy}
+            onClick={onPasteDay}
+            title="Ajouter les affectations copiées sans remplacer cette journée"
+          >
             Coller jour
           </button>
         ) : null}

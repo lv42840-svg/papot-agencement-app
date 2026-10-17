@@ -86,9 +86,17 @@ export const planningStaffSchema = z.object({
   lastName: z.string().trim().min(1).max(100),
   linkedUserId: z.string().uuid().nullable(),
   // End date is inclusive: a future date can be added later during notice.
-  endDate: z.string().regex(/^\d{4}-\d{2}-\d{2}$/).nullable().default(null),
+  endDate: z
+    .string()
+    .regex(/^\d{4}-\d{2}-\d{2}$/)
+    .nullable()
+    .default(null),
   // Deactivation takes effect on this date, without erasing past weeks.
-  inactiveSince: z.string().regex(/^\d{4}-\d{2}-\d{2}$/).nullable().default(null),
+  inactiveSince: z
+    .string()
+    .regex(/^\d{4}-\d{2}-\d{2}$/)
+    .nullable()
+    .default(null),
 });
 
 export type PlanningStaff = z.infer<typeof planningStaffSchema>;

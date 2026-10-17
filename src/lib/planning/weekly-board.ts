@@ -94,10 +94,15 @@ export const weeklyBoardPasteSchema = z.object({
   week: weeklyBoardWeekSchema,
   userId: z.string().uuid(),
   date: z.string().regex(/^\d{4}-\d{2}-\d{2}$/),
-  entries: z.array(z.object({
-    label: z.string().trim().min(1).max(160),
-    activity: planningDailyActivitySchema,
-  })).min(1).max(20),
+  entries: z
+    .array(
+      z.object({
+        label: z.string().trim().min(1).max(160),
+        activity: planningDailyActivitySchema,
+      }),
+    )
+    .min(1)
+    .max(20),
 });
 export type WeeklyBoardPasteInput = z.infer<typeof weeklyBoardPasteSchema>;
 
@@ -118,8 +123,10 @@ export function applyWeeklyBoardPaste(
   ).length;
   if (existing + input.entries.length > 20) throw new Error("PLANNING_DAILY_LIMIT");
   for (const entry of input.entries) {
-    const site = sites.find((candidate) =>
-      candidate.name.trim().toLocaleLowerCase("fr-FR") === entry.label.trim().toLocaleLowerCase("fr-FR"),
+    const site = sites.find(
+      (candidate) =>
+        candidate.name.trim().toLocaleLowerCase("fr-FR") ===
+        entry.label.trim().toLocaleLowerCase("fr-FR"),
     );
     payload.dailyAssignments.push({
       id: crypto.randomUUID(),
@@ -132,8 +139,6 @@ export function applyWeeklyBoardPaste(
   }
   return parsePlanningPayload(payload);
 }
-
-
 
 export function applyWeeklyBoardEntry(
   source: PlanningPayload,

@@ -81,18 +81,20 @@ export function WeeklyTeamBoard({ week }: { week: string }) {
       if (!saved) return;
       const parsed: unknown = JSON.parse(saved);
       if (!Array.isArray(parsed) || parsed.length > 20) return;
-      const valid = parsed.every((entry) =>
-        entry && typeof entry === "object" &&
-        typeof entry.label === "string" && entry.label.trim().length > 0 &&
-        entry.label.length <= 160 &&
-        ["BE", "WORKSHOP", "INSTALL", "NOTE"].includes(entry.activity),
+      const valid = parsed.every(
+        (entry) =>
+          entry &&
+          typeof entry === "object" &&
+          typeof entry.label === "string" &&
+          entry.label.trim().length > 0 &&
+          entry.label.length <= 160 &&
+          ["BE", "WORKSHOP", "INSTALL", "NOTE"].includes(entry.activity),
       );
       if (valid) setCopiedDay(parsed as Array<Pick<BoardEntry, "label" | "activity">>);
     } catch {
       window.sessionStorage.removeItem("papot.agencement.weekly-copied-day");
     }
   }, []);
-
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -168,7 +170,9 @@ export function WeeklyTeamBoard({ week }: { week: string }) {
     const entries = rows.map((row) => ({ label: row.label, activity: row.activity }));
     setCopiedDay(entries);
     window.sessionStorage.setItem("papot.agencement.weekly-copied-day", JSON.stringify(entries));
-    setMessage(`${entries.length} affectation(s) copiée(s). Sélectionne la journée de destination.`);
+    setMessage(
+      `${entries.length} affectation(s) copiée(s). Sélectionne la journée de destination.`,
+    );
   }
 
   async function pasteDay(userId: string, date: string) {
@@ -181,13 +185,20 @@ export function WeeklyTeamBoard({ week }: { week: string }) {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          action: "pasteDailyEntries", week, userId, date, entries: copiedDay,
+          action: "pasteDailyEntries",
+          week,
+          userId,
+          date,
+          entries: copiedDay,
         }),
       });
       const result = (await response.json()) as WeekData & { error?: string };
-      if (!response.ok) throw new Error(result.error ?? "Collage refusé, aucune affectation modifiée.");
+      if (!response.ok)
+        throw new Error(result.error ?? "Collage refusé, aucune affectation modifiée.");
       setData(result);
-      setMessage(`${copiedDay.length} affectation(s) collée(s), sans effacer celles déjà présentes.`);
+      setMessage(
+        `${copiedDay.length} affectation(s) collée(s), sans effacer celles déjà présentes.`,
+      );
     } catch (cause) {
       setMessage(cause instanceof Error ? cause.message : "Collage impossible.");
     } finally {
@@ -214,8 +225,11 @@ export function WeeklyTeamBoard({ week }: { week: string }) {
           <p>Du {period} · affectations journalières de l&apos;équipe</p>
         </div>
         <div className="weeklyBoardControls">
-          <button className="secondaryButton weeklyBoardPrintButton"
-            type="button" onClick={() => window.print()}>
+          <button
+            className="secondaryButton weeklyBoardPrintButton"
+            type="button"
+            onClick={() => window.print()}
+          >
             Imprimer la semaine
           </button>
           <Link className="secondaryButton" href={`/planning/${previous}`}>
@@ -407,8 +421,10 @@ export function WeeklyTeamBoard({ week }: { week: string }) {
                               holiday={holiday}
                               absence={absence}
                               isAbsent={dayOff}
-                              isPresent={(!person.endDate || date <= person.endDate) &&
-                                (!person.inactiveSince || date < person.inactiveSince)}
+                              isPresent={
+                                (!person.endDate || date <= person.endDate) &&
+                                (!person.inactiveSince || date < person.inactiveSince)
+                              }
                               canPaste={copiedDay.length > 0}
                               onCopyDay={() => copyDay(assignments.get(key) ?? [])}
                               onPasteDay={() => void pasteDay(person.userId, date)}
@@ -468,33 +484,105 @@ export function WeeklyTeamBoard({ week }: { week: string }) {
       ) : null}
 
       <style jsx global>{`
-        .weeklyBoardDayClipboard { display: flex; justify-content: space-between; gap: 5px; }
-        .weeklyBoardDayClipboard button { padding: 3px 6px; background: #fff; color: #6853a4;
-          border: 1px solid #c7bbe5; border-radius: 4px; font-size: 9px; cursor: pointer; }
-        @page { size: A4 landscape; margin: 8mm; }
+        .weeklyBoardDayClipboard {
+          display: flex;
+          justify-content: space-between;
+          gap: 5px;
+        }
+        .weeklyBoardDayClipboard button {
+          padding: 3px 6px;
+          background: #fff;
+          color: #6853a4;
+          border: 1px solid #c7bbe5;
+          border-radius: 4px;
+          font-size: 9px;
+          cursor: pointer;
+        }
+        @page {
+          size: A4 landscape;
+          margin: 8mm;
+        }
         @media print {
-          body * { visibility: hidden !important; }
-          .weeklyBoard, .weeklyBoard * { visibility: visible !important; }
-          .weeklyBoard { position: absolute; top: 0; left: 0; width: 100%; padding: 0;
-            background: white !important; print-color-adjust: exact; -webkit-print-color-adjust: exact; }
-          .weeklyBoardControls, .weeklyBoardTabs, .weeklyBoardDayClipboard,
-          .weeklyBoardAddEntry, .weeklyBoardEntryActions, .weeklyBoardEditForm,
-          .weeklyBoardFooter, .weeklyBoardMessage { display: none !important; }
-          .weeklyBoardTop { margin-bottom: 5mm; }
-          .weeklyBoardTopline { display: flex !important; margin-bottom: 4mm; }
-          .weeklyBoardIntro { min-width: 120px; padding: 6px !important; }
-          .weeklyBoardHours { width: 70% !important; min-width: 0 !important;
-            max-width: none !important; padding: 6px !important; }
-          .weeklyBoardChantierScroll { overflow: visible !important; max-height: none !important; }
-          .weeklyBoardTableScroll { overflow: visible !important; width: 100% !important; }
-          .weeklyBoardTable { width: 100% !important; min-width: 0 !important; font-size: 9px !important; }
-          .weeklyBoardNameHead { width: 120px !important; }
-          .weeklyBoardCell { padding: 3px !important; height: auto !important; }
-          .weeklyBoardDayHead { font-size: 11px !important; }
-          .weeklyBoardEntry { padding: 3px 4px !important; break-inside: avoid; }
-          .weeklyBoardEntryInfo strong { font-size: 9px !important; }
-          .weeklyBoardPerson strong { font-size: 10px !important; }
-          .weeklyBoardTable tr { break-inside: avoid; }
+          body * {
+            visibility: hidden !important;
+          }
+          .weeklyBoard,
+          .weeklyBoard * {
+            visibility: visible !important;
+          }
+          .weeklyBoard {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            padding: 0;
+            background: white !important;
+            print-color-adjust: exact;
+            -webkit-print-color-adjust: exact;
+          }
+          .weeklyBoardControls,
+          .weeklyBoardTabs,
+          .weeklyBoardDayClipboard,
+          .weeklyBoardAddEntry,
+          .weeklyBoardEntryActions,
+          .weeklyBoardEditForm,
+          .weeklyBoardFooter,
+          .weeklyBoardMessage {
+            display: none !important;
+          }
+          .weeklyBoardTop {
+            margin-bottom: 5mm;
+          }
+          .weeklyBoardTopline {
+            display: flex !important;
+            margin-bottom: 4mm;
+          }
+          .weeklyBoardIntro {
+            min-width: 120px;
+            padding: 6px !important;
+          }
+          .weeklyBoardHours {
+            width: 70% !important;
+            min-width: 0 !important;
+            max-width: none !important;
+            padding: 6px !important;
+          }
+          .weeklyBoardChantierScroll {
+            overflow: visible !important;
+            max-height: none !important;
+          }
+          .weeklyBoardTableScroll {
+            overflow: visible !important;
+            width: 100% !important;
+          }
+          .weeklyBoardTable {
+            width: 100% !important;
+            min-width: 0 !important;
+            font-size: 9px !important;
+          }
+          .weeklyBoardNameHead {
+            width: 120px !important;
+          }
+          .weeklyBoardCell {
+            padding: 3px !important;
+            height: auto !important;
+          }
+          .weeklyBoardDayHead {
+            font-size: 11px !important;
+          }
+          .weeklyBoardEntry {
+            padding: 3px 4px !important;
+            break-inside: avoid;
+          }
+          .weeklyBoardEntryInfo strong {
+            font-size: 9px !important;
+          }
+          .weeklyBoardPerson strong {
+            font-size: 10px !important;
+          }
+          .weeklyBoardTable tr {
+            break-inside: avoid;
+          }
         }
         .weeklyBoard {
           padding: 0 0 30px;

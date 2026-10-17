@@ -64,8 +64,10 @@ export function personPresentOnDate(
   person: Pick<PlanningVisiblePerson, "endDate" | "inactiveSince">,
   date: string,
 ): boolean {
-  return (!person.endDate || date <= person.endDate) &&
-    (!person.inactiveSince || date < person.inactiveSince);
+  return (
+    (!person.endDate || date <= person.endDate) &&
+    (!person.inactiveSince || date < person.inactiveSince)
+  );
 }
 
 export type PlanningStaffMutation =
@@ -114,10 +116,7 @@ export function applyPlanningStaffMutation(
   }
 
   if (input.action === "setPersonHidden") {
-    const visibleIds = new Set([
-      ...payload.staff.map((person) => person.id),
-      ...activeAccounts,
-    ]);
+    const visibleIds = new Set([...payload.staff.map((person) => person.id), ...activeAccounts]);
     if (!visibleIds.has(input.id)) throw new Error("PLANNING_USER_NOT_ACTIVE");
     payload.hiddenPersonIds = input.hidden
       ? [...new Set([...payload.hiddenPersonIds, input.id])]
@@ -129,10 +128,13 @@ export function applyPlanningStaffMutation(
   if (!person) throw new Error("PLANNING_STAFF_NOT_FOUND");
 
   if (input.action === "setStaffEndDate") {
-    if (input.endDate && (!/^\d{4}-\d{2}-\d{2}$/.test(input.endDate) ||
-      Number.isNaN(new Date(input.endDate + "T12:00:00Z").getTime()) ||
-      new Date(input.endDate + "T12:00:00Z").toISOString().slice(0, 10) !== input.endDate
-    )) throw new Error("PLANNING_END_DATE_INVALID");
+    if (
+      input.endDate &&
+      (!/^\d{4}-\d{2}-\d{2}$/.test(input.endDate) ||
+        Number.isNaN(new Date(input.endDate + "T12:00:00Z").getTime()) ||
+        new Date(input.endDate + "T12:00:00Z").toISOString().slice(0, 10) !== input.endDate)
+    )
+      throw new Error("PLANNING_END_DATE_INVALID");
     person.endDate = input.endDate;
     return parsePlanningPayload(payload);
   }
@@ -146,10 +148,12 @@ export function applyPlanningStaffMutation(
     return parsePlanningPayload(payload);
   }
   if (input.action === "deleteStaff") {
-    if (person.linkedUserId ||
+    if (
+      person.linkedUserId ||
       payload.absences.some((absence) => absence.userId === person.id) ||
       payload.dailyAssignments.some((entry) => entry.userId === person.id)
-    ) throw new Error("PLANNING_STAFF_HAS_HISTORY");
+    )
+      throw new Error("PLANNING_STAFF_HAS_HISTORY");
     payload.staff = payload.staff.filter((candidate) => candidate.id !== person.id);
     payload.peopleCapacity = payload.peopleCapacity.filter((entry) => entry.userId !== person.id);
     payload.hiddenPersonIds = payload.hiddenPersonIds.filter((id) => id !== person.id);
@@ -221,7 +225,9 @@ export function applyPlanningStaffMutation(
     }
   }
   if (accountId && payload.hiddenPersonIds.includes(accountId)) {
-    payload.hiddenPersonIds = [...new Set([...payload.hiddenPersonIds.filter((id) => id !== accountId), person.id])];
+    payload.hiddenPersonIds = [
+      ...new Set([...payload.hiddenPersonIds.filter((id) => id !== accountId), person.id]),
+    ];
   }
   person.linkedUserId = accountId;
   return parsePlanningPayload(payload);

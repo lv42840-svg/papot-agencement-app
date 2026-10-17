@@ -442,22 +442,38 @@ export function GrandPlanningWorkspace({
   async function setPersonHidden(person: PersonCapacity) {
     await postPlanningMutation(
       { action: "setPersonHidden", id: person.userId, hidden: !person.hiddenInWeeklyBoard },
-      person.hiddenInWeeklyBoard ? "Personne visible au petit planning." : "Personne masquée du petit planning.",
+      person.hiddenInWeeklyBoard
+        ? "Personne visible au petit planning."
+        : "Personne masquée du petit planning.",
     );
   }
 
-  async function staffAction(person: PersonCapacity, action: "deactivateStaff" | "reactivateStaff" | "deleteStaff") {
+  async function staffAction(
+    person: PersonCapacity,
+    action: "deactivateStaff" | "reactivateStaff" | "deleteStaff",
+  ) {
     if (person.kind !== "staff") return;
-    if (action === "deleteStaff" && !window.confirm(
-      `Supprimer définitivement ${person.displayName} ? Possible uniquement sans historique ni compte lié.`
-    )) return;
-    if (action === "deactivateStaff" && !window.confirm(
-      `Désactiver ${person.displayName} dès aujourd'hui ? Les anciennes semaines restent conservées.`
-    )) return;
+    if (
+      action === "deleteStaff" &&
+      !window.confirm(
+        `Supprimer définitivement ${person.displayName} ? Possible uniquement sans historique ni compte lié.`,
+      )
+    )
+      return;
+    if (
+      action === "deactivateStaff" &&
+      !window.confirm(
+        `Désactiver ${person.displayName} dès aujourd'hui ? Les anciennes semaines restent conservées.`,
+      )
+    )
+      return;
     await postPlanningMutation(
       { action, id: person.userId },
-      action === "deleteStaff" ? "Fiche supprimée." :
-        action === "reactivateStaff" ? "Personne réactivée." : "Personne désactivée.",
+      action === "deleteStaff"
+        ? "Fiche supprimée."
+        : action === "reactivateStaff"
+          ? "Personne réactivée."
+          : "Personne désactivée.",
     );
   }
 
@@ -1013,8 +1029,11 @@ export function GrandPlanningWorkspace({
                             {person.kind === "staff" ? (
                               <>
                                 <small>
-                                  {person.inactiveSince ? "Désactivé" :
-                                    person.endDate ? `Fin prévue : ${person.endDate.split("-").reverse().join("/")}` : "Sans date de fin"}
+                                  {person.inactiveSince
+                                    ? "Désactivé"
+                                    : person.endDate
+                                      ? `Fin prévue : ${person.endDate.split("-").reverse().join("/")}`
+                                      : "Sans date de fin"}
                                 </small>
                                 <small>
                                   {person.linkedUserId
@@ -1030,29 +1049,44 @@ export function GrandPlanningWorkspace({
                                         aria-label={`Date de fin de ${person.displayName}`}
                                         value={person.endDate ?? ""}
                                         disabled={savingKey !== null}
-                                        onChange={(event) => void postPlanningMutation(
-                                          { action: "setStaffEndDate", id: person.userId, endDate: event.target.value || null },
-                                          "Date de fin de présence enregistrée.",
-                                        )}
+                                        onChange={(event) =>
+                                          void postPlanningMutation(
+                                            {
+                                              action: "setStaffEndDate",
+                                              id: person.userId,
+                                              endDate: event.target.value || null,
+                                            },
+                                            "Date de fin de présence enregistrée.",
+                                          )
+                                        }
                                       />
                                     </label>
                                     {person.inactiveSince ? (
-                                      <button type="button" className="secondaryButton"
+                                      <button
+                                        type="button"
+                                        className="secondaryButton"
                                         disabled={savingKey !== null}
-                                        onClick={() => void staffAction(person, "reactivateStaff")}>
+                                        onClick={() => void staffAction(person, "reactivateStaff")}
+                                      >
                                         Réactiver
                                       </button>
                                     ) : (
-                                      <button type="button" className="secondaryButton"
+                                      <button
+                                        type="button"
+                                        className="secondaryButton"
                                         disabled={savingKey !== null}
-                                        onClick={() => void staffAction(person, "deactivateStaff")}>
+                                        onClick={() => void staffAction(person, "deactivateStaff")}
+                                      >
                                         Désactiver
                                       </button>
                                     )}
-                                    <button type="button" className="secondaryButton"
+                                    <button
+                                      type="button"
+                                      className="secondaryButton"
                                       disabled={savingKey !== null}
                                       title="Suppression autorisée uniquement si aucun historique ni compte lié"
-                                      onClick={() => void staffAction(person, "deleteStaff")}>
+                                      onClick={() => void staffAction(person, "deleteStaff")}
+                                    >
                                       Supprimer
                                     </button>
                                     <button

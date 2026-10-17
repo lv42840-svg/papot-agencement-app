@@ -88,7 +88,10 @@ export const planningMutationSchema = z.discriminatedUnion("action", [
   z.object({
     action: z.literal("setStaffEndDate"),
     id: z.string().uuid(),
-    endDate: z.string().regex(/^\d{4}-\d{2}-\d{2}$/).nullable(),
+    endDate: z
+      .string()
+      .regex(/^\d{4}-\d{2}-\d{2}$/)
+      .nullable(),
   }),
   z.object({ action: z.literal("deactivateStaff"), id: z.string().uuid() }),
   z.object({ action: z.literal("reactivateStaff"), id: z.string().uuid() }),

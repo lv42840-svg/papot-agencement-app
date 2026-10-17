@@ -200,8 +200,11 @@ export function buildWeeklyCapacityIndicators(
         sum +
         dates.reduce((personWeek, date) => {
           const id = dateId(date);
-          if ((person.endDate && id > person.endDate) ||
-              (person.inactiveSince && id >= person.inactiveSince)) return personWeek;
+          if (
+            (person.endDate && id > person.endDate) ||
+            (person.inactiveSince && id >= person.inactiveSince)
+          )
+            return personWeek;
           const scheduled = scheduleHoursForDate(person.weeklySchedule, date);
           const absence = absencesByDate.get(dateId(date));
           const unavailable = absence ? Math.min(absence.hours, scheduled) : 0;

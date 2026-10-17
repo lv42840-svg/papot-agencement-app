@@ -91,11 +91,14 @@ async function weeklySnapshot(
   }));
   const allPeople = effectivePlanningPeople(planning, auth.users);
   const dates = workingDaysOfWeek(week);
-  const people = allPeople.filter((person) =>
-    !person.hiddenInWeeklyBoard &&
-    (dates.some((date) => personPresentOnDate(person, date)) ||
-      planning.dailyAssignments.some((row) => row.userId === person.userId && dates.includes(row.date)) ||
-      planning.absences.some((row) => row.userId === person.userId && dates.includes(row.date))),
+  const people = allPeople.filter(
+    (person) =>
+      !person.hiddenInWeeklyBoard &&
+      (dates.some((date) => personPresentOnDate(person, date)) ||
+        planning.dailyAssignments.some(
+          (row) => row.userId === person.userId && dates.includes(row.date),
+        ) ||
+        planning.absences.some((row) => row.userId === person.userId && dates.includes(row.date))),
   );
   const holidays = dates.map((date) => ({
     date,
@@ -179,10 +182,8 @@ export async function POST(request: Request) {
       const people = effectivePlanningPeople(payload, auth.users);
       const selectedPerson = people.find((person) => person.userId === input.userId);
       if (!selectedPerson) throw new Error("PLANNING_USER_NOT_ACTIVE");
-      if (
-        input.action !== "deleteDailyEntry" &&
-        !personPresentOnDate(selectedPerson, input.date)
-      ) throw new Error("PLANNING_PERSON_NOT_PRESENT");
+      if (input.action !== "deleteDailyEntry" && !personPresentOnDate(selectedPerson, input.date))
+        throw new Error("PLANNING_PERSON_NOT_PRESENT");
       if (input.action === "pasteDailyEntries") {
         const scheduled = scheduleHoursForDate(
           selectedPerson.weeklySchedule,
@@ -195,7 +196,10 @@ export async function POST(request: Request) {
           throw new Error("PLANNING_DAY_PERSON_ABSENT");
         }
         return applyWeeklyBoardPaste(
-          payload, input, new Set(people.map((person) => person.userId)), activeSites,
+          payload,
+          input,
+          new Set(people.map((person) => person.userId)),
+          activeSites,
         );
       }
       if (input.action !== "setDailyAssignment") {
