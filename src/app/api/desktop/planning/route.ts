@@ -25,6 +25,7 @@ import {
   applyPlanningActualHoursMutation,
   applyPlanningChantierOrderMutation,
   applyPlanningDeleteAbsenceMutation,
+  applyPlanningDeleteAbsenceBatchMutation,
   applyPlanningFullWeekAbsenceMutation,
   applyPlanningMacroMutation,
   applyPlanningHoursBatchMutation,
@@ -318,6 +319,10 @@ export async function POST(request: Request) {
             input,
             new Set(effectivePlanningPeople(payload, auth.users).map((person) => person.userId)),
           ),
+        );
+      } else if (input.action === "deleteAbsenceBatch") {
+        await planningRepository.mutate((payload) =>
+          applyPlanningDeleteAbsenceBatchMutation(payload, input),
         );
       } else {
         await planningRepository.mutate((payload) =>
