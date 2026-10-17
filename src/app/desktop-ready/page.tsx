@@ -3,14 +3,17 @@ import { redirect } from "next/navigation";
 import { BriefcaseBusiness, Camera, Clock3, FolderOpen, Inbox, ListTodo } from "lucide-react";
 import { DashboardChantierStat } from "@/components/dashboard-chantier-stat";
 import { DashboardCommercialStats } from "@/components/dashboard-commercial-stats";
+import { DashboardWeeklyPlanning } from "@/components/dashboard-weekly-planning";
 import { DesktopAppShell } from "@/components/desktop-app-shell";
 import { DashboardTasksPanel } from "@/components/tasks-workspace";
 import { authHasUsers } from "@/lib/auth/store";
+import { currentDashboardPlanningWeek } from "@/lib/planning/dashboard-week";
 
 export const dynamic = "force-dynamic";
 
 export default async function DesktopReadyPage() {
   if (!(await authHasUsers())) redirect("/first-admin");
+  const currentWeek = currentDashboardPlanningWeek();
 
   return (
     <DesktopAppShell>
@@ -44,19 +47,7 @@ export default async function DesktopReadyPage() {
       </section>
 
       <section className="dashboardGrid">
-        <article className="dashboardPanel">
-          <div className="dashboardPanelHeader">
-            <div>
-              <h2>Grand planning</h2>
-              <p>Semaine de travail partagée</p>
-            </div>
-            <Link href="/planning/2026-S38">Ouvrir</Link>
-          </div>
-          <div className="dashboardEmpty">
-            <CalendarPreview />
-            <p>Le vrai planning sera construit ici à partir des chantiers.</p>
-          </div>
-        </article>
+        <DashboardWeeklyPlanning initialWeek={currentWeek} />
 
         <DashboardTasksPanel />
 
@@ -83,7 +74,7 @@ export default async function DesktopReadyPage() {
             <Link className="secondaryButton" href="/chantiers">
               <FolderOpen size={17} /> Chantiers
             </Link>
-            <Link className="secondaryButton" href="/planning/2026-S38">
+            <Link className="secondaryButton" href={`/planning/${currentWeek}`}>
               <Clock3 size={17} /> Planning partagé
             </Link>
           </div>
@@ -93,14 +84,3 @@ export default async function DesktopReadyPage() {
   );
 }
 
-function CalendarPreview() {
-  return (
-    <div className="calendarPreview" aria-hidden="true">
-      {["Lun", "Mar", "Mer", "Jeu", "Ven"].map((day, index) => (
-        <span className={index === 2 ? "calendarToday" : ""} key={day}>
-          {day}
-        </span>
-      ))}
-    </div>
-  );
-}
