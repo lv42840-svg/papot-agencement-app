@@ -9,6 +9,7 @@ import {
   calculateInvoiceDocumentTotals,
 } from "@/lib/billing/document-lines";
 import type { BillingDocumentLine, BillingDraft, BillingPayload } from "@/lib/billing/domain";
+import { calculateLineProgress, type LineProgressInput } from "@/lib/billing/progress";
 
 type ApiSnapshot = { payload: BillingPayload; canWrite: boolean; error?: string };
 type EditableRow = BillingDocumentLine & { quantityInput: string; priceInput: string };
@@ -70,6 +71,8 @@ const serverErrors: Record<string, string> = {
   BILLING_DOCUMENT_VAT_OUTSIDE_CONTRACT:
     "Le taux de TVA doit correspondre à un taux du devis retenu.",
   BILLING_DOCUMENT_SOURCE_LINE_INVALID: "La référence à une ligne du devis est incorrecte.",
+  BILLING_PROGRESS_CANNOT_DECREASE: "Un avancement ne peut pas être inférieur à la situation précédente.",
+  BILLING_PROGRESS_TAX_ALLOCATION_UNAVAILABLE: "La TVA est incompatible avec les acomptes déjà préparés.",
 };
 
 export function BillingDocumentEditor({ draftId }: { draftId: string }) {
@@ -78,6 +81,9 @@ export function BillingDocumentEditor({ draftId }: { draftId: string }) {
   const [canWrite, setCanWrite] = useState(false);
   const [rows, setRows] = useState<EditableRow[]>([]);
   const [initialRows, setInitialRows] = useState<EditableRow[]>([]);
+  const [payload, setPayload] = useState<BillingPayload | null>(null);
+  const [progressValues, setProgressValues] = useState<Record<string, string>>({});
+  const [pendingPercentages, setPendingPercentages] = useState<LineProgressInput[] | null>(null);
   const [label, setLabel] = useState("");
   const [notes, setNotes] = useState("");
   const [busy, setBusy] = useState(false);
@@ -93,7 +99,13 @@ export function BillingDocumentEditor({ draftId }: { draftId: string }) {
     const selected = json.payload.drafts.find((item) => item.id === draftId);
     if (!selected) throw new Error("Projet de facture introuvable");
     setDraft(selected);
+    setPayload(json.payload);
     setCanWrite(json.canWrite);
+    setProgressValues(Object.fromEntries((selected.lines ?? []).map((line) =>
+      [line.lineId, decimal(selected.lineProgress?.find((row) => row.lineId === line.lineId)?.percent
+        ?? selected.cumulativePercent ?? 0)],
+    )));
+    setPendingPercentages(null);
     setLabel(selected.label);
     setNotes(selected.notes);
     const original = (
