@@ -17,7 +17,9 @@ const gridSource = readFileSync(
 describe("grand planning commercial provision bridge", () => {
   it("loads provisional cases and retains firm versus provisional fields", () => {
     expect(apiSource).toContain("createCommercialRepository().load()");
-    expect(apiSource).toMatch(/buildCommercialProvisionRows\(\s*commercial,\s*planning,\s*year,\s*endYear,\s*quotes\.quotes,?\s*\)/);
+    expect(apiSource).toMatch(
+      /buildCommercialProvisionRows\(\s*commercial,\s*planning,\s*year,\s*endYear,\s*quotes\.quotes,?\s*\)/,
+    );
     expect(apiSource).toContain("provisionalRows");
   });
 
