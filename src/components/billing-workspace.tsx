@@ -254,7 +254,7 @@ export function BillingWorkspace({
                   {type === "PROGRESS" && mode === "LINES" && active?.lines?.length ? (
                     <div style={{ display: "grid", gap: 9 }}>
                       <p>
-                        Indique l'avancement <strong>cumulé</strong> de chaque ligne. PAPOT
+                        Indique l&apos;avancement <strong>cumulé</strong> de chaque ligne. PAPOT
                         soustraira les projets précédents, y compris les acomptes.
                       </p>
                       <div style={{ overflowX: "auto" }}>
