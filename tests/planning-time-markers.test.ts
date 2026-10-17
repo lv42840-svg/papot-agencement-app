@@ -70,7 +70,7 @@ describe("grand planning time markers", () => {
 
     expect(groupGrandPlanningMonths(meta)).toEqual([
       { key: "2026-W39:SEPTEMBRE", label: "SEPTEMBRE", year: 2026, span: 2 },
-      { key: "2026-W41:OCTOBRE", label: "OCTOBRE", span: 4 },
+      { key: "2026-W41:OCTOBRE", label: "OCTOBRE", year: 2026, span: 4 },
     ]);
   });
 });
