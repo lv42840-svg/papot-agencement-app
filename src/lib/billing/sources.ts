@@ -25,9 +25,7 @@ function quoteContractData(quote: NativeQuoteRecord): {
     quote.taxConfig.lineOverrides.map((item) => [item.lineId, item.ratePercent]),
   );
   const byLineId = new Map(
-    quote.model.items
-      .filter((item) => item.kind === "LINE")
-      .map((item) => [item.id, item]),
+    quote.model.items.filter((item) => item.kind === "LINE").map((item) => [item.id, item]),
   );
   const lines: BillingSourceLine[] = price.lines
     .filter((line) => line.optionStatus !== "PENDING" && line.optionStatus !== "REJECTED")

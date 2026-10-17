@@ -31,26 +31,30 @@ export const billingLineProgressSchema = z.object({
 });
 export type BillingLineProgress = z.infer<typeof billingLineProgressSchema>;
 
-export const billingDocumentLineSchema = z.object({
-  id: z.string().uuid(),
-  origin: z.enum(["QUOTE", "FREE", "TITLE"]),
-  sourceLineId: z.string().uuid().nullable(),
-  description: z.string().trim().min(1).max(4000),
-  quantity: z.number().finite().min(0).max(1000000),
-  unit: z.string().trim().max(40),
-  unitPriceCents: centsSchema,
-  vatRatePercent: z.number().finite().min(0).max(100),
-}).superRefine((line, ctx) => {
-  if (line.origin === "TITLE") {
-    if (line.quantity !== 0 || line.unitPriceCents !== 0 || line.sourceLineId !== null) {
-      ctx.addIssue({ code: z.ZodIssueCode.custom, message: "BILLING_TITLE_INVALID" });
+export const billingDocumentLineSchema = z
+  .object({
+    id: z.string().uuid(),
+    origin: z.enum(["QUOTE", "FREE", "TITLE"]),
+    sourceLineId: z.string().uuid().nullable(),
+    description: z.string().trim().min(1).max(4000),
+    quantity: z.number().finite().min(0).max(1000000),
+    unit: z.string().trim().max(40),
+    unitPriceCents: centsSchema,
+    vatRatePercent: z.number().finite().min(0).max(100),
+  })
+  .superRefine((line, ctx) => {
+    if (line.origin === "TITLE") {
+      if (line.quantity !== 0 || line.unitPriceCents !== 0 || line.sourceLineId !== null) {
+        ctx.addIssue({ code: z.ZodIssueCode.custom, message: "BILLING_TITLE_INVALID" });
+      }
+    } else if (
+      line.quantity <= 0 ||
+      (line.origin === "QUOTE" && !line.sourceLineId) ||
+      (line.origin === "FREE" && line.sourceLineId !== null)
+    ) {
+      ctx.addIssue({ code: z.ZodIssueCode.custom, message: "BILLING_DOCUMENT_LINE_INVALID" });
     }
-  } else if (line.quantity <= 0 ||
-    (line.origin === "QUOTE" && !line.sourceLineId) ||
-    (line.origin === "FREE" && line.sourceLineId !== null)) {
-    ctx.addIssue({ code: z.ZodIssueCode.custom, message: "BILLING_DOCUMENT_LINE_INVALID" });
-  }
-});
+  });
 export type BillingDocumentLine = z.infer<typeof billingDocumentLineSchema>;
 
 export const billingSourceSchema = z.object({
@@ -342,7 +346,6 @@ export function updateBillingDraft(
   });
 }
 
-
 /** Persists an editable invoice document, independently of the signed quote. */
 export function updateBillingDocument(
   payload: BillingPayload,
@@ -360,7 +363,11 @@ export function updateBillingDocument(
   if (index < 0) throw new Error("BILLING_DRAFT_NOT_FOUND");
   const draft = payload.drafts[index];
   if (draft.updatedAt !== input.expectedUpdatedAt) throw new Error("BILLING_VERSION_CONFLICT");
-  const documentLines = z.array(billingDocumentLineSchema).min(1).max(1000).parse(input.documentLines);
+  const documentLines = z
+    .array(billingDocumentLineSchema)
+    .min(1)
+    .max(1000)
+    .parse(input.documentLines);
   if (new Set(documentLines.map((line) => line.id)).size !== documentLines.length) {
     throw new Error("BILLING_DOCUMENT_DUPLICATE_LINE");
   }
@@ -369,8 +376,11 @@ export function updateBillingDocument(
   const allowedRates = new Set(draft.contractTaxGroups.map((group) => group.ratePercent));
   for (const line of documentLines) {
     if (line.origin === "QUOTE") {
-      if (!line.sourceLineId || !quoteIds.has(line.sourceLineId) ||
-        seenQuoteIds.has(line.sourceLineId)) {
+      if (
+        !line.sourceLineId ||
+        !quoteIds.has(line.sourceLineId) ||
+        seenQuoteIds.has(line.sourceLineId)
+      ) {
         throw new Error("BILLING_DOCUMENT_SOURCE_LINE_INVALID");
       }
       seenQuoteIds.add(line.sourceLineId);
@@ -384,12 +394,17 @@ export function updateBillingDocument(
   if (totals.amountHtCents + priorCents > draft.contractHtCents) {
     throw new Error("BILLING_AMOUNT_EXCEEDS_CONTRACT");
   }
-  const financialChange = totals.amountHtCents !== draft.amountHtCents ||
-    draft.taxGroups.some((group) =>
-      (totals.taxGroups.find((value) => value.ratePercent === group.ratePercent)?.baseHtCents ?? 0)
-       !== group.baseHtCents);
-  if (financialChange && payload.drafts.slice(index + 1).some(
-    (candidate) => candidate.quoteId === draft.quoteId)) {
+  const financialChange =
+    totals.amountHtCents !== draft.amountHtCents ||
+    draft.taxGroups.some(
+      (group) =>
+        (totals.taxGroups.find((value) => value.ratePercent === group.ratePercent)?.baseHtCents ??
+          0) !== group.baseHtCents,
+    );
+  if (
+    financialChange &&
+    payload.drafts.slice(index + 1).some((candidate) => candidate.quoteId === draft.quoteId)
+  ) {
     throw new Error("BILLING_DRAFT_HAS_DEPENDENTS");
   }
   return billingDraftSchema.parse({

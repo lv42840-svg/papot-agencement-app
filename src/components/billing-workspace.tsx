@@ -136,7 +136,10 @@ export function BillingWorkspace({
       payload.linePercentages = rows;
     } else if (percentMode) payload.cumulativePercent = numeric;
     else if (type !== "STANDARD" && type !== "FINAL") payload.amountHtCents = numeric;
-    const result = await write(payload, "Projet enregistré. Ouvre son éditeur pour personnaliser les lignes.");
+    const result = await write(
+      payload,
+      "Projet enregistré. Ouvre son éditeur pour personnaliser les lignes.",
+    );
     const created = result?.drafts.find((draft) => draft.requestId === payload.requestId);
     if (created) router.push(`/facturation/${encodeURIComponent(created.id)}`);
     else if (result) setValue("");
@@ -370,8 +373,7 @@ export function BillingWorkspace({
                   <b>TTC : {money(d.totalTtcCents)}</b>
                 </p>
                 <div>
-                  <Link href={`/facturation/${encodeURIComponent(d.id)}`}
-                    className="primaryButton">
+                  <Link href={`/facturation/${encodeURIComponent(d.id)}`} className="primaryButton">
                     Ouvrir et modifier la facture
                   </Link>
                 </div>

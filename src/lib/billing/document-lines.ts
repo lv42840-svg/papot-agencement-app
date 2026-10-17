@@ -1,4 +1,9 @@
-import type { BillingDocumentLine, BillingDraft, BillingPayload, BillingSourceLine } from "./domain";
+import type {
+  BillingDocumentLine,
+  BillingDraft,
+  BillingPayload,
+  BillingSourceLine,
+} from "./domain";
 
 export function lineHtCents(line: BillingDocumentLine): number {
   if (line.origin === "TITLE") return 0;
@@ -43,7 +48,7 @@ function distributeAmounts(
     weightsUsed = lines.map((line) => line.amountHtCents);
   }
   const totalWeights = weightsUsed.reduce((sum, value) => sum + value, 0);
-  if (totalWeights <= 0) return lines.map((_, i) => i === 0 ? amountHtCents : 0);
+  if (totalWeights <= 0) return lines.map((_, i) => (i === 0 ? amountHtCents : 0));
   const parts = lines.map((_, index) => {
     const raw = (amountHtCents * weightsUsed[index]) / totalWeights;
     return { index, amount: Math.floor(raw), fraction: raw % 1 };
@@ -63,7 +68,8 @@ export function buildInvoiceDocumentLines(
   payload: BillingPayload,
 ): BillingDocumentLine[] {
   const draftIndex = payload.drafts.findIndex((item) => item.id === draft.id);
-  const prior = payload.drafts.slice(0, draftIndex < 0 ? payload.drafts.length : draftIndex)
+  const prior = payload.drafts
+    .slice(0, draftIndex < 0 ? payload.drafts.length : draftIndex)
     .filter((item) => item.quoteId === draft.quoteId);
   const sourceLines = draft.lines ?? [];
   const output: BillingDocumentLine[] = [];
@@ -73,9 +79,12 @@ export function buildInvoiceDocumentLines(
     if (!matching.length) {
       output.push({
         id: globalThis.crypto.randomUUID(),
-        origin: "FREE", sourceLineId: null,
+        origin: "FREE",
+        sourceLineId: null,
         description: `Prestation selon devis ${draft.quoteLabel}`,
-        quantity: 1, unit: "forfait", unitPriceCents: group.baseHtCents,
+        quantity: 1,
+        unit: "forfait",
+        unitPriceCents: group.baseHtCents,
         vatRatePercent: group.ratePercent,
       });
       continue;
@@ -83,13 +92,17 @@ export function buildInvoiceDocumentLines(
 
     const previousSituations = prior.filter((item) => item.type === "PROGRESS");
     const weights = matching.map((line) => {
-      const target = draft.lineProgress?.find((row) => row.lineId === line.lineId)?.cumulativeHtCents;
+      const target = draft.lineProgress?.find(
+        (row) => row.lineId === line.lineId,
+      )?.cumulativeHtCents;
       if (target === undefined) return line.amountHtCents;
       const previousTarget = previousSituations.reduce((maximum, item) => {
         const row = item.lineProgress?.find((entry) => entry.lineId === line.lineId);
-        const amount = row?.cumulativeHtCents ??
-          (item.cumulativePercent === null ? 0 :
-            Math.round(line.amountHtCents * item.cumulativePercent / 100));
+        const amount =
+          row?.cumulativeHtCents ??
+          (item.cumulativePercent === null
+            ? 0
+            : Math.round((line.amountHtCents * item.cumulativePercent) / 100));
         return Math.max(maximum, amount);
       }, 0);
       return Math.max(0, target - previousTarget);
@@ -99,11 +112,14 @@ export function buildInvoiceDocumentLines(
       const amount = allocated[index];
       const quantity = source.quantity ?? 1;
       const roundedUnit = Math.round(amount / quantity);
-      const exact = amount > 0 && Number.isSafeInteger(roundedUnit) &&
+      const exact =
+        amount > 0 &&
+        Number.isSafeInteger(roundedUnit) &&
         Math.round(quantity * roundedUnit) === amount;
       output.push({
         id: globalThis.crypto.randomUUID(),
-        origin: "QUOTE", sourceLineId: source.lineId,
+        origin: "QUOTE",
+        sourceLineId: source.lineId,
         description: source.description,
         quantity: exact ? quantity : 1,
         unit: exact ? (source.unit ?? "u") : "forfait",

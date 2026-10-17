@@ -6,8 +6,11 @@ import {
   requireModuleRequestContext,
 } from "@/lib/desktop/request-context";
 import {
-  createBillingDraft, updateBillingDraft, updateBillingDocument,
-  billingTypeSchema, billingDocumentLineSchema,
+  createBillingDraft,
+  updateBillingDraft,
+  updateBillingDocument,
+  billingTypeSchema,
+  billingDocumentLineSchema,
 } from "@/lib/billing/domain";
 import { createBillingRepository } from "@/lib/billing/repository";
 import { loadBillingSources } from "@/lib/billing/sources";
@@ -122,7 +125,10 @@ export async function POST(request: Request) {
         const index = drafts.findIndex((draft) => draft.id === input.draftId);
         if (index < 0) throw new Error("BILLING_DRAFT_NOT_FOUND");
         drafts[index] = updateBillingDocument(
-          current, input.draftId, input, context.user.displayName,
+          current,
+          input.draftId,
+          input,
+          context.user.displayName,
         );
       } else if (input.action === "UPDATE") {
         const index = drafts.findIndex((draft) => draft.id === input.draftId);
@@ -134,11 +140,7 @@ export async function POST(request: Request) {
         if (drafts[index].updatedAt !== input.expectedUpdatedAt) {
           throw new Error("BILLING_VERSION_CONFLICT");
         }
-        if (
-          drafts
-            .slice(index + 1)
-            .some((draft) => draft.quoteId === drafts[index].quoteId)
-        ) {
+        if (drafts.slice(index + 1).some((draft) => draft.quoteId === drafts[index].quoteId)) {
           throw new Error("BILLING_DRAFT_HAS_DEPENDENTS");
         }
         drafts.splice(index, 1);
