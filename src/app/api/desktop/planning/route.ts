@@ -19,7 +19,7 @@ import {
   buildCommercialProvisionRows,
   buildFirmGrandPlanningRows,
   PLANNING_ABSENCE_TYPE_LABELS,
-  planningYearWeekIds,
+  planningYearWeekIdsRange,
 } from "@/lib/planning/domain";
 import { assertPlanningWeekEditable, isPlanningWeekPast } from "@/lib/planning/time-markers";
 import {
@@ -39,6 +39,14 @@ export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
 const yearSchema = z.coerce.number().int().min(2020).max(2100);
+
+function parseYearRange(startYear: number, value: unknown): number {
+  const endYear = yearSchema.parse(value ?? startYear);
+  if (endYear < startYear || endYear - startYear > 2) {
+    throw new Error("PLANNING_YEAR_RANGE_INVALID");
+  }
+  return endYear;
+}
 
 function noStoreJson(body: unknown, init?: ResponseInit) {
   const response = NextResponse.json(body, init);
@@ -79,6 +87,7 @@ function effectivePeopleCapacity(
 
 async function snapshot(
   year: number,
+  endYear: number,
   canWrite: boolean,
   user: { id: string },
   context: Awaited<ReturnType<typeof requireModuleRequestContext>>,
@@ -92,9 +101,9 @@ async function snapshot(
       hasEffectiveSpecialPermission(user, "planning.edit_macro"),
       hasEffectiveSpecialPermission(user, "planning.manage_schedules"),
     ]);
-  const weeks = planningYearWeekIds(year);
-  const rows = buildFirmGrandPlanningRows(chantiers, planning, year);
-  const provisionalRows = buildCommercialProvisionRows(commercial, planning, year);
+  const weeks = planningYearWeekIdsRange(year, endYear);
+  const rows = buildFirmGrandPlanningRows(chantiers, planning, year, endYear);
+  const provisionalRows = buildCommercialProvisionRows(commercial, planning, year, endYear);
   const firmLoadByWeek = new Map<string, number>();
   const provisionalLoadByWeek = new Map<string, number>();
 
@@ -119,6 +128,7 @@ async function snapshot(
 
   return {
     year,
+    endYear,
     weeks,
     rows,
     provisionalRows,
@@ -154,7 +164,10 @@ export async function GET(request: Request) {
     const context = await requireModuleRequestContext("planning", "READ");
     const url = new URL(request.url);
     const year = yearSchema.parse(url.searchParams.get("year") ?? new Date().getFullYear());
-    return noStoreJson(await snapshot(year, context.moduleAccess.canWrite, context.user, context));
+    const endYear = parseYearRange(year, url.searchParams.get("endYear"));
+    return noStoreJson(
+      await snapshot(year, endYear, context.moduleAccess.canWrite, context.user, context),
+    );
   } catch (error) {
     const code =
       error instanceof ZodError
@@ -170,6 +183,7 @@ export async function POST(request: Request) {
   try {
     const body = await request.json();
     const year = yearSchema.parse(body.year ?? new Date().getFullYear());
+    const endYear = parseYearRange(year, body.endYear);
     const input = planningMutationSchema.parse(body);
     const context = await requireModuleRequestContext("planning", "WRITE");
     const planningRepository = createPlanningRepository();
@@ -273,7 +287,7 @@ export async function POST(request: Request) {
       }
     }
 
-    return noStoreJson(await snapshot(year, true, context.user, context));
+    return noStoreJson(await snapshot(year, endYear, true, context.user, context));
   } catch (error) {
     const code =
       error instanceof ZodError
