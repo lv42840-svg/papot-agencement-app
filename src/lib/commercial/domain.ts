@@ -104,7 +104,7 @@ export const commercialCaseSchema = z.object({
   plannedInstallDate: dateOnlySchema.nullable(),
   confirmedAt: isoDateTimeSchema.nullable(),
   retainedQuoteIds: z.array(z.string().uuid()).max(1000).default([]),
-  forecastQuoteIds: z.array(z.string().uuid()).max(1000).nullable().default(null),
+  forecastQuoteIds: z.array(z.string().uuid()).max(1000).nullable().optional(),
   closedAt: isoDateTimeSchema.nullable(),
   closingReason: z.string().trim().max(2000).nullable(),
   documents: z.array(commercialDocumentSchema),
