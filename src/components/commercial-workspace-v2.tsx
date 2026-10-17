@@ -53,7 +53,13 @@ import { commercialAffairHref } from "@/lib/commercial/navigation";
 type Snapshot = {
   payload: CommercialPayload;
   actor: { userId: string; displayName: string };
-  capabilities: { canCreate: boolean; canRead: boolean; canModify: boolean; canProvision: boolean; canConfirm: boolean };
+  capabilities: {
+    canCreate: boolean;
+    canRead: boolean;
+    canModify: boolean;
+    canProvision: boolean;
+    canConfirm: boolean;
+  };
   activeUsers: Array<{ id: string; displayName: string }>;
   focusCaseId?: string;
   serverNow: string;

@@ -74,7 +74,15 @@ const quotes = [
 function affairPayload() {
   const payload = applyCommercialMutation(
     createInitialCommercialPayload(),
-    { action: "create", name: "Affaire test", clientName: "Client", siteLabel: "", description: "", nextAction: "", reviewDate: "2026-11-15" },
+    {
+      action: "create",
+      name: "Affaire test",
+      clientName: "Client",
+      siteLabel: "",
+      description: "",
+      nextAction: "",
+      reviewDate: "2026-11-15",
+    },
     actor,
     new Date("2026-10-15T10:00:00.000Z"),
   ).payload;
