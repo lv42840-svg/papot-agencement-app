@@ -29,7 +29,7 @@ describe("grand planning temporal markers UI", () => {
   it("locks editing for past weeks and read-only users", () => {
     expect(gridSource).toContain("metaByWeek.get(week)?.isPast");
     expect(gridSource).toContain("!snapshot.capabilities.canEditMacro");
-    expect(gridSource).toContain("disabled={readOnly}");
+    expect(gridSource).toContain("readOnly={readOnly}");
   });
 
   it("centers the scroll on the current week without a dedicated button", () => {
