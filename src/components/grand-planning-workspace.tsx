@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { PlanningExcelGrid } from "./planning-excel-grid";
 import type { PlanningClipboardUpdate } from "@/lib/planning/clipboard";
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState, type FormEvent } from "react";
 import type {
   GrandPlanningChantierRow,
   GrandPlanningProvisionRow,
@@ -26,6 +26,10 @@ type WeeklyCapacity = {
 type PersonCapacity = {
   userId: string;
   displayName: string;
+  kind: "account" | "staff";
+  firstName: string | null;
+  lastName: string | null;
+  linkedUserId: string | null;
   countsInMacroCapacity: boolean;
   weeklySchedule: {
     monday: number;
@@ -54,6 +58,7 @@ type PlanningSnapshot = {
   provisionalRows: GrandPlanningProvisionRow[];
   weeklyCapacity: WeeklyCapacity[];
   peopleCapacity: PersonCapacity[];
+  availableAccounts: Array<{ id: string; displayName: string }>;
   absences: PlanningAbsence[];
   capabilities: {
     canRead: boolean;
@@ -113,6 +118,9 @@ export function GrandPlanningWorkspace({
   const [drafts, setDrafts] = useState<Record<string, string>>({});
   const [savingKey, setSavingKey] = useState<string | null>(null);
   const [scheduleDrafts, setScheduleDrafts] = useState<Record<string, string>>({});
+  const [staffFirstName, setStaffFirstName] = useState("");
+  const [staffLastName, setStaffLastName] = useState("");
+  const [editingStaffId, setEditingStaffId] = useState<string | null>(null);
   const [absenceUserId, setAbsenceUserId] = useState("");
   const [absenceType, setAbsenceType] = useState<PlanningAbsence["type"]>("VACATION");
   const [absenceDate, setAbsenceDate] = useState(`${initialYear}-01-01`);
@@ -357,6 +365,39 @@ export function GrandPlanningWorkspace({
     setMessage(successMessage);
     setSavingKey(null);
     return true;
+  }
+
+  async function saveStaff(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    const firstName = staffFirstName.trim();
+    const lastName = staffLastName.trim();
+    if (!firstName || !lastName) {
+      setMessage("Renseigne le prénom et le nom.");
+      return;
+    }
+    const saved = await postPlanningMutation(
+      { action: "saveStaff", id: editingStaffId ?? undefined, firstName, lastName },
+      editingStaffId ? "Fiche personnel mise à jour." : "Personne ajoutée au planning.",
+    );
+    if (saved) {
+      setStaffFirstName("");
+      setStaffLastName("");
+      setEditingStaffId(null);
+    }
+  }
+
+  function editStaff(person: PersonCapacity) {
+    if (person.kind !== "staff") return;
+    setEditingStaffId(person.userId);
+    setStaffFirstName(person.firstName ?? "");
+    setStaffLastName(person.lastName ?? "");
+  }
+
+  async function linkStaffAccount(personId: string, linkedUserId: string | null) {
+    await postPlanningMutation(
+      { action: "linkStaffAccount", id: personId, linkedUserId },
+      linkedUserId ? "Compte PAPOT rattaché au personnel." : "Compte PAPOT détaché.",
+    );
   }
 
   async function togglePotentialCollapsed() {
@@ -811,6 +852,50 @@ export function GrandPlanningWorkspace({
                   <span className="planningReadOnly">Lecture seule</span>
                 ) : null}
               </div>
+              {snapshot.capabilities.canManageSchedules ? (
+                <form className="planningStaffForm" onSubmit={(event) => void saveStaff(event)}>
+                  <label>
+                    Prénom
+                    <input
+                      value={staffFirstName}
+                      maxLength={100}
+                      required
+                      placeholder="Prénom"
+                      onChange={(event) => setStaffFirstName(event.target.value)}
+                    />
+                  </label>
+                  <label>
+                    Nom
+                    <input
+                      value={staffLastName}
+                      maxLength={100}
+                      required
+                      placeholder="Nom"
+                      onChange={(event) => setStaffLastName(event.target.value)}
+                    />
+                  </label>
+                  <button type="submit" className="primaryButton fit" disabled={savingKey !== null}>
+                    {editingStaffId ? "Enregistrer la fiche" : "+ Ajouter une personne"}
+                  </button>
+                  {editingStaffId ? (
+                    <button
+                      type="button"
+                      className="secondaryButton"
+                      onClick={() => {
+                        setEditingStaffId(null);
+                        setStaffFirstName("");
+                        setStaffLastName("");
+                      }}
+                    >
+                      Annuler
+                    </button>
+                  ) : null}
+                </form>
+              ) : null}
+              <p className="planningStaffHint">
+                Une personne peut figurer au planning sans compte de connexion. Le rattachement
+                reste facultatif.
+              </p>
               <div className="planningScheduleTableWrap">
                 <table className="planningScheduleTable">
                   <thead>
@@ -826,7 +911,66 @@ export function GrandPlanningWorkspace({
                   <tbody>
                     {snapshot.peopleCapacity.map((person) => (
                       <tr key={person.userId}>
-                        <th scope="row">{person.displayName}</th>
+                        <th scope="row">
+                          <div className="planningStaffIdentity">
+                            <strong>{person.displayName}</strong>
+                            {person.kind === "staff" ? (
+                              <>
+                                <small>
+                                  {person.linkedUserId
+                                    ? "Compte PAPOT associé"
+                                    : "Sans compte PAPOT"}
+                                </small>
+                                {snapshot.capabilities.canManageSchedules ? (
+                                  <div className="planningStaffActions">
+                                    <button
+                                      type="button"
+                                      className="secondaryButton"
+                                      disabled={savingKey !== null}
+                                      onClick={() => editStaff(person)}
+                                    >
+                                      Modifier
+                                    </button>
+                                    <label>
+                                      <span className="sr-only">
+                                        Rattacher un compte à {person.displayName}
+                                      </span>
+                                      <select
+                                        aria-label={`Compte PAPOT associé à ${person.displayName}`}
+                                        value={person.linkedUserId ?? ""}
+                                        disabled={savingKey !== null}
+                                        onChange={(event) =>
+                                          void linkStaffAccount(
+                                            person.userId,
+                                            event.target.value || null,
+                                          )
+                                        }
+                                      >
+                                        <option value="">Aucun compte</option>
+                                        {snapshot.availableAccounts.map((account) => (
+                                          <option
+                                            key={account.id}
+                                            value={account.id}
+                                            disabled={snapshot.peopleCapacity.some(
+                                              (other) =>
+                                                other.kind === "staff" &&
+                                                other.userId !== person.userId &&
+                                                other.linkedUserId === account.id,
+                                            )}
+                                          >
+                                            {account.displayName}
+                                          </option>
+                                        ))}
+                                      </select>
+                                    </label>
+                                  </div>
+                                ) : null}
+                              </>
+                            ) : (
+                              <small>Compte PAPOT</small>
+                            )}
+                          </div>
+                        </th>
                         <td>
                           <label className="planningCapacityToggle">
                             <input
@@ -1134,6 +1278,54 @@ export function GrandPlanningWorkspace({
           color: #6450ad;
           border-bottom-color: #7666d6;
           background: #eeeafb;
+        }
+        .planningStaffForm {
+          display: flex;
+          flex-wrap: wrap;
+          align-items: flex-end;
+          gap: 10px;
+          padding: 10px 0;
+        }
+        .planningStaffForm label {
+          display: grid;
+          gap: 5px;
+          font-size: 11px;
+          font-weight: 700;
+        }
+        .planningStaffForm input {
+          min-width: 160px;
+          padding: 7px;
+          border: 1px solid #dcd5ea;
+          border-radius: 6px;
+        }
+        .planningStaffHint {
+          font-size: 11px;
+          color: #6c6480;
+          margin: 3px 0 12px;
+        }
+        .planningStaffIdentity {
+          display: grid;
+          gap: 4px;
+          text-align: left;
+          padding: 5px;
+        }
+        .planningStaffIdentity small {
+          color: #796f89;
+          font-size: 10px;
+          font-weight: 400;
+        }
+        .planningStaffActions {
+          display: flex;
+          flex-wrap: wrap;
+          gap: 5px;
+          align-items: center;
+        }
+        .planningStaffActions select {
+          max-width: 180px;
+          padding: 4px;
+          border-radius: 5px;
+          border: 1px solid #ddd5ee;
+          font-size: 10px;
         }
         .planningPersonnelContent {
           max-width: 1500px;
