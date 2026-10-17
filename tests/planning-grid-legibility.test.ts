@@ -12,7 +12,9 @@ const workspaceSource = readFileSync(
 
 describe("grand planning compact grid legibility", () => {
   it("only displays firm and provisional availability above the activity totals", () => {
-    const summaries = gridSource.split("const summaryRows:")[1].split("// Totaux de charge ferme")[0];
+    const summaries = gridSource
+      .split("const summaryRows:")[1]
+      .split("// Totaux de charge ferme")[0];
     expect(summaries).toContain("Disponible ferme");
     expect(summaries).toContain("Disponible avec potentiel");
     expect(summaries).not.toContain("Capacité totale");
