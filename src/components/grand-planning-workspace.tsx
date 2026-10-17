@@ -47,6 +47,7 @@ type PlanningAbsence = {
 };
 type PlanningSnapshot = {
   year: number;
+  endYear: number;
   weeks: string[];
   rows: GrandPlanningChantierRow[];
   provisionalRows: GrandPlanningProvisionRow[];
@@ -103,6 +104,9 @@ export function GrandPlanningWorkspace({
   initialPotentialCollapsed: boolean;
 }) {
   const [snapshot, setSnapshot] = useState<PlanningSnapshot | null>(null);
+  const [loadingNextYear, setLoadingNextYear] = useState(false);
+  const [hiddenUnallocated, setHiddenUnallocated] = useState(false);
+  const [hiddenProvisional, setHiddenProvisional] = useState(false);
   const [activeTab, setActiveTab] = useState<"planning" | "personnel">("planning");
   const [message, setMessage] = useState("Chargement du planning…");
   const [drafts, setDrafts] = useState<Record<string, string>>({});
@@ -117,11 +121,31 @@ export function GrandPlanningWorkspace({
   const [potentialCollapsed, setPotentialCollapsed] = useState(initialPotentialCollapsed);
   const [potentialPreferenceSaving, setPotentialPreferenceSaving] = useState(false);
   const planningScrollerRef = useRef<HTMLDivElement | null>(null);
+  const scrolledToCurrentRef = useRef(false);
+  const extendingRef = useRef(false);
+  const restoreScrollRef = useRef<number | null>(null);
   const currentWeek = useMemo(() => isoWeekKey(new Date()), []);
+
+  useEffect(() => {
+    setHiddenUnallocated(window.sessionStorage.getItem("papot.planning.hide-unallocated") === "1");
+    setHiddenProvisional(window.sessionStorage.getItem("papot.planning.hide-provisional") === "1");
+  }, []);
+
+  function toggleUnallocated(hidden: boolean) {
+    setHiddenUnallocated(hidden);
+    if (hidden) window.sessionStorage.setItem("papot.planning.hide-unallocated", "1");
+    else window.sessionStorage.removeItem("papot.planning.hide-unallocated");
+  }
+
+  function toggleProvisional(hidden: boolean) {
+    setHiddenProvisional(hidden);
+    if (hidden) window.sessionStorage.setItem("papot.planning.hide-provisional", "1");
+    else window.sessionStorage.removeItem("papot.planning.hide-provisional");
+  }
 
   const load = useCallback(async () => {
     setMessage("Chargement du planning…");
-    const response = await fetch(`/api/desktop/planning?year=${initialYear}`, {
+    const response = await fetch(`/api/desktop/planning?year=${initialYear}&endYear=${Math.min(2100, initialYear + 1)}`, {
       cache: "no-store",
     });
     const result = (await response.json()) as PlanningSnapshot & { error?: string };
@@ -155,16 +179,60 @@ export function GrandPlanningWorkspace({
 
   useEffect(() => {
     const scroller = planningScrollerRef.current;
-    if (!snapshot || !scroller || !snapshot.weeks.includes(currentWeek)) return;
-
+    if (!snapshot || !scroller) return;
+    if (restoreScrollRef.current != null) {
+      scroller.scrollLeft = restoreScrollRef.current;
+      restoreScrollRef.current = null;
+      return;
+    }
+    if (scrolledToCurrentRef.current || !snapshot.weeks.includes(currentWeek)) return;
     const currentHeader = scroller.querySelector<HTMLElement>(
       `[data-planning-week="${currentWeek}"]`,
     );
     if (!currentHeader) return;
-
-    const stickyColumnsWidth = 655;
-    scroller.scrollLeft = Math.max(0, currentHeader.offsetLeft - stickyColumnsWidth - 12);
+    scroller.scrollLeft = Math.max(0, currentHeader.offsetLeft - 655 - 12);
+    scrolledToCurrentRef.current = true;
   }, [currentWeek, snapshot]);
+
+  async function extendPlanning() {
+    if (!snapshot || extendingRef.current || snapshot.endYear >= 2100 || savingKey !== null) return;
+    extendingRef.current = true;
+    setLoadingNextYear(true);
+    const nextEndYear = snapshot.endYear + 1;
+    // Keep at most three years rendered; older years remain accessible via annual navigation.
+    const nextStartYear = Math.max(snapshot.year, nextEndYear - 2);
+    const removedWeeks = snapshot.weeks.filter(
+      (week) => Number(week.slice(0, 4)) < nextStartYear,
+    ).length;
+    const previousScrollLeft = planningScrollerRef.current?.scrollLeft ?? 0;
+    try {
+      const response = await fetch(
+        `/api/desktop/planning?year=${nextStartYear}&endYear=${nextEndYear}`,
+        { cache: "no-store" },
+      );
+      const result = (await response.json()) as PlanningSnapshot & { error?: string };
+      if (!response.ok) {
+        setMessage(result.error ?? "Impossible de charger la suite du planning.");
+        return;
+      }
+      restoreScrollRef.current = Math.max(0, previousScrollLeft - removedWeeks * 150);
+      setSnapshot(result);
+      setMessage("");
+    } catch {
+      setMessage("Impossible de charger la suite du planning.");
+    } finally {
+      extendingRef.current = false;
+      setLoadingNextYear(false);
+    }
+  }
+
+  function handlePlanningScroll() {
+    const scroller = planningScrollerRef.current;
+    if (!scroller || !snapshot || snapshot.endYear >= 2100) return;
+    if (scroller.scrollLeft + scroller.clientWidth >= scroller.scrollWidth - 450) {
+      void extendPlanning();
+    }
+  }
 
   function weekClassName(week: string) {
     const meta = weekMetaByWeek.get(week);
@@ -248,6 +316,7 @@ export function GrandPlanningWorkspace({
       body: JSON.stringify({
         action: "setPersonCapacity",
         year: snapshot.year,
+        endYear: snapshot.endYear,
         userId: person.userId,
         countsInMacroCapacity: person.countsInMacroCapacity,
         weeklySchedule: person.weeklySchedule,
@@ -426,6 +495,7 @@ export function GrandPlanningWorkspace({
       body: JSON.stringify({
         action: "setMacroHours",
         year: snapshot.year,
+        endYear: snapshot.endYear,
         chantierId,
         activity,
         week,
@@ -488,6 +558,7 @@ export function GrandPlanningWorkspace({
       body: JSON.stringify({
         action: "setProvisionHours",
         year: snapshot.year,
+        endYear: snapshot.endYear,
         caseId,
         activity,
         week,
