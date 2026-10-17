@@ -1,5 +1,6 @@
 import { z } from "zod";
 import { DEFAULT_WEEKLY_SCHEDULE, isoWeekDates, scheduleHoursForDate } from "./capacity";
+import { assertCombinedPersonWeekLimit } from "./actual-hours";
 import { isoWeekKey } from "./time-markers";
 import {
   actualHoursKey,
@@ -293,6 +294,7 @@ export function applyPlanningActualHoursMutation(
 
   if (index >= 0) payload.actualHours[index] = next;
   else payload.actualHours.push(next);
+  assertCombinedPersonWeekLimit(payload, input.userId, input.week);
 
   return parsePlanningPayload(payload);
 }
