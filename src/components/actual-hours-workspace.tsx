@@ -280,7 +280,7 @@ export function ActualHoursWorkspace() {
         <>
           {!data.weekIsPast ? (
             <p className="actualHoursNotice">
-              Cette semaine n'est pas terminée. Sélectionne une semaine écoulée pour saisir du
+              Cette semaine n&apos;est pas terminée. Sélectionne une semaine écoulée pour saisir du
               réalisé.
             </p>
           ) : null}
