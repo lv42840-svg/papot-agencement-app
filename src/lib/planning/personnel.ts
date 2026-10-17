@@ -1,4 +1,8 @@
-import { DEFAULT_WEEKLY_SCHEDULE, NEW_STAFF_WEEKLY_SCHEDULE, type PlanningPersonCapacity } from "./capacity";
+import {
+  DEFAULT_WEEKLY_SCHEDULE,
+  NEW_STAFF_WEEKLY_SCHEDULE,
+  type PlanningPersonCapacity,
+} from "./capacity";
 import { parsePlanningPayload, type PlanningPayload, type PlanningStaff } from "./domain";
 
 export type PlanningAccount = { id: string; displayName: string; isActive: boolean };
@@ -104,9 +108,7 @@ export function applyPlanningStaffMutation(
       !staffCapacity.countsInMacroCapacity &&
       Object.entries(NEW_STAFF_WEEKLY_SCHEDULE).every(
         ([day, hours]) =>
-          staffCapacity.weeklySchedule[
-            day as keyof typeof NEW_STAFF_WEEKLY_SCHEDULE
-          ] === hours,
+          staffCapacity.weeklySchedule[day as keyof typeof NEW_STAFF_WEEKLY_SCHEDULE] === hours,
       );
     if (legacyCapacity && staffCapacity && !untouchedNewStaffSchedule) {
       throw new Error("PLANNING_STAFF_CAPACITY_CONFLICT");
