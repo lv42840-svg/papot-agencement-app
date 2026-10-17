@@ -121,7 +121,7 @@ async function weeklySnapshot(
     }));
   const capacity = buildWeeklyCapacityIndicators(
     [week],
-    people,
+    allPeople,
     new Map([[week, firm.total]]),
     planning.absences,
     new Map([[week, provisional.total]]),
