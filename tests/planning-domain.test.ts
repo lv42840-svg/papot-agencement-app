@@ -6,6 +6,7 @@ import {
   buildFirmGrandPlanningRows,
   createInitialPlanningPayload,
   planningYearWeekIds,
+  planningYearWeekIdsRange,
   type PlanningPayload,
 } from "../src/lib/planning/domain";
 
@@ -151,6 +152,36 @@ describe("grand planning domain", () => {
   it("builds a complete ISO year", () => {
     expect(planningYearWeekIds(2026)[0]).toBe("2026-W01");
     expect(planningYearWeekIds(2026).at(-1)).toBe("2026-W53");
+  });
+
+  it("continues ISO weeks seamlessly into 2027 and limits the rolling window", () => {
+    const weeks = planningYearWeekIdsRange(2026, 2027);
+    expect(weeks).toHaveLength(105);
+    expect(weeks[52]).toBe("2026-W53");
+    expect(weeks[53]).toBe("2027-W01");
+    expect(weeks.at(-1)).toBe("2027-W52");
+    expect(() => planningYearWeekIdsRange(2026, 2029)).toThrow("PLANNING_YEAR_RANGE_INVALID");
+    expect(() => planningYearWeekIdsRange(2028, 2027)).toThrow("PLANNING_YEAR_RANGE_INVALID");
+  });
+
+  it("shows firm and provisional hours on both sides of the year boundary", () => {
+    const planning: PlanningPayload = {
+      ...createInitialPlanningPayload(),
+      macroAllocations: [
+        { chantierId: activeId, activity: "BE", week: "2026-W52", hours: 3 },
+        { chantierId: activeId, activity: "BE", week: "2027-W01", hours: 4 },
+      ],
+      provisionalAllocations: [
+        { caseId: provisionCaseId, activity: "WORKSHOP", week: "2026-W52", hours: 5 },
+        { caseId: provisionCaseId, activity: "WORKSHOP", week: "2027-W01", hours: 6 },
+      ],
+    };
+    const firm = buildFirmGrandPlanningRows(chantiersPayload(), planning, 2026, 2027)[0];
+    const provisional = buildCommercialProvisionRows(commercialPayload(), planning, 2026, 2027)[0];
+    expect(firm.activities[0].weeklyHours).toEqual({ "2026-W52": 3, "2027-W01": 4 });
+    expect(firm.activities[0].remainingHours).toBe(3);
+    expect(provisional.activities[1].weeklyHours).toEqual({ "2026-W52": 5, "2027-W01": 6 });
+    expect(provisional.activities[1].remainingHours).toBe(9);
   });
 
   it("shows only active chantiers with fixed BE / Atelier / Pose rows", () => {
