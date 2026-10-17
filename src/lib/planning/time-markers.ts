@@ -103,7 +103,11 @@ export function groupGrandPlanningMonths(
 
   for (const week of weeks) {
     const previous = groups.at(-1);
-    if (previous && previous.label === week.monthLabel && previous.year === week.monday.getUTCFullYear()) {
+    if (
+      previous &&
+      previous.label === week.monthLabel &&
+      previous.year === week.monday.getUTCFullYear()
+    ) {
       previous.span += 1;
       continue;
     }

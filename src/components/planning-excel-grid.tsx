@@ -114,9 +114,7 @@ export function PlanningExcelGrid({
   const selectedKeys = new Set<string>();
   if (selection) {
     const rows = rowsForKind(selection.anchor.kind);
-    const bounds = planningSelectionBounds(
-      selection.anchor, selection.end, rows, snapshot.weeks,
-    );
+    const bounds = planningSelectionBounds(selection.anchor, selection.end, rows, snapshot.weeks);
     if (bounds) {
       for (let r = bounds.top; r <= bounds.bottom; r++) {
         for (let c = bounds.left; c <= bounds.right; c++) {
@@ -132,8 +130,11 @@ export function PlanningExcelGrid({
     if (!(event.target instanceof HTMLInputElement) || !selection) return;
     try {
       const value = formatPlanningSelection(
-        selection.anchor, selection.end,
-        rowsForKind(selection.anchor.kind), snapshot.weeks, drafts,
+        selection.anchor,
+        selection.end,
+        rowsForKind(selection.anchor.kind),
+        snapshot.weeks,
+        drafts,
       );
       event.clipboardData.setData("text/plain", value);
       event.preventDefault();
@@ -229,21 +230,22 @@ export function PlanningExcelGrid({
         aria-label={[name, kind === "provisional" ? "provisionnel" : "", activity, week]
           .filter(Boolean)
           .join(" ")}
-        className={[
-          savingKey === key ? "isSaving" : "",
-          selectedKeys.has(key) ? "isSelected" : "",
-        ].filter(Boolean).join(" ")}
+        className={[savingKey === key ? "isSaving" : "", selectedKeys.has(key) ? "isSelected" : ""]
+          .filter(Boolean)
+          .join(" ")}
         readOnly={readOnly}
-        onFocus={() => setSelection({
-          anchor: { kind, id, activity, week },
-          end: { kind, id, activity, week },
-        })}
+        onFocus={() =>
+          setSelection({
+            anchor: { kind, id, activity, week },
+            end: { kind, id, activity, week },
+          })
+        }
         onMouseDown={(event) => {
           if (!event.shiftKey || !selection || selection.anchor.kind !== kind) return;
           event.preventDefault();
-          setSelection((current) => current
-            ? { anchor: current.anchor, end: { kind, id, activity, week } }
-            : current);
+          setSelection((current) =>
+            current ? { anchor: current.anchor, end: { kind, id, activity, week } } : current,
+          );
         }}
         inputMode="decimal"
         title={[name, activity, week].join(" · ")}

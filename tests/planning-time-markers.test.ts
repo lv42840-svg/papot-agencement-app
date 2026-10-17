@@ -67,11 +67,13 @@ describe("grand planning time markers", () => {
       ["2026-W53", "2027-W01", "2027-W02"],
       new Date(2026, 11, 28, 12),
     );
-    expect(groupGrandPlanningMonths(meta).map((group) => ({
-      label: group.label,
-      year: group.year,
-      span: group.span,
-    }))).toEqual([
+    expect(
+      groupGrandPlanningMonths(meta).map((group) => ({
+        label: group.label,
+        year: group.year,
+        span: group.span,
+      })),
+    ).toEqual([
       { label: "DÉCEMBRE", year: 2026, span: 1 },
       { label: "JANVIER", year: 2027, span: 2 },
     ]);

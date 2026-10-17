@@ -177,23 +177,30 @@ export function applyPlanningHoursBatchMutation(
   }
 
   const payload = structuredClone(parsePlanningPayload(source));
-  const firm = new Map<string, PlanningPayload["macroAllocations"][number]>(payload.macroAllocations.map((item) => [
-    allocationKey(item.chantierId, item.activity, item.week), item,
-  ]));
-  const provisional = new Map<string, PlanningPayload["provisionalAllocations"][number]>(payload.provisionalAllocations.map((item) => [
-    provisionalAllocationKey(item.caseId, item.activity, item.week), item,
-  ]));
+  const firm = new Map<string, PlanningPayload["macroAllocations"][number]>(
+    payload.macroAllocations.map((item) => [
+      allocationKey(item.chantierId, item.activity, item.week),
+      item,
+    ]),
+  );
+  const provisional = new Map<string, PlanningPayload["provisionalAllocations"][number]>(
+    payload.provisionalAllocations.map((item) => [
+      provisionalAllocationKey(item.caseId, item.activity, item.week),
+      item,
+    ]),
+  );
 
   for (const update of input.updates) {
     if (update.kind === "firm") {
       const key = allocationKey(update.id, update.activity, update.week);
       if (update.hours === 0) firm.delete(key);
-      else firm.set(key, {
-        chantierId: update.id,
-        activity: update.activity,
-        week: update.week,
-        hours: update.hours,
-      });
+      else
+        firm.set(key, {
+          chantierId: update.id,
+          activity: update.activity,
+          week: update.week,
+          hours: update.hours,
+        });
     } else {
       const key = provisionalAllocationKey(update.id, update.activity, update.week);
       if (update.hours === 0) provisional.delete(key);

@@ -217,7 +217,9 @@ export async function POST(request: Request) {
         createCommercialRepository().load(),
       ]);
       const activeChantierIds = new Set(
-        chantiers.chantiers.filter((chantier) => chantier.status === "ACTIVE").map((chantier) => chantier.id),
+        chantiers.chantiers
+          .filter((chantier) => chantier.status === "ACTIVE")
+          .map((chantier) => chantier.id),
       );
       const activeCommercialCaseIds = new Set(
         commercial.cases.filter(isCommercialActive).map((item) => item.id),

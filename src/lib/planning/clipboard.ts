@@ -87,9 +87,15 @@ export function planPlanningPaste(
 ): PlanningClipboardUpdate[] {
   const rect = planningSelectionBounds(anchor, end, rows, weeks);
   if (!rect) throw new Error("Sélection introuvable dans le planning.");
-  const matrix = text.replace(/\r/g, "").replace(/\n$/, "").split("\n").map((line) => line.split("\t"));
-  const height = matrix.length === 1 && matrix[0].length === 1 ? rect.bottom - rect.top + 1 : matrix.length;
-  const width = matrix.length === 1 && matrix[0].length === 1 ? rect.right - rect.left + 1 : matrix[0].length;
+  const matrix = text
+    .replace(/\r/g, "")
+    .replace(/\n$/, "")
+    .split("\n")
+    .map((line) => line.split("\t"));
+  const height =
+    matrix.length === 1 && matrix[0].length === 1 ? rect.bottom - rect.top + 1 : matrix.length;
+  const width =
+    matrix.length === 1 && matrix[0].length === 1 ? rect.right - rect.left + 1 : matrix[0].length;
   if (
     height < 1 ||
     width < 1 ||
@@ -106,11 +112,12 @@ export function planPlanningPaste(
     for (let colIndex = 0; colIndex < width; colIndex++) {
       const week = weeks[Math.floor((rect.left + colIndex) / 3)];
       if (isPast(week)) {
-        throw new Error("Impossible de coller sur une semaine passée : aucune heure n’a été modifiée.");
+        throw new Error(
+          "Impossible de coller sur une semaine passée : aucune heure n’a été modifiée.",
+        );
       }
-      const raw = matrix.length === 1 && matrix[0].length === 1
-        ? matrix[0][0]
-        : matrix[rowIndex][colIndex];
+      const raw =
+        matrix.length === 1 && matrix[0].length === 1 ? matrix[0][0] : matrix[rowIndex][colIndex];
       const normalized = raw.trim().replace(",", ".");
       const hours = normalized === "" ? 0 : Number(normalized);
       if (!Number.isFinite(hours) || hours < 0 || hours > 10000) {

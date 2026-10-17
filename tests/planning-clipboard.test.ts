@@ -33,20 +33,11 @@ const start: PlanningClipboardCell = {
 describe("planning Excel copy and paste", () => {
   it("copies a rectangular block with semicolon-free Excel-compatible tabs and decimal commas", () => {
     const end = { ...start, id: anotherId, activity: "WORKSHOP" as const };
-    expect(formatPlanningSelection(start, end, rows, weeks, {})).toBe(
-      "12\t3,5\n13\t4,5",
-    );
+    expect(formatPlanningSelection(start, end, rows, weeks, {})).toBe("12\t3,5\n13\t4,5");
   });
 
   it("pastes TSV across chantier rows, weeks and activities", () => {
-    const updates = planPlanningPaste(
-      "5\t6\r\n7\t8\r\n",
-      start,
-      start,
-      rows,
-      weeks,
-      () => false,
-    );
+    const updates = planPlanningPaste("5\t6\r\n7\t8\r\n", start, start, rows, weeks, () => false);
     expect(updates).toHaveLength(4);
     expect(updates).toMatchObject([
       { id: firmId, activity: "BE", week: "2026-W53", hours: 5 },
@@ -76,8 +67,26 @@ describe("planning Excel copy and paste", () => {
     expect(() => planPlanningPaste("5\tbad", start, start, rows, weeks, () => false)).toThrow();
     expect(() => planPlanningPaste("-1", start, start, rows, weeks, () => false)).toThrow();
     expect(() => planPlanningPaste("4", start, start, rows, weeks, () => true)).toThrow();
-    expect(() => planPlanningPaste("2\t4", { ...start, week: "2027-W01", activity: "INSTALL" }, { ...start, week: "2027-W01", activity: "INSTALL" }, rows, weeks, () => false)).toThrow();
-    expect(() => planPlanningPaste(Array.from({ length: 201 }, () => "1").join("\t"), start, start, rows, weeks, () => false)).toThrow();
+    expect(() =>
+      planPlanningPaste(
+        "2\t4",
+        { ...start, week: "2027-W01", activity: "INSTALL" },
+        { ...start, week: "2027-W01", activity: "INSTALL" },
+        rows,
+        weeks,
+        () => false,
+      ),
+    ).toThrow();
+    expect(() =>
+      planPlanningPaste(
+        Array.from({ length: 201 }, () => "1").join("\t"),
+        start,
+        start,
+        rows,
+        weeks,
+        () => false,
+      ),
+    ).toThrow();
   });
 
   it("validates and persists a mixed batch atomically, supporting clearing with zero", () => {
@@ -91,7 +100,10 @@ describe("planning Excel copy and paste", () => {
     });
     if (input.action !== "setHoursBatch") throw new Error("wrong action");
     const saved = applyPlanningHoursBatchMutation(
-      source, input, new Set([firmId]), new Set([caseId]),
+      source,
+      input,
+      new Set([firmId]),
+      new Set([caseId]),
     );
     expect(saved.macroAllocations[0]).toMatchObject({ chantierId: firmId, hours: 15 });
     expect(saved.provisionalAllocations[0]).toMatchObject({ caseId, hours: 8 });
@@ -99,9 +111,10 @@ describe("planning Excel copy and paste", () => {
     expect(source.macroAllocations).toHaveLength(0);
     const cleared = applyPlanningHoursBatchMutation(
       saved,
-      { action: "setHoursBatch", updates: [
-        { kind: "firm", id: firmId, activity: "BE", week: "2026-W53", hours: 0 },
-      ] },
+      {
+        action: "setHoursBatch",
+        updates: [{ kind: "firm", id: firmId, activity: "BE", week: "2026-W53", hours: 0 }],
+      },
       new Set([firmId]),
       new Set([caseId]),
     );
@@ -110,19 +123,44 @@ describe("planning Excel copy and paste", () => {
 
   it("rejects inactive or duplicate targets before modifying the stored payload", () => {
     const source = createInitialPlanningPayload();
-    const bad = { kind: "firm" as const, id: anotherId, activity: "BE" as const, week: "2027-W01", hours: 1 };
-    expect(() => applyPlanningHoursBatchMutation(source, {
-      action: "setHoursBatch",
-      updates: [{ ...bad, id: firmId }, bad],
-    }, new Set([firmId]), new Set())).toThrow("PLANNING_CHANTIER_NOT_ACTIVE");
-    expect(() => applyPlanningHoursBatchMutation(source, {
-      action: "setHoursBatch",
-      updates: [{ ...bad, id: firmId }, { ...bad, id: firmId }],
-    }, new Set([firmId]), new Set())).toThrow("PLANNING_BATCH_DUPLICATE_INVALID");
+    const bad = {
+      kind: "firm" as const,
+      id: anotherId,
+      activity: "BE" as const,
+      week: "2027-W01",
+      hours: 1,
+    };
+    expect(() =>
+      applyPlanningHoursBatchMutation(
+        source,
+        {
+          action: "setHoursBatch",
+          updates: [{ ...bad, id: firmId }, bad],
+        },
+        new Set([firmId]),
+        new Set(),
+      ),
+    ).toThrow("PLANNING_CHANTIER_NOT_ACTIVE");
+    expect(() =>
+      applyPlanningHoursBatchMutation(
+        source,
+        {
+          action: "setHoursBatch",
+          updates: [
+            { ...bad, id: firmId },
+            { ...bad, id: firmId },
+          ],
+        },
+        new Set([firmId]),
+        new Set(),
+      ),
+    ).toThrow("PLANNING_BATCH_DUPLICATE_INVALID");
     expect(source.macroAllocations).toHaveLength(0);
-    expect(() => planningMutationSchema.parse({
-      action: "setHoursBatch",
-      updates: [{ ...bad, hours: -5 }],
-    })).toThrow();
+    expect(() =>
+      planningMutationSchema.parse({
+        action: "setHoursBatch",
+        updates: [{ ...bad, hours: -5 }],
+      }),
+    ).toThrow();
   });
 });
