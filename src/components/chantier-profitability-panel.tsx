@@ -147,7 +147,7 @@ export function ChantierProfitabilityPanel({
             <CostRow
               label="Heures réelles valorisées"
               value={result.actualLaborCostCents}
-              missing="Module Heures / coûts mensuels non raccordé"
+              missing="Coût mensuel employeur manquant pour une ou plusieurs périodes"
             />
             <CostRow
               label="Achats / commandes"
