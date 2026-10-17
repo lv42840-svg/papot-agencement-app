@@ -2,6 +2,7 @@ import Link from "next/link";
 import { redirect } from "next/navigation";
 import { BriefcaseBusiness, Camera, Clock3, FolderOpen, Inbox, ListTodo } from "lucide-react";
 import { DashboardChantierStat } from "@/components/dashboard-chantier-stat";
+import { DashboardSoldMarginStat } from "@/components/dashboard-sold-margin-stat";
 import { DashboardCommercialStats } from "@/components/dashboard-commercial-stats";
 import { DashboardWeeklyPlanning } from "@/components/dashboard-weekly-planning";
 import { DesktopAppShell } from "@/components/desktop-app-shell";
@@ -34,16 +35,7 @@ export default async function DesktopReadyPage() {
       <section className="dashboardStats" aria-label="Indicateurs principaux">
         <DashboardCommercialStats />
         <DashboardChantierStat />
-        <article className="dashboardStat dashboardStatBlue">
-          <span className="dashboardStatIcon">
-            <Clock3 size={20} />
-          </span>
-          <div>
-            <strong>—</strong>
-            <span>Heures saisies</span>
-            <small>cette semaine</small>
-          </div>
-        </article>
+        <DashboardSoldMarginStat />
       </section>
 
       <section className="dashboardGrid">
