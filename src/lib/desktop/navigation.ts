@@ -30,7 +30,7 @@ export const desktopNavigation: DesktopNavigationItem[] = [
   { label: "Planning", icon: "calendar", href: "/planning", moduleKey: "planning" },
   { label: "Heures", icon: "clock", href: "/heures", moduleKey: "planning" },
   { label: "Achats", icon: "cart", moduleKey: "purchases" },
-  { label: "Facturation", icon: "file", moduleKey: "billing" },
+  { label: "Facturation", icon: "file", href: "/facturation", moduleKey: "billing" },
   { label: "Trésorerie", icon: "landmark", moduleKey: "treasury" },
   { label: "Équipe", icon: "users", moduleKey: "team" },
   { label: "Pilotage", icon: "chart", moduleKey: "pilotage" },
