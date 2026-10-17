@@ -6,6 +6,8 @@ import {
   type CommercialStatus,
 } from "../commercial/domain";
 import type { ChantierRecord, ChantiersPayload } from "@/lib/chantiers/domain";
+import { effectiveCommercialForecastHours } from "../commercial/forecast-quotes";
+import type { NativeQuoteRecord } from "../quotes/store";
 import { planningPersonCapacitySchema } from "./capacity";
 
 export const planningActivitySchema = z.enum(["BE", "WORKSHOP", "INSTALL"]);
@@ -400,6 +402,7 @@ export function buildCommercialProvisionRows(
   planningPayload: PlanningPayload,
   year: number,
   endYear = year,
+  quotes: readonly NativeQuoteRecord[] = [],
 ): GrandPlanningProvisionRow[] {
   const weeks = new Set(planningYearWeekIdsRange(year, endYear));
   const activities: PlanningActivity[] = ["BE", "WORKSHOP", "INSTALL"];
@@ -409,6 +412,11 @@ export function buildCommercialProvisionRows(
   return commercialPayload.cases
     .filter(isCommercialActive)
     .map((item, inputIndex) => ({
+      inputIndex,
+      provisionHours: effectiveCommercialForecastHours(item, quotes),
+      item,
+    }))
+    .map(({ inputIndex, provisionHours, item }) => ({
       inputIndex,
       row: {
         caseId: item.id,
@@ -426,13 +434,13 @@ export function buildCommercialProvisionRows(
               .map((allocation) => [allocation.week, allocation.hours]),
           );
           const allocatedHours = matching.reduce((sum, allocation) => sum + allocation.hours, 0);
-          const provisionHours = provisionHoursForActivity(item.provisionHours, activity);
+          const activityProvisionHours = provisionHoursForActivity(provisionHours, activity);
           return {
             activity,
             label: PLANNING_ACTIVITY_LABELS[activity],
-            provisionHours,
+            provisionHours: activityProvisionHours,
             allocatedHours,
-            remainingHours: provisionHours - allocatedHours,
+            remainingHours: activityProvisionHours - allocatedHours,
             weeklyHours,
           };
         }),

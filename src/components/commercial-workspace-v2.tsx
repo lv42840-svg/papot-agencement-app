@@ -53,7 +53,13 @@ import { commercialAffairHref } from "@/lib/commercial/navigation";
 type Snapshot = {
   payload: CommercialPayload;
   actor: { userId: string; displayName: string };
-  capabilities: { canCreate: boolean; canRead: boolean; canModify: boolean; canConfirm: boolean };
+  capabilities: {
+    canCreate: boolean;
+    canRead: boolean;
+    canModify: boolean;
+    canProvision: boolean;
+    canConfirm: boolean;
+  };
   activeUsers: Array<{ id: string; displayName: string }>;
   focusCaseId?: string;
   serverNow: string;
@@ -322,6 +328,7 @@ export function CommercialWorkspaceV2({ affairId }: { affairId?: string }) {
               busy={busy}
               canModify={snapshot.capabilities.canModify}
               canConfirm={snapshot.capabilities.canConfirm}
+              canProvision={snapshot.capabilities.canProvision}
               mutate={(body, success) =>
                 mutate({ ...body, expectedUpdatedAt: selected.updatedAt }, success)
               }
@@ -684,6 +691,7 @@ function AffairDetail({
   busy,
   canModify,
   canConfirm,
+  canProvision,
   mutate,
   upload,
 }: {
@@ -692,6 +700,7 @@ function AffairDetail({
   busy: boolean;
   canModify: boolean;
   canConfirm: boolean;
+  canProvision: boolean;
   mutate: (body: Mutation, success: string) => Promise<Snapshot | null>;
   upload: (
     caseId: string,
@@ -762,6 +771,7 @@ function AffairDetail({
             busy={busy}
             canModify={canModify}
             canConfirm={canConfirm}
+            canProvision={canProvision}
             mutate={mutate}
           />
         ) : null}
@@ -867,12 +877,14 @@ function FollowForm({
   busy,
   canModify,
   canConfirm,
+  canProvision,
   mutate,
 }: {
   item: CommercialCase;
   busy: boolean;
   canModify: boolean;
   canConfirm: boolean;
+  canProvision: boolean;
   mutate: (body: Mutation, success: string) => Promise<Snapshot | null>;
 }) {
   const [status, setStatus] = useState<CommercialStatus>(followStatusForUi(item.status));
@@ -936,7 +948,7 @@ function FollowForm({
 
   return (
     <div className="commercialV2FollowGrid">
-      <CommercialAffairQuotes item={item} />
+      <CommercialAffairQuotes item={item} busy={busy} canProvision={canProvision} mutate={mutate} />
       <section className="commercialV2Section">
         <h3>
           <CalendarClock size={15} /> Suivi global

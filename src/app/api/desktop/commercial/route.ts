@@ -34,6 +34,10 @@ import {
   clearPlanningProvisionForCommercialCase,
   syncPlanningPotentialOrderForCommercialCase,
 } from "@/lib/planning/mutations";
+import {
+  assertForecastQuoteSelection,
+  effectiveCommercialForecastHours,
+} from "@/lib/commercial/forecast-quotes";
 import { createQuotesRepository } from "@/lib/quotes/create-repository";
 import {
   validateAdditionalRetainedQuote,
@@ -271,6 +275,11 @@ export async function POST(request: Request) {
         await validateAdditionalQuoteRetention(input);
       }
 
+      if (input.action === "setForecastQuotes") {
+        const quotes = await createQuotesRepository().load();
+        assertForecastQuoteSelection(input.caseId, input.quoteIds, quotes.quotes);
+      }
+
       const result = applyCommercialMutation(source, input, actor);
 
       if (input.action === "create" || input.action === "updateDetails") {
@@ -309,8 +318,16 @@ export async function POST(request: Request) {
       await createPlanningRepository().mutate((payload) =>
         clearPlanningProvisionForCommercialCase(payload, caseId),
       );
-    } else if (input.action === "updateProvision") {
-      const hasProvisionReference = input.be > 0 || input.workshop > 0 || input.install > 0;
+    } else if (
+      input.action === "updateProvision" ||
+      input.action === "setForecastQuotes" ||
+      input.action === "useManualProvision"
+    ) {
+      const item = mutation.payload.cases.find((candidate) => candidate.id === input.caseId);
+      if (!item) throw new Error("COMMERCIAL_CASE_NOT_FOUND");
+      const quotePayload = await createQuotesRepository().load();
+      const hours = effectiveCommercialForecastHours(item, quotePayload.quotes);
+      const hasProvisionReference = hours.be > 0 || hours.workshop > 0 || hours.install > 0;
       stage = "sync-planning-potential-order";
       await createPlanningRepository().mutate((payload) =>
         syncPlanningPotentialOrderForCommercialCase(payload, input.caseId, hasProvisionReference),

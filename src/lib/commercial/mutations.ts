@@ -93,6 +93,15 @@ export const commercialMutationSchema = z.discriminatedUnion("action", [
     quoteNotes: z.string().max(12000),
   }),
   z.object({
+    action: z.literal("setForecastQuotes"),
+    caseId: z.string().uuid(),
+    quoteIds: z.array(z.string().uuid()).max(1000),
+  }),
+  z.object({
+    action: z.literal("useManualProvision"),
+    caseId: z.string().uuid(),
+  }),
+  z.object({
     action: z.literal("updateProvision"),
     caseId: z.string().uuid(),
     be: z.number().min(0).max(100000),
@@ -317,6 +326,7 @@ export function applyCommercialMutation(
       quoteSentAt: null,
       confirmedAt: null,
       retainedQuoteIds: [],
+      forecastQuoteIds: null,
       closedAt: null,
       closingReason: null,
       quoteNotes: "",
@@ -448,6 +458,7 @@ export function applyCommercialMutation(
       item.closedAt = now.toISOString();
       item.closingReason = text(input.closingReason ?? "");
       item.provisionHours = { be: 0, workshop: 0, install: 0 };
+      item.forecastQuoteIds = [];
       touch(item, actor, now);
       history(
         item,
@@ -524,9 +535,43 @@ export function applyCommercialMutation(
     return { payload, focusCaseId: item.id };
   }
 
+  if (input.action === "setForecastQuotes") {
+    assertOpen(item);
+    if (item.status === "CONFIRMED") throw new Error("COMMERCIAL_ALREADY_CONFIRMED");
+    if (new Set(input.quoteIds).size !== input.quoteIds.length) {
+      throw new Error("COMMERCIAL_FORECAST_QUOTE_DUPLICATE");
+    }
+    item.forecastQuoteIds = [...input.quoteIds];
+    touch(item, actor, now);
+    history(
+      item,
+      actor.displayName,
+      "FORECAST_QUOTES_UPDATED",
+      `${input.quoteIds.length} devis coché(s) pour les heures prévisionnelles.`,
+      now,
+    );
+    return { payload, focusCaseId: item.id };
+  }
+
+  if (input.action === "useManualProvision") {
+    assertOpen(item);
+    if (item.status === "CONFIRMED") throw new Error("COMMERCIAL_ALREADY_CONFIRMED");
+    item.forecastQuoteIds = null;
+    touch(item, actor, now);
+    history(
+      item,
+      actor.displayName,
+      "FORECAST_QUOTES_UPDATED",
+      "Retour à la charge manuelle.",
+      now,
+    );
+    return { payload, focusCaseId: item.id };
+  }
+
   if (input.action === "updateProvision") {
     assertOpen(item);
     item.provisionHours = { be: input.be, workshop: input.workshop, install: input.install };
+    item.forecastQuoteIds = null;
     touch(item, actor, now);
     history(
       item,
