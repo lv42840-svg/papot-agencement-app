@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 import { PlanningExcelGrid } from "./planning-excel-grid";
+import type { PlanningClipboardUpdate } from "@/lib/planning/clipboard";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type {
   GrandPlanningChantierRow,
@@ -344,7 +345,7 @@ export function GrandPlanningWorkspace({
     const response = await fetch("/api/desktop/planning", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ ...body, year: snapshot.year }),
+      body: JSON.stringify({ ...body, year: snapshot.year, endYear: snapshot.endYear }),
     });
     const result = (await response.json()) as PlanningSnapshot & { error?: string };
     if (!response.ok) {
@@ -585,6 +586,42 @@ export function GrandPlanningWorkspace({
     });
     setSavingKey(null);
     setMessage("Charge provisionnelle enregistrée.");
+  }
+
+  async function pastePlanningCells(updates: PlanningClipboardUpdate[]) {
+    if (!snapshot?.capabilities.canEditMacro || savingKey !== null) return;
+    setSavingKey("planning-mutation");
+    setMessage(`Enregistrement de ${updates.length} case(s)…`);
+    try {
+      const response = await fetch("/api/desktop/planning", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          action: "setHoursBatch",
+          year: snapshot.year,
+          endYear: snapshot.endYear,
+          updates,
+        }),
+      });
+      const result = (await response.json()) as PlanningSnapshot & { error?: string };
+      if (!response.ok) {
+        setMessage(result.error ?? "Collage refusé : aucune heure n’a été modifiée.");
+        return;
+      }
+      setSnapshot(result);
+      setDrafts((current) => {
+        const next = { ...current };
+        for (const update of updates) {
+          delete next[cellKey(update.kind, update.id, update.activity, update.week)];
+        }
+        return next;
+      });
+      setMessage(`${updates.length} case(s) collée(s) et enregistrée(s).`);
+    } catch {
+      setMessage("Connexion interrompue : vérifiez les heures avant de recommencer.");
+    } finally {
+      setSavingKey(null);
+    }
   }
 
   return (
@@ -1017,6 +1054,9 @@ export function GrandPlanningWorkspace({
             <span>
               <strong>Provisionnel</strong> = affaire non confirmée, affichée plus claire
             </span>
+            <span className="planningClipboardLegend">
+              Copier/coller : clic, Maj + clic pour sélectionner un bloc, Ctrl+C / Ctrl+V
+            </span>
             {!snapshot?.capabilities.canEditMacro ? (
               <span className="planningReadOnly">Lecture seule</span>
             ) : null}
@@ -1052,6 +1092,8 @@ export function GrandPlanningWorkspace({
                   onMoveFirm={moveFirm}
                   onMoveProvision={movePotential}
                   onTogglePotential={togglePotentialCollapsed}
+                  onPasteBatch={pastePlanningCells}
+                  onClipboardError={setMessage}
                 />
               </div>
               {snapshot.endYear < 2100 ? (
@@ -1174,6 +1216,17 @@ export function GrandPlanningWorkspace({
           height: 36px;
           display: grid;
           place-items: center;
+        }
+        .excelTriple > input.isSelected {
+          background: #d9d0fa !important;
+          box-shadow: inset 0 0 0 1px #8c74d4;
+        }
+        .excelTriple > input:read-only {
+          cursor: cell;
+        }
+        .planningClipboardLegend {
+          color: #6450ad;
+          font-weight: 700;
         }
         .excelTriple > input:focus {
           outline: 2px solid #7666d6;
