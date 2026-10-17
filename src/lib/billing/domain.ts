@@ -1,4 +1,5 @@
 import { calculateLineProgress } from "./progress";
+import { buildInvoiceDocumentLines, calculateInvoiceDocumentTotals } from "./document-lines";
 import { z } from "zod";
 
 const centsSchema = z.number().int().nonnegative().safe();
@@ -18,6 +19,8 @@ export const billingSourceLineSchema = z.object({
   description: z.string().min(1).max(4000),
   amountHtCents: centsSchema,
   vatRatePercent: z.number().finite().min(0).max(100),
+  quantity: z.number().finite().positive().optional(),
+  unit: z.string().trim().max(40).optional(),
 });
 export type BillingSourceLine = z.infer<typeof billingSourceLineSchema>;
 
@@ -27,6 +30,28 @@ export const billingLineProgressSchema = z.object({
   cumulativeHtCents: centsSchema,
 });
 export type BillingLineProgress = z.infer<typeof billingLineProgressSchema>;
+
+export const billingDocumentLineSchema = z.object({
+  id: z.string().uuid(),
+  origin: z.enum(["QUOTE", "FREE", "TITLE"]),
+  sourceLineId: z.string().uuid().nullable(),
+  description: z.string().trim().min(1).max(4000),
+  quantity: z.number().finite().min(0).max(1000000),
+  unit: z.string().trim().max(40),
+  unitPriceCents: centsSchema,
+  vatRatePercent: z.number().finite().min(0).max(100),
+}).superRefine((line, ctx) => {
+  if (line.origin === "TITLE") {
+    if (line.quantity !== 0 || line.unitPriceCents !== 0 || line.sourceLineId !== null) {
+      ctx.addIssue({ code: z.ZodIssueCode.custom, message: "BILLING_TITLE_INVALID" });
+    }
+  } else if (line.quantity <= 0 ||
+    (line.origin === "QUOTE" && !line.sourceLineId) ||
+    (line.origin === "FREE" && line.sourceLineId !== null)) {
+    ctx.addIssue({ code: z.ZodIssueCode.custom, message: "BILLING_DOCUMENT_LINE_INVALID" });
+  }
+});
+export type BillingDocumentLine = z.infer<typeof billingDocumentLineSchema>;
 
 export const billingSourceSchema = z.object({
   quoteId: z.string().uuid(),
@@ -55,6 +80,7 @@ export const billingDraftSchema = billingSourceSchema.extend({
   totalTtcCents: centsSchema.positive(),
   cumulativePercent: z.number().finite().min(0).max(100).nullable(),
   lineProgress: z.array(billingLineProgressSchema).max(1000).optional(),
+  documentLines: z.array(billingDocumentLineSchema).max(1000).optional(),
   createdAt: dateTimeSchema,
   createdByName: z.string().trim().min(1),
   updatedAt: dateTimeSchema,
@@ -236,7 +262,7 @@ export function createBillingDraft(
     PROGRESS: "Facture de situation",
     FINAL: "Facture de solde",
   };
-  return billingDraftSchema.parse({
+  const draft = billingDraftSchema.parse({
     ...validSource,
     id: globalThis.crypto.randomUUID(),
     requestId: input.requestId,
@@ -254,6 +280,10 @@ export function createBillingDraft(
     createdByName: actorName,
     updatedAt: now.toISOString(),
     updatedByName: actorName,
+  });
+  return billingDraftSchema.parse({
+    ...draft,
+    documentLines: buildInvoiceDocumentLines(draft, payload),
   });
 }
 
@@ -304,6 +334,70 @@ export function updateBillingDraft(
     totalTtcCents: tax.ttcCents,
     // Editing the amount explicitly switches the draft away from a cumulative percentage.
     cumulativePercent: amountHtCents !== draft.amountHtCents ? null : draft.cumulativePercent,
+    updatedAt: now.toISOString(),
+    updatedByName: actorName,
+  });
+}
+
+
+/** Persists an editable invoice document, independently of the signed quote. */
+export function updateBillingDocument(
+  payload: BillingPayload,
+  draftId: string,
+  input: {
+    expectedUpdatedAt: string;
+    label: string;
+    notes: string;
+    documentLines: BillingDocumentLine[];
+  },
+  actorName: string,
+  now = new Date(),
+): BillingDraft {
+  const index = payload.drafts.findIndex((candidate) => candidate.id === draftId);
+  if (index < 0) throw new Error("BILLING_DRAFT_NOT_FOUND");
+  const draft = payload.drafts[index];
+  if (draft.updatedAt !== input.expectedUpdatedAt) throw new Error("BILLING_VERSION_CONFLICT");
+  const documentLines = z.array(billingDocumentLineSchema).min(1).max(1000).parse(input.documentLines);
+  if (new Set(documentLines.map((line) => line.id)).size !== documentLines.length) {
+    throw new Error("BILLING_DOCUMENT_DUPLICATE_LINE");
+  }
+  const quoteIds = new Set((draft.lines ?? []).map((line) => line.lineId));
+  const seenQuoteIds = new Set<string>();
+  const allowedRates = new Set(draft.contractTaxGroups.map((group) => group.ratePercent));
+  for (const line of documentLines) {
+    if (line.origin === "QUOTE") {
+      if (!line.sourceLineId || !quoteIds.has(line.sourceLineId) ||
+        seenQuoteIds.has(line.sourceLineId)) {
+        throw new Error("BILLING_DOCUMENT_SOURCE_LINE_INVALID");
+      }
+      seenQuoteIds.add(line.sourceLineId);
+    }
+    if (line.origin !== "TITLE" && !allowedRates.has(line.vatRatePercent)) {
+      throw new Error("BILLING_DOCUMENT_VAT_OUTSIDE_CONTRACT");
+    }
+  }
+  const totals = calculateInvoiceDocumentTotals(documentLines);
+  const priorCents = preparedHtCents(payload, draft.quoteId, draft.id);
+  if (totals.amountHtCents + priorCents > draft.contractHtCents) {
+    throw new Error("BILLING_AMOUNT_EXCEEDS_CONTRACT");
+  }
+  const financialChange = totals.amountHtCents !== draft.amountHtCents ||
+    draft.taxGroups.some((group) =>
+      (totals.taxGroups.find((value) => value.ratePercent === group.ratePercent)?.baseHtCents ?? 0)
+       !== group.baseHtCents);
+  if (financialChange && payload.drafts.slice(index + 1).some(
+    (candidate) => candidate.quoteId === draft.quoteId)) {
+    throw new Error("BILLING_DRAFT_HAS_DEPENDENTS");
+  }
+  return billingDraftSchema.parse({
+    ...draft,
+    label: input.label,
+    notes: input.notes,
+    documentLines,
+    amountHtCents: totals.amountHtCents,
+    taxGroups: totals.taxGroups,
+    vatCents: totals.vatCents,
+    totalTtcCents: totals.totalTtcCents,
     updatedAt: now.toISOString(),
     updatedByName: actorName,
   });
