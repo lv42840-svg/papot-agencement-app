@@ -81,6 +81,19 @@ export const planningMutationSchema = z.discriminatedUnion("action", [
     linkedUserId: z.string().uuid().nullable(),
   }),
   z.object({
+    action: z.literal("setPersonHidden"),
+    id: z.string().uuid(),
+    hidden: z.boolean(),
+  }),
+  z.object({
+    action: z.literal("setStaffEndDate"),
+    id: z.string().uuid(),
+    endDate: z.string().regex(/^\d{4}-\d{2}-\d{2}$/).nullable(),
+  }),
+  z.object({ action: z.literal("deactivateStaff"), id: z.string().uuid() }),
+  z.object({ action: z.literal("reactivateStaff"), id: z.string().uuid() }),
+  z.object({ action: z.literal("deleteStaff"), id: z.string().uuid() }),
+  z.object({
     action: z.literal("setPersonCapacity"),
     userId: z.string().uuid(),
     countsInMacroCapacity: z.boolean(),
