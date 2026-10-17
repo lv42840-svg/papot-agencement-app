@@ -1,5 +1,5 @@
-import { isoWeekDates, scheduleHoursForDate, DEFAULT_WEEKLY_SCHEDULE } from "./capacity";
-import type { PlanningAbsence, PlanningPersonCapacity } from "./domain";
+import { isoWeekDates, scheduleHoursForDate, DEFAULT_WEEKLY_SCHEDULE, type PlanningPersonCapacity } from "./capacity";
+import type { PlanningAbsence } from "./domain";
 import { isoWeekKey } from "./time-markers";
 
 export type DisplayAbsence = PlanningAbsence & {
