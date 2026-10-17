@@ -146,16 +146,33 @@ describe("weekly team board", () => {
   it("keeps day assignments when an existing PAPOT account is linked to a staff identity", async () => {
     const { applyPlanningStaffMutation } = await import("../src/lib/planning/personnel");
     const source = createInitialPlanningPayload();
-    source.dailyAssignments = [{
-      userId: personId, date: "2026-10-19", chantierId, label: "Pralus Chambéry",
-    }];
-    const created = applyPlanningStaffMutation(source, {
-      action: "saveStaff", firstName: "Alex", lastName: "Martin",
-    }, new Set([personId]));
+    source.dailyAssignments = [
+      {
+        userId: personId,
+        date: "2026-10-19",
+        chantierId,
+        label: "Pralus Chambéry",
+      },
+    ];
+    const created = applyPlanningStaffMutation(
+      source,
+      {
+        action: "saveStaff",
+        firstName: "Alex",
+        lastName: "Martin",
+      },
+      new Set([personId]),
+    );
     const staffId = created.staff[0].id;
-    const linked = applyPlanningStaffMutation(created, {
-      action: "linkStaffAccount", id: staffId, linkedUserId: personId,
-    }, new Set([personId]));
+    const linked = applyPlanningStaffMutation(
+      created,
+      {
+        action: "linkStaffAccount",
+        id: staffId,
+        linkedUserId: personId,
+      },
+      new Set([personId]),
+    );
     expect(linked.dailyAssignments[0]).toMatchObject({ userId: staffId, label: "Pralus Chambéry" });
     expect(source.dailyAssignments[0].userId).toBe(personId);
   });
