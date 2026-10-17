@@ -66,9 +66,7 @@ export function DashboardSoldMarginStat() {
               <strong>{money(snapshot.yearly.plannedMarginCents)}</strong>
             </div>
             {snapshot.yearly.incompleteCases > 0 ? (
-              <small>
-                {snapshot.yearly.incompleteCases} affaire(s) sans devis natif complet.
-              </small>
+              <small>{snapshot.yearly.incompleteCases} affaire(s) sans devis natif complet.</small>
             ) : null}
           </>
         ) : null}

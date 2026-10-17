@@ -1,7 +1,10 @@
 import { readFileSync } from "node:fs";
 import { describe, expect, it } from "vitest";
 
-const homepage = readFileSync(new URL("../src/app/desktop-ready/page.tsx", import.meta.url), "utf8");
+const homepage = readFileSync(
+  new URL("../src/app/desktop-ready/page.tsx", import.meta.url),
+  "utf8",
+);
 const panel = readFileSync(
   new URL("../src/components/dashboard-sold-margin-stat.tsx", import.meta.url),
   "utf8",

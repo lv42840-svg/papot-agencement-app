@@ -25,10 +25,9 @@ export async function GET() {
       createQuotesRepository().load(),
     ]);
 
-    return NextResponse.json(
-      calculateDashboardSoldSummary(commercial.cases, quotes.quotes),
-      { headers: { "Cache-Control": "no-store" } },
-    );
+    return NextResponse.json(calculateDashboardSoldSummary(commercial.cases, quotes.quotes), {
+      headers: { "Cache-Control": "no-store" },
+    });
   } catch (error) {
     const code = error instanceof Error ? error.message : "DASHBOARD_SOLD_FAILED";
     return NextResponse.json(
