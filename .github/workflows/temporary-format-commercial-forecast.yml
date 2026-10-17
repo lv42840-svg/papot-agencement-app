@@ -1,0 +1,28 @@
+name: Format commercial quote forecast branch
+on:
+  push:
+    branches: [feat/commercial-quote-forecast-checkbox-20261017]
+permissions:
+  contents: write
+jobs:
+  format-forecast:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - name: Format modified files
+        run: |
+          npx --no-install prettier --write src/lib/commercial/domain.ts src/lib/commercial/mutations.ts src/lib/commercial/forecast-quotes.ts src/lib/auth/action-permissions.ts src/app/api/desktop/commercial/route.ts src/app/api/desktop/planning/route.ts src/lib/planning/domain.ts src/components/commercial-affair-quotes.tsx src/components/commercial-workspace-v2.tsx tests/commercial-quote-forecast.test.ts
+      - name: Push formatted sources
+        run: |
+          if [ -n "$(git status --porcelain)" ]; then
+            git config user.name "github-actions[bot]"
+            git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+            git add src/lib/commercial/domain.ts src/lib/commercial/mutations.ts src/lib/commercial/forecast-quotes.ts src/lib/auth/action-permissions.ts src/app/api/desktop/commercial/route.ts src/app/api/desktop/planning/route.ts src/lib/planning/domain.ts src/components/commercial-affair-quotes.tsx src/components/commercial-workspace-v2.tsx tests/commercial-quote-forecast.test.ts
+            git commit -m 'chore(commercial): format quote forecast'
+            git push origin HEAD:feat/commercial-quote-forecast-checkbox-20261017
+          fi
