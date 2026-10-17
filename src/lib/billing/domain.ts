@@ -328,15 +328,19 @@ export function updateBillingDraft(
     }
   }
   const tax = distributeBillingTax(draft.contractTaxGroups, amountHtCents);
-  const documentLines = draft.documentLines && amountHtCents !== draft.amountHtCents
-    ? buildInvoiceDocumentLines({
-        ...draft,
-        amountHtCents,
-        taxGroups: tax.groups,
-        vatCents: tax.vatCents,
-        totalTtcCents: tax.ttcCents,
-      }, payload)
-    : draft.documentLines;
+  const documentLines =
+    draft.documentLines && amountHtCents !== draft.amountHtCents
+      ? buildInvoiceDocumentLines(
+          {
+            ...draft,
+            amountHtCents,
+            taxGroups: tax.groups,
+            vatCents: tax.vatCents,
+            totalTtcCents: tax.ttcCents,
+          },
+          payload,
+        )
+      : draft.documentLines;
   return billingDraftSchema.parse({
     ...draft,
     ...(documentLines ? { documentLines } : {}),
