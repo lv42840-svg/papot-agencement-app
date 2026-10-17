@@ -37,8 +37,9 @@ describe("weekly team board navigation and connection", () => {
     expect(board).toContain("data.firm.workshop");
     expect(board).toContain("data.provisional.install");
     expect(board).toContain("data.capacity.firmAvailableHours");
-    expect(board).toContain("absence.typeLabel");
-    expect(board).toContain('action: "setDailyAssignment"');
+    expect(board).toContain("<WeeklyBoardDayCell");
+    expect(board).toContain("onChange={changeEntry}");
+    expect(board).toContain("firmChantiers");
   });
 
   it("guards both read and edit access, and derives figures from the existing grand planning calculation", () => {
