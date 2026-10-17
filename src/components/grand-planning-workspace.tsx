@@ -591,7 +591,7 @@ export function GrandPlanningWorkspace({
       <div className="pageHeader grandPlanningHeader">
         <div>
           <p className="eyebrow">Planning</p>
-          <h1>Grand planning {initialYear}</h1>
+          <h1>Grand planning {snapshot ? `${snapshot.year} → ${snapshot.endYear}` : initialYear}</h1>
           <p className="muted">
             Charges fermes et provisionnelles · BE / Atelier / Pose · saisie directe par semaine
           </p>
