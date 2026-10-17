@@ -5,7 +5,7 @@ import { requireUser } from "@/lib/auth/session";
 export default async function PlanningPage({
   searchParams,
 }: {
-  searchParams: Promise<{ year?: string }>;
+  searchParams: Promise<{ year?: string; tab?: string }>;
 }) {
   const [params, user] = await Promise.all([searchParams, requireUser()]);
   const parsedYear = Number(params.year);
@@ -19,6 +19,7 @@ export default async function PlanningPage({
       <GrandPlanningWorkspace
         initialPotentialCollapsed={user.planningPotentialCollapsed}
         initialYear={year}
+        initialTab={params.tab === "personnel" ? "personnel" : "planning"}
       />
     </DesktopAppShell>
   );
