@@ -1,6 +1,11 @@
 import { z } from "zod";
 import { isoWeekDates } from "./capacity";
-import { actualHoursKey, parsePlanningPayload, type PlanningPayload } from "./domain";
+import {
+  actualHoursKey,
+  indirectHoursCategorySchema,
+  parsePlanningPayload,
+  type PlanningPayload,
+} from "./domain";
 import { isoWeekKey } from "./time-markers";
 
 const weekSchema = z
@@ -42,6 +47,55 @@ export const actualHoursRowSchema = z
   });
 
 export type ActualHoursRowInput = z.infer<typeof actualHoursRowSchema>;
+
+export const indirectHoursRowSchema = z.object({
+  action: z.literal("saveIndirectHoursRow"),
+  userId: z.string().uuid(),
+  week: weekSchema,
+  category: indirectHoursCategorySchema,
+  hours: z.number().finite().nonnegative().max(168),
+});
+
+export type IndirectHoursRowInput = z.infer<typeof indirectHoursRowSchema>;
+
+export function assertCombinedPersonWeekLimit(
+  payload: PlanningPayload,
+  userId: string,
+  week: string,
+): void {
+  const direct = payload.actualHours
+    .filter((row) => row.userId === userId && row.week === week)
+    .reduce((sum, row) => sum + row.hours, 0);
+  const indirect = payload.indirectHours
+    .filter((row) => row.userId === userId && row.week === week)
+    .reduce((sum, row) => sum + row.hours, 0);
+  if (direct + indirect > 168) throw new Error("PLANNING_ACTUAL_PERSON_WEEK_TOO_HIGH");
+}
+
+/** SAV and general expenses have no chantier reference, now or later. */
+export function applyIndirectHoursRow(
+  source: PlanningPayload,
+  input: IndirectHoursRowInput,
+  knownPersonIds: ReadonlySet<string>,
+): PlanningPayload {
+  indirectHoursRowSchema.parse(input);
+  if (!knownPersonIds.has(input.userId)) throw new Error("PLANNING_PERSON_NOT_FOUND");
+  const payload = structuredClone(parsePlanningPayload(source));
+  payload.indirectHours = payload.indirectHours.filter(
+    (row) =>
+      row.userId !== input.userId || row.week !== input.week || row.category !== input.category,
+  );
+  if (input.hours > 0) {
+    payload.indirectHours.push({
+      userId: input.userId,
+      week: input.week,
+      category: input.category,
+      hours: input.hours,
+    });
+  }
+  assertCombinedPersonWeekLimit(payload, input.userId, input.week);
+  return parsePlanningPayload(payload);
+}
 
 export function actualHoursByActivity(
   entries: readonly { activity: "BE" | "WORKSHOP" | "INSTALL"; hours: number }[],
@@ -89,9 +143,6 @@ export function applyActualHoursRow(
       else payload.actualHours.push(next);
     }
   }
-  const totalForPerson = payload.actualHours
-    .filter((entry) => entry.week === input.week && entry.userId === input.userId)
-    .reduce((sum, entry) => sum + entry.hours, 0);
-  if (totalForPerson > 168) throw new Error("PLANNING_ACTUAL_PERSON_WEEK_TOO_HIGH");
+  assertCombinedPersonWeekLimit(payload, input.userId, input.week);
   return parsePlanningPayload(payload);
 }

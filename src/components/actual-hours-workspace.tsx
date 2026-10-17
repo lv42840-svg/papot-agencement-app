@@ -5,6 +5,11 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import { isoWeekKey, isoWeekMonday, weekDateRangeLabel } from "@/lib/planning/time-markers";
 
 type Activity = "BE" | "WORKSHOP" | "INSTALL";
+type IndirectCategory = "SAV" | "GENERAL";
+const INDIRECT_CATEGORIES = [
+  { code: "SAV", label: "SAV" },
+  { code: "GENERAL", label: "Frais généraux" },
+] as const;
 type Hours = { be: number; workshop: number; install: number };
 type Person = { id: string; name: string; endDate: string | null; inactiveSince: string | null };
 type Chantier = {
@@ -25,6 +30,12 @@ type RecordRow = {
   hours: number;
   personName: string;
 };
+type IndirectRecord = {
+  userId: string;
+  week: string;
+  category: IndirectCategory;
+  hours: number;
+};
 type HoursSnapshot = {
   week: string;
   editable: boolean;
@@ -32,6 +43,7 @@ type HoursSnapshot = {
   people: Person[];
   chantiers: Chantier[];
   records: RecordRow[];
+  indirectRecords: IndirectRecord[];
   suggestedChantierIds: Record<string, string[]>;
 };
 
@@ -71,6 +83,9 @@ export function ActualHoursWorkspace() {
   const [extraChoice, setExtraChoice] = useState("");
   const [showAdd, setShowAdd] = useState(false);
   const [drafts, setDrafts] = useState<Record<string, string>>({});
+  const [indirectDrafts, setIndirectDrafts] = useState<Partial<Record<IndirectCategory, string>>>(
+    {},
+  );
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState<string | null>(null);
   const [message, setMessage] = useState("");
@@ -89,6 +104,7 @@ export function ActualHoursWorkspace() {
       if (!response.ok) throw new Error(json.error ?? "Impossible de charger les heures.");
       setData(json);
       setDrafts({});
+      setIndirectDrafts({});
       setPersonId((old) =>
         json.people.some((person) => person.id === old) ? old : (json.people[0]?.id ?? ""),
       );
@@ -135,6 +151,21 @@ export function ActualHoursWorkspace() {
     return found;
   }, [data?.records, personId]);
 
+  const savedIndirectHours = useMemo(() => {
+    const found = new Map<IndirectCategory, number>();
+    for (const entry of data?.indirectRecords ?? []) {
+      if (entry.userId === personId) found.set(entry.category, entry.hours);
+    }
+    return found;
+  }, [data?.indirectRecords, personId]);
+
+  function indirectValue(category: IndirectCategory): string {
+    return indirectDrafts[category] ?? inputHours(savedIndirectHours.get(category) ?? 0);
+  }
+  function indirectHours(category: IndirectCategory): number {
+    return parseHours(indirectValue(category)) ?? 0;
+  }
+
   function cellValue(chantierId: string, activity: Activity): string {
     const key = keyFor(chantierId, activity);
     return drafts[key] ?? inputHours(savedHours.get(key) ?? 0);
@@ -145,14 +176,20 @@ export function ActualHoursWorkspace() {
   function totalForSite(chantierId: string): number {
     return ACTIVITIES.reduce((sum, activity) => sum + cellHours(chantierId, activity), 0);
   }
-  const totalForWeek = displayedChantiers.reduce(
+  const totalSiteWeek = displayedChantiers.reduce(
     (sum, chantier) => sum + totalForSite(chantier.id),
     0,
   );
+  const totalIndirectWeek = INDIRECT_CATEGORIES.reduce(
+    (sum, category) => sum + indirectHours(category.code),
+    0,
+  );
+  const totalForWeek = totalSiteWeek + totalIndirectWeek;
 
   function choosePerson(nextId: string) {
     setPersonId(nextId);
     setDrafts({});
+    setIndirectDrafts({});
     setExtraIds([]);
     setExtraChoice("");
     setShowAdd(false);
@@ -206,6 +243,47 @@ export function ActualHoursWorkspace() {
         return next;
       });
       setMessage("Heures enregistrées pour ce salarié et ce chantier.");
+    } catch (cause) {
+      setMessage(cause instanceof Error ? cause.message : "Enregistrement impossible.");
+    } finally {
+      setSaving(null);
+    }
+  }
+
+  async function saveIndirect(category: IndirectCategory) {
+    if (!data?.editable || !personId || saving) return;
+    const hours = parseHours(indirectValue(category));
+    if (hours === null) {
+      setMessage("Heures invalides : utilise un nombre positif avec deux décimales maximum.");
+      return;
+    }
+    setSaving("indirect:" + category);
+    setMessage("");
+    try {
+      const response = await fetch("/api/desktop/planning/actual-hours", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          action: "saveIndirectHoursRow",
+          week,
+          userId: personId,
+          category,
+          hours,
+        }),
+      });
+      const json = (await response.json()) as HoursSnapshot & { error?: string };
+      if (!response.ok) throw new Error(json.error ?? "Enregistrement impossible.");
+      setData(json);
+      setIndirectDrafts((old) => {
+        const next = { ...old };
+        delete next[category];
+        return next;
+      });
+      setMessage(
+        category === "SAV"
+          ? "Heures SAV enregistrées, sans rattachement à un chantier."
+          : "Heures de frais généraux enregistrées.",
+      );
     } catch (cause) {
       setMessage(cause instanceof Error ? cause.message : "Enregistrement impossible.");
     } finally {
@@ -408,7 +486,7 @@ export function ActualHoursWorkspace() {
               </tbody>
               <tfoot>
                 <tr>
-                  <th>Total salarié / semaine</th>
+                  <th>Total chantiers / semaine</th>
                   {ACTIVITIES.map((activity) => (
                     <td key={activity}>
                       {formatHours(
@@ -420,7 +498,7 @@ export function ActualHoursWorkspace() {
                       h
                     </td>
                   ))}
-                  <td>{formatHours(totalForWeek)} h</td>
+                  <td>{formatHours(totalSiteWeek)} h</td>
                   <td />
                 </tr>
               </tfoot>
@@ -476,6 +554,62 @@ export function ActualHoursWorkspace() {
               </>
             )}
           </div>
+          <section className="actualHoursIndirectPanel" aria-label="Heures hors chantier">
+            <h2>Heures hors chantier</h2>
+            <p>Saisie simple : aucun SAV ni frais généraux n’est rattaché à un chantier.</p>
+            <div className="actualHoursIndirectRows">
+              {INDIRECT_CATEGORIES.map((entry) => {
+                const dirty = indirectDrafts[entry.code] !== undefined;
+                return (
+                  <div className="actualHoursIndirectRow" key={entry.code}>
+                    <label htmlFor={"indirect-" + entry.code}>{entry.label}</label>
+                    <input
+                      id={"indirect-" + entry.code}
+                      aria-label={"Heures " + entry.label}
+                      type="text"
+                      inputMode="decimal"
+                      value={indirectValue(entry.code)}
+                      placeholder="0"
+                      disabled={!data.editable || saving !== null}
+                      onChange={(event) =>
+                        setIndirectDrafts((old) => ({
+                          ...old,
+                          [entry.code]: event.target.value,
+                        }))
+                      }
+                      onKeyDown={(event) => {
+                        if (event.key === "Enter") {
+                          event.preventDefault();
+                          void saveIndirect(entry.code);
+                        }
+                      }}
+                    />
+                    <span>h</span>
+                    <button
+                      type="button"
+                      className="secondaryButton"
+                      disabled={!data.editable || saving !== null || !dirty}
+                      onClick={() => void saveIndirect(entry.code)}
+                    >
+                      {saving === "indirect:" + entry.code ? "Enregistrement…" : "Enregistrer"}
+                    </button>
+                  </div>
+                );
+              })}
+            </div>
+            <p className="actualHoursHint">
+              Total heures hors chantier : {formatHours(totalIndirectWeek)} h. Ces heures sont
+              valorisées avec le coût employeur mensuel et diminuent la rentabilité globale, pas
+              celle d’un chantier.
+            </p>
+          </section>
+
+          {totalForWeek > 168 ? (
+            <p className="actualHoursNotice" role="alert">
+              Le total chantiers + SAV + frais généraux dépasse 168 h pour cette semaine. Corrige
+              les valeurs avant de les enregistrer.
+            </p>
+          ) : null}
           <p className="actualHoursHint">
             Les chantiers proposés viennent du petit planning. Les chantiers avec des heures déjà
             enregistrées restent visibles. Tu peux ajouter un chantier non prévu. Les heures réelles
@@ -649,6 +783,54 @@ export function ActualHoursWorkspace() {
         .actualHoursTable tfoot {
           background: #e9e3f8;
           font-weight: 850;
+        }
+        .actualHoursIndirectPanel {
+          display: grid;
+          gap: 11px;
+          padding: 16px;
+          border: 1px solid #ddd4ec;
+          background: #fbfaff;
+          border-radius: 10px;
+        }
+        .actualHoursIndirectPanel h2 {
+          margin: 0;
+          font-size: 15px;
+          color: #5d498a;
+        }
+        .actualHoursIndirectPanel > p {
+          margin: 0;
+          font-size: 11px;
+          color: #726783;
+        }
+        .actualHoursIndirectRows {
+          display: grid;
+          gap: 8px;
+        }
+        .actualHoursIndirectRow {
+          display: flex;
+          align-items: center;
+          gap: 12px;
+          flex-wrap: wrap;
+          padding: 9px 12px;
+          border: 1px solid #e7e1f0;
+          border-radius: 8px;
+          background: white;
+        }
+        .actualHoursIndirectRow label {
+          flex: 1 1 180px;
+          font-weight: 750;
+          font-size: 12px;
+        }
+        .actualHoursIndirectRow input {
+          width: 100px;
+          border: 1px solid #d8ceea;
+          border-radius: 6px;
+          padding: 9px;
+          text-align: right;
+        }
+        .actualHoursIndirectRow span {
+          color: #776b89;
+          font-size: 12px;
         }
         .actualHoursNotice {
           font-size: 12px;

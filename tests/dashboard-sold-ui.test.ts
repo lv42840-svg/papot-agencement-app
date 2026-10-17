@@ -21,7 +21,7 @@ describe("dashboard financial preview", () => {
     expect(panel).toContain("Vendu &amp; rentabilité");
     expect(panel).toContain("Marge prévue");
     expect(panel).toContain("pas CA facturé");
-    expect(panel).toContain("Marge réelle en attente des achats");
+    expect(panel).toContain("Ce n’est pas le résultat réel");
   });
 
   it("enforces private pilotage and quote access server side", () => {

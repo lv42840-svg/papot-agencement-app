@@ -151,7 +151,9 @@ export function applyPlanningStaffMutation(
     if (
       person.linkedUserId ||
       payload.absences.some((absence) => absence.userId === person.id) ||
-      payload.dailyAssignments.some((entry) => entry.userId === person.id)
+      payload.dailyAssignments.some((entry) => entry.userId === person.id) ||
+      payload.actualHours.some((entry) => entry.userId === person.id) ||
+      payload.indirectHours.some((entry) => entry.userId === person.id)
     )
       throw new Error("PLANNING_STAFF_HAS_HISTORY");
     payload.staff = payload.staff.filter((candidate) => candidate.id !== person.id);

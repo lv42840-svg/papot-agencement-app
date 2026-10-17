@@ -61,6 +61,17 @@ export const planningActualHoursSchema = z.object({
   hours: z.number().finite().nonnegative(),
 });
 
+/** Actual worked hours that do not belong to any chantier. */
+export const indirectHoursCategorySchema = z.enum(["SAV", "GENERAL"]);
+export type IndirectHoursCategory = z.infer<typeof indirectHoursCategorySchema>;
+export const planningIndirectHoursSchema = z.object({
+  userId: z.string().uuid(),
+  category: indirectHoursCategorySchema,
+  week: isoWeekSchema,
+  hours: z.number().finite().positive().max(168),
+});
+export type PlanningIndirectHours = z.infer<typeof planningIndirectHoursSchema>;
+
 export const planningAbsenceTypeSchema = z.enum(["VACATION", "SICK", "OTHER"]);
 export type PlanningAbsenceType = z.infer<typeof planningAbsenceTypeSchema>;
 
@@ -107,6 +118,7 @@ export const planningPayloadSchema = z
     macroAllocations: z.array(planningMacroAllocationSchema),
     provisionalAllocations: z.array(planningProvisionalAllocationSchema).default([]),
     actualHours: z.array(planningActualHoursSchema).default([]),
+    indirectHours: z.array(planningIndirectHoursSchema).default([]),
     chantierOrder: z.array(z.string().uuid()),
     provisionalOrder: z.array(z.string().uuid()).default([]),
     peopleCapacity: z.array(planningPersonCapacitySchema).default([]),
@@ -153,6 +165,19 @@ export const planningPayloadSchema = z
         });
       }
       actualHoursSeen.add(key);
+    });
+
+    const indirectSeen = new Set<string>();
+    value.indirectHours.forEach((entry, index) => {
+      const key = `${entry.userId}:${entry.category}:${entry.week}`;
+      if (indirectSeen.has(key)) {
+        context.addIssue({
+          code: z.ZodIssueCode.custom,
+          path: ["indirectHours", index],
+          message: "PLANNING_INDIRECT_HOURS_DUPLICATE",
+        });
+      }
+      indirectSeen.add(key);
     });
 
     const staffIds = new Set<string>();
@@ -286,6 +311,7 @@ export function createInitialPlanningPayload(): PlanningPayload {
     macroAllocations: [],
     provisionalAllocations: [],
     actualHours: [],
+    indirectHours: [],
     chantierOrder: [],
     provisionalOrder: [],
     peopleCapacity: [],
