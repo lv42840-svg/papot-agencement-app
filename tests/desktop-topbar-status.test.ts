@@ -1,8 +1,14 @@
 import { readFileSync } from "node:fs";
 import { describe, expect, it } from "vitest";
 
-const topbar = readFileSync(new URL("../src/components/desktop-topbar.tsx", import.meta.url), "utf8");
-const shell = readFileSync(new URL("../src/components/desktop-app-shell.tsx", import.meta.url), "utf8");
+const topbar = readFileSync(
+  new URL("../src/components/desktop-topbar.tsx", import.meta.url),
+  "utf8",
+);
+const shell = readFileSync(
+  new URL("../src/components/desktop-app-shell.tsx", import.meta.url),
+  "utf8",
+);
 const css = readFileSync(new URL("../src/app/globals.css", import.meta.url), "utf8");
 
 describe("topbar connection and device indicator", () => {
