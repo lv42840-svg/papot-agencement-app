@@ -117,10 +117,6 @@ export function PlanningExcelGrid({
       0,
     );
 
-  function activityTotal(value: number, activity: PlanningActivity) {
-    return tripleValues(ACTIVITIES.map((item) => (item === activity ? value : 0)));
-  }
-
   function weekClass(week: string) {
     const meta = metaByWeek.get(week);
     return [
@@ -194,7 +190,7 @@ export function PlanningExcelGrid({
           </th>
           {monthGroups.map((month) => (
             <th key={month.key} colSpan={month.span} className="excelMonthHeading">
-              {month.label}
+              {month.label} {month.key.slice(0, 4)}
             </th>
           ))}
         </tr>
@@ -241,30 +237,28 @@ export function PlanningExcelGrid({
             })}
           </tr>
         ))}
-        {ACTIVITIES.map((activity, index) => (
-          <tr key={"activity-total:" + activity} className="excelActivityTotalRow">
-            <th scope="row" className="excelFixed excelFixedName">
-              TOTAL {["ÉTUDE", "FABRICATION", "POSE"][index]}
-            </th>
-            <td className="excelFixed excelFixedPlan excelMetricCell">
-              {activityTotal(totalFor(activity, "plannedHours"), activity)}
+        <tr className="excelActivityTotalRow">
+          <th scope="row" className="excelFixed excelFixedName">
+            TOTAL ÉTUDE / FABRICATION / POSE
+          </th>
+          <td className="excelFixed excelFixedPlan excelMetricCell">
+            {tripleValues(ACTIVITIES.map((activity) => totalFor(activity, "plannedHours")))}
+          </td>
+          <td className="excelFixed excelFixedActual excelMetricCell">
+            {tripleValues(ACTIVITIES.map((activity) => totalFor(activity, "actualHours")))}
+          </td>
+          <td className="excelFixed excelFixedRemaining excelMetricCell">
+            {tripleValues(ACTIVITIES.map((activity) => totalFor(activity, "remainingHours")))}
+          </td>
+          {snapshot.weeks.map((week) => (
+            <td
+              key={week}
+              className={["excelWeekCell", "excelActivityTotalCell", weekClass(week)].join(" ")}
+            >
+              {tripleValues(ACTIVITIES.map((activity) => weeklyTotalFor(activity, week)))}
             </td>
-            <td className="excelFixed excelFixedActual excelMetricCell">
-              {activityTotal(totalFor(activity, "actualHours"), activity)}
-            </td>
-            <td className="excelFixed excelFixedRemaining excelMetricCell">
-              {activityTotal(totalFor(activity, "remainingHours"), activity)}
-            </td>
-            {snapshot.weeks.map((week) => (
-              <td
-                key={week}
-                className={["excelWeekCell", "excelActivityTotalCell", weekClass(week)].join(" ")}
-              >
-                {activityTotal(weeklyTotalFor(activity, week), activity)}
-              </td>
-            ))}
-          </tr>
-        ))}
+          ))}
+        </tr>
         {snapshot.rows.length === 0 && snapshot.provisionalRows.length === 0 ? (
           <tr>
             <td className="excelEmpty" colSpan={snapshot.weeks.length + 4}>
