@@ -546,22 +546,32 @@ export function BillingDocumentEditor({ draftId }: { draftId: string }) {
             </tbody>
           </table>
         </div>
-        {draft.type === "PROGRESS" && draft.lineProgress?.length ? (
-          <details className="invoiceProgress">
+        {draft.type === "PROGRESS" && draft.lines?.length ? (
+          <details className="invoiceProgress" open>
             <summary>Avancement cumulé par ligne du devis</summary>
-            <p>
-              Ces pourcentages restent les valeurs enregistrées lors de la création de la situation.
-              Modifier les montants ici n&apos;altère pas le devis ni les pourcentages déjà validés.
-            </p>
-            <ul>
-              {draft.lineProgress.map((item) => (
-                <li key={item.lineId}>
-                  {draft.lines?.find((line) => line.lineId === item.lineId)?.description ??
-                    "Ligne du devis"}{" "}
-                  : {item.percent} % cumulés
-                </li>
-              ))}
-            </ul>
+            <p>Tu peux corriger les pourcentages de cette situation.
+              Recalcule les lignes puis enregistre le projet. Les avancements antérieurs restent protégés.</p>
+            <div className="invoiceScroll">
+              <table className="invoiceTable">
+                <thead><tr><th>Prestation du devis</th><th>Avancement cumulé (%)</th></tr></thead>
+                <tbody>{draft.lines.map((line) => (
+                  <tr key={line.lineId}>
+                    <td>{line.description}</td>
+                    <td><input aria-label={`Avancement cumulé de ${line.description}`}
+                      inputMode="decimal" disabled={!canWrite || busy}
+                      value={progressValues[line.lineId] ?? "0"}
+                      onChange={(event) => setProgressValues((old) => ({
+                        ...old, [line.lineId]: event.target.value,
+                      }))} /></td>
+                  </tr>
+                ))}</tbody>
+              </table>
+            </div>
+            <button type="button" className="secondaryButton"
+              disabled={!canWrite || busy} onClick={applyProgress}>
+              Recalculer les lignes depuis les pourcentages
+            </button>
+            {pendingPercentages && <p>Avancements recalculés, enregistrement nécessaire.</p>}
           </details>
         ) : null}
         <p className="invoiceHint">
