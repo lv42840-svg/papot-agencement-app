@@ -760,22 +760,6 @@ select:focus {
   border-bottom: 1px solid #ebe8f2;
   backdrop-filter: blur(12px);
 }
-.desktopConnection {
-  display: flex;
-  align-items: center;
-  gap: 7px;
-  color: #43835f;
-  font-size: 11px;
-  font-weight: 700;
-}
-.desktopConnection::before {
-  content: "";
-  width: 7px;
-  height: 7px;
-  border-radius: 50%;
-  background: #51bc7b;
-  box-shadow: 0 0 0 3px #e7f7ed;
-}
 .desktopIdentity {
   display: flex;
   align-items: center;
