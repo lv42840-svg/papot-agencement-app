@@ -1,5 +1,6 @@
 import { DEFAULT_WEEKLY_SCHEDULE, isoWeekDates, scheduleHoursForDate } from "@/lib/planning/capacity";
-import type { PlanningActualHours, PlanningPersonCapacity } from "@/lib/planning/domain";
+import type { PlanningActualHours } from "@/lib/planning/domain";
+import type { PlanningPersonCapacity } from "@/lib/planning/capacity";
 import type { MonthlyLaborCostRecord } from "./monthly-labor-costs";
 
 /**
