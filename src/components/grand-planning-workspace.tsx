@@ -193,7 +193,8 @@ export function GrandPlanningWorkspace({
       `[data-planning-week="${currentWeek}"]`,
     );
     if (!currentHeader) return;
-    scroller.scrollLeft = Math.max(0, currentHeader.offsetLeft - 655 - 12);
+    const stickyColumnsWidth = 655;
+    scroller.scrollLeft = Math.max(0, currentHeader.offsetLeft - stickyColumnsWidth - 12);
     scrolledToCurrentRef.current = true;
   }, [currentWeek, snapshot]);
 
