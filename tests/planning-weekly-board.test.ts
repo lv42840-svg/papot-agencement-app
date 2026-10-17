@@ -143,6 +143,23 @@ describe("weekly team board", () => {
     expect(weekActivityHours(rows, "2026-W44").total).toBe(0);
   });
 
+  it("keeps day assignments when an existing PAPOT account is linked to a staff identity", async () => {
+    const { applyPlanningStaffMutation } = await import("../src/lib/planning/personnel");
+    const source = createInitialPlanningPayload();
+    source.dailyAssignments = [{
+      userId: personId, date: "2026-10-19", chantierId, label: "Pralus Chambéry",
+    }];
+    const created = applyPlanningStaffMutation(source, {
+      action: "saveStaff", firstName: "Alex", lastName: "Martin",
+    }, new Set([personId]));
+    const staffId = created.staff[0].id;
+    const linked = applyPlanningStaffMutation(created, {
+      action: "linkStaffAccount", id: staffId, linkedUserId: personId,
+    }, new Set([personId]));
+    expect(linked.dailyAssignments[0]).toMatchObject({ userId: staffId, label: "Pralus Chambéry" });
+    expect(source.dailyAssignments[0].userId).toBe(personId);
+  });
+
   it("parses legacy saved planning with no new daily assignment field", () => {
     const source = createInitialPlanningPayload();
     const legacy = { ...source, dailyAssignments: undefined };
