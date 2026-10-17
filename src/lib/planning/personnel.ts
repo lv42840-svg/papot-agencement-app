@@ -125,6 +125,19 @@ export function applyPlanningStaffMutation(
     )
       throw new Error("PLANNING_STAFF_ABSENCE_CONFLICT");
 
+    const staffAssignedDates = new Set(
+      payload.dailyAssignments
+        .filter((assignment) => assignment.userId === person.id)
+        .map((assignment) => assignment.date),
+    );
+    if (
+      payload.dailyAssignments.some(
+        (assignment) => assignment.userId === accountId && staffAssignedDates.has(assignment.date),
+      )
+    ) {
+      throw new Error("PLANNING_STAFF_DAILY_ASSIGNMENT_CONFLICT");
+    }
+
     if (legacyCapacity && staffCapacity) {
       // The newly created untouched default must not block association with
       // an older account: move the existing account schedule to the staff ID.
@@ -136,6 +149,9 @@ export function applyPlanningStaffMutation(
     }
     for (const absence of payload.absences) {
       if (absence.userId === accountId) absence.userId = person.id;
+    }
+    for (const assignment of payload.dailyAssignments) {
+      if (assignment.userId === accountId) assignment.userId = person.id;
     }
   }
   person.linkedUserId = accountId;
