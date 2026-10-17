@@ -1,0 +1,31 @@
+name: Format Billing Branch
+on:
+  push:
+    branches: [feat/billing-drafts-quote-chantier-20261017]
+permissions:
+  contents: write
+jobs:
+  format:
+    if: github.actor != 'github-actions[bot]'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: feat/billing-drafts-quote-chantier-20261017
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - name: Format changed billing files
+        run: |
+          npx prettier --write src/lib/billing src/app/api/desktop/billing src/components/billing-workspace.tsx src/app/facturation src/lib/server-db/migrations.ts src/lib/auth/permission-catalog.ts src/lib/desktop/navigation.ts src/components/quote-direct-editor.tsx src/components/chantier-workspace.tsx tests/billing-drafts.test.ts tests/auth-action-permissions.test.ts
+      - name: Commit formatting
+        run: |
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add src/lib/billing src/app/api/desktop/billing src/components/billing-workspace.tsx src/app/facturation src/lib/server-db/migrations.ts src/lib/auth/permission-catalog.ts src/lib/desktop/navigation.ts src/components/quote-direct-editor.tsx src/components/chantier-workspace.tsx tests/billing-drafts.test.ts tests/auth-action-permissions.test.ts
+          if ! git diff --cached --quiet; then
+            git commit -m 'style(billing): format new module'
+            git push origin HEAD:refs/heads/feat/billing-drafts-quote-chantier-20261017
+          fi
