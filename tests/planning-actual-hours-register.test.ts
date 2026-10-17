@@ -34,32 +34,73 @@ describe("weekly actual hours register", () => {
     ]);
     expect(source.actualHours).toEqual([]);
     expect(actualHoursByActivity(stored.actualHours)).toEqual({
-      be: 2.5, workshop: 18, install: 12,
+      be: 2.5,
+      workshop: 18,
+      install: 12,
     });
   });
 
   it("corrects the same person/week/site without duplicating previous hours", () => {
     const initial = applyActualHoursRow(createInitialPlanningPayload(), input, sites, people);
-    const corrected = applyActualHoursRow(initial, { ...input, be: 0, workshop: 10, install: 15 }, sites, people);
+    const corrected = applyActualHoursRow(
+      initial,
+      { ...input, be: 0, workshop: 10, install: 15 },
+      sites,
+      people,
+    );
     expect(corrected.actualHours).toHaveLength(2);
     expect(actualHoursByActivity(corrected.actualHours)).toEqual({
-      be: 0, workshop: 10, install: 15,
+      be: 0,
+      workshop: 10,
+      install: 15,
     });
-    const cleared = applyActualHoursRow(corrected, { ...input, be: 0, workshop: 0, install: 0 }, sites, people);
+    const cleared = applyActualHoursRow(
+      corrected,
+      { ...input, be: 0, workshop: 0, install: 0 },
+      sites,
+      people,
+    );
     expect(cleared.actualHours).toHaveLength(0);
   });
 
   it("preserves other people, chantiers and weeks", () => {
     const initial = applyActualHoursRow(createInitialPlanningPayload(), input, sites, people);
-    const otherSite = applyActualHoursRow(initial, {
-      ...input, chantierId: secondSiteId, workshop: 1, be: 0, install: 0,
-    }, sites, people);
-    const otherPerson = applyActualHoursRow(otherSite, {
-      ...input, userId: colleagueId, be: 4, workshop: 0, install: 0,
-    }, sites, people);
-    const otherWeek = applyActualHoursRow(otherPerson, {
-      ...input, week: "2026-W39", be: 1, workshop: 0, install: 0,
-    }, sites, people);
+    const otherSite = applyActualHoursRow(
+      initial,
+      {
+        ...input,
+        chantierId: secondSiteId,
+        workshop: 1,
+        be: 0,
+        install: 0,
+      },
+      sites,
+      people,
+    );
+    const otherPerson = applyActualHoursRow(
+      otherSite,
+      {
+        ...input,
+        userId: colleagueId,
+        be: 4,
+        workshop: 0,
+        install: 0,
+      },
+      sites,
+      people,
+    );
+    const otherWeek = applyActualHoursRow(
+      otherPerson,
+      {
+        ...input,
+        week: "2026-W39",
+        be: 1,
+        workshop: 0,
+        install: 0,
+      },
+      sites,
+      people,
+    );
     expect(otherWeek.actualHours).toHaveLength(6);
     expect(otherWeek.actualHours.filter((row) => row.week === "2026-W40")).toHaveLength(5);
     expect(otherWeek.actualHours.filter((row) => row.week === "2026-W39")).toHaveLength(1);
@@ -67,12 +108,31 @@ describe("weekly actual hours register", () => {
   });
 
   it("enforces a per-person weekly maximum across all projects", () => {
-    const first = applyActualHoursRow(createInitialPlanningPayload(), {
-      ...input, be: 0, workshop: 100, install: 0,
-    }, sites, people);
-    expect(() => applyActualHoursRow(first, {
-      ...input, chantierId: secondSiteId, be: 0, workshop: 69, install: 0,
-    }, sites, people)).toThrow("PLANNING_ACTUAL_PERSON_WEEK_TOO_HIGH");
+    const first = applyActualHoursRow(
+      createInitialPlanningPayload(),
+      {
+        ...input,
+        be: 0,
+        workshop: 100,
+        install: 0,
+      },
+      sites,
+      people,
+    );
+    expect(() =>
+      applyActualHoursRow(
+        first,
+        {
+          ...input,
+          chantierId: secondSiteId,
+          be: 0,
+          workshop: 69,
+          install: 0,
+        },
+        sites,
+        people,
+      ),
+    ).toThrow("PLANNING_ACTUAL_PERSON_WEEK_TOO_HIGH");
     expect(first.actualHours).toHaveLength(1);
     expect(() => actualHoursRowSchema.parse({ ...input, workshop: -1 })).toThrow();
     expect(() => actualHoursRowSchema.parse({ ...input, workshop: Number.NaN })).toThrow();
@@ -81,12 +141,12 @@ describe("weekly actual hours register", () => {
   });
 
   it("rejects unknown people, sites and invalid ISO weeks", () => {
-    expect(() => applyActualHoursRow(
-      createInitialPlanningPayload(), input, new Set(), people,
-    )).toThrow("PLANNING_CHANTIER_NOT_FOUND");
-    expect(() => applyActualHoursRow(
-      createInitialPlanningPayload(), input, sites, new Set(),
-    )).toThrow("PLANNING_PERSON_NOT_FOUND");
+    expect(() =>
+      applyActualHoursRow(createInitialPlanningPayload(), input, new Set(), people),
+    ).toThrow("PLANNING_CHANTIER_NOT_FOUND");
+    expect(() =>
+      applyActualHoursRow(createInitialPlanningPayload(), input, sites, new Set()),
+    ).toThrow("PLANNING_PERSON_NOT_FOUND");
     expect(actualHoursWeekSchema.safeParse("2026-W54").success).toBe(false);
     expect(actualHoursWeekSchema.safeParse("2027-W53").success).toBe(false);
     expect(actualHoursWeekSchema.safeParse("2026-W40").success).toBe(true);

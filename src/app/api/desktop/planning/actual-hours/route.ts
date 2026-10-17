@@ -3,8 +3,16 @@ import { ZodError } from "zod";
 import { requireSpecialPermission, hasEffectiveSpecialPermission } from "@/lib/auth/permissions";
 import { readAuthPayload } from "@/lib/auth/store";
 import { createChantiersRepository } from "@/lib/chantiers/create-repository";
-import { requireModuleRequestContext, desktopRequestErrorStatus } from "@/lib/desktop/request-context";
-import { actualHoursByActivity, actualHoursRowSchema, actualHoursWeekSchema, applyActualHoursRow } from "@/lib/planning/actual-hours";
+import {
+  requireModuleRequestContext,
+  desktopRequestErrorStatus,
+} from "@/lib/desktop/request-context";
+import {
+  actualHoursByActivity,
+  actualHoursRowSchema,
+  actualHoursWeekSchema,
+  applyActualHoursRow,
+} from "@/lib/planning/actual-hours";
 import { createPlanningRepository } from "@/lib/planning/create-repository";
 import { effectivePlanningPeople } from "@/lib/planning/personnel";
 import { isPlanningWeekPast } from "@/lib/planning/time-markers";
@@ -19,14 +27,25 @@ function noStoreJson(payload: unknown, init?: ResponseInit) {
 }
 
 function statusFor(code: string) {
-  return desktopRequestErrorStatus(code) ??
-    (code.includes("FORBIDDEN") ? 403 : code.includes("NOT_FOUND") ? 404 :
-      code.includes("NOT_PAST") || code.includes("TOO_HIGH") ? 409 : 400);
+  return (
+    desktopRequestErrorStatus(code) ??
+    (code.includes("FORBIDDEN")
+      ? 403
+      : code.includes("NOT_FOUND")
+        ? 404
+        : code.includes("NOT_PAST") || code.includes("TOO_HIGH")
+          ? 409
+          : 400)
+  );
 }
 
 function reportError(error: unknown) {
-  const code = error instanceof ZodError ? "PLANNING_ACTUAL_HOURS_INVALID" :
-    error instanceof Error ? error.message : "PLANNING_ACTUAL_HOURS_FAILED";
+  const code =
+    error instanceof ZodError
+      ? "PLANNING_ACTUAL_HOURS_INVALID"
+      : error instanceof Error
+        ? error.message
+        : "PLANNING_ACTUAL_HOURS_FAILED";
   return noStoreJson({ error: code }, { status: statusFor(code) });
 }
 
@@ -56,9 +75,15 @@ async function snapshot(
       inactiveSince: person.inactiveSince,
     })),
     ...auth.users
-      .filter((person) => storedPeople.has(person.id) && !people.some((active) => active.userId === person.id))
+      .filter(
+        (person) =>
+          storedPeople.has(person.id) && !people.some((active) => active.userId === person.id),
+      )
       .map((person) => ({
-        id: person.id, name: person.displayName, endDate: null, inactiveSince: null,
+        id: person.id,
+        name: person.displayName,
+        endDate: null,
+        inactiveSince: null,
       })),
   ].sort((a, b) => a.name.localeCompare(b.name, "fr"));
 
@@ -68,7 +93,9 @@ async function snapshot(
     .map((chantier) => {
       const matching = planning.actualHours.filter((entry) => entry.chantierId === chantier.id);
       const actual = actualHoursByActivity(matching);
-      const weekActual = actualHoursByActivity(recorded.filter((entry) => entry.chantierId === chantier.id));
+      const weekActual = actualHoursByActivity(
+        recorded.filter((entry) => entry.chantierId === chantier.id),
+      );
       return {
         id: chantier.id,
         name: chantier.name,
@@ -119,16 +146,20 @@ export async function POST(request: Request) {
       createChantiersRepository(context).load(),
       readAuthPayload(),
     ]);
-    const chantierIds = new Set(chantiers.chantiers
-      .filter((chantier) => chantier.status !== "CANCELLED")
-      .map((chantier) => chantier.id));
+    const chantierIds = new Set(
+      chantiers.chantiers
+        .filter((chantier) => chantier.status !== "CANCELLED")
+        .map((chantier) => chantier.id),
+    );
     await createPlanningRepository().mutate((payload) => {
       const people = effectivePlanningPeople(payload, auth.users);
       const ids = new Set(people.map((person) => person.userId));
       // Allow correcting historical entries of employees whose old login was disabled.
-      const recordedIds = new Set(payload.actualHours
-        .filter((entry) => entry.chantierId === input.chantierId && entry.week === input.week)
-        .map((entry) => entry.userId));
+      const recordedIds = new Set(
+        payload.actualHours
+          .filter((entry) => entry.chantierId === input.chantierId && entry.week === input.week)
+          .map((entry) => entry.userId),
+      );
       for (const user of auth.users) {
         if (recordedIds.has(user.id)) ids.add(user.id);
       }

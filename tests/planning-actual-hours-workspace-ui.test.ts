@@ -2,9 +2,18 @@ import { readFileSync } from "node:fs";
 import { describe, expect, it } from "vitest";
 
 const page = readFileSync(new URL("../src/app/heures/page.tsx", import.meta.url), "utf8");
-const workspace = readFileSync(new URL("../src/components/actual-hours-workspace.tsx", import.meta.url), "utf8");
-const route = readFileSync(new URL("../src/app/api/desktop/planning/actual-hours/route.ts", import.meta.url), "utf8");
-const chantiers = readFileSync(new URL("../src/app/api/desktop/chantiers/route.ts", import.meta.url), "utf8");
+const workspace = readFileSync(
+  new URL("../src/components/actual-hours-workspace.tsx", import.meta.url),
+  "utf8",
+);
+const route = readFileSync(
+  new URL("../src/app/api/desktop/planning/actual-hours/route.ts", import.meta.url),
+  "utf8",
+);
+const chantiers = readFileSync(
+  new URL("../src/app/api/desktop/chantiers/route.ts", import.meta.url),
+  "utf8",
+);
 const nav = readFileSync(new URL("../src/lib/desktop/navigation.ts", import.meta.url), "utf8");
 
 describe("actual hours interface and chantier bridge", () => {
@@ -30,7 +39,9 @@ describe("actual hours interface and chantier bridge", () => {
 
   it("requires the individual actual-hours permission on past weeks only", () => {
     expect(route).toContain('requireModuleRequestContext("planning", "WRITE")');
-    expect(route).toContain('requireSpecialPermission(context.user, "planning.enter_actual_hours")');
+    expect(route).toContain(
+      'requireSpecialPermission(context.user, "planning.enter_actual_hours")',
+    );
     expect(route).toContain("if (!isPlanningWeekPast(input.week))");
     expect(route).toContain("applyActualHoursRow");
     expect(route).toContain("effectivePlanningPeople(payload, auth.users)");

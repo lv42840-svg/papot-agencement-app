@@ -9,9 +9,11 @@ const weekSchema = z
   .refine((week) => {
     try {
       const monday = isoWeekDates(week)[0];
-      return isoWeekKey(new Date(
-        monday.getUTCFullYear(), monday.getUTCMonth(), monday.getUTCDate(), 12,
-      )) === week;
+      return (
+        isoWeekKey(
+          new Date(monday.getUTCFullYear(), monday.getUTCMonth(), monday.getUTCDate(), 12),
+        ) === week
+      );
     } catch {
       return false;
     }
@@ -19,19 +21,25 @@ const weekSchema = z
 
 export const actualHoursWeekSchema = weekSchema;
 
-export const actualHoursRowSchema = z.object({
-  action: z.literal("saveActualHoursRow"),
-  chantierId: z.string().uuid(),
-  userId: z.string().uuid(),
-  week: weekSchema,
-  be: z.number().finite().nonnegative().max(168),
-  workshop: z.number().finite().nonnegative().max(168),
-  install: z.number().finite().nonnegative().max(168),
-}).superRefine((input, ctx) => {
-  if (input.be + input.workshop + input.install > 168) {
-    ctx.addIssue({ code: "custom", path: ["hours"], message: "PLANNING_ACTUAL_WEEK_TOTAL_INVALID" });
-  }
-});
+export const actualHoursRowSchema = z
+  .object({
+    action: z.literal("saveActualHoursRow"),
+    chantierId: z.string().uuid(),
+    userId: z.string().uuid(),
+    week: weekSchema,
+    be: z.number().finite().nonnegative().max(168),
+    workshop: z.number().finite().nonnegative().max(168),
+    install: z.number().finite().nonnegative().max(168),
+  })
+  .superRefine((input, ctx) => {
+    if (input.be + input.workshop + input.install > 168) {
+      ctx.addIssue({
+        code: "custom",
+        path: ["hours"],
+        message: "PLANNING_ACTUAL_WEEK_TOTAL_INVALID",
+      });
+    }
+  });
 
 export type ActualHoursRowInput = z.infer<typeof actualHoursRowSchema>;
 
@@ -70,7 +78,13 @@ export function applyActualHoursRow(
     if (hours === 0) {
       if (index >= 0) payload.actualHours.splice(index, 1);
     } else {
-      const next = { chantierId: input.chantierId, userId: input.userId, activity, week: input.week, hours };
+      const next = {
+        chantierId: input.chantierId,
+        userId: input.userId,
+        activity,
+        week: input.week,
+        hours,
+      };
       if (index >= 0) payload.actualHours[index] = next;
       else payload.actualHours.push(next);
     }
