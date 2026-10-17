@@ -1,0 +1,31 @@
+name: Format planning rolling feature
+on:
+  push:
+    branches:
+      - feat/planning-continuous-totals-dismiss-20261017
+permissions:
+  contents: write
+jobs:
+  format-planning:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: true
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - name: Format changed planning files
+        run: |
+          npx --no-install prettier --write src/components/planning-excel-grid.tsx src/components/grand-planning-workspace.tsx src/lib/planning/domain.ts src/app/api/desktop/planning/route.ts tests/planning-domain.test.ts tests/planning-commercial-provision-ui.test.ts tests/planning-continuous-ui.test.ts
+      - name: Commit formatted sources
+        run: |
+          if [ -n "$(git status --porcelain)" ]; then
+            git config user.name "github-actions[bot]"
+            git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+            git add src/components/planning-excel-grid.tsx src/components/grand-planning-workspace.tsx src/lib/planning/domain.ts src/app/api/desktop/planning/route.ts tests/planning-domain.test.ts tests/planning-commercial-provision-ui.test.ts tests/planning-continuous-ui.test.ts
+            git commit -m 'chore(planning): format rolling planner'
+            git push origin HEAD:feat/planning-continuous-totals-dismiss-20261017
+          fi
