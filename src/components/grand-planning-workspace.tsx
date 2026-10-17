@@ -995,8 +995,8 @@ export function GrandPlanningWorkspace({
               ) : null}
               <p className="planningStaffHint">
                 Une personne peut figurer au planning sans compte de connexion. Le rattachement
-                reste facultatif. Masquer une personne du petit planning ne retire pas ses heures
-                de la capacité : seule la case « Capacité », la date de fin ou la désactivation
+                reste facultatif. Masquer une personne du petit planning ne retire pas ses heures de
+                la capacité : seule la case « Capacité », la date de fin ou la désactivation
                 agissent sur ses disponibilités.
               </p>
               <div className="planningScheduleTableWrap">
@@ -1018,7 +1018,10 @@ export function GrandPlanningWorkspace({
                           <div className="planningStaffIdentity">
                             <strong>{person.displayName}</strong>
                             {snapshot.capabilities.canManageSchedules ? (
-                              <label className="planningStaffHide" title="Masquer le nom du petit planning sans changer les heures de capacité">
+                              <label
+                                className="planningStaffHide"
+                                title="Masquer le nom du petit planning sans changer les heures de capacité"
+                              >
                                 <input
                                   type="checkbox"
                                   checked={!person.hiddenInWeeklyBoard}

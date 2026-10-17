@@ -17,7 +17,7 @@ const api = readFileSync(
 describe("compact weekly print and independent personnel visibility", () => {
   it("prints only a small week number, not the dashboard header or chantier summary", () => {
     expect(board).toContain('className="weeklyBoardPrintWeek"');
-    expect(board).toContain('S{week.slice(-2)} · {week.slice(0, 4)}');
+    expect(board).toContain("S{week.slice(-2)} · {week.slice(0, 4)}");
     expect(board).toContain("window.print()");
     const printRules = board.slice(board.indexOf("@media print"));
     expect(printRules).toContain(".weeklyBoardTop,");
