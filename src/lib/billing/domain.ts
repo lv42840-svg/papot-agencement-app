@@ -310,6 +310,9 @@ export function updateBillingDraft(
   if (amountHtCents + alreadyPreparedCents > draft.contractHtCents) {
     throw new Error("BILLING_AMOUNT_EXCEEDS_CONTRACT");
   }
+  if (draft.documentLines && amountHtCents !== draft.amountHtCents) {
+    throw new Error("BILLING_DOCUMENT_EDIT_REQUIRED");
+  }
   if (draft.lineProgress?.length && amountHtCents !== draft.amountHtCents) {
     throw new Error("BILLING_LINE_PROGRESS_EDIT_FORBIDDEN");
   }
