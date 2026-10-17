@@ -239,7 +239,7 @@ export function PlanningExcelGrid({
         ))}
         <tr className="excelActivityTotalRow">
           <th scope="row" className="excelFixed excelFixedName">
-            TOTAL ÉTUDE / FABRICATION / POSE
+            TOTAL CHANTIERS
           </th>
           <td className="excelFixed excelFixedPlan excelMetricCell">
             {tripleValues(ACTIVITIES.map((activity) => totalFor(activity, "plannedHours")))}
