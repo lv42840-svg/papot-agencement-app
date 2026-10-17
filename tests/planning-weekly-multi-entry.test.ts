@@ -128,7 +128,8 @@ describe("multiple weekly entries per person and day", () => {
       ...createInitialPlanningPayload(),
       dailyAssignments: [{ userId: personId, date, chantierId, label: "Pralus Chambéry" }],
     });
-    expect(legacy.dailyAssignments[0]).toMatchObject({ activity: "NOTE", id: undefined });
+    expect(legacy.dailyAssignments[0].activity).toBe("NOTE");
+    expect(legacy.dailyAssignments[0].id).toBeUndefined();
     const upgraded = applyWeeklyBoardEntry(
       legacy,
       {
