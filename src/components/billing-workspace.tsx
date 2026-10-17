@@ -1,5 +1,6 @@
 "use client";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
 import type {
   BillingDraft,
@@ -27,6 +28,7 @@ export function BillingWorkspace({
   quoteId?: string;
   chantierId?: string;
 }) {
+  const router = useRouter();
   const [data, setData] = useState<Snapshot | null>(null);
   const [error, setError] = useState("");
   const [notice, setNotice] = useState("");
@@ -91,14 +93,14 @@ export function BillingWorkspace({
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(body),
       });
-      const result = (await response.json()) as { error?: string };
+      const result = (await response.json()) as { error?: string; payload?: BillingPayload };
       if (!response.ok) throw new Error(result.error ?? "Erreur de facturation");
       await refresh();
       setNotice(success);
-      return true;
+      return result.payload ?? null;
     } catch (e) {
       setError(e instanceof Error ? e.message : "Erreur de facturation");
-      return false;
+      return null;
     } finally {
       setBusy(false);
     }
@@ -134,7 +136,13 @@ export function BillingWorkspace({
       payload.linePercentages = rows;
     } else if (percentMode) payload.cumulativePercent = numeric;
     else if (type !== "STANDARD" && type !== "FINAL") payload.amountHtCents = numeric;
-    if (await write(payload, "Projet enregistré. Aucune facture officielle émise.")) setValue("");
+    const result = await write(
+      payload,
+      "Projet enregistré. Aucune facture officielle émise. Ouvre son éditeur pour personnaliser les lignes.",
+    );
+    const created = result?.drafts.find((draft) => draft.requestId === payload.requestId);
+    if (created) router.push(`/facturation/${encodeURIComponent(created.id)}`);
+    else if (result) setValue("");
   }
   return (
     <div
@@ -364,6 +372,11 @@ export function BillingWorkspace({
                   <b>HT : {money(d.amountHtCents)}</b> · TVA : {money(d.vatCents)} ·{" "}
                   <b>TTC : {money(d.totalTtcCents)}</b>
                 </p>
+                <div>
+                  <Link href={`/facturation/${encodeURIComponent(d.id)}`} className="primaryButton">
+                    Ouvrir et modifier la facture
+                  </Link>
+                </div>
                 {d.lineProgress?.length ? (
                   <details>
                     <summary>Avancement cumulé par ligne</summary>

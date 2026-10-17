@@ -5,7 +5,13 @@ import {
   desktopRequestErrorStatus,
   requireModuleRequestContext,
 } from "@/lib/desktop/request-context";
-import { createBillingDraft, updateBillingDraft, billingTypeSchema } from "@/lib/billing/domain";
+import {
+  createBillingDraft,
+  updateBillingDraft,
+  updateBillingDocument,
+  billingTypeSchema,
+  billingDocumentLineSchema,
+} from "@/lib/billing/domain";
 import { createBillingRepository } from "@/lib/billing/repository";
 import { loadBillingSources } from "@/lib/billing/sources";
 
@@ -47,6 +53,27 @@ const billingMutationSchema = z.discriminatedUnion("action", [
     .strict(),
   z
     .object({
+      action: z.literal("UPDATE_DOCUMENT"),
+      draftId: z.string().uuid(),
+      expectedUpdatedAt: z.string().datetime({ offset: true }),
+      label: z.string().trim().min(1).max(240),
+      notes: z.string().trim().max(4000),
+      documentLines: z.array(billingDocumentLineSchema).min(1).max(1000),
+      linePercentages: z
+        .array(
+          z
+            .object({
+              lineId: z.string().uuid(),
+              percent: z.number().finite().min(0).max(100),
+            })
+            .strict(),
+        )
+        .max(1000)
+        .optional(),
+    })
+    .strict(),
+  z
+    .object({
       action: z.literal("DELETE"),
       draftId: z.string().uuid(),
       expectedUpdatedAt: z.string().datetime({ offset: true }),
@@ -68,7 +95,8 @@ function statusFor(code: string): number {
     code === "BILLING_CONTRACT_ALREADY_PREPARED" ||
     code === "BILLING_PROGRESS_CANNOT_DECREASE" ||
     code === "BILLING_PROGRESS_TAX_ALLOCATION_UNAVAILABLE" ||
-    code === "BILLING_DRAFT_HAS_DEPENDENTS"
+    code === "BILLING_DRAFT_HAS_DEPENDENTS" ||
+    code === "BILLING_DOCUMENT_EDIT_REQUIRED"
   )
     return 409;
   return 400;
@@ -104,6 +132,15 @@ export async function POST(request: Request) {
           throw new Error("BILLING_QUOTE_NOT_AVAILABLE");
         }
         drafts.push(createBillingDraft(current, source, input, context.user.displayName));
+      } else if (input.action === "UPDATE_DOCUMENT") {
+        const index = drafts.findIndex((draft) => draft.id === input.draftId);
+        if (index < 0) throw new Error("BILLING_DRAFT_NOT_FOUND");
+        drafts[index] = updateBillingDocument(
+          current,
+          input.draftId,
+          input,
+          context.user.displayName,
+        );
       } else if (input.action === "UPDATE") {
         const index = drafts.findIndex((draft) => draft.id === input.draftId);
         if (index < 0) throw new Error("BILLING_DRAFT_NOT_FOUND");
@@ -114,11 +151,7 @@ export async function POST(request: Request) {
         if (drafts[index].updatedAt !== input.expectedUpdatedAt) {
           throw new Error("BILLING_VERSION_CONFLICT");
         }
-        if (
-          drafts
-            .slice(index + 1)
-            .some((draft) => draft.quoteId === drafts[index].quoteId && draft.type === "PROGRESS")
-        ) {
+        if (drafts.slice(index + 1).some((draft) => draft.quoteId === drafts[index].quoteId)) {
           throw new Error("BILLING_DRAFT_HAS_DEPENDENTS");
         }
         drafts.splice(index, 1);
