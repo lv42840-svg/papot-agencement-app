@@ -263,7 +263,6 @@ export function WeeklyTeamBoard({ week }: { week: string }) {
                                       delete copy[key];
                                       return copy;
                                     });
-                                    event.currentTarget.blur();
                                   }
                                 }}
                               />
@@ -311,7 +310,7 @@ export function WeeklyTeamBoard({ week }: { week: string }) {
         .weeklyBoardHours { background: #fff; border: 1px solid #dcd2ef; border-radius: 10px; padding: 12px 14px; min-width: min(100%, 500px); max-width: 570px; }
         .weeklyBoardHoursHeading { display: flex; justify-content: space-between; gap: 12px; margin-bottom: 8px; font-size: 12px; color: #59498d; }
         .weeklyBoardHoursHeading span { font-size: 11px; color: #8678a8; }
-        .weeklyBoardHoursGrid { display: grid; grid-template-columns: repeat(3, minmax(125px, 1fr)); gap: 5px; }
+        .weeklyBoardHoursGrid { display: grid; grid-template-columns: 1fr; gap: 4px; }
         .weeklyBoardHoursGrid > div { display: grid; grid-template-columns: 65px repeat(4, minmax(45px, 1fr)); gap: 6px; align-items: center; background: #f7f4fd; border-radius: 5px; padding: 6px; font-size: 10px; white-space: nowrap; }
         .weeklyBoardHoursGrid > div small { color: #7b6c9a; }
         .weeklyBoardHoursGrid > div b, .weeklyBoardHoursGrid > div span, .weeklyBoardHoursGrid > div strong { text-align: right; }
@@ -350,7 +349,7 @@ export function WeeklyTeamBoard({ week }: { week: string }) {
           .weeklyBoardTopline { display: block; }
           .weeklyBoardHours { margin-top: 10px; min-width: 0; max-width: none; }
           .weeklyBoardHoursGrid { overflow-x: auto; }
-          .weeklyBoardHoursGrid > div { min-width: 430px; }
+          .weeklyBoardHoursGrid > div { min-width: 400px; }
         }
       `}</style>
     </div>
