@@ -1,4 +1,4 @@
-import { DEFAULT_WEEKLY_SCHEDULE, type PlanningPersonCapacity } from "./capacity";
+import { DEFAULT_WEEKLY_SCHEDULE, NEW_STAFF_WEEKLY_SCHEDULE, type PlanningPersonCapacity } from "./capacity";
 import { parsePlanningPayload, type PlanningPayload, type PlanningStaff } from "./domain";
 
 export type PlanningAccount = { id: string; displayName: string; isActive: boolean };
@@ -68,11 +68,17 @@ export function applyPlanningStaffMutation(
       person.firstName = firstName;
       person.lastName = lastName;
     } else {
+      const personId = crypto.randomUUID();
       payload.staff.push({
-        id: crypto.randomUUID(),
+        id: personId,
         firstName,
         lastName,
         linkedUserId: null,
+      });
+      payload.peopleCapacity.push({
+        userId: personId,
+        countsInMacroCapacity: false,
+        weeklySchedule: { ...NEW_STAFF_WEEKLY_SCHEDULE },
       });
     }
     return parsePlanningPayload(payload);
