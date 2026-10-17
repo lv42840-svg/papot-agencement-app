@@ -162,7 +162,7 @@ export function GrandPlanningWorkspace({
     );
     if (!currentHeader) return;
 
-    const stickyColumnsWidth = 520;
+    const stickyColumnsWidth = 655;
     scroller.scrollLeft = Math.max(0, currentHeader.offsetLeft - stickyColumnsWidth - 12);
   }, [currentWeek, snapshot]);
 
@@ -1003,8 +1003,8 @@ export function GrandPlanningWorkspace({
           background: #ece8f8;
         }
         .excelWeekHeading {
-          min-width: 100px;
-          width: 100px;
+          min-width: 150px;
+          width: 150px;
         }
         .excelWeekHeading strong {
           display: block;
@@ -1021,9 +1021,12 @@ export function GrandPlanningWorkspace({
         }
         .excelTriple > span,
         .excelTriple > input {
+          box-sizing: border-box;
           min-width: 0;
           width: 100%;
+          min-height: 30px;
           height: 30px;
+          padding: 0 2px;
           border: 0;
           border-right: 1px solid #dae0e9;
           border-radius: 0;
@@ -1032,6 +1035,7 @@ export function GrandPlanningWorkspace({
           text-align: center;
           font-size: 11px;
           font-weight: 650;
+          font-variant-numeric: tabular-nums;
         }
         .excelTriple > :last-child {
           border-right: 0;
@@ -1050,8 +1054,8 @@ export function GrandPlanningWorkspace({
           cursor: default;
         }
         .excelWeekCell {
-          width: 100px;
-          min-width: 100px;
+          width: 150px;
+          min-width: 150px;
           height: 39px;
         }
         .excelWeekCell:has(input:not(:placeholder-shown)) {
@@ -1081,18 +1085,18 @@ export function GrandPlanningWorkspace({
         }
         .excelFixedPlan {
           left: 205px;
-          min-width: 105px;
-          width: 105px;
+          min-width: 150px;
+          width: 150px;
         }
         .excelFixedActual {
-          left: 310px;
-          min-width: 105px;
-          width: 105px;
+          left: 355px;
+          min-width: 150px;
+          width: 150px;
         }
         .excelFixedRemaining {
-          left: 415px;
-          min-width: 105px;
-          width: 105px;
+          left: 505px;
+          min-width: 150px;
+          width: 150px;
         }
         .excelFixed small {
           display: block;
@@ -1218,10 +1222,10 @@ export function GrandPlanningWorkspace({
             left: 160px;
           }
           .excelFixedActual {
-            left: 265px;
+            left: 310px;
           }
           .excelFixedRemaining {
-            left: 370px;
+            left: 460px;
           }
         }
 
