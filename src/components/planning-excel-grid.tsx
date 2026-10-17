@@ -96,9 +96,6 @@ export function PlanningExcelGrid({
     [
       { label: "Disponible ferme", field: "firmAvailableHours", tone: true },
       { label: "Disponible avec potentiel", field: "availableWithProvisionHours", tone: true },
-      { label: "Capacité totale", field: "totalCapacityHours" },
-      { label: "Charge ferme", field: "firmLoadHours" },
-      { label: "Charge potentielle", field: "provisionalLoadHours" },
     ];
 
   // Totaux de charge ferme par activité, sans additionner une seconde fois le provisionnel.
