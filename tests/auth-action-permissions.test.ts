@@ -67,7 +67,7 @@ describe("permission catalog", () => {
     expect(MODULE_PERMISSIONS).toEqual(
       expect.arrayContaining([
         expect.objectContaining({ key: "quotes" }),
-        expect.objectContaining({ key: "billing", future: true }),
+        expect.objectContaining({ key: "billing", label: "Facturation" }),
       ]),
     );
   });
