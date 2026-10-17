@@ -37,6 +37,18 @@ export const DEFAULT_WEEKLY_SCHEDULE = {
   sunday: 0,
 } satisfies z.infer<typeof weekdayHoursSchema>;
 
+// Applied only when a new independent personnel record is created.
+// Existing staff schedules and legacy login accounts keep their current hours.
+export const NEW_STAFF_WEEKLY_SCHEDULE = {
+  monday: 8.5,
+  tuesday: 8.5,
+  wednesday: 8.5,
+  thursday: 8.5,
+  friday: 4.5,
+  saturday: 0,
+  sunday: 0,
+} satisfies z.infer<typeof weekdayHoursSchema>;
+
 export function weeklyScheduleHours(schedule: PlanningPersonCapacity["weeklySchedule"]): number {
   return Object.values(schedule).reduce((sum, hours) => sum + hours, 0);
 }
@@ -123,6 +135,18 @@ export function scheduleHoursForDate(
   const day = date.getUTCDay();
   const index = day === 0 ? 6 : day - 1;
   return schedule[WEEKDAY_KEYS[index]];
+}
+
+// Used to propose absence hours; the user may still enter a partial day.
+// National public holidays already contribute zero capacity.
+export function suggestedAbsenceHoursForDate(
+  schedule: PlanningPersonCapacity["weeklySchedule"],
+  dateId: string,
+): number {
+  if (!/^\\d{4}-\\d{2}-\\d{2}$/.test(dateId)) return 0;
+  const day = new Date(`${dateId}T12:00:00Z`);
+  if (Number.isNaN(day.getTime()) || day.toISOString().slice(0, 10) !== dateId) return 0;
+  return scheduleHoursForDate(schedule, day);
 }
 
 export function weeklyScheduleHoursForWeek(
