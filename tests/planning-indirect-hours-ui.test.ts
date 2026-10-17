@@ -13,7 +13,7 @@ describe("SAV and general overhead hour allocation", () => {
     expect(ui).toContain('"SAV"');
     expect(ui).toContain('action: "saveIndirectHoursRow"');
     expect(ui).toContain("const totalForWeek = totalSiteWeek + totalIndirectWeek");
-    expect(ui).toContain("Ces heures sont valorisées");
+    expect(ui).toContain("valorisées avec le coût employeur mensuel");
     expect(ui).toContain('action: "saveActualHoursRow"');
   });
 
