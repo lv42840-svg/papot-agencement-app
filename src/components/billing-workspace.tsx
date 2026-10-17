@@ -228,7 +228,7 @@ export function BillingWorkspace({
                         if (next === "LINES" && active) {
                           setLineValues(previousPercents(active));
                         }
-                      }
+                      }}
                     >
                       <option value="AMOUNT">Montant HT en €</option>
                       <option value="PERCENT">
