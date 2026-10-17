@@ -63,6 +63,15 @@ export const PLANNING_ABSENCE_TYPE_LABELS: Record<PlanningAbsenceType, string> =
   OTHER: "Autre",
 };
 
+export const planningStaffSchema = z.object({
+  id: z.string().uuid(),
+  firstName: z.string().trim().min(1).max(100),
+  lastName: z.string().trim().min(1).max(100),
+  linkedUserId: z.string().uuid().nullable(),
+});
+
+export type PlanningStaff = z.infer<typeof planningStaffSchema>;
+
 export const planningPayloadSchema = z
   .object({
     schemaVersion: z.literal(1),
@@ -72,6 +81,7 @@ export const planningPayloadSchema = z
     chantierOrder: z.array(z.string().uuid()),
     provisionalOrder: z.array(z.string().uuid()).default([]),
     peopleCapacity: z.array(planningPersonCapacitySchema).default([]),
+    staff: z.array(planningStaffSchema).default([]),
     absences: z.array(planningAbsenceSchema).default([]),
   })
   .superRefine((value, context) => {
@@ -112,6 +122,29 @@ export const planningPayloadSchema = z
         });
       }
       actualHoursSeen.add(key);
+    });
+
+    const staffIds = new Set<string>();
+    const linkedUsers = new Set<string>();
+    value.staff.forEach((person, index) => {
+      if (staffIds.has(person.id)) {
+        context.addIssue({
+          code: z.ZodIssueCode.custom,
+          path: ["staff", index, "id"],
+          message: "PLANNING_STAFF_DUPLICATE",
+        });
+      }
+      staffIds.add(person.id);
+      if (person.linkedUserId) {
+        if (linkedUsers.has(person.linkedUserId)) {
+          context.addIssue({
+            code: z.ZodIssueCode.custom,
+            path: ["staff", index, "linkedUserId"],
+            message: "PLANNING_STAFF_ACCOUNT_ALREADY_LINKED",
+          });
+        }
+        linkedUsers.add(person.linkedUserId);
+      }
     });
 
     const absenceKeys = new Set<string>();
@@ -200,6 +233,7 @@ export function createInitialPlanningPayload(): PlanningPayload {
     chantierOrder: [],
     provisionalOrder: [],
     peopleCapacity: [],
+    staff: [],
     absences: [],
   };
 }
