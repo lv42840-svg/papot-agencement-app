@@ -162,7 +162,7 @@ export function GrandPlanningWorkspace({
     );
     if (!currentHeader) return;
 
-    const stickyColumnsWidth = 408;
+    const stickyColumnsWidth = 520;
     scroller.scrollLeft = Math.max(0, currentHeader.offsetLeft - stickyColumnsWidth - 12);
   }, [currentWeek, snapshot]);
 
@@ -1130,6 +1130,20 @@ export function GrandPlanningWorkspace({
         }
         .excelMetricCell {
           background: #f2f4fb !important;
+        }
+        .excelActivityTotalRow .excelFixedName {
+          background: #eee9f8 !important;
+          color: #4c3b87;
+          font-weight: 900;
+          text-align: left !important;
+          padding: 7px 9px !important;
+          border-top: 2px solid #c4b9df;
+        }
+        .excelActivityTotalRow .excelMetricCell,
+        .excelActivityTotalCell {
+          background: #e1e9f5 !important;
+          font-weight: 800;
+          border-top: 2px solid #c4b9df;
         }
         .excelSummaryRow th {
           text-align: left !important;
