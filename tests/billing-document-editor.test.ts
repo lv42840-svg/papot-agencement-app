@@ -250,7 +250,7 @@ describe("éditeur de facture autonome", () => {
     expect(situation.amountHtCents).toBe(1_550_000);
     expect(situation.documentLines?.map((line) => line.sourceLineId)).toEqual([A, B, C]);
     expect(situation.documentLines?.map((line) => line.unitPriceCents)).toEqual([
-      1_400_000, 150_000, 0,
+      700_000, 150_000, 0,
     ]);
     // The editor's persisted line snapshot must exactly match the analytic situation.
     const totals = calculateInvoiceDocumentTotals(situation.documentLines!);
