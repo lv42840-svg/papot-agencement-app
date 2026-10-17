@@ -76,7 +76,7 @@ describe("planning Excel copy and paste", () => {
     expect(() => planPlanningPaste("5\tbad", start, start, rows, weeks, () => false)).toThrow();
     expect(() => planPlanningPaste("-1", start, start, rows, weeks, () => false)).toThrow();
     expect(() => planPlanningPaste("4", start, start, rows, weeks, () => true)).toThrow();
-    expect(() => planPlanningPaste("2\t4", { ...start, week: "2027-W01", activity: "INSTALL" }, start, rows, weeks, () => false)).toThrow();
+    expect(() => planPlanningPaste("2\t4", { ...start, week: "2027-W01", activity: "INSTALL" }, { ...start, week: "2027-W01", activity: "INSTALL" }, rows, weeks, () => false)).toThrow();
     expect(() => planPlanningPaste(Array.from({ length: 201 }, () => "1").join("\t"), start, start, rows, weeks, () => false)).toThrow();
   });
 
