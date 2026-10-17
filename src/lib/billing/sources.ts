@@ -24,6 +24,11 @@ function quoteContractData(quote: NativeQuoteRecord): {
   const rates = new Map(
     quote.taxConfig.lineOverrides.map((item) => [item.lineId, item.ratePercent]),
   );
+  const byLineId = new Map(
+    quote.model.items
+      .filter((item) => item.kind === "LINE")
+      .map((item) => [item.id, item]),
+  );
   const lines: BillingSourceLine[] = price.lines
     .filter((line) => line.optionStatus !== "PENDING" && line.optionStatus !== "REJECTED")
     .map((line) => ({
@@ -31,6 +36,8 @@ function quoteContractData(quote: NativeQuoteRecord): {
       description: line.description,
       amountHtCents: line.saleCents,
       vatRatePercent: rates.get(line.lineId) ?? quote.taxConfig.defaultRatePercent,
+      quantity: byLineId.get(line.lineId)?.quantity ?? 1,
+      unit: byLineId.get(line.lineId)?.unit ?? "u",
     }));
   const byRate = new Map<number, number>();
   for (const line of lines) {
