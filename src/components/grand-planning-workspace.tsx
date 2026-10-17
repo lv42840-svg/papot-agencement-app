@@ -33,6 +33,9 @@ type PersonCapacity = {
   firstName: string | null;
   lastName: string | null;
   linkedUserId: string | null;
+  hiddenInWeeklyBoard: boolean;
+  endDate: string | null;
+  inactiveSince: string | null;
   countsInMacroCapacity: boolean;
   weeklySchedule: {
     monday: number;
@@ -433,6 +436,28 @@ export function GrandPlanningWorkspace({
     await postPlanningMutation(
       { action: "linkStaffAccount", id: personId, linkedUserId },
       linkedUserId ? "Compte PAPOT rattaché au personnel." : "Compte PAPOT détaché.",
+    );
+  }
+
+  async function setPersonHidden(person: PersonCapacity) {
+    await postPlanningMutation(
+      { action: "setPersonHidden", id: person.userId, hidden: !person.hiddenInWeeklyBoard },
+      person.hiddenInWeeklyBoard ? "Personne visible au petit planning." : "Personne masquée du petit planning.",
+    );
+  }
+
+  async function staffAction(person: PersonCapacity, action: "deactivateStaff" | "reactivateStaff" | "deleteStaff") {
+    if (person.kind !== "staff") return;
+    if (action === "deleteStaff" && !window.confirm(
+      `Supprimer définitivement ${person.displayName} ? Possible uniquement sans historique ni compte lié.`
+    )) return;
+    if (action === "deactivateStaff" && !window.confirm(
+      `Désactiver ${person.displayName} dès aujourd'hui ? Les anciennes semaines restent conservées.`
+    )) return;
+    await postPlanningMutation(
+      { action, id: person.userId },
+      action === "deleteStaff" ? "Fiche supprimée." :
+        action === "reactivateStaff" ? "Personne réactivée." : "Personne désactivée.",
     );
   }
 
@@ -974,8 +999,23 @@ export function GrandPlanningWorkspace({
                         <th scope="row">
                           <div className="planningStaffIdentity">
                             <strong>{person.displayName}</strong>
+                            {snapshot.capabilities.canManageSchedules ? (
+                              <label className="planningStaffHide">
+                                <input
+                                  type="checkbox"
+                                  checked={!person.hiddenInWeeklyBoard}
+                                  disabled={savingKey !== null}
+                                  onChange={() => void setPersonHidden(person)}
+                                />
+                                Visible au petit planning
+                              </label>
+                            ) : null}
                             {person.kind === "staff" ? (
                               <>
+                                <small>
+                                  {person.inactiveSince ? "Désactivé" :
+                                    person.endDate ? `Fin prévue : ${person.endDate.split("-").reverse().join("/")}` : "Sans date de fin"}
+                                </small>
                                 <small>
                                   {person.linkedUserId
                                     ? "Compte PAPOT associé"
@@ -983,6 +1023,38 @@ export function GrandPlanningWorkspace({
                                 </small>
                                 {snapshot.capabilities.canManageSchedules ? (
                                   <div className="planningStaffActions">
+                                    <label className="planningStaffEndDate">
+                                      Fin de présence (préavis, intérim)
+                                      <input
+                                        type="date"
+                                        aria-label={`Date de fin de ${person.displayName}`}
+                                        value={person.endDate ?? ""}
+                                        disabled={savingKey !== null}
+                                        onChange={(event) => void postPlanningMutation(
+                                          { action: "setStaffEndDate", id: person.userId, endDate: event.target.value || null },
+                                          "Date de fin de présence enregistrée.",
+                                        )}
+                                      />
+                                    </label>
+                                    {person.inactiveSince ? (
+                                      <button type="button" className="secondaryButton"
+                                        disabled={savingKey !== null}
+                                        onClick={() => void staffAction(person, "reactivateStaff")}>
+                                        Réactiver
+                                      </button>
+                                    ) : (
+                                      <button type="button" className="secondaryButton"
+                                        disabled={savingKey !== null}
+                                        onClick={() => void staffAction(person, "deactivateStaff")}>
+                                        Désactiver
+                                      </button>
+                                    )}
+                                    <button type="button" className="secondaryButton"
+                                      disabled={savingKey !== null}
+                                      title="Suppression autorisée uniquement si aucun historique ni compte lié"
+                                      onClick={() => void staffAction(person, "deleteStaff")}>
+                                      Supprimer
+                                    </button>
                                     <button
                                       type="button"
                                       className="secondaryButton"
@@ -1453,6 +1525,26 @@ export function GrandPlanningWorkspace({
           flex-wrap: wrap;
           gap: 5px;
           align-items: center;
+        }
+        .planningStaffHide {
+          display: flex;
+          gap: 5px;
+          align-items: center;
+          font-size: 10px;
+          font-weight: 500;
+          color: #574b7e;
+        }
+        .planningStaffEndDate {
+          display: grid;
+          gap: 4px;
+          font-size: 10px;
+          font-weight: 600;
+        }
+        .planningStaffEndDate input {
+          padding: 4px;
+          border: 1px solid #ddd5ee;
+          border-radius: 5px;
+          font-size: 10px;
         }
         .planningStaffActions select {
           max-width: 180px;
