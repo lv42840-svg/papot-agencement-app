@@ -149,7 +149,7 @@ export function WeeklyTeamBoard({ week }: { week: string }) {
               · S{week.slice(-2)} / {week.slice(0, 4)}
             </span>
           </h1>
-          <p>Du {period} · affectations journalières de l'équipe</p>
+          <p>Du {period} · affectations journalières de l&apos;équipe</p>
         </div>
         <div className="weeklyBoardControls">
           <Link className="secondaryButton" href={`/planning/${previous}`}>
