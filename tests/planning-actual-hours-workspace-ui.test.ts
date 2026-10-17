@@ -28,7 +28,7 @@ describe("actual hours interface and chantier bridge", () => {
   it("chooses the employee first and shows weekly chantiers with 3-hour fields", () => {
     expect(workspace).toContain("1 · Salarié");
     expect(workspace).toContain("2 · Semaine écoulée");
-    expect(workspace).toContain("data.people.map((person)");
+    expect(workspace).toContain("data?.people.map((person)");
     expect(workspace).toContain("suggestedChantierIds");
     expect(workspace).toContain("Prévu au petit planning");
     expect(workspace).toContain("Heures déjà enregistrées");
