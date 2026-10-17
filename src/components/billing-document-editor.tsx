@@ -286,7 +286,7 @@ export function BillingDocumentEditor({ draftId }: { draftId: string }) {
 
       <aside className="invoiceDraftNotice">
         Tu modifies une <strong>copie des lignes du devis</strong>, uniquement pour cette facture.
-        Le devis signé reste inchangé. Ce projet n'a ni numéro officiel, ni PDF émis, ni envoi
+        Le devis signé reste inchangé. Ce projet n&apos;a ni numéro officiel, ni PDF émis, ni envoi
         Pennylane.
       </aside>
       {error && (
@@ -500,7 +500,7 @@ export function BillingDocumentEditor({ draftId }: { draftId: string }) {
             <summary>Historique des avancements du devis</summary>
             <p>
               Ces pourcentages restent les valeurs enregistrées lors de la création de la situation.
-              Modifier les montants ici n'altère pas le devis ni les pourcentages déjà validés.
+              Modifier les montants ici n&apos;altère pas le devis ni les pourcentages déjà validés.
             </p>
             <ul>
               {draft.lineProgress.map((item) => (
