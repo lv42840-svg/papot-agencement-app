@@ -9,7 +9,7 @@ export function effectiveCommercialForecastHours(
   quotes: readonly NativeQuoteRecord[],
 ): ForecastActivityHours {
   // null means legacy/manual mode, including all existing commercial cases.
-  if (item.forecastQuoteIds === null) return item.provisionHours;
+  if (item.forecastQuoteIds == null) return item.provisionHours;
   const ids = new Set(item.forecastQuoteIds);
   const total = { be: 0, workshop: 0, install: 0 };
   for (const quote of quotes) {
