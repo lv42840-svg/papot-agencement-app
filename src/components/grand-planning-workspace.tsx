@@ -191,10 +191,11 @@ export function GrandPlanningWorkspace({
     [snapshot?.absences, snapshot?.peopleCapacity],
   );
   const absencePeople = useMemo(() => {
-    const listed = snapshot?.peopleCapacity.map((person) => ({
-      id: person.userId,
-      displayName: person.displayName,
-    })) ?? [];
+    const listed =
+      snapshot?.peopleCapacity.map((person) => ({
+        id: person.userId,
+        displayName: person.displayName,
+      })) ?? [];
     const ids = new Set(listed.map((person) => person.id));
     for (const absence of snapshot?.absences ?? []) {
       if (ids.has(absence.userId)) continue;
@@ -203,8 +204,8 @@ export function GrandPlanningWorkspace({
     }
     return listed;
   }, [snapshot?.peopleCapacity, snapshot?.absences]);
-  const shownAbsences = groupedAbsences.filter((absence) =>
-    absence.userId === (absenceUserId || absencePeople[0]?.id),
+  const shownAbsences = groupedAbsences.filter(
+    (absence) => absence.userId === (absenceUserId || absencePeople[0]?.id),
   );
 
   const capacityByWeek = useMemo(
@@ -546,7 +547,9 @@ export function GrandPlanningWorkspace({
     setAbsenceUserId(absence.userId);
     setAbsenceType(absence.type);
     setAbsenceWeek(absence.week);
-    setMessage("Semaine sélectionnée : modifie le type puis clique sur « Mettre toute la semaine en absence ».");
+    setMessage(
+      "Semaine sélectionnée : modifie le type puis clique sur « Mettre toute la semaine en absence ».",
+    );
   }
 
   function editAbsence(absence: PlanningAbsence) {
@@ -1215,10 +1218,16 @@ export function GrandPlanningWorkspace({
                 </button>
               </div>
 
-              <div className="planningAbsencePersonTabs" role="tablist" aria-label="Absences par personne">
+              <div
+                className="planningAbsencePersonTabs"
+                role="tablist"
+                aria-label="Absences par personne"
+              >
                 {absencePeople.map((person) => {
                   const selected = (absenceUserId || absencePeople[0]?.id) === person.id;
-                  const count = groupedAbsences.filter((absence) => absence.userId === person.id).length;
+                  const count = groupedAbsences.filter(
+                    (absence) => absence.userId === person.id,
+                  ).length;
                   return (
                     <button
                       key={person.id}
@@ -1243,17 +1252,23 @@ export function GrandPlanningWorkspace({
                 ) : (
                   shownAbsences.map((absence) => (
                     <div
-                      className={absence.kind === "week"
-                        ? "planningAbsenceRow planningAbsenceWeekRow"
-                        : "planningAbsenceRow"}
+                      className={
+                        absence.kind === "week"
+                          ? "planningAbsenceRow planningAbsenceWeekRow"
+                          : "planningAbsenceRow"
+                      }
                       key={absence.key}
                     >
                       <div>
-                        <strong>{absence.kind === "week"
-                          ? `Semaine ${absence.week.slice(-2)}`
-                          : absence.startDate.split("-").reverse().join("/")}</strong>
+                        <strong>
+                          {absence.kind === "week"
+                            ? `Semaine ${absence.week.slice(-2)}`
+                            : absence.startDate.split("-").reverse().join("/")}
+                        </strong>
                         {absence.kind === "week" ? (
-                          <span>{weekDateRangeLabel(absence.week)} · {absence.days} jour(s)</span>
+                          <span>
+                            {weekDateRangeLabel(absence.week)} · {absence.days} jour(s)
+                          </span>
                         ) : null}
                         <span>{absence.typeLabel}</span>
                         <span>{formatHours(absence.hours)} h</span>
@@ -1281,9 +1296,11 @@ export function GrandPlanningWorkspace({
                             className="secondaryButton"
                             type="button"
                             disabled={savingKey !== null}
-                            onClick={() => void (absence.kind === "week"
-                              ? deleteAbsenceWeek(absence.absenceIds)
-                              : deleteAbsence(absence.absenceIds[0]))}
+                            onClick={() =>
+                              void (absence.kind === "week"
+                                ? deleteAbsenceWeek(absence.absenceIds)
+                                : deleteAbsence(absence.absenceIds[0]))
+                            }
                           >
                             {absence.kind === "week" ? "Supprimer la semaine" : "Supprimer"}
                           </button>

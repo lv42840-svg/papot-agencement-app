@@ -14,7 +14,7 @@ describe("person-by-person absence register", () => {
   it("provides one tab for each person and filters the displayed absences", () => {
     expect(source).toContain('aria-label="Absences par personne"');
     expect(source).toContain('role="tab"');
-    expect(source).toContain('aria-selected={selected}');
+    expect(source).toContain("aria-selected={selected}");
     expect(source).toContain("setAbsenceUserId(person.id)");
     expect(source).toContain("shownAbsences.map((absence)");
     expect(source).toContain("groupPlanningAbsences");

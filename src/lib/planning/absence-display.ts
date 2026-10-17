@@ -1,4 +1,9 @@
-import { isoWeekDates, scheduleHoursForDate, DEFAULT_WEEKLY_SCHEDULE, type PlanningPersonCapacity } from "./capacity";
+import {
+  isoWeekDates,
+  scheduleHoursForDate,
+  DEFAULT_WEEKLY_SCHEDULE,
+  type PlanningPersonCapacity,
+} from "./capacity";
 import type { PlanningAbsence } from "./domain";
 import { isoWeekKey } from "./time-markers";
 
@@ -66,10 +71,12 @@ export function groupPlanningAbsences(
     const first = rows[0];
     const week = weekFor(first.date);
     if (
-      rows.some((row) =>
-        row.userId !== first.userId || row.type !== first.type || weekFor(row.date) !== week
+      rows.some(
+        (row) =>
+          row.userId !== first.userId || row.type !== first.type || weekFor(row.date) !== week,
       )
-    ) continue;
+    )
+      continue;
     results.push(groupedEntry(rows, week, "week:" + groupId));
     rows.forEach((row) => usedIds.add(row.id));
   }
@@ -99,9 +106,10 @@ export function groupPlanningAbsences(
       expected.length < 2 ||
       expected.length !== rows.length ||
       !expected.every((day) =>
-        rows.some((row) => row.date === day.date && Math.abs(row.hours - day.hours) < 0.000001)
+        rows.some((row) => row.date === day.date && Math.abs(row.hours - day.hours) < 0.000001),
       )
-    ) continue;
+    )
+      continue;
     results.push(groupedEntry(rows, week, "legacy-week:" + key));
     rows.forEach((row) => usedIds.add(row.id));
   }

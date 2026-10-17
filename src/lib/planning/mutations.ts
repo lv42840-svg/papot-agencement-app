@@ -137,7 +137,10 @@ export type PlanningFullWeekAbsenceMutation = Extract<
   { action: "setFullWeekAbsence" }
 >;
 export type PlanningDeleteAbsenceMutation = Extract<PlanningMutation, { action: "deleteAbsence" }>;
-export type PlanningDeleteAbsenceBatchMutation = Extract<PlanningMutation, { action: "deleteAbsenceBatch" }>;
+export type PlanningDeleteAbsenceBatchMutation = Extract<
+  PlanningMutation,
+  { action: "deleteAbsenceBatch" }
+>;
 
 export function applyPlanningMacroMutation(
   source: PlanningPayload,
@@ -576,9 +579,7 @@ export function applyPlanningDeleteAbsenceMutation(
   payload.absences = payload.absences
     .filter((absence) => absence.id !== input.absenceId)
     .map((absence) =>
-      groupId && absence.weekGroupId === groupId
-        ? { ...absence, weekGroupId: undefined }
-        : absence,
+      groupId && absence.weekGroupId === groupId ? { ...absence, weekGroupId: undefined } : absence,
     );
   return parsePlanningPayload(payload);
 }
@@ -594,12 +595,12 @@ export function applyPlanningDeleteAbsenceBatchMutation(
   if (selected.length !== ids.size) throw new Error("PLANNING_ABSENCE_NOT_FOUND");
   const first = selected[0];
   const weekDates = new Set(
-    isoWeekDates(isoWeekKey(new Date(first.date + "T12:00:00Z")))
-      .map((date) => date.toISOString().slice(0, 10)),
+    isoWeekDates(isoWeekKey(new Date(first.date + "T12:00:00Z"))).map((date) =>
+      date.toISOString().slice(0, 10),
+    ),
   );
-  if (selected.some((absence) =>
-    absence.userId !== first.userId || !weekDates.has(absence.date)
-  )) throw new Error("PLANNING_ABSENCE_BATCH_INVALID");
+  if (selected.some((absence) => absence.userId !== first.userId || !weekDates.has(absence.date)))
+    throw new Error("PLANNING_ABSENCE_BATCH_INVALID");
   payload.absences = payload.absences.filter((absence) => !ids.has(absence.id));
   const orphanGroupIds = new Set(
     selected.map((absence) => absence.weekGroupId).filter((id): id is string => !!id),
