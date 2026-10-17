@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 import { PlanningExcelGrid } from "./planning-excel-grid";
+import { suggestedAbsenceHoursForDate } from "@/lib/planning/capacity";
 import type { PlanningClipboardUpdate } from "@/lib/planning/clipboard";
 import { useCallback, useEffect, useMemo, useRef, useState, type FormEvent } from "react";
 import type {
@@ -124,7 +125,8 @@ export function GrandPlanningWorkspace({
   const [absenceUserId, setAbsenceUserId] = useState("");
   const [absenceType, setAbsenceType] = useState<PlanningAbsence["type"]>("VACATION");
   const [absenceDate, setAbsenceDate] = useState(`${initialYear}-01-01`);
-  const [absenceHours, setAbsenceHours] = useState("7,8");
+  // null uses the hours scheduled for the selected person and date.
+  const [absenceHours, setAbsenceHours] = useState<string | null>(null);
   const [absenceWeek, setAbsenceWeek] = useState(`${initialYear}-W01`);
   const [absenceEditId, setAbsenceEditId] = useState<string | null>(null);
   const [potentialCollapsed, setPotentialCollapsed] = useState(initialPotentialCollapsed);
@@ -173,6 +175,13 @@ export function GrandPlanningWorkspace({
   useEffect(() => {
     void load();
   }, [load]);
+
+  const suggestedAbsenceHours = useMemo(() => {
+    const person = snapshot?.peopleCapacity.find((entry) => entry.userId === absenceUserId);
+    if (!person) return 0;
+    return suggestedAbsenceHoursForDate(person.weeklySchedule, absenceDate);
+  }, [snapshot?.peopleCapacity, absenceUserId, absenceDate]);
+  const displayedAbsenceHours = absenceHours ?? formatHours(suggestedAbsenceHours);
 
   const capacityByWeek = useMemo(
     () => new Map(snapshot?.weeklyCapacity.map((item) => [item.week, item]) ?? []),
@@ -455,7 +464,7 @@ export function GrandPlanningWorkspace({
 
   async function saveAbsence() {
     if (!snapshot?.capabilities.canManageSchedules || !absenceUserId) return;
-    const hours = parseHours(absenceHours);
+    const hours = parseHours(displayedAbsenceHours);
     if (hours == null || hours <= 0 || hours > 24) {
       setMessage("Absence invalide : saisissez entre 0 et 24 h.");
       return;
@@ -473,6 +482,7 @@ export function GrandPlanningWorkspace({
     );
     if (saved) {
       setAbsenceEditId(null);
+      setAbsenceHours(null);
     }
   }
 
@@ -1062,7 +1072,10 @@ export function GrandPlanningWorkspace({
                   <select
                     value={absenceUserId}
                     disabled={!snapshot.capabilities.canManageSchedules}
-                    onChange={(event) => setAbsenceUserId(event.target.value)}
+                    onChange={(event) => {
+                      setAbsenceUserId(event.target.value);
+                      setAbsenceHours(null);
+                    }}
                   >
                     {snapshot.peopleCapacity.map((person) => (
                       <option key={person.userId} value={person.userId}>
@@ -1091,7 +1104,10 @@ export function GrandPlanningWorkspace({
                     type="date"
                     value={absenceDate}
                     disabled={!snapshot.capabilities.canManageSchedules}
-                    onChange={(event) => setAbsenceDate(event.target.value)}
+                    onChange={(event) => {
+                      setAbsenceDate(event.target.value);
+                      setAbsenceHours(null);
+                    }}
                   />
                 </label>
                 <label>
@@ -1099,11 +1115,16 @@ export function GrandPlanningWorkspace({
                   <input
                     className="planningAbsenceHours"
                     inputMode="decimal"
-                    value={absenceHours}
+                    value={displayedAbsenceHours}
                     disabled={!snapshot.capabilities.canManageSchedules}
                     onChange={(event) => setAbsenceHours(event.target.value)}
                   />
                 </label>
+                <span className="planningAbsenceSuggestion">
+                  {suggestedAbsenceHours === 0
+                    ? "0 h prévues ce jour (repos ou jour férié)"
+                    : `Proposition : ${formatHours(suggestedAbsenceHours)} h selon les horaires de la personne`}
+                </span>
                 <button
                   className="secondaryButton"
                   type="button"
@@ -1712,6 +1733,12 @@ export function GrandPlanningWorkspace({
           background: #fff;
           border: 1px solid var(--border);
           border-radius: 11px;
+        }
+        .planningAbsenceSuggestion {
+          align-self: end;
+          color: #75698d;
+          font-size: 10px;
+          padding-bottom: 7px;
         }
         .planningAbsenceForm,
         .planningFullWeekForm {
