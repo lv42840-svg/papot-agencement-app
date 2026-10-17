@@ -31,11 +31,7 @@ function resolveTitle(pathname: string) {
   return routeTitles.find(({ prefix }) => pathname.startsWith(prefix))?.title ?? "PAPOT AGENCEMENT";
 }
 
-export function DesktopTopbar({
-  displayName,
-  deviceLabel,
-  initials,
-}: DesktopTopbarProps) {
+export function DesktopTopbar({ displayName, deviceLabel, initials }: DesktopTopbarProps) {
   const pathname = usePathname();
   const [dateLabel, setDateLabel] = useState("");
   const pageTitle = useMemo(() => resolveTitle(pathname), [pathname]);
