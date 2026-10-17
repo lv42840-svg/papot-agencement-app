@@ -15,7 +15,7 @@ const firmId = "11111111-1111-4111-8111-111111111111";
 const anotherId = "22222222-2222-4222-8222-222222222222";
 const caseId = "33333333-3333-4333-8333-333333333333";
 const weeks = ["2026-W53", "2027-W01"];
-const rows: PlanningClipboardRow[] = [firmId, anotherId].map((id, index) => ({
+const rows: PlanningClipboardRow[] = [firmId, anotherId].map((id, index): PlanningClipboardRow => ({
   id,
   activities: [
     { activity: "BE", weeklyHours: { "2026-W53": 12 + index } },
