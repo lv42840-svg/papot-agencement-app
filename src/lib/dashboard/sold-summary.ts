@@ -34,6 +34,12 @@ export function calculateDashboardSoldSummary(
   const year = parts.find((part) => part.type === "year")?.value ?? "";
   const month = year + "-" + (parts.find((part) => part.type === "month")?.value ?? "");
   const byId = new Map(quotes.map((quote) => [quote.id, quote]));
+  const parisDate = new Intl.DateTimeFormat("en-CA", {
+    timeZone: "Europe/Paris",
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+  });
 
   function forPeriod(period: string): SoldPeriodSummary {
     let soldCents = 0;
@@ -45,7 +51,9 @@ export function calculateDashboardSoldSummary(
 
     for (const item of cases) {
       if (item.status !== "CONFIRMED" || !item.confirmedAt) continue;
-      const date = item.confirmedAt.slice(0, 10);
+      const dateParts = parisDate.formatToParts(new Date(item.confirmedAt));
+      const dateValues = Object.fromEntries(dateParts.map((part) => [part.type, part.value]));
+      const date = dateValues.year + "-" + dateValues.month + "-" + dateValues.day;
       if (!date.startsWith(period)) continue;
       confirmedCases += 1;
 
