@@ -33,9 +33,7 @@ export const billingDraftSchema = billingSourceSchema.extend({
   label: z.string().trim().min(1).max(240),
   notes: z.string().trim().max(4000),
   amountHtCents: centsSchema.positive(),
-  taxGroups: z.array(
-    billingTaxGroupSchema.extend({ vatCents: centsSchema }),
-  ).min(1),
+  taxGroups: z.array(billingTaxGroupSchema.extend({ vatCents: centsSchema })).min(1),
   vatCents: centsSchema,
   totalTtcCents: centsSchema.positive(),
   cumulativePercent: z.number().finite().min(0).max(100).nullable(),
@@ -92,7 +90,12 @@ export function distributeBillingTax(
   // Largest remainder keeps the total at exactly the requested cent, across VAT rates.
   const allocations = groups.map((group, index) => {
     const raw = (amountHtCents * group.baseHtCents) / contractHtCents;
-    return { index, ratePercent: group.ratePercent, baseHtCents: Math.floor(raw), fraction: raw % 1 };
+    return {
+      index,
+      ratePercent: group.ratePercent,
+      baseHtCents: Math.floor(raw),
+      fraction: raw % 1,
+    };
   });
   let remaining = amountHtCents - allocations.reduce((sum, row) => sum + row.baseHtCents, 0);
   for (const row of [...allocations].sort((a, b) => b.fraction - a.fraction || a.index - b.index)) {
@@ -127,12 +130,12 @@ export function resolveBillingAmount(input: {
       !Number.isFinite(input.cumulativePercent) ||
       input.cumulativePercent <= 0 ||
       input.cumulativePercent > 100
-    ) throw new Error("BILLING_PERCENT_INVALID");
+    )
+      throw new Error("BILLING_PERCENT_INVALID");
     const percentTarget = Math.round((contractHtCents * input.cumulativePercent) / 100);
     // Situation = cumulative advancement, from which previous invoices/deposits are deducted.
     // Deposit = percentage of the contract, not cumulative advancement.
-    amountHtCents =
-      type === "PROGRESS" ? percentTarget - alreadyPreparedCents : percentTarget;
+    amountHtCents = type === "PROGRESS" ? percentTarget - alreadyPreparedCents : percentTarget;
   } else {
     amountHtCents = input.amountHtCents ?? 0;
   }
@@ -208,7 +211,7 @@ export function updateBillingDraft(
   const amountHtCents =
     draft.type === "STANDARD" || draft.type === "FINAL"
       ? draft.amountHtCents
-      : input.amountHtCents ?? draft.amountHtCents;
+      : (input.amountHtCents ?? draft.amountHtCents);
   if (amountHtCents + alreadyPreparedCents > draft.contractHtCents) {
     throw new Error("BILLING_AMOUNT_EXCEEDS_CONTRACT");
   }
@@ -222,8 +225,7 @@ export function updateBillingDraft(
     vatCents: tax.vatCents,
     totalTtcCents: tax.ttcCents,
     // Editing the amount explicitly switches the draft away from a cumulative percentage.
-    cumulativePercent:
-      amountHtCents !== draft.amountHtCents ? null : draft.cumulativePercent,
+    cumulativePercent: amountHtCents !== draft.amountHtCents ? null : draft.cumulativePercent,
     updatedAt: now.toISOString(),
     updatedByName: actorName,
   });

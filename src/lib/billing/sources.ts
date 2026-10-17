@@ -12,7 +12,9 @@ import { billingSourceSchema, type BillingSource, type BillingTaxGroup } from ".
 function quoteContractTaxGroups(quote: NativeQuoteRecord): BillingTaxGroup[] {
   const price = calculateQuoteAdjustedPricing(quote.model.items, quote.pricingConfig);
   if (price.warnings.length > 0) throw new Error("BILLING_QUOTE_PRICING_REVIEW_REQUIRED");
-  const rates = new Map(quote.taxConfig.lineOverrides.map((item) => [item.lineId, item.ratePercent]));
+  const rates = new Map(
+    quote.taxConfig.lineOverrides.map((item) => [item.lineId, item.ratePercent]),
+  );
   const byRate = new Map<number, number>();
   for (const line of price.lines) {
     if (line.optionStatus === "PENDING" || line.optionStatus === "REJECTED") continue;
@@ -41,34 +43,46 @@ export async function loadBillingSources(): Promise<BillingSource[]> {
     chantiers.chantiers.map((chantier) => [chantier.sourceCommercialCaseId, chantier]),
   );
 
-  return quotes.quotes.flatMap((quote): BillingSource[] => {
-    const affair = byAffair.get(quote.commercialCaseId);
-    if (!affair || !affair.retainedQuoteIds.includes(quote.id)) return [];
-    if (quote.status === "DRAFT" || quote.status === "CANCELLED" ||
-        quote.status === "REJECTED" || quote.status === "SUPERSEDED") return [];
-    if (!affair.clientId || affair.clientId !== quote.model.clientId) return [];
-    const client = byClient.get(affair.clientId);
-    if (!client) return [];
+  return quotes.quotes
+    .flatMap((quote): BillingSource[] => {
+      const affair = byAffair.get(quote.commercialCaseId);
+      if (!affair || !affair.retainedQuoteIds.includes(quote.id)) return [];
+      if (
+        quote.status === "DRAFT" ||
+        quote.status === "CANCELLED" ||
+        quote.status === "REJECTED" ||
+        quote.status === "SUPERSEDED"
+      )
+        return [];
+      if (!affair.clientId || affair.clientId !== quote.model.clientId) return [];
+      const client = byClient.get(affair.clientId);
+      if (!client) return [];
 
-    try {
-      const taxGroups = quoteContractTaxGroups(quote);
-      const chantier = byAffairChantier.get(affair.id) ?? null;
-      return [billingSourceSchema.parse({
-        quoteId: quote.id,
-        commercialCaseId: affair.id,
-        chantierId: chantier?.id ?? null,
-        clientId: client.id,
-        clientName: clientDisplayName(client),
-        affairName: affair.name,
-        quoteLabel: quote.finalPdf?.quoteNumber ??
-          `${quote.variantName} · version ${quote.version}`,
-        contractHtCents: taxGroups.reduce((sum, group) => sum + group.baseHtCents, 0),
-        contractTaxGroups: taxGroups,
-      })];
-    } catch {
-      // Do not invoice a quote whose pricing needs review. It remains editable in Quotes.
-      return [];
-    }
-  }).sort((a, b) => a.affairName.localeCompare(b.affairName, "fr-FR") ||
-    a.quoteLabel.localeCompare(b.quoteLabel, "fr-FR"));
+      try {
+        const taxGroups = quoteContractTaxGroups(quote);
+        const chantier = byAffairChantier.get(affair.id) ?? null;
+        return [
+          billingSourceSchema.parse({
+            quoteId: quote.id,
+            commercialCaseId: affair.id,
+            chantierId: chantier?.id ?? null,
+            clientId: client.id,
+            clientName: clientDisplayName(client),
+            affairName: affair.name,
+            quoteLabel:
+              quote.finalPdf?.quoteNumber ?? `${quote.variantName} · version ${quote.version}`,
+            contractHtCents: taxGroups.reduce((sum, group) => sum + group.baseHtCents, 0),
+            contractTaxGroups: taxGroups,
+          }),
+        ];
+      } catch {
+        // Do not invoice a quote whose pricing needs review. It remains editable in Quotes.
+        return [];
+      }
+    })
+    .sort(
+      (a, b) =>
+        a.affairName.localeCompare(b.affairName, "fr-FR") ||
+        a.quoteLabel.localeCompare(b.quoteLabel, "fr-FR"),
+    );
 }

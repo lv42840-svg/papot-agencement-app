@@ -1,7 +1,10 @@
 import { NextResponse } from "next/server";
 import { z } from "zod";
 
-import { desktopRequestErrorStatus, requireModuleRequestContext } from "@/lib/desktop/request-context";
+import {
+  desktopRequestErrorStatus,
+  requireModuleRequestContext,
+} from "@/lib/desktop/request-context";
 import { createBillingDraft, updateBillingDraft, billingTypeSchema } from "@/lib/billing/domain";
 import { createBillingRepository } from "@/lib/billing/repository";
 import { loadBillingSources } from "@/lib/billing/sources";
@@ -10,28 +13,34 @@ export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
 const billingMutationSchema = z.discriminatedUnion("action", [
-  z.object({
-    action: z.literal("CREATE"),
-    requestId: z.string().uuid(),
-    quoteId: z.string().uuid(),
-    chantierId: z.string().uuid().nullable().optional(),
-    type: billingTypeSchema,
-    amountHtCents: z.number().int().positive().safe().optional(),
-    cumulativePercent: z.number().finite().gt(0).max(100).optional(),
-  }).strict(),
-  z.object({
-    action: z.literal("UPDATE"),
-    draftId: z.string().uuid(),
-    expectedUpdatedAt: z.string().datetime({ offset: true }),
-    label: z.string().trim().min(1).max(240),
-    notes: z.string().trim().max(4000),
-    amountHtCents: z.number().int().positive().safe().optional(),
-  }).strict(),
-  z.object({
-    action: z.literal("DELETE"),
-    draftId: z.string().uuid(),
-    expectedUpdatedAt: z.string().datetime({ offset: true }),
-  }).strict(),
+  z
+    .object({
+      action: z.literal("CREATE"),
+      requestId: z.string().uuid(),
+      quoteId: z.string().uuid(),
+      chantierId: z.string().uuid().nullable().optional(),
+      type: billingTypeSchema,
+      amountHtCents: z.number().int().positive().safe().optional(),
+      cumulativePercent: z.number().finite().gt(0).max(100).optional(),
+    })
+    .strict(),
+  z
+    .object({
+      action: z.literal("UPDATE"),
+      draftId: z.string().uuid(),
+      expectedUpdatedAt: z.string().datetime({ offset: true }),
+      label: z.string().trim().min(1).max(240),
+      notes: z.string().trim().max(4000),
+      amountHtCents: z.number().int().positive().safe().optional(),
+    })
+    .strict(),
+  z
+    .object({
+      action: z.literal("DELETE"),
+      draftId: z.string().uuid(),
+      expectedUpdatedAt: z.string().datetime({ offset: true }),
+    })
+    .strict(),
 ]);
 
 function noStoreJson(data: unknown, status = 200) {
@@ -42,8 +51,12 @@ function statusFor(code: string): number {
   const authStatus = desktopRequestErrorStatus(code);
   if (authStatus) return authStatus;
   if (code === "BILLING_DRAFT_NOT_FOUND" || code === "BILLING_QUOTE_NOT_AVAILABLE") return 404;
-  if (code === "BILLING_VERSION_CONFLICT" || code === "BILLING_AMOUNT_EXCEEDS_CONTRACT" ||
-      code === "BILLING_CONTRACT_ALREADY_PREPARED") return 409;
+  if (
+    code === "BILLING_VERSION_CONFLICT" ||
+    code === "BILLING_AMOUNT_EXCEEDS_CONTRACT" ||
+    code === "BILLING_CONTRACT_ALREADY_PREPARED"
+  )
+    return 409;
   return 400;
 }
 
@@ -80,9 +93,7 @@ export async function POST(request: Request) {
       } else if (input.action === "UPDATE") {
         const index = drafts.findIndex((draft) => draft.id === input.draftId);
         if (index < 0) throw new Error("BILLING_DRAFT_NOT_FOUND");
-        drafts[index] = updateBillingDraft(
-          current, input.draftId, input, context.user.displayName,
-        );
+        drafts[index] = updateBillingDraft(current, input.draftId, input, context.user.displayName);
       } else {
         const index = drafts.findIndex((draft) => draft.id === input.draftId);
         if (index < 0) throw new Error("BILLING_DRAFT_NOT_FOUND");
@@ -95,9 +106,12 @@ export async function POST(request: Request) {
     });
     return noStoreJson({ payload, canWrite: true });
   } catch (error) {
-    const code = error instanceof z.ZodError
-      ? "BILLING_REQUEST_INVALID"
-      : error instanceof Error ? error.message : "BILLING_MUTATION_FAILED";
+    const code =
+      error instanceof z.ZodError
+        ? "BILLING_REQUEST_INVALID"
+        : error instanceof Error
+          ? error.message
+          : "BILLING_MUTATION_FAILED";
     return noStoreJson({ error: code }, statusFor(code));
   }
 }

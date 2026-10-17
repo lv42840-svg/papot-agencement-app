@@ -1,7 +1,13 @@
 import { describe, expect, it } from "vitest";
 import {
-  createBillingDraft, distributeBillingTax, parseBillingPayload, preparedHtCents,
-  resolveBillingAmount, updateBillingDraft, type BillingPayload, type BillingSource,
+  createBillingDraft,
+  distributeBillingTax,
+  parseBillingPayload,
+  preparedHtCents,
+  resolveBillingAmount,
+  updateBillingDraft,
+  type BillingPayload,
+  type BillingSource,
 } from "../src/lib/billing/domain";
 
 const quoteId = "c6339770-f28e-4e0c-aa42-bcb81dc523f9";
@@ -25,7 +31,8 @@ const user = "Nadia";
 describe("Projets de facture issus des devis retenus", () => {
   it("calcule un acompte puis la situation cumulée après déduction de l'acompte", () => {
     const acompte = createBillingDraft(
-      empty(), source,
+      empty(),
+      source,
       { requestId: "00000000-0000-4000-8000-000000000001", type: "DEPOSIT", amountHtCents: 30_000 },
       user,
     );
@@ -37,29 +44,45 @@ describe("Projets de facture issus des devis retenus", () => {
 
     const payload = { schemaVersion: 1 as const, drafts: [acompte] };
     const situation = createBillingDraft(
-      payload, source,
-      { requestId: "00000000-0000-4000-8000-000000000002", type: "PROGRESS", cumulativePercent: 40 },
+      payload,
+      source,
+      {
+        requestId: "00000000-0000-4000-8000-000000000002",
+        type: "PROGRESS",
+        cumulativePercent: 40,
+      },
       user,
     );
     expect(situation.amountHtCents).toBe(30_000);
     const final = createBillingDraft(
-      { schemaVersion: 1, drafts: [acompte, situation] }, source,
-      { requestId: "00000000-0000-4000-8000-000000000003", type: "FINAL" }, user,
+      { schemaVersion: 1, drafts: [acompte, situation] },
+      source,
+      { requestId: "00000000-0000-4000-8000-000000000003", type: "FINAL" },
+      user,
     );
     expect(final.amountHtCents).toBe(90_000);
-    expect(preparedHtCents({ schemaVersion: 1, drafts: [acompte, situation, final] }, quoteId))
-      .toBe(150_000);
+    expect(
+      preparedHtCents({ schemaVersion: 1, drafts: [acompte, situation, final] }, quoteId),
+    ).toBe(150_000);
   });
 
   it("ne dépasse pas le contrat même avec plusieurs projets", () => {
-    expect(() => resolveBillingAmount({
-      type: "DEPOSIT", contractHtCents: 1_000, alreadyPreparedCents: 800,
-      amountHtCents: 250,
-    })).toThrow("BILLING_AMOUNT_EXCEEDS_CONTRACT");
-    expect(() => resolveBillingAmount({
-      type: "PROGRESS", contractHtCents: 1_000, alreadyPreparedCents: 800,
-      cumulativePercent: 50,
-    })).toThrow("BILLING_AMOUNT_INVALID");
+    expect(() =>
+      resolveBillingAmount({
+        type: "DEPOSIT",
+        contractHtCents: 1_000,
+        alreadyPreparedCents: 800,
+        amountHtCents: 250,
+      }),
+    ).toThrow("BILLING_AMOUNT_EXCEEDS_CONTRACT");
+    expect(() =>
+      resolveBillingAmount({
+        type: "PROGRESS",
+        contractHtCents: 1_000,
+        alreadyPreparedCents: 800,
+        cumulativePercent: 50,
+      }),
+    ).toThrow("BILLING_AMOUNT_INVALID");
   });
 
   it("répartit au centime exact entre taux de TVA", () => {
@@ -71,24 +94,35 @@ describe("Projets de facture issus des devis retenus", () => {
 
   it("modifie un brouillon sans perdre ses références et refuse une édition obsolète", () => {
     const draft = createBillingDraft(
-      empty(), source,
+      empty(),
+      source,
       { requestId: "00000000-0000-4000-8000-000000000004", type: "DEPOSIT", amountHtCents: 20_000 },
       user,
     );
     const payload = { schemaVersion: 1 as const, drafts: [draft] };
     const updated = updateBillingDraft(
-      payload, draft.id,
-      { expectedUpdatedAt: draft.updatedAt, label: "Acompte chantier", notes: "30 jours", amountHtCents: 22_000 },
+      payload,
+      draft.id,
+      {
+        expectedUpdatedAt: draft.updatedAt,
+        label: "Acompte chantier",
+        notes: "30 jours",
+        amountHtCents: 22_000,
+      },
       "Lucien",
       new Date("2026-10-17T10:00:00Z"),
     );
     expect(updated.amountHtCents).toBe(22_000);
     expect(updated.quoteId).toBe(quoteId);
     expect(updated.updatedByName).toBe("Lucien");
-    expect(() => updateBillingDraft(
-      { schemaVersion: 1, drafts: [updated] }, draft.id,
-      { expectedUpdatedAt: draft.updatedAt, label: "Périmé", notes: "" }, user,
-    )).toThrow("BILLING_VERSION_CONFLICT");
+    expect(() =>
+      updateBillingDraft(
+        { schemaVersion: 1, drafts: [updated] },
+        draft.id,
+        { expectedUpdatedAt: draft.updatedAt, label: "Périmé", notes: "" },
+        user,
+      ),
+    ).toThrow("BILLING_VERSION_CONFLICT");
     expect(parseBillingPayload({ schemaVersion: 1, drafts: [updated] }).drafts).toHaveLength(1);
   });
 });
