@@ -53,6 +53,7 @@ describeWithPostgres("Planning PostgreSQL storage", () => {
       provisionalOrder: [],
       peopleCapacity: [],
       staff: [],
+      dailyAssignments: [],
       absences: [],
     });
   });
