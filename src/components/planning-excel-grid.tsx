@@ -1,5 +1,15 @@
 "use client";
 
+import { useState } from "react";
+import {
+  formatPlanningSelection,
+  planPlanningPaste,
+  planningSelectionBounds,
+  type PlanningClipboardCell,
+  type PlanningClipboardKind,
+  type PlanningClipboardUpdate,
+} from "@/lib/planning/clipboard";
+
 import type {
   GrandPlanningChantierRow,
   GrandPlanningProvisionRow,
@@ -48,6 +58,8 @@ type Props = {
   onMoveFirm: (chantierId: string, direction: -1 | 1) => Promise<void>;
   onMoveProvision: (caseId: string, direction: -1 | 1) => Promise<void>;
   onTogglePotential: () => Promise<void>;
+  onPasteBatch: (updates: PlanningClipboardUpdate[]) => Promise<void>;
+  onClipboardError: (message: string) => void;
 };
 
 const ACTIVITIES: PlanningActivity[] = ["BE", "WORKSHOP", "INSTALL"];
@@ -84,7 +96,76 @@ export function PlanningExcelGrid({
   onMoveFirm,
   onMoveProvision,
   onTogglePotential,
+  onPasteBatch,
+  onClipboardError,
 }: Props) {
+  const [selection, setSelection] = useState<{
+    anchor: PlanningClipboardCell;
+    end: PlanningClipboardCell;
+  } | null>(null);
+
+  function rowsForKind(kind: PlanningClipboardKind) {
+    if (kind === "firm") {
+      return snapshot.rows.map((row) => ({ id: row.chantierId, activities: row.activities }));
+    }
+    return snapshot.provisionalRows.map((row) => ({ id: row.caseId, activities: row.activities }));
+  }
+
+  const selectedKeys = new Set<string>();
+  if (selection) {
+    const rows = rowsForKind(selection.anchor.kind);
+    const bounds = planningSelectionBounds(
+      selection.anchor, selection.end, rows, snapshot.weeks,
+    );
+    if (bounds) {
+      for (let r = bounds.top; r <= bounds.bottom; r++) {
+        for (let c = bounds.left; c <= bounds.right; c++) {
+          const week = snapshot.weeks[Math.floor(c / 3)];
+          const activity = ACTIVITIES[c % 3];
+          selectedKeys.add([selection.anchor.kind, rows[r].id, activity, week].join(":"));
+        }
+      }
+    }
+  }
+
+  function handleCopy(event: React.ClipboardEvent<HTMLTableElement>) {
+    if (!(event.target instanceof HTMLInputElement) || !selection) return;
+    try {
+      const value = formatPlanningSelection(
+        selection.anchor, selection.end,
+        rowsForKind(selection.anchor.kind), snapshot.weeks, drafts,
+      );
+      event.clipboardData.setData("text/plain", value);
+      event.preventDefault();
+    } catch (error) {
+      event.preventDefault();
+      onClipboardError(error instanceof Error ? error.message : "Copie impossible.");
+    }
+  }
+
+  function handlePaste(event: React.ClipboardEvent<HTMLTableElement>) {
+    if (!(event.target instanceof HTMLInputElement) || !selection) return;
+    event.preventDefault();
+    if (!snapshot.capabilities.canEditMacro || savingKey !== null) {
+      onClipboardError("Le planning est en lecture seule ou en cours d'enregistrement.");
+      return;
+    }
+    try {
+      const pastWeeks = new Set(weekMeta.filter((item) => item.isPast).map((item) => item.week));
+      const updates = planPlanningPaste(
+        event.clipboardData.getData("text/plain"),
+        selection.anchor,
+        selection.end,
+        rowsForKind(selection.anchor.kind),
+        snapshot.weeks,
+        (week) => pastWeeks.has(week),
+      );
+      void onPasteBatch(updates);
+    } catch (error) {
+      onClipboardError(error instanceof Error ? error.message : "Collage impossible.");
+    }
+  }
+
   const weekMeta = buildGrandPlanningWeekMeta(snapshot.weeks);
   const monthGroups = groupGrandPlanningMonths(weekMeta);
   const capacityByWeek = new Map(
@@ -140,15 +221,30 @@ export function PlanningExcelGrid({
     const readOnly =
       !snapshot.capabilities.canEditMacro ||
       Boolean(metaByWeek.get(week)?.isPast) ||
-      savingKey === key;
+      savingKey === key ||
+      savingKey === "planning-mutation";
     return (
       <input
         key={activity}
         aria-label={[name, kind === "provisional" ? "provisionnel" : "", activity, week]
           .filter(Boolean)
           .join(" ")}
-        className={savingKey === key ? "isSaving" : undefined}
-        disabled={readOnly}
+        className={[
+          savingKey === key ? "isSaving" : "",
+          selectedKeys.has(key) ? "isSelected" : "",
+        ].filter(Boolean).join(" ")}
+        readOnly={readOnly}
+        onFocus={() => setSelection({
+          anchor: { kind, id, activity, week },
+          end: { kind, id, activity, week },
+        })}
+        onMouseDown={(event) => {
+          if (!event.shiftKey || !selection || selection.anchor.kind !== kind) return;
+          event.preventDefault();
+          setSelection((current) => current
+            ? { anchor: current.anchor, end: { kind, id, activity, week } }
+            : current);
+        }}
         inputMode="decimal"
         title={[name, activity, week].join(" · ")}
         value={drafts[key] ?? (displayedHours === 0 ? "" : fmt(displayedHours))}
@@ -172,6 +268,8 @@ export function PlanningExcelGrid({
   return (
     <table
       className="excelPlanningTable"
+      onCopy={handleCopy}
+      onPaste={handlePaste}
       aria-label="Grand planning hebdomadaire par chantier, étude, fabrication et pose"
     >
       <thead>
@@ -190,7 +288,7 @@ export function PlanningExcelGrid({
           </th>
           {monthGroups.map((month) => (
             <th key={month.key} colSpan={month.span} className="excelMonthHeading">
-              {month.label} {month.key.slice(0, 4)}
+              {month.label} {month.year}
             </th>
           ))}
         </tr>
