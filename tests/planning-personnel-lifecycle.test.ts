@@ -153,6 +153,18 @@ describe("staff lifecycle, notice and concealment", () => {
     expect(
       effectivePlanningPeople(alsoHidden, accounts).filter((p) => p.countsInMacroCapacity),
     ).toHaveLength(1);
+    const fullWeek = buildWeeklyCapacityIndicators(
+      ["2026-W43"],
+      effectivePlanningPeople(counted, accounts),
+      new Map(),
+    )[0].totalCapacityHours;
+    const hiddenWeek = buildWeeklyCapacityIndicators(
+      ["2026-W43"],
+      effectivePlanningPeople(alsoHidden, accounts),
+      new Map(),
+    )[0].totalCapacityHours;
+    expect(hiddenWeek).toBe(fullWeek);
+    expect(hiddenWeek).toBe(38.5);
     const visible = applyPlanningStaffMutation(
       alsoHidden,
       {
