@@ -5,7 +5,6 @@ import { DesktopTopbar } from "./desktop-topbar";
 
 type DesktopDeviceIdentity = {
   deviceLabel: string;
-  configured: boolean;
 };
 
 function readDesktopDeviceIdentity(): DesktopDeviceIdentity {
@@ -13,7 +12,6 @@ function readDesktopDeviceIdentity(): DesktopDeviceIdentity {
   if (!rawConfig) {
     return {
       deviceLabel: "Poste PAPOT",
-      configured: false,
     };
   }
 
@@ -21,7 +19,6 @@ function readDesktopDeviceIdentity(): DesktopDeviceIdentity {
     const config = JSON.parse(rawConfig) as { device_label?: unknown };
     return {
       deviceLabel: typeof config.device_label === "string" ? config.device_label : "Poste PAPOT",
-      configured: true,
     };
   } catch {
     return {
@@ -54,7 +51,6 @@ export async function DesktopAppShell({ children }: { children: React.ReactNode 
           displayName={user.displayName}
           deviceLabel={device.deviceLabel}
           initials={initials}
-          configured={device.configured}
         />
         <main className="desktopMain">{children}</main>
       </div>
