@@ -26,7 +26,9 @@ export async function readMonthlyLaborCosts(): Promise<MonthlyLaborCostsPayload>
   return parseMonthlyLaborCostsPayload(result.rows[0]?.payload);
 }
 
-export async function mutateMonthlyLaborCosts(transform: Mutation): Promise<MonthlyLaborCostsPayload> {
+export async function mutateMonthlyLaborCosts(
+  transform: Mutation,
+): Promise<MonthlyLaborCostsPayload> {
   if (isLocalStorageMode()) {
     return mutateLocalSnapshot(LOCAL_KEY, parseMonthlyLaborCostsPayload, ({ payload }) => {
       const next = transform(payload);

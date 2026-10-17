@@ -80,10 +80,12 @@ export function MonthlyLaborCostsWorkspace() {
 
   function rowDraft(personId: string): Draft {
     const row = snapshot?.records.find((item) => item.personId === personId);
-    return drafts[personId] ?? {
-      cost: row ? (row.employerCostCents / 100).toFixed(2).replace(".", ",") : "",
-      hours: row ? String(row.workedHours).replace(".", ",") : "",
-    };
+    return (
+      drafts[personId] ?? {
+        cost: row ? (row.employerCostCents / 100).toFixed(2).replace(".", ",") : "",
+        hours: row ? String(row.workedHours).replace(".", ",") : "",
+      }
+    );
   }
 
   async function save(personId: string) {
@@ -153,15 +155,21 @@ export function MonthlyLaborCostsWorkspace() {
       {loading ? <p className="monthlyCostsNotice">Chargement…</p> : null}
       {forbidden ? (
         <p className="monthlyCostsNotice" role="alert">
-          Accès réservé aux utilisateurs autorisés au module Paie. Les montants salariaux
-          restent confidentiels.
+          Accès réservé aux utilisateurs autorisés au module Paie. Les montants salariaux restent
+          confidentiels.
         </p>
       ) : null}
-      {error ? <p className="monthlyCostsNotice" role="alert">{error}</p> : null}
+      {error ? (
+        <p className="monthlyCostsNotice" role="alert">
+          {error}
+        </p>
+      ) : null}
       {snapshot && !loading ? (
         <>
           {!snapshot.editable ? (
-            <p className="monthlyCostsNotice">Lecture seule : droit de modification du module Paie requis.</p>
+            <p className="monthlyCostsNotice">
+              Lecture seule : droit de modification du module Paie requis.
+            </p>
           ) : null}
           <div className="monthlyCostsTableWrap">
             <table className="monthlyCostsTable">
@@ -184,7 +192,14 @@ export function MonthlyLaborCostsWorkspace() {
                   const changed = drafts[person.id] !== undefined;
                   return (
                     <tr key={person.id}>
-                      <th scope="row">{person.name}{stored ? <small>Enregistré pour ce mois</small> : <small>À compléter</small>}</th>
+                      <th scope="row">
+                        {person.name}
+                        {stored ? (
+                          <small>Enregistré pour ce mois</small>
+                        ) : (
+                          <small>À compléter</small>
+                        )}
+                      </th>
                       <td>
                         <input
                           type="text"
@@ -193,10 +208,12 @@ export function MonthlyLaborCostsWorkspace() {
                           value={value.cost}
                           placeholder="0,00"
                           disabled={!snapshot.editable || saving !== null}
-                          onChange={(event) => setDrafts((old) => ({
-                            ...old,
-                            [person.id]: { ...value, cost: event.target.value },
-                          }))}
+                          onChange={(event) =>
+                            setDrafts((old) => ({
+                              ...old,
+                              [person.id]: { ...value, cost: event.target.value },
+                            }))
+                          }
                         />
                       </td>
                       <td>
@@ -207,12 +224,17 @@ export function MonthlyLaborCostsWorkspace() {
                           value={value.hours}
                           placeholder="0"
                           disabled={!snapshot.editable || saving !== null}
-                          onChange={(event) => setDrafts((old) => ({
-                            ...old,
-                            [person.id]: { ...value, hours: event.target.value },
-                          }))}
+                          onChange={(event) =>
+                            setDrafts((old) => ({
+                              ...old,
+                              [person.id]: { ...value, hours: event.target.value },
+                            }))
+                          }
                           onKeyDown={(event) => {
-                            if (event.key === "Enter") { event.preventDefault(); void save(person.id); }
+                            if (event.key === "Enter") {
+                              event.preventDefault();
+                              void save(person.id);
+                            }
                           }}
                         />
                       </td>
@@ -220,46 +242,129 @@ export function MonthlyLaborCostsWorkspace() {
                         {rate === null ? "—" : displayMoney(rate) + " / h"}
                       </td>
                       <td>
-                        <button className="secondaryButton" type="button"
+                        <button
+                          className="secondaryButton"
+                          type="button"
                           disabled={!snapshot.editable || !changed || saving !== null}
-                          onClick={() => void save(person.id)}>
+                          onClick={() => void save(person.id)}
+                        >
                           {saving === person.id ? "Enregistrement…" : "Enregistrer"}
                         </button>
                       </td>
                     </tr>
                   );
                 })}
-                {snapshot.people.length === 0 ? <tr><td colSpan={5}>Aucun salarié connu.</td></tr> : null}
+                {snapshot.people.length === 0 ? (
+                  <tr>
+                    <td colSpan={5}>Aucun salarié connu.</td>
+                  </tr>
+                ) : null}
               </tbody>
             </table>
           </div>
           <p className="monthlyCostsNote">
-            Pour une semaine à cheval sur deux mois, la ventilation est estimée selon les
-            horaires habituels des jours ouvrés du salarié. Une paie manquante laisse le coût
-            du chantier non calculable, plutôt que d’afficher un total incomplet.
+            Pour une semaine à cheval sur deux mois, la ventilation est estimée selon les horaires
+            habituels des jours ouvrés du salarié. Une paie manquante laisse le coût du chantier non
+            calculable, plutôt que d’afficher un total incomplet.
           </p>
         </>
       ) : null}
-      {message ? <p className="monthlyCostsNotice" role="status">{message}</p> : null}
+      {message ? (
+        <p className="monthlyCostsNotice" role="status">
+          {message}
+        </p>
+      ) : null}
       <style jsx global>{`
-        .papotMonthlyCosts { display: grid; gap: 16px; color: #29223c; padding-bottom: 30px; }
-        .papotMonthlyCosts h2 { margin: 4px 0 8px; font-size: 22px; }
-        .papotMonthlyCosts header p:not(.eyebrow) { max-width: 920px; font-size: 13px; color: #746b83; }
-        .monthlyCostsPeriod { display: flex; align-items: center; gap: 14px; background: #f6f2fc;
-          border: 1px solid #e5dbf0; padding: 14px; border-radius: 10px; flex-wrap: wrap; }
-        .monthlyCostsPeriod label { font-weight: 800; font-size: 13px; }
-        .monthlyCostsPeriod input { padding: 9px; background: white; border: 1px solid #cec4dd; border-radius: 7px; }
-        .monthlyCostsTableWrap { overflow-x: auto; border: 1px solid #ded5e9; border-radius: 10px; }
-        .monthlyCostsTable { width: 100%; border-collapse: collapse; background: white; min-width: 760px; }
-        .monthlyCostsTable th,.monthlyCostsTable td { text-align: left; padding: 12px; border-bottom: 1px solid #e8e2f0; font-size: 12px; }
-        .monthlyCostsTable thead th { background: #eae3f6; color: #53417a; }
-        .monthlyCostsTable tbody tr:nth-child(even) { background: #fcfaff; }
-        .monthlyCostsTable tbody th small { display: block; margin-top: 4px; font-weight: 500; color: #80758e; }
-        .monthlyCostsTable input { width: 155px; max-width: 100%; border: 1px solid #d8ceea;
-          border-radius: 6px; padding: 9px; text-align: right; }
-        .monthlyCostsRate { color: #5a488b; font-weight: 800; white-space: nowrap; }
-        .monthlyCostsNote { font-size: 12px; color: #746b83; margin: 0; }
-        .monthlyCostsNotice { padding: 12px; background: #f5f0ff; border-radius: 8px; font-size: 12px; }
+        .papotMonthlyCosts {
+          display: grid;
+          gap: 16px;
+          color: #29223c;
+          padding-bottom: 30px;
+        }
+        .papotMonthlyCosts h2 {
+          margin: 4px 0 8px;
+          font-size: 22px;
+        }
+        .papotMonthlyCosts header p:not(.eyebrow) {
+          max-width: 920px;
+          font-size: 13px;
+          color: #746b83;
+        }
+        .monthlyCostsPeriod {
+          display: flex;
+          align-items: center;
+          gap: 14px;
+          background: #f6f2fc;
+          border: 1px solid #e5dbf0;
+          padding: 14px;
+          border-radius: 10px;
+          flex-wrap: wrap;
+        }
+        .monthlyCostsPeriod label {
+          font-weight: 800;
+          font-size: 13px;
+        }
+        .monthlyCostsPeriod input {
+          padding: 9px;
+          background: white;
+          border: 1px solid #cec4dd;
+          border-radius: 7px;
+        }
+        .monthlyCostsTableWrap {
+          overflow-x: auto;
+          border: 1px solid #ded5e9;
+          border-radius: 10px;
+        }
+        .monthlyCostsTable {
+          width: 100%;
+          border-collapse: collapse;
+          background: white;
+          min-width: 760px;
+        }
+        .monthlyCostsTable th,
+        .monthlyCostsTable td {
+          text-align: left;
+          padding: 12px;
+          border-bottom: 1px solid #e8e2f0;
+          font-size: 12px;
+        }
+        .monthlyCostsTable thead th {
+          background: #eae3f6;
+          color: #53417a;
+        }
+        .monthlyCostsTable tbody tr:nth-child(even) {
+          background: #fcfaff;
+        }
+        .monthlyCostsTable tbody th small {
+          display: block;
+          margin-top: 4px;
+          font-weight: 500;
+          color: #80758e;
+        }
+        .monthlyCostsTable input {
+          width: 155px;
+          max-width: 100%;
+          border: 1px solid #d8ceea;
+          border-radius: 6px;
+          padding: 9px;
+          text-align: right;
+        }
+        .monthlyCostsRate {
+          color: #5a488b;
+          font-weight: 800;
+          white-space: nowrap;
+        }
+        .monthlyCostsNote {
+          font-size: 12px;
+          color: #746b83;
+          margin: 0;
+        }
+        .monthlyCostsNotice {
+          padding: 12px;
+          background: #f5f0ff;
+          border-radius: 8px;
+          font-size: 12px;
+        }
       `}</style>
     </section>
   );

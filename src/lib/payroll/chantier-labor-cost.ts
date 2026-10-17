@@ -27,7 +27,9 @@ export function monthlySharesForWeek(
     const month = date.toISOString().slice(0, 7);
     byMonth.set(month, (byMonth.get(month) ?? 0) + weights[index] / weightSum);
   });
-  return [...byMonth].filter(([, fraction]) => fraction > 0).map(([month, fraction]) => ({ month, fraction }));
+  return [...byMonth]
+    .filter(([, fraction]) => fraction > 0)
+    .map(([month, fraction]) => ({ month, fraction }));
 }
 
 /**
@@ -47,7 +49,9 @@ export function calculateChantierLaborCostCents(
   const byPersonMonth = new Map(
     records.map((record) => [record.personId + ":" + record.month, record]),
   );
-  const byPerson = new Map(personCapacities.map((person) => [person.userId, person.weeklySchedule]));
+  const byPerson = new Map(
+    personCapacities.map((person) => [person.userId, person.weeklySchedule]),
+  );
   let totalCents = 0;
 
   for (const entry of entries) {

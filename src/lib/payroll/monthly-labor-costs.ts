@@ -12,7 +12,11 @@ export const monthlyLaborCostInputSchema = z.object({
     .finite()
     .positive()
     .max(744)
-    .refine((value) => Number.isInteger(Math.round(value * 100)) && Math.abs(Math.round(value * 100) - value * 100) < 0.000001),
+    .refine(
+      (value) =>
+        Number.isInteger(Math.round(value * 100)) &&
+        Math.abs(Math.round(value * 100) - value * 100) < 0.000001,
+    ),
 });
 
 export const monthlyLaborCostRecordSchema = monthlyLaborCostInputSchema
@@ -52,7 +56,9 @@ export function assertClosedMonth(month: string, now = new Date()): void {
   if (month >= parisCurrentMonth(now)) throw new Error("MONTHLY_LABOR_COST_MONTH_NOT_CLOSED");
 }
 
-export function monthlyHourlyRateEuro(record: Pick<MonthlyLaborCostRecord, "employerCostCents" | "workedHours">): number {
+export function monthlyHourlyRateEuro(
+  record: Pick<MonthlyLaborCostRecord, "employerCostCents" | "workedHours">,
+): number {
   return record.employerCostCents / 100 / record.workedHours;
 }
 

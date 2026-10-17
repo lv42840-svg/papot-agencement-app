@@ -1,7 +1,11 @@
 import { NextResponse } from "next/server";
 import { ZodError } from "zod";
 import { chantierSpecialPermissionForMutation } from "@/lib/auth/action-permissions";
-import { hasEffectiveSpecialPermission, hasModuleAccess, requireSpecialPermission } from "@/lib/auth/permissions";
+import {
+  hasEffectiveSpecialPermission,
+  hasModuleAccess,
+  requireSpecialPermission,
+} from "@/lib/auth/permissions";
 import { createChantiersRepository } from "@/lib/chantiers/create-repository";
 import type { ChantiersPayload } from "@/lib/chantiers/domain";
 import {
@@ -89,12 +93,14 @@ async function snapshot(
     actualLaborCostsByChantier: Object.fromEntries(
       payload.chantiers.map((chantier) => [
         chantier.id,
-        monthlyCosts ? calculateChantierLaborCostCents(
-          chantier.id,
-          planningPayload.actualHours,
-          monthlyCosts.records,
-          planningPayload.peopleCapacity,
-        ) : null,
+        monthlyCosts
+          ? calculateChantierLaborCostCents(
+              chantier.id,
+              planningPayload.actualHours,
+              monthlyCosts.records,
+              planningPayload.peopleCapacity,
+            )
+          : null,
       ]),
     ),
     actor,

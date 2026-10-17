@@ -31,8 +31,20 @@ describe("monthly employer costs", () => {
     const first = saveMonthlyLaborCost(initial, september, ids, "Nadia", now);
     expect(monthlyHourlyRateEuro(first.records[0])).toBe(25);
     expect(initial.records).toHaveLength(0);
-    const second = saveMonthlyLaborCost(first, { ...september, month: "2026-10" }, ids, "Nadia", now);
-    const corrected = saveMonthlyLaborCost(second, { ...september, employerCostCents: 468000 }, ids, "Lucien", now);
+    const second = saveMonthlyLaborCost(
+      first,
+      { ...september, month: "2026-10" },
+      ids,
+      "Nadia",
+      now,
+    );
+    const corrected = saveMonthlyLaborCost(
+      second,
+      { ...september, employerCostCents: 468000 },
+      ids,
+      "Lucien",
+      now,
+    );
     expect(corrected.records).toHaveLength(2);
     expect(corrected.records.find((r) => r.month === "2026-09")?.employerCostCents).toBe(468000);
     expect(corrected.records.find((r) => r.month === "2026-10")?.employerCostCents).toBe(390000);
@@ -44,8 +56,12 @@ describe("monthly employer costs", () => {
     expect(() => assertClosedMonth("2026-09", new Date("2026-10-17T12:00:00Z"))).not.toThrow();
     expect(() => monthlyLaborCostInputSchema.parse({ ...september, workedHours: 0 })).toThrow();
     expect(() => monthlyLaborCostInputSchema.parse({ ...september, workedHours: 6.123 })).toThrow();
-    expect(() => monthlyLaborCostInputSchema.parse({ ...september, employerCostCents: -100 })).toThrow();
-    expect(() => saveMonthlyLaborCost(parseMonthlyLaborCostsPayload(null), september, new Set(), "Nadia", now)).toThrow("MONTHLY_LABOR_COST_PERSON_NOT_FOUND");
+    expect(() =>
+      monthlyLaborCostInputSchema.parse({ ...september, employerCostCents: -100 }),
+    ).toThrow();
+    expect(() =>
+      saveMonthlyLaborCost(parseMonthlyLaborCostsPayload(null), september, new Set(), "Nadia", now),
+    ).toThrow("MONTHLY_LABOR_COST_PERSON_NOT_FOUND");
   });
 
   it("uses the employee's working-day share for a week crossing September and October", () => {
@@ -62,12 +78,29 @@ describe("monthly employer costs", () => {
       { chantierId, userId: personId, activity: "BE" as const, week: "2026-W40", hours: 10 },
     ];
     const original = structuredClone(week);
-    const septemberCost = saveMonthlyLaborCost(parseMonthlyLaborCostsPayload(null), {
-      ...september, employerCostCents: 312000, workedHours: 156,
-    }, ids, "Nadia", now);
-    const withOctober = saveMonthlyLaborCost(septemberCost, {
-      ...september, month: "2026-10", employerCostCents: 468000, workedHours: 156,
-    }, ids, "Nadia", now);
+    const septemberCost = saveMonthlyLaborCost(
+      parseMonthlyLaborCostsPayload(null),
+      {
+        ...september,
+        employerCostCents: 312000,
+        workedHours: 156,
+      },
+      ids,
+      "Nadia",
+      now,
+    );
+    const withOctober = saveMonthlyLaborCost(
+      septemberCost,
+      {
+        ...september,
+        month: "2026-10",
+        employerCostCents: 468000,
+        workedHours: 156,
+      },
+      ids,
+      "Nadia",
+      now,
+    );
     expect(calculateChantierLaborCostCents(chantierId, week, septemberCost.records, [])).toBeNull();
     expect(calculateChantierLaborCostCents(chantierId, week, withOctober.records, [])).toBe(24000);
     expect(week).toEqual(original);
