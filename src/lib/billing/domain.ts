@@ -366,6 +366,7 @@ export function updateBillingDocument(
     label: string;
     notes: string;
     documentLines: BillingDocumentLine[];
+    linePercentages?: Array<{ lineId: string; percent: number }>;
   },
   actorName: string,
   now = new Date(),
@@ -401,6 +402,20 @@ export function updateBillingDocument(
     }
   }
   const totals = calculateInvoiceDocumentTotals(documentLines);
+  const priorDrafts = payload.drafts.slice(0, index);
+  const recalculatedProgress = input.linePercentages
+    ? calculateLineProgress(
+        { schemaVersion: 1, drafts: priorDrafts },
+        draft,
+        input.linePercentages,
+      )
+    : null;
+  if (recalculatedProgress && draft.type !== "PROGRESS") {
+    throw new Error("BILLING_PROGRESS_INPUT_CONFLICT");
+  }
+  const progressChanged = recalculatedProgress?.lineProgress.some((row) =>
+    row.percent !== draft.lineProgress?.find((previous) => previous.lineId === row.lineId)?.percent
+  ) ?? false;
   const priorCents = preparedHtCents(payload, draft.quoteId, draft.id);
   if (totals.amountHtCents + priorCents > draft.contractHtCents) {
     throw new Error("BILLING_AMOUNT_EXCEEDS_CONTRACT");
@@ -413,7 +428,7 @@ export function updateBillingDocument(
           0) !== group.baseHtCents,
     );
   if (
-    financialChange &&
+    (financialChange || progressChanged) &&
     payload.drafts.slice(index + 1).some((candidate) => candidate.quoteId === draft.quoteId)
   ) {
     throw new Error("BILLING_DRAFT_HAS_DEPENDENTS");
@@ -423,6 +438,9 @@ export function updateBillingDocument(
     label: input.label,
     notes: input.notes,
     documentLines,
+    ...(recalculatedProgress
+      ? { lineProgress: recalculatedProgress.lineProgress, cumulativePercent: null }
+      : {}),
     amountHtCents: totals.amountHtCents,
     taxGroups: totals.taxGroups,
     vatCents: totals.vatCents,
