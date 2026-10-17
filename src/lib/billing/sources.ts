@@ -52,7 +52,8 @@ export async function loadBillingSources(): Promise<BillingSource[]> {
         affair.status !== "CONFIRMED" ||
         !affair.retainedQuoteIds.includes(quote.id) ||
         !quoteCanBeRetained(quote)
-      ) return [];
+      )
+        return [];
       if (!affair.clientId || affair.clientId !== quote.model.clientId) return [];
       const client = byClient.get(affair.clientId);
       if (!client) return [];
