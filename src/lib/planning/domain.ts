@@ -305,6 +305,15 @@ export function planningYearWeekIds(year: number): string[] {
   });
 }
 
+export function planningYearWeekIdsRange(startYear: number, endYear: number): string[] {
+  if (endYear < startYear || endYear - startYear > 2) {
+    throw new Error("PLANNING_YEAR_RANGE_INVALID");
+  }
+  return Array.from({ length: endYear - startYear + 1 }, (_, offset) =>
+    planningYearWeekIds(startYear + offset),
+  ).flat();
+}
+
 function orderActiveChantiers(
   chantiers: ChantierRecord[],
   chantierOrder: string[],
@@ -328,8 +337,9 @@ export function buildFirmGrandPlanningRows(
   chantiersPayload: ChantiersPayload,
   planningPayload: PlanningPayload,
   year: number,
+  endYear = year,
 ): GrandPlanningChantierRow[] {
-  const weeks = new Set(planningYearWeekIds(year));
+  const weeks = new Set(planningYearWeekIdsRange(year, endYear));
   const activities: PlanningActivity[] = ["BE", "WORKSHOP", "INSTALL"];
 
   return orderActiveChantiers(chantiersPayload.chantiers, planningPayload.chantierOrder).map(
@@ -389,8 +399,9 @@ export function buildCommercialProvisionRows(
   commercialPayload: CommercialPayload,
   planningPayload: PlanningPayload,
   year: number,
+  endYear = year,
 ): GrandPlanningProvisionRow[] {
-  const weeks = new Set(planningYearWeekIds(year));
+  const weeks = new Set(planningYearWeekIdsRange(year, endYear));
   const activities: PlanningActivity[] = ["BE", "WORKSHOP", "INSTALL"];
 
   const rank = new Map(planningPayload.provisionalOrder.map((id, index) => [id, index]));
