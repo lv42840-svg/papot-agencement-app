@@ -115,7 +115,9 @@ async function snapshot(
     .sort((a, b) => a.name.localeCompare(b.name, "fr"));
   const chantierIds = new Set(chantierRows.map((chantier) => chantier.id));
   const suggestedChantierIds = scheduledChantiersByPerson(
-    planning.dailyAssignments, week, chantierRows,
+    planning.dailyAssignments,
+    week,
+    chantierRows,
   );
   return {
     week,

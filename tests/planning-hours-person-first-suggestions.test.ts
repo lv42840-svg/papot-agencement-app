@@ -48,9 +48,12 @@ describe("weekly person-first actual hours suggestions", () => {
       [personA]: [chantierA],
       [personB]: [chantierB, chantierC],
     });
-    expect(scheduledChantiersByPerson(rows, "2026-W43", [
-      ...sites, { id: crypto.randomUUID(), name: "Clinique Annecy" },
-    ])[personB]).toEqual([chantierC]);
+    expect(
+      scheduledChantiersByPerson(rows, "2026-W43", [
+        ...sites,
+        { id: crypto.randomUUID(), name: "Clinique Annecy" },
+      ])[personB],
+    ).toEqual([chantierC]);
   });
 
   it("handles ISO year boundary, empty weeks and deleted chantiers", () => {

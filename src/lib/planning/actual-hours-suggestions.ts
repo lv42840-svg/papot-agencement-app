@@ -36,7 +36,5 @@ export function scheduledChantiersByPerson(
     ids.add(chantierId);
     byPerson.set(entry.userId, ids);
   }
-  return Object.fromEntries(
-    [...byPerson].map(([userId, ids]) => [userId, [...ids]]),
-  );
+  return Object.fromEntries([...byPerson].map(([userId, ids]) => [userId, [...ids]]));
 }

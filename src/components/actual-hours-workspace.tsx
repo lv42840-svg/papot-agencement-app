@@ -90,7 +90,7 @@ export function ActualHoursWorkspace() {
       setData(json);
       setDrafts({});
       setPersonId((old) =>
-        json.people.some((person) => person.id === old) ? old : json.people[0]?.id ?? "",
+        json.people.some((person) => person.id === old) ? old : (json.people[0]?.id ?? ""),
       );
       setExtraIds([]);
       setExtraChoice("");
@@ -112,19 +112,19 @@ export function ActualHoursWorkspace() {
   const suggestedIds = data?.suggestedChantierIds?.[personId] ?? [];
   const plannedIds = new Set(suggestedIds);
   const recordedIds = useMemo(
-    () => new Set(
-      data?.records.filter((entry) => entry.userId === personId)
-        .map((entry) => entry.chantierId) ?? [],
-    ),
+    () =>
+      new Set(
+        data?.records
+          .filter((entry) => entry.userId === personId)
+          .map((entry) => entry.chantierId) ?? [],
+      ),
     [data?.records, personId],
   );
   const visibleIds = new Set([...suggestedIds, ...recordedIds, ...extraIds]);
-  const displayedChantiers = data?.chantiers.filter((chantier) =>
-    visibleIds.has(chantier.id),
-  ) ?? [];
-  const availableChantiers = data?.chantiers.filter((chantier) =>
-    !visibleIds.has(chantier.id),
-  ) ?? [];
+  const displayedChantiers =
+    data?.chantiers.filter((chantier) => visibleIds.has(chantier.id)) ?? [];
+  const availableChantiers =
+    data?.chantiers.filter((chantier) => !visibleIds.has(chantier.id)) ?? [];
   const savedHours = useMemo(() => {
     const found = new Map<string, number>();
     for (const entry of data?.records ?? []) {
@@ -146,7 +146,8 @@ export function ActualHoursWorkspace() {
     return ACTIVITIES.reduce((sum, activity) => sum + cellHours(chantierId, activity), 0);
   }
   const totalForWeek = displayedChantiers.reduce(
-    (sum, chantier) => sum + totalForSite(chantier.id), 0,
+    (sum, chantier) => sum + totalForSite(chantier.id),
+    0,
   );
 
   function choosePerson(nextId: string) {
@@ -171,7 +172,9 @@ export function ActualHoursWorkspace() {
     const workshop = parseHours(cellValue(chantierId, "WORKSHOP"));
     const install = parseHours(cellValue(chantierId, "INSTALL"));
     if (be === null || workshop === null || install === null) {
-      setMessage("Heures invalides : utilise un nombre positif avec deux décimales maximum (ex. 7,5).");
+      setMessage(
+        "Heures invalides : utilise un nombre positif avec deux décimales maximum (ex. 7,5).",
+      );
       return;
     }
     if (be + workshop + install > 168) {
@@ -217,8 +220,8 @@ export function ActualHoursWorkspace() {
           <p className="eyebrow">PAPOT AGENCEMENT · PRODUCTION</p>
           <h1>Saisie des heures réelles</h1>
           <p>
-            Choisis une personne, puis retrouve ses chantiers de la semaine. Tu peux aussi
-            ajouter un chantier absent du petit planning.
+            Choisis une personne, puis retrouve ses chantiers de la semaine. Tu peux aussi ajouter
+            un chantier absent du petit planning.
           </p>
         </div>
         <div className="actualHoursActions">
@@ -242,7 +245,9 @@ export function ActualHoursWorkspace() {
           >
             {!data?.people.length ? <option value="">Aucun salarié</option> : null}
             {data?.people.map((person) => (
-              <option key={person.id} value={person.id}>{person.name}</option>
+              <option key={person.id} value={person.id}>
+                {person.name}
+              </option>
             ))}
           </select>
         </label>
@@ -254,7 +259,9 @@ export function ActualHoursWorkspace() {
               className="secondaryButton"
               disabled={saving !== null}
               onClick={() => setWeek(relativeWeek(week, -1))}
-            >←</button>
+            >
+              ←
+            </button>
             <input
               type="week"
               aria-label="Semaine de saisie"
@@ -269,7 +276,9 @@ export function ActualHoursWorkspace() {
               className="secondaryButton"
               disabled={saving !== null || relativeWeek(week, 1) >= isoWeekKey(new Date())}
               onClick={() => setWeek(relativeWeek(week, 1))}
-            >→</button>
+            >
+              →
+            </button>
           </div>
           <small>{weekDateRangeLabel(week)}</small>
         </label>
@@ -278,7 +287,10 @@ export function ActualHoursWorkspace() {
       {loading ? <p className="actualHoursNotice">Chargement…</p> : null}
       {error ? (
         <p className="actualHoursNotice" role="alert">
-          {error} <button type="button" onClick={() => void load()}>Réessayer</button>
+          {error}{" "}
+          <button type="button" onClick={() => void load()}>
+            Réessayer
+          </button>
         </p>
       ) : null}
 
@@ -286,7 +298,8 @@ export function ActualHoursWorkspace() {
         <>
           {!data.weekIsPast ? (
             <p className="actualHoursNotice">
-              Cette semaine n&apos;est pas terminée. Choisis une semaine écoulée pour saisir les heures réelles.
+              Cette semaine n&apos;est pas terminée. Choisis une semaine écoulée pour saisir les
+              heures réelles.
             </p>
           ) : null}
           {data.weekIsPast && !data.editable ? (
@@ -296,10 +309,22 @@ export function ActualHoursWorkspace() {
           ) : null}
 
           <div className="actualHoursMetrics">
-            <div><small>Salarié</small><strong>{selectedPerson.name}</strong></div>
-            <div><small>Chantiers prévus cette semaine</small><strong>{suggestedIds.length}</strong></div>
-            <div><small>Chantiers avec heures enregistrées</small><strong>{recordedIds.size}</strong></div>
-            <div><small>Total salarié / semaine</small><strong>{formatHours(totalForWeek)} h</strong></div>
+            <div>
+              <small>Salarié</small>
+              <strong>{selectedPerson.name}</strong>
+            </div>
+            <div>
+              <small>Chantiers prévus cette semaine</small>
+              <strong>{suggestedIds.length}</strong>
+            </div>
+            <div>
+              <small>Chantiers avec heures enregistrées</small>
+              <strong>{recordedIds.size}</strong>
+            </div>
+            <div>
+              <small>Total salarié / semaine</small>
+              <strong>{formatHours(totalForWeek)} h</strong>
+            </div>
           </div>
 
           <div className="actualHoursTableWrap">
@@ -316,13 +341,14 @@ export function ActualHoursWorkspace() {
               </thead>
               <tbody>
                 {displayedChantiers.map((chantier) => {
-                  const dirty = ACTIVITIES.some((activity) =>
-                    drafts[keyFor(chantier.id, activity)] !== undefined,
+                  const dirty = ACTIVITIES.some(
+                    (activity) => drafts[keyFor(chantier.id, activity)] !== undefined,
                   );
                   return (
                     <tr key={chantier.id}>
                       <th scope="row">
-                        {chantier.reference ? chantier.reference + " · " : ""}{chantier.name}
+                        {chantier.reference ? chantier.reference + " · " : ""}
+                        {chantier.name}
                         <small className="actualHoursSiteSource">
                           {plannedIds.has(chantier.id)
                             ? "Prévu au petit planning"
@@ -340,10 +366,12 @@ export function ActualHoursWorkspace() {
                             value={cellValue(chantier.id, activity)}
                             placeholder="0"
                             disabled={!data.editable || saving !== null}
-                            onChange={(event) => setDrafts((current) => ({
-                              ...current,
-                              [keyFor(chantier.id, activity)]: event.target.value,
-                            }))}
+                            onChange={(event) =>
+                              setDrafts((current) => ({
+                                ...current,
+                                [keyFor(chantier.id, activity)]: event.target.value,
+                              }))
+                            }
                             onKeyDown={(event) => {
                               if (event.key === "Enter") {
                                 event.preventDefault();
@@ -353,23 +381,29 @@ export function ActualHoursWorkspace() {
                           />
                         </td>
                       ))}
-                      <td className="actualHoursTotal">{formatHours(totalForSite(chantier.id))} h</td>
+                      <td className="actualHoursTotal">
+                        {formatHours(totalForSite(chantier.id))} h
+                      </td>
                       <td>
                         <button
                           className="secondaryButton"
                           type="button"
                           disabled={!data.editable || saving !== null || !dirty}
                           onClick={() => void saveChantier(chantier.id)}
-                        >{saving === chantier.id ? "Enregistrement…" : "Enregistrer"}</button>
+                        >
+                          {saving === chantier.id ? "Enregistrement…" : "Enregistrer"}
+                        </button>
                       </td>
                     </tr>
                   );
                 })}
                 {displayedChantiers.length === 0 ? (
-                  <tr><td colSpan={6}>
-                    Aucun chantier prévu pour cette personne cette semaine.
-                    Utilise « + Ajouter un chantier » pour saisir du réalisé.
-                  </td></tr>
+                  <tr>
+                    <td colSpan={6}>
+                      Aucun chantier prévu pour cette personne cette semaine. Utilise « + Ajouter un
+                      chantier » pour saisir du réalisé.
+                    </td>
+                  </tr>
                 ) : null}
               </tbody>
               <tfoot>
@@ -377,8 +411,13 @@ export function ActualHoursWorkspace() {
                   <th>Total salarié / semaine</th>
                   {ACTIVITIES.map((activity) => (
                     <td key={activity}>
-                      {formatHours(displayedChantiers.reduce((sum, chantier) =>
-                        sum + cellHours(chantier.id, activity), 0))} h
+                      {formatHours(
+                        displayedChantiers.reduce(
+                          (sum, chantier) => sum + cellHours(chantier.id, activity),
+                          0,
+                        ),
+                      )}{" "}
+                      h
                     </td>
                   ))}
                   <td>{formatHours(totalForWeek)} h</td>
@@ -395,7 +434,9 @@ export function ActualHoursWorkspace() {
                 className="secondaryButton"
                 disabled={!data.editable || saving !== null || availableChantiers.length === 0}
                 onClick={() => setShowAdd(true)}
-              >+ Ajouter un chantier</button>
+              >
+                + Ajouter un chantier
+              </button>
             ) : (
               <>
                 <label>
@@ -408,7 +449,8 @@ export function ActualHoursWorkspace() {
                     <option value="">Choisir un chantier…</option>
                     {availableChantiers.map((chantier) => (
                       <option key={chantier.id} value={chantier.id}>
-                        {chantier.reference ? chantier.reference + " · " : ""}{chantier.name}
+                        {chantier.reference ? chantier.reference + " · " : ""}
+                        {chantier.name}
                       </option>
                     ))}
                   </select>
@@ -418,19 +460,26 @@ export function ActualHoursWorkspace() {
                   className="secondaryButton"
                   disabled={!extraChoice}
                   onClick={addChantier}
-                >Ajouter</button>
+                >
+                  Ajouter
+                </button>
                 <button
                   type="button"
                   className="secondaryButton"
-                  onClick={() => { setExtraChoice(""); setShowAdd(false); }}
-                >Annuler</button>
+                  onClick={() => {
+                    setExtraChoice("");
+                    setShowAdd(false);
+                  }}
+                >
+                  Annuler
+                </button>
               </>
             )}
           </div>
           <p className="actualHoursHint">
-            Les chantiers proposés viennent du petit planning. Les chantiers avec des
-            heures déjà enregistrées restent visibles. Tu peux ajouter un chantier non prévu.
-            Les heures réelles ne modifient pas les affectations du petit planning.
+            Les chantiers proposés viennent du petit planning. Les chantiers avec des heures déjà
+            enregistrées restent visibles. Tu peux ajouter un chantier non prévu. Les heures réelles
+            ne modifient pas les affectations du petit planning.
           </p>
         </>
       ) : null}
