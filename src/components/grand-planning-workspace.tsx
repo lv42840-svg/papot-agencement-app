@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { PlanningExcelGrid } from "./planning-excel-grid";
 import type { PlanningClipboardUpdate } from "@/lib/planning/clipboard";
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState, type FormEvent } from "react";
 import type {
   GrandPlanningChantierRow,
   GrandPlanningProvisionRow,
@@ -367,7 +367,7 @@ export function GrandPlanningWorkspace({
     return true;
   }
 
-  async function saveStaff(event: React.FormEvent<HTMLFormElement>) {
+  async function saveStaff(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     const firstName = staffFirstName.trim();
     const lastName = staffLastName.trim();
