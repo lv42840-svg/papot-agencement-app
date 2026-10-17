@@ -39,10 +39,16 @@ export const planningProvisionalAllocationSchema = z.object({
 
 // Day-by-day team board is distinct from sold/allocated weekly activity hours.
 // A blank assignment is represented by no record.
+export const planningDailyActivitySchema = z.enum(["BE", "WORKSHOP", "INSTALL", "NOTE"]);
+export type PlanningDailyActivity = z.infer<typeof planningDailyActivitySchema>;
+
 export const planningDailyAssignmentSchema = z.object({
+  // Old saved lines have no id or activity. They remain readable and editable.
+  id: z.string().uuid().optional(),
   userId: z.string().uuid(),
   date: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, "PLANNING_DAY_INVALID"),
   chantierId: z.string().uuid().nullable(),
+  activity: planningDailyActivitySchema.default("NOTE"),
   label: z.string().trim().min(1).max(160),
 });
 export type PlanningDailyAssignment = z.infer<typeof planningDailyAssignmentSchema>;
@@ -159,17 +165,29 @@ export const planningPayloadSchema = z
       }
     });
 
-    const dailyKeys = new Set<string>();
+    const dailyIds = new Set<string>();
+    const legacyDayKeys = new Set<string>();
     value.dailyAssignments.forEach((assignment, index) => {
-      const key = `${assignment.userId}:${assignment.date}`;
-      if (dailyKeys.has(key)) {
-        context.addIssue({
-          code: z.ZodIssueCode.custom,
-          path: ["dailyAssignments", index],
-          message: "PLANNING_DAILY_DUPLICATE",
-        });
+      if (assignment.id) {
+        if (dailyIds.has(assignment.id)) {
+          context.addIssue({
+            code: z.ZodIssueCode.custom,
+            path: ["dailyAssignments", index, "id"],
+            message: "PLANNING_DAILY_DUPLICATE",
+          });
+        }
+        dailyIds.add(assignment.id);
+      } else {
+        const key = `${assignment.userId}:${assignment.date}`;
+        if (legacyDayKeys.has(key)) {
+          context.addIssue({
+            code: z.ZodIssueCode.custom,
+            path: ["dailyAssignments", index],
+            message: "PLANNING_DAILY_DUPLICATE",
+          });
+        }
+        legacyDayKeys.add(key);
       }
-      dailyKeys.add(key);
     });
 
     const absenceKeys = new Set<string>();
