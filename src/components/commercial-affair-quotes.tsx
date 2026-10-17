@@ -60,7 +60,12 @@ function statusTone(status: CommercialQuoteDisplayStatus): string {
   return "draft";
 }
 
-export function CommercialAffairQuotes({ item, busy, canProvision, mutate }: {
+export function CommercialAffairQuotes({
+  item,
+  busy,
+  canProvision,
+  mutate,
+}: {
   item: CommercialCase;
   busy: boolean;
   canProvision: boolean;
@@ -119,8 +124,12 @@ export function CommercialAffairQuotes({ item, busy, canProvision, mutate }: {
   );
   const retainedIds = useMemo(() => new Set(item.retainedQuoteIds), [item.retainedQuoteIds]);
   const forecastIds = useMemo(() => new Set(item.forecastQuoteIds ?? []), [item.forecastQuoteIds]);
-  const forecastHours = useMemo(() => effectiveCommercialForecastHours(item, quotes), [item, quotes]);
-  const forecastLocked = !canProvision || busy || isCommercialClosed(item) || item.status === "CONFIRMED";
+  const forecastHours = useMemo(
+    () => effectiveCommercialForecastHours(item, quotes),
+    [item, quotes],
+  );
+  const forecastLocked =
+    !canProvision || busy || isCommercialClosed(item) || item.status === "CONFIRMED";
 
   async function toggleForecastQuote(quoteId: string, checked: boolean) {
     if (forecastLocked) return;
@@ -237,7 +246,10 @@ export function CommercialAffairQuotes({ item, busy, canProvision, mutate }: {
           )}
 
           {item.status !== "CONFIRMED" && !isCommercialClosed(item) ? (
-            <div className="commercialAffairForecastOverview" aria-label="Heures du planning prévisionnel">
+            <div
+              className="commercialAffairForecastOverview"
+              aria-label="Heures du planning prévisionnel"
+            >
               <div>
                 <strong>Devis comptés dans le prévisionnel</strong>
                 <span>
@@ -247,14 +259,21 @@ export function CommercialAffairQuotes({ item, busy, canProvision, mutate }: {
                 </span>
               </div>
               <strong>
-                BE {hoursLabel(forecastHours.be)} · Atelier {hoursLabel(forecastHours.workshop)} · Pose {hoursLabel(forecastHours.install)}
+                BE {hoursLabel(forecastHours.be)} · Atelier {hoursLabel(forecastHours.workshop)} ·
+                Pose {hoursLabel(forecastHours.install)}
               </strong>
               {item.forecastQuoteIds != null && canProvision ? (
-                <button type="button" className="commercialForecastManualButton" disabled={busy}
-                  onClick={() => void mutate(
-                    { action: "useManualProvision", caseId: item.id },
-                    "Retour à la charge prévisionnelle manuelle.",
-                  )}>
+                <button
+                  type="button"
+                  className="commercialForecastManualButton"
+                  disabled={busy}
+                  onClick={() =>
+                    void mutate(
+                      { action: "useManualProvision", caseId: item.id },
+                      "Retour à la charge prévisionnelle manuelle.",
+                    )
+                  }
+                >
                   Revenir aux heures manuelles
                 </button>
               ) : null}
@@ -274,68 +293,73 @@ export function CommercialAffairQuotes({ item, busy, canProvision, mutate }: {
                         aria-label={`Compter le devis ${quote.variantName} V${quote.version} dans le prévisionnel`}
                         checked={forecastIds.has(quote.id)}
                         disabled={forecastLocked}
-                        onChange={(event) => void toggleForecastQuote(quote.id, event.target.checked)}
+                        onChange={(event) =>
+                          void toggleForecastQuote(quote.id, event.target.checked)
+                        }
                       />
                       <span>Prévisionnel</span>
                     </label>
                   ) : null}
-                  <button type="button" className="commercialAffairQuoteRow"
-                  onDoubleClick={() => window.location.assign(quoteEditorHref(quote.id))}
-                  onKeyDown={(event) => {
-                    if (event.key === "Enter") window.location.assign(quoteEditorHref(quote.id));
-                  }}
-                  title="Double-clique pour ouvrir ce devis dans le module Devis"
-                >
-                  <div className="commercialAffairQuoteMain">
-                    <FileText size={16} />
-                    <div>
-                      <strong>{quote.model.subject}</strong>
-                      <span>
-                        {quote.finalPdf
-                          ? `${quote.finalPdf.quoteNumber} · `
-                          : "Numéro à attribuer · "}
-                        {quote.variantName} · V{quote.version} · {dateLabel(quote.model.issueDate)}
+                  <button
+                    type="button"
+                    className="commercialAffairQuoteRow"
+                    onDoubleClick={() => window.location.assign(quoteEditorHref(quote.id))}
+                    onKeyDown={(event) => {
+                      if (event.key === "Enter") window.location.assign(quoteEditorHref(quote.id));
+                    }}
+                    title="Double-clique pour ouvrir ce devis dans le module Devis"
+                  >
+                    <div className="commercialAffairQuoteMain">
+                      <FileText size={16} />
+                      <div>
+                        <strong>{quote.model.subject}</strong>
+                        <span>
+                          {quote.finalPdf
+                            ? `${quote.finalPdf.quoteNumber} · `
+                            : "Numéro à attribuer · "}
+                          {quote.variantName} · V{quote.version} ·{" "}
+                          {dateLabel(quote.model.issueDate)}
+                        </span>
+                      </div>
+                    </div>
+
+                    <div className="commercialAffairQuoteFigures" aria-label="Chiffres du devis">
+                      <div>
+                        <span>Total HT</span>
+                        <strong>{moneyLabel(summary.totalHtCents)}</strong>
+                      </div>
+                      <div>
+                        <span>Heures vendues</span>
+                        <strong>{hoursLabel(summary.soldHours)}</strong>
+                      </div>
+                      <div>
+                        <span>Déboursé prévu</span>
+                        <strong>
+                          {summary.plannedDisbursementCents === null
+                            ? "À compléter"
+                            : moneyLabel(summary.plannedDisbursementCents)}
+                        </strong>
+                      </div>
+                    </div>
+
+                    <div className="commercialAffairQuoteMeta">
+                      {item.status === "CONFIRMED" ? (
+                        <span
+                          className={`commercialAffairQuoteRetention ${
+                            retainedIds.has(quote.id) ? "retained" : "notRetained"
+                          }`}
+                        >
+                          {retainedIds.has(quote.id) ? "Retenu / accepté" : "Non retenu / classé"}
+                        </span>
+                      ) : null}
+                      {quote.followUpDate ? (
+                        <small>Relance {dateLabel(quote.followUpDate)}</small>
+                      ) : null}
+                      <span className={`commercialAffairQuoteStatus ${statusTone(displayStatus)}`}>
+                        {COMMERCIAL_QUOTE_STATUS_LABELS[displayStatus]}
                       </span>
                     </div>
-                  </div>
-
-                  <div className="commercialAffairQuoteFigures" aria-label="Chiffres du devis">
-                    <div>
-                      <span>Total HT</span>
-                      <strong>{moneyLabel(summary.totalHtCents)}</strong>
-                    </div>
-                    <div>
-                      <span>Heures vendues</span>
-                      <strong>{hoursLabel(summary.soldHours)}</strong>
-                    </div>
-                    <div>
-                      <span>Déboursé prévu</span>
-                      <strong>
-                        {summary.plannedDisbursementCents === null
-                          ? "À compléter"
-                          : moneyLabel(summary.plannedDisbursementCents)}
-                      </strong>
-                    </div>
-                  </div>
-
-                  <div className="commercialAffairQuoteMeta">
-                    {item.status === "CONFIRMED" ? (
-                      <span
-                        className={`commercialAffairQuoteRetention ${
-                          retainedIds.has(quote.id) ? "retained" : "notRetained"
-                        }`}
-                      >
-                        {retainedIds.has(quote.id) ? "Retenu / accepté" : "Non retenu / classé"}
-                      </span>
-                    ) : null}
-                    {quote.followUpDate ? (
-                      <small>Relance {dateLabel(quote.followUpDate)}</small>
-                    ) : null}
-                    <span className={`commercialAffairQuoteStatus ${statusTone(displayStatus)}`}>
-                      {COMMERCIAL_QUOTE_STATUS_LABELS[displayStatus]}
-                    </span>
-                  </div>
-                </button>
+                  </button>
                 </div>
               );
             })}

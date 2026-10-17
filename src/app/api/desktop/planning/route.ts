@@ -106,7 +106,13 @@ async function snapshot(
     ]);
   const weeks = planningYearWeekIdsRange(year, endYear);
   const rows = buildFirmGrandPlanningRows(chantiers, planning, year, endYear);
-  const provisionalRows = buildCommercialProvisionRows(commercial, planning, year, endYear, quotes.quotes);
+  const provisionalRows = buildCommercialProvisionRows(
+    commercial,
+    planning,
+    year,
+    endYear,
+    quotes.quotes,
+  );
   const firmLoadByWeek = new Map<string, number>();
   const provisionalLoadByWeek = new Map<string, number>();
 

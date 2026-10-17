@@ -34,7 +34,10 @@ import {
   clearPlanningProvisionForCommercialCase,
   syncPlanningPotentialOrderForCommercialCase,
 } from "@/lib/planning/mutations";
-import { assertForecastQuoteSelection, effectiveCommercialForecastHours } from "@/lib/commercial/forecast-quotes";
+import {
+  assertForecastQuoteSelection,
+  effectiveCommercialForecastHours,
+} from "@/lib/commercial/forecast-quotes";
 import { createQuotesRepository } from "@/lib/quotes/create-repository";
 import {
   validateAdditionalRetainedQuote,

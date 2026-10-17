@@ -458,7 +458,7 @@ export function applyCommercialMutation(
       item.closedAt = now.toISOString();
       item.closingReason = text(input.closingReason ?? "");
       item.provisionHours = { be: 0, workshop: 0, install: 0 };
-    item.forecastQuoteIds = [];
+      item.forecastQuoteIds = [];
       touch(item, actor, now);
       history(
         item,
@@ -558,7 +558,13 @@ export function applyCommercialMutation(
     if (item.status === "CONFIRMED") throw new Error("COMMERCIAL_ALREADY_CONFIRMED");
     item.forecastQuoteIds = null;
     touch(item, actor, now);
-    history(item, actor.displayName, "FORECAST_QUOTES_UPDATED", "Retour à la charge manuelle.", now);
+    history(
+      item,
+      actor.displayName,
+      "FORECAST_QUOTES_UPDATED",
+      "Retour à la charge manuelle.",
+      now,
+    );
     return { payload, focusCaseId: item.id };
   }
 
