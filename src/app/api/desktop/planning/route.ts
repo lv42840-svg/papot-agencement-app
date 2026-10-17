@@ -140,7 +140,7 @@ async function snapshot(
       provisionalLoadByWeek,
     ),
     absences: planning.absences
-      .filter((absence) => absence.date.startsWith(String(year)))
+      .filter((absence) => Number(absence.date.slice(0, 4)) >= year && Number(absence.date.slice(0, 4)) <= endYear)
       .map((absence) => ({
         ...absence,
         displayName: userById.get(absence.userId)?.displayName ?? "Utilisateur",
