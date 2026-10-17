@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 import { PlanningExcelGrid } from "./planning-excel-grid";
+import { groupPlanningAbsences, type AbsenceDisplayEntry } from "@/lib/planning/absence-display";
 import { suggestedAbsenceHoursForDate } from "@/lib/planning/capacity";
 import type { PlanningClipboardUpdate } from "@/lib/planning/clipboard";
 import { useCallback, useEffect, useMemo, useRef, useState, type FormEvent } from "react";
@@ -14,6 +15,7 @@ import {
   buildGrandPlanningWeekMeta,
   groupGrandPlanningMonths,
   isoWeekKey,
+  weekDateRangeLabel,
 } from "@/lib/planning/time-markers";
 
 type WeeklyCapacity = {
@@ -44,6 +46,7 @@ type PersonCapacity = {
 };
 type PlanningAbsence = {
   id: string;
+  weekGroupId?: string;
   userId: string;
   displayName: string;
   type: "VACATION" | "SICK" | "OTHER";
@@ -182,6 +185,28 @@ export function GrandPlanningWorkspace({
     return suggestedAbsenceHoursForDate(person.weeklySchedule, absenceDate);
   }, [snapshot?.peopleCapacity, absenceUserId, absenceDate]);
   const displayedAbsenceHours = absenceHours ?? formatHours(suggestedAbsenceHours);
+
+  const groupedAbsences = useMemo(
+    () => groupPlanningAbsences(snapshot?.absences ?? [], snapshot?.peopleCapacity ?? []),
+    [snapshot?.absences, snapshot?.peopleCapacity],
+  );
+  const absencePeople = useMemo(() => {
+    const listed =
+      snapshot?.peopleCapacity.map((person) => ({
+        id: person.userId,
+        displayName: person.displayName,
+      })) ?? [];
+    const ids = new Set(listed.map((person) => person.id));
+    for (const absence of snapshot?.absences ?? []) {
+      if (ids.has(absence.userId)) continue;
+      ids.add(absence.userId);
+      listed.push({ id: absence.userId, displayName: absence.displayName });
+    }
+    return listed;
+  }, [snapshot?.peopleCapacity, snapshot?.absences]);
+  const shownAbsences = groupedAbsences.filter(
+    (absence) => absence.userId === (absenceUserId || absencePeople[0]?.id),
+  );
 
   const capacityByWeek = useMemo(
     () => new Map(snapshot?.weeklyCapacity.map((item) => [item.week, item]) ?? []),
@@ -506,6 +531,25 @@ export function GrandPlanningWorkspace({
   async function deleteAbsence(absenceId: string) {
     if (!snapshot?.capabilities.canManageSchedules) return;
     await postPlanningMutation({ action: "deleteAbsence", absenceId }, "Absence supprimée.");
+  }
+
+  async function deleteAbsenceWeek(ids: string[]) {
+    if (!snapshot?.capabilities.canManageSchedules) return;
+    await postPlanningMutation(
+      { action: "deleteAbsenceBatch", absenceIds: ids },
+      "Semaine d’absence supprimée.",
+    );
+  }
+
+  function editAbsenceWeek(absence: AbsenceDisplayEntry) {
+    setAbsenceEditId(null);
+    setAbsenceHours(null);
+    setAbsenceUserId(absence.userId);
+    setAbsenceType(absence.type);
+    setAbsenceWeek(absence.week);
+    setMessage(
+      "Semaine sélectionnée : modifie le type puis clique sur « Mettre toute la semaine en absence ».",
+    );
   }
 
   function editAbsence(absence: PlanningAbsence) {
@@ -1174,15 +1218,58 @@ export function GrandPlanningWorkspace({
                 </button>
               </div>
 
-              <div className="planningAbsenceList">
-                {snapshot.absences.length === 0 ? (
-                  <p className="muted">Aucune absence enregistrée sur {snapshot.year}.</p>
+              <div
+                className="planningAbsencePersonTabs"
+                role="tablist"
+                aria-label="Absences par personne"
+              >
+                {absencePeople.map((person) => {
+                  const selected = (absenceUserId || absencePeople[0]?.id) === person.id;
+                  const count = groupedAbsences.filter(
+                    (absence) => absence.userId === person.id,
+                  ).length;
+                  return (
+                    <button
+                      key={person.id}
+                      type="button"
+                      role="tab"
+                      aria-selected={selected}
+                      className={selected ? "isActive" : ""}
+                      onClick={() => {
+                        setAbsenceUserId(person.id);
+                        setAbsenceEditId(null);
+                        setAbsenceHours(null);
+                      }}
+                    >
+                      {person.displayName} <span>({count})</span>
+                    </button>
+                  );
+                })}
+              </div>
+              <div className="planningAbsenceList" role="tabpanel">
+                {shownAbsences.length === 0 ? (
+                  <p className="muted">Aucune absence enregistrée pour cette personne.</p>
                 ) : (
-                  snapshot.absences.map((absence) => (
-                    <div className="planningAbsenceRow" key={absence.id}>
+                  shownAbsences.map((absence) => (
+                    <div
+                      className={
+                        absence.kind === "week"
+                          ? "planningAbsenceRow planningAbsenceWeekRow"
+                          : "planningAbsenceRow"
+                      }
+                      key={absence.key}
+                    >
                       <div>
-                        <strong>{absence.displayName}</strong>
-                        <span>{absence.date}</span>
+                        <strong>
+                          {absence.kind === "week"
+                            ? `Semaine ${absence.week.slice(-2)}`
+                            : absence.startDate.split("-").reverse().join("/")}
+                        </strong>
+                        {absence.kind === "week" ? (
+                          <span>
+                            {weekDateRangeLabel(absence.week)} · {absence.days} jour(s)
+                          </span>
+                        ) : null}
                         <span>{absence.typeLabel}</span>
                         <span>{formatHours(absence.hours)} h</span>
                       </div>
@@ -1191,16 +1278,31 @@ export function GrandPlanningWorkspace({
                           <button
                             className="secondaryButton"
                             type="button"
-                            onClick={() => editAbsence(absence)}
+                            disabled={savingKey !== null}
+                            onClick={() => {
+                              if (absence.kind === "week") {
+                                editAbsenceWeek(absence);
+                              } else {
+                                const detail = snapshot.absences.find(
+                                  (entry) => entry.id === absence.absenceIds[0],
+                                );
+                                if (detail) editAbsence(detail);
+                              }
+                            }}
                           >
-                            Modifier
+                            {absence.kind === "week" ? "Modifier la semaine" : "Modifier"}
                           </button>
                           <button
                             className="secondaryButton"
                             type="button"
-                            onClick={() => void deleteAbsence(absence.id)}
+                            disabled={savingKey !== null}
+                            onClick={() =>
+                              void (absence.kind === "week"
+                                ? deleteAbsenceWeek(absence.absenceIds)
+                                : deleteAbsence(absence.absenceIds[0]))
+                            }
                           >
-                            Supprimer
+                            {absence.kind === "week" ? "Supprimer la semaine" : "Supprimer"}
                           </button>
                         </div>
                       ) : null}
@@ -1771,6 +1873,36 @@ export function GrandPlanningWorkspace({
         .planningAbsenceHours {
           width: 72px;
           min-width: 72px !important;
+        }
+        .planningAbsencePersonTabs {
+          display: flex;
+          flex-wrap: wrap;
+          gap: 6px;
+          margin-top: 16px;
+          padding-bottom: 8px;
+          border-bottom: 1px solid #e1dbef;
+        }
+        .planningAbsencePersonTabs button {
+          border: 1px solid #dcd6eb;
+          border-radius: 7px 7px 0 0;
+          padding: 8px 12px;
+          background: #faf9fd;
+          color: #605776;
+          font-size: 11px;
+          font-weight: 700;
+        }
+        .planningAbsencePersonTabs button.isActive {
+          background: #ede6ff;
+          border-color: #ad99dd;
+          color: #514091;
+        }
+        .planningAbsencePersonTabs button span {
+          font-size: 10px;
+          opacity: 0.75;
+        }
+        .planningAbsenceWeekRow {
+          border-left: 3px solid #9475ce !important;
+          background: #f8f5ff;
         }
         .planningAbsenceList {
           display: grid;

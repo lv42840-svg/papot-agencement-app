@@ -54,6 +54,7 @@ export const planningAbsenceSchema = z.object({
   type: planningAbsenceTypeSchema,
   date: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, "PLANNING_ABSENCE_DATE_INVALID"),
   hours: z.number().finite().positive().max(24),
+  weekGroupId: z.string().uuid().optional(),
 });
 export type PlanningAbsence = z.infer<typeof planningAbsenceSchema>;
 
