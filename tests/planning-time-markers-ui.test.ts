@@ -22,7 +22,7 @@ describe("grand planning temporal markers UI", () => {
   });
 
   it("displays Sxx and uses the date range as a tooltip", () => {
-    expect(gridSource).toContain('meta.week.slice(-2)');
+    expect(gridSource).toContain("meta.week.slice(-2)");
     expect(gridSource).toContain("title={meta.dateRangeLabel}");
   });
 
