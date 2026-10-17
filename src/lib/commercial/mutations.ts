@@ -458,6 +458,7 @@ export function applyCommercialMutation(
       item.closedAt = now.toISOString();
       item.closingReason = text(input.closingReason ?? "");
       item.provisionHours = { be: 0, workshop: 0, install: 0 };
+    item.forecastQuoteIds = [];
       touch(item, actor, now);
       history(
         item,
