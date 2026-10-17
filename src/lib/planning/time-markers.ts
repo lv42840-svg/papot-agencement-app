@@ -29,6 +29,7 @@ export type GrandPlanningWeekMeta = {
 export type GrandPlanningMonthGroup = {
   key: string;
   label: string;
+  year: number;
   span: number;
 };
 
@@ -102,7 +103,7 @@ export function groupGrandPlanningMonths(
 
   for (const week of weeks) {
     const previous = groups.at(-1);
-    if (previous && previous.label === week.monthLabel) {
+    if (previous && previous.label === week.monthLabel && previous.year === week.monday.getUTCFullYear()) {
       previous.span += 1;
       continue;
     }
@@ -110,6 +111,7 @@ export function groupGrandPlanningMonths(
     groups.push({
       key: `${week.week}:${week.monthLabel}`,
       label: week.monthLabel,
+      year: week.monday.getUTCFullYear(),
       span: 1,
     });
   }
