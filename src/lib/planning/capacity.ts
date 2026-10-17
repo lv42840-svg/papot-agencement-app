@@ -81,25 +81,37 @@ function dateId(date: Date): string {
   return date.toISOString().slice(0, 10);
 }
 
-export function frenchNationalPublicHolidayIds(year: number): Set<string> {
+export type FrenchPublicHoliday = {
+  date: string;
+  label: string;
+};
+
+export function frenchNationalPublicHolidays(year: number): FrenchPublicHoliday[] {
   const easter = easterSunday(year);
-  const fixed = [
-    [1, 1],
-    [5, 1],
-    [5, 8],
-    [7, 14],
-    [8, 15],
-    [11, 1],
-    [11, 11],
-    [12, 25],
-  ] as const;
-  const ids = new Set(
-    fixed.map(([month, day]) => dateId(new Date(Date.UTC(year, month - 1, day)))),
+  const fixed: Array<[number, number, string]> = [
+    [1, 1, "Jour de l’An"],
+    [5, 1, "Fête du Travail"],
+    [5, 8, "Victoire du 8 mai 1945"],
+    [7, 14, "Fête nationale"],
+    [8, 15, "Assomption"],
+    [11, 1, "Toussaint"],
+    [11, 11, "Armistice 1918"],
+    [12, 25, "Noël"],
+  ];
+  const entries: FrenchPublicHoliday[] = fixed.map(([month, day, label]) => ({
+    date: dateId(new Date(Date.UTC(year, month - 1, day))),
+    label,
+  }));
+  entries.push(
+    { date: dateId(addUtcDays(easter, 1)), label: "Lundi de Pâques" },
+    { date: dateId(addUtcDays(easter, 39)), label: "Ascension" },
+    { date: dateId(addUtcDays(easter, 50)), label: "Lundi de Pentecôte" },
   );
-  ids.add(dateId(addUtcDays(easter, 1)));
-  ids.add(dateId(addUtcDays(easter, 39)));
-  ids.add(dateId(addUtcDays(easter, 50)));
-  return ids;
+  return entries.sort((a, b) => a.date.localeCompare(b.date));
+}
+
+export function frenchNationalPublicHolidayIds(year: number): Set<string> {
+  return new Set(frenchNationalPublicHolidays(year).map((holiday) => holiday.date));
 }
 
 export function isoWeekDates(weekId: string): Date[] {
@@ -112,6 +124,13 @@ export function isoWeekDates(weekId: string): Date[] {
   const monday = new Date(jan4);
   monday.setUTCDate(jan4.getUTCDate() - jan4Day + 1 + (week - 1) * 7);
   return Array.from({ length: 7 }, (_, index) => addUtcDays(monday, index));
+}
+
+export function frenchPublicHolidaysForIsoWeek(weekId: string): FrenchPublicHoliday[] {
+  const dates = isoWeekDates(weekId).map(dateId);
+  const years = new Set(dates.map((date) => Number(date.slice(0, 4))));
+  const holidays = [...years].flatMap((year) => frenchNationalPublicHolidays(year));
+  return holidays.filter((holiday) => dates.includes(holiday.date));
 }
 
 export function scheduleHoursForDate(
