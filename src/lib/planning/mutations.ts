@@ -180,7 +180,7 @@ export function applyPlanningHoursBatchMutation(
   const firm = new Map<string, PlanningPayload["macroAllocations"][number]>(payload.macroAllocations.map((item) => [
     allocationKey(item.chantierId, item.activity, item.week), item,
   ]));
-  const provisional = new Map(payload.provisionalAllocations.map((item) => [
+  const provisional = new Map<string, PlanningPayload["provisionalAllocations"][number]>(payload.provisionalAllocations.map((item) => [
     provisionalAllocationKey(item.caseId, item.activity, item.week), item,
   ]));
 
