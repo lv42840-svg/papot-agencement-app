@@ -5,8 +5,12 @@ const apiSource = readFileSync(
   new URL("../src/app/api/desktop/planning/route.ts", import.meta.url),
   "utf-8",
 );
-const uiSource = readFileSync(
+const workspaceSource = readFileSync(
   new URL("../src/components/grand-planning-workspace.tsx", import.meta.url),
+  "utf-8",
+);
+const gridSource = readFileSync(
+  new URL("../src/components/planning-excel-grid.tsx", import.meta.url),
   "utf-8",
 );
 
@@ -17,10 +21,12 @@ describe("grand planning firm chantier order", () => {
     expect(apiSource).toContain('"planning.edit_macro"');
   });
 
-  it("allows authorized users to move active chantiers without touching hours", () => {
-    expect(uiSource).toContain('action: "setChantierOrder"');
-    expect(uiSource).toContain("moveFirm");
-    expect(uiSource).toContain("Monter ${chantier.name} dans les chantiers fermes");
-    expect(uiSource).toContain("Descendre ${chantier.name} dans les chantiers fermes");
+  it("allows authorized users to reorder whole chantier rows without changing hours", () => {
+    expect(workspaceSource).toContain('action: "setChantierOrder"');
+    expect(workspaceSource).toContain("moveFirm");
+    expect(workspaceSource).toContain("onMoveFirm={moveFirm}");
+    expect(gridSource).toContain("onMoveFirm(chantier.chantierId, -1)");
+    expect(gridSource).toContain("onMoveFirm(chantier.chantierId, 1)");
+    expect(gridSource).toContain("!snapshot.capabilities.canEditMacro");
   });
 });
