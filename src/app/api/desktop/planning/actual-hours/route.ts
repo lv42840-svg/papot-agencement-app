@@ -14,6 +14,7 @@ import {
   applyActualHoursRow,
 } from "@/lib/planning/actual-hours";
 import { createPlanningRepository } from "@/lib/planning/create-repository";
+import { scheduledChantiersByPerson } from "@/lib/planning/actual-hours-suggestions";
 import { effectivePlanningPeople } from "@/lib/planning/personnel";
 import { isPlanningWeekPast } from "@/lib/planning/time-markers";
 
@@ -113,12 +114,16 @@ async function snapshot(
     })
     .sort((a, b) => a.name.localeCompare(b.name, "fr"));
   const chantierIds = new Set(chantierRows.map((chantier) => chantier.id));
+  const suggestedChantierIds = scheduledChantiersByPerson(
+    planning.dailyAssignments, week, chantierRows,
+  );
   return {
     week,
     editable: context.moduleAccess.canWrite && canEnter && isPlanningWeekPast(week),
     weekIsPast: isPlanningWeekPast(week),
     people: personnel,
     chantiers: chantierRows,
+    suggestedChantierIds,
     records: recorded
       .filter((entry) => chantierIds.has(entry.chantierId))
       .map((entry) => ({ ...entry, personName: byId.get(entry.userId) ?? "Personnel" })),
