@@ -181,7 +181,7 @@ export function weeklyScheduleHoursForWeek(
 
 export function buildWeeklyCapacityIndicators(
   weeks: string[],
-  people: PlanningPersonCapacity[],
+  people: (PlanningPersonCapacity & { endDate?: string | null; inactiveSince?: string | null })[],
   firmLoadByWeek: ReadonlyMap<string, number>,
   absences: PlanningAbsence[] = [],
   provisionalLoadByWeek: ReadonlyMap<string, number> = new Map(),
@@ -199,6 +199,9 @@ export function buildWeeklyCapacityIndicators(
       return (
         sum +
         dates.reduce((personWeek, date) => {
+          const id = dateId(date);
+          if ((person.endDate && id > person.endDate) ||
+              (person.inactiveSince && id >= person.inactiveSince)) return personWeek;
           const scheduled = scheduleHoursForDate(person.weeklySchedule, date);
           const absence = absencesByDate.get(dateId(date));
           const unavailable = absence ? Math.min(absence.hours, scheduled) : 0;
