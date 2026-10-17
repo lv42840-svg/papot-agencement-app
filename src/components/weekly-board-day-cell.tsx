@@ -43,7 +43,11 @@ export function WeeklyBoardDayCell({
   holiday,
   absence,
   isAbsent,
+  isPresent,
   editable,
+  canPaste,
+  onCopyDay,
+  onPasteDay,
   busy,
   onChange,
 }: {
@@ -54,7 +58,11 @@ export function WeeklyBoardDayCell({
   holiday: string | null;
   absence: { type: string; typeLabel: string; hours: number } | undefined;
   isAbsent: boolean;
+  isPresent: boolean;
   editable: boolean;
+  canPaste: boolean;
+  onCopyDay: () => void;
+  onPasteDay: () => void;
   busy: boolean;
   onChange: (input: BoardEntryMutation) => Promise<boolean>;
 }) {
@@ -117,7 +125,7 @@ export function WeeklyBoardDayCell({
               <strong>{row.label}</strong>
               <small>{activityLabels[row.activity]}</small>
             </div>
-            {editable && !isAbsent ? (
+            {editable && !isAbsent && isPresent ? (
               <div className="weeklyBoardEntryActions">
                 <button
                   type="button"
@@ -172,6 +180,19 @@ export function WeeklyBoardDayCell({
           </div>
         );
       })}
+      <div className="weeklyBoardDayClipboard">
+        {rows.length > 0 ? (
+          <button type="button" onClick={onCopyDay} title="Copier toutes les affectations de cette journée">
+            Copier jour
+          </button>
+        ) : null}
+        {editable && !isAbsent && isPresent && canPaste ? (
+          <button type="button" disabled={busy} onClick={onPasteDay}
+            title="Ajouter les affectations copiées sans remplacer cette journée">
+            Coller jour
+          </button>
+        ) : null}
+      </div>
       {editing === "new" ? (
         <form className="weeklyBoardEditForm" onSubmit={(event) => void submit(event)}>
           <input
@@ -205,7 +226,9 @@ export function WeeklyBoardDayCell({
           </div>
         </form>
       ) : null}
-      {isAbsent ? (
+      {!isPresent ? (
+        <span className="weeklyBoardDayOff">Hors période de présence</span>
+      ) : isAbsent ? (
         <span className="weeklyBoardDayOff">Indisponible</span>
       ) : editable && editing !== "new" && rows.length < 20 ? (
         <button
