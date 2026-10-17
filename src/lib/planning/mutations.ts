@@ -103,6 +103,10 @@ export const planningMutationSchema = z.discriminatedUnion("action", [
     action: z.literal("deleteAbsence"),
     absenceId: z.string().uuid(),
   }),
+  z.object({
+    action: z.literal("deleteAbsenceBatch"),
+    absenceIds: z.array(z.string().uuid()).min(1).max(7),
+  }),
 ]);
 
 export const planningMacroMutationSchema = planningMutationSchema.options[0];
@@ -132,6 +136,7 @@ export type PlanningFullWeekAbsenceMutation = Extract<
   { action: "setFullWeekAbsence" }
 >;
 export type PlanningDeleteAbsenceMutation = Extract<PlanningMutation, { action: "deleteAbsence" }>;
+export type PlanningDeleteAbsenceBatchMutation = Extract<PlanningMutation, { action: "deleteAbsenceBatch" }>;
 
 export function applyPlanningMacroMutation(
   source: PlanningPayload,
@@ -505,6 +510,14 @@ export function applyPlanningAbsenceMutation(
     ? payload.absences.findIndex((absence) => absence.id === input.id)
     : -1;
   const index = byIdIndex >= 0 ? byIdIndex : sameDateIndex;
+  // Editing a day in a generated week breaks that original group into
+  // individual dates. No remaining day is mislabeled as a whole week.
+  const oldGroup = index >= 0 ? payload.absences[index].weekGroupId : undefined;
+  if (oldGroup) {
+    payload.absences = payload.absences.map((absence) =>
+      absence.weekGroupId === oldGroup ? { ...absence, weekGroupId: undefined } : absence,
+    );
+  }
   const next = {
     id: index >= 0 ? payload.absences[index].id : crypto.randomUUID(),
     userId: input.userId,
@@ -535,6 +548,7 @@ export function applyPlanningFullWeekAbsenceMutation(
     (absence) => absence.userId !== input.userId || !weekDateIds.has(absence.date),
   );
 
+  const weekGroupId = crypto.randomUUID();
   for (const date of weekDates) {
     const hours = scheduleHoursForDate(schedule, date);
     if (hours <= 0) continue;
@@ -544,6 +558,7 @@ export function applyPlanningFullWeekAbsenceMutation(
       type: input.type,
       date: date.toISOString().slice(0, 10),
       hours,
+      weekGroupId,
     });
   }
 
@@ -555,6 +570,43 @@ export function applyPlanningDeleteAbsenceMutation(
   input: PlanningDeleteAbsenceMutation,
 ): PlanningPayload {
   const payload = structuredClone(parsePlanningPayload(source));
-  payload.absences = payload.absences.filter((absence) => absence.id !== input.absenceId);
+  const selected = payload.absences.find((absence) => absence.id === input.absenceId);
+  const groupId = selected?.weekGroupId;
+  payload.absences = payload.absences
+    .filter((absence) => absence.id !== input.absenceId)
+    .map((absence) =>
+      groupId && absence.weekGroupId === groupId
+        ? { ...absence, weekGroupId: undefined }
+        : absence,
+    );
+  return parsePlanningPayload(payload);
+}
+
+export function applyPlanningDeleteAbsenceBatchMutation(
+  source: PlanningPayload,
+  input: PlanningDeleteAbsenceBatchMutation,
+): PlanningPayload {
+  const payload = structuredClone(parsePlanningPayload(source));
+  const ids = new Set(input.absenceIds);
+  if (ids.size !== input.absenceIds.length) throw new Error("PLANNING_ABSENCE_BATCH_DUPLICATE");
+  const selected = payload.absences.filter((absence) => ids.has(absence.id));
+  if (selected.length !== ids.size) throw new Error("PLANNING_ABSENCE_NOT_FOUND");
+  const first = selected[0];
+  const weekDates = new Set(
+    isoWeekDates(isoWeekKey(new Date(first.date + "T12:00:00Z")))
+      .map((date) => date.toISOString().slice(0, 10)),
+  );
+  if (selected.some((absence) =>
+    absence.userId !== first.userId || !weekDates.has(absence.date)
+  )) throw new Error("PLANNING_ABSENCE_BATCH_INVALID");
+  payload.absences = payload.absences.filter((absence) => !ids.has(absence.id));
+  const orphanGroupIds = new Set(
+    selected.map((absence) => absence.weekGroupId).filter((id): id is string => !!id),
+  );
+  payload.absences = payload.absences.map((absence) =>
+    absence.weekGroupId && orphanGroupIds.has(absence.weekGroupId)
+      ? { ...absence, weekGroupId: undefined }
+      : absence,
+  );
   return parsePlanningPayload(payload);
 }
