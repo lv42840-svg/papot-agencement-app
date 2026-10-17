@@ -75,6 +75,19 @@ export function PlanningExcelGrid({
     { label: "Charge potentielle", field: "provisionalLoadHours" },
   ];
 
+  // Totaux de charge ferme par activité, sans additionner une seconde fois le provisionnel.
+  const totalFor = (activity: PlanningActivity, field: "plannedHours" | "actualHours" | "remainingHours") =>
+    snapshot.rows.reduce((sum, chantier) =>
+      sum + (chantier.activities.find((item) => item.activity === activity)?.[field] ?? 0), 0);
+
+  const weeklyTotalFor = (activity: PlanningActivity, week: string) =>
+    snapshot.rows.reduce((sum, chantier) =>
+      sum + (chantier.activities.find((item) => item.activity === activity)?.weeklyHours[week] ?? 0), 0);
+
+  function activityTotal(value: number, activity: PlanningActivity) {
+    return tripleValues(ACTIVITIES.map((item) => item === activity ? value : 0));
+  }
+
   function weekClass(week: string) {
     const meta = metaByWeek.get(week);
     return [meta?.startsMonth ? "excelMonthStart" : "", meta?.isCurrent ? "excelCurrentWeek" : "", meta?.isPast ? "excelPastWeek" : ""].filter(Boolean).join(" ");
@@ -159,6 +172,19 @@ export function PlanningExcelGrid({
                 </td>
               );
             })}
+          </tr>
+        ))}
+        {ACTIVITIES.map((activity, index) => (
+          <tr key={"activity-total:" + activity} className="excelActivityTotalRow">
+            <th scope="row" className="excelFixed excelFixedName">TOTAL {["ÉTUDE", "FABRICATION", "POSE"][index]}</th>
+            <td className="excelFixed excelFixedPlan excelMetricCell">{activityTotal(totalFor(activity, "plannedHours"), activity)}</td>
+            <td className="excelFixed excelFixedActual excelMetricCell">{activityTotal(totalFor(activity, "actualHours"), activity)}</td>
+            <td className="excelFixed excelFixedRemaining excelMetricCell">{activityTotal(totalFor(activity, "remainingHours"), activity)}</td>
+            {snapshot.weeks.map((week) => (
+              <td key={week} className={["excelWeekCell", "excelActivityTotalCell", weekClass(week)].join(" ")}>
+                {activityTotal(weeklyTotalFor(activity, week), activity)}
+              </td>
+            ))}
           </tr>
         ))}
         {snapshot.rows.length === 0 && snapshot.provisionalRows.length === 0 ? (
