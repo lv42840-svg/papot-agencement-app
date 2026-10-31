@@ -1,0 +1,44 @@
+name: Format chantier BC PR 235
+
+on:
+  pull_request:
+    types: [opened, synchronize, reopened]
+
+permissions:
+  contents: read
+
+jobs:
+  format:
+    if: github.event.pull_request.number == 235 && github.event.pull_request.head.repo.full_name == github.repository && github.head_ref == 'feat/chantier-committed-purchases-close-review-20261031'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          ref: ${{ github.event.pull_request.head.sha }}
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci --ignore-scripts
+      - name: Prettier changed files
+        run: |
+          ./node_modules/.bin/prettier --write \
+            src/lib/purchases/domain.ts \
+            src/lib/chantiers/profitability.ts \
+            src/lib/chantiers/mutations.ts \
+            src/app/api/desktop/chantiers/route.ts \
+            src/components/chantier-profitability-panel.tsx \
+            src/components/chantier-workspace.tsx \
+            tests/chantier-purchase-closure.test.ts \
+            tests/chantier-profitability.test.ts \
+            tests/chantier-purchases-lifecycle-ui.test.ts
+      - name: Commit and push styling
+        run: |
+          git add -- src/lib/purchases/domain.ts src/lib/chantiers/profitability.ts src/lib/chantiers/mutations.ts src/app/api/desktop/chantiers/route.ts src/components/chantier-profitability-panel.tsx src/components/chantier-workspace.tsx tests/chantier-purchase-closure.test.ts tests/chantier-profitability.test.ts tests/chantier-purchases-lifecycle-ui.test.ts
+          if git diff --cached --quiet; then exit 0; fi
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git commit -m "style(chantier): format BC commitment closure review"
+          git push origin HEAD:refs/heads/feat/chantier-committed-purchases-close-review-20261031
