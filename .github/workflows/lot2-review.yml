@@ -1,0 +1,28 @@
+name: Lot 2 isolated review
+on:
+  push:
+    branches: [feat/personnel-paie-lot2]
+    paths: [.github/workflows/lot2-review.yml]
+permissions:
+  contents: read
+jobs:
+  package:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci --ignore-scripts
+      - name: Package source and dependency runtime
+        run: |
+          git archive -o /tmp/lot2-source.tar HEAD
+          tar -czf /tmp/lot2-deps.tgz --exclude='node_modules/electron' --exclude='node_modules/@next/swc-*' --exclude='node_modules/@cloudflare' --exclude='node_modules/workerd' --exclude='node_modules/wrangler' --exclude='node_modules/app-builder-bin' --exclude='node_modules/7zip-bin' node_modules
+      - uses: actions/upload-artifact@v4
+        with:
+          name: lot2-isolated-review
+          path: |
+            /tmp/lot2-source.tar
+            /tmp/lot2-deps.tgz
+          retention-days: 1
