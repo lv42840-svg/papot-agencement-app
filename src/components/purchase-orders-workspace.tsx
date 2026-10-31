@@ -662,10 +662,15 @@ export function PurchaseOrdersWorkspace({ chantierId }: { chantierId?: string })
                         {euro(order.amountHtCents)}
                       </td>
                       <td style={{ padding: 8 }}>
-                        {order.status === "COMMITTED" && snapshot.canWrite &&
-                          !order.removedAllocations?.length ? (
-                          <Link className="secondaryButton"
-                            href={`/achats/${encodeURIComponent(order.id)}/modifier`}>Modifier</Link>
+                        {order.status === "COMMITTED" &&
+                        snapshot.canWrite &&
+                        !order.removedAllocations?.length ? (
+                          <Link
+                            className="secondaryButton"
+                            href={`/achats/${encodeURIComponent(order.id)}/modifier`}
+                          >
+                            Modifier
+                          </Link>
                         ) : null}
                         {order.status === "COMMITTED" && snapshot.canWrite ? (
                           <button

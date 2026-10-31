@@ -151,18 +151,32 @@ describe("bons de commande engagés, sans rapprochement comptable", () => {
   });
 
   it("modifie un BC rapide multi-chantiers, conserve la référence et l'historique", () => {
-    const initial = addPurchaseOrder(empty(), crypto.randomUUID(), quick, names, "Lucien",
-      new Date("2026-10-30T09:00:00.000Z"));
+    const initial = addPurchaseOrder(
+      empty(),
+      crypto.randomUUID(),
+      quick,
+      names,
+      "Lucien",
+      new Date("2026-10-30T09:00:00.000Z"),
+    );
     const old = initial.orders[0];
-    const updated = updatePurchaseOrder(initial, old.id, old.updatedAt, {
-      mode: "QUICK",
-      supplierName: "Autre fournisseur",
-      description: "Rectification de la répartition",
-      allocations: [
-        { chantierId, amountHtCents: 12_000 },
-        { chantierId: secondChantierId, amountHtCents: 23_000 },
-      ],
-    }, names, "Nadia", new Date("2026-10-31T10:00:00.000Z"));
+    const updated = updatePurchaseOrder(
+      initial,
+      old.id,
+      old.updatedAt,
+      {
+        mode: "QUICK",
+        supplierName: "Autre fournisseur",
+        description: "Rectification de la répartition",
+        allocations: [
+          { chantierId, amountHtCents: 12_000 },
+          { chantierId: secondChantierId, amountHtCents: 23_000 },
+        ],
+      },
+      names,
+      "Nadia",
+      new Date("2026-10-31T10:00:00.000Z"),
+    );
     expect(updated.orders).toHaveLength(1);
     expect(updated.orders[0].reference).toBe(old.reference);
     expect(updated.orders[0].amountHtCents).toBe(35_000);
@@ -171,24 +185,41 @@ describe("bons de commande engagés, sans rapprochement comptable", () => {
     expect(updated.orders[0].revisions).toHaveLength(1);
     expect(updated.orders[0].revisions?.[0].previousAmountHtCents).toBe(50_000);
     expect(updated.orders[0].updatedByName).toBe("Nadia");
-    expect(() => updatePurchaseOrder(updated, old.id, old.updatedAt, quick, names, "Nadia"))
-      .toThrow("PURCHASE_ORDER_VERSION_CONFLICT");
+    expect(() =>
+      updatePurchaseOrder(updated, old.id, old.updatedAt, quick, names, "Nadia"),
+    ).toThrow("PURCHASE_ORDER_VERSION_CONFLICT");
   });
 
   it("modifie les lignes d'un BC détaillé mais interdit de changer son type", () => {
     const original = addPurchaseOrder(empty(), crypto.randomUUID(), detailed, names, "Lucien");
     const previous = original.orders[0];
-    const result = updatePurchaseOrder(original, previous.id, previous.updatedAt, {
-      ...detailed,
-      lines: [{ ...detailed.lines[0], quantity: 5 }],
-    }, names, "Nadia");
+    const result = updatePurchaseOrder(
+      original,
+      previous.id,
+      previous.updatedAt,
+      {
+        ...detailed,
+        lines: [{ ...detailed.lines[0], quantity: 5 }],
+      },
+      names,
+      "Nadia",
+    );
     expect(result.orders[0].amountHtCents).toBe(60_000);
     expect(result.orders[0].lines).toHaveLength(1);
-    expect(() => updatePurchaseOrder(original, previous.id, previous.updatedAt, quick, names, "Nadia"))
-      .toThrow("PURCHASE_ORDER_MODE_IMMUTABLE");
+    expect(() =>
+      updatePurchaseOrder(original, previous.id, previous.updatedAt, quick, names, "Nadia"),
+    ).toThrow("PURCHASE_ORDER_MODE_IMMUTABLE");
     const cancelled = cancelPurchaseOrder(original, previous.id, previous.updatedAt, "Nadia");
-    expect(() => updatePurchaseOrder(cancelled, previous.id, cancelled.orders[0].updatedAt, detailed, names, "Nadia"))
-      .toThrow("PURCHASE_ORDER_NOT_EDITABLE");
+    expect(() =>
+      updatePurchaseOrder(
+        cancelled,
+        previous.id,
+        cancelled.orders[0].updatedAt,
+        detailed,
+        names,
+        "Nadia",
+      ),
+    ).toThrow("PURCHASE_ORDER_NOT_EDITABLE");
   });
 
   it("refuse un fournisseur vide et un BC détaillé sans lignes", () => {

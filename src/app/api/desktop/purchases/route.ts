@@ -24,12 +24,14 @@ const requestSchema = z.discriminatedUnion("action", [
       order: purchaseOrderInputSchema,
     })
     .strict(),
-  z.object({
-    action: z.literal("UPDATE"),
-    orderId: z.string().uuid(),
-    expectedUpdatedAt: z.string().datetime({ offset: true }),
-    order: purchaseOrderInputSchema,
-  }).strict(),
+  z
+    .object({
+      action: z.literal("UPDATE"),
+      orderId: z.string().uuid(),
+      expectedUpdatedAt: z.string().datetime({ offset: true }),
+      order: purchaseOrderInputSchema,
+    })
+    .strict(),
   z
     .object({
       action: z.literal("CANCEL"),

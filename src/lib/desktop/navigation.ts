@@ -33,7 +33,12 @@ export const desktopNavigation: DesktopNavigationItem[] = [
   { label: "Facturation", icon: "file", href: "/facturation", moduleKey: "billing" },
   { label: "Trésorerie", icon: "landmark", moduleKey: "treasury" },
   { label: "Équipe", icon: "users", moduleKey: "team" },
-  { label: "Rentabilité entreprise", icon: "chart", href: "/pilotage/rentabilite", moduleKey: "pilotage" },
+  {
+    label: "Rentabilité entreprise",
+    icon: "chart",
+    href: "/pilotage/rentabilite",
+    moduleKey: "pilotage",
+  },
   {
     label: "Paramètres",
     icon: "settings",

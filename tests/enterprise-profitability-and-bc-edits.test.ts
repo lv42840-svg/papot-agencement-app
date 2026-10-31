@@ -1,6 +1,9 @@
 import { readFileSync } from "node:fs";
 import { describe, expect, it } from "vitest";
-import { companyProfitabilityTotals, type CompanyProfitabilityRow } from "../src/lib/pilotage/company-profitability";
+import {
+  companyProfitabilityTotals,
+  type CompanyProfitabilityRow,
+} from "../src/lib/pilotage/company-profitability";
 
 const example: CompanyProfitabilityRow = {
   chantierId: "11111111-1111-4111-8111-111111111111",
@@ -22,7 +25,10 @@ const example: CompanyProfitabilityRow = {
 
 describe("rentabilité entreprise", () => {
   it("additionne la marge une seule fois à partir du coût total heures comprises", () => {
-    const totals = companyProfitabilityTotals([example, { ...example, chantierId: "22222222-2222-4222-8222-222222222222" }]);
+    const totals = companyProfitabilityTotals([
+      example,
+      { ...example, chantierId: "22222222-2222-4222-8222-222222222222" },
+    ]);
     expect(totals.soldCents).toBe(200_000);
     expect(totals.plannedLaborCostCents).toBe(34_000);
     expect(totals.plannedTotalCostCents).toBe(114_000);
@@ -33,11 +39,17 @@ describe("rentabilité entreprise", () => {
   });
 
   it("ne présente pas des totaux financiers partiels comme une marge de l'entreprise", () => {
-    const totals = companyProfitabilityTotals([example, {
-      ...example, chantierId: "22222222-2222-4222-8222-222222222222",
-      plannedLaborCostCents: null, plannedTotalCostCents: null, plannedMarginCents: null,
-      missingData: true,
-    }]);
+    const totals = companyProfitabilityTotals([
+      example,
+      {
+        ...example,
+        chantierId: "22222222-2222-4222-8222-222222222222",
+        plannedLaborCostCents: null,
+        plannedTotalCostCents: null,
+        plannedMarginCents: null,
+        missingData: true,
+      },
+    ]);
     expect(totals.incompleteCount).toBe(1);
     expect(totals.plannedLaborCostCents).toBeNull();
     expect(totals.plannedTotalCostCents).toBeNull();

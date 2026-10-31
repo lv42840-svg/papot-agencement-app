@@ -4,9 +4,7 @@ import { createChantiersRepository } from "@/lib/chantiers/create-repository";
 import { createCommercialRepository } from "@/lib/commercial/create-repository";
 import { createPlanningRepository } from "@/lib/planning/create-repository";
 import { actualHoursByActivity } from "@/lib/planning/actual-hours";
-import {
-  calculateCompanyProfitability,
-} from "@/lib/pilotage/company-profitability";
+import { calculateCompanyProfitability } from "@/lib/pilotage/company-profitability";
 import { createPurchaseOrdersRepository } from "@/lib/purchases/repository";
 import { createQuotesRepository } from "@/lib/quotes/create-repository";
 import {
@@ -38,9 +36,7 @@ export async function GET() {
     const hoursBySite = new Map(
       sites.chantiers.map((site) => [
         site.id,
-        actualHoursByActivity(
-          planning.actualHours.filter((entry) => entry.chantierId === site.id),
-        ),
+        actualHoursByActivity(planning.actualHours.filter((entry) => entry.chantierId === site.id)),
       ]),
     );
     const rows = calculateCompanyProfitability(
@@ -50,16 +46,12 @@ export async function GET() {
       purchases,
       hoursBySite,
     );
-    return NextResponse.json(
-      { rows },
-      { headers: { "Cache-Control": "private, no-store" } },
-    );
+    return NextResponse.json({ rows }, { headers: { "Cache-Control": "private, no-store" } });
   } catch (error) {
     const code = error instanceof Error ? error.message : "COMPANY_PROFITABILITY_FAILED";
     return NextResponse.json(
       { error: code },
-      { status: desktopRequestErrorStatus(code) ?? 400,
-        headers: { "Cache-Control": "no-store" } },
+      { status: desktopRequestErrorStatus(code) ?? 400, headers: { "Cache-Control": "no-store" } },
     );
   }
 }

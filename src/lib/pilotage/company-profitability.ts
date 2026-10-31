@@ -51,7 +51,8 @@ export function calculateCompanyProfitability(
       const hours = actualHoursBySite.get(site.id);
       const projection = calculateChantierProfitability(
         hours ? { ...site, actualHours: hours } : site,
-        caseRecord, quotes,
+        caseRecord,
+        quotes,
         { laborCostCents: null, purchaseCostCents: null },
         committedPurchaseTotal(purchases, site.id),
       );
@@ -70,7 +71,8 @@ export function calculateCompanyProfitability(
         plannedPurchasesCents: projection.plannedPurchasesCents,
         plannedHours: projection.plannedHours.total,
         actualHours: projection.actualHours.total,
-        missingData: projection.plannedMarginCents === null ||
+        missingData:
+          projection.plannedMarginCents === null ||
           projection.plannedLaborCostCents === null ||
           projection.soldCents === null,
       };
@@ -82,8 +84,14 @@ export function companyProfitabilityTotals(
   rows: readonly CompanyProfitabilityRow[],
 ): CompanyProfitabilityTotals {
   const incompleteCount = rows.filter((row) => row.missingData).length;
-  const sum = (key: "soldCents" | "plannedLaborCostCents" | "plannedOtherCostCents" |
-    "plannedTotalCostCents" | "plannedMarginCents"): number | null =>
+  const sum = (
+    key:
+      | "soldCents"
+      | "plannedLaborCostCents"
+      | "plannedOtherCostCents"
+      | "plannedTotalCostCents"
+      | "plannedMarginCents",
+  ): number | null =>
     rows.some((row) => row[key] === null)
       ? null
       : rows.reduce((total, row) => total + (row[key] ?? 0), 0);

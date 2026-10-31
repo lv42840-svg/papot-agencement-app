@@ -98,9 +98,11 @@ export function ChantierProfitabilityPanel({
         <Metric
           label="Coût des heures prévues"
           value={money(result.plannedLaborCostCents)}
-          detail={result.plannedLaborCostCents === null
-            ? "Taux horaire manquant ou nul dans un devis : coût à compléter"
-            : "Heures BE, atelier et pose valorisées au coût horaire du devis"}
+          detail={
+            result.plannedLaborCostCents === null
+              ? "Taux horaire manquant ou nul dans un devis : coût à compléter"
+              : "Heures BE, atelier et pose valorisées au coût horaire du devis"
+          }
         />
         <Metric
           label="Coût total prévu"

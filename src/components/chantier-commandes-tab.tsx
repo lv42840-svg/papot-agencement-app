@@ -206,8 +206,10 @@ export function ChantierCommandesTab({ chantierId }: { chantierId: string }) {
                             </a>
                           ) : null}
                           {state === "COMMITTED" && !order.removedAllocations?.length ? (
-                            <Link className="secondaryButton"
-                              href={`/achats/${encodeURIComponent(order.id)}/modifier`}>
+                            <Link
+                              className="secondaryButton"
+                              href={`/achats/${encodeURIComponent(order.id)}/modifier`}
+                            >
                               Modifier le BC
                             </Link>
                           ) : null}

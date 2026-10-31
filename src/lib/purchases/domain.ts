@@ -45,13 +45,17 @@ export const purchaseOrderSchema = z.object({
   chantierId: z.string().uuid(),
   chantierName: text,
   allocations: z.array(purchaseOrderAllocationSchema).min(1).max(100).optional(),
-  revisions: z.array(z.object({
-    changedAt: when,
-    changedByName: text,
-    previousSupplierName: text,
-    previousAmountHtCents: cents,
-    previousChantierIds: z.array(z.string().uuid()),
-  })).optional(),
+  revisions: z
+    .array(
+      z.object({
+        changedAt: when,
+        changedByName: text,
+        previousSupplierName: text,
+        previousAmountHtCents: cents,
+        previousChantierIds: z.array(z.string().uuid()),
+      }),
+    )
+    .optional(),
   removedAllocations: z
     .array(
       purchaseOrderAllocationSchema.extend({
@@ -367,7 +371,6 @@ export function purchaseOrderHistoryForChantier(
   });
 }
 
-
 /** Editable BCs keep their number, original creation info and audit of earlier amounts. */
 export function updatePurchaseOrder(
   payload: PurchaseOrdersPayload,
@@ -388,9 +391,8 @@ export function updatePurchaseOrder(
   const value = purchaseOrderInputSchema.parse(input);
   if (value.mode !== original.mode) throw new Error("PURCHASE_ORDER_MODE_IMMUTABLE");
   const amountHtCents = purchaseOrderAmount(value);
-  const allocated = value.mode === "QUICK"
-    ? value.allocations
-    : [{ chantierId: value.chantierId, amountHtCents }];
+  const allocated =
+    value.mode === "QUICK" ? value.allocations : [{ chantierId: value.chantierId, amountHtCents }];
   const allocations = allocated.map((entry) => {
     const chantierName = chantierNames.get(entry.chantierId);
     if (!chantierName) throw new Error("PURCHASE_CHANTIER_NOT_FOUND");

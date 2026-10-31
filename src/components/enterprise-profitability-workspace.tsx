@@ -30,18 +30,21 @@ export function EnterpriseProfitabilityWorkspace() {
     try {
       setError("");
       const response = await fetch("/api/desktop/pilotage/rentabilite", { cache: "no-store" });
-      if (!response.ok) throw new Error(
-        response.status === 403
-          ? "Accès Pilotage global, Chantiers, Commercial, Devis et Achats nécessaire."
-          : "Impossible de charger la rentabilité entreprise.",
-      );
+      if (!response.ok)
+        throw new Error(
+          response.status === 403
+            ? "Accès Pilotage global, Chantiers, Commercial, Devis et Achats nécessaire."
+            : "Impossible de charger la rentabilité entreprise.",
+        );
       const result = (await response.json()) as { rows: CompanyProfitabilityRow[] };
       setRows(result.rows);
     } catch (cause) {
       setError(cause instanceof Error ? cause.message : "Chargement impossible.");
     }
   }
-  useEffect(() => { void reload(); }, []);
+  useEffect(() => {
+    void reload();
+  }, []);
 
   const years = useMemo(
     () => [...new Set((rows ?? []).map((row) => row.launchYear))].sort((a, b) => b - a),
@@ -50,22 +53,29 @@ export function EnterpriseProfitabilityWorkspace() {
   const filtered = (rows ?? [])
     .filter((row) => year === "ALL" || row.launchYear === Number(year))
     .filter((row) => status === "ALL" || row.status === status)
-    .filter((row) => (row.name + " " + row.clientName).toLocaleLowerCase("fr-FR")
-      .includes(search.toLocaleLowerCase("fr-FR").trim()))
+    .filter((row) =>
+      (row.name + " " + row.clientName)
+        .toLocaleLowerCase("fr-FR")
+        .includes(search.toLocaleLowerCase("fr-FR").trim()),
+    )
     .sort((a, b) => {
       if (a.missingData !== b.missingData) return a.missingData ? 1 : -1;
       return (a.plannedMarginCents ?? 0) - (b.plannedMarginCents ?? 0);
     });
   const total = companyProfitabilityTotals(filtered);
-  const overrun = filtered.filter((row) =>
-    row.plannedPurchasesCents !== null &&
-    row.committedPurchasesCents > row.plannedPurchasesCents).length;
-  const overtime = filtered.filter((row) =>
-    row.plannedHours > 0 && row.actualHours > row.plannedHours).length;
+  const overrun = filtered.filter(
+    (row) =>
+      row.plannedPurchasesCents !== null && row.committedPurchasesCents > row.plannedPurchasesCents,
+  ).length;
+  const overtime = filtered.filter(
+    (row) => row.plannedHours > 0 && row.actualHours > row.plannedHours,
+  ).length;
 
   return (
     <main style={{ padding: 22, maxWidth: 1560, margin: "0 auto", display: "grid", gap: 20 }}>
-      <header style={{ display: "flex", justifyContent: "space-between", gap: 12, flexWrap: "wrap" }}>
+      <header
+        style={{ display: "flex", justifyContent: "space-between", gap: 12, flexWrap: "wrap" }}
+      >
         <div>
           <h1>Rentabilité entreprise</h1>
           <p>
@@ -73,7 +83,9 @@ export function EnterpriseProfitabilityWorkspace() {
             atelier et pose est compté dans le coût prévu, sans double déduction.
           </p>
         </div>
-        <button type="button" className="secondaryButton" onClick={() => void reload()}>Actualiser</button>
+        <button type="button" className="secondaryButton" onClick={() => void reload()}>
+          Actualiser
+        </button>
       </header>
       <p>
         <strong>Ce tableau n&apos;est pas un résultat comptable.</strong> Les ventes sont issues des
@@ -85,26 +97,51 @@ export function EnterpriseProfitabilityWorkspace() {
       {rows && (
         <>
           <div style={{ display: "flex", gap: 12, flexWrap: "wrap" }}>
-            <label>Année de lancement
-              <select aria-label="Filtrer par année" value={year} onChange={(e) => setYear(e.target.value)}>
+            <label>
+              Année de lancement
+              <select
+                aria-label="Filtrer par année"
+                value={year}
+                onChange={(e) => setYear(e.target.value)}
+              >
                 <option value="ALL">Toutes les années</option>
-                {years.map((value) => <option key={value} value={value}>{value}</option>)}
+                {years.map((value) => (
+                  <option key={value} value={value}>
+                    {value}
+                  </option>
+                ))}
               </select>
             </label>
-            <label>État du chantier
-              <select aria-label="Filtrer par état" value={status} onChange={(e) => setStatus(e.target.value)}>
+            <label>
+              État du chantier
+              <select
+                aria-label="Filtrer par état"
+                value={status}
+                onChange={(e) => setStatus(e.target.value)}
+              >
                 <option value="ALL">Tous</option>
                 <option value="ACTIVE">Actifs</option>
                 <option value="DONE">Terminés</option>
                 <option value="ARCHIVED">Archivés</option>
               </select>
             </label>
-            <label>Rechercher
-              <input aria-label="Rechercher chantier ou client" value={search}
-                onChange={(e) => setSearch(e.target.value)} placeholder="Chantier ou client" />
+            <label>
+              Rechercher
+              <input
+                aria-label="Rechercher chantier ou client"
+                value={search}
+                onChange={(e) => setSearch(e.target.value)}
+                placeholder="Chantier ou client"
+              />
             </label>
           </div>
-          <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(180px, 1fr))", gap: 12 }}>
+          <div
+            style={{
+              display: "grid",
+              gridTemplateColumns: "repeat(auto-fit, minmax(180px, 1fr))",
+              gap: 12,
+            }}
+          >
             {[
               ["Chantiers", String(total.chantierCount)],
               ["Vendu prévu HT", euro(total.soldCents)],
@@ -122,23 +159,28 @@ export function EnterpriseProfitabilityWorkspace() {
           </div>
           {total.incompleteCount > 0 ? (
             <p role="status" style={{ color: "#a35018" }}>
-              {total.incompleteCount} chantier(s) ont des coûts prévus incomplets.
-              Les totaux financiers incomplets ne sont pas affichés pour éviter une marge surestimée.
-              Vérifie les taux horaires et les prix d&apos;achat dans les devis.
+              {total.incompleteCount} chantier(s) ont des coûts prévus incomplets. Les totaux
+              financiers incomplets ne sont pas affichés pour éviter une marge surestimée. Vérifie
+              les taux horaires et les prix d&apos;achat dans les devis.
             </p>
           ) : null}
           <p>
-            <strong>{overrun}</strong> chantier(s) avec achats commandés au-dessus du budget ;
-            {" "}<strong>{overtime}</strong> avec dépassement d&apos;heures ;
-            {" "}<strong>{hours(total.actualHours)}</strong> enregistrées pour
-            {" "}<strong>{hours(total.plannedHours)}</strong> prévues.
+            <strong>{overrun}</strong> chantier(s) avec achats commandés au-dessus du budget ;{" "}
+            <strong>{overtime}</strong> avec dépassement d&apos;heures ;{" "}
+            <strong>{hours(total.actualHours)}</strong> enregistrées pour{" "}
+            <strong>{hours(total.plannedHours)}</strong> prévues.
           </p>
-          <section style={{ background: "white", padding: 14, borderRadius: 12, overflowX: "auto" }}>
+          <section
+            style={{ background: "white", padding: 14, borderRadius: 12, overflowX: "auto" }}
+          >
             <h2>Rentabilité par chantier ({filtered.length})</h2>
-            <table style={{ width: "100%", minWidth: 1180, borderCollapse: "collapse", fontSize: 12 }}>
+            <table
+              style={{ width: "100%", minWidth: 1180, borderCollapse: "collapse", fontSize: 12 }}
+            >
               <thead>
                 <tr style={{ textAlign: "left", borderBottom: "2px solid #ded8e9" }}>
-                  <th>Chantier / client</th><th>État</th>
+                  <th>Chantier / client</th>
+                  <th>État</th>
                   <th style={{ textAlign: "right" }}>Vendu HT</th>
                   <th style={{ textAlign: "right" }}>Heures prévues (€)</th>
                   <th style={{ textAlign: "right" }}>Achats + frais prévus</th>
@@ -156,20 +198,31 @@ export function EnterpriseProfitabilityWorkspace() {
                         <strong>{row.name}</strong>
                       </Link>
                       <div style={{ fontSize: 11 }}>{row.clientName}</div>
-                      {row.missingData ? <small style={{ color: "#a35018" }}>Coûts à compléter</small> : null}
+                      {row.missingData ? (
+                        <small style={{ color: "#a35018" }}>Coûts à compléter</small>
+                      ) : null}
                     </td>
                     <td style={{ padding: 8 }}>{statuses[row.status]}</td>
-                    {[row.soldCents, row.plannedLaborCostCents, row.plannedOtherCostCents,
-                      row.plannedTotalCostCents, row.plannedMarginCents,
-                      row.committedPurchasesCents].map((value, index) => (
-                        <td key={index} style={{ padding: 8, textAlign: "right", whiteSpace: "nowrap" }}>
-                          {euro(value)}
-                        </td>
-                      ))}
+                    {[
+                      row.soldCents,
+                      row.plannedLaborCostCents,
+                      row.plannedOtherCostCents,
+                      row.plannedTotalCostCents,
+                      row.plannedMarginCents,
+                      row.committedPurchasesCents,
+                    ].map((value, index) => (
+                      <td
+                        key={index}
+                        style={{ padding: 8, textAlign: "right", whiteSpace: "nowrap" }}
+                      >
+                        {euro(value)}
+                      </td>
+                    ))}
                     <td style={{ padding: 8, textAlign: "right", whiteSpace: "nowrap" }}>
                       {hours(row.plannedHours)} / {hours(row.actualHours)}
-                      {row.plannedHours > 0 && row.actualHours > row.plannedHours
-                        ? <div style={{ color: "#b33138" }}>Dépassement</div> : null}
+                      {row.plannedHours > 0 && row.actualHours > row.plannedHours ? (
+                        <div style={{ color: "#b33138" }}>Dépassement</div>
+                      ) : null}
                     </td>
                   </tr>
                 ))}
