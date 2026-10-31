@@ -114,6 +114,7 @@ async function snapshot(
       ]),
     ),
     actor,
+    canRemovePurchaseCommitments: await hasModuleAccess(user.id, "purchases", "WRITE"),
     committedPurchasesByChantier: purchasePayload
       ? Object.fromEntries(
           payload.chantiers.map((chantier) => [
