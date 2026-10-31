@@ -375,7 +375,26 @@ describe("chantier global profitability", () => {
     expect(result.plannedPurchasesCents).toBe(20_000);
     expect(result.committedPurchasesCents).toBe(25_000);
     expect(result.purchaseBudgetOverrunCents).toBe(5_000);
+    expect(result.knownCostCommitmentsCents).toBe(37_000);
+    expect(result.remainingCostBudgetCents).toBe(-17_000);
+    expect(result.remainingLaborBudgetCents).toBe(-12_000);
     expect(result.actualPurchaseCostCents).toBeNull();
+    expect(result.actualMarginCents).toBeNull();
+  });
+
+  it("laisse la consommation budgétaire indisponible en l'absence de coût de paie", () => {
+    const item = chantier(affair([quoteAId]));
+    const result = calculateChantierProfitability(
+      item,
+      affair([quoteAId]),
+      { schemaVersion: 1, quotes: [quote({ id: quoteAId, saleCents: 100_000, costCents: 20_000 })] },
+      { laborCostCents: null, purchaseCostCents: null },
+      25_000,
+    );
+    expect(result.knownCostCommitmentsCents).toBeNull();
+    expect(result.remainingCostBudgetCents).toBeNull();
+    expect(result.remainingLaborBudgetCents).toBeNull();
+    expect(result.committedPurchasesCents).toBe(25_000);
     expect(result.actualMarginCents).toBeNull();
   });
 
