@@ -243,7 +243,7 @@ export function BillingWorkspace({
                         {type === "PROGRESS" ? "Avancement global cumulé %" : "Acompte %"}
                       </option>
                       {type === "PROGRESS" && (active?.lines?.length ?? 0) > 0 ? (
-                        <option value="LINES">Situation : pourcentage de chaque ligne (%)</option>
+                        <option value="LINES">Avancement par ligne (%)</option>
                       ) : null}
                     </select>
                   </label>
