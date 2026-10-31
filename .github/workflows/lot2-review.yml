@@ -15,14 +15,19 @@ jobs:
           node-version: 22
           cache: npm
       - run: npm ci --ignore-scripts
+      - run: npm install --ignore-scripts --save-exact exceljs@4.4.0
       - name: Package source and dependency runtime
         run: |
           git archive -o /tmp/lot2-source.tar HEAD
           tar -czf /tmp/lot2-deps.tgz --exclude='node_modules/electron' --exclude='node_modules/@next/swc-*' --exclude='node_modules/@cloudflare' --exclude='node_modules/workerd' --exclude='node_modules/wrangler' --exclude='node_modules/app-builder-bin' --exclude='node_modules/7zip-bin' node_modules
+          cp package.json /tmp/package.json
+          cp package-lock.json /tmp/package-lock.json
       - uses: actions/upload-artifact@v4
         with:
           name: lot2-isolated-review
           path: |
             /tmp/lot2-source.tar
             /tmp/lot2-deps.tgz
+            /tmp/package.json
+            /tmp/package-lock.json
           retention-days: 1
