@@ -71,22 +71,22 @@ export async function POST(request: Request) {
   try {
     const context = await requireModuleRequestContext("purchases", "WRITE");
     const input = requestSchema.parse(await request.json());
-    const chantierName =
+    const chantierNames =
       input.action === "CREATE"
-        ? (await createChantiersRepository().load()).chantiers.find(
-            (site) => site.id === input.order.chantierId,
-          )?.name
-        : null;
-    if (input.action === "CREATE" && !chantierName) {
-      throw new Error("PURCHASE_CHANTIER_NOT_FOUND");
-    }
+        ? new Map(
+            (await createChantiersRepository().load()).chantiers.map((site) => [
+              site.id,
+              site.name,
+            ]),
+          )
+        : new Map<string, string>();
     const payload = await createPurchaseOrdersRepository().mutate((current) => {
       if (input.action === "CREATE") {
         return addPurchaseOrder(
           current,
           input.requestId,
           input.order,
-          chantierName!,
+          chantierNames,
           context.user.displayName,
         );
       }

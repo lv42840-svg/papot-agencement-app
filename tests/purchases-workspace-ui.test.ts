@@ -7,12 +7,17 @@ describe("écran Bons de commande", () => {
     expect(ui).toContain("BC rapide · Montant global");
     expect(ui).toContain("BC détaillé · Articles");
     expect(ui).toContain("Fournisseur du BC");
-    expect(ui).toContain("Montant HT du BC rapide");
+    expect(ui).toContain("Répartition du BC par chantier");
+    expect(ui).toContain("Ajouter un chantier");
+    expect(ui).toContain("Montant HT ligne chantier");
+    expect(ui).toContain("allocations: entries.map");
+    expect(ui).toContain("order.allocations.map");
     expect(ui).toContain("Désignation ligne");
     expect(ui).toContain("Prix unitaire ligne");
     expect(ui).toContain("Ajouter une ligne");
     expect(ui).toContain("Enregistrer le BC (engagement)");
     expect(ui).toContain("Filtrer les BC par chantier");
+    expect(ui).toContain("Télécharger le PDF du");
   });
 
   it("ne confond pas BC et facture et utilise le droit achats", () => {
@@ -24,5 +29,8 @@ describe("écran Bons de commande", () => {
     expect(menu).toContain('href: "/achats"');
     expect(db).toContain("CREATE TABLE IF NOT EXISTS papot_purchase_orders_state");
     expect(db).toContain("await ensurePurchaseOrdersStorage(client)");
+    const pdfRoute = readFileSync("src/app/api/desktop/purchases/[orderId]/pdf/route.ts", "utf8");
+    expect(pdfRoute).toContain('requireModuleRequestContext("purchases", "READ")');
+    expect(pdfRoute).toContain("application/pdf");
   });
 });
