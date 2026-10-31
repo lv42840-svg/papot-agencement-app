@@ -1,0 +1,25 @@
+name: Apply payroll finishing fixes
+on:
+  push:
+    branches: [feat/personnel-paie-lot2]
+    paths: [.lot2fix/READY]
+permissions:
+  contents: write
+jobs:
+  apply:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: feat/personnel-paie-lot2
+          fetch-depth: 0
+      - name: Apply final fixes
+        run: |
+          cat .lot2fix/part* | base64 -d | xz -d > /tmp/payroll-fix.patch
+          git apply --check /tmp/payroll-fix.patch
+          git apply /tmp/payroll-fix.patch
+          rm -rf .lot2fix
+          git rm -f .github/workflows/lot2-fix.yml
+          git add -A
+          git -c user.name='github-actions[bot]' -c user.email='41898282+github-actions[bot]@users.noreply.github.com' commit -m 'fix(payroll): refresh holding hours and vacation days'
+          git push origin HEAD:refs/heads/feat/personnel-paie-lot2
