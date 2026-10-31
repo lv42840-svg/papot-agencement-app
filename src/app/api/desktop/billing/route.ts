@@ -129,7 +129,14 @@ export async function GET() {
 export async function POST(request: Request) {
   try {
     const context = await requireModuleRequestContext("billing", "WRITE");
-    const input = billingMutationSchema.parse(await request.json());
+    const parsed = billingMutationSchema.safeParse(await request.json());
+    if (!parsed.success) {
+      const fields = [
+        ...new Set(parsed.error.issues.map((issue) => issue.path.join(".") || "root")),
+      ];
+      return noStoreJson({ error: "BILLING_REQUEST_INVALID", fields }, 400);
+    }
+    const input = parsed.data;
     const sources = input.action === "CREATE" ? await loadBillingSources() : [];
     const repository = createBillingRepository();
     const payload = await repository.mutate((current) => {
@@ -180,12 +187,12 @@ export async function POST(request: Request) {
     });
     return noStoreJson({ payload, canWrite: true });
   } catch (error) {
-    const code =
-      error instanceof z.ZodError
-        ? "BILLING_REQUEST_INVALID"
-        : error instanceof Error
-          ? error.message
-          : "BILLING_MUTATION_FAILED";
+    if (error instanceof z.ZodError) {
+      const fields = [...new Set(error.issues.map((issue) => issue.path.join(".") || "root"))];
+      console.error("[billing] Invalid stored billing data fields:", fields);
+      return noStoreJson({ error: "BILLING_DRAFT_DATA_INVALID", fields }, 422);
+    }
+    const code = error instanceof Error ? error.message : "BILLING_MUTATION_FAILED";
     return noStoreJson({ error: code }, statusFor(code));
   }
 }

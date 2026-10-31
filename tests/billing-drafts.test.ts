@@ -29,6 +29,34 @@ const empty = (): BillingPayload => ({ schemaVersion: 1, drafts: [] });
 const user = "Nadia";
 
 describe("Projets de facture issus des devis retenus", () => {
+  it("crée 30 % d'acompte sur 1 800 € même avec une désignation vide dans le devis", () => {
+    const quoteSource: BillingSource = {
+      ...source,
+      contractHtCents: 180_000,
+      contractTaxGroups: [{ ratePercent: 20, baseHtCents: 180_000 }],
+      lines: [
+        {
+          lineId: "11111111-1111-4111-8111-111111111111",
+          description: "   ",
+          quantity: 1,
+          unit: "u",
+          amountHtCents: 180_000,
+          vatRatePercent: 20,
+        },
+      ],
+    };
+    const draft = createBillingDraft(
+      empty(),
+      quoteSource,
+      { requestId: crypto.randomUUID(), type: "DEPOSIT", cumulativePercent: 30 },
+      user,
+    );
+    expect(draft.amountHtCents).toBe(54_000);
+    expect(draft.vatCents).toBe(10_800);
+    expect(draft.documentLines?.[0].description).toBe("Prestation du devis D-2026-0123");
+    expect(draft.documentLines?.[0].unitPriceCents).toBe(54_000);
+  });
+
   it("calcule un acompte puis la situation cumulée après déduction de l'acompte", () => {
     const acompte = createBillingDraft(
       empty(),
