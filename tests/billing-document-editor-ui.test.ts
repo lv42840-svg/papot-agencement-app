@@ -19,7 +19,7 @@ describe("facturation: éditeur identique au parcours devis", () => {
     expect(ui).toContain('useState<BillingType>("DEPOSIT")');
     expect(ui).toContain('useState<"AMOUNT" | "PERCENT" | "LINES">("PERCENT")');
     expect(ui).toContain('setMode(e.target.value === "PROGRESS" ? "LINES" : "PERCENT")');
-    expect(ui).toContain("Situation : pourcentage de chaque ligne (%)");
+    expect(ui).toContain("Avancement par ligne (%)");
     expect(ui).toContain("router.push(`/facturation/");
   });
 
