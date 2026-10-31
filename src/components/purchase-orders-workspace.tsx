@@ -15,6 +15,10 @@ type Snapshot = {
   canWrite: boolean;
   error?: string;
 };
+type QuickAllocation = { id: string; chantierId: string; amount: string };
+const newAllocation = (chantierId = ""): QuickAllocation => ({
+  id: crypto.randomUUID(), chantierId, amount: "",
+});
 type EditableLine = {
   id: string;
   description: string;
@@ -63,7 +67,7 @@ export function PurchaseOrdersWorkspace({ chantierId }: { chantierId?: string })
   const [supplierName, setSupplierName] = useState("");
   const [mode, setMode] = useState<"QUICK" | "DETAILED">("QUICK");
   const [description, setDescription] = useState("");
-  const [amount, setAmount] = useState("");
+  const [allocations, setAllocations] = useState<QuickAllocation[]>([newAllocation(chantierId ?? "")]);
   const [lines, setLines] = useState<EditableLine[]>([newLine()]);
   const [search, setSearch] = useState("");
   const [siteFilter, setSiteFilter] = useState("ALL");
@@ -101,12 +105,22 @@ export function PurchaseOrdersWorkspace({ chantierId }: { chantierId?: string })
   const detailedTotal = linePreview.every((sum) => sum !== null)
     ? linePreview.reduce<number>((sum, cost) => sum + (cost ?? 0), 0)
     : null;
-  const preview = mode === "QUICK" ? moneyCents(amount) : detailedTotal;
+  const quickAmounts = allocations.map((entry) => moneyCents(entry.amount));
+  const quickTotal =
+    quickAmounts.every((value) => value !== null) && allocations.length > 0
+      ? quickAmounts.reduce<number>((sum, value) => sum + (value ?? 0), 0)
+      : null;
+  const preview = mode === "QUICK" ? quickTotal : detailedTotal;
   const all = snapshot?.payload.orders ?? [];
   const visible = all
-    .filter((order) => siteFilter === "ALL" || order.chantierId === siteFilter)
     .filter((order) =>
-      [order.reference, order.supplierName, order.chantierName, order.description]
+      siteFilter === "ALL" ||
+      (order.allocations?.some((allocation) => allocation.chantierId === siteFilter) ??
+        order.chantierId === siteFilter),
+    )
+    .filter((order) =>
+      [order.reference, order.supplierName, order.chantierName,
+        ...(order.allocations?.map((a) => a.chantierName) ?? []), order.description]
         .join(" ")
         .toLocaleLowerCase("fr-FR")
         .includes(search.trim().toLocaleLowerCase("fr-FR")),
@@ -123,24 +137,39 @@ export function PurchaseOrdersWorkspace({ chantierId }: { chantierId?: string })
   async function create() {
     if (!snapshot?.canWrite || busy) return;
     setError("");
-    if (!selected || !supplierName.trim()) {
-      setError("Choisis un chantier et renseigne le nom du fournisseur.");
+    if (!supplierName.trim()) {
+      setError("Renseigne le nom du fournisseur.");
       return;
     }
     let order: PurchaseOrderInput;
     if (mode === "QUICK") {
-      if (preview === null || preview <= 0) {
-        setError("Saisis un montant HT positif pour ce BC rapide.");
+      const entries = allocations.map((row) => ({
+        chantierId: row.chantierId || selected,
+        amountHtCents: moneyCents(row.amount),
+      }));
+      if (
+        entries.some((row) => !sites.some((site) => site.id === row.chantierId)) ||
+        entries.some((row) => row.amountHtCents === null || row.amountHtCents <= 0) ||
+        new Set(entries.map((row) => row.chantierId)).size !== entries.length ||
+        preview === null || preview <= 0
+      ) {
+        setError("Indique un chantier différent et un montant HT positif sur chaque ligne.");
         return;
       }
       order = {
         mode: "QUICK",
-        chantierId: selected,
+        allocations: entries.map((row) => ({
+          chantierId: row.chantierId,
+          amountHtCents: row.amountHtCents!,
+        })),
         supplierName: supplierName.trim(),
         description: description.trim(),
-        amountHtCents: preview,
       };
     } else {
+      if (!selected) {
+        setError("Choisis un chantier pour le BC détaillé.");
+        return;
+      }
       const parsed: PurchaseOrderLine[] = [];
       for (const line of lines) {
         const quantity = positiveQuantity(line.quantity);
@@ -189,7 +218,7 @@ export function PurchaseOrdersWorkspace({ chantierId }: { chantierId?: string })
         `${saved?.reference ?? "BC"} enregistré comme coût engagé, sans envoi au fournisseur.`,
       );
       requestId.current = crypto.randomUUID();
-      setAmount("");
+      setAllocations((rows) => rows.map((row) => ({ ...row, amount: "" })));
       setDescription("");
       setLines([newLine()]);
       // Keep site, supplier and mode for rapid repeat orders.
@@ -259,7 +288,7 @@ export function PurchaseOrdersWorkspace({ chantierId }: { chantierId?: string })
                 gap: 12,
               }}
             >
-              <label style={{ display: "grid", gap: 5 }}>
+              {mode === "DETAILED" ? <label style={{ display: "grid", gap: 5 }}>
                 Chantier *
                 <select
                   value={selected}
@@ -275,7 +304,7 @@ export function PurchaseOrdersWorkspace({ chantierId }: { chantierId?: string })
                     </option>
                   ))}
                 </select>
-              </label>
+              </label> : null}
               <label style={{ display: "grid", gap: 5 }}>
                 Fournisseur *
                 <input
@@ -330,21 +359,80 @@ export function PurchaseOrdersWorkspace({ chantierId }: { chantierId?: string })
               />
             </label>
             {mode === "QUICK" ? (
-              <label style={{ display: "grid", gap: 5, maxWidth: 380 }}>
-                Montant global HT (€) *
-                <input
-                  aria-label="Montant HT du BC rapide"
-                  inputMode="decimal"
-                  placeholder="Ex. 2500,00"
-                  value={amount}
-                  disabled={busy || !snapshot.canWrite}
-                  onChange={(e) => {
-                    setAmount(e.target.value);
-                    setError("");
-                  }}
-                />
-              </label>
-            ) : (
+              <div style={{ display: "grid", gap: 10 }}>
+                <strong>Répartition du BC par chantier</strong>
+                <div style={{ overflowX: "auto" }}>
+                  <table style={{ width: "100%", minWidth: 630, borderCollapse: "collapse" }}>
+                    <thead><tr style={{ textAlign: "left", borderBottom: "1px solid #ddd" }}>
+                      <th>Chantier</th><th>Montant HT (€)</th><th>Déjà engagé HT</th><th />
+                    </tr></thead>
+                    <tbody>
+                      {allocations.map((row, i) => {
+                        const selectedSite =
+                          sites.find((site) => site.id === row.chantierId)?.id ?? selected;
+                        return (
+                          <tr key={row.id}>
+                            <td>
+                              <select
+                                aria-label={`Chantier du BC rapide ligne ${i + 1}`}
+                                value={selectedSite}
+                                disabled={busy || !snapshot.canWrite}
+                                onChange={(e) => {
+                                  setAllocations((current) => current.map((item) =>
+                                    item.id === row.id ? { ...item, chantierId: e.target.value } : item));
+                                  setError("");
+                                }}
+                                style={{ width: "100%", minWidth: 210 }}
+                              >
+                                {sites.map((site) => (
+                                  <option key={site.id} value={site.id}>
+                                    {site.name} · {site.clientName}
+                                  </option>
+                                ))}
+                              </select>
+                            </td>
+                            <td>
+                              <input
+                                aria-label={`Montant HT ligne chantier ${i + 1}`}
+                                inputMode="decimal"
+                                placeholder="Ex. 250,00"
+                                value={row.amount}
+                                disabled={busy || !snapshot.canWrite}
+                                onChange={(e) => {
+                                  setAllocations((current) => current.map((item) =>
+                                    item.id === row.id ? { ...item, amount: e.target.value } : item));
+                                  setError("");
+                                }}
+                                style={{ width: 135 }}
+                              />
+                            </td>
+                            <td>{euro(committedPurchaseTotal(snapshot.payload, selectedSite))}</td>
+                            <td>
+                              <button type="button" className="secondaryButton"
+                                disabled={allocations.length === 1 || busy || !snapshot.canWrite}
+                                onClick={() => setAllocations((current) =>
+                                  current.filter((item) => item.id !== row.id))}>
+                                Retirer
+                              </button>
+                            </td>
+                          </tr>
+                        );
+                      })}
+                    </tbody>
+                  </table>
+                </div>
+                <button type="button" className="secondaryButton"
+                  disabled={busy || !snapshot.canWrite || allocations.length >= 100}
+                  onClick={() => {
+                    const firstUnused = sites.find((site) => !allocations.some((a) =>
+                      (a.chantierId || selected) === site.id));
+                    if (firstUnused) setAllocations((current) =>
+                      [...current, newAllocation(firstUnused.id)]);
+                    else setError("Tous les chantiers disponibles sont déjà sélectionnés.");
+                  }}>
+                  Ajouter un chantier
+                </button>
+              </div>            ) : (
               <div style={{ overflowX: "auto" }}>
                 <table style={{ width: "100%", minWidth: 810, borderCollapse: "collapse" }}>
                   <thead>
@@ -438,12 +526,16 @@ export function PurchaseOrdersWorkspace({ chantierId }: { chantierId?: string })
             >
               <div>
                 <strong>Total du BC : {preview === null ? "À renseigner" : euro(preview)}</strong>
-                <div>Déjà engagé sur ce chantier : {euro(committed)}</div>
+                {mode === "DETAILED" ? (
+                  <div>Déjà engagé sur ce chantier : {euro(committed)}</div>
+                ) : (
+                  <div>Le montant global sera ventilé une seule fois entre les chantiers.</div>
+                )}
               </div>
               <button
                 type="button"
                 className="primaryButton"
-                disabled={busy || !snapshot.canWrite || !selected}
+                disabled={busy || !snapshot.canWrite || sites.length === 0}
                 onClick={() => void create()}
               >
                 Enregistrer le BC (engagement)
@@ -505,7 +597,16 @@ export function PurchaseOrdersWorkspace({ chantierId }: { chantierId?: string })
                         {new Date(order.createdAt).toLocaleDateString("fr-FR")}
                       </td>
                       <td style={{ padding: 8 }}>{order.supplierName}</td>
-                      <td style={{ padding: 8 }}>{order.chantierName}</td>
+                      <td style={{ padding: 8 }}>
+                        {order.allocations?.length ? (
+                          <details>
+                            <summary>{order.allocations.length} chantier(s)</summary>
+                            {order.allocations.map((a) => (
+                              <div key={a.chantierId}>{a.chantierName} : {euro(a.amountHtCents)}</div>
+                            ))}
+                          </details>
+                        ) : order.chantierName}
+                      </td>
                       <td style={{ padding: 8 }}>
                         {order.mode === "QUICK" ? "Rapide" : `Détaillé (${order.lines.length})`}
                       </td>
@@ -527,6 +628,14 @@ export function PurchaseOrdersWorkspace({ chantierId }: { chantierId?: string })
                           </button>
                         ) : null}
                         {order.mode === "DETAILED" ? (
+                          <>
+                            <a
+                              className="secondaryButton"
+                              href={`/api/desktop/purchases/${encodeURIComponent(order.id)}/pdf`}
+                              aria-label={`Télécharger le PDF du ${order.reference}`}
+                            >
+                              PDF
+                            </a>
                           <details>
                             <summary>Lignes</summary>
                             {order.lines.map((line) => (
@@ -536,6 +645,7 @@ export function PurchaseOrdersWorkspace({ chantierId }: { chantierId?: string })
                               </div>
                             ))}
                           </details>
+                          </>
                         ) : order.description ? (
                           <small>{order.description}</small>
                         ) : null}
