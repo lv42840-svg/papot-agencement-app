@@ -45,6 +45,15 @@ export const purchaseOrderSchema = z.object({
   chantierId: z.string().uuid(),
   chantierName: text,
   allocations: z.array(purchaseOrderAllocationSchema).min(1).max(100).optional(),
+  removedAllocations: z
+    .array(
+      purchaseOrderAllocationSchema.extend({
+        removedAt: when,
+        removedByName: text,
+        reason: text,
+      }),
+    )
+    .optional(),
   supplierName: text,
   mode: z.enum(["QUICK", "DETAILED"]),
   description: z.string().trim().max(2000),
@@ -193,4 +202,117 @@ export function committedPurchaseTotal(payload: PurchaseOrdersPayload, chantierI
       // Existing pre-multisite BC remain compatible with their original chantier.
       return total + (order.chantierId === chantierId ? order.amountHtCents : 0);
     }, 0);
+}
+
+export type CommittedChantierOrder = {
+  orderId: string;
+  reference: string;
+  supplierName: string;
+  amountHtCents: number;
+  updatedAt: string;
+};
+
+/** Only allocations still committed count, including legacy single-chantier BC. */
+export function committedOrdersForChantier(
+  payload: PurchaseOrdersPayload,
+  chantierId: string,
+): CommittedChantierOrder[] {
+  return payload.orders.flatMap((order) => {
+    if (order.status !== "COMMITTED") return [];
+    const amount = order.allocations?.length
+      ? order.allocations.find((allocation) => allocation.chantierId === chantierId)?.amountHtCents
+      : order.chantierId === chantierId
+        ? order.amountHtCents
+        : undefined;
+    return amount === undefined
+      ? []
+      : [
+          {
+            orderId: order.id,
+            reference: order.reference,
+            supplierName: order.supplierName,
+            amountHtCents: amount,
+            updatedAt: order.updatedAt,
+          },
+        ];
+  });
+}
+
+/**
+ * Revoke only the engagement attributed to the closing chantier.
+ * Preserve the original BC and auditable removed allocations.
+ * Detailed and legacy mono-site BC are soft-cancelled.
+ */
+export function removeChantierPurchaseCommitments(
+  payload: PurchaseOrdersPayload,
+  chantierId: string,
+  actor: string,
+  now = new Date(),
+): PurchaseOrdersPayload {
+  const at = now.toISOString();
+  return {
+    ...payload,
+    orders: payload.orders.map((order) => {
+      if (order.status !== "COMMITTED") return order;
+      if (!order.allocations?.length) {
+        if (order.chantierId !== chantierId) return order;
+        return {
+          ...order,
+          status: "CANCELLED" as const,
+          updatedAt: at,
+          updatedByName: actor,
+          removedAllocations: [
+            ...(order.removedAllocations ?? []),
+            {
+              chantierId,
+              chantierName: order.chantierName,
+              amountHtCents: order.amountHtCents,
+              removedAt: at,
+              removedByName: actor,
+              reason: "Revue des BC à la clôture du chantier",
+            },
+          ],
+        };
+      }
+      const removed = order.allocations.filter(
+        (allocation) => allocation.chantierId === chantierId,
+      );
+      if (!removed.length) return order;
+      const remaining = order.allocations.filter(
+        (allocation) => allocation.chantierId !== chantierId,
+      );
+      const total = remaining.reduce((sum, row) => sum + row.amountHtCents, 0);
+      const first = remaining[0];
+      return {
+        ...order,
+        status: (first ? "COMMITTED" : "CANCELLED") as "COMMITTED" | "CANCELLED",
+        chantierId: first?.chantierId ?? order.chantierId,
+        chantierName: first?.chantierName ?? order.chantierName,
+        allocations: first ? remaining : order.allocations,
+        amountHtCents: first ? total : order.amountHtCents,
+        quickAmountHtCents: first ? total : order.quickAmountHtCents,
+        updatedAt: at,
+        updatedByName: actor,
+        removedAllocations: [
+          ...(order.removedAllocations ?? []),
+          ...removed.map((allocation) => ({
+            ...allocation,
+            removedAt: at,
+            removedByName: actor,
+            reason: "Revue des BC à la clôture du chantier",
+          })),
+        ],
+      };
+    }),
+  };
+}
+
+/** Optimistic review token detects changes to an order while closing the chantier. */
+export function purchaseCloseReviewToken(orders: CommittedChantierOrder[]): string {
+  return (
+    orders
+      .map((order) => [order.orderId, order.updatedAt, order.amountHtCents].join(":"))
+      .sort()
+      .join("|") || "none"
+  );
 }

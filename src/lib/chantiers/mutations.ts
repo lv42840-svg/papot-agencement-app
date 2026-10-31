@@ -103,6 +103,13 @@ export const chantierMutationSchema = z.discriminatedUnion("action", [
     action: z.literal("markDone"),
     chantierId: z.string().uuid(),
     reason: z.string().trim().min(1).max(2000),
+    purchaseReview: z
+      .object({
+        decision: z.enum(["KEEP", "REMOVE"]),
+        token: z.string().min(1).max(10000),
+        confirmRemove: z.boolean().optional(),
+      })
+      .optional(),
   }),
   z.object({
     action: z.literal("cancel"),
@@ -645,7 +652,13 @@ export function applyChantierMutation(
       item,
       actor.displayName,
       "MARKED_DONE",
-      `Chantier passé à Terminé. Motif : ${input.reason}`,
+      `Chantier passé à Terminé. Motif : ${input.reason}. Revue des BC : ${
+        input.purchaseReview?.decision === "REMOVE"
+          ? "engagements non rapprochés retirés"
+          : input.purchaseReview?.decision === "KEEP"
+            ? "engagements non rapprochés conservés"
+            : "aucun engagement à revoir"
+      }.`,
       now,
     );
     return { payload, focusChantierId: item.id };

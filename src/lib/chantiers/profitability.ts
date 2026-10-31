@@ -27,6 +27,8 @@ export type ChantierProfitability = {
   soldCents: number | null;
   plannedDisbursementCents: number | null;
   plannedPurchasesCents: number | null;
+  committedPurchasesCents: number | null;
+  purchaseBudgetOverrunCents: number | null;
   plannedPurchaseLines: PlannedPurchaseLine[];
   purchaseClassificationWarnings: Array<{
     quoteReference: string;
@@ -100,6 +102,7 @@ export function calculateChantierProfitability(
     laborCostCents: null,
     purchaseCostCents: null,
   },
+  committedPurchasesCents: number | null = null,
 ): ChantierProfitability {
   const retained = retainedQuotes(commercialCase, quotes);
   const purchaseExtracts = retained.records.map((quote) => extractPlannedPurchases(quote));
@@ -188,6 +191,11 @@ export function calculateChantierProfitability(
     soldCents,
     plannedDisbursementCents,
     plannedPurchasesCents,
+    committedPurchasesCents,
+    purchaseBudgetOverrunCents:
+      committedPurchasesCents === null || plannedPurchasesCents === null
+        ? null
+        : committedPurchasesCents - plannedPurchasesCents,
     plannedPurchaseLines,
     purchaseClassificationWarnings,
     plannedMarginCents,

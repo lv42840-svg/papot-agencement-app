@@ -30,12 +30,13 @@ describe("chantier profitability UI", () => {
     expect(panel).toContain("Heures prévues depuis le devis");
     expect(panel).toContain("Achats prévus extraits du devis");
     expect(panel).toContain("plannedPurchaseLines.map");
-    expect(panel).toContain("Achats / commandes");
+    expect(panel).toContain("Achats engagés (BC) HT");
+    expect(panel).toContain("Écart engagé - prévu HT");
   });
 
   it("does not invent actual costs while their source modules are absent", () => {
     expect(panel).toContain("Coût mensuel employeur manquant pour une ou plusieurs périodes");
-    expect(panel).toContain("Module Achats / commandes non raccordé");
+    expect(panel).toContain("En attente du rapprochement Pennylane");
     expect(engine).toContain("laborCostCents: null");
     expect(engine).toContain("purchaseCostCents: null");
   });

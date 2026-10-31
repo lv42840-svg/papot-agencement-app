@@ -42,13 +42,21 @@ export function ChantierProfitabilityPanel({
   commercialCase,
   quotes,
   actualCosts,
+  committedPurchasesCents = null,
 }: {
   chantier: ChantierRecord;
   commercialCase: CommercialCase | null;
   quotes: NativeQuotesPayload;
   actualCosts?: ChantierActualCostSnapshot;
+  committedPurchasesCents?: number | null;
 }) {
-  const result = calculateChantierProfitability(chantier, commercialCase, quotes, actualCosts);
+  const result = calculateChantierProfitability(
+    chantier,
+    commercialCase,
+    quotes,
+    actualCosts,
+    committedPurchasesCents,
+  );
 
   return (
     <section className="chantierProfitability">
@@ -158,6 +166,22 @@ export function ChantierProfitabilityPanel({
               missing="Budget incomplet : vérifier les composants non chiffrés ou non classés"
               total
             />
+            <CostRow
+              label="Achats engagés (BC) HT"
+              value={result.committedPurchasesCents}
+              missing="Accès au module Achats requis"
+            />
+            <CostRow
+              label="Écart engagé - prévu HT"
+              value={result.purchaseBudgetOverrunCents}
+              missing="Écart indisponible si le devis ou les BC sont incomplets"
+            />
+            {result.purchaseBudgetOverrunCents !== null && result.purchaseBudgetOverrunCents > 0 ? (
+              <div className="chantierProfitabilityWarning">
+                <AlertTriangle size={15} />
+                Dépassement du budget achats : {money(result.purchaseBudgetOverrunCents)} HT
+              </div>
+            ) : null}
           </div>
           <div style={{ maxHeight: 340, overflow: "auto" }}>
             {result.plannedPurchaseLines.length === 0 ? (
@@ -231,9 +255,9 @@ export function ChantierProfitabilityPanel({
             missing="Coût mensuel employeur manquant pour une ou plusieurs périodes"
           />
           <CostRow
-            label="Achats / commandes"
+            label="Achats facturés et validés"
             value={result.actualPurchaseCostCents}
-            missing="Module Achats / commandes non raccordé"
+            missing="En attente du rapprochement Pennylane ; les BC engagés ne sont pas des coûts réels"
           />
           <CostRow
             label="Total coûts réels"

@@ -49,9 +49,24 @@ type ChantiersSnapshot = {
   capabilities: ChantierCapabilities;
   focusChantierId?: string;
   planningCloseWarnings: Record<string, ChantierPlanningCloseWarning>;
+  committedPurchasesByChantier: Record<string, number> | null;
+  canRemovePurchaseCommitments: boolean;
+  purchaseCloseWarnings: Record<string, PurchaseCloseWarning> | null;
   serverNow: string;
 };
 
+type PurchaseCloseWarning = {
+  orders: Array<{
+    orderId: string;
+    reference: string;
+    supplierName: string;
+    amountHtCents: number;
+    updatedAt: string;
+  }>;
+  count: number;
+  amountHtCents: number;
+  token: string;
+};
 type CommercialSnapshot = { payload: CommercialPayload };
 type ClientsSnapshot = { payload: ClientsPayload; canWrite: boolean };
 type QuotesSnapshot = { payload: NativeQuotesPayload; canWrite: boolean };
@@ -75,6 +90,14 @@ const errorMessages: Record<string, string> = {
     "Ce chantier est archivé. Réactive-le avant de modifier ses données.",
   CHANTIER_HOURS_UNCHANGED: "Aucune heure prévisionnelle n'a changé.",
   CHANTIER_NOT_ACTIVE: "Seul un chantier actif peut être marqué Terminé.",
+  CHANTIER_PURCHASE_REVIEW_REQUIRED:
+    "Vérifie les bons de commande non rapprochés et choisis de les conserver ou de retirer leurs engagements.",
+  CHANTIER_PURCHASE_REVIEW_CONFLICT:
+    "Les bons de commande ont changé. Actualise le chantier et recommence la revue.",
+  CHANTIER_PURCHASE_REMOVE_CONFIRMATION_REQUIRED:
+    "Confirme explicitement le retrait des engagements avant de clôturer.",
+  CHANTIER_PURCHASE_REMOVE_FORBIDDEN:
+    "Tu n'as pas les droits Achats nécessaires pour retirer ces engagements. Choisis de les conserver ou demande l'autorisation.",
   CHANTIER_NOT_DONE: "Cette action nécessite un chantier terminé ou annulé.",
   CHANTIER_CANCELLED_READ_ONLY: "Ce chantier est annulé. Rouvre-le avant de modifier ses données.",
   CHANTIERS_VERSION_REQUIRED:
@@ -380,6 +403,8 @@ export function ChantierWorkspace({ chantierId }: { chantierId: string }) {
             busy={busy}
             capabilities={chantiersSnapshot.capabilities}
             closeWarning={chantiersSnapshot.planningCloseWarnings[chantier.id] ?? null}
+            purchaseWarning={chantiersSnapshot.purchaseCloseWarnings?.[chantier.id] ?? null}
+            canRemovePurchases={chantiersSnapshot.canRemovePurchaseCommitments}
             mutate={mutate}
           />
         ) : null}
@@ -418,6 +443,9 @@ export function ChantierWorkspace({ chantierId }: { chantierId: string }) {
               laborCostCents: chantiersSnapshot.actualLaborCostsByChantier?.[chantier.id] ?? null,
               purchaseCostCents: null,
             }}
+            committedPurchasesCents={
+              chantiersSnapshot.committedPurchasesByChantier?.[chantier.id] ?? null
+            }
           />
         ) : null}
         {activeTab === "billing" ? <ChantierBillingTab chantierId={chantier.id} /> : null}
@@ -675,18 +703,24 @@ function LifecycleTab({
   busy,
   capabilities,
   closeWarning,
+  purchaseWarning,
+  canRemovePurchases,
   mutate,
 }: {
   chantier: ChantierRecord;
   busy: boolean;
   capabilities: ChantierCapabilities;
   closeWarning: ChantierPlanningCloseWarning | null;
+  purchaseWarning: PurchaseCloseWarning | null;
+  canRemovePurchases: boolean;
   mutate: (body: MutationBody, message: string) => Promise<boolean>;
 }) {
   const [closingAction, setClosingAction] = useState<"close" | "cancel" | null>(null);
   const [cancelReason, setCancelReason] = useState("");
   const [cancelConfirmed, setCancelConfirmed] = useState(false);
   const [closeReason, setCloseReason] = useState("");
+  const [purchaseDecision, setPurchaseDecision] = useState<"KEEP" | "REMOVE" | "">("");
+  const [removeConfirmed, setRemoveConfirmed] = useState(false);
   const [reactivateReason, setReactivateReason] = useState("");
   const [archiveReviewed, setArchiveReviewed] = useState(false);
   const [unarchiveReason, setUnarchiveReason] = useState("");
@@ -780,10 +814,87 @@ function LifecycleTab({
                       placeholder="Motif obligatoire de fermeture"
                     />
                   </label>
+                  {purchaseWarning === null ? (
+                    <div className="chantierLifecycleWarning" role="alert">
+                      Impossible de vérifier les BC. Actualise ou demande l&apos;accès Achats avant
+                      de clôturer.
+                    </div>
+                  ) : purchaseWarning.count > 0 ? (
+                    <div className="chantierLifecycleWarning">
+                      <strong>
+                        {purchaseWarning.count} BC non rapproché(s) ·{" "}
+                        {(purchaseWarning.amountHtCents / 100).toLocaleString("fr-FR", {
+                          style: "currency",
+                          currency: "EUR",
+                        })}{" "}
+                        HT engagés sur ce chantier.
+                      </strong>
+                      <p>
+                        Le lien entre les BC et les factures Pennylane n&apos;est pas encore
+                        opérationnel. Vérifie ces engagements avant de clôturer.
+                      </p>
+                      <ul>
+                        {purchaseWarning.orders.map((order) => (
+                          <li key={order.orderId}>
+                            {order.reference} · {order.supplierName} ·{" "}
+                            {(order.amountHtCents / 100).toLocaleString("fr-FR", {
+                              style: "currency",
+                              currency: "EUR",
+                            })}{" "}
+                            HT
+                          </li>
+                        ))}
+                      </ul>
+                      <label className="chantierArchiveCheck">
+                        <input
+                          type="radio"
+                          name="purchase-close-review"
+                          checked={purchaseDecision === "KEEP"}
+                          disabled={busy}
+                          onChange={() => {
+                            setPurchaseDecision("KEEP");
+                            setRemoveConfirmed(false);
+                          }}
+                        />
+                        Conserver les engagements : factures encore possibles ou à vérifier
+                      </label>
+                      <label className="chantierArchiveCheck">
+                        <input
+                          type="radio"
+                          name="purchase-close-review"
+                          checked={purchaseDecision === "REMOVE"}
+                          disabled={busy || !canRemovePurchases}
+                          onChange={() => setPurchaseDecision("REMOVE")}
+                        />
+                        Retirer les engagements de ce chantier sans effacer les BC
+                        {!canRemovePurchases ? " (droit Achats modification requis)" : ""}
+                      </label>
+                      {purchaseDecision === "REMOVE" ? (
+                        <label className="chantierArchiveCheck">
+                          <input
+                            type="checkbox"
+                            checked={removeConfirmed}
+                            disabled={busy}
+                            onChange={(event) => setRemoveConfirmed(event.target.checked)}
+                          />
+                          Je confirme le retrait des engagements sur ce chantier, sans toucher aux
+                          éventuelles affectations des autres chantiers.
+                        </label>
+                      ) : null}
+                    </div>
+                  ) : (
+                    <p>Aucun BC engagé à vérifier pour ce chantier.</p>
+                  )}
                   <button
                     type="button"
                     className="primaryButton chantierFitButton"
-                    disabled={busy || !closeReason.trim()}
+                    disabled={
+                      busy ||
+                      !closeReason.trim() ||
+                      purchaseWarning === null ||
+                      (purchaseWarning.count > 0 &&
+                        (!purchaseDecision || (purchaseDecision === "REMOVE" && !removeConfirmed)))
+                    }
                     onClick={() =>
                       void mutate(
                         {
@@ -791,6 +902,15 @@ function LifecycleTab({
                           chantierId: chantier.id,
                           expectedUpdatedAt: chantier.updatedAt,
                           reason: closeReason,
+                          ...(purchaseWarning && purchaseWarning.count > 0
+                            ? {
+                                purchaseReview: {
+                                  decision: purchaseDecision,
+                                  token: purchaseWarning.token,
+                                  confirmRemove: purchaseDecision === "REMOVE" && removeConfirmed,
+                                },
+                              }
+                            : {}),
                         },
                         "Chantier clôturé : statut Terminé.",
                       )
