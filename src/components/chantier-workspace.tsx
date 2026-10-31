@@ -49,9 +49,23 @@ type ChantiersSnapshot = {
   capabilities: ChantierCapabilities;
   focusChantierId?: string;
   planningCloseWarnings: Record<string, ChantierPlanningCloseWarning>;
+  committedPurchasesByChantier: Record<string, number> | null;
+  purchaseCloseWarnings: Record<string, PurchaseCloseWarning> | null;
   serverNow: string;
 };
 
+type PurchaseCloseWarning = {
+  orders: Array<{
+    orderId: string;
+    reference: string;
+    supplierName: string;
+    amountHtCents: number;
+    updatedAt: string;
+  }>;
+  count: number;
+  amountHtCents: number;
+  token: string;
+};
 type CommercialSnapshot = { payload: CommercialPayload };
 type ClientsSnapshot = { payload: ClientsPayload; canWrite: boolean };
 type QuotesSnapshot = { payload: NativeQuotesPayload; canWrite: boolean };
@@ -75,6 +89,10 @@ const errorMessages: Record<string, string> = {
     "Ce chantier est archivé. Réactive-le avant de modifier ses données.",
   CHANTIER_HOURS_UNCHANGED: "Aucune heure prévisionnelle n'a changé.",
   CHANTIER_NOT_ACTIVE: "Seul un chantier actif peut être marqué Terminé.",
+  CHANTIER_PURCHASE_REVIEW_REQUIRED:
+    "Vérifie les bons de commande non rapprochés et choisis de les conserver ou de retirer leurs engagements.",
+  CHANTIER_PURCHASE_REVIEW_CONFLICT:
+    "Les bons de commande ont changé. Actualise le chantier et recommence la revue.",
   CHANTIER_NOT_DONE: "Cette action nécessite un chantier terminé ou annulé.",
   CHANTIER_CANCELLED_READ_ONLY: "Ce chantier est annulé. Rouvre-le avant de modifier ses données.",
   CHANTIERS_VERSION_REQUIRED:
@@ -380,6 +398,7 @@ export function ChantierWorkspace({ chantierId }: { chantierId: string }) {
             busy={busy}
             capabilities={chantiersSnapshot.capabilities}
             closeWarning={chantiersSnapshot.planningCloseWarnings[chantier.id] ?? null}
+            purchaseWarning={chantiersSnapshot.purchaseCloseWarnings?.[chantier.id] ?? null}
             mutate={mutate}
           />
         ) : null}
@@ -418,6 +437,9 @@ export function ChantierWorkspace({ chantierId }: { chantierId: string }) {
               laborCostCents: chantiersSnapshot.actualLaborCostsByChantier?.[chantier.id] ?? null,
               purchaseCostCents: null,
             }}
+            committedPurchasesCents={
+              chantiersSnapshot.committedPurchasesByChantier?.[chantier.id] ?? null
+            }
           />
         ) : null}
         {activeTab === "billing" ? <ChantierBillingTab chantierId={chantier.id} /> : null}
@@ -675,18 +697,22 @@ function LifecycleTab({
   busy,
   capabilities,
   closeWarning,
+  purchaseWarning,
   mutate,
 }: {
   chantier: ChantierRecord;
   busy: boolean;
   capabilities: ChantierCapabilities;
   closeWarning: ChantierPlanningCloseWarning | null;
+  purchaseWarning: PurchaseCloseWarning | null;
   mutate: (body: MutationBody, message: string) => Promise<boolean>;
 }) {
   const [closingAction, setClosingAction] = useState<"close" | "cancel" | null>(null);
   const [cancelReason, setCancelReason] = useState("");
   const [cancelConfirmed, setCancelConfirmed] = useState(false);
   const [closeReason, setCloseReason] = useState("");
+  const [purchaseDecision, setPurchaseDecision] = useState<"KEEP" | "REMOVE" | "">("");
+  const [removeConfirmed, setRemoveConfirmed] = useState(false);
   const [reactivateReason, setReactivateReason] = useState("");
   const [archiveReviewed, setArchiveReviewed] = useState(false);
   const [unarchiveReason, setUnarchiveReason] = useState("");
