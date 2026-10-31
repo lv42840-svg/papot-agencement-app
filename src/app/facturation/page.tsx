@@ -5,13 +5,17 @@ export const dynamic = "force-dynamic";
 export default async function BillingPage({
   searchParams,
 }: {
-  searchParams: Promise<{ quoteId?: string; chantierId?: string }>;
+  searchParams: Promise<{ quoteId?: string; chantierId?: string; tab?: string }>;
 }) {
   await requireModuleRequestContext("billing", "READ");
   const params = await searchParams;
   return (
     <DesktopAppShell>
-      <BillingWorkspace quoteId={params.quoteId} chantierId={params.chantierId} />
+      <BillingWorkspace
+        quoteId={params.quoteId}
+        chantierId={params.chantierId}
+        initialTab={params.tab}
+      />
     </DesktopAppShell>
   );
 }
