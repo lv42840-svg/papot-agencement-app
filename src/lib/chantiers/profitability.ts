@@ -19,6 +19,7 @@ export type ChantierProfitabilityQuote = {
   saleCents: number;
   soldHours: ChantierHours & { total: number };
   plannedDisbursementCents: number | null;
+  plannedLaborCostCents: number | null;
   plannedMarginCents: number | null;
   plannedPurchasesCents: number | null;
 };
@@ -26,6 +27,8 @@ export type ChantierProfitabilityQuote = {
 export type ChantierProfitability = {
   soldCents: number | null;
   plannedDisbursementCents: number | null;
+  plannedLaborCostCents: number | null;
+  plannedTotalCostCents: number | null;
   plannedPurchasesCents: number | null;
   committedPurchasesCents: number | null;
   purchaseBudgetOverrunCents: number | null;
@@ -118,6 +121,7 @@ export function calculateChantierProfitability(
       saleCents: summary.totalHtCents,
       soldHours: summary.soldHoursByActivity,
       plannedDisbursementCents: summary.plannedDisbursementCents,
+      plannedLaborCostCents: summary.plannedLaborCostCents,
       plannedMarginCents: summary.plannedMarginCents,
       plannedPurchasesCents: purchaseExtracts[index].totalCents,
     } satisfies ChantierProfitabilityQuote;
@@ -139,6 +143,15 @@ export function calculateChantierProfitability(
         0,
       )
     : null;
+  const plannedLaborComplete =
+    soldComplete && summaries.every((quote) => quote.plannedLaborCostCents !== null);
+  const plannedLaborCostCents = plannedLaborComplete
+    ? summaries.reduce((sum, quote) => addSafeMoney(sum, quote.plannedLaborCostCents ?? 0), 0)
+    : null;
+  const plannedTotalCostCents =
+    plannedDisbursementCents === null || plannedLaborCostCents === null
+      ? null
+      : addSafeMoney(plannedDisbursementCents, plannedLaborCostCents);
   const plannedPurchasesComplete =
     soldComplete && purchaseExtracts.every((quote) => quote.totalCents !== null);
   const plannedPurchasesCents = plannedPurchasesComplete
@@ -156,8 +169,6 @@ export function calculateChantierProfitability(
   const plannedMarginCents = plannedMarginComplete
     ? summaries.reduce((total, quote) => total + (quote.plannedMarginCents ?? 0), 0)
     : null;
-  const plannedTotalCostCents =
-    soldCents === null || plannedMarginCents === null ? null : soldCents - plannedMarginCents;
   const plannedMarginPercent =
     soldCents === null || plannedTotalCostCents === null
       ? null
@@ -190,6 +201,8 @@ export function calculateChantierProfitability(
   return {
     soldCents,
     plannedDisbursementCents,
+    plannedLaborCostCents,
+    plannedTotalCostCents,
     plannedPurchasesCents,
     committedPurchasesCents,
     purchaseBudgetOverrunCents:
