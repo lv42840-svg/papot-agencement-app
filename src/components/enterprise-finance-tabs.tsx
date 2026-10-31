@@ -62,7 +62,7 @@ export function EnterpriseFinanceTabs({ chantierView }: { chantierView: ReactNod
         <>
           <p style={{ margin: "0 22px 16px" }}>
             Suivi cumulé des chantiers : devis prévisionnels, heures consommées et commandes
-            engagées. Cette vue ne constitue pas le résultat mensuel de l'entreprise.
+            engagées. Cette vue ne constitue pas le résultat mensuel de l’entreprise.
           </p>
           {chantierView}
         </>
@@ -226,7 +226,7 @@ function MonthlyCompanyPosition() {
             <p>
               La valorisation porte uniquement sur les heures déjà saisies, pas sur toute la paie.
               Les engagements représentent les commandes actuellement actives, pas les factures du
-              mois. Ces montants ne s'ajoutent pas une seconde fois au résultat facturé.
+              mois. Ces montants ne s’ajoutent pas une seconde fois au résultat facturé.
             </p>
             {current.consumption?.provisional ? (
               <p>Coût horaire du mois en cours : valeur provisoire du mois précédent.</p>
@@ -255,7 +255,7 @@ function MonthlyCompanyPosition() {
           </section>
           <small>
             Lecture des données PAPOT :{" "}
-            {new Date(current.asOf).toLocaleString("fr-FR", { timeZone: "Europe/Paris" })}. Ce n'est
+            {new Date(current.asOf).toLocaleString("fr-FR", { timeZone: "Europe/Paris" })}. Ce n’est
             pas une synchronisation Pennylane.
           </small>
         </>
