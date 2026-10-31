@@ -135,7 +135,9 @@ export function PurchaseOrdersWorkspace({ chantierId }: { chantierId?: string })
     .filter(
       (order) =>
         siteFilter === "ALL" ||
-        (order.allocations?.some((allocation) => purchaseDestinationKey(allocation) === siteFilter) ??
+        (order.allocations?.some(
+          (allocation) => purchaseDestinationKey(allocation) === siteFilter,
+        ) ??
           order.chantierId === siteFilter),
     )
     .filter((order) =>
@@ -305,7 +307,9 @@ export function PurchaseOrdersWorkspace({ chantierId }: { chantierId?: string })
             <strong>{euro(commitmentTotals.savCents)}</strong> · Frais généraux :{" "}
             <strong>{euro(commitmentTotals.generalExpensesCents)}</strong>
           </p>
-          <p>Total unique : <strong>{euro(commitmentTotals.totalCents)}</strong></p>
+          <p>
+            Total unique : <strong>{euro(commitmentTotals.totalCents)}</strong>
+          </p>
           <small>Ces engagements ne sont ni les factures du mois, ni un résultat réel.</small>
         </section>
       ) : null}
@@ -469,7 +473,12 @@ export function PurchaseOrdersWorkspace({ chantierId }: { chantierId?: string })
                               />
                             </td>
                             <td>
-                              {euro(committedPurchaseDestinationTotal(snapshot.payload, selectedDestination))}
+                              {euro(
+                                committedPurchaseDestinationTotal(
+                                  snapshot.payload,
+                                  selectedDestination,
+                                ),
+                              )}
                             </td>
                             <td>
                               <button
@@ -477,7 +486,9 @@ export function PurchaseOrdersWorkspace({ chantierId }: { chantierId?: string })
                                 className="secondaryButton"
                                 disabled={allocations.length === 1 || busy || !snapshot.canWrite}
                                 onClick={() =>
-                                  setAllocations((current) => current.filter((item) => item.id !== row.id))
+                                  setAllocations((current) =>
+                                    current.filter((item) => item.id !== row.id),
+                                  )
                                 }
                               >
                                 Retirer
@@ -567,7 +578,9 @@ export function PurchaseOrdersWorkspace({ chantierId }: { chantierId?: string })
                             type="button"
                             className="secondaryButton"
                             disabled={lines.length === 1 || busy || !snapshot.canWrite}
-                            onClick={() => setLines((current) => current.filter((x) => x.id !== line.id))}
+                            onClick={() =>
+                              setLines((current) => current.filter((x) => x.id !== line.id))
+                            }
                           >
                             Retirer
                           </button>
@@ -666,7 +679,9 @@ export function PurchaseOrdersWorkspace({ chantierId }: { chantierId?: string })
                   {visible.map((order) => (
                     <tr key={order.id} style={{ borderBottom: "1px solid #ece8f0" }}>
                       <td style={{ padding: 8 }}>{order.reference}</td>
-                      <td style={{ padding: 8 }}>{new Date(order.createdAt).toLocaleDateString("fr-FR")}</td>
+                      <td style={{ padding: 8 }}>
+                        {new Date(order.createdAt).toLocaleDateString("fr-FR")}
+                      </td>
                       <td style={{ padding: 8 }}>{order.supplierName}</td>
                       <td style={{ padding: 8 }}>
                         {order.allocations?.length ? (
@@ -678,7 +693,9 @@ export function PurchaseOrdersWorkspace({ chantierId }: { chantierId?: string })
                               </div>
                             ))}
                           </details>
-                        ) : order.chantierName}
+                        ) : (
+                          order.chantierName
+                        )}
                       </td>
                       <td style={{ padding: 8 }}>
                         {order.mode === "QUICK" ? "Rapide" : `Détaillé (${order.lines.length})`}
@@ -690,8 +707,13 @@ export function PurchaseOrdersWorkspace({ chantierId }: { chantierId?: string })
                         {euro(order.amountHtCents)}
                       </td>
                       <td style={{ padding: 8 }}>
-                        {order.status === "COMMITTED" && snapshot.canWrite && !order.removedAllocations?.length ? (
-                          <Link className="secondaryButton" href={`/achats/${encodeURIComponent(order.id)}/modifier`}>
+                        {order.status === "COMMITTED" &&
+                        snapshot.canWrite &&
+                        !order.removedAllocations?.length ? (
+                          <Link
+                            className="secondaryButton"
+                            href={`/achats/${encodeURIComponent(order.id)}/modifier`}
+                          >
                             Modifier
                           </Link>
                         ) : null}
@@ -718,12 +740,15 @@ export function PurchaseOrdersWorkspace({ chantierId }: { chantierId?: string })
                               <summary>Lignes</summary>
                               {order.lines.map((line) => (
                                 <div key={line.id}>
-                                  {line.description} · {line.quantity} {line.unit} × {euro(line.unitPriceHtCents)}
+                                  {line.description} · {line.quantity} {line.unit} ×{" "}
+                                  {euro(line.unitPriceHtCents)}
                                 </div>
                               ))}
                             </details>
                           </>
-                        ) : order.description ? <small>{order.description}</small> : null}
+                        ) : order.description ? (
+                          <small>{order.description}</small>
+                        ) : null}
                       </td>
                     </tr>
                   ))}

@@ -50,7 +50,12 @@ function statusOf(code: string) {
   const auth = desktopRequestErrorStatus(code);
   if (auth) return auth;
   if (code === "PURCHASE_ORDER_NOT_FOUND" || code === "PURCHASE_CHANTIER_NOT_FOUND") return 404;
-  if (code.includes("CONFLICT") || code.includes("CANCELLED") || code === "PURCHASE_CHANTIER_NOT_ACTIVE") return 409;
+  if (
+    code.includes("CONFLICT") ||
+    code.includes("CANCELLED") ||
+    code === "PURCHASE_CHANTIER_NOT_ACTIVE"
+  )
+    return 409;
   return 400;
 }
 
@@ -81,15 +86,20 @@ export async function POST(request: Request) {
   try {
     const context = await requireModuleRequestContext("purchases", "WRITE");
     const input = requestSchema.parse(await request.json());
-    const sites = input.action === "CANCEL"
-      ? []
-      : (await createChantiersRepository().load()).chantiers;
+    const sites =
+      input.action === "CANCEL" ? [] : (await createChantiersRepository().load()).chantiers;
     const payload = await createPurchaseOrdersRepository().mutate((current) => {
       if (input.action === "CREATE") {
         // A lost HTTP response may be retried after the site has since closed.
         if (current.orders.some((order) => order.requestId === input.requestId)) return current;
         const chantierNames = purchaseChantierNamesForInput(input.order, sites);
-        return addPurchaseOrder(current, input.requestId, input.order, chantierNames, context.user.displayName);
+        return addPurchaseOrder(
+          current,
+          input.requestId,
+          input.order,
+          chantierNames,
+          context.user.displayName,
+        );
       }
       if (input.action === "UPDATE") {
         const previous = current.orders.find((order) => order.id === input.orderId);
@@ -104,7 +114,12 @@ export async function POST(request: Request) {
           context.user.displayName,
         );
       }
-      return cancelPurchaseOrder(current, input.orderId, input.expectedUpdatedAt, context.user.displayName);
+      return cancelPurchaseOrder(
+        current,
+        input.orderId,
+        input.expectedUpdatedAt,
+        context.user.displayName,
+      );
     });
     return json({ payload, canWrite: true });
   } catch (error) {

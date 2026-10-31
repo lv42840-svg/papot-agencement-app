@@ -69,7 +69,8 @@ function marginPercent(saleCents: number, costCents: number): number | null {
 
 function addSafeMoney(left: number, right: number): number {
   const total = left + right;
-  if (!Number.isSafeInteger(total) || total < 0) throw new Error("CHANTIER_PROFITABILITY_MONEY_INVALID");
+  if (!Number.isSafeInteger(total) || total < 0)
+    throw new Error("CHANTIER_PROFITABILITY_MONEY_INVALID");
   return total;
 }
 
@@ -123,57 +124,95 @@ export function calculateChantierProfitability(
       plannedPurchasesCents: purchaseExtracts[index].totalCents,
     } satisfies ChantierProfitabilityQuote;
   });
-  const soldComplete = commercialCase !== null && commercialCase.retainedQuoteIds.length > 0 && retained.missingIds.length === 0;
-  const soldCents = soldComplete ? summaries.reduce((total, quote) => addSafeMoney(total, quote.saleCents), 0) : null;
-  const plannedDisbursementComplete = soldComplete && summaries.every((quote) => quote.plannedDisbursementCents !== null);
-  const plannedDisbursementCents = plannedDisbursementComplete
-    ? summaries.reduce((total, quote) => addSafeMoney(total, quote.plannedDisbursementCents ?? 0), 0)
+  const soldComplete =
+    commercialCase !== null &&
+    commercialCase.retainedQuoteIds.length > 0 &&
+    retained.missingIds.length === 0;
+  const soldCents = soldComplete
+    ? summaries.reduce((total, quote) => addSafeMoney(total, quote.saleCents), 0)
     : null;
-  const plannedLaborComplete = soldComplete && summaries.every((quote) => quote.plannedLaborCostCents !== null);
+  const plannedDisbursementComplete =
+    soldComplete && summaries.every((quote) => quote.plannedDisbursementCents !== null);
+  const plannedDisbursementCents = plannedDisbursementComplete
+    ? summaries.reduce(
+        (total, quote) => addSafeMoney(total, quote.plannedDisbursementCents ?? 0),
+        0,
+      )
+    : null;
+  const plannedLaborComplete =
+    soldComplete && summaries.every((quote) => quote.plannedLaborCostCents !== null);
   const plannedLaborCostCents = plannedLaborComplete
     ? summaries.reduce((sum, quote) => addSafeMoney(sum, quote.plannedLaborCostCents ?? 0), 0)
     : null;
-  const plannedTotalCostCents = plannedDisbursementCents === null || plannedLaborCostCents === null
-    ? null : addSafeMoney(plannedDisbursementCents, plannedLaborCostCents);
-  const plannedPurchasesComplete = soldComplete && purchaseExtracts.every((quote) => quote.totalCents !== null);
+  const plannedTotalCostCents =
+    plannedDisbursementCents === null || plannedLaborCostCents === null
+      ? null
+      : addSafeMoney(plannedDisbursementCents, plannedLaborCostCents);
+  const plannedPurchasesComplete =
+    soldComplete && purchaseExtracts.every((quote) => quote.totalCents !== null);
   const plannedPurchasesCents = plannedPurchasesComplete
     ? purchaseExtracts.reduce((sum, item) => addSafeMoney(sum, item.totalCents ?? 0), 0)
     : null;
   const plannedPurchaseLines = purchaseExtracts.flatMap((item) => item.lines);
   const purchaseClassificationWarnings = purchaseExtracts.flatMap((item, index) =>
-    item.unclassified.map((warning) => ({ quoteReference: summaries[index].quoteNumber ?? summaries[index].subject, ...warning })),
+    item.unclassified.map((warning) => ({
+      quoteReference: summaries[index].quoteNumber ?? summaries[index].subject,
+      ...warning,
+    })),
   );
-  const plannedMarginComplete = soldComplete && summaries.every((quote) => quote.plannedMarginCents !== null);
+  const plannedMarginComplete =
+    soldComplete && summaries.every((quote) => quote.plannedMarginCents !== null);
   const plannedMarginCents = plannedMarginComplete
-    ? summaries.reduce((total, quote) => total + (quote.plannedMarginCents ?? 0), 0) : null;
-  const plannedMarginPercent = soldCents === null || plannedTotalCostCents === null
-    ? null : marginPercent(soldCents, plannedTotalCostCents);
+    ? summaries.reduce((total, quote) => total + (quote.plannedMarginCents ?? 0), 0)
+    : null;
+  const plannedMarginPercent =
+    soldCents === null || plannedTotalCostCents === null
+      ? null
+      : marginPercent(soldCents, plannedTotalCostCents);
 
   // Operational budget consumption remains separate from invoiced revenue and actual margin.
-  const knownCostCommitmentsCents = actualCosts.laborCostCents !== null && committedPurchasesCents !== null
-    ? addSafeMoney(actualCosts.laborCostCents, committedPurchasesCents) : null;
-  const remainingCostBudgetCents = knownCostCommitmentsCents !== null && plannedTotalCostCents !== null
-    ? plannedTotalCostCents - knownCostCommitmentsCents : null;
-  const remainingLaborBudgetCents = actualCosts.laborCostCents !== null && plannedLaborCostCents !== null
-    ? plannedLaborCostCents - actualCosts.laborCostCents : null;
+  const knownCostCommitmentsCents =
+    actualCosts.laborCostCents !== null && committedPurchasesCents !== null
+      ? addSafeMoney(actualCosts.laborCostCents, committedPurchasesCents)
+      : null;
+  const remainingCostBudgetCents =
+    knownCostCommitmentsCents !== null && plannedTotalCostCents !== null
+      ? plannedTotalCostCents - knownCostCommitmentsCents
+      : null;
+  const remainingLaborBudgetCents =
+    actualCosts.laborCostCents !== null && plannedLaborCostCents !== null
+      ? plannedLaborCostCents - actualCosts.laborCostCents
+      : null;
 
-  const actualRevenueCents = actualCosts.invoicedRevenueCents == null ? null : signedMoney(actualCosts.invoicedRevenueCents);
-  const actualCostsComplete = actualCosts.laborCostCents !== null && actualCosts.purchaseCostCents !== null;
+  const actualRevenueCents =
+    actualCosts.invoicedRevenueCents == null ? null : signedMoney(actualCosts.invoicedRevenueCents);
+  const actualCostsComplete =
+    actualCosts.laborCostCents !== null && actualCosts.purchaseCostCents !== null;
   const actualTotalCostCents = actualCostsComplete
-    ? signedMoney(signedMoney(actualCosts.laborCostCents ?? 0) + signedMoney(actualCosts.purchaseCostCents ?? 0))
+    ? signedMoney(
+        signedMoney(actualCosts.laborCostCents ?? 0) +
+          signedMoney(actualCosts.purchaseCostCents ?? 0),
+      )
     : null;
-  const actualMarginCents = actualRevenueCents === null || actualTotalCostCents === null
-    ? null : signedMoney(actualRevenueCents - actualTotalCostCents);
-  const actualMarginPercent = actualRevenueCents === null || actualTotalCostCents === null
-    ? null : marginPercent(actualRevenueCents, actualTotalCostCents);
+  const actualMarginCents =
+    actualRevenueCents === null || actualTotalCostCents === null
+      ? null
+      : signedMoney(actualRevenueCents - actualTotalCostCents);
+  const actualMarginPercent =
+    actualRevenueCents === null || actualTotalCostCents === null
+      ? null
+      : marginPercent(actualRevenueCents, actualTotalCostCents);
 
   const plannedHours = soldComplete
-    ? summaries.reduce((total, quote) => ({
-        be: total.be + quote.soldHours.be,
-        workshop: total.workshop + quote.soldHours.workshop,
-        install: total.install + quote.soldHours.install,
-        total: total.total + quote.soldHours.total,
-      }), { be: 0, workshop: 0, install: 0, total: 0 })
+    ? summaries.reduce(
+        (total, quote) => ({
+          be: total.be + quote.soldHours.be,
+          workshop: total.workshop + quote.soldHours.workshop,
+          install: total.install + quote.soldHours.install,
+          total: total.total + quote.soldHours.total,
+        }),
+        { be: 0, workshop: 0, install: 0, total: 0 },
+      )
     : { be: 0, workshop: 0, install: 0, total: 0 };
   return {
     soldCents,
@@ -182,8 +221,10 @@ export function calculateChantierProfitability(
     plannedTotalCostCents,
     plannedPurchasesCents,
     committedPurchasesCents,
-    purchaseBudgetOverrunCents: committedPurchasesCents === null || plannedPurchasesCents === null
-      ? null : committedPurchasesCents - plannedPurchasesCents,
+    purchaseBudgetOverrunCents:
+      committedPurchasesCents === null || plannedPurchasesCents === null
+        ? null
+        : committedPurchasesCents - plannedPurchasesCents,
     knownCostCommitmentsCents,
     remainingCostBudgetCents,
     remainingLaborBudgetCents,

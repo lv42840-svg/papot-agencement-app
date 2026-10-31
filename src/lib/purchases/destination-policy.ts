@@ -32,7 +32,11 @@ export function purchaseChantierNamesForInput(
   // Removing a closed site's allocation is a deliberate close-review action, not a silent edit.
   for (const [id, amount] of before) {
     const site = id ? byId.get(id) : undefined;
-    if (site && site.status !== "ACTIVE" && !rows.some((row) => row.chantierId === id && row.amountHtCents === amount)) {
+    if (
+      site &&
+      site.status !== "ACTIVE" &&
+      !rows.some((row) => row.chantierId === id && row.amountHtCents === amount)
+    ) {
       throw new Error("PURCHASE_CHANTIER_NOT_ACTIVE");
     }
   }

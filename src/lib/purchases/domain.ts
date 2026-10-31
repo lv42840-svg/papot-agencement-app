@@ -325,7 +325,8 @@ export function committedPurchasesByDestination(payload: PurchaseOrdersPayload) 
             : "chantierCents";
       result[key] += row.amountHtCents;
       result.totalCents += row.amountHtCents;
-      if (!Number.isSafeInteger(result.totalCents)) throw new Error("PURCHASE_ORDER_AMOUNT_INVALID");
+      if (!Number.isSafeInteger(result.totalCents))
+        throw new Error("PURCHASE_ORDER_AMOUNT_INVALID");
     }
   }
   return result;

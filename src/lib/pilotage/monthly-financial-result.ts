@@ -44,10 +44,13 @@ export type MonthlyFinancialResult = {
 
 const supplierSchema = z.object({
   id: z.string().min(1),
-  documentDate: z.string().regex(/^\d{4}-\d{2}-\d{2}$/).refine((value) => {
-    const date = new Date(`${value}T12:00:00Z`);
-    return Number.isFinite(date.getTime()) && date.toISOString().slice(0, 10) === value;
-  }),
+  documentDate: z
+    .string()
+    .regex(/^\d{4}-\d{2}-\d{2}$/)
+    .refine((value) => {
+      const date = new Date(`${value}T12:00:00Z`);
+      return Number.isFinite(date.getTime()) && date.toISOString().slice(0, 10) === value;
+    }),
   type: z.enum(["INVOICE", "CREDIT_NOTE"]),
   status: z.enum(["VALIDATED", "DRAFT", "CANCELLED"]),
   recognition: z.enum(["EXPENSE", "ADVANCE"]),
@@ -79,7 +82,11 @@ export function calculateMonthlyFinancialResult(input: {
   const suppliersComplete = isComplete(input.supplierInvoices, month);
   const payrollComplete = isComplete(input.payroll, month);
   const invoicedRevenueCents = revenueComplete
-    ? summarizeIssuedInvoices(input.customerInvoices!.records, true, new Date(`${month}-15T12:00:00Z`)).monthly.amountHtCents
+    ? summarizeIssuedInvoices(
+        input.customerInvoices!.records,
+        true,
+        new Date(`${month}-15T12:00:00Z`),
+      ).monthly.amountHtCents
     : null;
   let supplierExpenseCents: number | null = null;
   if (suppliersComplete) {
@@ -89,16 +96,29 @@ export function calculateMonthlyFinancialResult(input: {
       const item = supplierSchema.parse(raw);
       if (ids.has(item.id)) throw new Error("MONTHLY_SUPPLIER_INVOICE_DUPLICATE");
       ids.add(item.id);
-      if (item.documentDate.slice(0, 7) !== month || item.status !== "VALIDATED" || item.recognition !== "EXPENSE") continue;
-      supplierExpenseCents = money(supplierExpenseCents + (item.type === "CREDIT_NOTE" ? -item.amountHtCents : item.amountHtCents));
+      if (
+        item.documentDate.slice(0, 7) !== month ||
+        item.status !== "VALIDATED" ||
+        item.recognition !== "EXPENSE"
+      )
+        continue;
+      supplierExpenseCents = money(
+        supplierExpenseCents +
+          (item.type === "CREDIT_NOTE" ? -item.amountHtCents : item.amountHtCents),
+      );
     }
   }
   const payrollExpenseCents = payrollComplete ? money(input.payroll!.totalExpenseCents) : null;
-  if (payrollExpenseCents !== null && payrollExpenseCents < 0) throw new Error("MONTHLY_PAYROLL_AMOUNT_INVALID");
-  const totalExpenseCents = supplierExpenseCents === null || payrollExpenseCents === null
-    ? null : money(supplierExpenseCents + payrollExpenseCents);
-  const resultCents = invoicedRevenueCents === null || totalExpenseCents === null
-    ? null : money(invoicedRevenueCents - totalExpenseCents);
+  if (payrollExpenseCents !== null && payrollExpenseCents < 0)
+    throw new Error("MONTHLY_PAYROLL_AMOUNT_INVALID");
+  const totalExpenseCents =
+    supplierExpenseCents === null || payrollExpenseCents === null
+      ? null
+      : money(supplierExpenseCents + payrollExpenseCents);
+  const resultCents =
+    invoicedRevenueCents === null || totalExpenseCents === null
+      ? null
+      : money(invoicedRevenueCents - totalExpenseCents);
   return {
     month,
     invoicedRevenueCents,

@@ -217,7 +217,9 @@ export function PurchaseOrderEditWorkspace({ orderId }: { orderId: string }) {
           PURCHASE_CHANTIER_NOT_ACTIVE:
             "Aucun nouvel engagement sur un chantier fermé ou annulé. Les affectations historiques inchangées restent conservées.",
         };
-        throw new Error(errors[result.error ?? ""] ?? "Enregistrement impossible. Vérifie les données.");
+        throw new Error(
+          errors[result.error ?? ""] ?? "Enregistrement impossible. Vérifie les données.",
+        );
       }
       const updated = result.payload.orders.find((order) => order.id === original.id);
       if (!updated) throw new Error("Le BC enregistré est introuvable.");
@@ -233,47 +235,90 @@ export function PurchaseOrderEditWorkspace({ orderId }: { orderId: string }) {
 
   return (
     <main style={{ maxWidth: 1120, margin: "0 auto", padding: 22, display: "grid", gap: 16 }}>
-      <Link className="secondaryButton" href="/achats">Retour aux bons de commande</Link>
+      <Link className="secondaryButton" href="/achats">
+        Retour aux bons de commande
+      </Link>
       <h1>Modifier un bon de commande</h1>
-      {error ? <p role="alert" style={{ color: "#b33138" }}>{error}</p> : null}
-      {notice ? <p role="status" style={{ color: "#276748" }}>{notice}</p> : null}
+      {error ? (
+        <p role="alert" style={{ color: "#b33138" }}>
+          {error}
+        </p>
+      ) : null}
+      {notice ? (
+        <p role="status" style={{ color: "#276748" }}>
+          {notice}
+        </p>
+      ) : null}
       {!data && !error ? <p>Chargement du BC…</p> : null}
       {original ? (
-        <section style={{ background: "white", padding: 20, borderRadius: 12, display: "grid", gap: 16 }}>
+        <section
+          style={{ background: "white", padding: 20, borderRadius: 12, display: "grid", gap: 16 }}
+        >
           <div>
-            <strong>{original.reference}</strong> · {original.mode === "QUICK" ? "BC rapide" : "BC détaillé"}
-            <p>Un BC conserve son numéro et ses précédentes valeurs dans son historique de révisions.</p>
+            <strong>{original.reference}</strong> ·{" "}
+            {original.mode === "QUICK" ? "BC rapide" : "BC détaillé"}
+            <p>
+              Un BC conserve son numéro et ses précédentes valeurs dans son historique de révisions.
+            </p>
           </div>
           {readOnly ? (
-            <p role="status">Ce BC est en lecture seule : commande annulée, engagement retiré ou droit Achats en écriture absent.</p>
+            <p role="status">
+              Ce BC est en lecture seule : commande annulée, engagement retiré ou droit Achats en
+              écriture absent.
+            </p>
           ) : null}
           <label style={{ display: "grid", gap: 5 }}>
             Fournisseur
-            <input list="edit-bc-suppliers" value={supplier} disabled={readOnly || busy} onChange={(event) => setSupplier(event.target.value)} />
+            <input
+              list="edit-bc-suppliers"
+              value={supplier}
+              disabled={readOnly || busy}
+              onChange={(event) => setSupplier(event.target.value)}
+            />
             <datalist id="edit-bc-suppliers">
-              {suppliers.map((name) => <option key={name} value={name} />)}
+              {suppliers.map((name) => (
+                <option key={name} value={name} />
+              ))}
             </datalist>
           </label>
           <label style={{ display: "grid", gap: 5 }}>
             Descriptif / remarque
-            <textarea rows={3} maxLength={2000} value={description} disabled={readOnly || busy} onChange={(event) => setDescription(event.target.value)} />
+            <textarea
+              rows={3}
+              maxLength={2000}
+              value={description}
+              disabled={readOnly || busy}
+              onChange={(event) => setDescription(event.target.value)}
+            />
           </label>
           {original.mode === "QUICK" ? (
             <div style={{ display: "grid", gap: 10 }}>
               <h2>Montants par chantier, SAV ou frais généraux</h2>
               {allocations.map((row, index) => (
-                <div key={row.id} style={{ display: "flex", gap: 12, flexWrap: "wrap", alignItems: "center" }}>
+                <div
+                  key={row.id}
+                  style={{ display: "flex", gap: 12, flexWrap: "wrap", alignItems: "center" }}
+                >
                   <select
                     aria-label={`Destination ligne ${index + 1}`}
                     value={row.chantierId}
                     disabled={readOnly || busy}
                     onChange={(event) =>
-                      setAllocations((items) => items.map((item) => item.id === row.id ? { ...item, chantierId: event.target.value } : item))
+                      setAllocations((items) =>
+                        items.map((item) =>
+                          item.id === row.id ? { ...item, chantierId: event.target.value } : item,
+                        ),
+                      )
                     }
                   >
                     {destinations.map((item) => (
-                      <option key={item.id} value={item.id} disabled={!item.active && item.id !== row.chantierId}>
-                        {item.name}{item.active ? "" : " (fermé / annulé)"}
+                      <option
+                        key={item.id}
+                        value={item.id}
+                        disabled={!item.active && item.id !== row.chantierId}
+                      >
+                        {item.name}
+                        {item.active ? "" : " (fermé / annulé)"}
                       </option>
                     ))}
                   </select>
@@ -284,10 +329,23 @@ export function PurchaseOrderEditWorkspace({ orderId }: { orderId: string }) {
                       inputMode="decimal"
                       value={row.amount}
                       disabled={readOnly || busy}
-                      onChange={(event) => setAllocations((items) => items.map((item) => item.id === row.id ? { ...item, amount: event.target.value } : item))}
+                      onChange={(event) =>
+                        setAllocations((items) =>
+                          items.map((item) =>
+                            item.id === row.id ? { ...item, amount: event.target.value } : item,
+                          ),
+                        )
+                      }
                     />
                   </label>
-                  <button className="secondaryButton" type="button" disabled={readOnly || busy || allocations.length === 1} onClick={() => setAllocations((items) => items.filter((item) => item.id !== row.id))}>
+                  <button
+                    className="secondaryButton"
+                    type="button"
+                    disabled={readOnly || busy || allocations.length === 1}
+                    onClick={() =>
+                      setAllocations((items) => items.filter((item) => item.id !== row.id))
+                    }
+                  >
                     Retirer la ligne
                   </button>
                 </div>
@@ -297,8 +355,16 @@ export function PurchaseOrderEditWorkspace({ orderId }: { orderId: string }) {
                 className="secondaryButton"
                 disabled={readOnly || busy || allocations.length >= 100}
                 onClick={() => {
-                  const destination = destinations.find((candidate) => candidate.active && !allocations.some((row) => row.chantierId === candidate.id));
-                  if (destination) setAllocations((rows) => [...rows, { id: crypto.randomUUID(), chantierId: destination.id, amount: "" }]);
+                  const destination = destinations.find(
+                    (candidate) =>
+                      candidate.active &&
+                      !allocations.some((row) => row.chantierId === candidate.id),
+                  );
+                  if (destination)
+                    setAllocations((rows) => [
+                      ...rows,
+                      { id: crypto.randomUUID(), chantierId: destination.id, amount: "" },
+                    ]);
                 }}
               >
                 Ajouter un chantier / SAV / frais généraux
@@ -308,13 +374,28 @@ export function PurchaseOrderEditWorkspace({ orderId }: { orderId: string }) {
             <div style={{ display: "grid", gap: 12 }}>
               <label>
                 Chantier
-                <select value={siteId} disabled={readOnly || busy} onChange={(event) => setSiteId(event.target.value)}>
-                  {sites.map((site) => <option key={site.id} value={site.id} disabled={site.status !== "ACTIVE" && site.id !== siteId}>{site.name}</option>)}
+                <select
+                  value={siteId}
+                  disabled={readOnly || busy}
+                  onChange={(event) => setSiteId(event.target.value)}
+                >
+                  {sites.map((site) => (
+                    <option
+                      key={site.id}
+                      value={site.id}
+                      disabled={site.status !== "ACTIVE" && site.id !== siteId}
+                    >
+                      {site.name}
+                    </option>
+                  ))}
                 </select>
               </label>
               <h2>Articles</h2>
               {lines.map((line, index) => (
-                <div key={line.id} style={{ display: "flex", flexWrap: "wrap", alignItems: "end", gap: 8 }}>
+                <div
+                  key={line.id}
+                  style={{ display: "flex", flexWrap: "wrap", alignItems: "end", gap: 8 }}
+                >
                   <label style={{ flex: "3 1 200px" }}>
                     Désignation
                     <input
@@ -322,7 +403,15 @@ export function PurchaseOrderEditWorkspace({ orderId }: { orderId: string }) {
                       value={line.description}
                       disabled={readOnly || busy}
                       style={{ width: "100%" }}
-                      onChange={(event) => setLines((list) => list.map((item) => item.id === line.id ? { ...item, description: event.target.value } : item))}
+                      onChange={(event) =>
+                        setLines((list) =>
+                          list.map((item) =>
+                            item.id === line.id
+                              ? { ...item, description: event.target.value }
+                              : item,
+                          ),
+                        )
+                      }
                     />
                   </label>
                   {(["quantity", "unit", "unitPrice"] as const).map((field) => (
@@ -333,31 +422,73 @@ export function PurchaseOrderEditWorkspace({ orderId }: { orderId: string }) {
                         value={line[field]}
                         disabled={readOnly || busy}
                         style={{ width: 95 }}
-                        onChange={(event) => setLines((list) => list.map((item) => item.id === line.id ? { ...item, [field]: event.target.value } : item))}
+                        onChange={(event) =>
+                          setLines((list) =>
+                            list.map((item) =>
+                              item.id === line.id ? { ...item, [field]: event.target.value } : item,
+                            ),
+                          )
+                        }
                       />
                     </label>
                   ))}
-                  <button type="button" className="secondaryButton" disabled={readOnly || busy || lines.length === 1} onClick={() => setLines((list) => list.filter((item) => item.id !== line.id))}>Retirer</button>
+                  <button
+                    type="button"
+                    className="secondaryButton"
+                    disabled={readOnly || busy || lines.length === 1}
+                    onClick={() => setLines((list) => list.filter((item) => item.id !== line.id))}
+                  >
+                    Retirer
+                  </button>
                 </div>
               ))}
               <button
                 type="button"
                 className="secondaryButton"
                 disabled={readOnly || busy || lines.length >= 200}
-                onClick={() => setLines((list) => [...list, { id: crypto.randomUUID(), description: "", quantity: "1", unit: "u", unitPrice: "" }])}
+                onClick={() =>
+                  setLines((list) => [
+                    ...list,
+                    {
+                      id: crypto.randomUUID(),
+                      description: "",
+                      quantity: "1",
+                      unit: "u",
+                      unitPrice: "",
+                    },
+                  ])
+                }
               >
                 Ajouter un article
               </button>
             </div>
           )}
-          <div style={{ display: "flex", flexWrap: "wrap", gap: 12, alignItems: "center", justifyContent: "space-between" }}>
+          <div
+            style={{
+              display: "flex",
+              flexWrap: "wrap",
+              gap: 12,
+              alignItems: "center",
+              justifyContent: "space-between",
+            }}
+          >
             <strong>Total HT : {preview === null ? "À renseigner" : euros(preview)}</strong>
-            <button type="button" className="primaryButton" disabled={readOnly || busy} onClick={() => void save()}>
+            <button
+              type="button"
+              className="primaryButton"
+              disabled={readOnly || busy}
+              onClick={() => void save()}
+            >
               {busy ? "Enregistrement…" : "Enregistrer les modifications"}
             </button>
           </div>
           {original.mode === "DETAILED" ? (
-            <a className="secondaryButton" href={`/api/desktop/purchases/${encodeURIComponent(original.id)}/pdf`}>Télécharger le PDF actualisé</a>
+            <a
+              className="secondaryButton"
+              href={`/api/desktop/purchases/${encodeURIComponent(original.id)}/pdf`}
+            >
+              Télécharger le PDF actualisé
+            </a>
           ) : null}
         </section>
       ) : null}

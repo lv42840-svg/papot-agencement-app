@@ -1,6 +1,9 @@
 import type { PlanningPayload } from "../planning/domain";
 import { monthlySharesForWeek } from "../payroll/chantier-labor-cost";
-import { resolveLaborCostForWorkedMonth, type MonthlyLaborCostRecord } from "../payroll/monthly-labor-costs";
+import {
+  resolveLaborCostForWorkedMonth,
+  type MonthlyLaborCostRecord,
+} from "../payroll/monthly-labor-costs";
 import { financialMonthSchema } from "./monthly-financial-result";
 
 export type MonthlyConsumptionBucket = {
@@ -31,7 +34,9 @@ export function calculateMonthlyConsumption(
   now = new Date(),
 ): MonthlyConsumption {
   financialMonthSchema.parse(month);
-  const schedules = new Map(planning.peopleCapacity.map((person) => [person.userId, person.weeklySchedule]));
+  const schedules = new Map(
+    planning.peopleCapacity.map((person) => [person.userId, person.weeklySchedule]),
+  );
   const rates = new Map<string, MonthlyLaborCostRecord>();
   for (const record of records ?? []) {
     const key = `${record.personId}:${record.month}`;
@@ -45,7 +50,10 @@ export function calculateMonthlyConsumption(
   };
   const entries = [
     ...planning.actualHours.map((row) => ({ ...row, destination: "chantier" as const })),
-    ...planning.indirectHours.map((row) => ({ ...row, destination: row.category === "SAV" ? "sav" as const : "generalExpenses" as const })),
+    ...planning.indirectHours.map((row) => ({
+      ...row,
+      destination: row.category === "SAV" ? ("sav" as const) : ("generalExpenses" as const),
+    })),
   ];
   let provisional = false;
   let estimatedMonthSplit = false;
@@ -58,19 +66,25 @@ export function calculateMonthlyConsumption(
     const bucket = buckets[row.destination];
     const hours = row.hours * split.fraction;
     bucket.hours += hours;
-    const resolved = records === null ? null : resolveLaborCostForWorkedMonth(row.userId, month, rates, now);
+    const resolved =
+      records === null ? null : resolveLaborCostForWorkedMonth(row.userId, month, rates, now);
     if (!resolved) {
       bucket.unvaluedHours += hours;
       continue;
     }
     provisional ||= resolved.provisional;
-    bucket.cents += hours * resolved.record.employerCostCents / resolved.record.workedHours;
+    bucket.cents += (hours * resolved.record.employerCostCents) / resolved.record.workedHours;
   }
   const hours = (value: number) => Math.round(value * 100) / 100;
   function finish(bucket: typeof buckets.chantier): MonthlyConsumptionBucket {
     const cents = records !== null && bucket.unvaluedHours === 0 ? Math.round(bucket.cents) : null;
-    if (cents !== null && !Number.isSafeInteger(cents)) throw new Error("MONTHLY_LABOR_COST_INVALID");
-    return { hours: hours(bucket.hours), valuedCostCents: cents, unvaluedHours: hours(bucket.unvaluedHours) };
+    if (cents !== null && !Number.isSafeInteger(cents))
+      throw new Error("MONTHLY_LABOR_COST_INVALID");
+    return {
+      hours: hours(bucket.hours),
+      valuedCostCents: cents,
+      unvaluedHours: hours(bucket.unvaluedHours),
+    };
   }
   const chantier = finish(buckets.chantier);
   const sav = finish(buckets.sav);
@@ -84,7 +98,9 @@ export function calculateMonthlyConsumption(
     total: {
       hours: hours(totals.reduce((sum, bucket) => sum + bucket.hours, 0)),
       unvaluedHours: hours(totals.reduce((sum, bucket) => sum + bucket.unvaluedHours, 0)),
-      valuedCostCents: totals.some((bucket) => bucket.valuedCostCents === null) ? null : totals.reduce((sum, bucket) => sum + (bucket.valuedCostCents ?? 0), 0),
+      valuedCostCents: totals.some((bucket) => bucket.valuedCostCents === null)
+        ? null
+        : totals.reduce((sum, bucket) => sum + (bucket.valuedCostCents ?? 0), 0),
     },
     provisional,
     estimatedMonthSplit,
