@@ -123,7 +123,7 @@ export function ChantierCommandesTab({ chantierId }: { chantierId: string }) {
               <strong>{euros(committedHtCents)}</strong> HT engagés sur ce chantier
             </div>
             <div>
-              <strong>{history.length}</strong> BC dans l'historique
+              <strong>{history.length}</strong> BC dans l&apos;historique
             </div>
           </div>
           <div style={{ display: "flex", gap: 10, flexWrap: "wrap" }}>
