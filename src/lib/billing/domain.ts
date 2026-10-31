@@ -74,7 +74,9 @@ export type BillingSource = z.infer<typeof billingSourceSchema>;
 export const billingDraftSchema = billingSourceSchema.extend({
   id: z.string().uuid(),
   requestId: z.string().uuid(),
-  status: z.literal("DRAFT"),
+  status: z.enum(["DRAFT", "APPROVED"]),
+  approvedAt: dateTimeSchema.optional(),
+  approvedByName: z.string().trim().min(1).optional(),
   type: billingTypeSchema,
   label: z.string().trim().min(1).max(240),
   notes: z.string().trim().max(4000),
@@ -305,6 +307,7 @@ export function updateBillingDraft(
 ): BillingDraft {
   const draft = payload.drafts.find((item) => item.id === draftId);
   if (!draft) throw new Error("BILLING_DRAFT_NOT_FOUND");
+  if (draft.status !== "DRAFT") throw new Error("BILLING_DRAFT_LOCKED");
   if (draft.updatedAt !== input.expectedUpdatedAt) throw new Error("BILLING_VERSION_CONFLICT");
   const alreadyPreparedCents = preparedHtCents(payload, draft.quoteId, draft.id);
   const amountHtCents =
@@ -374,6 +377,7 @@ export function updateBillingDocument(
   const index = payload.drafts.findIndex((candidate) => candidate.id === draftId);
   if (index < 0) throw new Error("BILLING_DRAFT_NOT_FOUND");
   const draft = payload.drafts[index];
+  if (draft.status !== "DRAFT") throw new Error("BILLING_DRAFT_LOCKED");
   if (draft.updatedAt !== input.expectedUpdatedAt) throw new Error("BILLING_VERSION_CONFLICT");
   const documentLines = z
     .array(billingDocumentLineSchema)
@@ -465,6 +469,39 @@ export function updateBillingDocument(
     taxGroups: totals.taxGroups,
     vatCents: totals.vatCents,
     totalTtcCents: totals.totalTtcCents,
+    updatedAt: now.toISOString(),
+    updatedByName: actorName,
+  });
+}
+
+/** Internal approval only: does not allocate a legal invoice number or issue a document. */
+export function approveBillingDraft(
+  payload: BillingPayload,
+  draftId: string,
+  expectedUpdatedAt: string,
+  actorName: string,
+  now = new Date(),
+): BillingDraft {
+  const draft = payload.drafts.find((item) => item.id === draftId);
+  if (!draft) throw new Error("BILLING_DRAFT_NOT_FOUND");
+  if (draft.status !== "DRAFT") throw new Error("BILLING_DRAFT_LOCKED");
+  if (draft.updatedAt !== expectedUpdatedAt) throw new Error("BILLING_VERSION_CONFLICT");
+  const lines = draft.documentLines ?? buildInvoiceDocumentLines(draft, payload);
+  const totals = calculateInvoiceDocumentTotals(lines);
+  if (
+    totals.amountHtCents !== draft.amountHtCents ||
+    totals.vatCents !== draft.vatCents ||
+    totals.totalTtcCents !== draft.totalTtcCents ||
+    draft.taxGroups.some((group) =>
+      (totals.taxGroups.find((row) => row.ratePercent === group.ratePercent)?.baseHtCents ?? 0) !== group.baseHtCents,
+    )
+  ) throw new Error("BILLING_APPROVAL_TOTALS_MISMATCH");
+  return billingDraftSchema.parse({
+    ...draft,
+    documentLines: lines,
+    status: "APPROVED",
+    approvedAt: now.toISOString(),
+    approvedByName: actorName,
     updatedAt: now.toISOString(),
     updatedByName: actorName,
   });
