@@ -113,8 +113,8 @@ export function ChantierProfitabilityPanel({
         <section className="chantierProfitabilityBlock">
           <BlockTitle
             icon={<Clock3 size={16} />}
-            title="Heures chantier"
-            subtitle="Heures vendues des devis / TS retenus et réalisé actuellement enregistré."
+            title="Heures prévues depuis le devis"
+            subtitle="BE, atelier et pose des devis / TS retenus, comparés au temps réellement saisi."
           />
           <div className="chantierProfitabilityRows">
             <HoursRow label="BE" planned={result.plannedHours.be} actual={result.actualHours.be} />
@@ -138,6 +138,76 @@ export function ChantierProfitabilityPanel({
         </section>
 
         <section className="chantierProfitabilityBlock">
+          <BlockTitle
+            icon={<ReceiptText size={16} />}
+            title="Achats prévus extraits du devis"
+            subtitle="Fournitures et prestations externes des devis / TS retenus, hors heures de travail."
+          />
+          <div className="chantierProfitabilityRows">
+            <CostRow
+              label="Budget d'achats identifiés HT"
+              value={result.plannedPurchasesCents}
+              missing="Budget incomplet : vérifier les composants non chiffrés ou non classés"
+              total
+            />
+          </div>
+          <div style={{ maxHeight: 340, overflow: "auto" }}>
+            {result.plannedPurchaseLines.length === 0 ? (
+              <p className="chantierProfitabilityNote">
+                Aucun composant d'achat identifié dans les devis retenus.
+              </p>
+            ) : (
+              <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 11 }}>
+                <thead>
+                  <tr>
+                    <th style={{ textAlign: "left" }}>Devis / ouvrage</th>
+                    <th style={{ textAlign: "left" }}>Achat prévu</th>
+                    <th style={{ textAlign: "right" }}>Quantité</th>
+                    <th style={{ textAlign: "right" }}>Coût HT</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {result.plannedPurchaseLines.map((item) => (
+                    <tr key={`${item.quoteId}:${item.quoteLineId}:${item.componentId}`}>
+                      <td style={{ padding: 6, borderBottom: "1px solid #eee" }}>
+                        <strong>{item.quoteReference}</strong>
+                        <div>{item.quoteLineDescription}</div>
+                      </td>
+                      <td style={{ padding: 6, borderBottom: "1px solid #eee" }}>
+                        {item.description}
+                      </td>
+                      <td style={{ padding: 6, borderBottom: "1px solid #eee", textAlign: "right" }}>
+                        {numberFormatter.format(item.quantity)} {item.unit}
+                      </td>
+                      <td style={{ padding: 6, borderBottom: "1px solid #eee", textAlign: "right" }}>
+                        {money(item.totalCostCents)}
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            )}
+          </div>
+          {result.purchaseClassificationWarnings.length > 0 ? (
+            <div className="chantierProfitabilityWarning">
+              <AlertTriangle size={15} />
+              <span>
+                {result.purchaseClassificationWarnings.length} élément(s) à classer ou chiffrer :
+                {" "}
+                {result.purchaseClassificationWarnings.map((warning) =>
+                  `${warning.quoteReference} · ${warning.description}`,
+                ).join(" ; ")}
+              </span>
+            </div>
+          ) : null}
+          <p className="chantierProfitabilityNote">
+            Ce sont des achats prévus, pas des commandes passées. Les frais annexes et ajustements
+            du devis peuvent rester dans le déboursé prévu sans figurer dans cette liste.
+          </p>
+        </section>
+      </div>
+
+              <section className="chantierProfitabilityBlock">
           <BlockTitle
             icon={<ReceiptText size={16} />}
             title="Coûts réels"
@@ -166,7 +236,6 @@ export function ChantierProfitabilityPanel({
             le coût horaire réel du mois de chaque personne.
           </p>
         </section>
-      </div>
 
       <section className="chantierProfitabilityBlock">
         <BlockTitle
