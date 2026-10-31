@@ -4,10 +4,7 @@ import { useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
 import { parseBillingPercentageInput } from "@/lib/billing/percentage-input";
 import { calculateLineProgress } from "@/lib/billing/progress";
-import {
-  filterBillingProjects,
-  type BillingProjectSort,
-} from "@/lib/billing/workspace-list";
+import { filterBillingProjects, type BillingProjectSort } from "@/lib/billing/workspace-list";
 import type {
   BillingDraft,
   BillingPayload,
@@ -287,11 +284,13 @@ export function BillingWorkspace({
         aria-label="Rubriques de facturation"
         style={{ display: "flex", gap: 8, flexWrap: "wrap" }}
       >
-        {([
-          ["QUOTE", "Nouvelle facture depuis devis"],
-          ["CHANTIER", "Nouvelle facture depuis chantier"],
-          ["PROJECTS", `Projets de factures (${drafts.length})`],
-        ] as const).map(([key, caption]) => (
+        {(
+          [
+            ["QUOTE", "Nouvelle facture depuis devis"],
+            ["CHANTIER", "Nouvelle facture depuis chantier"],
+            ["PROJECTS", `Projets de factures (${drafts.length})`],
+          ] as const
+        ).map(([key, caption]) => (
           <button
             key={key}
             type="button"
@@ -631,7 +630,9 @@ export function BillingWorkspace({
                 </p>
                 <div>
                   <Link href={`/facturation/${encodeURIComponent(d.id)}`} className="primaryButton">
-                    {d.status === "APPROVED" ? "Consulter le projet" : "Ouvrir et modifier la facture"}
+                    {d.status === "APPROVED"
+                      ? "Consulter le projet"
+                      : "Ouvrir et modifier la facture"}
                   </Link>
                 </div>
                 {d.lineProgress?.length ? (

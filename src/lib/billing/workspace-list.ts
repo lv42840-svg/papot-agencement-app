@@ -35,8 +35,7 @@ export function filterBillingProjects(
         return false;
       if (!query) return true;
       return normalize(
-        [draft.clientName, draft.affairName, draft.quoteLabel, draft.label, draft.notes]
-          .join(" "),
+        [draft.clientName, draft.affairName, draft.quoteLabel, draft.label, draft.notes].join(" "),
       ).includes(query);
     })
     .sort((a, b) => {

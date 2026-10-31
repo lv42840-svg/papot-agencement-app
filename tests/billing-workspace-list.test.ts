@@ -1,6 +1,13 @@
 import { describe, expect, it } from "vitest";
-import { createBillingDraft, type BillingDraft, type BillingSource } from "../src/lib/billing/domain";
-import { filterBillingProjects, type BillingProjectFilter } from "../src/lib/billing/workspace-list";
+import {
+  createBillingDraft,
+  type BillingDraft,
+  type BillingSource,
+} from "../src/lib/billing/domain";
+import {
+  filterBillingProjects,
+  type BillingProjectFilter,
+} from "../src/lib/billing/workspace-list";
 
 const source: BillingSource = {
   quoteId: "11111111-1111-4111-8111-111111111111",
@@ -77,14 +84,18 @@ describe("liste des projets de factures", () => {
   });
 
   it("filtre par statut, type et chantier sans toucher aux sources", () => {
-    expect(filterBillingProjects(rows, { ...baseFilter, status: "APPROVED" }).map((x) => x.id))
-      .toEqual([rows[1].id]);
-    expect(filterBillingProjects(rows, { ...baseFilter, type: "DEPOSIT" }).map((x) => x.id))
-      .toEqual([rows[0].id]);
-    expect(filterBillingProjects(rows, { ...baseFilter, chantierId: otherSite }).map((x) => x.id))
-      .toEqual([rows[1].id]);
-    expect(filterBillingProjects(rows, { ...baseFilter, chantierId: "NONE" }).map((x) => x.id))
-      .toEqual([rows[2].id]);
+    expect(
+      filterBillingProjects(rows, { ...baseFilter, status: "APPROVED" }).map((x) => x.id),
+    ).toEqual([rows[1].id]);
+    expect(
+      filterBillingProjects(rows, { ...baseFilter, type: "DEPOSIT" }).map((x) => x.id),
+    ).toEqual([rows[0].id]);
+    expect(
+      filterBillingProjects(rows, { ...baseFilter, chantierId: otherSite }).map((x) => x.id),
+    ).toEqual([rows[1].id]);
+    expect(
+      filterBillingProjects(rows, { ...baseFilter, chantierId: "NONE" }).map((x) => x.id),
+    ).toEqual([rows[2].id]);
   });
 
   it("trie par date, client et montant sans modifier l'ordre initial", () => {
@@ -94,12 +105,15 @@ describe("liste des projets de factures", () => {
       rows[1].id,
       rows[0].id,
     ]);
-    expect(filterBillingProjects(rows, { ...baseFilter, sort: "OLDEST" }).map((x) => x.id))
-      .toEqual(original);
-    expect(filterBillingProjects(rows, { ...baseFilter, sort: "AMOUNT_DESC" }).map((x) => x.id))
-      .toEqual([rows[1].id, rows[0].id, rows[2].id]);
-    expect(filterBillingProjects(rows, { ...baseFilter, sort: "CLIENT" }).map((x) => x.id))
-      .toEqual([rows[2].id, rows[0].id, rows[1].id]);
+    expect(filterBillingProjects(rows, { ...baseFilter, sort: "OLDEST" }).map((x) => x.id)).toEqual(
+      original,
+    );
+    expect(
+      filterBillingProjects(rows, { ...baseFilter, sort: "AMOUNT_DESC" }).map((x) => x.id),
+    ).toEqual([rows[1].id, rows[0].id, rows[2].id]);
+    expect(filterBillingProjects(rows, { ...baseFilter, sort: "CLIENT" }).map((x) => x.id)).toEqual(
+      [rows[2].id, rows[0].id, rows[1].id],
+    );
     expect(rows.map((row) => row.id)).toEqual(original);
   });
 });
