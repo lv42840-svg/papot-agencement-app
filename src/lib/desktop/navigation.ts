@@ -29,7 +29,7 @@ export const desktopNavigation: DesktopNavigationItem[] = [
   { label: "Chantiers", icon: "folder", href: "/chantiers", moduleKey: "chantiers" },
   { label: "Planning", icon: "calendar", href: "/planning", moduleKey: "planning" },
   { label: "Heures", icon: "clock", href: "/heures", moduleKey: "planning" },
-  { label: "Achats", icon: "cart", moduleKey: "purchases" },
+  { label: "Achats", icon: "cart", href: "/achats", moduleKey: "purchases" },
   { label: "Facturation", icon: "file", href: "/facturation", moduleKey: "billing" },
   { label: "Trésorerie", icon: "landmark", moduleKey: "treasury" },
   { label: "Équipe", icon: "users", moduleKey: "team" },
