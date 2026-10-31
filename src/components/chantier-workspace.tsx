@@ -93,6 +93,10 @@ const errorMessages: Record<string, string> = {
     "Vérifie les bons de commande non rapprochés et choisis de les conserver ou de retirer leurs engagements.",
   CHANTIER_PURCHASE_REVIEW_CONFLICT:
     "Les bons de commande ont changé. Actualise le chantier et recommence la revue.",
+  CHANTIER_PURCHASE_REMOVE_CONFIRMATION_REQUIRED:
+    "Confirme explicitement le retrait des engagements avant de clôturer.",
+  CHANTIER_PURCHASE_REMOVE_FORBIDDEN:
+    "Tu n'as pas les droits Achats nécessaires pour retirer ces engagements. Choisis de les conserver ou demande l'autorisation.",
   CHANTIER_NOT_DONE: "Cette action nécessite un chantier terminé ou annulé.",
   CHANTIER_CANCELLED_READ_ONLY: "Ce chantier est annulé. Rouvre-le avant de modifier ses données.",
   CHANTIERS_VERSION_REQUIRED:
@@ -898,6 +902,7 @@ function LifecycleTab({
                                 purchaseReview: {
                                   decision: purchaseDecision,
                                   token: purchaseWarning.token,
+                                  confirmRemove: purchaseDecision === "REMOVE" && removeConfirmed,
                                 },
                               }
                             : {}),
