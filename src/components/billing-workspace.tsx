@@ -67,7 +67,7 @@ export function BillingWorkspace({
   }, []);
   const allSources = data?.sources ?? [];
   const chantierChoices = [
-    ...new Map(
+    ...new Map<string, { id: string; name: string; client: string }>(
       allSources
         .filter((source) => source.chantierId !== null)
         .map((source) => [
@@ -86,7 +86,7 @@ export function BillingWorkspace({
   const active = sources.find((source) => source.quoteId === selection) ?? sources[0];
   const drafts = data?.payload.drafts ?? [];
   const projectChantiers = [
-    ...new Map(
+    ...new Map<string, { id: string; label: string }>(
       drafts
         .filter((draft) => draft.chantierId !== null)
         .map((draft) => [draft.chantierId!, { id: draft.chantierId!, label: draft.affairName }]),
