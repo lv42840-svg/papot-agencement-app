@@ -409,6 +409,27 @@ export function updateBillingDocument(
   if (recalculatedProgress && draft.type !== "PROGRESS") {
     throw new Error("BILLING_PROGRESS_INPUT_CONFLICT");
   }
+  // A progress correction must not save a document whose amounts disagree
+  // with the cumulative progress ledger. This also protects VAT by rate.
+  if (recalculatedProgress) {
+    const expected = recalculatedProgress.tax.groups;
+    const actual = totals.taxGroups;
+    if (
+      totals.amountHtCents !== recalculatedProgress.amountHtCents ||
+      expected.some(
+        (group) =>
+          (actual.find((row) => row.ratePercent === group.ratePercent)?.baseHtCents ?? 0) !==
+          group.baseHtCents,
+      ) ||
+      actual.some(
+        (group) =>
+          (expected.find((row) => row.ratePercent === group.ratePercent)?.baseHtCents ?? 0) !==
+          group.baseHtCents,
+      )
+    ) {
+      throw new Error("BILLING_PROGRESS_DOCUMENT_MISMATCH");
+    }
+  }
   const progressChanged =
     recalculatedProgress?.lineProgress.some(
       (row) =>
