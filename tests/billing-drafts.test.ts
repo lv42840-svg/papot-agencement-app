@@ -57,6 +57,55 @@ describe("Projets de facture issus des devis retenus", () => {
     expect(draft.documentLines?.[0].unitPriceCents).toBe(54_000);
   });
 
+  it("refuse une situation à 20 % après un acompte de 30 %, accepte 40 %", () => {
+    const lineId = "11111111-1111-4111-8111-111111111111";
+    const contract: BillingSource = {
+      ...source,
+      contractHtCents: 180_000,
+      contractTaxGroups: [{ ratePercent: 20, baseHtCents: 180_000 }],
+      lines: [
+        {
+          lineId,
+          description: "Ouvrage test",
+          amountHtCents: 180_000,
+          vatRatePercent: 20,
+        },
+      ],
+    };
+    const deposit = createBillingDraft(
+      empty(),
+      contract,
+      { requestId: crypto.randomUUID(), type: "DEPOSIT", cumulativePercent: 30 },
+      user,
+    );
+    const afterDeposit = { schemaVersion: 1 as const, drafts: [deposit] };
+    expect(deposit.amountHtCents).toBe(54_000);
+    expect(() =>
+      createBillingDraft(
+        afterDeposit,
+        contract,
+        {
+          requestId: crypto.randomUUID(),
+          type: "PROGRESS",
+          linePercentages: [{ lineId, percent: 20 }],
+        },
+        user,
+      ),
+    ).toThrow("BILLING_PROGRESS_TAX_ALLOCATION_UNAVAILABLE");
+    const progress = createBillingDraft(
+      afterDeposit,
+      contract,
+      {
+        requestId: crypto.randomUUID(),
+        type: "PROGRESS",
+        linePercentages: [{ lineId, percent: 40 }],
+      },
+      user,
+    );
+    expect(progress.amountHtCents).toBe(18_000);
+    expect(progress.totalTtcCents).toBe(21_600);
+  });
+
   it("calcule un acompte puis la situation cumulée après déduction de l'acompte", () => {
     const acompte = createBillingDraft(
       empty(),

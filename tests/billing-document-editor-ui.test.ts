@@ -20,7 +20,19 @@ describe("facturation: éditeur identique au parcours devis", () => {
     expect(ui).toContain('useState<"AMOUNT" | "PERCENT" | "LINES">("PERCENT")');
     expect(ui).toContain('setMode(e.target.value === "PROGRESS" ? "LINES" : "PERCENT")');
     expect(ui).toContain("Avancement par ligne (%)");
+    expect(ui).toContain("parseBillingPercentageInput(value)");
+    expect(ui).toContain("Ex. 30 (à saisir)");
+    expect(ui).not.toContain('Number(value.replace(",", "."))');
     expect(ui).toContain("router.push(`/facturation/");
+  });
+
+  it("signale avant envoi une situation inférieure aux acomptes déjà préparés", () => {
+    const ui = readFileSync("src/components/billing-workspace.tsx", "utf8");
+    expect(ui).toContain("calculateLineProgress(data.payload, active, enteredLineRows)");
+    expect(ui).toContain("BILLING_PROGRESS_TAX_ALLOCATION_UNAVAILABLE");
+    expect(ui).toContain("Avancement cumulé insuffisant");
+    expect(ui).toContain("Boolean(progressPreviewError)");
+    expect(ui).toContain("const rows = enteredLineRows;");
   });
 
   it("permet modification, ajout, titres et réorganisation sans émettre la facture", () => {
