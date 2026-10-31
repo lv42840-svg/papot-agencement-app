@@ -119,12 +119,7 @@ export function generateDetailedPurchaseOrderPdf(order: PurchaseOrder): Uint8Arr
   if (cursor > 725) newPage();
   horizontal(cursor + 10);
   show(`TOTAL HT : ${currency(order.amountHtCents)}`, 370, cursor + 30, 12, true);
-  pages.forEach((commands, index) => {
-    // Footer on each printed page.
-    commands.push(
-      `BT /F1 8 Tf 35 37 Td (Document interne - non envoye automatiquement au fournisseur - Page ${index + 1}/${pages.length}) Tj ET`,
-    );
-  });
+  // Footer intentionally blank: the BC is printable for the supplier.
 
   const objects: Buffer[] = [];
   const add = (data: string | Buffer) => {
