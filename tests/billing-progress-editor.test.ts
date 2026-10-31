@@ -76,6 +76,82 @@ describe("correction d'avancement dans l'éditeur de facture", () => {
     expect(saved.cumulativePercent).toBeNull();
   });
 
+  it("refuse un document dont le total diverge des pourcentages", () => {
+    const initial = amount(20);
+    const percentages = [
+      { lineId: a, percent: 40 },
+      { lineId: b, percent: 50 },
+    ];
+    const recomputed = calculateLineProgress(empty, initial, percentages);
+    const lines = buildInvoiceDocumentLines(
+      {
+        ...initial,
+        lineProgress: recomputed.lineProgress,
+        taxGroups: recomputed.tax.groups,
+        amountHtCents: recomputed.amountHtCents,
+        vatCents: recomputed.tax.vatCents,
+        totalTtcCents: recomputed.tax.ttcCents,
+      },
+      empty,
+    );
+    const changed = lines.map((line, index) =>
+      index === 0 ? { ...line, unitPriceCents: line.unitPriceCents + 100 } : line,
+    );
+    expect(() =>
+      updateBillingDocument(
+        { schemaVersion: 1, drafts: [initial] },
+        initial.id,
+        {
+          expectedUpdatedAt: initial.updatedAt,
+          label: initial.label,
+          notes: "",
+          documentLines: changed,
+          linePercentages: percentages,
+        },
+        "Nadia",
+      ),
+    ).toThrow("BILLING_PROGRESS_DOCUMENT_MISMATCH");
+  });
+
+  it("refuse un déplacement de base TVA même si le total HT reste identique", () => {
+    const initial = amount(20);
+    const percentages = [
+      { lineId: a, percent: 40 },
+      { lineId: b, percent: 50 },
+    ];
+    const recomputed = calculateLineProgress(empty, initial, percentages);
+    const lines = buildInvoiceDocumentLines(
+      {
+        ...initial,
+        lineProgress: recomputed.lineProgress,
+        taxGroups: recomputed.tax.groups,
+        amountHtCents: recomputed.amountHtCents,
+        vatCents: recomputed.tax.vatCents,
+        totalTtcCents: recomputed.tax.ttcCents,
+      },
+      empty,
+    );
+    const changed = lines.map((line, index) =>
+      index === 0
+        ? { ...line, unitPriceCents: line.unitPriceCents + 100 }
+        : { ...line, unitPriceCents: line.unitPriceCents - 100 },
+    );
+    expect(() =>
+      updateBillingDocument(
+        { schemaVersion: 1, drafts: [initial] },
+        initial.id,
+        {
+          expectedUpdatedAt: initial.updatedAt,
+          label: initial.label,
+          notes: "",
+          documentLines: changed,
+          linePercentages: percentages,
+        },
+        "Nadia",
+      ),
+    ).toThrow("BILLING_PROGRESS_DOCUMENT_MISMATCH");
+  });
+
   it("refuse de corriger une ancienne situation quand une suivante existe", () => {
     const first = amount(20);
     const second = amount(60, { schemaVersion: 1, drafts: [first] });
