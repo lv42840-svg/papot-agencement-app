@@ -204,7 +204,6 @@ export function committedPurchaseTotal(payload: PurchaseOrdersPayload, chantierI
     }, 0);
 }
 
-
 export type CommittedChantierOrder = {
   orderId: string;
   reference: string;
@@ -222,14 +221,20 @@ export function committedOrdersForChantier(
     if (order.status !== "COMMITTED") return [];
     const amount = order.allocations?.length
       ? order.allocations.find((allocation) => allocation.chantierId === chantierId)?.amountHtCents
-      : order.chantierId === chantierId ? order.amountHtCents : undefined;
-    return amount === undefined ? [] : [{
-      orderId: order.id,
-      reference: order.reference,
-      supplierName: order.supplierName,
-      amountHtCents: amount,
-      updatedAt: order.updatedAt,
-    }];
+      : order.chantierId === chantierId
+        ? order.amountHtCents
+        : undefined;
+    return amount === undefined
+      ? []
+      : [
+          {
+            orderId: order.id,
+            reference: order.reference,
+            supplierName: order.supplierName,
+            amountHtCents: amount,
+            updatedAt: order.updatedAt,
+          },
+        ];
   });
 }
 
@@ -269,9 +274,13 @@ export function removeChantierPurchaseCommitments(
           ],
         };
       }
-      const removed = order.allocations.filter((allocation) => allocation.chantierId === chantierId);
+      const removed = order.allocations.filter(
+        (allocation) => allocation.chantierId === chantierId,
+      );
       if (!removed.length) return order;
-      const remaining = order.allocations.filter((allocation) => allocation.chantierId !== chantierId);
+      const remaining = order.allocations.filter(
+        (allocation) => allocation.chantierId !== chantierId,
+      );
       const total = remaining.reduce((sum, row) => sum + row.amountHtCents, 0);
       const first = remaining[0];
       return {
@@ -300,8 +309,10 @@ export function removeChantierPurchaseCommitments(
 
 /** Optimistic review token detects changes to an order while closing the chantier. */
 export function purchaseCloseReviewToken(orders: CommittedChantierOrder[]): string {
-  return orders
-    .map((order) => [order.orderId, order.updatedAt, order.amountHtCents].join(":"))
-    .sort()
-    .join("|") || "none";
+  return (
+    orders
+      .map((order) => [order.orderId, order.updatedAt, order.amountHtCents].join(":"))
+      .sort()
+      .join("|") || "none"
+  );
 }

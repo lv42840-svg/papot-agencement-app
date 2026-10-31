@@ -81,8 +81,7 @@ async function snapshot(
     hasEffectiveSpecialPermission(user, "chantiers.archive_reactivate"),
   ]);
   const canReadPurchases =
-    (await hasModuleAccess(user.id, "purchases", "READ")) ||
-    (canWrite && canCloseReopenSpecial);
+    (await hasModuleAccess(user.id, "purchases", "READ")) || (canWrite && canCloseReopenSpecial);
   const purchasePayload = canReadPurchases ? await createPurchaseOrdersRepository().load() : null;
   // Reconcile the chantier's read-only production metrics from the real hours register.
   // Do not write the projection into the chantier repository: the planning ledger is the source.

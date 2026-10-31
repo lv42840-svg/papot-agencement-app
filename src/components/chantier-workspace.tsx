@@ -822,8 +822,8 @@ function LifecycleTab({
                         HT engagés sur ce chantier.
                       </strong>
                       <p>
-                        Le lien entre les BC et les factures Pennylane n'est pas encore opérationnel.
-                        Vérifie ces engagements avant de clôturer.
+                        Le lien entre les BC et les factures Pennylane n'est pas encore
+                        opérationnel. Vérifie ces engagements avant de clôturer.
                       </p>
                       <ul>
                         {purchaseWarning.orders.map((order) => (
@@ -838,26 +838,38 @@ function LifecycleTab({
                         ))}
                       </ul>
                       <label className="chantierArchiveCheck">
-                        <input type="radio" name="purchase-close-review"
-                          checked={purchaseDecision === "KEEP"} disabled={busy}
+                        <input
+                          type="radio"
+                          name="purchase-close-review"
+                          checked={purchaseDecision === "KEEP"}
+                          disabled={busy}
                           onChange={() => {
                             setPurchaseDecision("KEEP");
                             setRemoveConfirmed(false);
-                          }} />
+                          }}
+                        />
                         Conserver les engagements : factures encore possibles ou à vérifier
                       </label>
                       <label className="chantierArchiveCheck">
-                        <input type="radio" name="purchase-close-review"
-                          checked={purchaseDecision === "REMOVE"} disabled={busy}
-                          onChange={() => setPurchaseDecision("REMOVE")} />
+                        <input
+                          type="radio"
+                          name="purchase-close-review"
+                          checked={purchaseDecision === "REMOVE"}
+                          disabled={busy}
+                          onChange={() => setPurchaseDecision("REMOVE")}
+                        />
                         Retirer les engagements de ce chantier sans effacer les BC
                       </label>
                       {purchaseDecision === "REMOVE" ? (
                         <label className="chantierArchiveCheck">
-                          <input type="checkbox" checked={removeConfirmed} disabled={busy}
-                            onChange={(event) => setRemoveConfirmed(event.target.checked)} />
-                          Je confirme le retrait des engagements sur ce chantier, sans toucher
-                          aux éventuelles affectations des autres chantiers.
+                          <input
+                            type="checkbox"
+                            checked={removeConfirmed}
+                            disabled={busy}
+                            onChange={(event) => setRemoveConfirmed(event.target.checked)}
+                          />
+                          Je confirme le retrait des engagements sur ce chantier, sans toucher aux
+                          éventuelles affectations des autres chantiers.
                         </label>
                       ) : null}
                     </div>

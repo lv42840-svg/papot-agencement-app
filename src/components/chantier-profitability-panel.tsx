@@ -176,8 +176,7 @@ export function ChantierProfitabilityPanel({
               value={result.purchaseBudgetOverrunCents}
               missing="Écart indisponible si le devis ou les BC sont incomplets"
             />
-            {result.purchaseBudgetOverrunCents !== null &&
-            result.purchaseBudgetOverrunCents > 0 ? (
+            {result.purchaseBudgetOverrunCents !== null && result.purchaseBudgetOverrunCents > 0 ? (
               <div className="chantierProfitabilityWarning">
                 <AlertTriangle size={15} />
                 Dépassement du budget achats : {money(result.purchaseBudgetOverrunCents)} HT
