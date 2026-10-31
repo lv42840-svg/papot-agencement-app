@@ -12,6 +12,7 @@ import {
   updateBillingDocument,
   billingTypeSchema,
   billingDocumentLineSchema,
+  billingTitlesSchema,
 } from "@/lib/billing/domain";
 import { createBillingRepository } from "@/lib/billing/repository";
 import { loadBillingSources } from "@/lib/billing/sources";
@@ -20,6 +21,10 @@ export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
 const billingMutationSchema = z.discriminatedUnion("action", [
+  z.object({
+    action: z.literal("SET_TITLES"),
+    invoiceTitles: billingTitlesSchema,
+  }).strict(),
   z
     .object({
       action: z.literal("CREATE"),
@@ -141,6 +146,9 @@ export async function POST(request: Request) {
     const repository = createBillingRepository();
     const payload = await repository.mutate((current) => {
       const drafts = [...current.drafts];
+      if (input.action === "SET_TITLES") {
+        return { ...current, invoiceTitles: input.invoiceTitles };
+      }
       if (input.action === "CREATE") {
         // Request IDs survive retries, including a retry after a connection timeout.
         if (drafts.some((draft) => draft.requestId === input.requestId)) return current;
@@ -183,7 +191,7 @@ export async function POST(request: Request) {
         }
         drafts.splice(index, 1);
       }
-      return { schemaVersion: 1 as const, drafts };
+      return { ...current, drafts };
     });
     return noStoreJson({ payload, canWrite: true });
   } catch (error) {
