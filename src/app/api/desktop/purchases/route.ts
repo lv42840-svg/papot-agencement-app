@@ -16,16 +16,20 @@ export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
 const requestSchema = z.discriminatedUnion("action", [
-  z.object({
-    action: z.literal("CREATE"),
-    requestId: z.string().uuid(),
-    order: purchaseOrderInputSchema,
-  }).strict(),
-  z.object({
-    action: z.literal("CANCEL"),
-    orderId: z.string().uuid(),
-    expectedUpdatedAt: z.string().datetime({ offset: true }),
-  }).strict(),
+  z
+    .object({
+      action: z.literal("CREATE"),
+      requestId: z.string().uuid(),
+      order: purchaseOrderInputSchema,
+    })
+    .strict(),
+  z
+    .object({
+      action: z.literal("CANCEL"),
+      orderId: z.string().uuid(),
+      expectedUpdatedAt: z.string().datetime({ offset: true }),
+    })
+    .strict(),
 ]);
 
 function json(body: unknown, status = 200) {
@@ -95,9 +99,12 @@ export async function POST(request: Request) {
     });
     return json({ payload, canWrite: true });
   } catch (error) {
-    const code = error instanceof z.ZodError
-      ? "PURCHASE_ORDER_REQUEST_INVALID"
-      : error instanceof Error ? error.message : "PURCHASE_ORDER_MUTATION_FAILED";
+    const code =
+      error instanceof z.ZodError
+        ? "PURCHASE_ORDER_REQUEST_INVALID"
+        : error instanceof Error
+          ? error.message
+          : "PURCHASE_ORDER_MUTATION_FAILED";
     return json({ error: code }, statusOf(code));
   }
 }

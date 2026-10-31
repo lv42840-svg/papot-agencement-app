@@ -4,13 +4,15 @@ const cents = z.number().int().safe().min(0).max(1_000_000_000_00);
 const when = z.string().datetime({ offset: true });
 const text = z.string().trim().min(1).max(240);
 
-export const purchaseOrderLineSchema = z.object({
-  id: z.string().uuid(),
-  description: z.string().trim().min(1).max(1000),
-  quantity: z.number().finite().positive().max(1_000_000),
-  unit: z.string().trim().min(1).max(40),
-  unitPriceHtCents: cents,
-}).strict();
+export const purchaseOrderLineSchema = z
+  .object({
+    id: z.string().uuid(),
+    description: z.string().trim().min(1).max(1000),
+    quantity: z.number().finite().positive().max(1_000_000),
+    unit: z.string().trim().min(1).max(40),
+    unitPriceHtCents: cents,
+  })
+  .strict();
 
 export const purchaseOrderSchema = z.object({
   id: z.string().uuid(),
@@ -49,20 +51,24 @@ export function parsePurchaseOrdersPayload(value: unknown): PurchaseOrdersPayloa
 
 const lineInput = purchaseOrderLineSchema;
 export const purchaseOrderInputSchema = z.discriminatedUnion("mode", [
-  z.object({
-    mode: z.literal("QUICK"),
-    chantierId: z.string().uuid(),
-    supplierName: text,
-    description: z.string().trim().max(2000),
-    amountHtCents: cents.positive(),
-  }).strict(),
-  z.object({
-    mode: z.literal("DETAILED"),
-    chantierId: z.string().uuid(),
-    supplierName: text,
-    description: z.string().trim().max(2000),
-    lines: z.array(lineInput).min(1).max(200),
-  }).strict(),
+  z
+    .object({
+      mode: z.literal("QUICK"),
+      chantierId: z.string().uuid(),
+      supplierName: text,
+      description: z.string().trim().max(2000),
+      amountHtCents: cents.positive(),
+    })
+    .strict(),
+  z
+    .object({
+      mode: z.literal("DETAILED"),
+      chantierId: z.string().uuid(),
+      supplierName: text,
+      description: z.string().trim().max(2000),
+      lines: z.array(lineInput).min(1).max(200),
+    })
+    .strict(),
 ]);
 export type PurchaseOrderInput = z.infer<typeof purchaseOrderInputSchema>;
 
@@ -124,14 +130,16 @@ export function cancelPurchaseOrder(
   if (order.updatedAt !== expectedUpdatedAt) throw new Error("PURCHASE_ORDER_VERSION_CONFLICT");
   if (order.status === "CANCELLED") throw new Error("PURCHASE_ORDER_ALREADY_CANCELLED");
   const orders = [...payload.orders];
-  orders[index] = { ...order, status: "CANCELLED", updatedAt: now.toISOString(), updatedByName: actor };
+  orders[index] = {
+    ...order,
+    status: "CANCELLED",
+    updatedAt: now.toISOString(),
+    updatedByName: actor,
+  };
   return { ...payload, orders };
 }
 
-export function committedPurchaseTotal(
-  payload: PurchaseOrdersPayload,
-  chantierId: string,
-): number {
+export function committedPurchaseTotal(payload: PurchaseOrdersPayload, chantierId: string): number {
   return payload.orders
     .filter((order) => order.chantierId === chantierId && order.status === "COMMITTED")
     .reduce((total, order) => total + order.amountHtCents, 0);

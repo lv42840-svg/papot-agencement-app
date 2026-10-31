@@ -35,9 +35,7 @@ function moneyCents(raw: string): number | null {
   const value = raw.trim().replace(",", ".");
   if (!/^\d+(?:\.\d{1,2})?$/.test(value)) return null;
   const cents = Math.round(Number(value) * 100);
-  return Number.isSafeInteger(cents) && cents >= 0 && cents <= 100_000_000_000
-    ? cents
-    : null;
+  return Number.isSafeInteger(cents) && cents >= 0 && cents <= 100_000_000_000 ? cents : null;
 }
 function positiveQuantity(raw: string): number | null {
   const value = raw.trim().replace(",", ".");
@@ -83,11 +81,16 @@ export function PurchaseOrdersWorkspace({ chantierId }: { chantierId?: string })
   }, []);
 
   const sites = snapshot?.chantiers ?? [];
-  const selected = sites.find((site) => site.id === siteId)?.id ??
-    (sites.find((site) => site.id === chantierId)?.id ?? sites[0]?.id ?? "");
+  const selected =
+    sites.find((site) => site.id === siteId)?.id ??
+    sites.find((site) => site.id === chantierId)?.id ??
+    sites[0]?.id ??
+    "";
   const suppliers = useMemo(
-    () => [...new Set((snapshot?.payload.orders ?? []).map((order) => order.supplierName))]
-      .sort((a, b) => a.localeCompare(b, "fr-FR")),
+    () =>
+      [...new Set((snapshot?.payload.orders ?? []).map((order) => order.supplierName))].sort(
+        (a, b) => a.localeCompare(b, "fr-FR"),
+      ),
     [snapshot],
   );
   const linePreview = lines.map((line) => {
@@ -112,7 +115,9 @@ export function PurchaseOrdersWorkspace({ chantierId }: { chantierId?: string })
   const committed = snapshot ? committedPurchaseTotal(snapshot.payload, selected) : 0;
 
   function patchLine(id: string, key: keyof EditableLine, value: string) {
-    setLines((current) => current.map((line) => line.id === id ? { ...line, [key]: value } : line));
+    setLines((current) =>
+      current.map((line) => (line.id === id ? { ...line, [key]: value } : line)),
+    );
     setError("");
   }
   async function create() {
@@ -141,8 +146,10 @@ export function PurchaseOrdersWorkspace({ chantierId }: { chantierId?: string })
         const quantity = positiveQuantity(line.quantity);
         const unitPriceHtCents = moneyCents(line.unitPrice);
         if (
-          !line.description.trim() || !line.unit.trim() ||
-          quantity === null || unitPriceHtCents === null
+          !line.description.trim() ||
+          !line.unit.trim() ||
+          quantity === null ||
+          unitPriceHtCents === null
         ) {
           setError("Chaque ligne doit avoir une désignation, quantité, unité et prix HT valides.");
           return;
@@ -176,9 +183,11 @@ export function PurchaseOrdersWorkspace({ chantierId }: { chantierId?: string })
       });
       const result = (await response.json()) as Snapshot;
       if (!response.ok) throw new Error(result.error ?? "PURCHASE_ORDER_CREATE_FAILED");
-      setSnapshot((current) => current ? { ...current, payload: result.payload } : current);
+      setSnapshot((current) => (current ? { ...current, payload: result.payload } : current));
       const saved = result.payload.orders.find((item) => item.requestId === requestId.current);
-      setNotice(`${saved?.reference ?? "BC"} enregistré comme coût engagé, sans envoi au fournisseur.`);
+      setNotice(
+        `${saved?.reference ?? "BC"} enregistré comme coût engagé, sans envoi au fournisseur.`,
+      );
       requestId.current = crypto.randomUUID();
       setAmount("");
       setDescription("");
@@ -191,8 +200,12 @@ export function PurchaseOrdersWorkspace({ chantierId }: { chantierId?: string })
     }
   }
   async function cancel(id: string, expectedUpdatedAt: string) {
-    if (!snapshot?.canWrite || busy ||
-      !window.confirm("Annuler ce BC ? Son engagement sera retiré, mais la trace restera visible.")) return;
+    if (
+      !snapshot?.canWrite ||
+      busy ||
+      !window.confirm("Annuler ce BC ? Son engagement sera retiré, mais la trace restera visible.")
+    )
+      return;
     setBusy(true);
     setError("");
     try {
@@ -203,7 +216,7 @@ export function PurchaseOrdersWorkspace({ chantierId }: { chantierId?: string })
       });
       const result = (await response.json()) as Snapshot;
       if (!response.ok) throw new Error(result.error ?? "PURCHASE_ORDER_CANCEL_FAILED");
-      setSnapshot((current) => current ? { ...current, payload: result.payload } : current);
+      setSnapshot((current) => (current ? { ...current, payload: result.payload } : current));
       setNotice("BC annulé. Il n'est plus comptabilisé parmi les engagements.");
     } catch (e) {
       setError(messageFor(e instanceof Error ? e.message : "PURCHASE_ORDER_CANCEL_FAILED"));
@@ -217,26 +230,49 @@ export function PurchaseOrdersWorkspace({ chantierId }: { chantierId?: string })
       <div>
         <h1>Achats · Bons de commande</h1>
         <p>
-          Un BC enregistré est un <strong>coût engagé HT</strong>. Il ne crée ni facture fournisseur,
-          ni coût réel validé, ni envoi automatique. Rapprochement Pennylane à venir.
+          Un BC enregistré est un <strong>coût engagé HT</strong>. Il ne crée ni facture
+          fournisseur, ni coût réel validé, ni envoi automatique. Rapprochement Pennylane à venir.
         </p>
       </div>
-      {error ? <p role="alert" style={{ color: "#b33138" }}>{error}</p> : null}
-      {notice ? <p role="status" style={{ color: "#327550" }}>{notice}</p> : null}
-      {!snapshot ? <p>Chargement des chantiers et des commandes…</p> : (
+      {error ? (
+        <p role="alert" style={{ color: "#b33138" }}>
+          {error}
+        </p>
+      ) : null}
+      {notice ? (
+        <p role="status" style={{ color: "#327550" }}>
+          {notice}
+        </p>
+      ) : null}
+      {!snapshot ? (
+        <p>Chargement des chantiers et des commandes…</p>
+      ) : (
         <>
-          <section style={{ background: "white", borderRadius: 12, padding: 18, display: "grid", gap: 14 }}>
+          <section
+            style={{ background: "white", borderRadius: 12, padding: 18, display: "grid", gap: 14 }}
+          >
             <h2>Nouveau bon de commande</h2>
-            <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(230px, 1fr))", gap: 12 }}>
+            <div
+              style={{
+                display: "grid",
+                gridTemplateColumns: "repeat(auto-fit, minmax(230px, 1fr))",
+                gap: 12,
+              }}
+            >
               <label style={{ display: "grid", gap: 5 }}>
                 Chantier *
                 <select
                   value={selected}
                   disabled={busy || !snapshot.canWrite}
-                  onChange={(e) => { setSiteId(e.target.value); setError(""); }}
+                  onChange={(e) => {
+                    setSiteId(e.target.value);
+                    setError("");
+                  }}
                 >
                   {sites.map((site) => (
-                    <option key={site.id} value={site.id}>{site.name} · {site.clientName}</option>
+                    <option key={site.id} value={site.id}>
+                      {site.name} · {site.clientName}
+                    </option>
                   ))}
                 </select>
               </label>
@@ -249,10 +285,15 @@ export function PurchaseOrdersWorkspace({ chantierId }: { chantierId?: string })
                   placeholder="Nom du fournisseur"
                   value={supplierName}
                   disabled={busy || !snapshot.canWrite}
-                  onChange={(e) => { setSupplierName(e.target.value); setError(""); }}
+                  onChange={(e) => {
+                    setSupplierName(e.target.value);
+                    setError("");
+                  }}
                 />
                 <datalist id="bc-supplier-names">
-                  {suppliers.map((supplier) => <option key={supplier} value={supplier} />)}
+                  {suppliers.map((supplier) => (
+                    <option key={supplier} value={supplier} />
+                  ))}
                 </datalist>
               </label>
             </div>
@@ -297,7 +338,10 @@ export function PurchaseOrdersWorkspace({ chantierId }: { chantierId?: string })
                   placeholder="Ex. 2500,00"
                   value={amount}
                   disabled={busy || !snapshot.canWrite}
-                  onChange={(e) => { setAmount(e.target.value); setError(""); }}
+                  onChange={(e) => {
+                    setAmount(e.target.value);
+                    setError("");
+                  }}
                 />
               </label>
             ) : (
@@ -305,100 +349,196 @@ export function PurchaseOrdersWorkspace({ chantierId }: { chantierId?: string })
                 <table style={{ width: "100%", minWidth: 810, borderCollapse: "collapse" }}>
                   <thead>
                     <tr style={{ textAlign: "left", borderBottom: "1px solid #ddd" }}>
-                      <th>Désignation</th><th>Qté</th><th>Unité</th><th>PU HT (€)</th>
-                      <th style={{ textAlign: "right" }}>Total HT</th><th />
+                      <th>Désignation</th>
+                      <th>Qté</th>
+                      <th>Unité</th>
+                      <th>PU HT (€)</th>
+                      <th style={{ textAlign: "right" }}>Total HT</th>
+                      <th />
                     </tr>
                   </thead>
                   <tbody>
                     {lines.map((line, i) => (
                       <tr key={line.id}>
-                        <td><input aria-label={`Désignation ligne ${i + 1}`} value={line.description}
-                          disabled={busy || !snapshot.canWrite} onChange={(e) => patchLine(line.id, "description", e.target.value)}
-                          style={{ width: "100%", minWidth: 230 }} /></td>
-                        <td><input aria-label={`Quantité ligne ${i + 1}`} inputMode="decimal" value={line.quantity}
-                          disabled={busy || !snapshot.canWrite} onChange={(e) => patchLine(line.id, "quantity", e.target.value)}
-                          style={{ width: 80 }} /></td>
-                        <td><input aria-label={`Unité ligne ${i + 1}`} value={line.unit}
-                          disabled={busy || !snapshot.canWrite} onChange={(e) => patchLine(line.id, "unit", e.target.value)}
-                          style={{ width: 75 }} /></td>
-                        <td><input aria-label={`Prix unitaire ligne ${i + 1}`} inputMode="decimal" value={line.unitPrice}
-                          disabled={busy || !snapshot.canWrite} onChange={(e) => patchLine(line.id, "unitPrice", e.target.value)}
-                          style={{ width: 110 }} /></td>
+                        <td>
+                          <input
+                            aria-label={`Désignation ligne ${i + 1}`}
+                            value={line.description}
+                            disabled={busy || !snapshot.canWrite}
+                            onChange={(e) => patchLine(line.id, "description", e.target.value)}
+                            style={{ width: "100%", minWidth: 230 }}
+                          />
+                        </td>
+                        <td>
+                          <input
+                            aria-label={`Quantité ligne ${i + 1}`}
+                            inputMode="decimal"
+                            value={line.quantity}
+                            disabled={busy || !snapshot.canWrite}
+                            onChange={(e) => patchLine(line.id, "quantity", e.target.value)}
+                            style={{ width: 80 }}
+                          />
+                        </td>
+                        <td>
+                          <input
+                            aria-label={`Unité ligne ${i + 1}`}
+                            value={line.unit}
+                            disabled={busy || !snapshot.canWrite}
+                            onChange={(e) => patchLine(line.id, "unit", e.target.value)}
+                            style={{ width: 75 }}
+                          />
+                        </td>
+                        <td>
+                          <input
+                            aria-label={`Prix unitaire ligne ${i + 1}`}
+                            inputMode="decimal"
+                            value={line.unitPrice}
+                            disabled={busy || !snapshot.canWrite}
+                            onChange={(e) => patchLine(line.id, "unitPrice", e.target.value)}
+                            style={{ width: 110 }}
+                          />
+                        </td>
                         <td style={{ textAlign: "right", whiteSpace: "nowrap" }}>
                           {linePreview[i] === null ? "À renseigner" : euro(linePreview[i] ?? 0)}
                         </td>
-                        <td><button type="button" className="secondaryButton"
-                          disabled={lines.length === 1 || busy || !snapshot.canWrite}
-                          onClick={() => setLines((current) => current.filter((x) => x.id !== line.id))}>
-                          Retirer
-                        </button></td>
+                        <td>
+                          <button
+                            type="button"
+                            className="secondaryButton"
+                            disabled={lines.length === 1 || busy || !snapshot.canWrite}
+                            onClick={() =>
+                              setLines((current) => current.filter((x) => x.id !== line.id))
+                            }
+                          >
+                            Retirer
+                          </button>
+                        </td>
                       </tr>
                     ))}
                   </tbody>
                 </table>
-                <button type="button" className="secondaryButton"
+                <button
+                  type="button"
+                  className="secondaryButton"
                   disabled={busy || !snapshot.canWrite || lines.length >= 200}
-                  onClick={() => setLines((current) => [...current, newLine()])}>
+                  onClick={() => setLines((current) => [...current, newLine()])}
+                >
                   Ajouter une ligne
                 </button>
               </div>
             )}
-            <div style={{ display: "flex", justifyContent: "space-between", gap: 16, flexWrap: "wrap", alignItems: "center" }}>
+            <div
+              style={{
+                display: "flex",
+                justifyContent: "space-between",
+                gap: 16,
+                flexWrap: "wrap",
+                alignItems: "center",
+              }}
+            >
               <div>
                 <strong>Total du BC : {preview === null ? "À renseigner" : euro(preview)}</strong>
                 <div>Déjà engagé sur ce chantier : {euro(committed)}</div>
               </div>
-              <button type="button" className="primaryButton"
+              <button
+                type="button"
+                className="primaryButton"
                 disabled={busy || !snapshot.canWrite || !selected}
-                onClick={() => void create()}>
+                onClick={() => void create()}
+              >
                 Enregistrer le BC (engagement)
               </button>
             </div>
           </section>
-          <section style={{ background: "white", borderRadius: 12, padding: 18, display: "grid", gap: 12 }}>
+          <section
+            style={{ background: "white", borderRadius: 12, padding: 18, display: "grid", gap: 12 }}
+          >
             <h2>Liste des bons de commande ({all.length})</h2>
             <div style={{ display: "flex", gap: 12, flexWrap: "wrap" }}>
-              <input aria-label="Rechercher un BC" placeholder="Référence, fournisseur, chantier…"
-                value={search} onChange={(e) => setSearch(e.target.value)} style={{ minWidth: 230, flex: 2 }} />
-              <select aria-label="Filtrer les BC par chantier" value={siteFilter}
-                onChange={(e) => setSiteFilter(e.target.value)} style={{ flex: 1 }}>
+              <input
+                aria-label="Rechercher un BC"
+                placeholder="Référence, fournisseur, chantier…"
+                value={search}
+                onChange={(e) => setSearch(e.target.value)}
+                style={{ minWidth: 230, flex: 2 }}
+              />
+              <select
+                aria-label="Filtrer les BC par chantier"
+                value={siteFilter}
+                onChange={(e) => setSiteFilter(e.target.value)}
+                style={{ flex: 1 }}
+              >
                 <option value="ALL">Tous les chantiers</option>
-                {sites.map((site) => <option key={site.id} value={site.id}>{site.name}</option>)}
+                {sites.map((site) => (
+                  <option key={site.id} value={site.id}>
+                    {site.name}
+                  </option>
+                ))}
               </select>
-              <button type="button" className="secondaryButton" onClick={() => void reload().catch(() =>
-                setError("Actualisation impossible."))}>Actualiser</button>
+              <button
+                type="button"
+                className="secondaryButton"
+                onClick={() => void reload().catch(() => setError("Actualisation impossible."))}
+              >
+                Actualiser
+              </button>
             </div>
             <div style={{ overflowX: "auto" }}>
               <table style={{ width: "100%", minWidth: 920, borderCollapse: "collapse" }}>
                 <thead>
                   <tr style={{ textAlign: "left", borderBottom: "2px solid #ddd" }}>
-                    <th>Référence</th><th>Date</th><th>Fournisseur</th><th>Chantier</th>
-                    <th>Mode</th><th>Statut</th><th style={{ textAlign: "right" }}>HT</th><th />
+                    <th>Référence</th>
+                    <th>Date</th>
+                    <th>Fournisseur</th>
+                    <th>Chantier</th>
+                    <th>Mode</th>
+                    <th>Statut</th>
+                    <th style={{ textAlign: "right" }}>HT</th>
+                    <th />
                   </tr>
                 </thead>
                 <tbody>
                   {visible.map((order) => (
                     <tr key={order.id} style={{ borderBottom: "1px solid #ece8f0" }}>
                       <td style={{ padding: 8 }}>{order.reference}</td>
-                      <td style={{ padding: 8 }}>{new Date(order.createdAt).toLocaleDateString("fr-FR")}</td>
+                      <td style={{ padding: 8 }}>
+                        {new Date(order.createdAt).toLocaleDateString("fr-FR")}
+                      </td>
                       <td style={{ padding: 8 }}>{order.supplierName}</td>
                       <td style={{ padding: 8 }}>{order.chantierName}</td>
-                      <td style={{ padding: 8 }}>{order.mode === "QUICK" ? "Rapide" : `Détaillé (${order.lines.length})`}</td>
-                      <td style={{ padding: 8 }}>{order.status === "CANCELLED" ? "Annulé" : "Engagé · Non envoyé"}</td>
-                      <td style={{ padding: 8, textAlign: "right", whiteSpace: "nowrap" }}>{euro(order.amountHtCents)}</td>
+                      <td style={{ padding: 8 }}>
+                        {order.mode === "QUICK" ? "Rapide" : `Détaillé (${order.lines.length})`}
+                      </td>
+                      <td style={{ padding: 8 }}>
+                        {order.status === "CANCELLED" ? "Annulé" : "Engagé · Non envoyé"}
+                      </td>
+                      <td style={{ padding: 8, textAlign: "right", whiteSpace: "nowrap" }}>
+                        {euro(order.amountHtCents)}
+                      </td>
                       <td style={{ padding: 8 }}>
                         {order.status === "COMMITTED" && snapshot.canWrite ? (
-                          <button type="button" className="secondaryButton" disabled={busy}
-                            onClick={() => void cancel(order.id, order.updatedAt)}>Annuler</button>
+                          <button
+                            type="button"
+                            className="secondaryButton"
+                            disabled={busy}
+                            onClick={() => void cancel(order.id, order.updatedAt)}
+                          >
+                            Annuler
+                          </button>
                         ) : null}
                         {order.mode === "DETAILED" ? (
                           <details>
                             <summary>Lignes</summary>
-                            {order.lines.map((line) => <div key={line.id}>
-                              {line.description} · {line.quantity} {line.unit} × {euro(line.unitPriceHtCents)}
-                            </div>)}
+                            {order.lines.map((line) => (
+                              <div key={line.id}>
+                                {line.description} · {line.quantity} {line.unit} ×{" "}
+                                {euro(line.unitPriceHtCents)}
+                              </div>
+                            ))}
                           </details>
-                        ) : order.description ? <small>{order.description}</small> : null}
+                        ) : order.description ? (
+                          <small>{order.description}</small>
+                        ) : null}
                       </td>
                     </tr>
                   ))}

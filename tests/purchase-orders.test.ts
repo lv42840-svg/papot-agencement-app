@@ -44,7 +44,11 @@ const empty = () => parsePurchaseOrdersPayload(null);
 describe("bons de commande engagés, sans rapprochement comptable", () => {
   it("enregistre un BC rapide au coût global et sans lignes artificielles", () => {
     const result = addPurchaseOrder(
-      empty(), crypto.randomUUID(), quick, "Chantier test", "Nadia",
+      empty(),
+      crypto.randomUUID(),
+      quick,
+      "Chantier test",
+      "Nadia",
       new Date("2026-10-31T14:00:00.000Z"),
     );
     expect(result.orders[0]).toMatchObject({
@@ -81,10 +85,14 @@ describe("bons de commande engagés, sans rapprochement comptable", () => {
   it("annule sans effacer et retire l'engagement, avec contrôle de version", () => {
     const first = addPurchaseOrder(empty(), crypto.randomUUID(), quick, "A", "Lucien");
     const previous = first.orders[0];
-    expect(() => cancelPurchaseOrder(first, previous.id, "2020-01-01T00:00:00.000Z", "Lucien"))
-      .toThrow("PURCHASE_ORDER_VERSION_CONFLICT");
+    expect(() =>
+      cancelPurchaseOrder(first, previous.id, "2020-01-01T00:00:00.000Z", "Lucien"),
+    ).toThrow("PURCHASE_ORDER_VERSION_CONFLICT");
     const cancelled = cancelPurchaseOrder(
-      first, previous.id, previous.updatedAt, "Lucien",
+      first,
+      previous.id,
+      previous.updatedAt,
+      "Lucien",
       new Date(Date.parse(previous.updatedAt) + 1000),
     );
     expect(cancelled.orders[0].status).toBe("CANCELLED");
@@ -95,8 +103,16 @@ describe("bons de commande engagés, sans rapprochement comptable", () => {
   it("refuse un fournisseur vide et un BC détaillé sans lignes", () => {
     expect(purchaseOrderInputSchema.safeParse({ ...quick, supplierName: "" }).success).toBe(false);
     expect(purchaseOrderInputSchema.safeParse({ ...detailed, lines: [] }).success).toBe(false);
-    expect(() => purchaseOrderAmount({ ...detailed, lines: [{
-      ...detailed.lines[0], unitPriceHtCents: 0,
-    }] })).toThrow("PURCHASE_ORDER_AMOUNT_INVALID");
+    expect(() =>
+      purchaseOrderAmount({
+        ...detailed,
+        lines: [
+          {
+            ...detailed.lines[0],
+            unitPriceHtCents: 0,
+          },
+        ],
+      }),
+    ).toThrow("PURCHASE_ORDER_AMOUNT_INVALID");
   });
 });

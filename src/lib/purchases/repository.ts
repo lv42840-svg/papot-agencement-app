@@ -5,7 +5,9 @@ import { getServerDbPool, runServerDbMigrations, withServerDbTransaction } from 
 import { parsePurchaseOrdersPayload, type PurchaseOrdersPayload } from "./domain";
 
 const RESOURCE_KEY = "purchase-orders";
-type Transform = (payload: PurchaseOrdersPayload) => PurchaseOrdersPayload | Promise<PurchaseOrdersPayload>;
+type Transform = (
+  payload: PurchaseOrdersPayload,
+) => PurchaseOrdersPayload | Promise<PurchaseOrdersPayload>;
 
 export function createPurchaseOrdersRepository() {
   if (isLocalStorageMode()) {
@@ -14,10 +16,14 @@ export function createPurchaseOrdersRepository() {
         return readLocalSnapshot(RESOURCE_KEY, parsePurchaseOrdersPayload).payload;
       },
       mutate(transform: Transform) {
-        return mutateLocalSnapshot(RESOURCE_KEY, parsePurchaseOrdersPayload, async ({ payload }) => {
-          const next = parsePurchaseOrdersPayload(await transform(structuredClone(payload)));
-          return { payload: next, result: next };
-        });
+        return mutateLocalSnapshot(
+          RESOURCE_KEY,
+          parsePurchaseOrdersPayload,
+          async ({ payload }) => {
+            const next = parsePurchaseOrdersPayload(await transform(structuredClone(payload)));
+            return { payload: next, result: next };
+          },
+        );
       },
     };
   }
