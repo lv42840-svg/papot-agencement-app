@@ -46,6 +46,13 @@ describe("chantier profitability UI", () => {
     expect(panel).toContain("plannedPurchaseLines.map");
     expect(panel).toContain("Achats engagés (BC) HT");
     expect(panel).toContain("Écart engagé - prévu HT");
+    expect(panel).toContain("Consommation du budget à date");
+    expect(panel).toContain("result.knownCostCommitmentsCents");
+    expect(panel).toContain("result.remainingCostBudgetCents");
+    expect(panel).toContain("result.remainingLaborBudgetCents");
+    expect(panel).toContain("Dépassement du budget total de coûts");
+    expect(panel).toContain("n&apos;est ni une marge à terminaison");
+    expect(engine).toContain("knownCostCommitmentsCents");
   });
 
   it("does not invent actual costs while their source modules are absent", () => {
