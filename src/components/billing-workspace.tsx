@@ -2,6 +2,7 @@
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
+import { parseBillingPercentageInput } from "@/lib/billing/percentage-input";
 import type {
   BillingDraft,
   BillingPayload,
@@ -124,7 +125,11 @@ export function BillingWorkspace({
     if (!active) return;
     const linesMode = type === "PROGRESS" && mode === "LINES";
     const percentMode = mode === "PERCENT" && (type === "PROGRESS" || type === "DEPOSIT");
-    const numeric = percentMode ? Number(value.replace(",", ".")) : parseMoney(value);
+    const numeric = percentMode ? parseBillingPercentageInput(value) : parseMoney(value);
+    if (percentMode && numeric === null) {
+      setError("Saisis un pourcentage entre 0,01 et 100 (par exemple 30).");
+      return;
+    }
     if (!linesMode && type !== "STANDARD" && type !== "FINAL" && !Number.isFinite(numeric)) {
       setError("Montant invalide.");
       return;
@@ -269,8 +274,13 @@ export function BillingWorkspace({
                         style={{ padding: 9 }}
                         inputMode="decimal"
                         value={value}
-                        onChange={(e) => setValue(e.target.value)}
-                        placeholder={mode === "PERCENT" ? "30" : "2500,00"}
+                        onChange={(e) => {
+                          setValue(e.target.value);
+                          setError("");
+                        }}
+                        placeholder={
+                          mode === "PERCENT" ? "Ex. 30 (à saisir)" : "Ex. 2500,00 (à saisir)"
+                        }
                       />
                     </label>
                   )}
