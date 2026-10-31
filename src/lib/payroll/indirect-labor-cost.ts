@@ -1,7 +1,7 @@
 import type { PlanningPersonCapacity } from "../planning/capacity";
 import type { PlanningIndirectHours } from "../planning/domain";
 import { monthlySharesForWeek } from "./chantier-labor-cost";
-import type { MonthlyLaborCostRecord } from "./monthly-labor-costs";
+import { resolveLaborCostForWorkedMonth, type MonthlyLaborCostRecord } from "./monthly-labor-costs";
 
 export type IndirectLaborCostsPeriod = {
   savHours: number;
@@ -9,6 +9,7 @@ export type IndirectLaborCostsPeriod = {
   savCostCents: number | null;
   generalCostCents: number | null;
   totalCostCents: number | null;
+  provisional: boolean;
 };
 
 type InternalBucket = { hours: number; costCents: number; complete: boolean };
@@ -27,11 +28,13 @@ export function calculateIndirectLaborCostsForPeriod(
   entries: readonly PlanningIndirectHours[],
   records: readonly MonthlyLaborCostRecord[],
   peopleCapacity: readonly PlanningPersonCapacity[],
+  now = new Date(),
 ): IndirectLaborCostsPeriod {
   const byPersonMonth = new Map(
     records.map((record) => [record.personId + ":" + record.month, record]),
   );
   const schedules = new Map(peopleCapacity.map((person) => [person.userId, person.weeklySchedule]));
+  let provisional = false;
   const buckets: Record<PlanningIndirectHours["category"], InternalBucket> = {
     SAV: { hours: 0, costCents: 0, complete: true },
     GENERAL: { hours: 0, costCents: 0, complete: true },
@@ -44,11 +47,12 @@ export function calculateIndirectLaborCostsForPeriod(
       const bucket = buckets[entry.category];
       const hours = entry.hours * split.fraction;
       bucket.hours += hours;
-      const cost = byPersonMonth.get(entry.userId + ":" + split.month);
-      if (!cost || cost.workedHours <= 0) {
+      const resolved = resolveLaborCostForWorkedMonth(entry.userId, split.month, byPersonMonth, now);
+      if (!resolved) {
         bucket.complete = false;
       } else {
-        bucket.costCents += hours * (cost.employerCostCents / cost.workedHours);
+        provisional ||= resolved.provisional;
+        bucket.costCents += hours * (resolved.record.employerCostCents / resolved.record.workedHours);
       }
     }
   }
@@ -61,6 +65,7 @@ export function calculateIndirectLaborCostsForPeriod(
     generalHours: sumHours(buckets.GENERAL.hours),
     savCostCents,
     generalCostCents,
+    provisional: provisional && savCostCents !== null && generalCostCents !== null,
     totalCostCents:
       savCostCents === null || generalCostCents === null ? null : savCostCents + generalCostCents,
   };
