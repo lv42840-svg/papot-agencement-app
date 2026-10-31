@@ -335,6 +335,137 @@ describe("chantier global profitability", () => {
     expect(result.missingRetainedQuoteIds).toEqual([quoteBId]);
   });
 
+  it("sépare les heures BE/atelier/pose des achats prévus par composants", () => {
+    const q = quote({ id: quoteAId, saleCents: 100_000, costCents: 60_000 });
+    const line = q.model.items[0];
+    if (line.kind !== "LINE") throw new Error("Expected quote line");
+    line.quantity = 2;
+    line.components = [
+      {
+        id: crypto.randomUUID(),
+        description: "Panneau mélaminé",
+        unit: "m²",
+        quantity: 3,
+        quantityFormula: null,
+        costPriceCents: 1000,
+        unitPriceCents: 1300,
+      },
+      {
+        id: crypto.randomUUID(),
+        description: "Montage atelier",
+        unit: "h",
+        quantity: 4,
+        quantityFormula: null,
+        activity: "ATELIER",
+        costPriceCents: 2000,
+        unitPriceCents: 2500,
+      },
+      {
+        id: crypto.randomUUID(),
+        description: "Étude technique",
+        unit: "h",
+        quantity: 1,
+        quantityFormula: null,
+        activity: "BE",
+        costPriceCents: 2500,
+        unitPriceCents: 3200,
+      },
+      {
+        id: crypto.randomUUID(),
+        description: "Pose",
+        unit: "h",
+        quantity: 2,
+        quantityFormula: null,
+        activity: "POSE",
+        costPriceCents: 3500,
+        unitPriceCents: 4200,
+      },
+    ];
+    const result = calculateChantierProfitability(
+      chantier(affair([quoteAId])),
+      affair([quoteAId]),
+      {
+        schemaVersion: 1,
+        quotes: [q],
+      },
+    );
+    expect(result.plannedHours).toEqual({ be: 2, workshop: 8, install: 4, total: 14 });
+    expect(result.plannedPurchaseLines).toHaveLength(1);
+    expect(result.plannedPurchaseLines[0]).toMatchObject({
+      quoteId: quoteAId,
+      description: "Panneau mélaminé",
+      quantity: 6,
+      unit: "m²",
+      totalCostCents: 6000,
+    });
+    expect(result.plannedPurchasesCents).toBe(6000);
+    expect(result.purchaseClassificationWarnings).toHaveLength(0);
+  });
+
+  it("n'invente pas le coût d'achat si le prix ou la catégorie est absent", () => {
+    const q = quote({ id: quoteAId, saleCents: 100_000, costCents: 60_000 });
+    const line = q.model.items[0];
+    if (line.kind !== "LINE") throw new Error("Expected quote line");
+    line.components = [
+      {
+        id: crypto.randomUUID(),
+        description: "Quincaillerie sans coût",
+        unit: "u",
+        quantity: 1,
+        quantityFormula: null,
+        unitPriceCents: 1000,
+      },
+      {
+        id: crypto.randomUUID(),
+        description: "Heures sans activité",
+        unit: "h",
+        quantity: 2,
+        quantityFormula: null,
+        costPriceCents: 2000,
+        unitPriceCents: 2500,
+      },
+    ];
+    const result = calculateChantierProfitability(
+      chantier(affair([quoteAId])),
+      affair([quoteAId]),
+      {
+        schemaVersion: 1,
+        quotes: [q],
+      },
+    );
+    expect(result.plannedPurchasesCents).toBeNull();
+    expect(result.plannedPurchaseLines).toHaveLength(1);
+    expect(result.plannedPurchaseLines[0].totalCostCents).toBeNull();
+    expect(result.purchaseClassificationWarnings).toHaveLength(1);
+    expect(result.plannedHours.total).toBe(0);
+  });
+
+  it("ignore les achats d'options non retenues du devis", () => {
+    const q = quote({ id: quoteAId, saleCents: 100_000, costCents: 60_000 });
+    const line = q.model.items[0];
+    if (line.kind !== "LINE") throw new Error("Expected quote line");
+    q.pricingConfig.options = [
+      {
+        id: crypto.randomUUID(),
+        targetItemId: line.id,
+        targetKind: "LINE",
+        label: "Option rejetée",
+        status: "REJECTED",
+      },
+    ];
+    const result = calculateChantierProfitability(
+      chantier(affair([quoteAId])),
+      affair([quoteAId]),
+      {
+        schemaVersion: 1,
+        quotes: [q],
+      },
+    );
+    expect(result.plannedPurchasesCents).toBe(0);
+    expect(result.plannedPurchaseLines).toEqual([]);
+    expect(result.plannedHours.total).toBe(0);
+  });
+
   it("calculates real global margin only when both real cost sources are available", () => {
     const commercialCase = affair([quoteAId]);
     const item = chantier(commercialCase);

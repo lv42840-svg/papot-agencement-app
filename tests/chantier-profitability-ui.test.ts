@@ -27,7 +27,9 @@ describe("chantier profitability UI", () => {
     expect(panel).toContain("Déboursé prévu");
     expect(panel).toContain("Marge prévue");
     expect(panel).toContain("Marge réelle");
-    expect(panel).toContain("Heures chantier");
+    expect(panel).toContain("Heures prévues depuis le devis");
+    expect(panel).toContain("Achats prévus extraits du devis");
+    expect(panel).toContain("plannedPurchaseLines.map");
     expect(panel).toContain("Achats / commandes");
   });
 

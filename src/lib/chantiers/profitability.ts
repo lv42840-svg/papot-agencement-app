@@ -1,6 +1,7 @@
 import type { ChantierHours, ChantierRecord } from "./domain";
 import type { CommercialCase } from "../commercial/domain";
 import { calculateCommercialQuoteSummary } from "../quotes/commercial-summary";
+import { extractPlannedPurchases, type PlannedPurchaseLine } from "./quote-purchases";
 import type { NativeQuoteRecord, NativeQuotesPayload } from "../quotes/store";
 
 export type ChantierActualCostSnapshot = {
@@ -19,11 +20,20 @@ export type ChantierProfitabilityQuote = {
   soldHours: ChantierHours & { total: number };
   plannedDisbursementCents: number | null;
   plannedMarginCents: number | null;
+  plannedPurchasesCents: number | null;
 };
 
 export type ChantierProfitability = {
   soldCents: number | null;
   plannedDisbursementCents: number | null;
+  plannedPurchasesCents: number | null;
+  plannedPurchaseLines: PlannedPurchaseLine[];
+  purchaseClassificationWarnings: Array<{
+    quoteReference: string;
+    quoteLineId: string;
+    description: string;
+    reason: string;
+  }>;
   plannedMarginCents: number | null;
   plannedMarginPercent: number | null;
   plannedHours: ChantierHours & { total: number };
@@ -92,7 +102,8 @@ export function calculateChantierProfitability(
   },
 ): ChantierProfitability {
   const retained = retainedQuotes(commercialCase, quotes);
-  const summaries = retained.records.map((quote) => {
+  const purchaseExtracts = retained.records.map((quote) => extractPlannedPurchases(quote));
+  const summaries = retained.records.map((quote, index) => {
     const summary = calculateCommercialQuoteSummary(quote);
     return {
       quoteId: quote.id,
@@ -105,6 +116,7 @@ export function calculateChantierProfitability(
       soldHours: summary.soldHoursByActivity,
       plannedDisbursementCents: summary.plannedDisbursementCents,
       plannedMarginCents: summary.plannedMarginCents,
+      plannedPurchasesCents: purchaseExtracts[index].totalCents,
     } satisfies ChantierProfitabilityQuote;
   });
 
@@ -124,6 +136,18 @@ export function calculateChantierProfitability(
         0,
       )
     : null;
+  const plannedPurchasesComplete =
+    soldComplete && purchaseExtracts.every((quote) => quote.totalCents !== null);
+  const plannedPurchasesCents = plannedPurchasesComplete
+    ? purchaseExtracts.reduce((sum, item) => addSafeMoney(sum, item.totalCents ?? 0), 0)
+    : null;
+  const plannedPurchaseLines = purchaseExtracts.flatMap((item) => item.lines);
+  const purchaseClassificationWarnings = purchaseExtracts.flatMap((item, index) =>
+    item.unclassified.map((warning) => ({
+      quoteReference: summaries[index].quoteNumber ?? summaries[index].subject,
+      ...warning,
+    })),
+  );
   const plannedMarginComplete =
     soldComplete && summaries.every((quote) => quote.plannedMarginCents !== null);
   const plannedMarginCents = plannedMarginComplete
@@ -163,6 +187,9 @@ export function calculateChantierProfitability(
   return {
     soldCents,
     plannedDisbursementCents,
+    plannedPurchasesCents,
+    plannedPurchaseLines,
+    purchaseClassificationWarnings,
     plannedMarginCents,
     plannedMarginPercent,
     plannedHours,
