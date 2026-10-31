@@ -122,7 +122,9 @@ export function buildInvoiceDocumentLines(
         sourceLineId: source.lineId,
         // A retained quote can have a whitespace-only label. Keep its amount and
         // source link, but give the editable invoice row a valid description.
-        description: source.description.trim() ? source.description : `Prestation du devis ${draft.quoteLabel}`,
+        description: source.description.trim()
+          ? source.description
+          : `Prestation du devis ${draft.quoteLabel}`,
         quantity: exact ? quantity : 1,
         unit: exact ? (source.unit ?? "u") : "forfait",
         unitPriceCents: exact ? roundedUnit : amount,
