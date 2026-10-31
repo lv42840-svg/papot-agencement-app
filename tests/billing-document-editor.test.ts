@@ -95,15 +95,22 @@ describe("validation interne de projet de facture", () => {
     expect(approved.approvedAt).toBe("2026-10-31T10:00:00.000Z");
     expect("invoiceNumber" in approved).toBe(false);
     expect(() => patch(approved, approved.documentLines!)).toThrow("BILLING_DRAFT_LOCKED");
-    expect(() => updateBillingDraft(
-      { schemaVersion: 1, drafts: [approved] },
-      approved.id,
-      { expectedUpdatedAt: approved.updatedAt, label: "Modification", notes: "" },
-      "Lucien",
-    )).toThrow("BILLING_DRAFT_LOCKED");
-    expect(() => approveBillingDraft(
-      { schemaVersion: 1, drafts: [approved] }, approved.id, approved.updatedAt, "Lucien",
-    )).toThrow("BILLING_DRAFT_LOCKED");
+    expect(() =>
+      updateBillingDraft(
+        { schemaVersion: 1, drafts: [approved] },
+        approved.id,
+        { expectedUpdatedAt: approved.updatedAt, label: "Modification", notes: "" },
+        "Lucien",
+      ),
+    ).toThrow("BILLING_DRAFT_LOCKED");
+    expect(() =>
+      approveBillingDraft(
+        { schemaVersion: 1, drafts: [approved] },
+        approved.id,
+        approved.updatedAt,
+        "Lucien",
+      ),
+    ).toThrow("BILLING_DRAFT_LOCKED");
   });
 });
 

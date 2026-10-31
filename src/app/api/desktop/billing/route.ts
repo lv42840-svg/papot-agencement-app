@@ -73,11 +73,13 @@ const billingMutationSchema = z.discriminatedUnion("action", [
         .optional(),
     })
     .strict(),
-  z.object({
-    action: z.literal("APPROVE"),
-    draftId: z.string().uuid(),
-    expectedUpdatedAt: z.string().datetime({ offset: true }),
-  }).strict(),
+  z
+    .object({
+      action: z.literal("APPROVE"),
+      draftId: z.string().uuid(),
+      expectedUpdatedAt: z.string().datetime({ offset: true }),
+    })
+    .strict(),
   z
     .object({
       action: z.literal("DELETE"),
@@ -143,7 +145,12 @@ export async function POST(request: Request) {
       } else if (input.action === "APPROVE") {
         const index = drafts.findIndex((draft) => draft.id === input.draftId);
         if (index < 0) throw new Error("BILLING_DRAFT_NOT_FOUND");
-        drafts[index] = approveBillingDraft(current, input.draftId, input.expectedUpdatedAt, context.user.displayName);
+        drafts[index] = approveBillingDraft(
+          current,
+          input.draftId,
+          input.expectedUpdatedAt,
+          context.user.displayName,
+        );
       } else if (input.action === "UPDATE_DOCUMENT") {
         const index = drafts.findIndex((draft) => draft.id === input.draftId);
         if (index < 0) throw new Error("BILLING_DRAFT_NOT_FOUND");

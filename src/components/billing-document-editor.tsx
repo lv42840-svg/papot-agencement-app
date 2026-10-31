@@ -61,8 +61,10 @@ const labels: Record<BillingDraft["type"], string> = {
 };
 const serverErrors: Record<string, string> = {
   BILLING_DRAFT_LOCKED: "Ce document est validé en interne et verrouillé.",
-  BILLING_APPROVAL_TOTALS_MISMATCH: "Les totaux ne correspondent pas. Corrige puis enregistre avant validation.",
-  BILLING_PROGRESS_DOCUMENT_MISMATCH: "Le montant de la facture ne correspond pas aux avancements par ligne.",
+  BILLING_APPROVAL_TOTALS_MISMATCH:
+    "Les totaux ne correspondent pas. Corrige puis enregistre avant validation.",
+  BILLING_PROGRESS_DOCUMENT_MISMATCH:
+    "Le montant de la facture ne correspond pas aux avancements par ligne.",
   BILLING_VERSION_CONFLICT:
     "Cette facture a été modifiée depuis l'ouverture. Recharge la page avant de poursuivre.",
   BILLING_DRAFT_HAS_DEPENDENTS:
@@ -329,14 +331,23 @@ export function BillingDocumentEditor({ draftId }: { draftId: string }) {
 
   async function approve() {
     if (!draft || !canWrite || busy || dirty) return;
-    if (!window.confirm("Valider et verrouiller ce projet en interne ? Il ne pourra plus être modifié. Aucun numéro légal ni facture officielle ne sera émis.")) return;
+    if (
+      !window.confirm(
+        "Valider et verrouiller ce projet en interne ? Il ne pourra plus être modifié. Aucun numéro légal ni facture officielle ne sera émis.",
+      )
+    )
+      return;
     setBusy(true);
     setError("");
     try {
       const response = await fetch("/api/desktop/billing", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ action: "APPROVE", draftId: draft.id, expectedUpdatedAt: draft.updatedAt }),
+        body: JSON.stringify({
+          action: "APPROVE",
+          draftId: draft.id,
+          expectedUpdatedAt: draft.updatedAt,
+        }),
       });
       const result = (await response.json()) as ApiSnapshot;
       if (!response.ok) throw new Error(result.error ?? "Validation impossible");
@@ -365,7 +376,9 @@ export function BillingDocumentEditor({ draftId }: { draftId: string }) {
           <button type="button" className="secondaryButton" onClick={goBack}>
             <ArrowLeft size={15} /> Retour aux projets
           </button>
-          <span className="invoiceTag">{draft.status === "APPROVED" ? "VALIDÉ EN INTERNE · NON ÉMIS" : "PROJET · NON ÉMIS"}</span>
+          <span className="invoiceTag">
+            {draft.status === "APPROVED" ? "VALIDÉ EN INTERNE · NON ÉMIS" : "PROJET · NON ÉMIS"}
+          </span>
           <h1>
             <FileText size={25} /> {labels[draft.type]}
           </h1>
@@ -408,7 +421,11 @@ export function BillingDocumentEditor({ draftId }: { draftId: string }) {
         </p>
       )}
       {!canWrite && (
-        <p className="invoiceDraftNotice">{draft.status === "APPROVED" ? "Projet verrouillé après validation interne." : "Lecture seule : droit Facturation en écriture requis."}</p>
+        <p className="invoiceDraftNotice">
+          {draft.status === "APPROVED"
+            ? "Projet verrouillé après validation interne."
+            : "Lecture seule : droit Facturation en écriture requis."}
+        </p>
       )}
 
       <section className="invoiceCard">
@@ -686,7 +703,12 @@ export function BillingDocumentEditor({ draftId }: { draftId: string }) {
         </div>
         <div className="invoiceFooterActions">
           {draft.status === "DRAFT" && (
-            <button className="secondaryButton" type="button" disabled={!canWrite || busy || dirty || !preview} onClick={() => void approve()}>
+            <button
+              className="secondaryButton"
+              type="button"
+              disabled={!canWrite || busy || dirty || !preview}
+              onClick={() => void approve()}
+            >
               Valider en interne et verrouiller
             </button>
           )}

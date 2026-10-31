@@ -492,10 +492,13 @@ export function approveBillingDraft(
     totals.amountHtCents !== draft.amountHtCents ||
     totals.vatCents !== draft.vatCents ||
     totals.totalTtcCents !== draft.totalTtcCents ||
-    draft.taxGroups.some((group) =>
-      (totals.taxGroups.find((row) => row.ratePercent === group.ratePercent)?.baseHtCents ?? 0) !== group.baseHtCents,
+    draft.taxGroups.some(
+      (group) =>
+        (totals.taxGroups.find((row) => row.ratePercent === group.ratePercent)?.baseHtCents ??
+          0) !== group.baseHtCents,
     )
-  ) throw new Error("BILLING_APPROVAL_TOTALS_MISMATCH");
+  )
+    throw new Error("BILLING_APPROVAL_TOTALS_MISMATCH");
   return billingDraftSchema.parse({
     ...draft,
     documentLines: lines,
