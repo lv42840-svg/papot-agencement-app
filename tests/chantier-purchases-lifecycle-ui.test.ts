@@ -24,5 +24,8 @@ describe("raccordement BC et clôture chantier", () => {
     expect(api).toContain("CHANTIER_PURCHASE_REVIEW_REQUIRED");
     expect(api).toContain("CHANTIER_PURCHASE_REVIEW_CONFLICT");
     expect(api).toContain("removeChantierPurchaseCommitments");
+    expect(api).toContain("CHANTIER_PURCHASE_REMOVE_CONFIRMATION_REQUIRED");
+    expect(api).toContain('"purchases", "WRITE"');
+    expect(ui).toContain('confirmRemove: purchaseDecision === "REMOVE" && removeConfirmed');
   });
 });
