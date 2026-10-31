@@ -808,7 +808,7 @@ function LifecycleTab({
                   </label>
                   {purchaseWarning === null ? (
                     <div className="chantierLifecycleWarning" role="alert">
-                      Impossible de vérifier les BC. Actualise ou demande l'accès Achats avant de
+                      Impossible de vérifier les BC. Actualise ou demande l&apos;accès Achats avant de
                       clôturer.
                     </div>
                   ) : purchaseWarning.count > 0 ? (
@@ -822,7 +822,7 @@ function LifecycleTab({
                         HT engagés sur ce chantier.
                       </strong>
                       <p>
-                        Le lien entre les BC et les factures Pennylane n'est pas encore
+                        Le lien entre les BC et les factures Pennylane n&apos;est pas encore
                         opérationnel. Vérifie ces engagements avant de clôturer.
                       </p>
                       <ul>
