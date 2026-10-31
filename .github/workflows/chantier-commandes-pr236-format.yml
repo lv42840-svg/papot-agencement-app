@@ -1,0 +1,41 @@
+name: Format chantier Commandes PR 236
+
+on:
+  pull_request:
+    types: [opened, synchronize, reopened]
+
+permissions:
+  contents: read
+
+jobs:
+  format:
+    if: github.event.pull_request.number == 236 && github.event.pull_request.head.repo.full_name == github.repository && github.head_ref == 'feat/chantier-commandes-tab-20261031'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          ref: ${{ github.event.pull_request.head.sha }}
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci --ignore-scripts
+      - name: Format changed files
+        run: |
+          ./node_modules/.bin/prettier --write \
+            src/lib/purchases/domain.ts \
+            src/components/chantier-commandes-tab.tsx \
+            src/components/chantier-workspace.tsx \
+            src/components/purchase-orders-workspace.tsx \
+            tests/chantier-purchase-closure.test.ts \
+            tests/chantier-commandes-tab.test.ts
+      - name: Commit formatting
+        run: |
+          git add -- src/lib/purchases/domain.ts src/components/chantier-commandes-tab.tsx src/components/chantier-workspace.tsx src/components/purchase-orders-workspace.tsx tests/chantier-purchase-closure.test.ts tests/chantier-commandes-tab.test.ts
+          if git diff --cached --quiet; then exit 0; fi
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git commit -m "style(chantier): format Commandes tab"
+          git push origin HEAD:refs/heads/feat/chantier-commandes-tab-20261031
