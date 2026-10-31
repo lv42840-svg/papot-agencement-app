@@ -11,7 +11,7 @@ const euro = (cents: number | null) =>
   cents === null
     ? "Incomplet"
     : (cents / 100).toLocaleString("fr-FR", { style: "currency", currency: "EUR" });
-const actualEuro = (cents: number | null) => cents === null ? "Non disponible" : euro(cents);
+const actualEuro = (cents: number | null) => (cents === null ? "Non disponible" : euro(cents));
 const hours = (value: number) => value.toLocaleString("fr-FR", { maximumFractionDigits: 1 }) + " h";
 const statuses: Record<CompanyProfitabilityRow["status"], string> = {
   ACTIVE: "Actif",
@@ -142,18 +142,20 @@ export function EnterpriseProfitabilityWorkspace() {
             </label>
           </div>
           <p>
-            <strong>{total.chantierCount}</strong> chantier(s) dans la sélection.
-            {" "}<strong>{euro(total.committedPurchasesCents)}</strong> HT de BC engagés
-            (non assimilés aux factures fournisseurs).
+            <strong>{total.chantierCount}</strong> chantier(s) dans la sélection.{" "}
+            <strong>{euro(total.committedPurchasesCents)}</strong> HT de BC engagés (non assimilés
+            aux factures fournisseurs).
           </p>
           <h2 style={{ fontSize: 15, margin: "5px 0 0", color: "#6251ba" }}>
             Prévisionnel depuis les devis retenus
           </h2>
-          <div style={{
-            display: "grid",
-            gridTemplateColumns: "repeat(auto-fit, minmax(min(100%, 185px), 1fr))",
-            gap: 12,
-          }}>
+          <div
+            style={{
+              display: "grid",
+              gridTemplateColumns: "repeat(auto-fit, minmax(min(100%, 185px), 1fr))",
+              gap: 12,
+            }}
+          >
             {[
               ["Vendu prévu HT", euro(total.soldCents)],
               ["Achats et frais prévus HT", euro(total.plannedOtherCostCents)],
@@ -161,22 +163,28 @@ export function EnterpriseProfitabilityWorkspace() {
               ["Coût total prévu HT", euro(total.plannedTotalCostCents)],
               ["Marge prévue HT", euro(total.plannedMarginCents)],
             ].map(([label, value]) => (
-              <div key={label} style={{
-                background: "white", borderRadius: 10, padding: 15, minWidth: 0,
-              }}>
+              <div
+                key={label}
+                style={{
+                  background: "white",
+                  borderRadius: 10,
+                  padding: 15,
+                  minWidth: 0,
+                }}
+              >
                 <div style={{ fontSize: 12, color: "#6f677a" }}>{label}</div>
                 <strong style={{ fontSize: 20 }}>{value}</strong>
               </div>
             ))}
           </div>
-          <h2 style={{ fontSize: 15, margin: "5px 0 0", color: "#6251ba" }}>
-            Réalisé à ce jour
-          </h2>
-          <div style={{
-            display: "grid",
-            gridTemplateColumns: "repeat(auto-fit, minmax(min(100%, 185px), 1fr))",
-            gap: 12,
-          }}>
+          <h2 style={{ fontSize: 15, margin: "5px 0 0", color: "#6251ba" }}>Réalisé à ce jour</h2>
+          <div
+            style={{
+              display: "grid",
+              gridTemplateColumns: "repeat(auto-fit, minmax(min(100%, 185px), 1fr))",
+              gap: 12,
+            }}
+          >
             {[
               ["Facturé client HT", "Non disponible"],
               ["Achats et frais réels HT", actualEuro(total.actualPurchaseCostCents)],
@@ -189,9 +197,15 @@ export function EnterpriseProfitabilityWorkspace() {
               ["Coût total réel HT", actualEuro(total.actualTotalCostCents)],
               ["Marge réelle HT", actualEuro(total.actualMarginCents)],
             ].map(([label, value]) => (
-              <div key={label} style={{
-                background: "white", borderRadius: 10, padding: 15, minWidth: 0,
-              }}>
+              <div
+                key={label}
+                style={{
+                  background: "white",
+                  borderRadius: 10,
+                  padding: 15,
+                  minWidth: 0,
+                }}
+              >
                 <div style={{ fontSize: 12, color: "#6f677a" }}>{label}</div>
                 <strong style={{ fontSize: 20 }}>{value}</strong>
               </div>
@@ -199,18 +213,16 @@ export function EnterpriseProfitabilityWorkspace() {
           </div>
           {total.provisionalLaborCount > 0 ? (
             <p role="status">
-              Coûts des heures provisoires sur {total.provisionalLaborCount} chantier(s) :
-              taux du mois précédent appliqué au mois en cours.
+              Coûts des heures provisoires sur {total.provisionalLaborCount} chantier(s) : taux du
+              mois précédent appliqué au mois en cours.
             </p>
           ) : null}
           {!canReadPayroll ? (
-            <p>
-              Les coûts réels des heures sont masqués : droit de lecture Paie requis.
-            </p>
+            <p>Les coûts réels des heures sont masqués : droit de lecture Paie requis.</p>
           ) : null}
           <p>
-            Les factures clients et fournisseurs ne sont pas encore raccordées à Pennylane :
-            leur montant réel, le coût réel total et la marge réelle restent indisponibles.
+            Les factures clients et fournisseurs ne sont pas encore raccordées à Pennylane : leur
+            montant réel, le coût réel total et la marge réelle restent indisponibles.
           </p>
           {total.incompleteCount > 0 ? (
             <p role="status" style={{ color: "#a35018" }}>

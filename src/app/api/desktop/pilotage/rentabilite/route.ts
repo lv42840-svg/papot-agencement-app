@@ -67,7 +67,10 @@ export async function GET() {
       hoursBySite,
       laborBySite,
     );
-    return NextResponse.json({ rows, canReadPayroll }, { headers: { "Cache-Control": "private, no-store" } });
+    return NextResponse.json(
+      { rows, canReadPayroll },
+      { headers: { "Cache-Control": "private, no-store" } },
+    );
   } catch (error) {
     const code = error instanceof Error ? error.message : "COMPANY_PROFITABILITY_FAILED";
     return NextResponse.json(
