@@ -160,13 +160,13 @@ export function buildPayrollSummary(
         const extra50 = Math.max(0, selected - rules.start50);
         return { week, source, baseHours, absenceHours, hours: selected, extra25, extra50 };
       });
-      const vacationHours = absences
+      const vacationDays = absences
         .filter((row) => row.type === "VACATION")
-        .reduce((sum, row) => sum + row.hours, 0);
-      const dayHours = Object.values(person.weeklySchedule).filter((x) => x > 0);
-      const standardDayHours = dayHours.length
-        ? dayHours.reduce((a, b) => a + b, 0) / dayHours.length
-        : 0;
+        .reduce((sum, row) => {
+          const date = new Date(`${row.date}T12:00:00Z`);
+          const dailyHours = scheduleHoursForDate(person.weeklySchedule, date);
+          return sum + (dailyHours > 0 ? row.hours / dailyHours : 0);
+        }, 0);
       return [
         {
           personId: person.userId,
@@ -175,8 +175,7 @@ export function buildPayrollSummary(
           workedHours: weekRows.reduce((sum, row) => sum + row.hours, 0),
           overtime25: weekRows.reduce((sum, row) => sum + row.extra25, 0),
           overtime50: weekRows.reduce((sum, row) => sum + row.extra50, 0),
-          vacationDays:
-            standardDayHours > 0 ? Math.round((vacationHours / standardDayHours) * 100) / 100 : 0,
+          vacationDays: Math.round(vacationDays * 100) / 100,
           absences: absences.map((entry) => ({
             date: entry.date,
             type: entry.type,

@@ -255,3 +255,35 @@ describe("coût mensuel salarié / holding", () => {
     ).toThrow("VERSION_CONFLICT");
   });
 });
+
+describe("cas particuliers de paie", () => {
+  it("compte un vendredi de 4,5 h comme un jour de congé pour un horaire 8,5/4,5", () => {
+    const weeklySchedule = {
+      monday: 8.5,
+      tuesday: 8.5,
+      wednesday: 8.5,
+      thursday: 8.5,
+      friday: 4.5,
+      saturday: 0,
+      sunday: 0,
+    };
+    const p = { ...person, weeklySchedule };
+    const planning = base();
+    planning.absences.push({
+      id: crypto.randomUUID(),
+      userId: id,
+      type: "VACATION",
+      date: "2026-10-02",
+      hours: 4.5,
+    });
+    const summary = buildPayrollSummary(
+      "2026-10",
+      planning,
+      [p],
+      getMonthState(parsePayrollPreparation(null), "2026-10"),
+      DEFAULT_OVERTIME_RULES,
+      now,
+    );
+    expect(summary.rows[0].vacationDays).toBe(1);
+  });
+});
