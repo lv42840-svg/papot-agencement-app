@@ -329,7 +329,7 @@ export function purchaseOrderHistoryForChantier(
   payload: PurchaseOrdersPayload,
   chantierId: string,
 ): ChantierPurchaseHistoryEntry[] {
-  return payload.orders.flatMap((order) => {
+  return payload.orders.flatMap<ChantierPurchaseHistoryEntry>((order) => {
     const removed = (order.removedAllocations ?? []).filter(
       (allocation) => allocation.chantierId === chantierId,
     );
