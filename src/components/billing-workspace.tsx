@@ -3,6 +3,7 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
 import { parseBillingPercentageInput } from "@/lib/billing/percentage-input";
+import { calculateLineProgress } from "@/lib/billing/progress";
 import type {
   BillingDraft,
   BillingPayload,
@@ -80,10 +81,49 @@ export function BillingWorkspace({
       ]),
     );
   }
-  const cumulativeLinesCents = (active?.lines ?? []).reduce((sum, line) => {
-    const percent = Number((lineValues[line.lineId] ?? "0").replace(",", "."));
+  // Preview and submit the same percentages, including visible saved defaults.
+  const previousLineValues = active ? previousPercents(active) : {};
+  const enteredLineRows = (active?.lines ?? []).map((line) => ({
+    lineId: line.lineId,
+    percent: Number(
+      (lineValues[line.lineId] ?? previousLineValues[line.lineId] ?? "0").replace(",", "."),
+    ),
+  }));
+  const cumulativeLinesCents = (active?.lines ?? []).reduce((sum, line, index) => {
+    const percent = enteredLineRows[index]?.percent;
     return sum + (Number.isFinite(percent) ? Math.round((line.amountHtCents * percent) / 100) : 0);
   }, 0);
+  const progressPreviewError = (() => {
+    if (type !== "PROGRESS" || mode !== "LINES" || !active || !data) return "";
+    try {
+      calculateLineProgress(data.payload, active, enteredLineRows);
+      return "";
+    } catch (error) {
+      const code = error instanceof Error ? error.message : "";
+      if (code === "BILLING_PROGRESS_TAX_ALLOCATION_UNAVAILABLE") {
+        if (cumulativeLinesCents < used) {
+          const minimum =
+            active.lines?.length === 1
+              ? ` Sur cette ligne, indique plus de ${((used / active.contractHtCents) * 100).toLocaleString("fr-FR", { maximumFractionDigits: 2 })} %.`
+              : "";
+          return `Avancement cumulé insuffisant : ${money(cumulativeLinesCents)} HT contre ${money(used)} HT déjà préparés (acomptes inclus).${minimum}`;
+        }
+        return "Les pourcentages doivent couvrir les acomptes déjà préparés pour chaque taux de TVA.";
+      }
+      if (code === "BILLING_AMOUNT_INVALID") {
+        return cumulativeLinesCents === used
+          ? "Aucun montant complémentaire à facturer : augmente l'avancement cumulé."
+          : "Indique un avancement positif supérieur aux montants déjà préparés.";
+      }
+      if (code === "BILLING_PROGRESS_CANNOT_DECREASE") {
+        return "Une situation ne peut pas revenir en dessous de l'avancement déjà enregistré.";
+      }
+      if (code === "BILLING_PROGRESS_PERCENT_INVALID" || code === "BILLING_PROGRESS_LINES_REQUIRED") {
+        return "Indique un pourcentage entre 0 et 100 % pour chaque ligne.";
+      }
+      return "Vérifie les avancements cumulés avant de créer cette situation.";
+    }
+  })();
   async function write(body: Record<string, unknown>, success: string) {
     setBusy(true);
     setError("");
@@ -142,10 +182,11 @@ export function BillingWorkspace({
       type,
     };
     if (linesMode) {
-      const rows = (active.lines ?? []).map((line) => ({
-        lineId: line.lineId,
-        percent: Number((lineValues[line.lineId] ?? "").replace(",", ".")),
-      }));
+      if (progressPreviewError) {
+        setError(progressPreviewError);
+        return;
+      }
+      const rows = enteredLineRows;
       if (
         rows.length === 0 ||
         rows.some((row) => !Number.isFinite(row.percent) || row.percent < 0 || row.percent > 100)
@@ -303,7 +344,7 @@ export function BillingWorkspace({
                           </thead>
                           <tbody>
                             {active.lines.map((line) => {
-                              const previous = Number(previousPercents(active)[line.lineId] ?? "0");
+                              const previous = Number(previousLineValues[line.lineId] ?? "0");
                               const entered = lineValues[line.lineId] ?? String(previous);
                               const percent = Number(entered.replace(",", "."));
                               const cumulative = Number.isFinite(percent)
@@ -324,12 +365,13 @@ export function BillingWorkspace({
                                       style={{ maxWidth: 95, padding: 8 }}
                                       inputMode="decimal"
                                       value={entered}
-                                      onChange={(e) =>
+                                      onChange={(e) => {
                                         setLineValues((current) => ({
                                           ...current,
                                           [line.lineId]: e.target.value,
-                                        }))
-                                      }
+                                        }));
+                                        setError("");
+                                      }}
                                     />
                                   </td>
                                   <td style={{ textAlign: "right", padding: 8 }}>
@@ -346,6 +388,11 @@ export function BillingWorkspace({
                         préparé : {money(used)} HT. Projet complémentaire estimé :{" "}
                         {money(cumulativeLinesCents - used)} HT.
                       </p>
+                      {progressPreviewError ? (
+                        <p role="status" style={{ color: "#aa2525" }}>
+                          {progressPreviewError}
+                        </p>
+                      ) : null}
                       <small>
                         Les retours en arrière et les répartitions de TVA incompatibles avec les
                         acomptes antérieurs sont bloqués.
@@ -359,7 +406,7 @@ export function BillingWorkspace({
               <button
                 type="button"
                 className="primaryButton"
-                disabled={!data.canWrite || busy || remaining <= 0}
+                disabled={!data.canWrite || busy || remaining <= 0 || Boolean(progressPreviewError)}
                 onClick={() => void create()}
               >
                 Créer le projet
