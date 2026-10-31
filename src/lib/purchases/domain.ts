@@ -316,3 +316,46 @@ export function purchaseCloseReviewToken(orders: CommittedChantierOrder[]): stri
       .join("|") || "none"
   );
 }
+
+/** Historical chantier-level view, including cancelled and removed BC allocations. */
+export type ChantierPurchaseHistoryEntry = {
+  order: PurchaseOrder;
+  amountHtCents: number;
+  state: "COMMITTED" | "REMOVED" | "CANCELLED";
+  removedAt: string | null;
+};
+
+export function purchaseOrderHistoryForChantier(
+  payload: PurchaseOrdersPayload,
+  chantierId: string,
+): ChantierPurchaseHistoryEntry[] {
+  return payload.orders.flatMap<ChantierPurchaseHistoryEntry>((order) => {
+    const removed = (order.removedAllocations ?? []).filter(
+      (allocation) => allocation.chantierId === chantierId,
+    );
+    if (removed.length > 0) {
+      return [
+        {
+          order,
+          amountHtCents: removed.reduce((sum, item) => sum + item.amountHtCents, 0),
+          state: "REMOVED" as const,
+          removedAt: removed[removed.length - 1].removedAt,
+        },
+      ];
+    }
+    const allocation = order.allocations?.length
+      ? order.allocations.find((item) => item.chantierId === chantierId)
+      : order.chantierId === chantierId
+        ? { amountHtCents: order.amountHtCents }
+        : undefined;
+    if (!allocation) return [];
+    return [
+      {
+        order,
+        amountHtCents: allocation.amountHtCents,
+        state: order.status === "COMMITTED" ? ("COMMITTED" as const) : ("CANCELLED" as const),
+        removedAt: null,
+      },
+    ];
+  });
+}

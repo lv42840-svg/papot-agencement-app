@@ -20,12 +20,14 @@ import {
   RefreshCw,
   RotateCcw,
   Save,
+  ShoppingCart,
   X,
 } from "lucide-react";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { ChantierOperationalWorkspace } from "@/components/chantier-operational-workspace";
 import { ChantierProfitabilityPanel } from "@/components/chantier-profitability-panel";
 import { ChantierBillingTab } from "@/components/chantier-billing-tab";
+import { ChantierCommandesTab } from "@/components/chantier-commandes-tab";
 import {
   CHANTIER_STATUS_LABELS,
   chantierRemainingHours,
@@ -79,6 +81,7 @@ type ChantierTab =
   | "capacity"
   | "profitability"
   | "billing"
+  | "commandes"
   | "history";
 
 const errorMessages: Record<string, string> = {
@@ -318,6 +321,7 @@ export function ChantierWorkspace({ chantierId }: { chantierId: string }) {
     { id: "capacity", label: "Charge", icon: CalendarClock },
     { id: "profitability", label: "Rentabilité", icon: BadgeEuro },
     { id: "billing", label: "Factures", icon: FileText },
+    { id: "commandes", label: "Commandes", icon: ShoppingCart },
     { id: "history", label: "Historique", icon: History, badge: chantier.history.length },
   ];
 
@@ -449,6 +453,7 @@ export function ChantierWorkspace({ chantierId }: { chantierId: string }) {
           />
         ) : null}
         {activeTab === "billing" ? <ChantierBillingTab chantierId={chantier.id} /> : null}
+        {activeTab === "commandes" ? <ChantierCommandesTab chantierId={chantier.id} /> : null}
         {activeTab === "history" ? <HistoryTab chantier={chantier} /> : null}
       </section>
 

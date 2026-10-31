@@ -74,7 +74,7 @@ export function PurchaseOrdersWorkspace({ chantierId }: { chantierId?: string })
   ]);
   const [lines, setLines] = useState<EditableLine[]>([newLine()]);
   const [search, setSearch] = useState("");
-  const [siteFilter, setSiteFilter] = useState("ALL");
+  const [siteFilter, setSiteFilter] = useState(chantierId ?? "ALL");
   const requestId = useRef<string>(crypto.randomUUID());
 
   async function reload() {
