@@ -1,6 +1,8 @@
 import { describe, it, expect } from "vitest";
 import {
   createBillingDraft,
+  approveBillingDraft,
+  updateBillingDraft,
   parseBillingPayload,
   updateBillingDocument,
   type BillingDocumentLine,
@@ -77,6 +79,33 @@ function patch(
     new Date("2026-10-17T16:00:00.000Z"),
   );
 }
+
+describe("validation interne de projet de facture", () => {
+  it("verrouille un projet cohérent sans lui attribuer de numéro de facture", () => {
+    const draft = make({ requestId: crypto.randomUUID(), type: "STANDARD" });
+    const approved = approveBillingDraft(
+      { schemaVersion: 1, drafts: [draft] },
+      draft.id,
+      draft.updatedAt,
+      "Nadia",
+      new Date("2026-10-31T10:00:00.000Z"),
+    );
+    expect(approved.status).toBe("APPROVED");
+    expect(approved.approvedByName).toBe("Nadia");
+    expect(approved.approvedAt).toBe("2026-10-31T10:00:00.000Z");
+    expect("invoiceNumber" in approved).toBe(false);
+    expect(() => patch(approved, approved.documentLines!)).toThrow("BILLING_DRAFT_LOCKED");
+    expect(() => updateBillingDraft(
+      { schemaVersion: 1, drafts: [approved] },
+      approved.id,
+      { expectedUpdatedAt: approved.updatedAt, label: "Modification", notes: "" },
+      "Lucien",
+    )).toThrow("BILLING_DRAFT_LOCKED");
+    expect(() => approveBillingDraft(
+      { schemaVersion: 1, drafts: [approved] }, approved.id, approved.updatedAt, "Lucien",
+    )).toThrow("BILLING_DRAFT_LOCKED");
+  });
+});
 
 describe("éditeur de facture autonome", () => {
   it("reprend les lignes du devis sans le modifier et avec les montants exacts", () => {
