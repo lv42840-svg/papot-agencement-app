@@ -106,7 +106,10 @@ export const billingTitlesSchema = z
   .array(z.string().trim().min(1).max(240))
   .min(1)
   .max(50)
-  .refine((items) => new Set(items.map((item) => item.toLocaleLowerCase("fr-FR"))).size === items.length, "BILLING_TITLES_DUPLICATE");
+  .refine(
+    (items) => new Set(items.map((item) => item.toLocaleLowerCase("fr-FR"))).size === items.length,
+    "BILLING_TITLES_DUPLICATE",
+  );
 
 export const billingPayloadSchema = z.object({
   schemaVersion: z.literal(1),

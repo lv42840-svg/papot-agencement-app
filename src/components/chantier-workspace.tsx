@@ -321,11 +321,7 @@ export function ChantierWorkspace({ chantierId }: { chantierId: string }) {
         </div>
         <div className="chantierHeadingActions">
           {commercialCase && commercialCase.retainedQuoteIds.length > 0 ? (
-            <button
-              type="button"
-              className="primaryButton"
-              onClick={() => setActiveTab("billing")}
-            >
+            <button type="button" className="primaryButton" onClick={() => setActiveTab("billing")}>
               Factures de ce chantier
             </button>
           ) : null}

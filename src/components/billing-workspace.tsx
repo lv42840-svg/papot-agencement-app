@@ -41,9 +41,7 @@ export function BillingWorkspace({
   const [mode, setMode] = useState<"AMOUNT" | "PERCENT" | "LINES">("PERCENT");
   const [lineValues, setLineValues] = useState<Record<string, string>>({});
   const [value, setValue] = useState("");
-  const [tab, setTab] = useState<"CHANTIER" | "PROJECTS">(
-    chantierId ? "CHANTIER" : "PROJECTS",
-  );
+  const [tab, setTab] = useState<"CHANTIER" | "PROJECTS">(chantierId ? "CHANTIER" : "PROJECTS");
   const [selectedChantier, setSelectedChantier] = useState(chantierId ?? "");
   const [projectSearch, setProjectSearch] = useState("");
   const [projectStatus, setProjectStatus] = useState<"ALL" | BillingDraft["status"]>("ALL");
@@ -280,7 +278,7 @@ export function BillingWorkspace({
       >
         {(
           [
-              ["CHANTIER", "Nouvelle facture depuis chantier"],
+            ["CHANTIER", "Nouvelle facture depuis chantier"],
             ["PROJECTS", `Projets de factures (${drafts.length})`],
           ] as const
         ).map(([key, caption]) => (
@@ -311,29 +309,29 @@ export function BillingWorkspace({
         >
           <h2>Nouvelle facture depuis un chantier</h2>
           <label>
-              Chantier
-              {chantierChoices.length > 0 ? (
-                <select
-                  aria-label="Choisir un chantier à facturer"
-                  style={{ width: "100%", padding: 9 }}
-                  value={activeChantierId}
-                  onChange={(e) => {
-                    setSelectedChantier(e.target.value);
-                    setSelection("");
-                    setLineValues({});
-                    setError("");
-                  }}
-                >
-                  {chantierChoices.map((site) => (
-                    <option key={site.id} value={site.id}>
-                      {site.name} · {site.client}
-                    </option>
-                  ))}
-                </select>
-              ) : (
-                <p>Aucun chantier avec un devis retenu éligible à la facturation.</p>
-              )}
-            </label>
+            Chantier
+            {chantierChoices.length > 0 ? (
+              <select
+                aria-label="Choisir un chantier à facturer"
+                style={{ width: "100%", padding: 9 }}
+                value={activeChantierId}
+                onChange={(e) => {
+                  setSelectedChantier(e.target.value);
+                  setSelection("");
+                  setLineValues({});
+                  setError("");
+                }}
+              >
+                {chantierChoices.map((site) => (
+                  <option key={site.id} value={site.id}>
+                    {site.name} · {site.client}
+                  </option>
+                ))}
+              </select>
+            ) : (
+              <p>Aucun chantier avec un devis retenu éligible à la facturation.</p>
+            )}
+          </label>
           {sources.length === 0 ? (
             <p>
               Aucun devis retenu éligible pour cette sélection. Vérifie les devis retenus et leurs
@@ -631,7 +629,10 @@ export function BillingWorkspace({
                       </td>
                       <td style={{ padding: 9 }}>
                         <div style={{ display: "flex", gap: 6, alignItems: "center" }}>
-                          <Link href={`/facturation/${encodeURIComponent(d.id)}`} className="secondaryButton">
+                          <Link
+                            href={`/facturation/${encodeURIComponent(d.id)}`}
+                            className="secondaryButton"
+                          >
                             {d.status === "APPROVED" ? "Consulter" : "Ouvrir"}
                           </Link>
                           {data.canWrite && d.status === "DRAFT" ? (

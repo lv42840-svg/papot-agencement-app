@@ -29,7 +29,7 @@ describe("paramétrage des intitulés de factures", () => {
     expect(editor).toContain("availableTitles.map");
     expect(editor).toContain("/settings/billing");
     expect(editor).toContain("Déjà préparé sur ce devis");
-    expect(editor).toContain('item.quoteId === draft.quoteId');
+    expect(editor).toContain("item.quoteId === draft.quoteId");
     expect(editor).toContain("Validé en interne");
     const settings = readFileSync("src/components/billing-titles-settings.tsx", "utf8");
     expect(settings).toContain("SET_TITLES");

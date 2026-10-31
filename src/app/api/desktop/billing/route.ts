@@ -21,10 +21,12 @@ export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
 const billingMutationSchema = z.discriminatedUnion("action", [
-  z.object({
-    action: z.literal("SET_TITLES"),
-    invoiceTitles: billingTitlesSchema,
-  }).strict(),
+  z
+    .object({
+      action: z.literal("SET_TITLES"),
+      invoiceTitles: billingTitlesSchema,
+    })
+    .strict(),
   z
     .object({
       action: z.literal("CREATE"),

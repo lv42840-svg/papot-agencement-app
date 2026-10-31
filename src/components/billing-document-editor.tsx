@@ -8,7 +8,12 @@ import {
   buildInvoiceDocumentLines,
   calculateInvoiceDocumentTotals,
 } from "@/lib/billing/document-lines";
-import { DEFAULT_BILLING_TITLES, type BillingDocumentLine, type BillingDraft, type BillingPayload } from "@/lib/billing/domain";
+import {
+  DEFAULT_BILLING_TITLES,
+  type BillingDocumentLine,
+  type BillingDraft,
+  type BillingPayload,
+} from "@/lib/billing/domain";
 import { calculateLineProgress, type LineProgressInput } from "@/lib/billing/progress";
 
 type ApiSnapshot = { payload: BillingPayload; canWrite: boolean; error?: string };
@@ -163,10 +168,15 @@ export function BillingDocumentEditor({ draftId }: { draftId: string }) {
   );
   const titleChoices = payload?.invoiceTitles ?? [...DEFAULT_BILLING_TITLES];
   const availableTitles = titleChoices.includes(label) ? titleChoices : [label, ...titleChoices];
-  const priorProjects = draft && payload
-    ? payload.drafts.slice(0, payload.drafts.findIndex((item) => item.id === draft.id))
-        .filter((item) => item.quoteId === draft.quoteId)
-    : [];
+  const priorProjects =
+    draft && payload
+      ? payload.drafts
+          .slice(
+            0,
+            payload.drafts.findIndex((item) => item.id === draft.id),
+          )
+          .filter((item) => item.quoteId === draft.quoteId)
+      : [];
   const priorHt = priorProjects.reduce((sum, item) => sum + item.amountHtCents, 0);
 
   function alter(id: string, patch: Partial<EditableRow>) {
@@ -449,7 +459,9 @@ export function BillingDocumentEditor({ draftId }: { draftId: string }) {
               }}
             >
               {availableTitles.map((item) => (
-                <option key={item} value={item}>{item}</option>
+                <option key={item} value={item}>
+                  {item}
+                </option>
               ))}
             </select>
             <Link href="/settings/billing" style={{ fontSize: 12 }}>
@@ -475,8 +487,8 @@ export function BillingDocumentEditor({ draftId }: { draftId: string }) {
       <section className="invoiceCard">
         <h2>Déjà préparé sur ce devis</h2>
         <p>
-          Ces montants correspondent aux projets antérieurs, acomptes et situations inclus.
-          Ce ne sont pas des factures officiellement émises.
+          Ces montants correspondent aux projets antérieurs, acomptes et situations inclus. Ce ne
+          sont pas des factures officiellement émises.
         </p>
         {priorProjects.length === 0 ? (
           <p>Aucun acompte ni situation précédemment préparé sur ce devis.</p>
@@ -516,8 +528,7 @@ export function BillingDocumentEditor({ draftId }: { draftId: string }) {
         )}
         <p>
           <strong>Déjà préparé : {currency(priorHt)} HT</strong> · Projet actuel :{" "}
-          {currency(preview?.amountHtCents ?? draft.amountHtCents)} HT ·
-          Cumul après ce projet :{" "}
+          {currency(preview?.amountHtCents ?? draft.amountHtCents)} HT · Cumul après ce projet :{" "}
           {currency(priorHt + (preview?.amountHtCents ?? draft.amountHtCents))} HT sur{" "}
           {currency(draft.contractHtCents)} HT.
         </p>

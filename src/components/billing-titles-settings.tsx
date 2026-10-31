@@ -60,8 +60,8 @@ export function BillingTitlesSettings() {
     <main style={{ maxWidth: 850, display: "grid", gap: 16 }}>
       <h1>Intitulés des factures</h1>
       <p>
-        Ces propositions apparaissent dans la liste déroulante du projet de facture.
-        Modifier la liste ne modifie pas les projets existants.
+        Ces propositions apparaissent dans la liste déroulante du projet de facture. Modifier la
+        liste ne modifie pas les projets existants.
       </p>
       {titles.map((value, index) => (
         <div key={index} style={{ display: "flex", gap: 8 }}>
@@ -81,7 +81,9 @@ export function BillingTitlesSettings() {
             type="button"
             className="secondaryButton"
             disabled={!canWrite || pending || titles.length <= 1}
-            onClick={() => setTitles((current) => current.filter((_, itemIndex) => itemIndex !== index))}
+            onClick={() =>
+              setTitles((current) => current.filter((_, itemIndex) => itemIndex !== index))
+            }
           >
             Supprimer
           </button>
@@ -105,7 +107,9 @@ export function BillingTitlesSettings() {
           Enregistrer
         </button>
       </div>
-      {!canWrite ? <p>Gestion des intitulés réservée aux utilisateurs autorisés à modifier la facturation.</p> : null}
+      {!canWrite ? (
+        <p>Gestion des intitulés réservée aux utilisateurs autorisés à modifier la facturation.</p>
+      ) : null}
       {message ? <p role="status">{message}</p> : null}
     </main>
   );
