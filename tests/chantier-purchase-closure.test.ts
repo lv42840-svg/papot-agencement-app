@@ -5,6 +5,7 @@ import {
   committedPurchaseTotal,
   parsePurchaseOrdersPayload,
   purchaseCloseReviewToken,
+  purchaseOrderHistoryForChantier,
   removeChantierPurchaseCommitments,
 } from "../src/lib/purchases/domain";
 
@@ -102,6 +103,44 @@ describe("réconciliation manuelle à la clôture chantier", () => {
     });
     expect(updated.orders[1].status).toBe("CANCELLED");
     expect(updated.orders[1].removedAllocations?.[0].amountHtCents).toBe(10_000);
+  });
+
+  it("affiche dans Commandes la part exacte des BC actifs, sans doubler le global", () => {
+    const orders = snapshot();
+    const onA = purchaseOrderHistoryForChantier(orders, a);
+    const onB = purchaseOrderHistoryForChantier(orders, b);
+    expect(onA).toHaveLength(2);
+    expect(onA.map((item) => item.amountHtCents)).toEqual([25_000, 10_000]);
+    expect(onB).toHaveLength(1);
+    expect(onB[0].amountHtCents).toBe(15_000);
+    expect(onB[0].order.amountHtCents).toBe(40_000);
+    expect(onA.every((item) => item.state === "COMMITTED")).toBe(true);
+  });
+
+  it("conserve l'historique d'une part retirée même si le BC sert toujours un autre chantier", () => {
+    const updated = removeChantierPurchaseCommitments(snapshot(), a, "Lucien");
+    const aHistory = purchaseOrderHistoryForChantier(updated, a);
+    const bHistory = purchaseOrderHistoryForChantier(updated, b);
+    expect(aHistory).toHaveLength(2);
+    expect(aHistory.map((item) => item.state)).toEqual(["REMOVED", "REMOVED"]);
+    expect(aHistory.map((item) => item.amountHtCents)).toEqual([25_000, 10_000]);
+    expect(aHistory.every((item) => item.removedAt !== null)).toBe(true);
+    expect(bHistory).toHaveLength(1);
+    expect(bHistory[0].state).toBe("COMMITTED");
+    expect(bHistory[0].amountHtCents).toBe(15_000);
+  });
+
+  it("affiche aussi les BC annulés sans mouvement de fermeture", () => {
+    const orders = snapshot();
+    orders.orders[0].status = "CANCELLED";
+    expect(purchaseOrderHistoryForChantier(orders, b)[0]).toMatchObject({
+      amountHtCents: 15_000,
+      state: "CANCELLED",
+    });
+    const legacy = snapshot();
+    delete legacy.orders[0].allocations;
+    // The historical one-chantier format remains supported.
+    expect(purchaseOrderHistoryForChantier(legacy, a)[0].amountHtCents).toBe(40_000);
   });
 
   it("n'annule jamais un BC déjà retiré sur un autre chantier", () => {
