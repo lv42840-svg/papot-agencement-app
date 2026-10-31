@@ -70,7 +70,7 @@ export function ChantierCommandesTab({ chantierId }: { chantierId: string }) {
           <h2>Commandes du chantier</h2>
           <p>
             Bons de commande rapides et détaillés, affectés à ce chantier.
-            Les BC multi-chantiers n'affichent ici que leur part.
+            Les BC multi-chantiers n&apos;affichent ici que leur part.
           </p>
         </div>
         <div style={{ display: "flex", flexWrap: "wrap", gap: 8 }}>
@@ -82,7 +82,7 @@ export function ChantierCommandesTab({ chantierId }: { chantierId: string }) {
       </header>
       <p>
         <strong>Facture fournisseur :</strong> rapprochement Pennylane à venir.
-        Aucun lien ni statut comptable n'est encore disponible dans PAPOT.
+        Aucun lien ni statut comptable n&apos;est encore disponible dans PAPOT.
       </p>
       {error ? <p role="alert">{error}</p> : null}
       {loading ? <p>Chargement des commandes…</p> : null}
