@@ -203,8 +203,8 @@ export function ChantierProfitabilityPanel({
         </div>
       ) : null}
       <p className="chantierProfitabilityNote">
-        Ce suivi de budget n&apos;est ni une marge à terminaison ni un résultat réel :
-        les BC ne sont pas des factures, et les achats ou heures restant à faire sont exclus.
+        Ce suivi de budget n&apos;est ni une marge à terminaison ni un résultat réel : les BC ne
+        sont pas des factures, et les achats ou heures restant à faire sont exclus.
       </p>
 
       <div style={{ display: "flex", justifyContent: "flex-end" }}>

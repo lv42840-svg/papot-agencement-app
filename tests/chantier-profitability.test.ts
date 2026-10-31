@@ -387,7 +387,10 @@ describe("chantier global profitability", () => {
     const result = calculateChantierProfitability(
       item,
       affair([quoteAId]),
-      { schemaVersion: 1, quotes: [quote({ id: quoteAId, saleCents: 100_000, costCents: 20_000 })] },
+      {
+        schemaVersion: 1,
+        quotes: [quote({ id: quoteAId, saleCents: 100_000, costCents: 20_000 })],
+      },
       { laborCostCents: null, purchaseCostCents: null },
       25_000,
     );

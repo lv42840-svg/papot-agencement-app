@@ -100,7 +100,9 @@ describe("rentabilité entreprise", () => {
   it("remonte les dépassements de coût à date sans inventer une marge réelle", () => {
     const totals = companyProfitabilityTotals([
       example,
-      { ...example, chantierId: "22222222-2222-4222-8222-222222222222",
+      {
+        ...example,
+        chantierId: "22222222-2222-4222-8222-222222222222",
         committedPurchasesCents: 60_000,
         knownCostCommitmentsCents: 72_000,
         remainingCostBudgetCents: -15_000,

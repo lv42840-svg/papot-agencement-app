@@ -227,11 +227,13 @@ export function EnterpriseProfitabilityWorkspace() {
           <h2 style={{ fontSize: 15, margin: "5px 0 0", color: "#6251ba" }}>
             Suivi des budgets engagés à date
           </h2>
-          <div style={{
-            display: "grid",
-            gridTemplateColumns: "repeat(auto-fit, minmax(min(100%, 200px), 1fr))",
-            gap: 12,
-          }}>
+          <div
+            style={{
+              display: "grid",
+              gridTemplateColumns: "repeat(auto-fit, minmax(min(100%, 200px), 1fr))",
+              gap: 12,
+            }}
+          >
             {[
               ["Heures réalisées + BC engagés", actualEuro(total.knownCostCommitmentsCents)],
               ["Budget total restant à couvrir", actualEuro(total.remainingCostBudgetCents)],
@@ -246,14 +248,14 @@ export function EnterpriseProfitabilityWorkspace() {
             ))}
           </div>
           <p>
-            Budget consommé à date = heures effectuées au coût employeur + BC engagés.
-            Ce solde ne comprend ni le travail restant ni les achats non commandés ;
-            ce n&apos;est pas une marge prévisionnelle à terminaison.
+            Budget consommé à date = heures effectuées au coût employeur + BC engagés. Ce solde ne
+            comprend ni le travail restant ni les achats non commandés ; ce n&apos;est pas une marge
+            prévisionnelle à terminaison.
           </p>
           {total.budgetOverrunCount > 0 ? (
             <p role="alert" style={{ color: "#a34c32" }}>
-              {total.budgetOverrunCount} chantier(s) ont dépassé leur budget total de coûts
-              avant même de tenir compte des dépenses restantes.
+              {total.budgetOverrunCount} chantier(s) ont dépassé leur budget total de coûts avant
+              même de tenir compte des dépenses restantes.
             </p>
           ) : null}
           {total.incompleteCount > 0 ? (
