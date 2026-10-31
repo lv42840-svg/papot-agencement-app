@@ -1,14 +1,19 @@
 "use client";
 
 import Link from "next/link";
-
 import { useEffect, useMemo, useRef, useState } from "react";
 import type {
   PurchaseOrderInput,
   PurchaseOrderLine,
   PurchaseOrdersPayload,
 } from "@/lib/purchases/domain";
-import { committedPurchaseTotal } from "@/lib/purchases/domain";
+import {
+  committedPurchaseTotal,
+  committedPurchaseDestinationTotal,
+  committedPurchasesByDestination,
+  purchaseAllocationFromSelection,
+  purchaseDestinationKey,
+} from "@/lib/purchases/domain";
 
 type Site = { id: string; name: string; clientName: string; status: string };
 type Snapshot = {
@@ -56,6 +61,7 @@ const messageFor = (code: string) => {
     PURCHASE_ORDER_REQUEST_INVALID: "Vérifie les champs du bon de commande.",
     PURCHASE_ORDER_AMOUNT_INVALID: "Le montant total doit être supérieur à zéro.",
     PURCHASE_CHANTIER_NOT_FOUND: "Le chantier n'existe plus. Actualise la page.",
+    PURCHASE_CHANTIER_NOT_ACTIVE: "Aucune nouvelle commande sur un chantier fermé ou annulé.",
     PURCHASE_ORDER_VERSION_CONFLICT: "Ce BC a été modifié. Recharge la page.",
     MODULE_FORBIDDEN: "Tu n'as pas les droits de modification des achats.",
   };
@@ -90,7 +96,13 @@ export function PurchaseOrdersWorkspace({ chantierId }: { chantierId?: string })
     void reload().catch(() => setError("Impossible de charger les bons de commande."));
   }, []);
 
-  const sites = snapshot?.chantiers ?? [];
+  const allSites = snapshot?.chantiers ?? [];
+  const sites = allSites.filter((site) => site.status === "ACTIVE");
+  const destinations = [
+    ...sites.map((site) => ({ id: site.id, label: `${site.name} · ${site.clientName ?? ""}` })),
+    { id: "SAV", label: "SAV (hors chantier)" },
+    { id: "GENERAL_EXPENSES", label: "Frais généraux (hors chantier)" },
+  ];
   const selected =
     sites.find((site) => site.id === siteId)?.id ??
     sites.find((site) => site.id === chantierId)?.id ??
@@ -103,6 +115,7 @@ export function PurchaseOrdersWorkspace({ chantierId }: { chantierId?: string })
       ),
     [snapshot],
   );
+  const commitmentTotals = snapshot ? committedPurchasesByDestination(snapshot.payload) : null;
   const linePreview = lines.map((line) => {
     const qty = positiveQuantity(line.quantity);
     const price = moneyCents(line.unitPrice);
@@ -122,7 +135,7 @@ export function PurchaseOrdersWorkspace({ chantierId }: { chantierId?: string })
     .filter(
       (order) =>
         siteFilter === "ALL" ||
-        (order.allocations?.some((allocation) => allocation.chantierId === siteFilter) ??
+        (order.allocations?.some((allocation) => purchaseDestinationKey(allocation) === siteFilter) ??
           order.chantierId === siteFilter),
     )
     .filter((order) =>
@@ -160,27 +173,26 @@ export function PurchaseOrdersWorkspace({ chantierId }: { chantierId?: string })
         amountHtCents: moneyCents(row.amount),
       }));
       if (
-        entries.some((row) => !sites.some((site) => site.id === row.chantierId)) ||
+        entries.some((row) => !destinations.some((item) => item.id === row.chantierId)) ||
         entries.some((row) => row.amountHtCents === null || row.amountHtCents <= 0) ||
         new Set(entries.map((row) => row.chantierId)).size !== entries.length ||
         preview === null ||
         preview <= 0
       ) {
-        setError("Indique un chantier différent et un montant HT positif sur chaque ligne.");
+        setError("Indique une destination distincte et un montant HT positif sur chaque ligne.");
         return;
       }
       order = {
         mode: "QUICK",
-        allocations: entries.map((row) => ({
-          chantierId: row.chantierId,
-          amountHtCents: row.amountHtCents!,
-        })),
+        allocations: entries.map((row) =>
+          purchaseAllocationFromSelection(row.chantierId, row.amountHtCents!),
+        ),
         supplierName: supplierName.trim(),
         description: description.trim(),
       };
     } else {
       if (!selected) {
-        setError("Choisis un chantier pour le BC détaillé.");
+        setError("Choisis un chantier actif pour le BC détaillé.");
         return;
       }
       const parsed: PurchaseOrderLine[] = [];
@@ -234,7 +246,6 @@ export function PurchaseOrdersWorkspace({ chantierId }: { chantierId?: string })
       setAllocations((rows) => rows.map((row) => ({ ...row, amount: "" })));
       setDescription("");
       setLines([newLine()]);
-      // Keep site, supplier and mode for rapid repeat orders.
     } catch (e) {
       setError(messageFor(e instanceof Error ? e.message : "PURCHASE_ORDER_CREATE_FAILED"));
     } finally {
@@ -286,6 +297,18 @@ export function PurchaseOrdersWorkspace({ chantierId }: { chantierId?: string })
           {notice}
         </p>
       ) : null}
+      {commitmentTotals ? (
+        <section style={{ background: "white", borderRadius: 12, padding: 18 }}>
+          <h2>Engagements actuels HT · toutes dates</h2>
+          <p>
+            Chantiers : <strong>{euro(commitmentTotals.chantierCents)}</strong> · SAV :{" "}
+            <strong>{euro(commitmentTotals.savCents)}</strong> · Frais généraux :{" "}
+            <strong>{euro(commitmentTotals.generalExpensesCents)}</strong>
+          </p>
+          <p>Total unique : <strong>{euro(commitmentTotals.totalCents)}</strong></p>
+          <small>Ces engagements ne sont ni les factures du mois, ni un résultat réel.</small>
+        </section>
+      ) : null}
       {!snapshot ? (
         <p>Chargement des chantiers et des commandes…</p>
       ) : (
@@ -312,6 +335,7 @@ export function PurchaseOrdersWorkspace({ chantierId }: { chantierId?: string })
                       setError("");
                     }}
                   >
+                    {sites.length === 0 ? <option value="">Aucun chantier actif</option> : null}
                     {sites.map((site) => (
                       <option key={site.id} value={site.id}>
                         {site.name} · {site.clientName}
@@ -350,6 +374,7 @@ export function PurchaseOrdersWorkspace({ chantierId }: { chantierId?: string })
                 type="button"
                 className={mode === "QUICK" ? "primaryButton" : "secondaryButton"}
                 aria-pressed={mode === "QUICK"}
+                disabled={busy}
                 onClick={() => setMode("QUICK")}
               >
                 BC rapide · Montant global
@@ -358,6 +383,7 @@ export function PurchaseOrdersWorkspace({ chantierId }: { chantierId?: string })
                 type="button"
                 className={mode === "DETAILED" ? "primaryButton" : "secondaryButton"}
                 aria-pressed={mode === "DETAILED"}
+                disabled={busy}
                 onClick={() => setMode("DETAILED")}
               >
                 BC détaillé · Articles
@@ -375,12 +401,12 @@ export function PurchaseOrdersWorkspace({ chantierId }: { chantierId?: string })
             </label>
             {mode === "QUICK" ? (
               <div style={{ display: "grid", gap: 10 }}>
-                <strong>Répartition du BC par chantier</strong>
+                <strong>Répartition du BC par chantier, SAV ou frais généraux</strong>
                 <div style={{ overflowX: "auto" }}>
                   <table style={{ width: "100%", minWidth: 630, borderCollapse: "collapse" }}>
                     <thead>
                       <tr style={{ textAlign: "left", borderBottom: "1px solid #ddd" }}>
-                        <th>Chantier</th>
+                        <th>Destination</th>
                         <th>Montant HT (€)</th>
                         <th>Déjà engagé HT</th>
                         <th />
@@ -388,14 +414,13 @@ export function PurchaseOrdersWorkspace({ chantierId }: { chantierId?: string })
                     </thead>
                     <tbody>
                       {allocations.map((row, i) => {
-                        const selectedSite =
-                          sites.find((site) => site.id === row.chantierId)?.id ?? selected;
+                        const selectedDestination = row.chantierId || selected;
                         return (
                           <tr key={row.id}>
                             <td>
                               <select
-                                aria-label={`Chantier du BC rapide ligne ${i + 1}`}
-                                value={selectedSite}
+                                aria-label={`Destination du BC rapide ligne ${i + 1}`}
+                                value={selectedDestination}
                                 disabled={busy || !snapshot.canWrite}
                                 onChange={(e) => {
                                   setAllocations((current) =>
@@ -409,16 +434,23 @@ export function PurchaseOrdersWorkspace({ chantierId }: { chantierId?: string })
                                 }}
                                 style={{ width: "100%", minWidth: 210 }}
                               >
-                                {sites.map((site) => (
-                                  <option key={site.id} value={site.id}>
-                                    {site.name} · {site.clientName}
+                                <option value="">Choisir une destination</option>
+                                {!destinations.some((item) => item.id === selectedDestination) &&
+                                selectedDestination ? (
+                                  <option value={selectedDestination} disabled>
+                                    Chantier indisponible : choisir une destination
+                                  </option>
+                                ) : null}
+                                {destinations.map((item) => (
+                                  <option key={item.id} value={item.id}>
+                                    {item.label}
                                   </option>
                                 ))}
                               </select>
                             </td>
                             <td>
                               <input
-                                aria-label={`Montant HT ligne chantier ${i + 1}`}
+                                aria-label={`Montant HT ligne chantier, SAV ou frais généraux ${i + 1}`}
                                 inputMode="decimal"
                                 placeholder="Ex. 250,00"
                                 value={row.amount}
@@ -436,16 +468,16 @@ export function PurchaseOrdersWorkspace({ chantierId }: { chantierId?: string })
                                 style={{ width: 135 }}
                               />
                             </td>
-                            <td>{euro(committedPurchaseTotal(snapshot.payload, selectedSite))}</td>
+                            <td>
+                              {euro(committedPurchaseDestinationTotal(snapshot.payload, selectedDestination))}
+                            </td>
                             <td>
                               <button
                                 type="button"
                                 className="secondaryButton"
                                 disabled={allocations.length === 1 || busy || !snapshot.canWrite}
                                 onClick={() =>
-                                  setAllocations((current) =>
-                                    current.filter((item) => item.id !== row.id),
-                                  )
+                                  setAllocations((current) => current.filter((item) => item.id !== row.id))
                                 }
                               >
                                 Retirer
@@ -462,15 +494,15 @@ export function PurchaseOrdersWorkspace({ chantierId }: { chantierId?: string })
                   className="secondaryButton"
                   disabled={busy || !snapshot.canWrite || allocations.length >= 100}
                   onClick={() => {
-                    const firstUnused = sites.find(
-                      (site) => !allocations.some((a) => (a.chantierId || selected) === site.id),
+                    const firstUnused = destinations.find(
+                      (item) => !allocations.some((a) => (a.chantierId || selected) === item.id),
                     );
                     if (firstUnused)
                       setAllocations((current) => [...current, newAllocation(firstUnused.id)]);
-                    else setError("Tous les chantiers disponibles sont déjà sélectionnés.");
+                    else setError("Toutes les destinations disponibles sont déjà sélectionnées.");
                   }}
                 >
-                  Ajouter un chantier
+                  Ajouter un chantier / SAV / frais généraux
                 </button>
               </div>
             ) : (
@@ -535,9 +567,7 @@ export function PurchaseOrdersWorkspace({ chantierId }: { chantierId?: string })
                             type="button"
                             className="secondaryButton"
                             disabled={lines.length === 1 || busy || !snapshot.canWrite}
-                            onClick={() =>
-                              setLines((current) => current.filter((x) => x.id !== line.id))
-                            }
+                            onClick={() => setLines((current) => current.filter((x) => x.id !== line.id))}
                           >
                             Retirer
                           </button>
@@ -570,13 +600,13 @@ export function PurchaseOrdersWorkspace({ chantierId }: { chantierId?: string })
                 {mode === "DETAILED" ? (
                   <div>Déjà engagé sur ce chantier : {euro(committed)}</div>
                 ) : (
-                  <div>Le montant global sera ventilé une seule fois entre les chantiers.</div>
+                  <div>Le montant global sera ventilé une seule fois entre les destinations.</div>
                 )}
               </div>
               <button
                 type="button"
                 className="primaryButton"
-                disabled={busy || !snapshot.canWrite || sites.length === 0}
+                disabled={busy || !snapshot.canWrite || (mode === "DETAILED" && sites.length === 0)}
                 onClick={() => void create()}
               >
                 Enregistrer le BC (engagement)
@@ -590,19 +620,21 @@ export function PurchaseOrdersWorkspace({ chantierId }: { chantierId?: string })
             <div style={{ display: "flex", gap: 12, flexWrap: "wrap" }}>
               <input
                 aria-label="Rechercher un BC"
-                placeholder="Référence, fournisseur, chantier…"
+                placeholder="Référence, fournisseur, chantier, SAV…"
                 value={search}
                 onChange={(e) => setSearch(e.target.value)}
                 style={{ minWidth: 230, flex: 2 }}
               />
               <select
-                aria-label="Filtrer les BC par chantier"
+                aria-label="Filtrer les BC par chantier, SAV ou frais généraux"
                 value={siteFilter}
                 onChange={(e) => setSiteFilter(e.target.value)}
                 style={{ flex: 1 }}
               >
-                <option value="ALL">Tous les chantiers</option>
-                {sites.map((site) => (
+                <option value="ALL">Toutes les destinations</option>
+                <option value="SAV">SAV</option>
+                <option value="GENERAL_EXPENSES">Frais généraux</option>
+                {allSites.map((site) => (
                   <option key={site.id} value={site.id}>
                     {site.name}
                   </option>
@@ -623,10 +655,10 @@ export function PurchaseOrdersWorkspace({ chantierId }: { chantierId?: string })
                     <th>Référence</th>
                     <th>Date</th>
                     <th>Fournisseur</th>
-                    <th>Chantier</th>
+                    <th>Destination</th>
                     <th>Mode</th>
                     <th>Statut</th>
-                    <th style={{ textAlign: "right" }}>HT</th>
+                    <th style={{ textAlign: "right" }}>HT du BC complet</th>
                     <th />
                   </tr>
                 </thead>
@@ -634,23 +666,19 @@ export function PurchaseOrdersWorkspace({ chantierId }: { chantierId?: string })
                   {visible.map((order) => (
                     <tr key={order.id} style={{ borderBottom: "1px solid #ece8f0" }}>
                       <td style={{ padding: 8 }}>{order.reference}</td>
-                      <td style={{ padding: 8 }}>
-                        {new Date(order.createdAt).toLocaleDateString("fr-FR")}
-                      </td>
+                      <td style={{ padding: 8 }}>{new Date(order.createdAt).toLocaleDateString("fr-FR")}</td>
                       <td style={{ padding: 8 }}>{order.supplierName}</td>
                       <td style={{ padding: 8 }}>
                         {order.allocations?.length ? (
                           <details>
-                            <summary>{order.allocations.length} chantier(s)</summary>
+                            <summary>{order.allocations.length} destination(s)</summary>
                             {order.allocations.map((a) => (
-                              <div key={a.chantierId}>
+                              <div key={purchaseDestinationKey(a)}>
                                 {a.chantierName} : {euro(a.amountHtCents)}
                               </div>
                             ))}
                           </details>
-                        ) : (
-                          order.chantierName
-                        )}
+                        ) : order.chantierName}
                       </td>
                       <td style={{ padding: 8 }}>
                         {order.mode === "QUICK" ? "Rapide" : `Détaillé (${order.lines.length})`}
@@ -662,13 +690,8 @@ export function PurchaseOrdersWorkspace({ chantierId }: { chantierId?: string })
                         {euro(order.amountHtCents)}
                       </td>
                       <td style={{ padding: 8 }}>
-                        {order.status === "COMMITTED" &&
-                        snapshot.canWrite &&
-                        !order.removedAllocations?.length ? (
-                          <Link
-                            className="secondaryButton"
-                            href={`/achats/${encodeURIComponent(order.id)}/modifier`}
-                          >
+                        {order.status === "COMMITTED" && snapshot.canWrite && !order.removedAllocations?.length ? (
+                          <Link className="secondaryButton" href={`/achats/${encodeURIComponent(order.id)}/modifier`}>
                             Modifier
                           </Link>
                         ) : null}
@@ -695,15 +718,12 @@ export function PurchaseOrdersWorkspace({ chantierId }: { chantierId?: string })
                               <summary>Lignes</summary>
                               {order.lines.map((line) => (
                                 <div key={line.id}>
-                                  {line.description} · {line.quantity} {line.unit} ×{" "}
-                                  {euro(line.unitPriceHtCents)}
+                                  {line.description} · {line.quantity} {line.unit} × {euro(line.unitPriceHtCents)}
                                 </div>
                               ))}
                             </details>
                           </>
-                        ) : order.description ? (
-                          <small>{order.description}</small>
-                        ) : null}
+                        ) : order.description ? <small>{order.description}</small> : null}
                       </td>
                     </tr>
                   ))}
