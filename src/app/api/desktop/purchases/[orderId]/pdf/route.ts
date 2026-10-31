@@ -1,15 +1,15 @@
 import { z } from "zod";
-import { requireModuleRequestContext, desktopRequestErrorStatus } from "@/lib/desktop/request-context";
+import {
+  requireModuleRequestContext,
+  desktopRequestErrorStatus,
+} from "@/lib/desktop/request-context";
 import { createPurchaseOrdersRepository } from "@/lib/purchases/repository";
 import { generateDetailedPurchaseOrderPdf } from "@/lib/purchases/pdf";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
-export async function GET(
-  _request: Request,
-  { params }: { params: Promise<{ orderId: string }> },
-) {
+export async function GET(_request: Request, { params }: { params: Promise<{ orderId: string }> }) {
   try {
     await requireModuleRequestContext("purchases", "READ");
     const { orderId } = await params;

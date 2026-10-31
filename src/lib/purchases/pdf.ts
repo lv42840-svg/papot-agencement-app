@@ -17,8 +17,7 @@ function pdfText(input: string): string {
   return cleaned.replace(/\\/g, "\\\\").replace(/\(/g, "\\(").replace(/\)/g, "\\)");
 }
 
-const currency = (cents: number) =>
-  `${(cents / 100).toFixed(2).replace(".", ",")} EUR`;
+const currency = (cents: number) => `${(cents / 100).toFixed(2).replace(".", ",")} EUR`;
 const number = (value: number) => String(value).replace(".", ",");
 const sheetHeight = 842;
 
@@ -28,7 +27,10 @@ function wrap(text: string, width: number): string[] {
   let row = "";
   for (const word of words) {
     if (word.length > width) {
-      if (row) { lines.push(row); row = ""; }
+      if (row) {
+        lines.push(row);
+        row = "";
+      }
       for (let i = 0; i < word.length; i += width) lines.push(word.slice(i, i + width));
       continue;
     }
@@ -49,7 +51,9 @@ export function generateDetailedPurchaseOrderPdf(order: PurchaseOrder): Uint8Arr
   let page = pages[0];
   let cursor = 0;
 
-  function raw(command: string) { page.push(command); }
+  function raw(command: string) {
+    page.push(command);
+  }
   function show(value: string, x: number, top: number, size = 10, bold = false) {
     const font = bold ? "F2" : "F1";
     raw(`BT /${font} ${size} Tf ${x} ${sheetHeight - top} Td (${pdfText(value)}) Tj ET`);
@@ -65,7 +69,13 @@ export function generateDetailedPurchaseOrderPdf(order: PurchaseOrder): Uint8Arr
     show(`Fournisseur : ${order.supplierName}`, 35, 108, 10);
     show(`Chantier : ${order.chantierName}`, 35, 126, 10);
     show(`Date : ${new Date(order.createdAt).toLocaleDateString("fr-FR")}`, 35, 144, 10);
-    show(order.status === "CANCELLED" ? "STATUT : ANNULE" : "STATUT : ENREGISTRE - NON ENVOYE", 35, 162, 9, true);
+    show(
+      order.status === "CANCELLED" ? "STATUT : ANNULE" : "STATUT : ENREGISTRE - NON ENVOYE",
+      35,
+      162,
+      9,
+      true,
+    );
     horizontal(180);
     show("Designation", 40, 200, 10, true);
     show("Qte", 322, 200, 10, true);
@@ -128,11 +138,13 @@ export function generateDetailedPurchaseOrderPdf(order: PurchaseOrder): Uint8Arr
   const ids: number[] = [];
   for (const content of pages) {
     const stream = Buffer.from(content.join("\n") + "\n", "latin1");
-    const streamObj = add(Buffer.concat([
-      Buffer.from(`<< /Length ${stream.length} >>\nstream\n`, "ascii"),
-      stream,
-      Buffer.from("endstream", "ascii"),
-    ]));
+    const streamObj = add(
+      Buffer.concat([
+        Buffer.from(`<< /Length ${stream.length} >>\nstream\n`, "ascii"),
+        stream,
+        Buffer.from("endstream", "ascii"),
+      ]),
+    );
     const pageObj = add(
       `<< /Type /Page /Parent 2 0 R /MediaBox [0 0 595 842] /Resources << /Font << /F1 3 0 R /F2 4 0 R >> >> /Contents ${streamObj} 0 R >>`,
     );

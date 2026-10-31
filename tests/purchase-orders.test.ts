@@ -102,19 +102,27 @@ describe("bons de commande engagés, sans rapprochement comptable", () => {
     expect(committedPurchaseTotal(saved, chantierId)).toBe(25_000);
     expect(committedPurchaseTotal(saved, secondChantierId)).toBe(15_000);
     expect(committedPurchaseTotal(saved, "55555555-5555-4555-8555-555555555555")).toBe(0);
-    expect(() => addPurchaseOrder(saved, crypto.randomUUID(), multi,
-      new Map([[chantierId, "Chantier A"]]), "Lucien"),
+    expect(() =>
+      addPurchaseOrder(
+        saved,
+        crypto.randomUUID(),
+        multi,
+        new Map([[chantierId, "Chantier A"]]),
+        "Lucien",
+      ),
     ).toThrow("PURCHASE_CHANTIER_NOT_FOUND");
   });
 
   it("refuse deux fois le même chantier et conserve les anciens BC mono-chantier", () => {
-    expect(purchaseOrderInputSchema.safeParse({
-      ...quick,
-      allocations: [
-        { chantierId, amountHtCents: 5_000 },
-        { chantierId, amountHtCents: 3_000 },
-      ],
-    }).success).toBe(false);
+    expect(
+      purchaseOrderInputSchema.safeParse({
+        ...quick,
+        allocations: [
+          { chantierId, amountHtCents: 5_000 },
+          { chantierId, amountHtCents: 3_000 },
+        ],
+      }).success,
+    ).toBe(false);
     const saved = addPurchaseOrder(empty(), crypto.randomUUID(), quick, names, "Lucien");
     const old = JSON.parse(JSON.stringify(saved)) as typeof saved;
     delete old.orders[0].allocations;

@@ -9,13 +9,15 @@ const detailed = {
   chantierId,
   supplierName: "Fournisseur Éléments & Fils",
   description: "Livraison des composants pour chantier, tarif HT.",
-  lines: [{
-    id: "22222222-2222-4222-8222-222222222222",
-    description: "Panneaux mélaminés (blanc) - 1 200 mm",
-    quantity: 3,
-    unit: "m²",
-    unitPriceHtCents: 125_00,
-  }],
+  lines: [
+    {
+      id: "22222222-2222-4222-8222-222222222222",
+      description: "Panneaux mélaminés (blanc) - 1 200 mm",
+      quantity: 3,
+      unit: "m²",
+      unitPriceHtCents: 125_00,
+    },
+  ],
 };
 
 describe("PDF de bon de commande détaillé", () => {
@@ -57,7 +59,9 @@ describe("PDF de bon de commande détaillé", () => {
       names,
       "Nadia",
     );
-    const text = Buffer.from(generateDetailedPurchaseOrderPdf(payload.orders[0])).toString("latin1");
+    const text = Buffer.from(generateDetailedPurchaseOrderPdf(payload.orders[0])).toString(
+      "latin1",
+    );
     const count = Number(text.match(/\/Type \/Pages \/Count (\d+)/)?.[1] ?? 0);
     expect(count).toBeGreaterThan(1);
     expect(text).toContain("Article 90");
@@ -77,7 +81,8 @@ describe("PDF de bon de commande détaillé", () => {
       names,
       "Lucien",
     );
-    expect(() => generateDetailedPurchaseOrderPdf(payload.orders[0]))
-      .toThrow("PURCHASE_ORDER_PDF_DETAILED_ONLY");
+    expect(() => generateDetailedPurchaseOrderPdf(payload.orders[0])).toThrow(
+      "PURCHASE_ORDER_PDF_DETAILED_ONLY",
+    );
   });
 });

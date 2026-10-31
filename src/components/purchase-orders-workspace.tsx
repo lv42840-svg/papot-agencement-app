@@ -17,7 +17,9 @@ type Snapshot = {
 };
 type QuickAllocation = { id: string; chantierId: string; amount: string };
 const newAllocation = (chantierId = ""): QuickAllocation => ({
-  id: crypto.randomUUID(), chantierId, amount: "",
+  id: crypto.randomUUID(),
+  chantierId,
+  amount: "",
 });
 type EditableLine = {
   id: string;
@@ -67,7 +69,9 @@ export function PurchaseOrdersWorkspace({ chantierId }: { chantierId?: string })
   const [supplierName, setSupplierName] = useState("");
   const [mode, setMode] = useState<"QUICK" | "DETAILED">("QUICK");
   const [description, setDescription] = useState("");
-  const [allocations, setAllocations] = useState<QuickAllocation[]>([newAllocation(chantierId ?? "")]);
+  const [allocations, setAllocations] = useState<QuickAllocation[]>([
+    newAllocation(chantierId ?? ""),
+  ]);
   const [lines, setLines] = useState<EditableLine[]>([newLine()]);
   const [search, setSearch] = useState("");
   const [siteFilter, setSiteFilter] = useState("ALL");
@@ -113,14 +117,20 @@ export function PurchaseOrdersWorkspace({ chantierId }: { chantierId?: string })
   const preview = mode === "QUICK" ? quickTotal : detailedTotal;
   const all = snapshot?.payload.orders ?? [];
   const visible = all
-    .filter((order) =>
-      siteFilter === "ALL" ||
-      (order.allocations?.some((allocation) => allocation.chantierId === siteFilter) ??
-        order.chantierId === siteFilter),
+    .filter(
+      (order) =>
+        siteFilter === "ALL" ||
+        (order.allocations?.some((allocation) => allocation.chantierId === siteFilter) ??
+          order.chantierId === siteFilter),
     )
     .filter((order) =>
-      [order.reference, order.supplierName, order.chantierName,
-        ...(order.allocations?.map((a) => a.chantierName) ?? []), order.description]
+      [
+        order.reference,
+        order.supplierName,
+        order.chantierName,
+        ...(order.allocations?.map((a) => a.chantierName) ?? []),
+        order.description,
+      ]
         .join(" ")
         .toLocaleLowerCase("fr-FR")
         .includes(search.trim().toLocaleLowerCase("fr-FR")),
@@ -151,7 +161,8 @@ export function PurchaseOrdersWorkspace({ chantierId }: { chantierId?: string })
         entries.some((row) => !sites.some((site) => site.id === row.chantierId)) ||
         entries.some((row) => row.amountHtCents === null || row.amountHtCents <= 0) ||
         new Set(entries.map((row) => row.chantierId)).size !== entries.length ||
-        preview === null || preview <= 0
+        preview === null ||
+        preview <= 0
       ) {
         setError("Indique un chantier différent et un montant HT positif sur chaque ligne.");
         return;
@@ -288,23 +299,25 @@ export function PurchaseOrdersWorkspace({ chantierId }: { chantierId?: string })
                 gap: 12,
               }}
             >
-              {mode === "DETAILED" ? <label style={{ display: "grid", gap: 5 }}>
-                Chantier *
-                <select
-                  value={selected}
-                  disabled={busy || !snapshot.canWrite}
-                  onChange={(e) => {
-                    setSiteId(e.target.value);
-                    setError("");
-                  }}
-                >
-                  {sites.map((site) => (
-                    <option key={site.id} value={site.id}>
-                      {site.name} · {site.clientName}
-                    </option>
-                  ))}
-                </select>
-              </label> : null}
+              {mode === "DETAILED" ? (
+                <label style={{ display: "grid", gap: 5 }}>
+                  Chantier *
+                  <select
+                    value={selected}
+                    disabled={busy || !snapshot.canWrite}
+                    onChange={(e) => {
+                      setSiteId(e.target.value);
+                      setError("");
+                    }}
+                  >
+                    {sites.map((site) => (
+                      <option key={site.id} value={site.id}>
+                        {site.name} · {site.clientName}
+                      </option>
+                    ))}
+                  </select>
+                </label>
+              ) : null}
               <label style={{ display: "grid", gap: 5 }}>
                 Fournisseur *
                 <input
@@ -363,9 +376,14 @@ export function PurchaseOrdersWorkspace({ chantierId }: { chantierId?: string })
                 <strong>Répartition du BC par chantier</strong>
                 <div style={{ overflowX: "auto" }}>
                   <table style={{ width: "100%", minWidth: 630, borderCollapse: "collapse" }}>
-                    <thead><tr style={{ textAlign: "left", borderBottom: "1px solid #ddd" }}>
-                      <th>Chantier</th><th>Montant HT (€)</th><th>Déjà engagé HT</th><th />
-                    </tr></thead>
+                    <thead>
+                      <tr style={{ textAlign: "left", borderBottom: "1px solid #ddd" }}>
+                        <th>Chantier</th>
+                        <th>Montant HT (€)</th>
+                        <th>Déjà engagé HT</th>
+                        <th />
+                      </tr>
+                    </thead>
                     <tbody>
                       {allocations.map((row, i) => {
                         const selectedSite =
@@ -378,8 +396,13 @@ export function PurchaseOrdersWorkspace({ chantierId }: { chantierId?: string })
                                 value={selectedSite}
                                 disabled={busy || !snapshot.canWrite}
                                 onChange={(e) => {
-                                  setAllocations((current) => current.map((item) =>
-                                    item.id === row.id ? { ...item, chantierId: e.target.value } : item));
+                                  setAllocations((current) =>
+                                    current.map((item) =>
+                                      item.id === row.id
+                                        ? { ...item, chantierId: e.target.value }
+                                        : item,
+                                    ),
+                                  );
                                   setError("");
                                 }}
                                 style={{ width: "100%", minWidth: 210 }}
@@ -399,8 +422,13 @@ export function PurchaseOrdersWorkspace({ chantierId }: { chantierId?: string })
                                 value={row.amount}
                                 disabled={busy || !snapshot.canWrite}
                                 onChange={(e) => {
-                                  setAllocations((current) => current.map((item) =>
-                                    item.id === row.id ? { ...item, amount: e.target.value } : item));
+                                  setAllocations((current) =>
+                                    current.map((item) =>
+                                      item.id === row.id
+                                        ? { ...item, amount: e.target.value }
+                                        : item,
+                                    ),
+                                  );
                                   setError("");
                                 }}
                                 style={{ width: 135 }}
@@ -408,10 +436,16 @@ export function PurchaseOrdersWorkspace({ chantierId }: { chantierId?: string })
                             </td>
                             <td>{euro(committedPurchaseTotal(snapshot.payload, selectedSite))}</td>
                             <td>
-                              <button type="button" className="secondaryButton"
+                              <button
+                                type="button"
+                                className="secondaryButton"
                                 disabled={allocations.length === 1 || busy || !snapshot.canWrite}
-                                onClick={() => setAllocations((current) =>
-                                  current.filter((item) => item.id !== row.id))}>
+                                onClick={() =>
+                                  setAllocations((current) =>
+                                    current.filter((item) => item.id !== row.id),
+                                  )
+                                }
+                              >
                                 Retirer
                               </button>
                             </td>
@@ -421,18 +455,23 @@ export function PurchaseOrdersWorkspace({ chantierId }: { chantierId?: string })
                     </tbody>
                   </table>
                 </div>
-                <button type="button" className="secondaryButton"
+                <button
+                  type="button"
+                  className="secondaryButton"
                   disabled={busy || !snapshot.canWrite || allocations.length >= 100}
                   onClick={() => {
-                    const firstUnused = sites.find((site) => !allocations.some((a) =>
-                      (a.chantierId || selected) === site.id));
-                    if (firstUnused) setAllocations((current) =>
-                      [...current, newAllocation(firstUnused.id)]);
+                    const firstUnused = sites.find(
+                      (site) => !allocations.some((a) => (a.chantierId || selected) === site.id),
+                    );
+                    if (firstUnused)
+                      setAllocations((current) => [...current, newAllocation(firstUnused.id)]);
                     else setError("Tous les chantiers disponibles sont déjà sélectionnés.");
-                  }}>
+                  }}
+                >
                   Ajouter un chantier
                 </button>
-              </div>            ) : (
+              </div>
+            ) : (
               <div style={{ overflowX: "auto" }}>
                 <table style={{ width: "100%", minWidth: 810, borderCollapse: "collapse" }}>
                   <thead>
@@ -602,10 +641,14 @@ export function PurchaseOrdersWorkspace({ chantierId }: { chantierId?: string })
                           <details>
                             <summary>{order.allocations.length} chantier(s)</summary>
                             {order.allocations.map((a) => (
-                              <div key={a.chantierId}>{a.chantierName} : {euro(a.amountHtCents)}</div>
+                              <div key={a.chantierId}>
+                                {a.chantierName} : {euro(a.amountHtCents)}
+                              </div>
                             ))}
                           </details>
-                        ) : order.chantierName}
+                        ) : (
+                          order.chantierName
+                        )}
                       </td>
                       <td style={{ padding: 8 }}>
                         {order.mode === "QUICK" ? "Rapide" : `Détaillé (${order.lines.length})`}
@@ -636,15 +679,15 @@ export function PurchaseOrdersWorkspace({ chantierId }: { chantierId?: string })
                             >
                               PDF
                             </a>
-                          <details>
-                            <summary>Lignes</summary>
-                            {order.lines.map((line) => (
-                              <div key={line.id}>
-                                {line.description} · {line.quantity} {line.unit} ×{" "}
-                                {euro(line.unitPriceHtCents)}
-                              </div>
-                            ))}
-                          </details>
+                            <details>
+                              <summary>Lignes</summary>
+                              {order.lines.map((line) => (
+                                <div key={line.id}>
+                                  {line.description} · {line.quantity} {line.unit} ×{" "}
+                                  {euro(line.unitPriceHtCents)}
+                                </div>
+                              ))}
+                            </details>
                           </>
                         ) : order.description ? (
                           <small>{order.description}</small>

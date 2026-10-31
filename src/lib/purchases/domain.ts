@@ -127,9 +127,7 @@ export function addPurchaseOrder(
   const value = purchaseOrderInputSchema.parse(input);
   const amountHtCents = purchaseOrderAmount(value);
   const allocationInput =
-    value.mode === "QUICK"
-      ? value.allocations
-      : [{ chantierId: value.chantierId, amountHtCents }];
+    value.mode === "QUICK" ? value.allocations : [{ chantierId: value.chantierId, amountHtCents }];
   const allocations = allocationInput.map((allocation) => {
     const chantierName = chantierNames.get(allocation.chantierId);
     if (!chantierName) throw new Error("PURCHASE_CHANTIER_NOT_FOUND");
@@ -185,9 +183,12 @@ export function committedPurchaseTotal(payload: PurchaseOrdersPayload, chantierI
     .filter((order) => order.status === "COMMITTED")
     .reduce((total, order) => {
       if (order.allocations?.length) {
-        return total + order.allocations
-          .filter((allocation) => allocation.chantierId === chantierId)
-          .reduce((sum, allocation) => sum + allocation.amountHtCents, 0);
+        return (
+          total +
+          order.allocations
+            .filter((allocation) => allocation.chantierId === chantierId)
+            .reduce((sum, allocation) => sum + allocation.amountHtCents, 0)
+        );
       }
       // Existing pre-multisite BC remain compatible with their original chantier.
       return total + (order.chantierId === chantierId ? order.amountHtCents : 0);
