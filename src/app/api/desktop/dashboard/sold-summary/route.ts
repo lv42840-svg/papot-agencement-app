@@ -59,6 +59,7 @@ export async function GET() {
       planning.indirectHours,
       payroll.records,
       planning.peopleCapacity,
+      now,
     );
     return NextResponse.json(
       {
