@@ -128,8 +128,12 @@ export function ChantierProfitabilityPanel({
       <div className="chantierProfitabilityCards">
         <Metric
           label="Facturé client HT"
-          value="Non disponible"
-          detail="Factures clients à raccorder à la comptabilité"
+          value={money(result.actualRevenueCents)}
+          detail={
+            result.actualRevenueCents === null
+              ? "Factures clients à raccorder à la comptabilité"
+              : "Factures émises nettes des avoirs"
+          }
         />
         <Metric
           label="Achats et frais réels HT"

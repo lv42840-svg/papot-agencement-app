@@ -8,8 +8,13 @@ import type {
   PurchaseOrderLine,
   PurchaseOrdersPayload,
 } from "@/lib/purchases/domain";
+import {
+  purchaseAllocationFromSelection,
+  purchaseDestinationKey,
+  purchaseOrderAllocations,
+} from "@/lib/purchases/domain";
 
-type Site = { id: string; name: string };
+type Site = { id: string; name: string; status: string };
 type Snapshot = {
   payload: PurchaseOrdersPayload;
   chantiers: Site[];
@@ -49,19 +54,11 @@ export function PurchaseOrderEditWorkspace({ orderId }: { orderId: string }) {
     setOriginal(order);
     setSupplier(order.supplierName);
     setDescription(order.description);
-    setSiteId(order.chantierId);
+    setSiteId(order.chantierId ?? "");
     setAllocations(
-      (order.allocations?.length
-        ? order.allocations
-        : [
-            {
-              chantierId: order.chantierId,
-              amountHtCents: order.amountHtCents,
-            },
-          ]
-      ).map((item) => ({
+      purchaseOrderAllocations(order).map((item) => ({
         id: crypto.randomUUID(),
-        chantierId: item.chantierId,
+        chantierId: purchaseDestinationKey(item),
         amount: amountText(item.amountHtCents),
       })),
     );
@@ -101,6 +98,11 @@ export function PurchaseOrderEditWorkspace({ orderId }: { orderId: string }) {
   }, [orderId]);
 
   const sites = data?.chantiers ?? [];
+  const destinations = [
+    ...sites.map((site) => ({ id: site.id, name: site.name, active: site.status === "ACTIVE" })),
+    { id: "SAV", name: "SAV (hors chantier)", active: true },
+    { id: "GENERAL_EXPENSES", name: "Frais généraux (hors chantier)", active: true },
+  ];
   const suppliers = useMemo(
     () => [...new Set(data?.payload.orders.map((order) => order.supplierName) ?? [])].sort(),
     [data],
@@ -139,7 +141,7 @@ export function PurchaseOrderEditWorkspace({ orderId }: { orderId: string }) {
         !rows.length ||
         rows.some(
           (row) =>
-            !sites.some((site) => site.id === row.chantierId) ||
+            !destinations.some((item) => item.id === row.chantierId) ||
             row.amountHtCents === null ||
             row.amountHtCents <= 0,
         ) ||
@@ -147,17 +149,16 @@ export function PurchaseOrderEditWorkspace({ orderId }: { orderId: string }) {
         preview === null ||
         preview <= 0
       ) {
-        setError("Indique un chantier distinct et un montant HT positif par ligne.");
+        setError("Indique une destination distincte et un montant HT positif par ligne.");
         return;
       }
       input = {
         mode: "QUICK",
         supplierName: supplier.trim(),
         description: description.trim(),
-        allocations: rows.map((row) => ({
-          chantierId: row.chantierId,
-          amountHtCents: row.amountHtCents!,
-        })),
+        allocations: rows.map((row) =>
+          purchaseAllocationFromSelection(row.chantierId, row.amountHtCents!),
+        ),
       };
     } else {
       const parsed: PurchaseOrderLine[] = [];
@@ -213,6 +214,8 @@ export function PurchaseOrderEditWorkspace({ orderId }: { orderId: string }) {
           PURCHASE_ORDER_NOT_EDITABLE:
             "Ce BC est annulé ou comporte un engagement retiré à la clôture. Il ne peut plus être modifié.",
           PURCHASE_CHANTIER_NOT_FOUND: "Un chantier n'existe plus.",
+          PURCHASE_CHANTIER_NOT_ACTIVE:
+            "Aucun nouvel engagement sur un chantier fermé ou annulé. Les affectations historiques inchangées restent conservées.",
         };
         throw new Error(
           errors[result.error ?? ""] ?? "Enregistrement impossible. Vérifie les données.",
@@ -290,14 +293,14 @@ export function PurchaseOrderEditWorkspace({ orderId }: { orderId: string }) {
           </label>
           {original.mode === "QUICK" ? (
             <div style={{ display: "grid", gap: 10 }}>
-              <h2>Montants par chantier</h2>
+              <h2>Montants par chantier, SAV ou frais généraux</h2>
               {allocations.map((row, index) => (
                 <div
                   key={row.id}
                   style={{ display: "flex", gap: 12, flexWrap: "wrap", alignItems: "center" }}
                 >
                   <select
-                    aria-label={`Chantier ligne ${index + 1}`}
+                    aria-label={`Destination ligne ${index + 1}`}
                     value={row.chantierId}
                     disabled={readOnly || busy}
                     onChange={(event) =>
@@ -308,9 +311,14 @@ export function PurchaseOrderEditWorkspace({ orderId }: { orderId: string }) {
                       )
                     }
                   >
-                    {sites.map((site) => (
-                      <option key={site.id} value={site.id}>
-                        {site.name}
+                    {destinations.map((item) => (
+                      <option
+                        key={item.id}
+                        value={item.id}
+                        disabled={!item.active && item.id !== row.chantierId}
+                      >
+                        {item.name}
+                        {item.active ? "" : " (fermé / annulé)"}
                       </option>
                     ))}
                   </select>
@@ -347,17 +355,19 @@ export function PurchaseOrderEditWorkspace({ orderId }: { orderId: string }) {
                 className="secondaryButton"
                 disabled={readOnly || busy || allocations.length >= 100}
                 onClick={() => {
-                  const site = sites.find(
-                    (candidate) => !allocations.some((row) => row.chantierId === candidate.id),
+                  const destination = destinations.find(
+                    (candidate) =>
+                      candidate.active &&
+                      !allocations.some((row) => row.chantierId === candidate.id),
                   );
-                  if (site)
+                  if (destination)
                     setAllocations((rows) => [
                       ...rows,
-                      { id: crypto.randomUUID(), chantierId: site.id, amount: "" },
+                      { id: crypto.randomUUID(), chantierId: destination.id, amount: "" },
                     ]);
                 }}
               >
-                Ajouter un chantier
+                Ajouter un chantier / SAV / frais généraux
               </button>
             </div>
           ) : (
@@ -370,7 +380,11 @@ export function PurchaseOrderEditWorkspace({ orderId }: { orderId: string }) {
                   onChange={(event) => setSiteId(event.target.value)}
                 >
                   {sites.map((site) => (
-                    <option key={site.id} value={site.id}>
+                    <option
+                      key={site.id}
+                      value={site.id}
+                      disabled={site.status !== "ACTIVE" && site.id !== siteId}
+                    >
                       {site.name}
                     </option>
                   ))}

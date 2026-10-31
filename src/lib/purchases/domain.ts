@@ -4,6 +4,55 @@ const cents = z.number().int().safe().min(0).max(1_000_000_000_00);
 const when = z.string().datetime({ offset: true });
 const text = z.string().trim().min(1).max(240);
 
+export const purchaseDestinationTypeSchema = z.enum(["CHANTIER", "SAV", "GENERAL_EXPENSES"]);
+export type PurchaseDestinationType = z.infer<typeof purchaseDestinationTypeSchema>;
+
+type Destination = {
+  chantierId: string | null;
+  destinationType?: PurchaseDestinationType;
+};
+
+/** Missing destinationType is the original, backwards-compatible chantier allocation. */
+export function purchaseDestinationKey(destination: Destination): string {
+  return destination.destinationType && destination.destinationType !== "CHANTIER"
+    ? destination.destinationType
+    : (destination.chantierId ?? "");
+}
+
+function validateDestination(value: Destination, ctx: z.RefinementCtx) {
+  const kind = value.destinationType ?? "CHANTIER";
+  if ((kind === "CHANTIER") !== (value.chantierId !== null)) {
+    ctx.addIssue({ code: "custom", message: "PURCHASE_DESTINATION_INVALID" });
+  }
+}
+
+const allocationInputBase = z
+  .object({
+    destinationType: purchaseDestinationTypeSchema.optional(),
+    chantierId: z.string().uuid().nullable(),
+    amountHtCents: cents.positive(),
+  })
+  .strict();
+
+export const purchaseAllocationInputSchema = allocationInputBase.superRefine(validateDestination);
+export type PurchaseAllocationInput = z.infer<typeof purchaseAllocationInputSchema>;
+
+/** UI selection tokens are converted into explicit destinations, never fake chantier IDs. */
+export function purchaseAllocationFromSelection(
+  selection: string,
+  amountHtCents: number,
+): PurchaseAllocationInput {
+  return purchaseAllocationInputSchema.parse(
+    selection === "SAV" || selection === "GENERAL_EXPENSES"
+      ? { destinationType: selection, chantierId: null, amountHtCents }
+      : { destinationType: "CHANTIER", chantierId: selection, amountHtCents },
+  );
+}
+
+const allocationBase = allocationInputBase.extend({ chantierName: text });
+export const purchaseOrderAllocationSchema = allocationBase.superRefine(validateDestination);
+export type PurchaseOrderAllocation = z.infer<typeof purchaseOrderAllocationSchema>;
+
 export const purchaseOrderLineSchema = z
   .object({
     id: z.string().uuid(),
@@ -14,69 +63,79 @@ export const purchaseOrderLineSchema = z
   })
   .strict();
 
-export const purchaseOrderAllocationSchema = z
-  .object({
-    chantierId: z.string().uuid(),
-    chantierName: text,
-    amountHtCents: cents.positive(),
-  })
-  .strict();
-
 const quickAllocationsInputSchema = z
-  .array(
-    z
-      .object({
-        chantierId: z.string().uuid(),
-        amountHtCents: cents.positive(),
-      })
-      .strict(),
-  )
+  .array(purchaseAllocationInputSchema)
   .min(1)
   .max(100)
   .refine(
-    (rows) => new Set(rows.map((row) => row.chantierId)).size === rows.length,
+    (rows) => new Set(rows.map(purchaseDestinationKey)).size === rows.length,
     "PURCHASE_ORDER_DUPLICATE_CHANTIER",
   );
 
-export const purchaseOrderSchema = z.object({
-  id: z.string().uuid(),
-  requestId: z.string().uuid(),
-  reference: text,
-  chantierId: z.string().uuid(),
-  chantierName: text,
-  allocations: z.array(purchaseOrderAllocationSchema).min(1).max(100).optional(),
-  revisions: z
-    .array(
-      z.object({
-        changedAt: when,
-        changedByName: text,
-        previousSupplierName: text,
-        previousAmountHtCents: cents,
-        previousChantierIds: z.array(z.string().uuid()),
-      }),
-    )
-    .optional(),
-  removedAllocations: z
-    .array(
-      purchaseOrderAllocationSchema.extend({
-        removedAt: when,
-        removedByName: text,
-        reason: text,
-      }),
-    )
-    .optional(),
-  supplierName: text,
-  mode: z.enum(["QUICK", "DETAILED"]),
-  description: z.string().trim().max(2000),
-  quickAmountHtCents: cents.nullable(),
-  lines: z.array(purchaseOrderLineSchema).max(200),
-  amountHtCents: cents,
-  status: z.enum(["COMMITTED", "CANCELLED"]),
-  createdAt: when,
-  createdByName: text,
-  updatedAt: when,
-  updatedByName: text,
-});
+export const purchaseOrderSchema = z
+  .object({
+    id: z.string().uuid(),
+    requestId: z.string().uuid(),
+    reference: text,
+    chantierId: z.string().uuid().nullable(),
+    chantierName: text,
+    allocations: z.array(purchaseOrderAllocationSchema).min(1).max(100).optional(),
+    revisions: z
+      .array(
+        z.object({
+          changedAt: when,
+          changedByName: text,
+          previousSupplierName: text,
+          previousAmountHtCents: cents,
+          previousChantierIds: z.array(z.string().uuid()),
+          previousAllocations: z.array(purchaseOrderAllocationSchema).optional(),
+        }),
+      )
+      .optional(),
+    removedAllocations: z
+      .array(
+        allocationBase
+          .extend({ removedAt: when, removedByName: text, reason: text })
+          .superRefine(validateDestination),
+      )
+      .optional(),
+    supplierName: text,
+    mode: z.enum(["QUICK", "DETAILED"]),
+    description: z.string().trim().max(2000),
+    quickAmountHtCents: cents.nullable(),
+    lines: z.array(purchaseOrderLineSchema).max(200),
+    amountHtCents: cents,
+    status: z.enum(["COMMITTED", "CANCELLED"]),
+    createdAt: when,
+    createdByName: text,
+    updatedAt: when,
+    updatedByName: text,
+  })
+  .superRefine((order, ctx) => {
+    if (order.mode === "DETAILED" && order.chantierId === null) {
+      ctx.addIssue({ code: "custom", message: "PURCHASE_DETAILED_CHANTIER_REQUIRED" });
+    }
+    if (!order.allocations?.length) {
+      if (order.chantierId === null) {
+        ctx.addIssue({ code: "custom", message: "PURCHASE_DESTINATION_REQUIRED" });
+      }
+      return;
+    }
+    const allocations = order.allocations;
+    if (
+      allocations.reduce((sum, row) => sum + row.amountHtCents, 0) !== order.amountHtCents ||
+      new Set(allocations.map(purchaseDestinationKey)).size !== allocations.length ||
+      order.chantierId !== allocations[0].chantierId
+    ) {
+      ctx.addIssue({ code: "custom", message: "PURCHASE_ALLOCATION_TOTAL_INVALID" });
+    }
+    if (
+      order.mode === "DETAILED" &&
+      (allocations.length !== 1 || (allocations[0].destinationType ?? "CHANTIER") !== "CHANTIER")
+    ) {
+      ctx.addIssue({ code: "custom", message: "PURCHASE_DETAILED_CHANTIER_REQUIRED" });
+    }
+  });
 export type PurchaseOrder = z.infer<typeof purchaseOrderSchema>;
 export type PurchaseOrderLine = z.infer<typeof purchaseOrderLineSchema>;
 
@@ -94,7 +153,6 @@ export function parsePurchaseOrdersPayload(value: unknown): PurchaseOrdersPayloa
   return purchaseOrdersPayloadSchema.parse(value);
 }
 
-const lineInput = purchaseOrderLineSchema;
 export const purchaseOrderInputSchema = z.discriminatedUnion("mode", [
   z
     .object({
@@ -110,29 +168,53 @@ export const purchaseOrderInputSchema = z.discriminatedUnion("mode", [
       chantierId: z.string().uuid(),
       supplierName: text,
       description: z.string().trim().max(2000),
-      lines: z.array(lineInput).min(1).max(200),
+      lines: z.array(purchaseOrderLineSchema).min(1).max(200),
     })
     .strict(),
 ]);
 export type PurchaseOrderInput = z.infer<typeof purchaseOrderInputSchema>;
 
 export function purchaseOrderAmount(input: PurchaseOrderInput): number {
-  if (input.mode === "QUICK") {
-    const total = input.allocations.reduce((sum, item) => sum + item.amountHtCents, 0);
-    if (!Number.isSafeInteger(total) || total <= 0 || total > 1_000_000_000_00) {
-      throw new Error("PURCHASE_ORDER_AMOUNT_INVALID");
-    }
-    return total;
-  }
-  // Round each extended line once in cents, then sum. Reject overflow.
-  const sum = input.lines.reduce(
-    (total, line) => total + Math.round(line.quantity * line.unitPriceHtCents),
-    0,
-  );
-  if (!Number.isSafeInteger(sum) || sum <= 0 || sum > 1_000_000_000_00) {
+  const total =
+    input.mode === "QUICK"
+      ? input.allocations.reduce((sum, item) => sum + item.amountHtCents, 0)
+      : input.lines.reduce(
+          (sum, line) => sum + Math.round(line.quantity * line.unitPriceHtCents),
+          0,
+        );
+  if (!Number.isSafeInteger(total) || total <= 0 || total > 1_000_000_000_00) {
     throw new Error("PURCHASE_ORDER_AMOUNT_INVALID");
   }
-  return sum;
+  return total;
+}
+
+function resolveAllocations(
+  rows: readonly PurchaseAllocationInput[],
+  chantierNames: ReadonlyMap<string, string>,
+): PurchaseOrderAllocation[] {
+  return rows.map((row) => {
+    const kind = row.destinationType ?? "CHANTIER";
+    const chantierName =
+      kind === "SAV"
+        ? "SAV"
+        : kind === "GENERAL_EXPENSES"
+          ? "Frais généraux"
+          : chantierNames.get(row.chantierId ?? "");
+    if (!chantierName) throw new Error("PURCHASE_CHANTIER_NOT_FOUND");
+    return { ...row, chantierName };
+  });
+}
+
+/** Each order is represented exactly once, either by its allocations or its legacy header. */
+export function purchaseOrderAllocations(order: PurchaseOrder): PurchaseOrderAllocation[] {
+  if (order.allocations?.length) return order.allocations;
+  return [
+    {
+      chantierId: order.chantierId,
+      chantierName: order.chantierName,
+      amountHtCents: order.amountHtCents,
+    },
+  ];
 }
 
 export function addPurchaseOrder(
@@ -146,13 +228,10 @@ export function addPurchaseOrder(
   if (payload.orders.some((order) => order.requestId === requestId)) return payload;
   const value = purchaseOrderInputSchema.parse(input);
   const amountHtCents = purchaseOrderAmount(value);
-  const allocationInput =
-    value.mode === "QUICK" ? value.allocations : [{ chantierId: value.chantierId, amountHtCents }];
-  const allocations = allocationInput.map((allocation) => {
-    const chantierName = chantierNames.get(allocation.chantierId);
-    if (!chantierName) throw new Error("PURCHASE_CHANTIER_NOT_FOUND");
-    return { ...allocation, chantierName };
-  });
+  const allocations = resolveAllocations(
+    value.mode === "QUICK" ? value.allocations : [{ chantierId: value.chantierId, amountHtCents }],
+    chantierNames,
+  );
   const primary = allocations[0];
   const order: PurchaseOrder = {
     id: crypto.randomUUID(),
@@ -198,21 +277,59 @@ export function cancelPurchaseOrder(
   return { ...payload, orders };
 }
 
+export function committedPurchaseDestinationTotal(
+  payload: PurchaseOrdersPayload,
+  destination: string,
+): number {
+  return payload.orders
+    .filter((order) => order.status === "COMMITTED")
+    .reduce(
+      (total, order) =>
+        total +
+        purchaseOrderAllocations(order)
+          .filter((allocation) => purchaseDestinationKey(allocation) === destination)
+          .reduce((sum, allocation) => sum + allocation.amountHtCents, 0),
+      0,
+    );
+}
+
 export function committedPurchaseTotal(payload: PurchaseOrdersPayload, chantierId: string): number {
   return payload.orders
     .filter((order) => order.status === "COMMITTED")
-    .reduce((total, order) => {
-      if (order.allocations?.length) {
-        return (
-          total +
-          order.allocations
-            .filter((allocation) => allocation.chantierId === chantierId)
-            .reduce((sum, allocation) => sum + allocation.amountHtCents, 0)
-        );
-      }
-      // Existing pre-multisite BC remain compatible with their original chantier.
-      return total + (order.chantierId === chantierId ? order.amountHtCents : 0);
-    }, 0);
+    .reduce(
+      (total, order) =>
+        total +
+        purchaseOrderAllocations(order)
+          .filter(
+            (allocation) =>
+              (allocation.destinationType ?? "CHANTIER") === "CHANTIER" &&
+              allocation.chantierId === chantierId,
+          )
+          .reduce((sum, allocation) => sum + allocation.amountHtCents, 0),
+      0,
+    );
+}
+
+/** Current commitments, all dates. Never a monthly invoiced expense or a bank movement. */
+export function committedPurchasesByDestination(payload: PurchaseOrdersPayload) {
+  const result = { chantierCents: 0, savCents: 0, generalExpensesCents: 0, totalCents: 0 };
+  for (const order of parsePurchaseOrdersPayload(payload).orders) {
+    if (order.status !== "COMMITTED") continue;
+    for (const row of purchaseOrderAllocations(order)) {
+      const kind = row.destinationType ?? "CHANTIER";
+      const key =
+        kind === "SAV"
+          ? "savCents"
+          : kind === "GENERAL_EXPENSES"
+            ? "generalExpensesCents"
+            : "chantierCents";
+      result[key] += row.amountHtCents;
+      result.totalCents += row.amountHtCents;
+      if (!Number.isSafeInteger(result.totalCents))
+        throw new Error("PURCHASE_ORDER_AMOUNT_INVALID");
+    }
+  }
+  return result;
 }
 
 export type CommittedChantierOrder = {
@@ -223,37 +340,30 @@ export type CommittedChantierOrder = {
   updatedAt: string;
 };
 
-/** Only allocations still committed count, including legacy single-chantier BC. */
 export function committedOrdersForChantier(
   payload: PurchaseOrdersPayload,
   chantierId: string,
 ): CommittedChantierOrder[] {
   return payload.orders.flatMap((order) => {
     if (order.status !== "COMMITTED") return [];
-    const amount = order.allocations?.length
-      ? order.allocations.find((allocation) => allocation.chantierId === chantierId)?.amountHtCents
-      : order.chantierId === chantierId
-        ? order.amountHtCents
-        : undefined;
-    return amount === undefined
-      ? []
-      : [
+    const allocation = purchaseOrderAllocations(order).find(
+      (row) => (row.destinationType ?? "CHANTIER") === "CHANTIER" && row.chantierId === chantierId,
+    );
+    return allocation
+      ? [
           {
             orderId: order.id,
             reference: order.reference,
             supplierName: order.supplierName,
-            amountHtCents: amount,
+            amountHtCents: allocation.amountHtCents,
             updatedAt: order.updatedAt,
           },
-        ];
+        ]
+      : [];
   });
 }
 
-/**
- * Revoke only the engagement attributed to the closing chantier.
- * Preserve the original BC and auditable removed allocations.
- * Detailed and legacy mono-site BC are soft-cancelled.
- */
+/** Closing a chantier removes only its own commitment, never the SAV/FG allocations. */
 export function removeChantierPurchaseCommitments(
   payload: PurchaseOrdersPayload,
   chantierId: string,
@@ -265,40 +375,17 @@ export function removeChantierPurchaseCommitments(
     ...payload,
     orders: payload.orders.map((order) => {
       if (order.status !== "COMMITTED") return order;
-      if (!order.allocations?.length) {
-        if (order.chantierId !== chantierId) return order;
-        return {
-          ...order,
-          status: "CANCELLED" as const,
-          updatedAt: at,
-          updatedByName: actor,
-          removedAllocations: [
-            ...(order.removedAllocations ?? []),
-            {
-              chantierId,
-              chantierName: order.chantierName,
-              amountHtCents: order.amountHtCents,
-              removedAt: at,
-              removedByName: actor,
-              reason: "Revue des BC à la clôture du chantier",
-            },
-          ],
-        };
-      }
-      const removed = order.allocations.filter(
-        (allocation) => allocation.chantierId === chantierId,
-      );
+      const allocations = purchaseOrderAllocations(order);
+      const removed = allocations.filter((allocation) => allocation.chantierId === chantierId);
       if (!removed.length) return order;
-      const remaining = order.allocations.filter(
-        (allocation) => allocation.chantierId !== chantierId,
-      );
+      const remaining = allocations.filter((allocation) => allocation.chantierId !== chantierId);
       const total = remaining.reduce((sum, row) => sum + row.amountHtCents, 0);
       const first = remaining[0];
       return {
         ...order,
         status: (first ? "COMMITTED" : "CANCELLED") as "COMMITTED" | "CANCELLED",
-        chantierId: first?.chantierId ?? order.chantierId,
-        chantierName: first?.chantierName ?? order.chantierName,
+        chantierId: first ? first.chantierId : order.chantierId,
+        chantierName: first ? first.chantierName : order.chantierName,
         allocations: first ? remaining : order.allocations,
         amountHtCents: first ? total : order.amountHtCents,
         quickAmountHtCents: first ? total : order.quickAmountHtCents,
@@ -318,7 +405,6 @@ export function removeChantierPurchaseCommitments(
   };
 }
 
-/** Optimistic review token detects changes to an order while closing the chantier. */
 export function purchaseCloseReviewToken(orders: CommittedChantierOrder[]): string {
   return (
     orders
@@ -328,7 +414,6 @@ export function purchaseCloseReviewToken(orders: CommittedChantierOrder[]): stri
   );
 }
 
-/** Historical chantier-level view, including cancelled and removed BC allocations. */
 export type ChantierPurchaseHistoryEntry = {
   order: PurchaseOrder;
   amountHtCents: number;
@@ -354,11 +439,9 @@ export function purchaseOrderHistoryForChantier(
         },
       ];
     }
-    const allocation = order.allocations?.length
-      ? order.allocations.find((item) => item.chantierId === chantierId)
-      : order.chantierId === chantierId
-        ? { amountHtCents: order.amountHtCents }
-        : undefined;
+    const allocation = purchaseOrderAllocations(order).find(
+      (item) => item.chantierId === chantierId,
+    );
     if (!allocation) return [];
     return [
       {
@@ -371,7 +454,6 @@ export function purchaseOrderHistoryForChantier(
   });
 }
 
-/** Editable BCs keep their number, original creation info and audit of earlier amounts. */
 export function updatePurchaseOrder(
   payload: PurchaseOrdersPayload,
   orderId: string,
@@ -391,13 +473,11 @@ export function updatePurchaseOrder(
   const value = purchaseOrderInputSchema.parse(input);
   if (value.mode !== original.mode) throw new Error("PURCHASE_ORDER_MODE_IMMUTABLE");
   const amountHtCents = purchaseOrderAmount(value);
-  const allocated =
-    value.mode === "QUICK" ? value.allocations : [{ chantierId: value.chantierId, amountHtCents }];
-  const allocations = allocated.map((entry) => {
-    const chantierName = chantierNames.get(entry.chantierId);
-    if (!chantierName) throw new Error("PURCHASE_CHANTIER_NOT_FOUND");
-    return { ...entry, chantierName };
-  });
+  const allocations = resolveAllocations(
+    value.mode === "QUICK" ? value.allocations : [{ chantierId: value.chantierId, amountHtCents }],
+    chantierNames,
+  );
+  const previousAllocations = purchaseOrderAllocations(original);
   const primary = allocations[0];
   const next: PurchaseOrder = {
     ...original,
@@ -416,9 +496,10 @@ export function updatePurchaseOrder(
         changedByName: actor,
         previousSupplierName: original.supplierName,
         previousAmountHtCents: original.amountHtCents,
-        previousChantierIds: original.allocations?.length
-          ? original.allocations.map((item) => item.chantierId)
-          : [original.chantierId],
+        previousChantierIds: previousAllocations
+          .map((item) => item.chantierId)
+          .filter((id): id is string => id !== null),
+        previousAllocations: structuredClone(previousAllocations),
       },
     ],
     updatedAt: now.toISOString(),

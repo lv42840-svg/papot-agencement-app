@@ -11,6 +11,7 @@ import {
   updatePurchaseOrder,
   purchaseOrderInputSchema,
 } from "@/lib/purchases/domain";
+import { purchaseChantierNamesForInput } from "@/lib/purchases/destination-policy";
 import { createPurchaseOrdersRepository } from "@/lib/purchases/repository";
 
 export const runtime = "nodejs";
@@ -49,7 +50,12 @@ function statusOf(code: string) {
   const auth = desktopRequestErrorStatus(code);
   if (auth) return auth;
   if (code === "PURCHASE_ORDER_NOT_FOUND" || code === "PURCHASE_CHANTIER_NOT_FOUND") return 404;
-  if (code.includes("CONFLICT") || code.includes("CANCELLED")) return 409;
+  if (
+    code.includes("CONFLICT") ||
+    code.includes("CANCELLED") ||
+    code === "PURCHASE_CHANTIER_NOT_ACTIVE"
+  )
+    return 409;
   return 400;
 }
 
@@ -80,17 +86,13 @@ export async function POST(request: Request) {
   try {
     const context = await requireModuleRequestContext("purchases", "WRITE");
     const input = requestSchema.parse(await request.json());
-    const chantierNames =
-      input.action === "CREATE" || input.action === "UPDATE"
-        ? new Map(
-            (await createChantiersRepository().load()).chantiers.map((site) => [
-              site.id,
-              site.name,
-            ]),
-          )
-        : new Map<string, string>();
+    const sites =
+      input.action === "CANCEL" ? [] : (await createChantiersRepository().load()).chantiers;
     const payload = await createPurchaseOrdersRepository().mutate((current) => {
       if (input.action === "CREATE") {
+        // A lost HTTP response may be retried after the site has since closed.
+        if (current.orders.some((order) => order.requestId === input.requestId)) return current;
+        const chantierNames = purchaseChantierNamesForInput(input.order, sites);
         return addPurchaseOrder(
           current,
           input.requestId,
@@ -100,6 +102,9 @@ export async function POST(request: Request) {
         );
       }
       if (input.action === "UPDATE") {
+        const previous = current.orders.find((order) => order.id === input.orderId);
+        if (!previous) throw new Error("PURCHASE_ORDER_NOT_FOUND");
+        const chantierNames = purchaseChantierNamesForInput(input.order, sites, previous);
         return updatePurchaseOrder(
           current,
           input.orderId,

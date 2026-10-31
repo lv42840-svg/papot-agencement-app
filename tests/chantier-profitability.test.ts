@@ -532,7 +532,7 @@ describe("chantier global profitability", () => {
     expect(result.plannedHours.total).toBe(0);
   });
 
-  it("calculates real global margin only when both real cost sources are available", () => {
+  it("calculates real margin from issued revenue, different from quotes, and both real cost sources", () => {
     const commercialCase = affair([quoteAId]);
     const item = chantier(commercialCase);
     const quotes = {
@@ -547,9 +547,10 @@ describe("chantier global profitability", () => {
     const complete = calculateChantierProfitability(item, commercialCase, quotes, {
       laborCostCents: 70_000,
       purchaseCostCents: 50_000,
+      invoicedRevenueCents: 90_000,
     });
     expect(complete.actualTotalCostCents).toBe(120_000);
-    expect(complete.actualMarginCents).toBe(-20_000);
-    expect(complete.actualMarginPercent).toBeCloseTo(-16.666666, 5);
+    expect(complete.actualMarginCents).toBe(-30_000);
+    expect(complete.actualMarginPercent).toBe(-25);
   });
 });

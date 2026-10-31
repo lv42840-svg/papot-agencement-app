@@ -7,6 +7,8 @@ import type { NativeQuoteRecord, NativeQuotesPayload } from "../quotes/store";
 export type ChantierActualCostSnapshot = {
   laborCostCents: number | null;
   purchaseCostCents: number | null;
+  /** Net issued customer invoices, including credit notes. Missing is not zero. */
+  invoicedRevenueCents?: number | null;
 };
 
 export type ChantierProfitabilityQuote = {
@@ -46,6 +48,7 @@ export type ChantierProfitability = {
   plannedMarginPercent: number | null;
   plannedHours: ChantierHours & { total: number };
   actualHours: ChantierHours & { total: number };
+  actualRevenueCents: number | null;
   actualLaborCostCents: number | null;
   actualPurchaseCostCents: number | null;
   actualTotalCostCents: number | null;
@@ -56,10 +59,7 @@ export type ChantierProfitability = {
 };
 
 function totalHours(hours: ChantierHours): ChantierHours & { total: number } {
-  return {
-    ...hours,
-    total: hours.be + hours.workshop + hours.install,
-  };
+  return { ...hours, total: hours.be + hours.workshop + hours.install };
 }
 
 function marginPercent(saleCents: number, costCents: number): number | null {
@@ -69,25 +69,24 @@ function marginPercent(saleCents: number, costCents: number): number | null {
 
 function addSafeMoney(left: number, right: number): number {
   const total = left + right;
-  if (!Number.isSafeInteger(total) || total < 0) {
+  if (!Number.isSafeInteger(total) || total < 0)
     throw new Error("CHANTIER_PROFITABILITY_MONEY_INVALID");
-  }
   return total;
+}
+
+function signedMoney(value: number): number {
+  if (!Number.isSafeInteger(value)) throw new Error("CHANTIER_PROFITABILITY_MONEY_INVALID");
+  return value;
 }
 
 function retainedQuotes(
   commercialCase: CommercialCase | null,
   quotes: NativeQuotesPayload,
-): {
-  records: NativeQuoteRecord[];
-  missingIds: string[];
-} {
+): { records: NativeQuoteRecord[]; missingIds: string[] } {
   if (!commercialCase) return { records: [], missingIds: [] };
-
   const quotesById = new Map(quotes.quotes.map((quote) => [quote.id, quote]));
   const records: NativeQuoteRecord[] = [];
   const missingIds: string[] = [];
-
   for (const quoteId of commercialCase.retainedQuoteIds) {
     const quote = quotesById.get(quoteId);
     if (!quote || quote.commercialCaseId !== commercialCase.id) {
@@ -96,7 +95,6 @@ function retainedQuotes(
     }
     records.push(quote);
   }
-
   return { records, missingIds };
 }
 
@@ -104,10 +102,7 @@ export function calculateChantierProfitability(
   chantier: ChantierRecord,
   commercialCase: CommercialCase | null,
   quotes: NativeQuotesPayload,
-  actualCosts: ChantierActualCostSnapshot = {
-    laborCostCents: null,
-    purchaseCostCents: null,
-  },
+  actualCosts: ChantierActualCostSnapshot = { laborCostCents: null, purchaseCostCents: null },
   committedPurchasesCents: number | null = null,
 ): ChantierProfitability {
   const retained = retainedQuotes(commercialCase, quotes);
@@ -129,7 +124,6 @@ export function calculateChantierProfitability(
       plannedPurchasesCents: purchaseExtracts[index].totalCents,
     } satisfies ChantierProfitabilityQuote;
   });
-
   const soldComplete =
     commercialCase !== null &&
     commercialCase.retainedQuoteIds.length > 0 &&
@@ -137,7 +131,6 @@ export function calculateChantierProfitability(
   const soldCents = soldComplete
     ? summaries.reduce((total, quote) => addSafeMoney(total, quote.saleCents), 0)
     : null;
-
   const plannedDisbursementComplete =
     soldComplete && summaries.every((quote) => quote.plannedDisbursementCents !== null);
   const plannedDisbursementCents = plannedDisbursementComplete
@@ -177,9 +170,7 @@ export function calculateChantierProfitability(
       ? null
       : marginPercent(soldCents, plannedTotalCostCents);
 
-  // Operational consumption is deliberately NOT "actual cost" or accounting margin:
-  // payroll hours are incurred and purchase orders only committed, not invoiced.
-  // It can still increase as more work is recorded or BCs are placed.
+  // Operational budget consumption remains separate from invoiced revenue and actual margin.
   const knownCostCommitmentsCents =
     actualCosts.laborCostCents !== null && committedPurchasesCents !== null
       ? addSafeMoney(actualCosts.laborCostCents, committedPurchasesCents)
@@ -193,17 +184,24 @@ export function calculateChantierProfitability(
       ? plannedLaborCostCents - actualCosts.laborCostCents
       : null;
 
+  const actualRevenueCents =
+    actualCosts.invoicedRevenueCents == null ? null : signedMoney(actualCosts.invoicedRevenueCents);
   const actualCostsComplete =
     actualCosts.laborCostCents !== null && actualCosts.purchaseCostCents !== null;
   const actualTotalCostCents = actualCostsComplete
-    ? addSafeMoney(actualCosts.laborCostCents ?? 0, actualCosts.purchaseCostCents ?? 0)
+    ? signedMoney(
+        signedMoney(actualCosts.laborCostCents ?? 0) +
+          signedMoney(actualCosts.purchaseCostCents ?? 0),
+      )
     : null;
   const actualMarginCents =
-    soldCents === null || actualTotalCostCents === null ? null : soldCents - actualTotalCostCents;
-  const actualMarginPercent =
-    soldCents === null || actualTotalCostCents === null
+    actualRevenueCents === null || actualTotalCostCents === null
       ? null
-      : marginPercent(soldCents, actualTotalCostCents);
+      : signedMoney(actualRevenueCents - actualTotalCostCents);
+  const actualMarginPercent =
+    actualRevenueCents === null || actualTotalCostCents === null
+      ? null
+      : marginPercent(actualRevenueCents, actualTotalCostCents);
 
   const plannedHours = soldComplete
     ? summaries.reduce(
@@ -216,7 +214,6 @@ export function calculateChantierProfitability(
         { be: 0, workshop: 0, install: 0, total: 0 },
       )
     : { be: 0, workshop: 0, install: 0, total: 0 };
-
   return {
     soldCents,
     plannedDisbursementCents,
@@ -237,6 +234,7 @@ export function calculateChantierProfitability(
     plannedMarginPercent,
     plannedHours,
     actualHours: totalHours(chantier.actualHours),
+    actualRevenueCents,
     actualLaborCostCents: actualCosts.laborCostCents,
     actualPurchaseCostCents: actualCosts.purchaseCostCents,
     actualTotalCostCents,
