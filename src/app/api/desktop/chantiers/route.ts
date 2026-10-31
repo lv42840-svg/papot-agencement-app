@@ -34,6 +34,13 @@ import {
 import { createQuotesRepository } from "@/lib/quotes/create-repository";
 import { readMonthlyLaborCosts } from "@/lib/payroll/monthly-labor-costs-repository";
 import { calculateChantierLaborCostCents } from "@/lib/payroll/chantier-labor-cost";
+import {
+  committedOrdersForChantier,
+  committedPurchaseTotal,
+  purchaseCloseReviewToken,
+  removeChantierPurchaseCommitments,
+} from "@/lib/purchases/domain";
+import { createPurchaseOrdersRepository } from "@/lib/purchases/repository";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -73,6 +80,10 @@ async function snapshot(
     hasEffectiveSpecialPermission(user, "chantiers.close_reopen"),
     hasEffectiveSpecialPermission(user, "chantiers.archive_reactivate"),
   ]);
+  const canReadPurchases =
+    (await hasModuleAccess(user.id, "purchases", "READ")) ||
+    (canWrite && canCloseReopenSpecial);
+  const purchasePayload = canReadPurchases ? await createPurchaseOrdersRepository().load() : null;
   // Reconcile the chantier's read-only production metrics from the real hours register.
   // Do not write the projection into the chantier repository: the planning ledger is the source.
   const realizedChantierIds = new Set(planningPayload.actualHours.map((entry) => entry.chantierId));
@@ -104,6 +115,30 @@ async function snapshot(
       ]),
     ),
     actor,
+    committedPurchasesByChantier: purchasePayload
+      ? Object.fromEntries(
+          payload.chantiers.map((chantier) => [
+            chantier.id,
+            committedPurchaseTotal(purchasePayload, chantier.id),
+          ]),
+        )
+      : null,
+    purchaseCloseWarnings: purchasePayload
+      ? Object.fromEntries(
+          payload.chantiers.map((chantier) => {
+            const orders = committedOrdersForChantier(purchasePayload, chantier.id);
+            return [
+              chantier.id,
+              {
+                orders,
+                count: orders.length,
+                amountHtCents: orders.reduce((total, order) => total + order.amountHtCents, 0),
+                token: purchaseCloseReviewToken(orders),
+              },
+            ];
+          }),
+        )
+      : null,
     capabilities: {
       ...baseCapabilities,
       canRead: true,
@@ -182,6 +217,46 @@ export async function POST(request: Request) {
     const quotes = mutationNeedsCommercialOrigin(input)
       ? await createQuotesRepository().load()
       : null;
+
+    // The Pennylane reconciliation is not connected yet: all active BC allocations
+    // are unverified. Require an explicit keep/remove decision before closing.
+    if (input.action === "markDone") {
+      stage = "review-purchase-orders";
+      const chantierBefore = (await repository.load()).chantiers.find(
+        (candidate) => candidate.id === input.chantierId,
+      );
+      if (!chantierBefore) throw new Error("CHANTIER_NOT_FOUND");
+      assertChantierRevision(chantierBefore, expectedUpdatedAt);
+      if (chantierBefore.status !== "ACTIVE") throw new Error("CHANTIER_NOT_ACTIVE");
+      const purchasesRepo = createPurchaseOrdersRepository();
+      const outstanding = committedOrdersForChantier(await purchasesRepo.load(), input.chantierId);
+      const token = purchaseCloseReviewToken(outstanding);
+      if (outstanding.length > 0) {
+        if (!input.purchaseReview) throw new Error("CHANTIER_PURCHASE_REVIEW_REQUIRED");
+        if (input.purchaseReview.token !== token) {
+          throw new Error("CHANTIER_PURCHASE_REVIEW_CONFLICT");
+        }
+        if (input.purchaseReview.decision === "REMOVE") {
+          // Preserve other chantier allocations and the original BC audit trail.
+          // This operation precedes closing so failure cannot silently mark the
+          // chantier done while leaving purchases unresolved. A concurrent change
+          // to the chantier itself may still require the operator to retry.
+          await purchasesRepo.mutate((current) => {
+            if (
+              purchaseCloseReviewToken(committedOrdersForChantier(current, input.chantierId)) !==
+              token
+            ) {
+              throw new Error("CHANTIER_PURCHASE_REVIEW_CONFLICT");
+            }
+            return removeChantierPurchaseCommitments(
+              current,
+              input.chantierId,
+              context.user.displayName,
+            );
+          });
+        }
+      }
+    }
 
     stage = "apply-and-save-mutation";
     const mutation = await repository.mutate((payload) => {
