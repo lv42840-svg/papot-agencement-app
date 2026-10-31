@@ -131,7 +131,9 @@ export async function POST(request: Request) {
     const context = await requireModuleRequestContext("billing", "WRITE");
     const parsed = billingMutationSchema.safeParse(await request.json());
     if (!parsed.success) {
-      const fields = [...new Set(parsed.error.issues.map((issue) => issue.path.join(".") || "root"))];
+      const fields = [
+        ...new Set(parsed.error.issues.map((issue) => issue.path.join(".") || "root")),
+      ];
       return noStoreJson({ error: "BILLING_REQUEST_INVALID", fields }, 400);
     }
     const input = parsed.data;
