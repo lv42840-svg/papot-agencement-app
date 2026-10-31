@@ -236,6 +236,12 @@ export async function POST(request: Request) {
           throw new Error("CHANTIER_PURCHASE_REVIEW_CONFLICT");
         }
         if (input.purchaseReview.decision === "REMOVE") {
+          if (input.purchaseReview.confirmRemove !== true) {
+            throw new Error("CHANTIER_PURCHASE_REMOVE_CONFIRMATION_REQUIRED");
+          }
+          if (!(await hasModuleAccess(context.user.id, "purchases", "WRITE"))) {
+            throw new Error("CHANTIER_PURCHASE_REMOVE_FORBIDDEN");
+          }
           // Preserve other chantier allocations and the original BC audit trail.
           // This operation precedes closing so failure cannot silently mark the
           // chantier done while leaving purchases unresolved. A concurrent change
