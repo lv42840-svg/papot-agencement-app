@@ -816,8 +816,8 @@ function LifecycleTab({
                   </label>
                   {purchaseWarning === null ? (
                     <div className="chantierLifecycleWarning" role="alert">
-                      Impossible de vérifier les BC. Actualise ou demande l&apos;accès Achats avant de
-                      clôturer.
+                      Impossible de vérifier les BC. Actualise ou demande l&apos;accès Achats avant
+                      de clôturer.
                     </div>
                   ) : purchaseWarning.count > 0 ? (
                     <div className="chantierLifecycleWarning">
