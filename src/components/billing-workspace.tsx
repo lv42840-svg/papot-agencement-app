@@ -41,12 +41,7 @@ export function BillingWorkspace({
   const [mode, setMode] = useState<"AMOUNT" | "PERCENT" | "LINES">("PERCENT");
   const [lineValues, setLineValues] = useState<Record<string, string>>({});
   const [value, setValue] = useState("");
-  const [edit, setEdit] = useState<BillingDraft | null>(null);
-  const [label, setLabel] = useState("");
-  const [notes, setNotes] = useState("");
-  const [tab, setTab] = useState<"QUOTE" | "CHANTIER" | "PROJECTS">(
-    chantierId ? "CHANTIER" : "QUOTE",
-  );
+  const [tab, setTab] = useState<"CHANTIER" | "PROJECTS">(chantierId ? "CHANTIER" : "PROJECTS");
   const [selectedChantier, setSelectedChantier] = useState(chantierId ?? "");
   const [projectSearch, setProjectSearch] = useState("");
   const [projectStatus, setProjectStatus] = useState<"ALL" | BillingDraft["status"]>("ALL");
@@ -76,10 +71,7 @@ export function BillingWorkspace({
   const activeChantierId = chantierChoices.some((site) => site.id === selectedChantier)
     ? selectedChantier
     : (chantierChoices[0]?.id ?? "");
-  const sources =
-    tab === "CHANTIER"
-      ? allSources.filter((source) => source.chantierId === activeChantierId)
-      : allSources;
+  const sources = allSources.filter((source) => source.chantierId === activeChantierId);
   const active = sources.find((source) => source.quoteId === selection) ?? sources[0];
   const drafts = data?.payload.drafts ?? [];
   const projectChantiers = [
@@ -286,7 +278,6 @@ export function BillingWorkspace({
       >
         {(
           [
-            ["QUOTE", "Nouvelle facture depuis devis"],
             ["CHANTIER", "Nouvelle facture depuis chantier"],
             ["PROJECTS", `Projets de factures (${drafts.length})`],
           ] as const
@@ -304,7 +295,6 @@ export function BillingWorkspace({
               setValue("");
               setError("");
               setNotice("");
-              setEdit(null);
             }}
           >
             {caption}
@@ -317,37 +307,31 @@ export function BillingWorkspace({
           role="tabpanel"
           style={{ background: "white", padding: 20, borderRadius: 12, display: "grid", gap: 12 }}
         >
-          <h2>
-            {tab === "CHANTIER"
-              ? "Nouvelle facture depuis un chantier"
-              : "Nouvelle facture depuis un devis retenu"}
-          </h2>
-          {tab === "CHANTIER" && (
-            <label>
-              Chantier
-              {chantierChoices.length > 0 ? (
-                <select
-                  aria-label="Choisir un chantier à facturer"
-                  style={{ width: "100%", padding: 9 }}
-                  value={activeChantierId}
-                  onChange={(e) => {
-                    setSelectedChantier(e.target.value);
-                    setSelection("");
-                    setLineValues({});
-                    setError("");
-                  }}
-                >
-                  {chantierChoices.map((site) => (
-                    <option key={site.id} value={site.id}>
-                      {site.name} · {site.client}
-                    </option>
-                  ))}
-                </select>
-              ) : (
-                <p>Aucun chantier avec un devis retenu éligible à la facturation.</p>
-              )}
-            </label>
-          )}
+          <h2>Nouvelle facture depuis un chantier</h2>
+          <label>
+            Chantier
+            {chantierChoices.length > 0 ? (
+              <select
+                aria-label="Choisir un chantier à facturer"
+                style={{ width: "100%", padding: 9 }}
+                value={activeChantierId}
+                onChange={(e) => {
+                  setSelectedChantier(e.target.value);
+                  setSelection("");
+                  setLineValues({});
+                  setError("");
+                }}
+              >
+                {chantierChoices.map((site) => (
+                  <option key={site.id} value={site.id}>
+                    {site.name} · {site.client}
+                  </option>
+                ))}
+              </select>
+            ) : (
+              <p>Aucun chantier avec un devis retenu éligible à la facturation.</p>
+            )}
+          </label>
           {sources.length === 0 ? (
             <p>
               Aucun devis retenu éligible pour cette sélection. Vérifie les devis retenus et leurs
@@ -604,121 +588,80 @@ export function BillingWorkspace({
           {visibleDrafts.length === 0 ? (
             <p>Aucun projet ne correspond aux filtres.</p>
           ) : (
-            visibleDrafts.map((d) => (
-              <article
-                key={d.id}
-                style={{
-                  border: "1px solid #e3dfeb",
-                  borderRadius: 9,
-                  padding: 13,
-                  display: "grid",
-                  gap: 9,
-                }}
-              >
-                <div>
-                  <b>{d.label}</b>{" "}
-                  <span style={{ fontSize: 11, color: "#815ba0" }}>
-                    {d.status === "APPROVED" ? "VALIDÉ EN INTERNE · NON ÉMIS" : "PROJET · NON ÉMIS"}
-                  </span>
-                </div>
-                <small>
-                  {d.affairName} · {d.quoteLabel} · {d.clientName}
-                </small>
-                <p>
-                  <b>HT : {money(d.amountHtCents)}</b> · TVA : {money(d.vatCents)} ·{" "}
-                  <b>TTC : {money(d.totalTtcCents)}</b>
-                </p>
-                <div>
-                  <Link href={`/facturation/${encodeURIComponent(d.id)}`} className="primaryButton">
-                    {d.status === "APPROVED"
-                      ? "Consulter le projet"
-                      : "Ouvrir et modifier la facture"}
-                  </Link>
-                </div>
-                {d.lineProgress?.length ? (
-                  <details>
-                    <summary>Avancement cumulé par ligne</summary>
-                    <ul>
-                      {d.lineProgress.map((row) => (
-                        <li key={row.lineId}>
-                          {d.lines?.find((line) => line.lineId === row.lineId)?.description ??
-                            "Ligne"}
-                          {" : "}
-                          {row.percent} % · {money(row.cumulativeHtCents)} HT cumulés
-                        </li>
-                      ))}
-                    </ul>
-                  </details>
-                ) : null}
-                {edit?.id === d.id ? (
-                  <div style={{ display: "grid", gap: 8 }}>
-                    <label>
-                      Libellé <input value={label} onChange={(e) => setLabel(e.target.value)} />
-                    </label>
-                    <label>
-                      Notes <textarea value={notes} onChange={(e) => setNotes(e.target.value)} />
-                    </label>
-                    <button
-                      className="primaryButton"
-                      disabled={busy}
-                      onClick={() =>
-                        void (async () => {
-                          if (
-                            await write(
-                              {
-                                action: "UPDATE",
-                                draftId: d.id,
-                                expectedUpdatedAt: d.updatedAt,
-                                label,
-                                notes,
-                              },
-                              "Projet modifié",
-                            )
-                          )
-                            setEdit(null);
-                        })()
-                      }
-                    >
-                      Enregistrer
-                    </button>
-                    <button className="secondaryButton" onClick={() => setEdit(null)}>
-                      Annuler
-                    </button>
-                  </div>
-                ) : (
-                  <div style={{ display: "flex", gap: 8 }}>
-                    {data.canWrite && d.status === "DRAFT" && (
-                      <button
-                        className="secondaryButton"
-                        disabled={busy}
-                        onClick={() => {
-                          setEdit(d);
-                          setLabel(d.label);
-                          setNotes(d.notes);
-                        }}
-                      >
-                        Modifier
-                      </button>
-                    )}
-                    {data.canWrite && d.status === "DRAFT" && (
-                      <button
-                        className="secondaryButton"
-                        disabled={busy}
-                        onClick={() => {
-                          if (confirm("Supprimer ce projet non émis ?"))
-                            void write(
-                              { action: "DELETE", draftId: d.id, expectedUpdatedAt: d.updatedAt },
-                              "Projet supprimé",
-                            );
-                        }}
-                      >
-                        Supprimer
-                      </button>
-                    )}
-                  </div>
-                )}
-              </article>
-            ))
+            <div style={{ overflowX: "auto" }}>
+              <table style={{ width: "100%", minWidth: 950, borderCollapse: "collapse" }}>
+                <thead>
+                  <tr style={{ textAlign: "left", borderBottom: "2px solid #ded8e9" }}>
+                    <th style={{ padding: 9 }}>Date</th>
+                    <th style={{ padding: 9 }}>Client / chantier</th>
+                    <th style={{ padding: 9 }}>Devis</th>
+                    <th style={{ padding: 9 }}>Intitulé / type</th>
+                    <th style={{ padding: 9 }}>Statut</th>
+                    <th style={{ padding: 9, textAlign: "right" }}>HT</th>
+                    <th style={{ padding: 9, textAlign: "right" }}>TTC</th>
+                    <th style={{ padding: 9 }}>Actions</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {visibleDrafts.map((d) => (
+                    <tr key={d.id} style={{ borderBottom: "1px solid #e9e5ef" }}>
+                      <td style={{ padding: 9, whiteSpace: "nowrap" }}>
+                        {new Date(d.createdAt).toLocaleDateString("fr-FR")}
+                      </td>
+                      <td style={{ padding: 9 }}>
+                        <strong>{d.clientName}</strong>
+                        <div>{d.affairName}</div>
+                      </td>
+                      <td style={{ padding: 9 }}>{d.quoteLabel}</td>
+                      <td style={{ padding: 9 }}>
+                        <strong>{d.label}</strong>
+                        <div>{options.find((option) => option.value === d.type)?.label}</div>
+                      </td>
+                      <td style={{ padding: 9 }}>
+                        {d.status === "APPROVED" ? "Validé en interne" : "Projet"}
+                        <div style={{ fontSize: 11 }}>Non émis</div>
+                      </td>
+                      <td style={{ padding: 9, textAlign: "right", whiteSpace: "nowrap" }}>
+                        {money(d.amountHtCents)}
+                      </td>
+                      <td style={{ padding: 9, textAlign: "right", whiteSpace: "nowrap" }}>
+                        {money(d.totalTtcCents)}
+                      </td>
+                      <td style={{ padding: 9 }}>
+                        <div style={{ display: "flex", gap: 6, alignItems: "center" }}>
+                          <Link
+                            href={`/facturation/${encodeURIComponent(d.id)}`}
+                            className="secondaryButton"
+                          >
+                            {d.status === "APPROVED" ? "Consulter" : "Ouvrir"}
+                          </Link>
+                          {data.canWrite && d.status === "DRAFT" ? (
+                            <button
+                              type="button"
+                              className="secondaryButton"
+                              disabled={busy}
+                              onClick={() => {
+                                if (confirm("Supprimer ce projet non émis ?"))
+                                  void write(
+                                    {
+                                      action: "DELETE",
+                                      draftId: d.id,
+                                      expectedUpdatedAt: d.updatedAt,
+                                    },
+                                    "Projet supprimé",
+                                  );
+                              }}
+                            >
+                              Supprimer
+                            </button>
+                          ) : null}
+                        </div>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
           )}
         </section>
       )}

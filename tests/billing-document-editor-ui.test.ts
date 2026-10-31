@@ -8,9 +8,11 @@ describe("facturation: éditeur identique au parcours devis", () => {
     const site = readFileSync("src/components/chantier-workspace.tsx", "utf8");
     const page = readFileSync("src/app/facturation/[draftId]/page.tsx", "utf8");
     expect(list).toContain("router.push(");
-    expect(list).toContain("Ouvrir et modifier la facture");
+    expect(list).toContain("Nouvelle facture depuis chantier");
     expect(quote).toContain("/facturation?quoteId=");
-    expect(site).toContain("/facturation?chantierId=");
+    const siteBilling = readFileSync("src/components/chantier-billing-tab.tsx", "utf8");
+    expect(site).toContain("ChantierBillingTab");
+    expect(siteBilling).toContain("/facturation?chantierId=");
     expect(page).toContain("<BillingDocumentEditor draftId={draftId} />");
   });
 
@@ -35,11 +37,11 @@ describe("facturation: éditeur identique au parcours devis", () => {
     expect(ui).toContain("const rows = enteredLineRows;");
   });
 
-  it("sépare création depuis devis ou chantier et projets filtrables", () => {
+  it("crée depuis le chantier et présente les projets en tableau filtrable", () => {
     const ui = readFileSync("src/components/billing-workspace.tsx", "utf8");
-    expect(ui).toContain('chantierId ? "CHANTIER" : "QUOTE"');
+    expect(ui).toContain('chantierId ? "CHANTIER" : "PROJECTS"');
     expect(ui).toContain('role="tablist"');
-    expect(ui).toContain("Nouvelle facture depuis devis");
+    expect(ui).not.toContain("Nouvelle facture depuis devis");
     expect(ui).toContain("Nouvelle facture depuis chantier");
     expect(ui).toContain("Projets de factures");
     expect(ui).toContain('aria-label="Choisir un chantier à facturer"');
@@ -48,7 +50,8 @@ describe("facturation: éditeur identique au parcours devis", () => {
     expect(ui).toContain('aria-label="Filtrer par chantier"');
     expect(ui).toContain('aria-label="Trier les projets de factures"');
     expect(ui).toContain('d.status === "APPROVED"');
-    expect(ui).toContain("Consulter le projet");
+    expect(ui).toContain("Consulter");
+    expect(ui).toContain("<table");
   });
 
   it("permet modification, ajout, titres et réorganisation sans émettre la facture", () => {

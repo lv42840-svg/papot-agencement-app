@@ -5,7 +5,7 @@ import Link from "next/link";
 export function SettingsSectionNav({
   active,
 }: {
-  active: "company" | "users" | "entries" | "emails";
+  active: "company" | "users" | "entries" | "emails" | "billing";
 }) {
   return (
     <nav className="settingsSectionNav" aria-label="Paramètres">
@@ -20,6 +20,9 @@ export function SettingsSectionNav({
       </Link>
       <Link className={active === "emails" ? "isActive" : undefined} href="/settings/emails">
         E-mails des devis
+      </Link>
+      <Link className={active === "billing" ? "isActive" : undefined} href="/settings/billing">
+        Intitulés des factures
       </Link>
       <style jsx global>{`
         .settingsSectionNav {

@@ -8,7 +8,12 @@ import {
   buildInvoiceDocumentLines,
   calculateInvoiceDocumentTotals,
 } from "@/lib/billing/document-lines";
-import type { BillingDocumentLine, BillingDraft, BillingPayload } from "@/lib/billing/domain";
+import {
+  DEFAULT_BILLING_TITLES,
+  type BillingDocumentLine,
+  type BillingDraft,
+  type BillingPayload,
+} from "@/lib/billing/domain";
 import { calculateLineProgress, type LineProgressInput } from "@/lib/billing/progress";
 
 type ApiSnapshot = { payload: BillingPayload; canWrite: boolean; error?: string };
@@ -161,6 +166,18 @@ export function BillingDocumentEditor({ draftId }: { draftId: string }) {
   const rates = [...new Set(draft?.contractTaxGroups.map((rate) => rate.ratePercent) ?? [20])].sort(
     (a, b) => a - b,
   );
+  const titleChoices = payload?.invoiceTitles ?? [...DEFAULT_BILLING_TITLES];
+  const availableTitles = titleChoices.includes(label) ? titleChoices : [label, ...titleChoices];
+  const priorProjects =
+    draft && payload
+      ? payload.drafts
+          .slice(
+            0,
+            payload.drafts.findIndex((item) => item.id === draft.id),
+          )
+          .filter((item) => item.quoteId === draft.quoteId)
+      : [];
+  const priorHt = priorProjects.reduce((sum, item) => sum + item.amountHtCents, 0);
 
   function alter(id: string, patch: Partial<EditableRow>) {
     setRows((old) => old.map((row) => (row.id === id ? { ...row, ...patch } : row)));
@@ -432,16 +449,24 @@ export function BillingDocumentEditor({ draftId }: { draftId: string }) {
         <h2>Informations de la facture</h2>
         <div className="invoiceMeta">
           <label>
-            Libellé du projet
-            <input
+            Intitulé de la facture
+            <select
               value={label}
               disabled={!canWrite}
-              maxLength={240}
               onChange={(e) => {
                 setLabel(e.target.value);
                 setDirty(true);
               }}
-            />
+            >
+              {availableTitles.map((item) => (
+                <option key={item} value={item}>
+                  {item}
+                </option>
+              ))}
+            </select>
+            <Link href="/settings/billing" style={{ fontSize: 12 }}>
+              Gérer les intitulés dans Paramètres
+            </Link>
           </label>
           <label>
             Observations / conditions
@@ -457,6 +482,56 @@ export function BillingDocumentEditor({ draftId }: { draftId: string }) {
             />
           </label>
         </div>
+      </section>
+
+      <section className="invoiceCard">
+        <h2>Déjà préparé sur ce devis</h2>
+        <p>
+          Ces montants correspondent aux projets antérieurs, acomptes et situations inclus. Ce ne
+          sont pas des factures officiellement émises.
+        </p>
+        {priorProjects.length === 0 ? (
+          <p>Aucun acompte ni situation précédemment préparé sur ce devis.</p>
+        ) : (
+          <div className="invoiceScroll">
+            <table className="invoiceTable">
+              <thead>
+                <tr>
+                  <th>Projet précédent</th>
+                  <th>Date</th>
+                  <th>Statut</th>
+                  <th>HT</th>
+                  <th>TVA</th>
+                  <th>TTC</th>
+                </tr>
+              </thead>
+              <tbody>
+                {priorProjects.map((item) => (
+                  <tr key={item.id}>
+                    <td>
+                      <Link href={`/facturation/${item.id}`}>
+                        {labels[item.type]} · {item.label}
+                      </Link>
+                    </td>
+                    <td>{new Date(item.createdAt).toLocaleDateString("fr-FR")}</td>
+                    <td>
+                      {item.status === "APPROVED" ? "Validé en interne" : "Projet non validé"}
+                    </td>
+                    <td>{currency(item.amountHtCents)}</td>
+                    <td>{currency(item.vatCents)}</td>
+                    <td>{currency(item.totalTtcCents)}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        )}
+        <p>
+          <strong>Déjà préparé : {currency(priorHt)} HT</strong> · Projet actuel :{" "}
+          {currency(preview?.amountHtCents ?? draft.amountHtCents)} HT · Cumul après ce projet :{" "}
+          {currency(priorHt + (preview?.amountHtCents ?? draft.amountHtCents))} HT sur{" "}
+          {currency(draft.contractHtCents)} HT.
+        </p>
       </section>
 
       <section className="invoiceCard invoiceLines">
@@ -857,6 +932,7 @@ export function BillingDocumentEditor({ draftId }: { draftId: string }) {
           font-weight: 600;
         }
         .invoiceMeta input,
+        .invoiceMeta select,
         .invoiceMeta textarea {
           border: 1px solid #ded9e5;
           border-radius: 7px;
