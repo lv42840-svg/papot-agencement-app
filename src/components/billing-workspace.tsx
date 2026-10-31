@@ -5,7 +5,10 @@ import { useEffect, useState } from "react";
 import { parseBillingPercentageInput } from "@/lib/billing/percentage-input";
 import { calculateLineProgress } from "@/lib/billing/progress";
 import { filterBillingProjects, type BillingProjectSort } from "@/lib/billing/workspace-list";
-import { billingPreparationFollowup, type BillingPreparationStatus } from "@/lib/billing/preparation-followup";
+import {
+  billingPreparationFollowup,
+  type BillingPreparationStatus,
+} from "@/lib/billing/preparation-followup";
 import type {
   BillingDraft,
   BillingPayload,
@@ -85,9 +88,13 @@ export function BillingWorkspace({
   const visibleFollowup = followup.filter((row) => {
     if (followupStatus !== "ALL" && row.status !== followupStatus) return false;
     const needle = followupSearch.trim().toLocaleLowerCase("fr-FR");
-    return !needle || [
-      row.source.clientName, row.source.affairName, row.source.quoteLabel,
-    ].join(" ").toLocaleLowerCase("fr-FR").includes(needle);
+    return (
+      !needle ||
+      [row.source.clientName, row.source.affairName, row.source.quoteLabel]
+        .join(" ")
+        .toLocaleLowerCase("fr-FR")
+        .includes(needle)
+    );
   });
   const projectChantiers = [
     ...new Map<string, { id: string; label: string }>(
@@ -538,20 +545,28 @@ export function BillingWorkspace({
           </p>
           <div style={{ display: "flex", flexWrap: "wrap", gap: 12 }}>
             <strong>{followup.length} devis retenu(s)</strong>
-            <strong>{money(followup.reduce((s, r) => s + r.preparedHtCents, 0))} HT en projets</strong>
-            <strong>{money(followup.reduce((s, r) => s + r.remainingToPrepareHtCents, 0))} HT à préparer</strong>
+            <strong>
+              {money(followup.reduce((s, r) => s + r.preparedHtCents, 0))} HT en projets
+            </strong>
+            <strong>
+              {money(followup.reduce((s, r) => s + r.remainingToPrepareHtCents, 0))} HT à préparer
+            </strong>
           </div>
           <div style={{ display: "flex", gap: 12, flexWrap: "wrap" }}>
             <label style={{ display: "grid", gap: 5, flex: "2 1 220px" }}>
               Rechercher un devis accepté
-              <input value={followupSearch}
+              <input
+                value={followupSearch}
                 onChange={(event) => setFollowupSearch(event.target.value)}
-                placeholder="Chantier, client ou référence" />
+                placeholder="Chantier, client ou référence"
+              />
             </label>
             <label style={{ display: "grid", gap: 5, flex: "1 1 180px" }}>
               Préparation des factures
-              <select value={followupStatus}
-                onChange={(event) => setFollowupStatus(event.target.value as typeof followupStatus)}>
+              <select
+                value={followupStatus}
+                onChange={(event) => setFollowupStatus(event.target.value as typeof followupStatus)}
+              >
                 <option value="ALL">Tous les devis</option>
                 <option value="NONE">Aucun projet</option>
                 <option value="PARTIAL">Projets partiels</option>
@@ -585,26 +600,43 @@ export function BillingWorkspace({
                         {row.source.quoteLabel}
                       </Link>
                     </td>
-                    <td style={{ padding: 9, textAlign: "right" }}>{money(row.source.contractHtCents)}</td>
+                    <td style={{ padding: 9, textAlign: "right" }}>
+                      {money(row.source.contractHtCents)}
+                    </td>
                     <td style={{ padding: 9, textAlign: "right" }}>{money(row.preparedHtCents)}</td>
-                    <td style={{ padding: 9, textAlign: "right" }}>{money(row.remainingToPrepareHtCents)}</td>
+                    <td style={{ padding: 9, textAlign: "right" }}>
+                      {money(row.remainingToPrepareHtCents)}
+                    </td>
                     <td style={{ padding: 9 }}>
-                      {row.status === "NONE" ? "Aucun projet" :
-                        row.status === "PARTIAL" ? "Préparation partielle" : "Totalité préparée"}
+                      {row.status === "NONE"
+                        ? "Aucun projet"
+                        : row.status === "PARTIAL"
+                          ? "Préparation partielle"
+                          : "Totalité préparée"}
                       <div style={{ fontSize: 11 }}>{row.projectCount} projet(s) non émis</div>
                     </td>
                     <td style={{ padding: 9 }}>À rapprocher avec Pennylane</td>
                     <td style={{ padding: 9 }}>
                       {row.source.chantierId ? (
-                        <button type="button" className="secondaryButton" onClick={() => {
-                          setSelectedChantier(row.source.chantierId!);
-                          setSelection(row.source.quoteId);
-                          setTab("CHANTIER");
-                          setValue("");
-                        }}>Préparer une facture</button>
+                        <button
+                          type="button"
+                          className="secondaryButton"
+                          onClick={() => {
+                            setSelectedChantier(row.source.chantierId!);
+                            setSelection(row.source.quoteId);
+                            setTab("CHANTIER");
+                            setValue("");
+                          }}
+                        >
+                          Préparer une facture
+                        </button>
                       ) : (
-                        <Link className="secondaryButton"
-                          href={`/devis/${encodeURIComponent(row.source.quoteId)}`}>Voir le devis</Link>
+                        <Link
+                          className="secondaryButton"
+                          href={`/devis/${encodeURIComponent(row.source.quoteId)}`}
+                        >
+                          Voir le devis
+                        </Link>
                       )}
                     </td>
                   </tr>

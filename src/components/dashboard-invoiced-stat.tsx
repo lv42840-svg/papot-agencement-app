@@ -43,7 +43,9 @@ export function DashboardInvoicedStat() {
 
   return (
     <article className="dashboardStat dashboardStatBlue dashboardInvoicedStat">
-      <span className="dashboardStatIcon"><FileCheck2 size={20} aria-hidden="true" /></span>
+      <span className="dashboardStatIcon">
+        <FileCheck2 size={20} aria-hidden="true" />
+      </span>
       <div className="dashboardInvoicedBody">
         <strong className="dashboardInvoicedTitle">Chiffre d&apos;affaires facturé HT</strong>
         {loading ? <small>Chargement…</small> : null}
@@ -64,8 +66,8 @@ export function DashboardInvoicedStat() {
             </div>
             {!summary.connected ? (
               <small>
-                Pennylane non raccordé : aucune facture officielle n&apos;est encore disponible.
-                Les devis acceptés et projets de factures ne sont pas comptés dans le CA.
+                Pennylane non raccordé : aucune facture officielle n&apos;est encore disponible. Les
+                devis acceptés et projets de factures ne sont pas comptés dans le CA.
               </small>
             ) : null}
             <Link href="/facturation?tab=FOLLOWUP" className="secondaryButton">
@@ -75,16 +77,43 @@ export function DashboardInvoicedStat() {
         ) : null}
       </div>
       <style jsx>{`
-        .dashboardInvoicedStat { align-items: flex-start; gap: 10px; }
-        .dashboardInvoicedBody { width: 100%; min-width: 0; display: grid; gap: 8px; }
-        .dashboardInvoicedTitle { font-size: 12px; color: #425578; }
-        .dashboardInvoicedLine {
-          display: flex; align-items: baseline; justify-content: space-between;
-          flex-wrap: wrap; gap: 4px; padding-top: 5px; border-top: 1px solid #e9e5f1;
+        .dashboardInvoicedStat {
+          align-items: flex-start;
+          gap: 10px;
         }
-        .dashboardInvoicedLine span { font-size: 10px; color: #625c70; }
-        .dashboardInvoicedLine strong { font-size: 14px; color: #344b79; font-variant-numeric: tabular-nums; }
-        .dashboardInvoicedBody small { font-size: 10px; line-height: 1.4; color: #767182; }
+        .dashboardInvoicedBody {
+          width: 100%;
+          min-width: 0;
+          display: grid;
+          gap: 8px;
+        }
+        .dashboardInvoicedTitle {
+          font-size: 12px;
+          color: #425578;
+        }
+        .dashboardInvoicedLine {
+          display: flex;
+          align-items: baseline;
+          justify-content: space-between;
+          flex-wrap: wrap;
+          gap: 4px;
+          padding-top: 5px;
+          border-top: 1px solid #e9e5f1;
+        }
+        .dashboardInvoicedLine span {
+          font-size: 10px;
+          color: #625c70;
+        }
+        .dashboardInvoicedLine strong {
+          font-size: 14px;
+          color: #344b79;
+          font-variant-numeric: tabular-nums;
+        }
+        .dashboardInvoicedBody small {
+          font-size: 10px;
+          line-height: 1.4;
+          color: #767182;
+        }
       `}</style>
     </article>
   );

@@ -48,37 +48,82 @@ describe("factures réellement émises et devis à préparer", () => {
   });
 
   it("prévoit CA mensuel par date réelle, avoirs en négatif et exclusion des brouillons", () => {
-    const issued = summarizeIssuedInvoices([
-      { id: "A", issuedAt: "2026-10-01T11:00:00Z", status: "ISSUED", type: "INVOICE", amountHtCents: 120_000 },
-      { id: "B", issuedAt: "2026-10-11T11:00:00Z", status: "ISSUED", type: "CREDIT_NOTE", amountHtCents: 20_000 },
-      { id: "C", issuedAt: "2026-09-20T11:00:00Z", status: "ISSUED", type: "INVOICE", amountHtCents: 50_000 },
-      { id: "D", issuedAt: "2026-10-20T11:00:00Z", status: "DRAFT", type: "INVOICE", amountHtCents: 99_000 },
-    ], true, now);
+    const issued = summarizeIssuedInvoices(
+      [
+        {
+          id: "A",
+          issuedAt: "2026-10-01T11:00:00Z",
+          status: "ISSUED",
+          type: "INVOICE",
+          amountHtCents: 120_000,
+        },
+        {
+          id: "B",
+          issuedAt: "2026-10-11T11:00:00Z",
+          status: "ISSUED",
+          type: "CREDIT_NOTE",
+          amountHtCents: 20_000,
+        },
+        {
+          id: "C",
+          issuedAt: "2026-09-20T11:00:00Z",
+          status: "ISSUED",
+          type: "INVOICE",
+          amountHtCents: 50_000,
+        },
+        {
+          id: "D",
+          issuedAt: "2026-10-20T11:00:00Z",
+          status: "DRAFT",
+          type: "INVOICE",
+          amountHtCents: 99_000,
+        },
+      ],
+      true,
+      now,
+    );
     expect(issued.monthly).toEqual({ amountHtCents: 100_000, invoiceCount: 1 });
     expect(issued.yearly).toEqual({ amountHtCents: 150_000, invoiceCount: 2 });
   });
 
   it("les projets internes, même approuvés, ne sont jamais comptés comme du facturé", () => {
-    expect(billingPreparationFollowup([source], [draft(30_000)]))
-      .toEqual([expect.objectContaining({
-        status: "PARTIAL", projectCount: 1,
-        preparedHtCents: 30_000, remainingToPrepareHtCents: 70_000,
-      })]);
+    expect(billingPreparationFollowup([source], [draft(30_000)])).toEqual([
+      expect.objectContaining({
+        status: "PARTIAL",
+        projectCount: 1,
+        preparedHtCents: 30_000,
+        remainingToPrepareHtCents: 70_000,
+      }),
+    ]);
     expect(summarizeIssuedInvoices([], false, now).monthly.amountHtCents).toBeNull();
     expect(billingPreparationFollowup([source], [draft(60_000), draft(40_000)])[0]).toMatchObject({
-      status: "FULL", remainingToPrepareHtCents: 0,
+      status: "FULL",
+      remainingToPrepareHtCents: 0,
     });
     expect(billingPreparationFollowup([source], [])[0]).toMatchObject({
-      status: "NONE", preparedHtCents: 0, remainingToPrepareHtCents: 100_000,
+      status: "NONE",
+      preparedHtCents: 0,
+      remainingToPrepareHtCents: 100_000,
     });
-    expect(() => billingPreparationFollowup([source], [draft(70_000), draft(40_000)]))
-      .toThrow("BILLING_PREPARATION_EXCEEDS_CONTRACT");
+    expect(() => billingPreparationFollowup([source], [draft(70_000), draft(40_000)])).toThrow(
+      "BILLING_PREPARATION_EXCEEDS_CONTRACT",
+    );
   });
 
   it("bascule la date de facturation au mois local Europe/Paris", () => {
-    const issued = summarizeIssuedInvoices([
-      { id: "Paris", issuedAt: "2026-09-30T22:30:00Z", status: "ISSUED", type: "INVOICE", amountHtCents: 100 },
-    ], true, now);
+    const issued = summarizeIssuedInvoices(
+      [
+        {
+          id: "Paris",
+          issuedAt: "2026-09-30T22:30:00Z",
+          status: "ISSUED",
+          type: "INVOICE",
+          amountHtCents: 100,
+        },
+      ],
+      true,
+      now,
+    );
     expect(issued.monthly.amountHtCents).toBe(100);
   });
 });

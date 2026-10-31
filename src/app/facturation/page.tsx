@@ -11,7 +11,11 @@ export default async function BillingPage({
   const params = await searchParams;
   return (
     <DesktopAppShell>
-      <BillingWorkspace quoteId={params.quoteId} chantierId={params.chantierId} initialTab={params.tab} />
+      <BillingWorkspace
+        quoteId={params.quoteId}
+        chantierId={params.chantierId}
+        initialTab={params.tab}
+      />
     </DesktopAppShell>
   );
 }

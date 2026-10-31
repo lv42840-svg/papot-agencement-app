@@ -73,7 +73,10 @@ export function summarizeIssuedInvoices(
       0,
     );
     if (!Number.isSafeInteger(amountHtCents)) throw new Error("ISSUED_INVOICE_SUM_INVALID");
-    return { amountHtCents, invoiceCount: selected.filter((item) => item.type === "INVOICE").length };
+    return {
+      amountHtCents,
+      invoiceCount: selected.filter((item) => item.type === "INVOICE").length,
+    };
   };
   return { year, month, connected: true, yearly: forPeriod(year), monthly: forPeriod(month) };
 }
