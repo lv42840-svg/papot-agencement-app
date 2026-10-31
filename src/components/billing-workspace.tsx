@@ -91,10 +91,11 @@ export function BillingWorkspace({
   }));
   const cumulativeLinesCents = (active?.lines ?? []).reduce((sum, line, index) => {
     const percent = enteredLineRows[index]?.percent;
-    return sum +
-      (typeof percent === "number" && Number.isFinite(percent)
+    const lineValue =
+      typeof percent === "number" && Number.isFinite(percent)
         ? Math.round((line.amountHtCents * percent) / 100)
-        : 0);
+        : 0;
+    return sum + lineValue;
   }, 0);
   const progressPreviewError = (() => {
     if (type !== "PROGRESS" || mode !== "LINES" || !active || !data) return "";
@@ -121,7 +122,10 @@ export function BillingWorkspace({
       if (code === "BILLING_PROGRESS_CANNOT_DECREASE") {
         return "Une situation ne peut pas revenir en dessous de l'avancement déjà enregistré.";
       }
-      if (code === "BILLING_PROGRESS_PERCENT_INVALID" || code === "BILLING_PROGRESS_LINES_REQUIRED") {
+      if (
+        code === "BILLING_PROGRESS_PERCENT_INVALID" ||
+        code === "BILLING_PROGRESS_LINES_REQUIRED"
+      ) {
         return "Indique un pourcentage entre 0 et 100 % pour chaque ligne.";
       }
       return "Vérifie les avancements cumulés avant de créer cette situation.";
