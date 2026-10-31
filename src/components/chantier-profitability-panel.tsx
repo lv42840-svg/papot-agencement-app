@@ -126,7 +126,7 @@ export function ChantierProfitabilityPanel({
         <Metric
           label="Achats et frais réels HT"
           value={money(result.actualPurchaseCostCents)}
-          detail="Factures fournisseurs validées dans Pennylane à raccorder"
+          detail="En attente du rapprochement Pennylane : factures fournisseurs validées"
         />
         <Metric
           label={actualLaborCostProvisional
@@ -134,7 +134,7 @@ export function ChantierProfitabilityPanel({
             : "Coût des heures réalisées"}
           value={money(result.actualLaborCostCents)}
           detail={result.actualLaborCostCents === null
-            ? "Coût employeur manquant ou accès Paie requis"
+            ? "Coût employeur manquant pour un mois clos ou son mois précédent, ou accès Paie requis"
             : actualLaborCostProvisional
               ? "Mois en cours valorisé au taux du mois précédent"
               : "Heures saisies valorisées au coût employeur"}
@@ -280,48 +280,6 @@ export function ChantierProfitabilityPanel({
           </p>
         </section>
       </div>
-
-      <section className="chantierProfitabilityBlock">
-        <BlockTitle
-          icon={<ReceiptText size={16} />}
-          title="Coûts réels"
-          subtitle="Un coût n'est pris en compte que lorsqu'une vraie source le fournit."
-        />
-        <div className="chantierProfitabilityRows">
-          <CostRow
-            label={
-              actualLaborCostProvisional
-                ? "Heures valorisées · estimation"
-                : "Heures réelles valorisées"
-            }
-            value={result.actualLaborCostCents}
-            missing="Coût employeur manquant pour un mois clos ou son mois précédent"
-          />
-          {actualLaborCostProvisional && result.actualLaborCostCents !== null ? (
-            <p className="chantierProfitabilityNote">
-              Estimation provisoire : les heures du mois en cours utilisent le coût horaire
-              employeur de chaque salarié du mois précédent. Recalcul automatique dès la
-              disponibilité du coût réel du mois.
-            </p>
-          ) : null}
-          <CostRow
-            label="Achats facturés et validés"
-            value={result.actualPurchaseCostCents}
-            missing="En attente du rapprochement Pennylane ; les BC engagés ne sont pas des coûts réels"
-          />
-          <CostRow
-            label="Total coûts réels"
-            value={result.actualTotalCostCents}
-            missing="Disponible quand les deux sources sont complètes"
-            total
-          />
-        </div>
-        <p className="chantierProfitabilityNote">
-          Le coût des heures effectuées ne reprend jamais le tarif prévu du devis. Le mois en cours
-          utilise provisoirement le coût horaire du mois précédent ; un mois clôturé exige son
-          propre coût employeur.
-        </p>
-      </section>
 
       <section className="chantierProfitabilityBlock">
         <BlockTitle
