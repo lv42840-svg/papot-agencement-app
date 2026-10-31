@@ -516,6 +516,22 @@ async function ensureBillingStorage(client: PoolClient): Promise<void> {
   `);
 }
 
+async function ensurePurchaseOrdersStorage(client: PoolClient): Promise<void> {
+  await client.query(`
+    CREATE TABLE IF NOT EXISTS papot_purchase_orders_state (
+      scope TEXT PRIMARY KEY CHECK (scope = 'global'),
+      version INTEGER NOT NULL DEFAULT 1 CHECK (version > 0),
+      payload JSONB NOT NULL CHECK (jsonb_typeof(payload) = 'object'),
+      updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+    )
+  `);
+  await client.query(`
+    INSERT INTO papot_purchase_orders_state (scope, version, payload)
+    VALUES ('global', 1, '{"schemaVersion":1,"nextNumber":1,"orders":[]}'::jsonb)
+    ON CONFLICT (scope) DO NOTHING
+  `);
+}
+
 async function ensureCompanyProfileStorage(client: PoolClient): Promise<void> {
   await client.query(`
     CREATE TABLE IF NOT EXISTS papot_company_profile (
@@ -681,6 +697,8 @@ export async function runServerDbMigrations(
       `,
       [MONTHLY_LABOR_COSTS_STORAGE_VERSION, MONTHLY_LABOR_COSTS_STORAGE_NAME],
     );
+
+    await ensurePurchaseOrdersStorage(client);
 
     await ensureBillingStorage(client);
     await client.query(
