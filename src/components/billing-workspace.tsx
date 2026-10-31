@@ -91,7 +91,10 @@ export function BillingWorkspace({
   }));
   const cumulativeLinesCents = (active?.lines ?? []).reduce((sum, line, index) => {
     const percent = enteredLineRows[index]?.percent;
-    return sum + (Number.isFinite(percent) ? Math.round((line.amountHtCents * percent) / 100) : 0);
+    return sum +
+      (typeof percent === "number" && Number.isFinite(percent)
+        ? Math.round((line.amountHtCents * percent) / 100)
+        : 0);
   }, 0);
   const progressPreviewError = (() => {
     if (type !== "PROGRESS" || mode !== "LINES" || !active || !data) return "";
