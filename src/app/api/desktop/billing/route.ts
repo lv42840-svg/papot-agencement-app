@@ -7,6 +7,7 @@ import {
 } from "@/lib/desktop/request-context";
 import {
   createBillingDraft,
+  approveBillingDraft,
   updateBillingDraft,
   updateBillingDocument,
   billingTypeSchema,
@@ -72,6 +73,11 @@ const billingMutationSchema = z.discriminatedUnion("action", [
         .optional(),
     })
     .strict(),
+  z.object({
+    action: z.literal("APPROVE"),
+    draftId: z.string().uuid(),
+    expectedUpdatedAt: z.string().datetime({ offset: true }),
+  }).strict(),
   z
     .object({
       action: z.literal("DELETE"),
@@ -96,7 +102,9 @@ function statusFor(code: string): number {
     code === "BILLING_PROGRESS_CANNOT_DECREASE" ||
     code === "BILLING_PROGRESS_TAX_ALLOCATION_UNAVAILABLE" ||
     code === "BILLING_DRAFT_HAS_DEPENDENTS" ||
-    code === "BILLING_DOCUMENT_EDIT_REQUIRED"
+    code === "BILLING_DOCUMENT_EDIT_REQUIRED" ||
+    code === "BILLING_DRAFT_LOCKED" ||
+    code === "BILLING_APPROVAL_TOTALS_MISMATCH"
   )
     return 409;
   return 400;
@@ -132,6 +140,10 @@ export async function POST(request: Request) {
           throw new Error("BILLING_QUOTE_NOT_AVAILABLE");
         }
         drafts.push(createBillingDraft(current, source, input, context.user.displayName));
+      } else if (input.action === "APPROVE") {
+        const index = drafts.findIndex((draft) => draft.id === input.draftId);
+        if (index < 0) throw new Error("BILLING_DRAFT_NOT_FOUND");
+        drafts[index] = approveBillingDraft(current, input.draftId, input.expectedUpdatedAt, context.user.displayName);
       } else if (input.action === "UPDATE_DOCUMENT") {
         const index = drafts.findIndex((draft) => draft.id === input.draftId);
         if (index < 0) throw new Error("BILLING_DRAFT_NOT_FOUND");
@@ -148,6 +160,7 @@ export async function POST(request: Request) {
       } else {
         const index = drafts.findIndex((draft) => draft.id === input.draftId);
         if (index < 0) throw new Error("BILLING_DRAFT_NOT_FOUND");
+        if (drafts[index].status !== "DRAFT") throw new Error("BILLING_DRAFT_LOCKED");
         if (drafts[index].updatedAt !== input.expectedUpdatedAt) {
           throw new Error("BILLING_VERSION_CONFLICT");
         }
