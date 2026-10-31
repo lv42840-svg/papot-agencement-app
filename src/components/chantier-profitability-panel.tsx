@@ -109,6 +109,14 @@ export function ChantierProfitabilityPanel({
         />
       </div>
 
+      <div style={{ display: "flex", justifyContent: "flex-end" }}>
+        <Link
+          href={`/achats?chantierId=${encodeURIComponent(chantier.id)}`}
+          className="secondaryButton"
+        >
+          Nouveau bon de commande pour ce chantier
+        </Link>
+      </div>
       <div className="chantierProfitabilityColumns">
         <section className="chantierProfitabilityBlock">
           <BlockTitle
