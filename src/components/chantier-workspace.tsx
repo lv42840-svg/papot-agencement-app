@@ -50,6 +50,7 @@ type ChantiersSnapshot = {
   focusChantierId?: string;
   planningCloseWarnings: Record<string, ChantierPlanningCloseWarning>;
   committedPurchasesByChantier: Record<string, number> | null;
+  canRemovePurchaseCommitments: boolean;
   purchaseCloseWarnings: Record<string, PurchaseCloseWarning> | null;
   serverNow: string;
 };
@@ -403,6 +404,7 @@ export function ChantierWorkspace({ chantierId }: { chantierId: string }) {
             capabilities={chantiersSnapshot.capabilities}
             closeWarning={chantiersSnapshot.planningCloseWarnings[chantier.id] ?? null}
             purchaseWarning={chantiersSnapshot.purchaseCloseWarnings?.[chantier.id] ?? null}
+            canRemovePurchases={chantiersSnapshot.canRemovePurchaseCommitments}
             mutate={mutate}
           />
         ) : null}
@@ -702,6 +704,7 @@ function LifecycleTab({
   capabilities,
   closeWarning,
   purchaseWarning,
+  canRemovePurchases,
   mutate,
 }: {
   chantier: ChantierRecord;
@@ -709,6 +712,7 @@ function LifecycleTab({
   capabilities: ChantierCapabilities;
   closeWarning: ChantierPlanningCloseWarning | null;
   purchaseWarning: PurchaseCloseWarning | null;
+  canRemovePurchases: boolean;
   mutate: (body: MutationBody, message: string) => Promise<boolean>;
 }) {
   const [closingAction, setClosingAction] = useState<"close" | "cancel" | null>(null);
@@ -859,10 +863,11 @@ function LifecycleTab({
                           type="radio"
                           name="purchase-close-review"
                           checked={purchaseDecision === "REMOVE"}
-                          disabled={busy}
+                          disabled={busy || !canRemovePurchases}
                           onChange={() => setPurchaseDecision("REMOVE")}
                         />
                         Retirer les engagements de ce chantier sans effacer les BC
+                        {!canRemovePurchases ? " (droit Achats modification requis)" : ""}
                       </label>
                       {purchaseDecision === "REMOVE" ? (
                         <label className="chantierArchiveCheck">
