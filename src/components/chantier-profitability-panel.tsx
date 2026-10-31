@@ -169,6 +169,44 @@ export function ChantierProfitabilityPanel({
         réelle.
       </p>
 
+      <h3 className="chantierProfitabilityCardsLabel">Consommation du budget à date</h3>
+      <div className="chantierProfitabilityCards">
+        <Metric
+          label="Heures réalisées + BC engagés"
+          value={money(result.knownCostCommitmentsCents)}
+          detail="Heures au coût employeur et BC HT, sans les assimiler à des factures"
+        />
+        <Metric
+          label="Budget total restant à couvrir"
+          value={money(result.remainingCostBudgetCents)}
+          detail="Budget total du devis moins heures réalisées et BC engagés ; reste à produire non inclus"
+          className={tone(result.remainingCostBudgetCents)}
+        />
+        <Metric
+          label="Budget heures restant"
+          value={money(result.remainingLaborBudgetCents)}
+          detail="Coût des heures prévu moins coût des heures effectivement saisies"
+          className={tone(result.remainingLaborBudgetCents)}
+        />
+      </div>
+      {result.remainingCostBudgetCents !== null && result.remainingCostBudgetCents < 0 ? (
+        <div className="chantierProfitabilityWarning" role="alert">
+          <AlertTriangle size={15} />
+          Dépassement du budget total de coûts de {money(-result.remainingCostBudgetCents)}
+          avant même les travaux et achats restant à réaliser.
+        </div>
+      ) : null}
+      {result.remainingLaborBudgetCents !== null && result.remainingLaborBudgetCents < 0 ? (
+        <div className="chantierProfitabilityWarning" role="alert">
+          <AlertTriangle size={15} />
+          Dépassement du budget main-d&apos;œuvre de {money(-result.remainingLaborBudgetCents)}.
+        </div>
+      ) : null}
+      <p className="chantierProfitabilityNote">
+        Ce suivi de budget n&apos;est ni une marge à terminaison ni un résultat réel : les BC ne
+        sont pas des factures, et les achats ou heures restant à faire sont exclus.
+      </p>
+
       <div style={{ display: "flex", justifyContent: "flex-end" }}>
         <Link
           href={`/achats?chantierId=${encodeURIComponent(chantier.id)}`}

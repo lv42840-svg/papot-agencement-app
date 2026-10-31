@@ -21,6 +21,9 @@ const example: CompanyProfitabilityRow = {
   actualPurchaseCostCents: null,
   actualTotalCostCents: null,
   actualMarginCents: null,
+  knownCostCommitmentsCents: 57_000,
+  remainingCostBudgetCents: 0,
+  remainingLaborBudgetCents: 5_000,
   plannedPurchasesCents: 40_000,
   committedPurchasesCents: 45_000,
   plannedHours: 6,
@@ -44,6 +47,11 @@ describe("rentabilité entreprise", () => {
     expect(totals.actualTotalCostCents).toBeNull();
     expect(totals.actualMarginCents).toBeNull();
     expect(totals.provisionalLaborCount).toBe(2);
+    expect(totals.knownCostCommitmentsCents).toBe(114_000);
+    expect(totals.remainingCostBudgetCents).toBe(0);
+    expect(totals.remainingLaborBudgetCents).toBe(10_000);
+    expect(totals.budgetOverrunCount).toBe(0);
+    expect(totals.laborBudgetOverrunCount).toBe(0);
     expect(totals.plannedHours).toBe(12);
     expect(totals.actualHours).toBe(16);
   });
@@ -58,12 +66,14 @@ describe("rentabilité entreprise", () => {
         plannedTotalCostCents: null,
         plannedMarginCents: null,
         missingData: true,
+        remainingCostBudgetCents: null,
       },
     ]);
     expect(totals.incompleteCount).toBe(1);
     expect(totals.plannedLaborCostCents).toBeNull();
     expect(totals.plannedTotalCostCents).toBeNull();
     expect(totals.plannedMarginCents).toBeNull();
+    expect(totals.remainingCostBudgetCents).toBeNull();
   });
 
   it("masque les totaux des heures réelles si un chantier manque son coût de paie", () => {
@@ -74,11 +84,36 @@ describe("rentabilité entreprise", () => {
         chantierId: "22222222-2222-4222-8222-222222222222",
         actualLaborCostCents: null,
         actualLaborCostProvisional: false,
+        knownCostCommitmentsCents: null,
+        remainingCostBudgetCents: null,
+        remainingLaborBudgetCents: null,
       },
     ]);
     expect(totals.actualLaborCostCents).toBeNull();
+    expect(totals.knownCostCommitmentsCents).toBeNull();
+    expect(totals.remainingCostBudgetCents).toBeNull();
+    expect(totals.remainingLaborBudgetCents).toBeNull();
     expect(totals.provisionalLaborCount).toBe(1);
     expect(totals.plannedMarginCents).toBe(86_000);
+  });
+
+  it("remonte les dépassements de coût à date sans inventer une marge réelle", () => {
+    const totals = companyProfitabilityTotals([
+      example,
+      {
+        ...example,
+        chantierId: "22222222-2222-4222-8222-222222222222",
+        committedPurchasesCents: 60_000,
+        knownCostCommitmentsCents: 72_000,
+        remainingCostBudgetCents: -15_000,
+        remainingLaborBudgetCents: 5_000,
+      },
+    ]);
+    expect(totals.knownCostCommitmentsCents).toBe(129_000);
+    expect(totals.remainingCostBudgetCents).toBe(-15_000);
+    expect(totals.budgetOverrunCount).toBe(1);
+    expect(totals.laborBudgetOverrunCount).toBe(0);
+    expect(totals.actualMarginCents).toBeNull();
   });
 
   it("sécurise l'accès global et montre chaque chantier sans facturation fictive", () => {
@@ -103,6 +138,10 @@ describe("rentabilité entreprise", () => {
     expect(ui).toContain("total.actualLaborCostCents");
     expect(ui).toContain("total.actualPurchaseCostCents");
     expect(ui).toContain("total.actualMarginCents");
+    expect(ui).toContain("Suivi des budgets engagés à date");
+    expect(ui).toContain("total.remainingCostBudgetCents");
+    expect(ui).toContain("total.remainingLaborBudgetCents");
+    expect(ui).toContain("total.budgetOverrunCount");
     expect(ui).toContain("Coûts à compléter");
     expect(ui).toContain("Les achats engagés sont des BC");
   });

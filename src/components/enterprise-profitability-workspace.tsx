@@ -224,6 +224,40 @@ export function EnterpriseProfitabilityWorkspace() {
             Les factures clients et fournisseurs ne sont pas encore raccordées à Pennylane : leur
             montant réel, le coût réel total et la marge réelle restent indisponibles.
           </p>
+          <h2 style={{ fontSize: 15, margin: "5px 0 0", color: "#6251ba" }}>
+            Suivi des budgets engagés à date
+          </h2>
+          <div
+            style={{
+              display: "grid",
+              gridTemplateColumns: "repeat(auto-fit, minmax(min(100%, 200px), 1fr))",
+              gap: 12,
+            }}
+          >
+            {[
+              ["Heures réalisées + BC engagés", actualEuro(total.knownCostCommitmentsCents)],
+              ["Budget total restant à couvrir", actualEuro(total.remainingCostBudgetCents)],
+              ["Budget heures restant", actualEuro(total.remainingLaborBudgetCents)],
+              ["Chantiers dépassant le budget total", String(total.budgetOverrunCount)],
+              ["Chantiers dépassant le budget heures", String(total.laborBudgetOverrunCount)],
+            ].map(([label, value]) => (
+              <div key={label} style={{ background: "white", borderRadius: 10, padding: 15 }}>
+                <div style={{ fontSize: 12, color: "#6f677a" }}>{label}</div>
+                <strong style={{ fontSize: 20 }}>{value}</strong>
+              </div>
+            ))}
+          </div>
+          <p>
+            Budget consommé à date = heures effectuées au coût employeur + BC engagés. Ce solde ne
+            comprend ni le travail restant ni les achats non commandés ; ce n&apos;est pas une marge
+            prévisionnelle à terminaison.
+          </p>
+          {total.budgetOverrunCount > 0 ? (
+            <p role="alert" style={{ color: "#a34c32" }}>
+              {total.budgetOverrunCount} chantier(s) ont dépassé leur budget total de coûts avant
+              même de tenir compte des dépenses restantes.
+            </p>
+          ) : null}
           {total.incompleteCount > 0 ? (
             <p role="status" style={{ color: "#a35018" }}>
               {total.incompleteCount} chantier(s) ont des coûts prévus incomplets. Les totaux
@@ -242,7 +276,7 @@ export function EnterpriseProfitabilityWorkspace() {
           >
             <h2>Rentabilité par chantier ({filtered.length})</h2>
             <table
-              style={{ width: "100%", minWidth: 1430, borderCollapse: "collapse", fontSize: 12 }}
+              style={{ width: "100%", minWidth: 1650, borderCollapse: "collapse", fontSize: 12 }}
             >
               <thead>
                 <tr style={{ textAlign: "left", borderBottom: "2px solid #ded8e9" }}>
@@ -257,6 +291,8 @@ export function EnterpriseProfitabilityWorkspace() {
                   <th style={{ textAlign: "right" }}>Heures réalisées (€)</th>
                   <th style={{ textAlign: "right" }}>Achats réels (€)</th>
                   <th style={{ textAlign: "right" }}>Marge réelle</th>
+                  <th style={{ textAlign: "right" }}>Budget coûts restant</th>
+                  <th style={{ textAlign: "right" }}>Budget heures restant</th>
                   <th style={{ textAlign: "right" }}>Heures prévues / réelles</th>
                 </tr>
               </thead>
@@ -283,6 +319,8 @@ export function EnterpriseProfitabilityWorkspace() {
                       row.actualLaborCostCents,
                       row.actualPurchaseCostCents,
                       row.actualMarginCents,
+                      row.remainingCostBudgetCents,
+                      row.remainingLaborBudgetCents,
                     ].map((value, index) => (
                       <td
                         key={index}

@@ -32,6 +32,9 @@ export type ChantierProfitability = {
   plannedPurchasesCents: number | null;
   committedPurchasesCents: number | null;
   purchaseBudgetOverrunCents: number | null;
+  knownCostCommitmentsCents: number | null;
+  remainingCostBudgetCents: number | null;
+  remainingLaborBudgetCents: number | null;
   plannedPurchaseLines: PlannedPurchaseLine[];
   purchaseClassificationWarnings: Array<{
     quoteReference: string;
@@ -174,6 +177,22 @@ export function calculateChantierProfitability(
       ? null
       : marginPercent(soldCents, plannedTotalCostCents);
 
+  // Operational consumption is deliberately NOT "actual cost" or accounting margin:
+  // payroll hours are incurred and purchase orders only committed, not invoiced.
+  // It can still increase as more work is recorded or BCs are placed.
+  const knownCostCommitmentsCents =
+    actualCosts.laborCostCents !== null && committedPurchasesCents !== null
+      ? addSafeMoney(actualCosts.laborCostCents, committedPurchasesCents)
+      : null;
+  const remainingCostBudgetCents =
+    knownCostCommitmentsCents !== null && plannedTotalCostCents !== null
+      ? plannedTotalCostCents - knownCostCommitmentsCents
+      : null;
+  const remainingLaborBudgetCents =
+    actualCosts.laborCostCents !== null && plannedLaborCostCents !== null
+      ? plannedLaborCostCents - actualCosts.laborCostCents
+      : null;
+
   const actualCostsComplete =
     actualCosts.laborCostCents !== null && actualCosts.purchaseCostCents !== null;
   const actualTotalCostCents = actualCostsComplete
@@ -209,6 +228,9 @@ export function calculateChantierProfitability(
       committedPurchasesCents === null || plannedPurchasesCents === null
         ? null
         : committedPurchasesCents - plannedPurchasesCents,
+    knownCostCommitmentsCents,
+    remainingCostBudgetCents,
+    remainingLaborBudgetCents,
     plannedPurchaseLines,
     purchaseClassificationWarnings,
     plannedMarginCents,
