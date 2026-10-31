@@ -150,7 +150,7 @@ export function EnterpriseProfitabilityWorkspace() {
           </h2>
           <div style={{
             display: "grid",
-            gridTemplateColumns: "repeat(5, minmax(0, 1fr))",
+            gridTemplateColumns: "repeat(auto-fit, minmax(min(100%, 185px), 1fr))",
             gap: 12,
           }}>
             {[
@@ -173,7 +173,7 @@ export function EnterpriseProfitabilityWorkspace() {
           </h2>
           <div style={{
             display: "grid",
-            gridTemplateColumns: "repeat(5, minmax(0, 1fr))",
+            gridTemplateColumns: "repeat(auto-fit, minmax(min(100%, 185px), 1fr))",
             gap: 12,
           }}>
             {[
