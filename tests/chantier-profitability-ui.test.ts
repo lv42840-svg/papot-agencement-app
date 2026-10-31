@@ -23,7 +23,7 @@ describe("chantier profitability UI", () => {
   });
 
   it("shows sold, planned debourse, hours, actual costs and margins", () => {
-    expect(panel).toContain("Vendu HT");
+    expect(panel).toContain("Vendu prévu HT");
     expect(panel).toContain("Achats et frais prévus (hors heures)");
     expect(panel).toContain("Coût des heures prévues");
     expect(panel).toContain("Coût total prévu");
