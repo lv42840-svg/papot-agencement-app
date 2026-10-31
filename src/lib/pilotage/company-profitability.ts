@@ -47,7 +47,7 @@ export function calculateCompanyProfitability(
   return chantiers
     .filter((site) => site.status !== "CANCELLED")
     .map((site) => {
-      const caseRecord = casesById.get(site.commercialCaseId) ?? null;
+      const caseRecord = casesById.get(site.sourceCommercialCaseId) ?? null;
       const hours = actualHoursBySite.get(site.id);
       const projection = calculateChantierProfitability(
         hours ? { ...site, actualHours: hours } : site,
