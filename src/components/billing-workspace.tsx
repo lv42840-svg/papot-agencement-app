@@ -4,6 +4,10 @@ import { useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
 import { parseBillingPercentageInput } from "@/lib/billing/percentage-input";
 import { calculateLineProgress } from "@/lib/billing/progress";
+import {
+  filterBillingProjects,
+  type BillingProjectSort,
+} from "@/lib/billing/workspace-list";
 import type {
   BillingDraft,
   BillingPayload,
@@ -43,6 +47,15 @@ export function BillingWorkspace({
   const [edit, setEdit] = useState<BillingDraft | null>(null);
   const [label, setLabel] = useState("");
   const [notes, setNotes] = useState("");
+  const [tab, setTab] = useState<"QUOTE" | "CHANTIER" | "PROJECTS">(
+    chantierId ? "CHANTIER" : "QUOTE",
+  );
+  const [selectedChantier, setSelectedChantier] = useState(chantierId ?? "");
+  const [projectSearch, setProjectSearch] = useState("");
+  const [projectStatus, setProjectStatus] = useState<"ALL" | BillingDraft["status"]>("ALL");
+  const [projectType, setProjectType] = useState<"ALL" | BillingType>("ALL");
+  const [projectChantier, setProjectChantier] = useState("ALL");
+  const [projectSort, setProjectSort] = useState<BillingProjectSort>("RECENT");
   async function refresh() {
     const response = await fetch("/api/desktop/billing", { cache: "no-store" });
     const body = (await response.json()) as Snapshot & { error?: string };
@@ -52,13 +65,40 @@ export function BillingWorkspace({
   useEffect(() => {
     void refresh().catch(() => setError("Impossible de charger la facturation."));
   }, []);
-  const sources = (data?.sources ?? []).filter(
-    (s) => (!quoteId || s.quoteId === quoteId) && (!chantierId || s.chantierId === chantierId),
-  );
-  const active = sources.find((s) => s.quoteId === selection) ?? sources[0];
-  const drafts = (data?.payload.drafts ?? []).filter(
-    (d) => (!quoteId || d.quoteId === quoteId) && (!chantierId || d.chantierId === chantierId),
-  );
+  const allSources = data?.sources ?? [];
+  const chantierChoices = [
+    ...new Map(
+      allSources
+        .filter((source) => source.chantierId !== null)
+        .map((source) => [
+          source.chantierId!,
+          { id: source.chantierId!, name: source.affairName, client: source.clientName },
+        ]),
+    ).values(),
+  ].sort((a, b) => a.name.localeCompare(b.name, "fr-FR"));
+  const activeChantierId = chantierChoices.some((site) => site.id === selectedChantier)
+    ? selectedChantier
+    : (chantierChoices[0]?.id ?? "");
+  const sources =
+    tab === "CHANTIER"
+      ? allSources.filter((source) => source.chantierId === activeChantierId)
+      : allSources;
+  const active = sources.find((source) => source.quoteId === selection) ?? sources[0];
+  const drafts = data?.payload.drafts ?? [];
+  const projectChantiers = [
+    ...new Map(
+      drafts
+        .filter((draft) => draft.chantierId !== null)
+        .map((draft) => [draft.chantierId!, { id: draft.chantierId!, label: draft.affairName }]),
+    ).values(),
+  ].sort((a, b) => a.label.localeCompare(b.label, "fr-FR"));
+  const visibleDrafts = filterBillingProjects(drafts, {
+    search: projectSearch,
+    status: projectStatus,
+    type: projectType,
+    chantierId: projectChantier,
+    sort: projectSort,
+  });
   const used = active
     ? (data?.payload.drafts ?? [])
         .filter((d) => d.quoteId === active.quoteId)
@@ -242,14 +282,78 @@ export function BillingWorkspace({
           {notice}
         </p>
       )}
+      <div
+        role="tablist"
+        aria-label="Rubriques de facturation"
+        style={{ display: "flex", gap: 8, flexWrap: "wrap" }}
+      >
+        {([
+          ["QUOTE", "Nouvelle facture depuis devis"],
+          ["CHANTIER", "Nouvelle facture depuis chantier"],
+          ["PROJECTS", `Projets de factures (${drafts.length})`],
+        ] as const).map(([key, caption]) => (
+          <button
+            key={key}
+            type="button"
+            role="tab"
+            aria-selected={tab === key}
+            className={tab === key ? "primaryButton" : "secondaryButton"}
+            onClick={() => {
+              setTab(key);
+              setSelection("");
+              setLineValues({});
+              setValue("");
+              setError("");
+              setNotice("");
+              setEdit(null);
+            }}
+          >
+            {caption}
+          </button>
+        ))}
+      </div>
       {!data && <p>Chargement…</p>}
-      {data && (
+      {data && tab !== "PROJECTS" && (
         <section
+          role="tabpanel"
           style={{ background: "white", padding: 20, borderRadius: 12, display: "grid", gap: 12 }}
         >
-          <h2>Créer une facture depuis le devis, puis modifier ses lignes</h2>
+          <h2>
+            {tab === "CHANTIER"
+              ? "Nouvelle facture depuis un chantier"
+              : "Nouvelle facture depuis un devis retenu"}
+          </h2>
+          {tab === "CHANTIER" && (
+            <label>
+              Chantier
+              {chantierChoices.length > 0 ? (
+                <select
+                  aria-label="Choisir un chantier à facturer"
+                  style={{ width: "100%", padding: 9 }}
+                  value={activeChantierId}
+                  onChange={(e) => {
+                    setSelectedChantier(e.target.value);
+                    setSelection("");
+                    setLineValues({});
+                    setError("");
+                  }}
+                >
+                  {chantierChoices.map((site) => (
+                    <option key={site.id} value={site.id}>
+                      {site.name} · {site.client}
+                    </option>
+                  ))}
+                </select>
+              ) : (
+                <p>Aucun chantier avec un devis retenu éligible à la facturation.</p>
+              )}
+            </label>
+          )}
           {sources.length === 0 ? (
-            <p>Aucun devis retenu éligible. Vérifie les devis retenus et leurs prix.</p>
+            <p>
+              Aucun devis retenu éligible pour cette sélection. Vérifie les devis retenus et leurs
+              prix.
+            </p>
           ) : (
             <>
               <label>
@@ -422,15 +526,86 @@ export function BillingWorkspace({
           )}
         </section>
       )}
-      {data && (
+      {data && tab === "PROJECTS" && (
         <section
+          role="tabpanel"
           style={{ background: "white", padding: 20, borderRadius: 12, display: "grid", gap: 12 }}
         >
-          <h2>Projets de facture ({drafts.length})</h2>
-          {drafts.length === 0 ? (
-            <p>Aucun projet pour cette sélection.</p>
+          <h2>Projets de factures ({drafts.length})</h2>
+          <div style={{ display: "flex", gap: 12, flexWrap: "wrap", alignItems: "end" }}>
+            <label style={{ display: "grid", gap: 5, flex: "2 1 220px" }}>
+              Rechercher (client, chantier, devis)
+              <input
+                aria-label="Rechercher un projet de facture"
+                value={projectSearch}
+                placeholder="Nom, référence, libellé…"
+                onChange={(e) => setProjectSearch(e.target.value)}
+              />
+            </label>
+            <label style={{ display: "grid", gap: 5, flex: "1 1 125px" }}>
+              Statut
+              <select
+                aria-label="Filtrer par statut"
+                value={projectStatus}
+                onChange={(e) => setProjectStatus(e.target.value as typeof projectStatus)}
+              >
+                <option value="ALL">Tous</option>
+                <option value="DRAFT">À préparer</option>
+                <option value="APPROVED">Validés en interne</option>
+              </select>
+            </label>
+            <label style={{ display: "grid", gap: 5, flex: "1 1 125px" }}>
+              Type
+              <select
+                aria-label="Filtrer par type"
+                value={projectType}
+                onChange={(e) => setProjectType(e.target.value as typeof projectType)}
+              >
+                <option value="ALL">Tous</option>
+                {options.map((option) => (
+                  <option key={option.value} value={option.value}>
+                    {option.label}
+                  </option>
+                ))}
+              </select>
+            </label>
+            <label style={{ display: "grid", gap: 5, flex: "1 1 170px" }}>
+              Chantier
+              <select
+                aria-label="Filtrer par chantier"
+                value={projectChantier}
+                onChange={(e) => setProjectChantier(e.target.value)}
+              >
+                <option value="ALL">Tous les chantiers</option>
+                <option value="NONE">Sans chantier</option>
+                {projectChantiers.map((site) => (
+                  <option key={site.id} value={site.id}>
+                    {site.label}
+                  </option>
+                ))}
+              </select>
+            </label>
+            <label style={{ display: "grid", gap: 5, flex: "1 1 135px" }}>
+              Trier par
+              <select
+                aria-label="Trier les projets de factures"
+                value={projectSort}
+                onChange={(e) => setProjectSort(e.target.value as BillingProjectSort)}
+              >
+                <option value="RECENT">Plus récents</option>
+                <option value="OLDEST">Plus anciens</option>
+                <option value="CLIENT">Client A-Z</option>
+                <option value="AMOUNT_DESC">Montant HT décroissant</option>
+              </select>
+            </label>
+          </div>
+          <p>
+            {visibleDrafts.length} projet(s) affiché(s) sur {drafts.length}.
+          </p>
+          {visibleDrafts.length === 0 ? (
+            <p>Aucun projet ne correspond aux filtres.</p>
           ) : (
-            drafts.map((d) => (
+            visibleDrafts.map((d) => (
               <article
                 key={d.id}
                 style={{
@@ -442,7 +617,10 @@ export function BillingWorkspace({
                 }}
               >
                 <div>
-                  <b>{d.label}</b> <span style={{ fontSize: 11, color: "#815ba0" }}>PROJET</span>
+                  <b>{d.label}</b>{" "}
+                  <span style={{ fontSize: 11, color: "#815ba0" }}>
+                    {d.status === "APPROVED" ? "VALIDÉ EN INTERNE · NON ÉMIS" : "PROJET · NON ÉMIS"}
+                  </span>
                 </div>
                 <small>
                   {d.affairName} · {d.quoteLabel} · {d.clientName}
@@ -453,7 +631,7 @@ export function BillingWorkspace({
                 </p>
                 <div>
                   <Link href={`/facturation/${encodeURIComponent(d.id)}`} className="primaryButton">
-                    Ouvrir et modifier la facture
+                    {d.status === "APPROVED" ? "Consulter le projet" : "Ouvrir et modifier la facture"}
                   </Link>
                 </div>
                 {d.lineProgress?.length ? (
@@ -508,7 +686,7 @@ export function BillingWorkspace({
                   </div>
                 ) : (
                   <div style={{ display: "flex", gap: 8 }}>
-                    {data.canWrite && (
+                    {data.canWrite && d.status === "DRAFT" && (
                       <button
                         className="secondaryButton"
                         disabled={busy}
@@ -521,7 +699,7 @@ export function BillingWorkspace({
                         Modifier
                       </button>
                     )}
-                    {data.canWrite && (
+                    {data.canWrite && d.status === "DRAFT" && (
                       <button
                         className="secondaryButton"
                         disabled={busy}
