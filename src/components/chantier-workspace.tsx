@@ -25,6 +25,7 @@ import {
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { ChantierOperationalWorkspace } from "@/components/chantier-operational-workspace";
 import { ChantierProfitabilityPanel } from "@/components/chantier-profitability-panel";
+import { ChantierBillingTab } from "@/components/chantier-billing-tab";
 import {
   CHANTIER_STATUS_LABELS,
   chantierRemainingHours,
@@ -62,6 +63,7 @@ type ChantierTab =
   | "documents"
   | "capacity"
   | "profitability"
+  | "billing"
   | "history";
 
 const errorMessages: Record<string, string> = {
@@ -292,6 +294,7 @@ export function ChantierWorkspace({ chantierId }: { chantierId: string }) {
     },
     { id: "capacity", label: "Charge", icon: CalendarClock },
     { id: "profitability", label: "Rentabilité", icon: BadgeEuro },
+    { id: "billing", label: "Factures", icon: FileText },
     { id: "history", label: "Historique", icon: History, badge: chantier.history.length },
   ];
 
@@ -318,12 +321,13 @@ export function ChantierWorkspace({ chantierId }: { chantierId: string }) {
         </div>
         <div className="chantierHeadingActions">
           {commercialCase && commercialCase.retainedQuoteIds.length > 0 ? (
-            <Link
+            <button
+              type="button"
               className="primaryButton"
-              href={`/facturation?chantierId=${encodeURIComponent(chantier.id)}`}
+              onClick={() => setActiveTab("billing")}
             >
-              Facturer ce chantier
-            </Link>
+              Factures de ce chantier
+            </button>
           ) : null}
           {commercialCase ? (
             <Link className="secondaryButton" href={`/commercial?focus=${commercialCase.id}`}>
@@ -420,6 +424,7 @@ export function ChantierWorkspace({ chantierId }: { chantierId: string }) {
             }}
           />
         ) : null}
+        {activeTab === "billing" ? <ChantierBillingTab chantierId={chantier.id} /> : null}
         {activeTab === "history" ? <HistoryTab chantier={chantier} /> : null}
       </section>
 
