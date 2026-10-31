@@ -1,5 +1,6 @@
 import type { ChantierHours, ChantierRecord } from "../chantiers/domain";
 import { calculateChantierProfitability } from "../chantiers/profitability";
+import type { ChantierLaborCostEstimate } from "../payroll/chantier-labor-cost";
 import type { CommercialCase } from "../commercial/domain";
 import type { NativeQuotesPayload } from "../quotes/store";
 import type { PurchaseOrdersPayload } from "../purchases/domain";
@@ -16,6 +17,11 @@ export type CompanyProfitabilityRow = {
   plannedOtherCostCents: number | null;
   plannedTotalCostCents: number | null;
   plannedMarginCents: number | null;
+  actualLaborCostCents: number | null;
+  actualLaborCostProvisional: boolean;
+  actualPurchaseCostCents: number | null;
+  actualTotalCostCents: number | null;
+  actualMarginCents: number | null;
   committedPurchasesCents: number;
   plannedPurchasesCents: number | null;
   plannedHours: number;
@@ -31,6 +37,11 @@ export type CompanyProfitabilityTotals = {
   plannedOtherCostCents: number | null;
   plannedTotalCostCents: number | null;
   plannedMarginCents: number | null;
+  actualLaborCostCents: number | null;
+  actualPurchaseCostCents: number | null;
+  actualTotalCostCents: number | null;
+  actualMarginCents: number | null;
+  provisionalLaborCount: number;
   committedPurchasesCents: number;
   plannedHours: number;
   actualHours: number;
@@ -42,6 +53,7 @@ export function calculateCompanyProfitability(
   quotes: NativeQuotesPayload,
   purchases: PurchaseOrdersPayload,
   actualHoursBySite: ReadonlyMap<string, ChantierHours> = new Map(),
+  laborCostsBySite: ReadonlyMap<string, ChantierLaborCostEstimate> = new Map(),
 ): CompanyProfitabilityRow[] {
   const casesById = new Map(cases.map((item) => [item.id, item]));
   return chantiers
@@ -49,11 +61,12 @@ export function calculateCompanyProfitability(
     .map((site) => {
       const caseRecord = casesById.get(site.sourceCommercialCaseId) ?? null;
       const hours = actualHoursBySite.get(site.id);
+      const labor = laborCostsBySite.get(site.id);
       const projection = calculateChantierProfitability(
         hours ? { ...site, actualHours: hours } : site,
         caseRecord,
         quotes,
-        { laborCostCents: null, purchaseCostCents: null },
+        { laborCostCents: labor?.costCents ?? null, purchaseCostCents: null },
         committedPurchaseTotal(purchases, site.id),
       );
       return {
@@ -67,6 +80,11 @@ export function calculateCompanyProfitability(
         plannedOtherCostCents: projection.plannedDisbursementCents,
         plannedTotalCostCents: projection.plannedTotalCostCents,
         plannedMarginCents: projection.plannedMarginCents,
+        actualLaborCostCents: projection.actualLaborCostCents,
+        actualLaborCostProvisional: labor?.provisional ?? false,
+        actualPurchaseCostCents: projection.actualPurchaseCostCents,
+        actualTotalCostCents: projection.actualTotalCostCents,
+        actualMarginCents: projection.actualMarginCents,
         committedPurchasesCents: projection.committedPurchasesCents ?? 0,
         plannedPurchasesCents: projection.plannedPurchasesCents,
         plannedHours: projection.plannedHours.total,
@@ -90,7 +108,11 @@ export function companyProfitabilityTotals(
       | "plannedLaborCostCents"
       | "plannedOtherCostCents"
       | "plannedTotalCostCents"
-      | "plannedMarginCents",
+      | "plannedMarginCents"
+      | "actualLaborCostCents"
+      | "actualPurchaseCostCents"
+      | "actualTotalCostCents"
+      | "actualMarginCents",
   ): number | null =>
     rows.some((row) => row[key] === null)
       ? null
@@ -103,6 +125,11 @@ export function companyProfitabilityTotals(
     plannedOtherCostCents: sum("plannedOtherCostCents"),
     plannedTotalCostCents: sum("plannedTotalCostCents"),
     plannedMarginCents: sum("plannedMarginCents"),
+    actualLaborCostCents: sum("actualLaborCostCents"),
+    actualPurchaseCostCents: sum("actualPurchaseCostCents"),
+    actualTotalCostCents: sum("actualTotalCostCents"),
+    actualMarginCents: sum("actualMarginCents"),
+    provisionalLaborCount: rows.filter((row) => row.actualLaborCostProvisional).length,
     committedPurchasesCents: rows.reduce((total, row) => total + row.committedPurchasesCents, 0),
     plannedHours: rows.reduce((total, row) => total + row.plannedHours, 0),
     actualHours: rows.reduce((total, row) => total + row.actualHours, 0),
