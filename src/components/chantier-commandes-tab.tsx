@@ -86,8 +86,8 @@ export function ChantierCommandesTab({ chantierId }: { chantierId: string }) {
         <div>
           <h2>Commandes du chantier</h2>
           <p>
-            Bons de commande rapides et détaillés, affectés à ce chantier. Les BC multi-chantiers
-            n&apos;affichent ici que leur part.
+            Bons de commande rapides et détaillés, affectés à ce chantier. Les commandes partagées
+            n&apos;affichent ici que la part chantier, hors SAV et frais généraux.
           </p>
         </div>
         <div style={{ display: "flex", flexWrap: "wrap", gap: 8 }}>
@@ -228,10 +228,10 @@ export function ChantierCommandesTab({ chantierId }: { chantierId: string }) {
                                   ))}
                                 </ul>
                               ) : (
-                                <p>BC rapide, montant global HT réparti par chantier.</p>
+                                <p>BC rapide, montant global HT réparti par destination.</p>
                               )}
                               {order.allocations && order.allocations.length > 1 ? (
-                                <p>Commande partagée entre {order.allocations.length} chantiers.</p>
+                                <p>{order.allocations.length} destinations dans cette commande.</p>
                               ) : null}
                             </div>
                           </details>
