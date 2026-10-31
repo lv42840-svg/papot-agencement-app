@@ -107,6 +107,7 @@ export const chantierMutationSchema = z.discriminatedUnion("action", [
       .object({
         decision: z.enum(["KEEP", "REMOVE"]),
         token: z.string().min(1).max(10000),
+        confirmRemove: z.boolean().optional(),
       })
       .optional(),
   }),
