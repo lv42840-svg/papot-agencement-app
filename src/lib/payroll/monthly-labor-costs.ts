@@ -51,6 +51,33 @@ export function parisCurrentMonth(now = new Date()): string {
   return year + "-" + month;
 }
 
+/** Return the preceding calendar month, including the December/January boundary. */
+export function previousMonthKey(month: string): string {
+  monthlyKeySchema.parse(month);
+  const year = Number(month.slice(0, 4));
+  const number = Number(month.slice(5));
+  return number === 1 ? `${year - 1}-12` : `${year}-${String(number - 1).padStart(2, "0")}`;
+}
+
+/**
+ * Current-month working hours are provisionally costed at the LAST CLOSED MONTH's
+ * actual employer hourly rate for the same employee. A missing prior month never
+ * becomes a zero cost, and we never use the prior rate for an older closed month.
+ * As soon as a new month starts, the previous month is recalculated from its
+ * own finalized record (no estimate is persisted to the payroll database).
+ */
+export function resolveLaborCostForWorkedMonth(
+  personId: string,
+  workedMonth: string,
+  byPersonMonth: ReadonlyMap<string, MonthlyLaborCostRecord>,
+  now = new Date(),
+): { record: MonthlyLaborCostRecord; provisional: boolean } | null {
+  const provisional = workedMonth === parisCurrentMonth(now);
+  const recordMonth = provisional ? previousMonthKey(workedMonth) : workedMonth;
+  const record = byPersonMonth.get(`${personId}:${recordMonth}`);
+  return record && record.workedHours > 0 ? { record, provisional } : null;
+}
+
 export function assertClosedMonth(month: string, now = new Date()): void {
   monthlyKeySchema.parse(month);
   if (month >= parisCurrentMonth(now)) throw new Error("MONTHLY_LABOR_COST_MONTH_NOT_CLOSED");

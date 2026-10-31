@@ -47,6 +47,7 @@ import type { NativeQuotesPayload } from "@/lib/quotes/store";
 type ChantiersSnapshot = {
   payload: ChantiersPayload;
   actualLaborCostsByChantier: Record<string, number | null>;
+  provisionalLaborCostsByChantier: Record<string, boolean>;
   actor: { userId: string; displayName: string };
   capabilities: ChantierCapabilities;
   focusChantierId?: string;
@@ -447,6 +448,9 @@ export function ChantierWorkspace({ chantierId }: { chantierId: string }) {
               laborCostCents: chantiersSnapshot.actualLaborCostsByChantier?.[chantier.id] ?? null,
               purchaseCostCents: null,
             }}
+            actualLaborCostProvisional={
+              chantiersSnapshot.provisionalLaborCostsByChantier?.[chantier.id] ?? false
+            }
             committedPurchasesCents={
               chantiersSnapshot.committedPurchasesByChantier?.[chantier.id] ?? null
             }

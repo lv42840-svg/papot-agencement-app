@@ -114,6 +114,7 @@ describe("SAV and overhead weekly hours without chantier", () => {
       savCostCents: 15000,
       generalCostCents: 10000,
       totalCostCents: 25000,
+      provisional: false,
     });
     expect(calculateIndicativeCompanyMarginCents(100000, result)).toBe(75000);
     expect(calculateIndicativeCompanyMarginCents(null, result)).toBeNull();
@@ -121,11 +122,13 @@ describe("SAV and overhead weekly hours without chantier", () => {
 
   it("prorates a split-week SAV using each month's rate and keeps missing costs unpriced", () => {
     const input = [{ userId: workerId, week: "2026-W40", category: "SAV" as const, hours: 10 }];
+    const afterClosing = new Date("2026-11-15T12:00:00Z");
     const onlySeptember = calculateIndirectLaborCostsForPeriod(
       "2026",
       input,
       [wage("2026-09", 390000)],
       [],
+      afterClosing,
     );
     expect(onlySeptember.savHours).toBe(10);
     expect(onlySeptember.savCostCents).toBeNull();
@@ -136,6 +139,7 @@ describe("SAV and overhead weekly hours without chantier", () => {
       input,
       [wage("2026-09", 390000), wage("2026-10", 468000)],
       [],
+      afterClosing,
     );
     expect(both.savCostCents).toBe(27000);
     expect(both.totalCostCents).toBe(27000);
@@ -144,8 +148,53 @@ describe("SAV and overhead weekly hours without chantier", () => {
         .savCostCents,
     ).toBe(15000);
     expect(
-      calculateIndirectLaborCostsForPeriod("2026-10", input, [wage("2026-10", 468000)], [])
-        .savCostCents,
+      calculateIndirectLaborCostsForPeriod(
+        "2026-10",
+        input,
+        [wage("2026-10", 468000)],
+        [],
+        afterClosing,
+      ).savCostCents,
     ).toBe(12000);
+  });
+
+  it("estime les heures SAV et frais généraux du mois en cours au taux du mois passé", () => {
+    const input = [
+      { userId: workerId, week: "2026-W40", category: "SAV" as const, hours: 10 },
+      { userId: workerId, week: "2026-W40", category: "GENERAL" as const, hours: 5 },
+    ];
+    const october = calculateIndirectLaborCostsForPeriod(
+      "2026-10",
+      input,
+      [wage("2026-09", 390000)],
+      [],
+      new Date("2026-10-31T12:00:00Z"),
+    );
+    expect(october).toMatchObject({
+      savHours: 4,
+      generalHours: 2,
+      savCostCents: 10000,
+      generalCostCents: 5000,
+      totalCostCents: 15000,
+      provisional: true,
+    });
+    const noEstimate = calculateIndirectLaborCostsForPeriod(
+      "2026-10",
+      input,
+      [],
+      [],
+      new Date("2026-10-31T12:00:00Z"),
+    );
+    expect(noEstimate.totalCostCents).toBeNull();
+    expect(noEstimate.provisional).toBe(false);
+    const finalized = calculateIndirectLaborCostsForPeriod(
+      "2026-10",
+      input,
+      [wage("2026-10", 468000)],
+      [],
+      new Date("2026-11-01T12:00:00Z"),
+    );
+    expect(finalized.savCostCents).toBe(12000);
+    expect(finalized.provisional).toBe(false);
   });
 });

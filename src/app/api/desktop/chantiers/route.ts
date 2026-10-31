@@ -33,7 +33,7 @@ import {
 } from "@/lib/planning/mutations";
 import { createQuotesRepository } from "@/lib/quotes/create-repository";
 import { readMonthlyLaborCosts } from "@/lib/payroll/monthly-labor-costs-repository";
-import { calculateChantierLaborCostCents } from "@/lib/payroll/chantier-labor-cost";
+import { calculateChantierLaborCostEstimate } from "@/lib/payroll/chantier-labor-cost";
 import {
   committedOrdersForChantier,
   committedPurchaseTotal,
@@ -98,19 +98,32 @@ async function snapshot(
       };
     }),
   };
+  const laborEstimates = monthlyCosts
+    ? new Map(
+        payload.chantiers.map((chantier) => [
+          chantier.id,
+          calculateChantierLaborCostEstimate(
+            chantier.id,
+            planningPayload.actualHours,
+            monthlyCosts.records,
+            planningPayload.peopleCapacity,
+            now,
+          ),
+        ]),
+      )
+    : null;
   return {
     payload: viewPayload,
     actualLaborCostsByChantier: Object.fromEntries(
       payload.chantiers.map((chantier) => [
         chantier.id,
-        monthlyCosts
-          ? calculateChantierLaborCostCents(
-              chantier.id,
-              planningPayload.actualHours,
-              monthlyCosts.records,
-              planningPayload.peopleCapacity,
-            )
-          : null,
+        laborEstimates?.get(chantier.id)?.costCents ?? null,
+      ]),
+    ),
+    provisionalLaborCostsByChantier: Object.fromEntries(
+      payload.chantiers.map((chantier) => [
+        chantier.id,
+        laborEstimates?.get(chantier.id)?.provisional ?? false,
       ]),
     ),
     actor,

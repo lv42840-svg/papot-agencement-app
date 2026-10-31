@@ -264,8 +264,9 @@ export function MonthlyLaborCostsWorkspace() {
           </div>
           <p className="monthlyCostsNote">
             Pour une semaine à cheval sur deux mois, la ventilation est estimée selon les horaires
-            habituels des jours ouvrés du salarié. Une paie manquante laisse le coût du chantier non
-            calculable, plutôt que d’afficher un total incomplet.
+            habituels des jours ouvrés du salarié. Pour le mois en cours, PAPOT utilise
+            provisoirement le coût horaire employeur du mois précédent. Les mois clôturés exigent
+            leur propre paie ; si elle manque, le coût du chantier reste non calculable.
           </p>
         </>
       ) : null}

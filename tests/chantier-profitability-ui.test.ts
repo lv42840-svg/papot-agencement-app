@@ -37,8 +37,9 @@ describe("chantier profitability UI", () => {
   });
 
   it("does not invent actual costs while their source modules are absent", () => {
-    expect(panel).toContain("Coût mensuel employeur manquant pour une ou plusieurs périodes");
+    expect(panel).toContain("Coût employeur manquant pour un mois clos ou son mois précédent");
     expect(panel).toContain("En attente du rapprochement Pennylane");
+    expect(panel).toContain("actualLaborCostProvisional");
     expect(engine).toContain("laborCostCents: null");
     expect(engine).toContain("purchaseCostCents: null");
   });

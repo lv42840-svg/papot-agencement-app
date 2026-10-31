@@ -31,7 +31,8 @@ export async function GET() {
       createQuotesRepository().load(),
     ]);
 
-    const sales = calculateDashboardSoldSummary(commercial.cases, quotes.quotes);
+    const now = new Date();
+    const sales = calculateDashboardSoldSummary(commercial.cases, quotes.quotes, now);
     // Do not expose salary-derived SAV / overhead costs to users without Paie access.
     const canReadPayroll = await hasModuleAccess(context.user.id, "payroll", "READ");
     if (!canReadPayroll) {
@@ -51,12 +52,14 @@ export async function GET() {
       planning.indirectHours,
       payroll.records,
       planning.peopleCapacity,
+      now,
     );
     const monthly = calculateIndirectLaborCostsForPeriod(
       sales.month,
       planning.indirectHours,
       payroll.records,
       planning.peopleCapacity,
+      now,
     );
     return NextResponse.json(
       {
