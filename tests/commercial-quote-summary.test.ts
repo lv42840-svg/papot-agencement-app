@@ -137,6 +137,8 @@ describe("commercial quote summary", () => {
         total: 14,
       },
       plannedDisbursementCents: 8_000,
+      plannedLaborCostCents: 32_000,
+      plannedTotalCostCents: 40_000,
       plannedMarginCents: 34_000,
     });
   });
@@ -184,6 +186,8 @@ describe("commercial quote summary", () => {
         total: 0,
       },
       plannedDisbursementCents: null,
+      plannedLaborCostCents: null,
+      plannedTotalCostCents: null,
       plannedMarginCents: null,
     });
   });

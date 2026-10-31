@@ -45,6 +45,17 @@ export const purchaseOrderSchema = z.object({
   chantierId: z.string().uuid(),
   chantierName: text,
   allocations: z.array(purchaseOrderAllocationSchema).min(1).max(100).optional(),
+  revisions: z
+    .array(
+      z.object({
+        changedAt: when,
+        changedByName: text,
+        previousSupplierName: text,
+        previousAmountHtCents: cents,
+        previousChantierIds: z.array(z.string().uuid()),
+      }),
+    )
+    .optional(),
   removedAllocations: z
     .array(
       purchaseOrderAllocationSchema.extend({
@@ -358,4 +369,62 @@ export function purchaseOrderHistoryForChantier(
       },
     ];
   });
+}
+
+/** Editable BCs keep their number, original creation info and audit of earlier amounts. */
+export function updatePurchaseOrder(
+  payload: PurchaseOrdersPayload,
+  orderId: string,
+  expectedUpdatedAt: string,
+  input: PurchaseOrderInput,
+  chantierNames: ReadonlyMap<string, string>,
+  actor: string,
+  now = new Date(),
+): PurchaseOrdersPayload {
+  const index = payload.orders.findIndex((order) => order.id === orderId);
+  if (index < 0) throw new Error("PURCHASE_ORDER_NOT_FOUND");
+  const original = payload.orders[index];
+  if (original.updatedAt !== expectedUpdatedAt) throw new Error("PURCHASE_ORDER_VERSION_CONFLICT");
+  if (original.status === "CANCELLED" || original.removedAllocations?.length) {
+    throw new Error("PURCHASE_ORDER_NOT_EDITABLE");
+  }
+  const value = purchaseOrderInputSchema.parse(input);
+  if (value.mode !== original.mode) throw new Error("PURCHASE_ORDER_MODE_IMMUTABLE");
+  const amountHtCents = purchaseOrderAmount(value);
+  const allocated =
+    value.mode === "QUICK" ? value.allocations : [{ chantierId: value.chantierId, amountHtCents }];
+  const allocations = allocated.map((entry) => {
+    const chantierName = chantierNames.get(entry.chantierId);
+    if (!chantierName) throw new Error("PURCHASE_CHANTIER_NOT_FOUND");
+    return { ...entry, chantierName };
+  });
+  const primary = allocations[0];
+  const next: PurchaseOrder = {
+    ...original,
+    chantierId: primary.chantierId,
+    chantierName: primary.chantierName,
+    allocations: value.mode === "QUICK" ? allocations : undefined,
+    supplierName: value.supplierName,
+    description: value.description,
+    quickAmountHtCents: value.mode === "QUICK" ? amountHtCents : null,
+    lines: value.mode === "DETAILED" ? value.lines : [],
+    amountHtCents,
+    revisions: [
+      ...(original.revisions ?? []),
+      {
+        changedAt: now.toISOString(),
+        changedByName: actor,
+        previousSupplierName: original.supplierName,
+        previousAmountHtCents: original.amountHtCents,
+        previousChantierIds: original.allocations?.length
+          ? original.allocations.map((item) => item.chantierId)
+          : [original.chantierId],
+      },
+    ],
+    updatedAt: now.toISOString(),
+    updatedByName: actor,
+  };
+  const orders = [...payload.orders];
+  orders[index] = next;
+  return { ...payload, orders };
 }

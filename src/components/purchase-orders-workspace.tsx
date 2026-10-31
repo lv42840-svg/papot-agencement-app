@@ -1,5 +1,7 @@
 "use client";
 
+import Link from "next/link";
+
 import { useEffect, useMemo, useRef, useState } from "react";
 import type {
   PurchaseOrderInput,
@@ -660,6 +662,16 @@ export function PurchaseOrdersWorkspace({ chantierId }: { chantierId?: string })
                         {euro(order.amountHtCents)}
                       </td>
                       <td style={{ padding: 8 }}>
+                        {order.status === "COMMITTED" &&
+                        snapshot.canWrite &&
+                        !order.removedAllocations?.length ? (
+                          <Link
+                            className="secondaryButton"
+                            href={`/achats/${encodeURIComponent(order.id)}/modifier`}
+                          >
+                            Modifier
+                          </Link>
+                        ) : null}
                         {order.status === "COMMITTED" && snapshot.canWrite ? (
                           <button
                             type="button"

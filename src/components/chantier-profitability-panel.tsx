@@ -87,7 +87,7 @@ export function ChantierProfitabilityPanel({
           }
         />
         <Metric
-          label="Déboursé prévu"
+          label="Achats et frais prévus (hors heures)"
           value={money(result.plannedDisbursementCents)}
           detail={
             result.plannedDisbursementCents === null
@@ -96,12 +96,26 @@ export function ChantierProfitabilityPanel({
           }
         />
         <Metric
+          label="Coût des heures prévues"
+          value={money(result.plannedLaborCostCents)}
+          detail={
+            result.plannedLaborCostCents === null
+              ? "Taux horaire manquant ou nul dans un devis : coût à compléter"
+              : "Heures BE, atelier et pose valorisées au coût horaire du devis"
+          }
+        />
+        <Metric
+          label="Coût total prévu"
+          value={money(result.plannedTotalCostCents)}
+          detail="Fournitures, heures et autres frais du devis"
+        />
+        <Metric
           label="Marge prévue"
           value={money(result.plannedMarginCents)}
           detail={
             result.plannedMarginCents === null
               ? "Non calculable avec les données actuelles"
-              : percent(result.plannedMarginPercent)
+              : percent(result.plannedMarginPercent) + " · heures déjà déduites"
           }
           className={tone(result.plannedMarginCents)}
         />

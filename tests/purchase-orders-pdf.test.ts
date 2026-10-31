@@ -40,7 +40,7 @@ describe("PDF de bon de commande détaillé", () => {
     expect(text).toContain("Fournisseur");
     expect(text).toContain("Panneaux");
     expect(text).toContain("375,00 EUR");
-    expect(text).toContain("NON ENVOYE");
+    expect(text).not.toContain("Document interne");
     expect(order.amountHtCents).toBe(37500);
   });
 

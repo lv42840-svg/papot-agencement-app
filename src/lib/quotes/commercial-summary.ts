@@ -18,6 +18,8 @@ export type CommercialQuoteSummary = {
   soldHours: number;
   soldHoursByActivity: CommercialSoldHours;
   plannedDisbursementCents: number | null;
+  plannedLaborCostCents: number | null;
+  plannedTotalCostCents: number | null;
   plannedMarginCents: number | null;
 };
 
@@ -27,6 +29,8 @@ export type CommercialContractSummary = {
   soldHours: number;
   soldHoursByActivity: CommercialSoldHours;
   plannedDisbursementCents: number | null;
+  plannedLaborCostCents: number | null;
+  plannedTotalCostCents: number | null;
   plannedMarginCents: number | null;
 };
 
@@ -56,7 +60,8 @@ function lineBaseLaborCostCents(line: QuoteLine): number | null {
   for (const component of line.components ?? []) {
     if (componentActivity(component) === null) continue;
     const costRateCents = quoteOuvrageComponentCostPriceCents(component);
-    if (costRateCents === null) return null;
+    // An unpriced labor hour cannot be treated as free: it would inflate margin.
+    if (costRateCents === null || costRateCents === 0) return null;
     unitLaborCostCents += Math.round(component.quantity * costRateCents);
   }
 
@@ -74,7 +79,7 @@ function linePoseCostRateCents(line: QuoteLine): number | null {
 
   for (const component of poseComponents) {
     const costRateCents = quoteOuvrageComponentCostPriceCents(component);
-    if (costRateCents === null) return null;
+    if (costRateCents === null || costRateCents === 0) return null;
     hoursPerLineUnit += component.quantity;
     costPerLineUnitCents += component.quantity * costRateCents;
   }
@@ -134,10 +139,14 @@ export function calculateCommercialQuoteSummary(quote: NativeQuoteRecord): Comme
     return total + nonPoseHours.be + nonPoseHours.workshop + adjustedLine.poseHours;
   }, 0);
 
-  const plannedDisbursementCents =
-    pricing.totalCostCents === null || !laborCostComplete
-      ? null
-      : Math.max(0, pricing.totalCostCents - laborCostCents);
+  const complete = pricing.totalCostCents !== null && laborCostComplete;
+  const plannedLaborCostCents = complete ? laborCostCents : null;
+  const plannedTotalCostCents = complete ? pricing.totalCostCents : null;
+  // The quote engine already includes component labor in total cost.
+  // The margin MUST subtract total cost once; never subtract planned labor twice.
+  const plannedDisbursementCents = complete
+    ? Math.max(0, (pricing.totalCostCents ?? 0) - laborCostCents)
+    : null;
 
   return {
     totalHtCents: pricing.totalSaleCents,
@@ -149,7 +158,10 @@ export function calculateCommercialQuoteSummary(quote: NativeQuoteRecord): Comme
       total: roundHours(soldHours),
     },
     plannedDisbursementCents,
-    plannedMarginCents: pricing.marginAmountCents,
+    plannedLaborCostCents,
+    plannedTotalCostCents,
+    plannedMarginCents:
+      plannedTotalCostCents === null ? null : pricing.totalSaleCents - plannedTotalCostCents,
   };
 }
 
@@ -165,8 +177,12 @@ export function calculateCommercialContractSummary(
   let soldWorkshopHours = 0;
   let soldInstallHours = 0;
   let plannedDisbursementCents = 0;
+  let plannedLaborCostCents = 0;
+  let plannedTotalCostCents = 0;
   let plannedMarginCents = 0;
   let disbursementComplete = true;
+  let laborComplete = true;
+  let totalCostComplete = true;
   let marginComplete = true;
 
   for (const quote of selected) {
@@ -180,6 +196,16 @@ export function calculateCommercialContractSummary(
       disbursementComplete = false;
     } else {
       plannedDisbursementCents += summary.plannedDisbursementCents;
+    }
+    if (summary.plannedLaborCostCents === null) {
+      laborComplete = false;
+    } else {
+      plannedLaborCostCents += summary.plannedLaborCostCents;
+    }
+    if (summary.plannedTotalCostCents === null) {
+      totalCostComplete = false;
+    } else {
+      plannedTotalCostCents += summary.plannedTotalCostCents;
     }
     if (summary.plannedMarginCents === null) {
       marginComplete = false;
@@ -199,6 +225,8 @@ export function calculateCommercialContractSummary(
       total: roundHours(soldHours),
     },
     plannedDisbursementCents: disbursementComplete ? plannedDisbursementCents : null,
+    plannedLaborCostCents: laborComplete ? plannedLaborCostCents : null,
+    plannedTotalCostCents: totalCostComplete ? plannedTotalCostCents : null,
     plannedMarginCents: marginComplete ? plannedMarginCents : null,
   };
 }

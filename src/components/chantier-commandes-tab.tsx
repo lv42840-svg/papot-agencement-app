@@ -205,6 +205,14 @@ export function ChantierCommandesTab({ chantierId }: { chantierId: string }) {
                               Télécharger le PDF
                             </a>
                           ) : null}
+                          {state === "COMMITTED" && !order.removedAllocations?.length ? (
+                            <Link
+                              className="secondaryButton"
+                              href={`/achats/${encodeURIComponent(order.id)}/modifier`}
+                            >
+                              Modifier le BC
+                            </Link>
+                          ) : null}
                           <details>
                             <summary>Voir le BC</summary>
                             <div style={{ minWidth: 260, paddingTop: 7 }}>
