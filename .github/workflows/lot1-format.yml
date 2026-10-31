@@ -1,0 +1,31 @@
+name: Lot 1 formatting
+on:
+  push:
+    branches: [feat/achats-destinations-finance-lot1]
+permissions:
+  contents: write
+concurrency:
+  group: lot1-format
+  cancel-in-progress: true
+jobs:
+  format:
+    if: github.ref == 'refs/heads/feat/achats-destinations-finance-lot1'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: feat/achats-destinations-finance-lot1
+          fetch-depth: 0
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - name: Format only changed source, tests and documentation
+        run: |
+          git diff --name-only -z ea4e06208c52ef1d7c50ee460ac30aadeec2af9e HEAD -- src tests docs | xargs -0 -r ./node_modules/.bin/prettier --write
+          git add -- src tests docs
+          if ! git diff --cached --quiet; then
+            git -c user.name='github-actions[bot]' -c user.email='41898282+github-actions[bot]@users.noreply.github.com' commit -m 'style: format lot 1 source and regression tests'
+            git push origin HEAD:refs/heads/feat/achats-destinations-finance-lot1
+          fi
