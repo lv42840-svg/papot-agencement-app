@@ -22,6 +22,9 @@ export type CompanyProfitabilityRow = {
   actualPurchaseCostCents: number | null;
   actualTotalCostCents: number | null;
   actualMarginCents: number | null;
+  knownCostCommitmentsCents: number | null;
+  remainingCostBudgetCents: number | null;
+  remainingLaborBudgetCents: number | null;
   committedPurchasesCents: number;
   plannedPurchasesCents: number | null;
   plannedHours: number;
@@ -41,6 +44,11 @@ export type CompanyProfitabilityTotals = {
   actualPurchaseCostCents: number | null;
   actualTotalCostCents: number | null;
   actualMarginCents: number | null;
+  knownCostCommitmentsCents: number | null;
+  remainingCostBudgetCents: number | null;
+  remainingLaborBudgetCents: number | null;
+  budgetOverrunCount: number;
+  laborBudgetOverrunCount: number;
   provisionalLaborCount: number;
   committedPurchasesCents: number;
   plannedHours: number;
@@ -85,6 +93,9 @@ export function calculateCompanyProfitability(
         actualPurchaseCostCents: projection.actualPurchaseCostCents,
         actualTotalCostCents: projection.actualTotalCostCents,
         actualMarginCents: projection.actualMarginCents,
+        knownCostCommitmentsCents: projection.knownCostCommitmentsCents,
+        remainingCostBudgetCents: projection.remainingCostBudgetCents,
+        remainingLaborBudgetCents: projection.remainingLaborBudgetCents,
         committedPurchasesCents: projection.committedPurchasesCents ?? 0,
         plannedPurchasesCents: projection.plannedPurchasesCents,
         plannedHours: projection.plannedHours.total,
@@ -112,7 +123,10 @@ export function companyProfitabilityTotals(
       | "actualLaborCostCents"
       | "actualPurchaseCostCents"
       | "actualTotalCostCents"
-      | "actualMarginCents",
+      | "actualMarginCents"
+      | "knownCostCommitmentsCents"
+      | "remainingCostBudgetCents"
+      | "remainingLaborBudgetCents",
   ): number | null =>
     rows.some((row) => row[key] === null)
       ? null
@@ -129,6 +143,15 @@ export function companyProfitabilityTotals(
     actualPurchaseCostCents: sum("actualPurchaseCostCents"),
     actualTotalCostCents: sum("actualTotalCostCents"),
     actualMarginCents: sum("actualMarginCents"),
+    knownCostCommitmentsCents: sum("knownCostCommitmentsCents"),
+    remainingCostBudgetCents: sum("remainingCostBudgetCents"),
+    remainingLaborBudgetCents: sum("remainingLaborBudgetCents"),
+    budgetOverrunCount: rows.filter(
+      (row) => row.remainingCostBudgetCents !== null && row.remainingCostBudgetCents < 0,
+    ).length,
+    laborBudgetOverrunCount: rows.filter(
+      (row) => row.remainingLaborBudgetCents !== null && row.remainingLaborBudgetCents < 0,
+    ).length,
     provisionalLaborCount: rows.filter((row) => row.actualLaborCostProvisional).length,
     committedPurchasesCents: rows.reduce((total, row) => total + row.committedPurchasesCents, 0),
     plannedHours: rows.reduce((total, row) => total + row.plannedHours, 0),
