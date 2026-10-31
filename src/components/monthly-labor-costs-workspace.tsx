@@ -3,13 +3,16 @@
 import { useCallback, useEffect, useState } from "react";
 import { parisCurrentMonth } from "@/lib/payroll/monthly-labor-costs";
 
-type Person = { id: string; name: string };
+type Person = { id: string; name: string; holdingHours?: number };
 type MonthlyRow = {
   personId: string;
   month: string;
   employerCostCents: number;
   workedHours: number;
-  hourlyRateEuro: number;
+  hourlyRateEuro: number | null;
+  sourceType: "SALARY" | "HOLDING";
+  revision: number;
+  derivedHoldingHours?: number | null;
   updatedAt: string;
   updatedBy: string;
 };
@@ -18,8 +21,15 @@ type Snapshot = {
   editable: boolean;
   people: Person[];
   records: MonthlyRow[];
+  history?: Array<{
+    personId: string;
+    previous: MonthlyRow | null;
+    next: MonthlyRow;
+    at: string;
+    by: string;
+  }>;
 };
-type Draft = { cost: string; hours: string };
+type Draft = { cost: string; hours: string; sourceType: "SALARY" | "HOLDING" };
 
 function previousMonth(): string {
   const current = parisCurrentMonth();
@@ -83,7 +93,8 @@ export function MonthlyLaborCostsWorkspace() {
     return (
       drafts[personId] ?? {
         cost: row ? (row.employerCostCents / 100).toFixed(2).replace(".", ",") : "",
-        hours: row ? String(row.workedHours).replace(".", ",") : "",
+        hours: row ? String(row.derivedHoldingHours ?? row.workedHours).replace(".", ",") : "",
+        sourceType: row?.sourceType ?? "SALARY",
       }
     );
   }
@@ -93,8 +104,8 @@ export function MonthlyLaborCostsWorkspace() {
     const draft = rowDraft(personId);
     const cost = decimal(draft.cost);
     const hours = decimal(draft.hours);
-    if (cost === null || hours === null || hours <= 0 || hours > 744 || cost > 1_000_000) {
-      setMessage("Renseigne un coût employeur valide et des heures travaillées supérieures à 0.");
+    if (cost === null || hours === null || hours < 0 || hours > 744 || cost > 1_000_000) {
+      setMessage("Renseigne un montant valide et des heures comprises entre 0 et 744.");
       return;
     }
     setSaving(personId);
@@ -109,6 +120,8 @@ export function MonthlyLaborCostsWorkspace() {
           personId,
           employerCostCents: Math.round(cost * 100),
           workedHours: hours,
+          sourceType: draft.sourceType,
+          expectedRevision: snapshot.records.find((r) => r.personId === personId)?.revision ?? null,
         }),
       });
       const body = (await response.json()) as Snapshot & { error?: string };
@@ -121,7 +134,11 @@ export function MonthlyLaborCostsWorkspace() {
       });
       setMessage("Coût mensuel enregistré. La valorisation des chantiers est actualisée.");
     } catch (cause) {
-      setMessage(cause instanceof Error ? cause.message : "Enregistrement impossible.");
+      setMessage(
+        cause instanceof Error
+          ? cause.message
+          : "Enregistrement impossible. Si une autre personne a corrigé ce mois, actualise les valeurs.",
+      );
     } finally {
       setSaving(null);
     }
@@ -131,11 +148,11 @@ export function MonthlyLaborCostsWorkspace() {
     <section className="papotMonthlyCosts">
       <header>
         <p className="eyebrow">PAPOT AGENCEMENT · HEURES</p>
-        <h2>Coûts salariaux mensuels</h2>
+        <h2>Coûts mensuels · salariés et holding</h2>
         <p>
-          Après chaque paie, saisis le coût total employeur (brut + charges patronales) et les
-          heures travaillées. Le coût horaire sert à valoriser les heures déjà affectées aux
-          chantiers. Les heures saisies ne sont jamais modifiées.
+          Après chaque paie, saisis le coût employeur des salariés ou le montant HT de la facture
+          holding pour le dirigeant, et les heures travaillées. Le coût horaire sert à valoriser les
+          heures déjà affectées aux chantiers. Les heures saisies ne sont jamais modifiées.
         </p>
       </header>
       <div className="monthlyCostsPeriod">
@@ -145,7 +162,7 @@ export function MonthlyLaborCostsWorkspace() {
           aria-label="Mois des coûts salariaux"
           type="month"
           value={month}
-          max={previousMonth()}
+          max={parisCurrentMonth()}
           disabled={loading || saving !== null}
           onChange={(event) => {
             if (/^\d{4}-\d{2}$/.test(event.target.value)) setMonth(event.target.value);
@@ -176,7 +193,8 @@ export function MonthlyLaborCostsWorkspace() {
               <thead>
                 <tr>
                   <th scope="col">Salarié</th>
-                  <th scope="col">Coût employeur (€)</th>
+                  <th scope="col">Origine du coût</th>
+                  <th scope="col">Coût mensuel (€)</th>
                   <th scope="col">Heures travaillées</th>
                   <th scope="col">Coût réel / heure</th>
                   <th scope="col">Validation</th>
@@ -187,8 +205,18 @@ export function MonthlyLaborCostsWorkspace() {
                   const value = rowDraft(person.id);
                   const cost = decimal(value.cost);
                   const hours = decimal(value.hours);
-                  const rate = cost !== null && hours !== null && hours > 0 ? cost / hours : null;
                   const stored = snapshot.records.find((record) => record.personId === person.id);
+                  const automaticHours =
+                    snapshot.people.find((p) => p.id === person.id)?.holdingHours ?? null;
+                  const effectiveHours =
+                    value.sourceType === "HOLDING" && automaticHours !== null
+                      ? automaticHours
+                      : hours;
+                  const rate =
+                    cost !== null && effectiveHours !== null && effectiveHours > 0
+                      ? cost / effectiveHours
+                      : null;
+                  // Holding hours are recomputed on the server for every save.
                   const changed = drafts[person.id] !== undefined;
                   return (
                     <tr key={person.id}>
@@ -201,10 +229,29 @@ export function MonthlyLaborCostsWorkspace() {
                         )}
                       </th>
                       <td>
+                        <select
+                          aria-label={"Source de coût " + person.name}
+                          value={value.sourceType}
+                          disabled={!snapshot.editable || saving !== null}
+                          onChange={(event) =>
+                            setDrafts((old) => ({
+                              ...old,
+                              [person.id]: {
+                                ...value,
+                                sourceType: event.target.value as "SALARY" | "HOLDING",
+                              },
+                            }))
+                          }
+                        >
+                          <option value="SALARY">Salarié</option>
+                          <option value="HOLDING">Facture holding HT</option>
+                        </select>
+                      </td>
+                      <td>
                         <input
                           type="text"
                           inputMode="decimal"
-                          aria-label={"Coût total employeur " + person.name}
+                          aria-label={"Coût mensuel " + person.name}
                           value={value.cost}
                           placeholder="0,00"
                           disabled={!snapshot.editable || saving !== null}
@@ -221,9 +268,15 @@ export function MonthlyLaborCostsWorkspace() {
                           type="text"
                           inputMode="decimal"
                           aria-label={"Heures travaillées " + person.name}
-                          value={value.hours}
+                          value={
+                            value.sourceType === "HOLDING" && automaticHours !== null
+                              ? String(automaticHours).replace(".", ",")
+                              : value.hours
+                          }
                           placeholder="0"
-                          disabled={!snapshot.editable || saving !== null}
+                          disabled={
+                            !snapshot.editable || saving !== null || value.sourceType === "HOLDING"
+                          }
                           onChange={(event) =>
                             setDrafts((old) => ({
                               ...old,
@@ -239,7 +292,7 @@ export function MonthlyLaborCostsWorkspace() {
                         />
                       </td>
                       <td className="monthlyCostsRate">
-                        {rate === null ? "—" : displayMoney(rate) + " / h"}
+                        {rate === null ? "Non calculable (0 h)" : displayMoney(rate) + " / h"}
                       </td>
                       <td>
                         <button
@@ -256,7 +309,7 @@ export function MonthlyLaborCostsWorkspace() {
                 })}
                 {snapshot.people.length === 0 ? (
                   <tr>
-                    <td colSpan={5}>Aucun salarié connu.</td>
+                    <td colSpan={6}>Aucun salarié connu.</td>
                   </tr>
                 ) : null}
               </tbody>

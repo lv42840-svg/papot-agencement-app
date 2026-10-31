@@ -31,6 +31,8 @@ const AUTH_CONCEPT_SECURITY_VERSION = 13;
 const AUTH_CONCEPT_SECURITY_NAME = "auth_concept_security";
 const MONTHLY_LABOR_COSTS_STORAGE_VERSION = 14;
 const MONTHLY_LABOR_COSTS_STORAGE_NAME = "monthly_labor_costs_storage";
+const PAYROLL_PREPARATION_VERSION = 16;
+const PAYROLL_PREPARATION_NAME = "payroll_preparation_storage";
 const BILLING_STORAGE_VERSION = 15;
 const BILLING_STORAGE_NAME = "billing_draft_storage";
 
@@ -446,6 +448,22 @@ async function ensureMonthlyLaborCostsStorage(client: PoolClient): Promise<void>
   `);
 }
 
+async function ensurePayrollPreparationStorage(client: PoolClient): Promise<void> {
+  await client.query(`
+    CREATE TABLE IF NOT EXISTS papot_payroll_preparation_state (
+      scope TEXT PRIMARY KEY CHECK (scope = 'global'),
+      version INTEGER NOT NULL DEFAULT 1 CHECK (version > 0),
+      payload JSONB NOT NULL CHECK (jsonb_typeof(payload) = 'object'),
+      updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+    )
+  `);
+  await client.query(`
+    INSERT INTO papot_payroll_preparation_state (scope, version, payload)
+    VALUES ('global', 1, '{"schemaVersion":1,"months":[]}'::jsonb)
+    ON CONFLICT (scope) DO NOTHING
+  `);
+}
+
 async function ensurePlanningStorage(client: PoolClient): Promise<void> {
   await client.query(`
     CREATE TABLE IF NOT EXISTS papot_planning_state (
@@ -696,6 +714,15 @@ export async function runServerDbMigrations(
         ON CONFLICT (version) DO NOTHING
       `,
       [MONTHLY_LABOR_COSTS_STORAGE_VERSION, MONTHLY_LABOR_COSTS_STORAGE_NAME],
+    );
+
+    await ensurePayrollPreparationStorage(client);
+    await client.query(
+      `
+      INSERT INTO papot_schema_migrations (version, name)
+      VALUES ($1, $2) ON CONFLICT (version) DO NOTHING
+    `,
+      [PAYROLL_PREPARATION_VERSION, PAYROLL_PREPARATION_NAME],
     );
 
     await ensurePurchaseOrdersStorage(client);

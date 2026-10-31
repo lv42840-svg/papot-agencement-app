@@ -12,7 +12,7 @@ describe("monthly salary costs in the Heures screen", () => {
     expect(page).toContain("<HeuresTabs");
     expect(tabs).toContain("Saisie des heures");
     expect(tabs).toContain("Coûts mensuels");
-    expect(monthly).toContain("Coût employeur (€)");
+    expect(monthly).toContain("Coût mensuel (€)");
     expect(monthly).toContain("Heures travaillées");
     expect(monthly).toContain('action: "saveMonthlyLaborCost"');
   });
