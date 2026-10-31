@@ -28,7 +28,8 @@ describe("monthly salary costs in the Heures screen", () => {
   it("connects monthly salaries to profitability without modifying planned or actual hours", () => {
     const api = source("../src/app/api/desktop/chantiers/route.ts");
     const workspace = source("../src/components/chantier-workspace.tsx");
-    expect(api).toContain("calculateChantierLaborCostCents");
+    expect(api).toContain("calculateChantierLaborCostEstimate");
+    expect(api).toContain("provisionalLaborCostsByChantier");
     expect(api).toContain("actualLaborCostsByChantier");
     expect(workspace).toContain("actualLaborCostsByChantier");
     expect(workspace).toContain("purchaseCostCents: null");
