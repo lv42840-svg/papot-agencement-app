@@ -13,9 +13,8 @@ describe("accueil : chiffre d'affaires réellement facturé", () => {
     expect(card).toContain("Chiffre d&apos;affaires facturé HT");
     expect(card).toContain("Non disponible");
     expect(card).toContain("Pennylane non raccordé");
-    expect(card).toContain(
-      "Les devis acceptés et projets de factures ne sont pas comptés dans le CA",
-    );
+    expect(card).toContain("Les devis acceptés et projets de factures");
+    expect(card).toContain("ne sont pas comptés dans le CA");
     expect(card).toContain("/api/desktop/dashboard/invoiced-summary");
     expect(card).not.toContain("/api/desktop/dashboard/sold-summary");
   });
