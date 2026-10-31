@@ -14,6 +14,15 @@ describe("facturation: éditeur identique au parcours devis", () => {
     expect(page).toContain("<BillingDocumentEditor draftId={draftId} />");
   });
 
+  it("propose directement le pourcentage global pour un acompte et par ligne pour une situation", () => {
+    const ui = readFileSync("src/components/billing-workspace.tsx", "utf8");
+    expect(ui).toContain('useState<BillingType>("DEPOSIT")');
+    expect(ui).toContain('useState<"AMOUNT" | "PERCENT" | "LINES">("PERCENT")');
+    expect(ui).toContain('setMode(e.target.value === "PROGRESS" ? "LINES" : "PERCENT")');
+    expect(ui).toContain("Situation : pourcentage de chaque ligne (%)");
+    expect(ui).toContain("router.push(`/facturation/");
+  });
+
   it("permet modification, ajout, titres et réorganisation sans émettre la facture", () => {
     const ui = readFileSync("src/components/billing-document-editor.tsx", "utf8");
     const api = readFileSync("src/app/api/desktop/billing/route.ts", "utf8");
