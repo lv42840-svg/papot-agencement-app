@@ -334,12 +334,14 @@ export function purchaseOrderHistoryForChantier(
       (allocation) => allocation.chantierId === chantierId,
     );
     if (removed.length > 0) {
-      return [{
-        order,
-        amountHtCents: removed.reduce((sum, item) => sum + item.amountHtCents, 0),
-        state: "REMOVED" as const,
-        removedAt: removed[removed.length - 1].removedAt,
-      }];
+      return [
+        {
+          order,
+          amountHtCents: removed.reduce((sum, item) => sum + item.amountHtCents, 0),
+          state: "REMOVED" as const,
+          removedAt: removed[removed.length - 1].removedAt,
+        },
+      ];
     }
     const allocation = order.allocations?.length
       ? order.allocations.find((item) => item.chantierId === chantierId)
@@ -347,11 +349,13 @@ export function purchaseOrderHistoryForChantier(
         ? { amountHtCents: order.amountHtCents }
         : undefined;
     if (!allocation) return [];
-    return [{
-      order,
-      amountHtCents: allocation.amountHtCents,
-      state: order.status === "COMMITTED" ? "COMMITTED" as const : "CANCELLED" as const,
-      removedAt: null,
-    }];
+    return [
+      {
+        order,
+        amountHtCents: allocation.amountHtCents,
+        state: order.status === "COMMITTED" ? ("COMMITTED" as const) : ("CANCELLED" as const),
+        removedAt: null,
+      },
+    ];
   });
 }
