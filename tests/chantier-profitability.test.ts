@@ -293,7 +293,34 @@ describe("chantier global profitability", () => {
     expect(item.plannedHours).toEqual({ be: 10, workshop: 20, install: 30 });
     expect(result.plannedHours).toEqual({ be: 2, workshop: 3, install: 1, total: 6 });
     expect(result.plannedDisbursementCents).toBe(40_000);
+    expect(result.plannedLaborCostCents).toBe(17_000);
+    expect(result.plannedTotalCostCents).toBe(57_000);
     expect(result.plannedMarginCents).toBe(43_000);
+  });
+
+  it("masque la marge prévue lorsqu'une heure de main-d'œuvre n'a aucun coût", () => {
+    const commercialCase = affair([quoteAId]);
+    const q = quote({ id: quoteAId, saleCents: 100_000, costCents: 40_000 });
+    const line = q.model.items[0];
+    if (line.kind !== "LINE") throw new Error("Expected LINE");
+    line.components?.push({
+      id: crypto.randomUUID(),
+      description: "Heures atelier sans coût",
+      unit: "h",
+      quantity: 3,
+      quantityFormula: null,
+      activity: "ATELIER",
+      costPriceCents: 0,
+      unitPriceCents: 6_000,
+    });
+    const result = calculateChantierProfitability(chantier(commercialCase), commercialCase, {
+      schemaVersion: 1,
+      quotes: [q],
+    });
+    expect(result.plannedLaborCostCents).toBeNull();
+    expect(result.plannedTotalCostCents).toBeNull();
+    expect(result.plannedMarginCents).toBeNull();
+    expect(result.plannedHours.workshop).toBe(3);
   });
 
   it("leaves planned cost and margin empty when one retained quote has incomplete costing", () => {
