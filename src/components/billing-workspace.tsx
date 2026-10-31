@@ -93,8 +93,21 @@ export function BillingWorkspace({
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(body),
       });
-      const result = (await response.json()) as { error?: string; payload?: BillingPayload };
-      if (!response.ok) throw new Error(result.error ?? "Erreur de facturation");
+      const result = (await response.json()) as {
+        error?: string;
+        fields?: string[];
+        payload?: BillingPayload;
+      };
+      if (!response.ok) {
+        const fields = result.fields?.length ? ` (champs : ${result.fields.join(", ")})` : "";
+        if (result.error === "BILLING_REQUEST_INVALID") {
+          throw new Error(`La demande de facturation est invalide${fields}.`);
+        }
+        if (result.error === "BILLING_DRAFT_DATA_INVALID") {
+          throw new Error(`Des données du devis empêchent la création${fields}. Vérifie les lignes du devis.`);
+        }
+        throw new Error(result.error ?? "Erreur de facturation");
+      }
       await refresh();
       setNotice(success);
       return result.payload ?? null;
