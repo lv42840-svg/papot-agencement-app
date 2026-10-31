@@ -806,10 +806,74 @@ function LifecycleTab({
                       placeholder="Motif obligatoire de fermeture"
                     />
                   </label>
+                  {purchaseWarning === null ? (
+                    <div className="chantierLifecycleWarning" role="alert">
+                      Impossible de vérifier les BC. Actualise ou demande l'accès Achats avant de
+                      clôturer.
+                    </div>
+                  ) : purchaseWarning.count > 0 ? (
+                    <div className="chantierLifecycleWarning">
+                      <strong>
+                        {purchaseWarning.count} BC non rapproché(s) ·{" "}
+                        {(purchaseWarning.amountHtCents / 100).toLocaleString("fr-FR", {
+                          style: "currency",
+                          currency: "EUR",
+                        })}{" "}
+                        HT engagés sur ce chantier.
+                      </strong>
+                      <p>
+                        Le lien entre les BC et les factures Pennylane n'est pas encore opérationnel.
+                        Vérifie ces engagements avant de clôturer.
+                      </p>
+                      <ul>
+                        {purchaseWarning.orders.map((order) => (
+                          <li key={order.orderId}>
+                            {order.reference} · {order.supplierName} ·{" "}
+                            {(order.amountHtCents / 100).toLocaleString("fr-FR", {
+                              style: "currency",
+                              currency: "EUR",
+                            })}{" "}
+                            HT
+                          </li>
+                        ))}
+                      </ul>
+                      <label className="chantierArchiveCheck">
+                        <input type="radio" name="purchase-close-review"
+                          checked={purchaseDecision === "KEEP"} disabled={busy}
+                          onChange={() => {
+                            setPurchaseDecision("KEEP");
+                            setRemoveConfirmed(false);
+                          }} />
+                        Conserver les engagements : factures encore possibles ou à vérifier
+                      </label>
+                      <label className="chantierArchiveCheck">
+                        <input type="radio" name="purchase-close-review"
+                          checked={purchaseDecision === "REMOVE"} disabled={busy}
+                          onChange={() => setPurchaseDecision("REMOVE")} />
+                        Retirer les engagements de ce chantier sans effacer les BC
+                      </label>
+                      {purchaseDecision === "REMOVE" ? (
+                        <label className="chantierArchiveCheck">
+                          <input type="checkbox" checked={removeConfirmed} disabled={busy}
+                            onChange={(event) => setRemoveConfirmed(event.target.checked)} />
+                          Je confirme le retrait des engagements sur ce chantier, sans toucher
+                          aux éventuelles affectations des autres chantiers.
+                        </label>
+                      ) : null}
+                    </div>
+                  ) : (
+                    <p>Aucun BC engagé à vérifier pour ce chantier.</p>
+                  )}
                   <button
                     type="button"
                     className="primaryButton chantierFitButton"
-                    disabled={busy || !closeReason.trim()}
+                    disabled={
+                      busy ||
+                      !closeReason.trim() ||
+                      purchaseWarning === null ||
+                      (purchaseWarning.count > 0 &&
+                        (!purchaseDecision || (purchaseDecision === "REMOVE" && !removeConfirmed)))
+                    }
                     onClick={() =>
                       void mutate(
                         {
@@ -817,6 +881,14 @@ function LifecycleTab({
                           chantierId: chantier.id,
                           expectedUpdatedAt: chantier.updatedAt,
                           reason: closeReason,
+                          ...(purchaseWarning && purchaseWarning.count > 0
+                            ? {
+                                purchaseReview: {
+                                  decision: purchaseDecision,
+                                  token: purchaseWarning.token,
+                                },
+                              }
+                            : {}),
                         },
                         "Chantier clôturé : statut Terminé.",
                       )
