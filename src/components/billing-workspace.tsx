@@ -104,7 +104,9 @@ export function BillingWorkspace({
           throw new Error(`La demande de facturation est invalide${fields}.`);
         }
         if (result.error === "BILLING_DRAFT_DATA_INVALID") {
-          throw new Error(`Des données du devis empêchent la création${fields}. Vérifie les lignes du devis.`);
+          throw new Error(
+            `Des données du devis empêchent la création${fields}. Vérifie les lignes du devis.`,
+          );
         }
         throw new Error(result.error ?? "Erreur de facturation");
       }
