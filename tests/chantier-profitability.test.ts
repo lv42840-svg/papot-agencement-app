@@ -335,6 +335,23 @@ describe("chantier global profitability", () => {
     expect(result.missingRetainedQuoteIds).toEqual([quoteBId]);
   });
 
+  it("montre l'engagé des commandes distinct des achats facturés et du budget devis", () => {
+    const input = quote({ id: quoteAId, saleCents: 100_000, costCents: 20_000 });
+    const project = chantier(affair([quoteAId]));
+    const result = calculateChantierProfitability(
+      project,
+      affair([quoteAId]),
+      { schemaVersion: 1, quotes: [input] },
+      { laborCostCents: 12_000, purchaseCostCents: null },
+      25_000,
+    );
+    expect(result.plannedPurchasesCents).toBe(20_000);
+    expect(result.committedPurchasesCents).toBe(25_000);
+    expect(result.purchaseBudgetOverrunCents).toBe(5_000);
+    expect(result.actualPurchaseCostCents).toBeNull();
+    expect(result.actualMarginCents).toBeNull();
+  });
+
   it("sépare les heures BE/atelier/pose des achats prévus par composants", () => {
     const q = quote({ id: quoteAId, saleCents: 100_000, costCents: 60_000 });
     const line = q.model.items[0];
