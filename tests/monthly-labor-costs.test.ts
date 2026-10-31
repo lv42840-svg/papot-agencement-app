@@ -156,8 +156,8 @@ describe("monthly employer costs", () => {
       "Nadia",
       now,
     );
-    expect(calculateChantierLaborCostCents(chantierId, week, septemberCost.records, [])).toBeNull();
-    expect(calculateChantierLaborCostCents(chantierId, week, withOctober.records, [])).toBe(24000);
+    expect(calculateChantierLaborCostCents(chantierId, week, septemberCost.records, [], now)).toBeNull();
+    expect(calculateChantierLaborCostCents(chantierId, week, withOctober.records, [], now)).toBe(24000);
     expect(week).toEqual(original);
     expect(calculateChantierLaborCostCents(chantierId, [], withOctober.records, [])).toBe(0);
   });
