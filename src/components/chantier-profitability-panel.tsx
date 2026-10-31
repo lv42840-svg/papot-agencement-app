@@ -42,12 +42,14 @@ export function ChantierProfitabilityPanel({
   commercialCase,
   quotes,
   actualCosts,
+  actualLaborCostProvisional = false,
   committedPurchasesCents = null,
 }: {
   chantier: ChantierRecord;
   commercialCase: CommercialCase | null;
   quotes: NativeQuotesPayload;
   actualCosts?: ChantierActualCostSnapshot;
+  actualLaborCostProvisional?: boolean;
   committedPurchasesCents?: number | null;
 }) {
   const result = calculateChantierProfitability(
@@ -264,10 +266,17 @@ export function ChantierProfitabilityPanel({
         />
         <div className="chantierProfitabilityRows">
           <CostRow
-            label="Heures réelles valorisées"
+            label={actualLaborCostProvisional ? "Heures valorisées · estimation" : "Heures réelles valorisées"}
             value={result.actualLaborCostCents}
-            missing="Coût mensuel employeur manquant pour une ou plusieurs périodes"
+            missing="Coût employeur manquant pour un mois clos ou son mois précédent"
           />
+          {actualLaborCostProvisional && result.actualLaborCostCents !== null ? (
+            <p className="chantierProfitabilityNote">
+              Estimation provisoire : les heures du mois en cours utilisent le coût horaire
+              employeur de chaque salarié du mois précédent. Recalcul automatique dès la
+              disponibilité du coût réel du mois.
+            </p>
+          ) : null}
           <CostRow
             label="Achats facturés et validés"
             value={result.actualPurchaseCostCents}
@@ -281,8 +290,9 @@ export function ChantierProfitabilityPanel({
           />
         </div>
         <p className="chantierProfitabilityNote">
-          Le coût des heures réelles ne reprend jamais le coût horaire prévu du devis. Il attend le
-          coût horaire réel du mois de chaque personne.
+          Le coût des heures effectuées ne reprend jamais le tarif prévu du devis. Le mois en
+          cours utilise provisoirement le coût horaire du mois précédent ; un mois clôturé
+          exige son propre coût employeur.
         </p>
       </section>
 
