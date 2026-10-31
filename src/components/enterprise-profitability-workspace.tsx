@@ -11,6 +11,7 @@ const euro = (cents: number | null) =>
   cents === null
     ? "Incomplet"
     : (cents / 100).toLocaleString("fr-FR", { style: "currency", currency: "EUR" });
+const actualEuro = (cents: number | null) => cents === null ? "Non disponible" : euro(cents);
 const hours = (value: number) => value.toLocaleString("fr-FR", { maximumFractionDigits: 1 }) + " h";
 const statuses: Record<CompanyProfitabilityRow["status"], string> = {
   ACTIVE: "Actif",
@@ -178,15 +179,15 @@ export function EnterpriseProfitabilityWorkspace() {
           }}>
             {[
               ["Facturé client HT", "Non disponible"],
-              ["Achats et frais réels HT", euro(total.actualPurchaseCostCents)],
+              ["Achats et frais réels HT", actualEuro(total.actualPurchaseCostCents)],
               [
                 total.provisionalLaborCount > 0
                   ? "Coût des heures réalisées · estimé"
                   : "Coût des heures réalisées",
-                euro(total.actualLaborCostCents),
+                actualEuro(total.actualLaborCostCents),
               ],
-              ["Coût total réel HT", euro(total.actualTotalCostCents)],
-              ["Marge réelle HT", euro(total.actualMarginCents)],
+              ["Coût total réel HT", actualEuro(total.actualTotalCostCents)],
+              ["Marge réelle HT", actualEuro(total.actualMarginCents)],
             ].map(([label, value]) => (
               <div key={label} style={{
                 background: "white", borderRadius: 10, padding: 15, minWidth: 0,
@@ -275,7 +276,7 @@ export function EnterpriseProfitabilityWorkspace() {
                         key={index}
                         style={{ padding: 8, textAlign: "right", whiteSpace: "nowrap" }}
                       >
-                        {euro(value)}
+                        {index >= 6 ? actualEuro(value) : euro(value)}
                       </td>
                     ))}
                     <td style={{ padding: 8, textAlign: "right", whiteSpace: "nowrap" }}>
