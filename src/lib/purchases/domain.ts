@@ -297,3 +297,11 @@ export function removeChantierPurchaseCommitments(
     }),
   };
 }
+
+/** Optimistic review token detects changes to an order while closing the chantier. */
+export function purchaseCloseReviewToken(orders: CommittedChantierOrder[]): string {
+  return orders
+    .map((order) => [order.orderId, order.updatedAt, order.amountHtCents].join(":"))
+    .sort()
+    .join("|") || "none";
+}
