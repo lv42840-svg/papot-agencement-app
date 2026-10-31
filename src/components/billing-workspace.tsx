@@ -5,6 +5,7 @@ import { useEffect, useState } from "react";
 import { parseBillingPercentageInput } from "@/lib/billing/percentage-input";
 import { calculateLineProgress } from "@/lib/billing/progress";
 import { filterBillingProjects, type BillingProjectSort } from "@/lib/billing/workspace-list";
+import { billingPreparationFollowup, type BillingPreparationStatus } from "@/lib/billing/preparation-followup";
 import type {
   BillingDraft,
   BillingPayload,
@@ -27,9 +28,11 @@ const parseMoney = (text: string) => {
 export function BillingWorkspace({
   quoteId,
   chantierId,
+  initialTab,
 }: {
   quoteId?: string;
   chantierId?: string;
+  initialTab?: string;
 }) {
   const router = useRouter();
   const [data, setData] = useState<Snapshot | null>(null);
@@ -41,9 +44,13 @@ export function BillingWorkspace({
   const [mode, setMode] = useState<"AMOUNT" | "PERCENT" | "LINES">("PERCENT");
   const [lineValues, setLineValues] = useState<Record<string, string>>({});
   const [value, setValue] = useState("");
-  const [tab, setTab] = useState<"CHANTIER" | "PROJECTS">(chantierId ? "CHANTIER" : "PROJECTS");
+  const [tab, setTab] = useState<"CHANTIER" | "PROJECTS" | "FOLLOWUP">(
+    chantierId ? "CHANTIER" : initialTab === "FOLLOWUP" ? "FOLLOWUP" : "PROJECTS",
+  );
   const [selectedChantier, setSelectedChantier] = useState(chantierId ?? "");
   const [projectSearch, setProjectSearch] = useState("");
+  const [followupSearch, setFollowupSearch] = useState("");
+  const [followupStatus, setFollowupStatus] = useState<BillingPreparationStatus | "ALL">("ALL");
   const [projectStatus, setProjectStatus] = useState<"ALL" | BillingDraft["status"]>("ALL");
   const [projectType, setProjectType] = useState<"ALL" | BillingType>("ALL");
   const [projectChantier, setProjectChantier] = useState("ALL");
@@ -74,6 +81,14 @@ export function BillingWorkspace({
   const sources = allSources.filter((source) => source.chantierId === activeChantierId);
   const active = sources.find((source) => source.quoteId === selection) ?? sources[0];
   const drafts = data?.payload.drafts ?? [];
+  const followup = billingPreparationFollowup(allSources, drafts);
+  const visibleFollowup = followup.filter((row) => {
+    if (followupStatus !== "ALL" && row.status !== followupStatus) return false;
+    const needle = followupSearch.trim().toLocaleLowerCase("fr-FR");
+    return !needle || [
+      row.source.clientName, row.source.affairName, row.source.quoteLabel,
+    ].join(" ").toLocaleLowerCase("fr-FR").includes(needle);
+  });
   const projectChantiers = [
     ...new Map<string, { id: string; label: string }>(
       drafts
@@ -280,6 +295,7 @@ export function BillingWorkspace({
           [
             ["CHANTIER", "Nouvelle facture depuis chantier"],
             ["PROJECTS", `Projets de factures (${drafts.length})`],
+            ["FOLLOWUP", `Devis à facturer (${followup.length})`],
           ] as const
         ).map(([key, caption]) => (
           <button
@@ -302,7 +318,7 @@ export function BillingWorkspace({
         ))}
       </div>
       {!data && <p>Chargement…</p>}
-      {data && tab !== "PROJECTS" && (
+      {data && tab === "CHANTIER" && (
         <section
           role="tabpanel"
           style={{ background: "white", padding: 20, borderRadius: 12, display: "grid", gap: 12 }}
@@ -507,6 +523,96 @@ export function BillingWorkspace({
               </button>
             </>
           )}
+        </section>
+      )}
+      {data && tab === "FOLLOWUP" && (
+        <section
+          role="tabpanel"
+          style={{ background: "white", padding: 20, borderRadius: 12, display: "grid", gap: 14 }}
+        >
+          <h2>Devis acceptés et suivi de préparation des factures</h2>
+          <p>
+            Un devis signé n&apos;est pas une facture. Les acomptes, situations et soldes ci-dessous
+            sont uniquement des <strong>projets PAPOT non émis</strong>. En attendant Pennylane,
+            l&apos;état réellement non facturé ou partiellement facturé ne peut pas être certifié.
+          </p>
+          <div style={{ display: "flex", flexWrap: "wrap", gap: 12 }}>
+            <strong>{followup.length} devis retenu(s)</strong>
+            <strong>{money(followup.reduce((s, r) => s + r.preparedHtCents, 0))} HT en projets</strong>
+            <strong>{money(followup.reduce((s, r) => s + r.remainingToPrepareHtCents, 0))} HT à préparer</strong>
+          </div>
+          <div style={{ display: "flex", gap: 12, flexWrap: "wrap" }}>
+            <label style={{ display: "grid", gap: 5, flex: "2 1 220px" }}>
+              Rechercher un devis accepté
+              <input value={followupSearch}
+                onChange={(event) => setFollowupSearch(event.target.value)}
+                placeholder="Chantier, client ou référence" />
+            </label>
+            <label style={{ display: "grid", gap: 5, flex: "1 1 180px" }}>
+              Préparation des factures
+              <select value={followupStatus}
+                onChange={(event) => setFollowupStatus(event.target.value as typeof followupStatus)}>
+                <option value="ALL">Tous les devis</option>
+                <option value="NONE">Aucun projet</option>
+                <option value="PARTIAL">Projets partiels</option>
+                <option value="FULL">Totalité préparée (non émise)</option>
+              </select>
+            </label>
+          </div>
+          <div style={{ overflowX: "auto" }}>
+            <table style={{ width: "100%", minWidth: 900, borderCollapse: "collapse" }}>
+              <thead>
+                <tr style={{ textAlign: "left", borderBottom: "2px solid #ded8e9" }}>
+                  <th style={{ padding: 9 }}>Client / chantier</th>
+                  <th style={{ padding: 9 }}>Devis accepté</th>
+                  <th style={{ padding: 9, textAlign: "right" }}>Contrat HT</th>
+                  <th style={{ padding: 9, textAlign: "right" }}>Projets préparés HT</th>
+                  <th style={{ padding: 9, textAlign: "right" }}>Reste à préparer HT</th>
+                  <th style={{ padding: 9 }}>État des projets</th>
+                  <th style={{ padding: 9 }}>Facturé réel</th>
+                  <th style={{ padding: 9 }}>Action</th>
+                </tr>
+              </thead>
+              <tbody>
+                {visibleFollowup.map((row) => (
+                  <tr key={row.source.quoteId} style={{ borderBottom: "1px solid #ece8f0" }}>
+                    <td style={{ padding: 9 }}>
+                      <strong>{row.source.clientName}</strong>
+                      <div>{row.source.affairName}</div>
+                    </td>
+                    <td style={{ padding: 9 }}>
+                      <Link href={`/devis/${encodeURIComponent(row.source.quoteId)}`}>
+                        {row.source.quoteLabel}
+                      </Link>
+                    </td>
+                    <td style={{ padding: 9, textAlign: "right" }}>{money(row.source.contractHtCents)}</td>
+                    <td style={{ padding: 9, textAlign: "right" }}>{money(row.preparedHtCents)}</td>
+                    <td style={{ padding: 9, textAlign: "right" }}>{money(row.remainingToPrepareHtCents)}</td>
+                    <td style={{ padding: 9 }}>
+                      {row.status === "NONE" ? "Aucun projet" :
+                        row.status === "PARTIAL" ? "Préparation partielle" : "Totalité préparée"}
+                      <div style={{ fontSize: 11 }}>{row.projectCount} projet(s) non émis</div>
+                    </td>
+                    <td style={{ padding: 9 }}>À rapprocher avec Pennylane</td>
+                    <td style={{ padding: 9 }}>
+                      {row.source.chantierId ? (
+                        <button type="button" className="secondaryButton" onClick={() => {
+                          setSelectedChantier(row.source.chantierId!);
+                          setSelection(row.source.quoteId);
+                          setTab("CHANTIER");
+                          setValue("");
+                        }}>Préparer une facture</button>
+                      ) : (
+                        <Link className="secondaryButton"
+                          href={`/devis/${encodeURIComponent(row.source.quoteId)}`}>Voir le devis</Link>
+                      )}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+            {!visibleFollowup.length ? <p>Aucun devis ne correspond aux filtres.</p> : null}
+          </div>
         </section>
       )}
       {data && tab === "PROJECTS" && (
