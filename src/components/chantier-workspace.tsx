@@ -20,6 +20,7 @@ import {
   RefreshCw,
   RotateCcw,
   Save,
+  ShoppingCart,
   X,
 } from "lucide-react";
 import { useCallback, useEffect, useMemo, useState } from "react";
@@ -320,7 +321,7 @@ export function ChantierWorkspace({ chantierId }: { chantierId: string }) {
     { id: "capacity", label: "Charge", icon: CalendarClock },
     { id: "profitability", label: "Rentabilité", icon: BadgeEuro },
     { id: "billing", label: "Factures", icon: FileText },
-    { id: "commandes", label: "Commandes", icon: FileText },
+    { id: "commandes", label: "Commandes", icon: ShoppingCart },
     { id: "history", label: "Historique", icon: History, badge: chantier.history.length },
   ];
 
