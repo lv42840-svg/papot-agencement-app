@@ -8,6 +8,7 @@ import {
 import {
   addPurchaseOrder,
   cancelPurchaseOrder,
+  updatePurchaseOrder,
   purchaseOrderInputSchema,
 } from "@/lib/purchases/domain";
 import { createPurchaseOrdersRepository } from "@/lib/purchases/repository";
@@ -23,6 +24,12 @@ const requestSchema = z.discriminatedUnion("action", [
       order: purchaseOrderInputSchema,
     })
     .strict(),
+  z.object({
+    action: z.literal("UPDATE"),
+    orderId: z.string().uuid(),
+    expectedUpdatedAt: z.string().datetime({ offset: true }),
+    order: purchaseOrderInputSchema,
+  }).strict(),
   z
     .object({
       action: z.literal("CANCEL"),
@@ -72,7 +79,7 @@ export async function POST(request: Request) {
     const context = await requireModuleRequestContext("purchases", "WRITE");
     const input = requestSchema.parse(await request.json());
     const chantierNames =
-      input.action === "CREATE"
+      input.action === "CREATE" || input.action === "UPDATE"
         ? new Map(
             (await createChantiersRepository().load()).chantiers.map((site) => [
               site.id,
@@ -85,6 +92,16 @@ export async function POST(request: Request) {
         return addPurchaseOrder(
           current,
           input.requestId,
+          input.order,
+          chantierNames,
+          context.user.displayName,
+        );
+      }
+      if (input.action === "UPDATE") {
+        return updatePurchaseOrder(
+          current,
+          input.orderId,
+          input.expectedUpdatedAt,
           input.order,
           chantierNames,
           context.user.displayName,
