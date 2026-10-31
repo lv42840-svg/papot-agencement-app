@@ -35,6 +35,21 @@ describe("facturation: éditeur identique au parcours devis", () => {
     expect(ui).toContain("const rows = enteredLineRows;");
   });
 
+  it("sépare création depuis devis ou chantier et projets filtrables", () => {
+    const ui = readFileSync("src/components/billing-workspace.tsx", "utf8");
+    expect(ui).toContain('chantierId ? "CHANTIER" : "QUOTE"');
+    expect(ui).toContain('role="tablist"');
+    expect(ui).toContain("Nouvelle facture depuis devis");
+    expect(ui).toContain("Nouvelle facture depuis chantier");
+    expect(ui).toContain("Projets de factures");
+    expect(ui).toContain('aria-label="Choisir un chantier à facturer"');
+    expect(ui).toContain("filterBillingProjects(drafts");
+    expect(ui).toContain('aria-label="Filtrer par statut"');
+    expect(ui).toContain('aria-label="Filtrer par chantier"');
+    expect(ui).toContain('aria-label="Trier les projets de factures"');
+    expect(ui).toContain('{d.status === "APPROVED" ? "Consulter le projet"');
+  });
+
   it("permet modification, ajout, titres et réorganisation sans émettre la facture", () => {
     const ui = readFileSync("src/components/billing-document-editor.tsx", "utf8");
     const api = readFileSync("src/app/api/desktop/billing/route.ts", "utf8");
