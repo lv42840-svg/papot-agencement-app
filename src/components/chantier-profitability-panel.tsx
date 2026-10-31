@@ -176,10 +176,14 @@ export function ChantierProfitabilityPanel({
                       <td style={{ padding: 6, borderBottom: "1px solid #eee" }}>
                         {item.description}
                       </td>
-                      <td style={{ padding: 6, borderBottom: "1px solid #eee", textAlign: "right" }}>
+                      <td
+                        style={{ padding: 6, borderBottom: "1px solid #eee", textAlign: "right" }}
+                      >
                         {numberFormatter.format(item.quantity)} {item.unit}
                       </td>
-                      <td style={{ padding: 6, borderBottom: "1px solid #eee", textAlign: "right" }}>
+                      <td
+                        style={{ padding: 6, borderBottom: "1px solid #eee", textAlign: "right" }}
+                      >
                         {money(item.totalCostCents)}
                       </td>
                     </tr>
@@ -192,11 +196,10 @@ export function ChantierProfitabilityPanel({
             <div className="chantierProfitabilityWarning">
               <AlertTriangle size={15} />
               <span>
-                {result.purchaseClassificationWarnings.length} élément(s) à classer ou chiffrer :
-                {" "}
-                {result.purchaseClassificationWarnings.map((warning) =>
-                  `${warning.quoteReference} · ${warning.description}`,
-                ).join(" ; ")}
+                {result.purchaseClassificationWarnings.length} élément(s) à classer ou chiffrer :{" "}
+                {result.purchaseClassificationWarnings
+                  .map((warning) => `${warning.quoteReference} · ${warning.description}`)
+                  .join(" ; ")}
               </span>
             </div>
           ) : null}
@@ -207,35 +210,35 @@ export function ChantierProfitabilityPanel({
         </section>
       </div>
 
-              <section className="chantierProfitabilityBlock">
-          <BlockTitle
-            icon={<ReceiptText size={16} />}
-            title="Coûts réels"
-            subtitle="Un coût n'est pris en compte que lorsqu'une vraie source le fournit."
+      <section className="chantierProfitabilityBlock">
+        <BlockTitle
+          icon={<ReceiptText size={16} />}
+          title="Coûts réels"
+          subtitle="Un coût n'est pris en compte que lorsqu'une vraie source le fournit."
+        />
+        <div className="chantierProfitabilityRows">
+          <CostRow
+            label="Heures réelles valorisées"
+            value={result.actualLaborCostCents}
+            missing="Coût mensuel employeur manquant pour une ou plusieurs périodes"
           />
-          <div className="chantierProfitabilityRows">
-            <CostRow
-              label="Heures réelles valorisées"
-              value={result.actualLaborCostCents}
-              missing="Coût mensuel employeur manquant pour une ou plusieurs périodes"
-            />
-            <CostRow
-              label="Achats / commandes"
-              value={result.actualPurchaseCostCents}
-              missing="Module Achats / commandes non raccordé"
-            />
-            <CostRow
-              label="Total coûts réels"
-              value={result.actualTotalCostCents}
-              missing="Disponible quand les deux sources sont complètes"
-              total
-            />
-          </div>
-          <p className="chantierProfitabilityNote">
-            Le coût des heures réelles ne reprend jamais le coût horaire prévu du devis. Il attend
-            le coût horaire réel du mois de chaque personne.
-          </p>
-        </section>
+          <CostRow
+            label="Achats / commandes"
+            value={result.actualPurchaseCostCents}
+            missing="Module Achats / commandes non raccordé"
+          />
+          <CostRow
+            label="Total coûts réels"
+            value={result.actualTotalCostCents}
+            missing="Disponible quand les deux sources sont complètes"
+            total
+          />
+        </div>
+        <p className="chantierProfitabilityNote">
+          Le coût des heures réelles ne reprend jamais le coût horaire prévu du devis. Il attend le
+          coût horaire réel du mois de chaque personne.
+        </p>
+      </section>
 
       <section className="chantierProfitabilityBlock">
         <BlockTitle

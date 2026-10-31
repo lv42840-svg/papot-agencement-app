@@ -381,10 +381,14 @@ describe("chantier global profitability", () => {
         unitPriceCents: 4200,
       },
     ];
-    const result = calculateChantierProfitability(chantier(affair([quoteAId])), affair([quoteAId]), {
-      schemaVersion: 1,
-      quotes: [q],
-    });
+    const result = calculateChantierProfitability(
+      chantier(affair([quoteAId])),
+      affair([quoteAId]),
+      {
+        schemaVersion: 1,
+        quotes: [q],
+      },
+    );
     expect(result.plannedHours).toEqual({ be: 2, workshop: 8, install: 4, total: 14 });
     expect(result.plannedPurchaseLines).toHaveLength(1);
     expect(result.plannedPurchaseLines[0]).toMatchObject({
@@ -421,10 +425,14 @@ describe("chantier global profitability", () => {
         unitPriceCents: 2500,
       },
     ];
-    const result = calculateChantierProfitability(chantier(affair([quoteAId])), affair([quoteAId]), {
-      schemaVersion: 1,
-      quotes: [q],
-    });
+    const result = calculateChantierProfitability(
+      chantier(affair([quoteAId])),
+      affair([quoteAId]),
+      {
+        schemaVersion: 1,
+        quotes: [q],
+      },
+    );
     expect(result.plannedPurchasesCents).toBeNull();
     expect(result.plannedPurchaseLines).toHaveLength(1);
     expect(result.plannedPurchaseLines[0].totalCostCents).toBeNull();
@@ -436,17 +444,23 @@ describe("chantier global profitability", () => {
     const q = quote({ id: quoteAId, saleCents: 100_000, costCents: 60_000 });
     const line = q.model.items[0];
     if (line.kind !== "LINE") throw new Error("Expected quote line");
-    q.pricingConfig.options = [{
-      id: crypto.randomUUID(),
-      targetItemId: line.id,
-      targetKind: "LINE",
-      label: "Option rejetée",
-      status: "REJECTED",
-    }];
-    const result = calculateChantierProfitability(chantier(affair([quoteAId])), affair([quoteAId]), {
-      schemaVersion: 1,
-      quotes: [q],
-    });
+    q.pricingConfig.options = [
+      {
+        id: crypto.randomUUID(),
+        targetItemId: line.id,
+        targetKind: "LINE",
+        label: "Option rejetée",
+        status: "REJECTED",
+      },
+    ];
+    const result = calculateChantierProfitability(
+      chantier(affair([quoteAId])),
+      affair([quoteAId]),
+      {
+        schemaVersion: 1,
+        quotes: [q],
+      },
+    );
     expect(result.plannedPurchasesCents).toBe(0);
     expect(result.plannedPurchaseLines).toEqual([]);
     expect(result.plannedHours.total).toBe(0);
