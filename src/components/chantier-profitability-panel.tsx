@@ -154,7 +154,7 @@ export function ChantierProfitabilityPanel({
           <div style={{ maxHeight: 340, overflow: "auto" }}>
             {result.plannedPurchaseLines.length === 0 ? (
               <p className="chantierProfitabilityNote">
-                Aucun composant d'achat identifié dans les devis retenus.
+                Aucun composant d&apos;achat identifié dans les devis retenus.
               </p>
             ) : (
               <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 11 }}>
