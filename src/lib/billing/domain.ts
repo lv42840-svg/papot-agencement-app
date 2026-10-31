@@ -94,9 +94,24 @@ export const billingDraftSchema = billingSourceSchema.extend({
 });
 export type BillingDraft = z.infer<typeof billingDraftSchema>;
 
+export const DEFAULT_BILLING_TITLES = [
+  "Facture de travaux",
+  "Facture d'acompte",
+  "Situation de travaux",
+  "Facture de solde",
+  "Travaux supplémentaires",
+] as const;
+
+export const billingTitlesSchema = z
+  .array(z.string().trim().min(1).max(240))
+  .min(1)
+  .max(50)
+  .refine((items) => new Set(items.map((item) => item.toLocaleLowerCase("fr-FR"))).size === items.length, "BILLING_TITLES_DUPLICATE");
+
 export const billingPayloadSchema = z.object({
   schemaVersion: z.literal(1),
   drafts: z.array(billingDraftSchema),
+  invoiceTitles: billingTitlesSchema.optional(),
 });
 export type BillingPayload = z.infer<typeof billingPayloadSchema>;
 
