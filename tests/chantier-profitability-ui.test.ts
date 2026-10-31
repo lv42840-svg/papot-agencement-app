@@ -23,12 +23,24 @@ describe("chantier profitability UI", () => {
   });
 
   it("shows sold, planned debourse, hours, actual costs and margins", () => {
-    expect(panel).toContain("Vendu HT");
+    expect(panel).toContain("Vendu prévu HT");
     expect(panel).toContain("Achats et frais prévus (hors heures)");
     expect(panel).toContain("Coût des heures prévues");
     expect(panel).toContain("Coût total prévu");
     expect(panel).toContain("Marge prévue");
     expect(panel).toContain("Marge réelle");
+    expect(panel).toContain("Prévisionnel depuis le devis");
+    expect(panel).toContain("Réalisé à ce jour");
+    expect(panel).toContain("Facturé client HT");
+    expect(panel).toContain("Achats et frais réels HT");
+    expect(panel).toContain("Coût des heures réalisées");
+    expect(panel).toContain("Coût total réel");
+    expect(panel).toContain("result.actualLaborCostCents");
+    expect(panel).toContain("result.actualPurchaseCostCents");
+    expect(panel).toContain("result.actualTotalCostCents");
+    expect(panel.indexOf("Prévisionnel depuis le devis")).toBeLessThan(
+      panel.indexOf("Réalisé à ce jour"),
+    );
     expect(panel).toContain("Heures prévues depuis le devis");
     expect(panel).toContain("Achats prévus extraits du devis");
     expect(panel).toContain("plannedPurchaseLines.map");

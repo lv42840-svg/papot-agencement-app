@@ -78,9 +78,10 @@ export function ChantierProfitabilityPanel({
         </div>
       ) : null}
 
+      <h3 className="chantierProfitabilityCardsLabel">Prévisionnel depuis le devis</h3>
       <div className="chantierProfitabilityCards">
         <Metric
-          label="Vendu HT"
+          label="Vendu prévu HT"
           value={money(result.soldCents)}
           detail={
             result.soldCents === null
@@ -103,13 +104,13 @@ export function ChantierProfitabilityPanel({
           detail={
             result.plannedLaborCostCents === null
               ? "Taux horaire manquant ou nul dans un devis : coût à compléter"
-              : "Heures BE, atelier et pose valorisées au coût horaire du devis"
+              : "BE, atelier et pose valorisés au taux du devis"
           }
         />
         <Metric
           label="Coût total prévu"
           value={money(result.plannedTotalCostCents)}
-          detail="Fournitures, heures et autres frais du devis"
+          detail="Achats, frais et heures du devis"
         />
         <Metric
           label="Marge prévue"
@@ -121,17 +122,52 @@ export function ChantierProfitabilityPanel({
           }
           className={tone(result.plannedMarginCents)}
         />
+      </div>
+
+      <h3 className="chantierProfitabilityCardsLabel">Réalisé à ce jour</h3>
+      <div className="chantierProfitabilityCards">
+        <Metric
+          label="Facturé client HT"
+          value="Non disponible"
+          detail="Factures clients à raccorder à la comptabilité"
+        />
+        <Metric
+          label="Achats et frais réels HT"
+          value={money(result.actualPurchaseCostCents)}
+          detail="En attente du rapprochement Pennylane : factures fournisseurs validées"
+        />
+        <Metric
+          label={
+            actualLaborCostProvisional
+              ? "Coût des heures réalisées · estimé"
+              : "Coût des heures réalisées"
+          }
+          value={money(result.actualLaborCostCents)}
+          detail={
+            result.actualLaborCostCents === null
+              ? "Coût employeur manquant pour un mois clos ou son mois précédent, ou accès Paie requis"
+              : actualLaborCostProvisional
+                ? "Mois en cours valorisé au taux du mois précédent"
+                : "Heures saisies valorisées au coût employeur"
+          }
+        />
+        <Metric
+          label="Coût total réel"
+          value={money(result.actualTotalCostCents)}
+          detail="Disponible après validation des achats facturés"
+        />
         <Metric
           label="Marge réelle"
           value={money(result.actualMarginCents)}
-          detail={
-            result.actualMarginCents === null
-              ? "En attente des coûts réels Heures + Achats"
-              : percent(result.actualMarginPercent)
-          }
+          detail="Non disponible avant rapprochement des factures"
           className={tone(result.actualMarginCents) + " isStrong"}
         />
       </div>
+      <p className="chantierProfitabilityNote">
+        Les BC engagés restent visibles dans les achats ci-dessous, sans être assimilés à des
+        factures. Le coût horaire du mois en cours est une estimation jusqu’à saisie de la paie
+        réelle.
+      </p>
 
       <div style={{ display: "flex", justifyContent: "flex-end" }}>
         <Link
@@ -260,48 +296,6 @@ export function ChantierProfitabilityPanel({
 
       <section className="chantierProfitabilityBlock">
         <BlockTitle
-          icon={<ReceiptText size={16} />}
-          title="Coûts réels"
-          subtitle="Un coût n'est pris en compte que lorsqu'une vraie source le fournit."
-        />
-        <div className="chantierProfitabilityRows">
-          <CostRow
-            label={
-              actualLaborCostProvisional
-                ? "Heures valorisées · estimation"
-                : "Heures réelles valorisées"
-            }
-            value={result.actualLaborCostCents}
-            missing="Coût employeur manquant pour un mois clos ou son mois précédent"
-          />
-          {actualLaborCostProvisional && result.actualLaborCostCents !== null ? (
-            <p className="chantierProfitabilityNote">
-              Estimation provisoire : les heures du mois en cours utilisent le coût horaire
-              employeur de chaque salarié du mois précédent. Recalcul automatique dès la
-              disponibilité du coût réel du mois.
-            </p>
-          ) : null}
-          <CostRow
-            label="Achats facturés et validés"
-            value={result.actualPurchaseCostCents}
-            missing="En attente du rapprochement Pennylane ; les BC engagés ne sont pas des coûts réels"
-          />
-          <CostRow
-            label="Total coûts réels"
-            value={result.actualTotalCostCents}
-            missing="Disponible quand les deux sources sont complètes"
-            total
-          />
-        </div>
-        <p className="chantierProfitabilityNote">
-          Le coût des heures effectuées ne reprend jamais le tarif prévu du devis. Le mois en cours
-          utilise provisoirement le coût horaire du mois précédent ; un mois clôturé exige son
-          propre coût employeur.
-        </p>
-      </section>
-
-      <section className="chantierProfitabilityBlock">
-        <BlockTitle
           icon={<TrendingUp size={16} />}
           title="Composition du vendu"
           subtitle="Contrôle par devis retenu, sans ventilation de marge par ligne."
@@ -370,9 +364,15 @@ export function ChantierProfitabilityPanel({
           color: #9a6418;
           font-size: 11px;
         }
+        .chantierProfitabilityCardsLabel {
+          margin: 4px 0 0;
+          color: #6251ba;
+          font-size: 12px;
+          font-weight: 800;
+        }
         .chantierProfitabilityCards {
           display: grid;
-          grid-template-columns: repeat(4, minmax(0, 1fr));
+          grid-template-columns: repeat(5, minmax(0, 1fr));
           gap: 8px;
         }
         .chantierProfitabilityColumns {

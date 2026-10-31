@@ -16,6 +16,11 @@ const example: CompanyProfitabilityRow = {
   plannedOtherCostCents: 40_000,
   plannedTotalCostCents: 57_000,
   plannedMarginCents: 43_000,
+  actualLaborCostCents: 12_000,
+  actualLaborCostProvisional: true,
+  actualPurchaseCostCents: null,
+  actualTotalCostCents: null,
+  actualMarginCents: null,
   plannedPurchasesCents: 40_000,
   committedPurchasesCents: 45_000,
   plannedHours: 6,
@@ -34,6 +39,11 @@ describe("rentabilité entreprise", () => {
     expect(totals.plannedTotalCostCents).toBe(114_000);
     expect(totals.plannedMarginCents).toBe(86_000);
     expect(totals.committedPurchasesCents).toBe(90_000);
+    expect(totals.actualLaborCostCents).toBe(24_000);
+    expect(totals.actualPurchaseCostCents).toBeNull();
+    expect(totals.actualTotalCostCents).toBeNull();
+    expect(totals.actualMarginCents).toBeNull();
+    expect(totals.provisionalLaborCount).toBe(2);
     expect(totals.plannedHours).toBe(12);
     expect(totals.actualHours).toBe(16);
   });
@@ -56,6 +66,21 @@ describe("rentabilité entreprise", () => {
     expect(totals.plannedMarginCents).toBeNull();
   });
 
+  it("masque les totaux des heures réelles si un chantier manque son coût de paie", () => {
+    const totals = companyProfitabilityTotals([
+      example,
+      {
+        ...example,
+        chantierId: "22222222-2222-4222-8222-222222222222",
+        actualLaborCostCents: null,
+        actualLaborCostProvisional: false,
+      },
+    ]);
+    expect(totals.actualLaborCostCents).toBeNull();
+    expect(totals.provisionalLaborCount).toBe(1);
+    expect(totals.plannedMarginCents).toBe(86_000);
+  });
+
   it("sécurise l'accès global et montre chaque chantier sans facturation fictive", () => {
     const route = readFileSync("src/app/api/desktop/pilotage/rentabilite/route.ts", "utf8");
     const page = readFileSync("src/app/pilotage/rentabilite/page.tsx", "utf8");
@@ -64,10 +89,20 @@ describe("rentabilité entreprise", () => {
     expect(route).toContain('requireModuleRequestContext("pilotage", "READ")');
     expect(route).toContain('requireSpecialPermission(context.user, "dashboard.view_global")');
     expect(route).toContain('requireModuleRequestContext("purchases", "READ")');
+    expect(route).toContain('hasModuleAccess(context.user.id, "payroll", "READ")');
+    expect(route).toContain("calculateChantierLaborCostEstimate");
+    expect(route).toContain("canReadPayroll ? readMonthlyLaborCosts() : Promise.resolve(null)");
     expect(page).toContain("EnterpriseProfitabilityWorkspace");
     expect(menu).toContain('href: "/pilotage/rentabilite"');
     expect(ui).toContain("Coût des heures prévues");
     expect(ui).toContain("Marge prévue HT");
+    expect(ui).toContain("Réalisé à ce jour");
+    expect(ui).toContain("Coût des heures réalisées");
+    expect(ui).toContain("Facturé client HT");
+    expect(ui).toContain("Marge réelle HT");
+    expect(ui).toContain("total.actualLaborCostCents");
+    expect(ui).toContain("total.actualPurchaseCostCents");
+    expect(ui).toContain("total.actualMarginCents");
     expect(ui).toContain("Coûts à compléter");
     expect(ui).toContain("Les achats engagés sont des BC");
   });
