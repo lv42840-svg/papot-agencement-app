@@ -21,6 +21,7 @@ const statuses: Record<CompanyProfitabilityRow["status"], string> = {
 
 export function EnterpriseProfitabilityWorkspace() {
   const [rows, setRows] = useState<CompanyProfitabilityRow[] | null>(null);
+  const [canReadPayroll, setCanReadPayroll] = useState(false);
   const [error, setError] = useState("");
   const [year, setYear] = useState("ALL");
   const [status, setStatus] = useState("ALL");
@@ -36,8 +37,12 @@ export function EnterpriseProfitabilityWorkspace() {
             ? "Accès Pilotage global, Chantiers, Commercial, Devis et Achats nécessaire."
             : "Impossible de charger la rentabilité entreprise.",
         );
-      const result = (await response.json()) as { rows: CompanyProfitabilityRow[] };
+      const result = (await response.json()) as {
+        rows: CompanyProfitabilityRow[];
+        canReadPayroll: boolean;
+      };
       setRows(result.rows);
+      setCanReadPayroll(result.canReadPayroll);
     } catch (cause) {
       setError(cause instanceof Error ? cause.message : "Chargement impossible.");
     }
@@ -135,28 +140,77 @@ export function EnterpriseProfitabilityWorkspace() {
               />
             </label>
           </div>
-          <div
-            style={{
-              display: "grid",
-              gridTemplateColumns: "repeat(auto-fit, minmax(180px, 1fr))",
-              gap: 12,
-            }}
-          >
+          <p>
+            <strong>{total.chantierCount}</strong> chantier(s) dans la sélection.
+            {" "}<strong>{euro(total.committedPurchasesCents)}</strong> HT de BC engagés
+            (non assimilés aux factures fournisseurs).
+          </p>
+          <h2 style={{ fontSize: 15, margin: "5px 0 0", color: "#6251ba" }}>
+            Prévisionnel depuis les devis retenus
+          </h2>
+          <div style={{
+            display: "grid",
+            gridTemplateColumns: "repeat(5, minmax(0, 1fr))",
+            gap: 12,
+          }}>
             {[
-              ["Chantiers", String(total.chantierCount)],
               ["Vendu prévu HT", euro(total.soldCents)],
+              ["Achats et frais prévus HT", euro(total.plannedOtherCostCents)],
               ["Coût des heures prévues", euro(total.plannedLaborCostCents)],
-              ["Autres coûts prévus", euro(total.plannedOtherCostCents)],
               ["Coût total prévu HT", euro(total.plannedTotalCostCents)],
               ["Marge prévue HT", euro(total.plannedMarginCents)],
-              ["BC engagés HT", euro(total.committedPurchasesCents)],
             ].map(([label, value]) => (
-              <div key={label} style={{ background: "white", borderRadius: 10, padding: 15 }}>
+              <div key={label} style={{
+                background: "white", borderRadius: 10, padding: 15, minWidth: 0,
+              }}>
                 <div style={{ fontSize: 12, color: "#6f677a" }}>{label}</div>
                 <strong style={{ fontSize: 20 }}>{value}</strong>
               </div>
             ))}
           </div>
+          <h2 style={{ fontSize: 15, margin: "5px 0 0", color: "#6251ba" }}>
+            Réalisé à ce jour
+          </h2>
+          <div style={{
+            display: "grid",
+            gridTemplateColumns: "repeat(5, minmax(0, 1fr))",
+            gap: 12,
+          }}>
+            {[
+              ["Facturé client HT", "Non disponible"],
+              ["Achats et frais réels HT", euro(total.actualPurchaseCostCents)],
+              [
+                total.provisionalLaborCount > 0
+                  ? "Coût des heures réalisées · estimé"
+                  : "Coût des heures réalisées",
+                euro(total.actualLaborCostCents),
+              ],
+              ["Coût total réel HT", euro(total.actualTotalCostCents)],
+              ["Marge réelle HT", euro(total.actualMarginCents)],
+            ].map(([label, value]) => (
+              <div key={label} style={{
+                background: "white", borderRadius: 10, padding: 15, minWidth: 0,
+              }}>
+                <div style={{ fontSize: 12, color: "#6f677a" }}>{label}</div>
+                <strong style={{ fontSize: 20 }}>{value}</strong>
+              </div>
+            ))}
+          </div>
+          {total.provisionalLaborCount > 0 ? (
+            <p role="status">
+              Coûts des heures provisoires sur {total.provisionalLaborCount} chantier(s) :
+              taux du mois précédent appliqué au mois en cours.
+            </p>
+          ) : null}
+          {!canReadPayroll ? (
+            <p>
+              Les coûts réels des heures sont masqués : droit de lecture Paie requis.
+            </p>
+          ) : null}
+          <p>
+            Les factures clients et fournisseurs ne sont pas encore raccordées à Pennylane :
+            leur montant réel, le coût réel total et la marge réelle restent indisponibles.
+          </p>
           {total.incompleteCount > 0 ? (
             <p role="status" style={{ color: "#a35018" }}>
               {total.incompleteCount} chantier(s) ont des coûts prévus incomplets. Les totaux
@@ -175,7 +229,7 @@ export function EnterpriseProfitabilityWorkspace() {
           >
             <h2>Rentabilité par chantier ({filtered.length})</h2>
             <table
-              style={{ width: "100%", minWidth: 1180, borderCollapse: "collapse", fontSize: 12 }}
+              style={{ width: "100%", minWidth: 1430, borderCollapse: "collapse", fontSize: 12 }}
             >
               <thead>
                 <tr style={{ textAlign: "left", borderBottom: "2px solid #ded8e9" }}>
@@ -187,6 +241,9 @@ export function EnterpriseProfitabilityWorkspace() {
                   <th style={{ textAlign: "right" }}>Coût total prévu</th>
                   <th style={{ textAlign: "right" }}>Marge prévue</th>
                   <th style={{ textAlign: "right" }}>BC engagés</th>
+                  <th style={{ textAlign: "right" }}>Heures réalisées (€)</th>
+                  <th style={{ textAlign: "right" }}>Achats réels (€)</th>
+                  <th style={{ textAlign: "right" }}>Marge réelle</th>
                   <th style={{ textAlign: "right" }}>Heures prévues / réelles</th>
                 </tr>
               </thead>
@@ -210,6 +267,9 @@ export function EnterpriseProfitabilityWorkspace() {
                       row.plannedTotalCostCents,
                       row.plannedMarginCents,
                       row.committedPurchasesCents,
+                      row.actualLaborCostCents,
+                      row.actualPurchaseCostCents,
+                      row.actualMarginCents,
                     ].map((value, index) => (
                       <td
                         key={index}
