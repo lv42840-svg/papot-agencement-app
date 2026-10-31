@@ -35,7 +35,7 @@ export function BillingWorkspace({
   const [busy, setBusy] = useState(false);
   const [selection, setSelection] = useState(quoteId ?? "");
   const [type, setType] = useState<BillingType>("DEPOSIT");
-  const [mode, setMode] = useState<"AMOUNT" | "PERCENT" | "LINES">("AMOUNT");
+  const [mode, setMode] = useState<"AMOUNT" | "PERCENT" | "LINES">("PERCENT");
   const [lineValues, setLineValues] = useState<Record<string, string>>({});
   const [value, setValue] = useState("");
   const [edit, setEdit] = useState<BillingDraft | null>(null);
@@ -179,7 +179,7 @@ export function BillingWorkspace({
         <section
           style={{ background: "white", padding: 20, borderRadius: 12, display: "grid", gap: 12 }}
         >
-          <h2>Nouveau projet de facture</h2>
+          <h2>Créer une facture depuis le devis, puis modifier ses lignes</h2>
           {sources.length === 0 ? (
             <p>Aucun devis retenu éligible. Vérifie les devis retenus et leurs prix.</p>
           ) : (
@@ -213,7 +213,7 @@ export function BillingWorkspace({
                   value={type}
                   onChange={(e) => {
                     setType(e.target.value as BillingType);
-                    setMode("AMOUNT");
+                    setMode(e.target.value === "PROGRESS" ? "LINES" : "PERCENT");
                   }}
                 >
                   {options.map((o) => (
@@ -238,12 +238,12 @@ export function BillingWorkspace({
                         }
                       }}
                     >
-                      <option value="AMOUNT">Montant HT en €</option>
+                      <option value="AMOUNT">Montant HT en € (optionnel)</option>
                       <option value="PERCENT">
                         {type === "PROGRESS" ? "Avancement global cumulé %" : "Acompte %"}
                       </option>
                       {type === "PROGRESS" && (active?.lines?.length ?? 0) > 0 ? (
-                        <option value="LINES">Avancement par ligne (%)</option>
+                        <option value="LINES">Situation : pourcentage de chaque ligne (%)</option>
                       ) : null}
                     </select>
                   </label>
