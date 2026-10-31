@@ -1,0 +1,47 @@
+name: Format payroll PR 238
+
+on:
+  pull_request:
+    types: [opened, synchronize, reopened]
+
+permissions:
+  contents: read
+
+jobs:
+  format:
+    if: github.event.pull_request.number == 238 && github.event.pull_request.head.repo.full_name == github.repository && github.head_ref == 'feat/current-month-labor-cost-prior-month-20261031'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          ref: ${{ github.event.pull_request.head.sha }}
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci --ignore-scripts
+      - name: Prettier changed files
+        run: |
+          ./node_modules/.bin/prettier --write \
+            src/lib/payroll/monthly-labor-costs.ts \
+            src/lib/payroll/chantier-labor-cost.ts \
+            src/lib/payroll/indirect-labor-cost.ts \
+            src/app/api/desktop/chantiers/route.ts \
+            src/app/api/desktop/dashboard/sold-summary/route.ts \
+            src/components/chantier-workspace.tsx \
+            src/components/chantier-profitability-panel.tsx \
+            src/components/dashboard-sold-margin-stat.tsx \
+            src/components/monthly-labor-costs-workspace.tsx \
+            tests/monthly-labor-costs.test.ts \
+            tests/planning-indirect-hours.test.ts \
+            tests/monthly-labor-costs-ui.test.ts
+      - name: Commit formatting
+        run: |
+          git add -- src/lib/payroll/monthly-labor-costs.ts src/lib/payroll/chantier-labor-cost.ts src/lib/payroll/indirect-labor-cost.ts src/app/api/desktop/chantiers/route.ts src/app/api/desktop/dashboard/sold-summary/route.ts src/components/chantier-workspace.tsx src/components/chantier-profitability-panel.tsx src/components/dashboard-sold-margin-stat.tsx src/components/monthly-labor-costs-workspace.tsx tests/monthly-labor-costs.test.ts tests/planning-indirect-hours.test.ts tests/monthly-labor-costs-ui.test.ts
+          if git diff --cached --quiet; then exit 0; fi
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git commit -m "style(payroll): format current-month cost estimate"
+          git push origin HEAD:refs/heads/feat/current-month-labor-cost-prior-month-20261031
