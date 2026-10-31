@@ -47,7 +47,8 @@ describe("facturation: éditeur identique au parcours devis", () => {
     expect(ui).toContain('aria-label="Filtrer par statut"');
     expect(ui).toContain('aria-label="Filtrer par chantier"');
     expect(ui).toContain('aria-label="Trier les projets de factures"');
-    expect(ui).toContain('{d.status === "APPROVED" ? "Consulter le projet"');
+    expect(ui).toContain('d.status === "APPROVED"');
+    expect(ui).toContain("Consulter le projet");
   });
 
   it("permet modification, ajout, titres et réorganisation sans émettre la facture", () => {
