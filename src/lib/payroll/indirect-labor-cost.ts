@@ -47,12 +47,18 @@ export function calculateIndirectLaborCostsForPeriod(
       const bucket = buckets[entry.category];
       const hours = entry.hours * split.fraction;
       bucket.hours += hours;
-      const resolved = resolveLaborCostForWorkedMonth(entry.userId, split.month, byPersonMonth, now);
+      const resolved = resolveLaborCostForWorkedMonth(
+        entry.userId,
+        split.month,
+        byPersonMonth,
+        now,
+      );
       if (!resolved) {
         bucket.complete = false;
       } else {
         provisional ||= resolved.provisional;
-        bucket.costCents += hours * (resolved.record.employerCostCents / resolved.record.workedHours);
+        bucket.costCents +=
+          hours * (resolved.record.employerCostCents / resolved.record.workedHours);
       }
     }
   }

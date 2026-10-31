@@ -64,11 +64,16 @@ export function calculateChantierLaborCostEstimate(
   for (const entry of entries) {
     for (const split of monthlySharesForWeek(entry.week, byPerson.get(entry.userId))) {
       const resolved = resolveLaborCostForWorkedMonth(
-        entry.userId, split.month, byPersonMonth, now,
+        entry.userId,
+        split.month,
+        byPersonMonth,
+        now,
       );
       if (!resolved) return { costCents: null, provisional: false };
       provisional ||= resolved.provisional;
-      totalCents += entry.hours * split.fraction *
+      totalCents +=
+        entry.hours *
+        split.fraction *
         (resolved.record.employerCostCents / resolved.record.workedHours);
     }
   }
@@ -83,7 +88,6 @@ export function calculateChantierLaborCostCents(
   personCapacities: readonly PlanningPersonCapacity[],
   now = new Date(),
 ): number | null {
-  return calculateChantierLaborCostEstimate(
-    chantierId, actualHours, records, personCapacities, now,
-  ).costCents;
+  return calculateChantierLaborCostEstimate(chantierId, actualHours, records, personCapacities, now)
+    .costCents;
 }

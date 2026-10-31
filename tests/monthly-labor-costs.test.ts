@@ -78,8 +78,12 @@ describe("monthly employer costs", () => {
 
   it("valorise octobre en cours au coût de septembre et signale l'estimation", () => {
     const wage = {
-      personId, month: "2026-09", employerCostCents: 312000, workedHours: 156,
-      updatedAt: "2026-10-01T08:00:00Z", updatedBy: "Nadia",
+      personId,
+      month: "2026-09",
+      employerCostCents: 312000,
+      workedHours: 156,
+      updatedAt: "2026-10-01T08:00:00Z",
+      updatedBy: "Nadia",
     };
     const entries = [
       { chantierId, userId: personId, activity: "ATELIER" as const, week: "2026-W40", hours: 10 },
@@ -88,28 +92,59 @@ describe("monthly employer costs", () => {
     const estimate = calculateChantierLaborCostEstimate(chantierId, entries, [wage], [], october);
     expect(estimate).toEqual({ costCents: 20_000, provisional: true });
     expect(calculateChantierLaborCostCents(chantierId, entries, [wage], [], october)).toBe(20_000);
-    expect(resolveLaborCostForWorkedMonth(personId, "2026-10",
-      new Map([[personId + ":2026-09", wage]]), october)?.provisional).toBe(true);
+    expect(
+      resolveLaborCostForWorkedMonth(
+        personId,
+        "2026-10",
+        new Map([[personId + ":2026-09", wage]]),
+        october,
+      )?.provisional,
+    ).toBe(true);
     expect(entries[0].hours).toBe(10);
   });
 
   it("ne prolonge pas l'estimation sur un mois clos sans ses coûts propres", () => {
-    const wages = [{
-      personId, month: "2026-09", employerCostCents: 312000, workedHours: 156,
-      updatedAt: "2026-10-01T08:00:00Z", updatedBy: "Nadia",
-    }];
+    const wages = [
+      {
+        personId,
+        month: "2026-09",
+        employerCostCents: 312000,
+        workedHours: 156,
+        updatedAt: "2026-10-01T08:00:00Z",
+        updatedBy: "Nadia",
+      },
+    ];
     const entries = [
       { chantierId, userId: personId, activity: "BE" as const, week: "2026-W40", hours: 10 },
     ];
-    expect(calculateChantierLaborCostEstimate(chantierId, entries, wages, [],
-      new Date("2026-11-01T12:00:00Z"))).toEqual({ costCents: null, provisional: false });
+    expect(
+      calculateChantierLaborCostEstimate(
+        chantierId,
+        entries,
+        wages,
+        [],
+        new Date("2026-11-01T12:00:00Z"),
+      ),
+    ).toEqual({ costCents: null, provisional: false });
     const octoberWage = { ...wages[0], month: "2026-10", employerCostCents: 468000 };
-    expect(calculateChantierLaborCostEstimate(chantierId, entries,
-      [...wages, octoberWage], [], new Date("2026-11-01T12:00:00Z")))
-      .toEqual({ costCents: 24_000, provisional: false });
-    expect(calculateChantierLaborCostEstimate(chantierId, entries,
-      [...wages, octoberWage], [], new Date("2026-10-31T12:00:00Z")))
-      .toEqual({ costCents: 20_000, provisional: true });
+    expect(
+      calculateChantierLaborCostEstimate(
+        chantierId,
+        entries,
+        [...wages, octoberWage],
+        [],
+        new Date("2026-11-01T12:00:00Z"),
+      ),
+    ).toEqual({ costCents: 24_000, provisional: false });
+    expect(
+      calculateChantierLaborCostEstimate(
+        chantierId,
+        entries,
+        [...wages, octoberWage],
+        [],
+        new Date("2026-10-31T12:00:00Z"),
+      ),
+    ).toEqual({ costCents: 20_000, provisional: true });
   });
 
   it("refuse une estimation sans paie du mois précédent et gère décembre-janvier", () => {
@@ -121,11 +156,16 @@ describe("monthly employer costs", () => {
     const january = new Date("2027-01-15T12:00:00Z");
     expect(calculateChantierLaborCostCents(chantierId, entries, [], [], january)).toBeNull();
     const december = {
-      personId, month: "2026-12", employerCostCents: 390000, workedHours: 156,
-      updatedAt: "2027-01-01T08:00:00Z", updatedBy: "Nadia",
+      personId,
+      month: "2026-12",
+      employerCostCents: 390000,
+      workedHours: 156,
+      updatedAt: "2027-01-01T08:00:00Z",
+      updatedBy: "Nadia",
     };
-    expect(calculateChantierLaborCostEstimate(chantierId, entries, [december], [], january))
-      .toEqual({ costCents: 20_000, provisional: true });
+    expect(
+      calculateChantierLaborCostEstimate(chantierId, entries, [december], [], january),
+    ).toEqual({ costCents: 20_000, provisional: true });
   });
 
   it("values chantier hours from monthly costs and preserves weekly quantities", () => {
@@ -156,8 +196,12 @@ describe("monthly employer costs", () => {
       "Nadia",
       now,
     );
-    expect(calculateChantierLaborCostCents(chantierId, week, septemberCost.records, [], now)).toBeNull();
-    expect(calculateChantierLaborCostCents(chantierId, week, withOctober.records, [], now)).toBe(24000);
+    expect(
+      calculateChantierLaborCostCents(chantierId, week, septemberCost.records, [], now),
+    ).toBeNull();
+    expect(calculateChantierLaborCostCents(chantierId, week, withOctober.records, [], now)).toBe(
+      24000,
+    );
     expect(week).toEqual(original);
     expect(calculateChantierLaborCostCents(chantierId, [], withOctober.records, [])).toBe(0);
   });

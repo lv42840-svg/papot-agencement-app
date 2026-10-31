@@ -266,7 +266,11 @@ export function ChantierProfitabilityPanel({
         />
         <div className="chantierProfitabilityRows">
           <CostRow
-            label={actualLaborCostProvisional ? "Heures valorisées · estimation" : "Heures réelles valorisées"}
+            label={
+              actualLaborCostProvisional
+                ? "Heures valorisées · estimation"
+                : "Heures réelles valorisées"
+            }
             value={result.actualLaborCostCents}
             missing="Coût employeur manquant pour un mois clos ou son mois précédent"
           />
@@ -290,9 +294,9 @@ export function ChantierProfitabilityPanel({
           />
         </div>
         <p className="chantierProfitabilityNote">
-          Le coût des heures effectuées ne reprend jamais le tarif prévu du devis. Le mois en
-          cours utilise provisoirement le coût horaire du mois précédent ; un mois clôturé
-          exige son propre coût employeur.
+          Le coût des heures effectuées ne reprend jamais le tarif prévu du devis. Le mois en cours
+          utilise provisoirement le coût horaire du mois précédent ; un mois clôturé exige son
+          propre coût employeur.
         </p>
       </section>
 

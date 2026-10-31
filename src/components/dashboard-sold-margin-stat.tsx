@@ -89,11 +89,10 @@ export function DashboardSoldMarginStat() {
                   <span>Marge globale indicative {snapshot.year}</span>
                   <strong>{money(snapshot.indirect.indicativeYearlyMarginCents)}</strong>
                 </div>
-                {snapshot.indirect.monthly.provisional ||
-                snapshot.indirect.yearly.provisional ? (
+                {snapshot.indirect.monthly.provisional || snapshot.indirect.yearly.provisional ? (
                   <small className="dashboardSoldWarning">
-                    Estimation provisoire : les heures du mois en cours utilisent
-                    le coût horaire employeur du mois précédent.
+                    Estimation provisoire : les heures du mois en cours utilisent le coût horaire
+                    employeur du mois précédent.
                   </small>
                 ) : null}
                 <small className="dashboardSoldWarning">

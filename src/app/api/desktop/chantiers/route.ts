@@ -103,8 +103,11 @@ async function snapshot(
         payload.chantiers.map((chantier) => [
           chantier.id,
           calculateChantierLaborCostEstimate(
-            chantier.id, planningPayload.actualHours, monthlyCosts.records,
-            planningPayload.peopleCapacity, now,
+            chantier.id,
+            planningPayload.actualHours,
+            monthlyCosts.records,
+            planningPayload.peopleCapacity,
+            now,
           ),
         ]),
       )

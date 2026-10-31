@@ -56,9 +56,7 @@ export function previousMonthKey(month: string): string {
   monthlyKeySchema.parse(month);
   const year = Number(month.slice(0, 4));
   const number = Number(month.slice(5));
-  return number === 1
-    ? `${year - 1}-12`
-    : `${year}-${String(number - 1).padStart(2, "0")}`;
+  return number === 1 ? `${year - 1}-12` : `${year}-${String(number - 1).padStart(2, "0")}`;
 }
 
 /**
