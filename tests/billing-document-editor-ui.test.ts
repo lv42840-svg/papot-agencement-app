@@ -26,6 +26,15 @@ describe("facturation: éditeur identique au parcours devis", () => {
     expect(ui).toContain("router.push(`/facturation/");
   });
 
+  it("signale avant envoi une situation inférieure aux acomptes déjà préparés", () => {
+    const ui = readFileSync("src/components/billing-workspace.tsx", "utf8");
+    expect(ui).toContain("calculateLineProgress(data.payload, active, enteredLineRows)");
+    expect(ui).toContain("BILLING_PROGRESS_TAX_ALLOCATION_UNAVAILABLE");
+    expect(ui).toContain("Avancement cumulé insuffisant");
+    expect(ui).toContain("Boolean(progressPreviewError)");
+    expect(ui).toContain("const rows = enteredLineRows;");
+  });
+
   it("permet modification, ajout, titres et réorganisation sans émettre la facture", () => {
     const ui = readFileSync("src/components/billing-document-editor.tsx", "utf8");
     const api = readFileSync("src/app/api/desktop/billing/route.ts", "utf8");
