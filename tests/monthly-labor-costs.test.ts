@@ -86,7 +86,7 @@ describe("monthly employer costs", () => {
       updatedBy: "Nadia",
     };
     const entries = [
-      { chantierId, userId: personId, activity: "ATELIER" as const, week: "2026-W40", hours: 10 },
+      { chantierId, userId: personId, activity: "WORKSHOP" as const, week: "2026-W40", hours: 10 },
     ];
     const october = new Date("2026-10-31T12:00:00Z");
     const estimate = calculateChantierLaborCostEstimate(chantierId, entries, [wage], [], october);
@@ -151,7 +151,7 @@ describe("monthly employer costs", () => {
     expect(previousMonthKey("2027-01")).toBe("2026-12");
     expect(previousMonthKey("2026-10")).toBe("2026-09");
     const entries = [
-      { chantierId, userId: personId, activity: "POSE" as const, week: "2027-W02", hours: 8 },
+      { chantierId, userId: personId, activity: "INSTALL" as const, week: "2027-W02", hours: 8 },
     ];
     const january = new Date("2027-01-15T12:00:00Z");
     expect(calculateChantierLaborCostCents(chantierId, entries, [], [], january)).toBeNull();
