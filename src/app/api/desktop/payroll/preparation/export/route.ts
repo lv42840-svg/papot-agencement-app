@@ -1,3 +1,4 @@
+import { addPayrollWeeklySheets } from "@/lib/payroll/weekly-export";
 import { NextResponse } from "next/server";
 import ExcelJS from "exceljs";
 import {
@@ -88,6 +89,7 @@ export async function GET(request: Request) {
         { width: 45 },
       ];
     sheet.views = [{ state: "frozen", ySplit: 4 }];
+    addPayrollWeeklySheets(workbook, summary);
     const bytes = await workbook.xlsx.writeBuffer();
     const filename = `Paie_${month.replace("-", "_")}_${selected ? `V${selected.number}` : period.status === "REOPENED" ? "BROUILLON" : "ACTUEL"}.xlsx`;
     return new NextResponse(new Uint8Array(bytes), {

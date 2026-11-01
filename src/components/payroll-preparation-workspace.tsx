@@ -204,7 +204,8 @@ export function PayrollPreparationWorkspace() {
                 href={download(frozen && valid.latest ? String(valid.latest.number) : "current")}
                 className="secondaryButton"
               >
-                Exporter Excel {frozen ? `V${valid.latest?.number}` : "actuel / brouillon"}
+                Exporter Excel {frozen ? `V${valid.latest?.number}` : "actuel / brouillon"} · détail
+                hebdomadaire par personne
               </a>
             ) : null}
           </div>
