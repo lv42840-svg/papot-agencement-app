@@ -3,7 +3,7 @@ import "server-only";
 import { createHash, randomUUID } from "node:crypto";
 import { cookies } from "next/headers";
 import { redirect } from "next/navigation";
-import { mutateAuthPayload, readAuthPayload } from "@/lib/auth/store";
+import { mutateAuthPayload, readAuthPayload, readSessionIdentity } from "@/lib/auth/store";
 import { newSessionToken } from "@/lib/auth/session-token";
 
 const cookieName = process.env.SESSION_COOKIE_NAME ?? "papot_session";
@@ -96,25 +96,7 @@ export async function getCurrentUser(): Promise<CurrentUser | null> {
   const token = (await cookies()).get(cookieName)?.value;
   if (!token) return null;
 
-  const hash = tokenHash(token);
-  const payload = await readAuthPayload();
-  const session = payload.sessions.find((candidate) => candidate.tokenHash === hash);
-  if (!session || Date.parse(session.expiresAt) <= Date.now()) return null;
-
-  const user = payload.users.find(
-    (candidate) => candidate.id === session.userId && candidate.isActive,
-  );
-  if (!user) return null;
-  return {
-    id: user.id,
-    username: user.username,
-    displayName: user.displayName,
-    email: user.email,
-    accentKey: user.accentKey,
-    planningPotentialCollapsed: user.planningPotentialCollapsed ?? false,
-    canManagePermissions: user.canManagePermissions,
-    mustChangePassword: user.mustChangePassword,
-  };
+  return readSessionIdentity(tokenHash(token));
 }
 
 export async function requireUser(): Promise<CurrentUser> {

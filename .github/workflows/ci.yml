@@ -51,6 +51,7 @@ jobs:
       - run: npm test -- tests/quotes-postgres.integration.test.ts
       - run: npm test -- tests/planning-postgres.integration.test.ts
       - run: npm test -- tests/audit-postgres.integration.test.ts
+      - run: npm test -- tests/auth-read-model.integration.test.ts
 
   pdf-integration:
     runs-on: ubuntu-latest

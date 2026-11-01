@@ -1,3 +1,4 @@
+import { readSessionIdentityFromDb, readUserPermissionsFromDb } from "./read-model";
 import "server-only";
 
 import { isLocalStorageMode, mutateLocalSnapshot, readLocalSnapshot } from "../local-db/runtime";
@@ -61,4 +62,37 @@ export async function mutateAuthPayload<T>(
 
 export async function authHasUsers(): Promise<boolean> {
   return (await readAuthPayload()).users.length > 0;
+}
+
+export async function readSessionIdentity(hash: string) {
+  if (!isLocalStorageMode()) {
+    await getAuthRepository();
+    return readSessionIdentityFromDb(getServerDbPool(), hash);
+  }
+  const payload = await readAuthPayload();
+  const session = payload.sessions.find(
+    (row) => row.tokenHash === hash && Date.parse(row.expiresAt) > Date.now(),
+  );
+  const user = session && payload.users.find((row) => row.id === session.userId && row.isActive);
+  if (!user) return null;
+  return {
+    id: user.id,
+    username: user.username,
+    displayName: user.displayName,
+    email: user.email,
+    accentKey: user.accentKey,
+    planningPotentialCollapsed: user.planningPotentialCollapsed ?? false,
+    canManagePermissions: user.canManagePermissions,
+    mustChangePassword: user.mustChangePassword,
+  };
+}
+export async function readUserPermissions(userId: string) {
+  if (!isLocalStorageMode()) {
+    await getAuthRepository();
+    return readUserPermissionsFromDb(getServerDbPool(), userId);
+  }
+  const user = (await readAuthPayload()).users.find((row) => row.id === userId && row.isActive);
+  return user
+    ? { modulePermissions: user.modulePermissions, specialPermissions: user.specialPermissions }
+    : null;
 }
