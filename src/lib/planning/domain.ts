@@ -1,3 +1,4 @@
+import { editHistorySchema } from "../edit-history";
 import { z } from "zod";
 import {
   COMMERCIAL_STATUS_LABELS,
@@ -115,6 +116,8 @@ export type PlanningStaff = z.infer<typeof planningStaffSchema>;
 export const planningPayloadSchema = z
   .object({
     schemaVersion: z.literal(1),
+    editRevisions: z.record(z.number().int().nonnegative()).optional(),
+    editHistory: z.array(editHistorySchema).optional(),
     macroAllocations: z.array(planningMacroAllocationSchema),
     provisionalAllocations: z.array(planningProvisionalAllocationSchema).default([]),
     actualHours: z.array(planningActualHoursSchema).default([]),

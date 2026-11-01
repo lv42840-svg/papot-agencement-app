@@ -1,3 +1,4 @@
+import { safePreviewType, documentSecurityHeaders } from "@/lib/server-files/preview";
 import { NextResponse } from "next/server";
 import { requireModuleRequestContext } from "@/lib/auth/module-request-context";
 import { desktopRequestErrorStatus } from "@/lib/desktop/request-context";
@@ -43,16 +44,16 @@ export async function GET(request: Request, context: RouteContext) {
     });
     const bytes = await readEntryAttachment(transport, attachment);
     const download = new URL(request.url).searchParams.get("download") === "1";
-    const canInline =
-      attachment.contentType.startsWith("image/") || attachment.contentType === "application/pdf";
+    const previewType = safePreviewType(bytes);
+    const canInline = previewType !== null;
 
     return new NextResponse(new Uint8Array(bytes), {
       status: 200,
       headers: {
-        "Content-Type": attachment.contentType || "application/octet-stream",
+        "Content-Type": previewType ?? "application/octet-stream",
         "Content-Length": String(bytes.length),
         "Content-Disposition": contentDisposition(attachment.fileName, download || !canInline),
-        "Cache-Control": "private, max-age=60",
+        ...documentSecurityHeaders,
         "X-Content-Type-Options": "nosniff",
       },
     });

@@ -16,7 +16,8 @@
     "format": "prettier --write .",
     "format:check": "prettier --check .",
     "typecheck": "tsc --noEmit",
-    "test": "vitest run"
+    "test": "vitest run",
+    "test:e2e": "playwright test"
   },
   "dependencies": {
     "lucide-react": "0.468.0",
@@ -29,6 +30,7 @@
   },
   "devDependencies": {
     "@eslint/eslintrc": "3.2.0",
+    "@playwright/test": "1.56.1",
     "@types/node": "22.10.2",
     "@types/pg": "8.15.5",
     "@types/react": "19.0.3",

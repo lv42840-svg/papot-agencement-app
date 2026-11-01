@@ -263,6 +263,14 @@ export function applyEntriesMutation(
   const now = nowDate.toISOString();
 
   if (input.action === "create") {
+    const existing = input.entryId
+      ? payload.entries.find((entry) => entry.id === input.entryId)
+      : undefined;
+    if (existing) {
+      if (existing.rawText !== input.rawText || existing.priority !== input.priority)
+        throw new Error("CAPTURE_REQUEST_CONFLICT");
+      return { payload, focusEntryId: existing.id };
+    }
     ensureTagIds(payload, input.tagIds);
     const entry: EntryRecord = {
       id: input.entryId ?? randomUUID(),

@@ -32,7 +32,7 @@ type ContextPayload = {
   error?: string;
 };
 
-export function MobileEntryCapture() {
+export function MobileEntryCapture({ userId }: { userId: string }) {
   const [context, setContext] = useState<ContextPayload | null>(null);
   const [rawText, setRawText] = useState("");
   const [priority, setPriority] = useState<"NORMAL" | "URGENT">("NORMAL");
@@ -50,17 +50,18 @@ export function MobileEntryCapture() {
   const filesRef = useRef<HTMLInputElement>(null);
 
   const refreshQueuedCount = useCallback(async () => {
-    const queued = await listOfflineEntries();
+    const queued = await listOfflineEntries(userId);
     setQueuedCount(queued.length);
-  }, []);
+  }, [userId]);
 
   const syncQueuedEntries = useCallback(async () => {
     if (!navigator.onLine) return;
     setSyncing(true);
     setError(null);
     try {
-      const queued = await listOfflineEntries();
+      const queued = await listOfflineEntries(userId);
       for (const draft of queued) {
+        await queueOfflineEntry(draft);
         const response = await fetch("/api/mobile/entries/capture", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
@@ -70,7 +71,7 @@ export function MobileEntryCapture() {
           const body = (await response.json()) as { error?: string };
           throw new Error(body.error ?? "Synchronisation impossible");
         }
-        await removeOfflineEntry(draft.id);
+        await removeOfflineEntry(draft.id, userId);
       }
       await refreshQueuedCount();
       if (queued.length > 0) setSuccess(true);
@@ -79,51 +80,20 @@ export function MobileEntryCapture() {
     } finally {
       setSyncing(false);
     }
-  }, [refreshQueuedCount]);
+  }, [refreshQueuedCount, userId]);
 
   useEffect(() => {
     setOnline(navigator.onLine);
     void refreshQueuedCount();
 
-    if ("serviceWorker" in navigator) {
-      void navigator.serviceWorker.register("/sw.js").then(async () => {
-        if (!("caches" in window)) return;
-        const cache = await caches.open("papot-mobile-shell-v2");
-        const resources = new Set<string>(["/capture"]);
-        for (const entry of performance.getEntriesByType("resource")) {
-          const url = new URL(entry.name);
-          if (
-            url.origin === window.location.origin &&
-            (url.pathname.startsWith("/_next/") || url.pathname === "/capture")
-          ) {
-            resources.add(url.pathname + url.search);
-          }
-        }
-        for (const resource of resources) {
-          try {
-            await cache.add(resource);
-          } catch {
-            // A single optional asset must not block offline preparation.
-          }
-        }
-      });
-    }
-
-    const cachedContext = localStorage.getItem("papot-mobile-entry-context");
-    if (cachedContext) {
-      try {
-        setContext(JSON.parse(cachedContext) as ContextPayload);
-      } catch {
-        localStorage.removeItem("papot-mobile-entry-context");
-      }
-    }
+    // Remove the legacy shared customer cache; never load it for another account.
+    localStorage.removeItem("papot-mobile-entry-context");
 
     void fetch("/api/mobile/entries/context", { cache: "no-store" })
       .then(async (response) => {
         const body = (await response.json()) as ContextPayload;
         if (!response.ok) throw new Error(body.error ?? "Chargement impossible");
         setContext(body);
-        localStorage.setItem("papot-mobile-entry-context", JSON.stringify(body));
       })
       .catch(() => undefined);
 
@@ -167,6 +137,7 @@ export function MobileEntryCapture() {
 
   async function saveOfflineDraft(): Promise<void> {
     const draft: OfflineEntryDraft = {
+      ownerUserId: userId,
       id: crypto.randomUUID(),
       createdAt: new Date().toISOString(),
       rawText,
@@ -195,6 +166,7 @@ export function MobileEntryCapture() {
       }
 
       const draft: OfflineEntryDraft = {
+        ownerUserId: userId,
         id: crypto.randomUUID(),
         createdAt: new Date().toISOString(),
         rawText,
@@ -204,6 +176,7 @@ export function MobileEntryCapture() {
         commercialCaseId,
         files,
       };
+      await queueOfflineEntry(draft);
       const response = await fetch("/api/mobile/entries/capture", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -211,11 +184,14 @@ export function MobileEntryCapture() {
       });
       const body = (await response.json()) as { error?: string };
       if (!response.ok) throw new Error(body.error ?? "Envoi impossible");
+      await removeOfflineEntry(draft.id, userId);
+      await refreshQueuedCount();
       resetForm();
       setSuccess(true);
     } catch (submitError) {
       if (!navigator.onLine || submitError instanceof TypeError) {
-        await saveOfflineDraft();
+        await refreshQueuedCount();
+        resetForm();
         setOnline(false);
       } else {
         setError(submitError instanceof Error ? submitError.message : "Envoi impossible");

@@ -1,56 +1,28 @@
-const CACHE = "papot-mobile-shell-v2";
-
-async function installCaptureShell() {
-  const cache = await caches.open(CACHE);
-  try {
-    await cache.add("/capture");
-  } catch {
-    // The authenticated shell is also primed from the page after login.
-  }
-}
-
-async function clearOldCaches() {
-  const keys = await caches.keys();
-  const oldKeys = keys.filter((key) => key !== CACHE);
-  await Promise.all(oldKeys.map((key) => caches.delete(key)));
-}
-
-self.addEventListener("install", (event) => {
-  event.waitUntil(installCaptureShell());
-  self.skipWaiting();
-});
-
+const CACHE = "papot-static-v3";
+self.addEventListener("install", () => self.skipWaiting());
 self.addEventListener("activate", (event) => {
-  event.waitUntil(Promise.all([self.clients.claim(), clearOldCaches()]));
+  event.waitUntil(
+    (async () => {
+      for (const key of await caches.keys()) {
+        if (key.startsWith("papot-") && key !== CACHE) await caches.delete(key);
+      }
+      await self.clients.claim();
+    })(),
+  );
 });
-
 self.addEventListener("fetch", (event) => {
   const request = event.request;
-  if (request.method !== "GET") return;
-
   const url = new URL(request.url);
-  if (url.origin !== self.location.origin) return;
-  if (url.pathname.startsWith("/api/")) return;
-
+  if (request.method !== "GET" || url.origin !== self.location.origin) return;
+  if (!url.pathname.startsWith("/_next/static/") && url.pathname !== "/papot-icon.svg") return;
   event.respondWith(
-    fetch(request)
-      .then((response) => {
-        if (response.ok) {
-          const copy = response.clone();
-          void caches.open(CACHE).then((cache) => cache.put(request, copy));
-        }
-        return response;
-      })
-      .catch(async () => {
-        const cached = await caches.match(request);
-        if (cached) return cached;
-
-        if (request.mode === "navigate") {
-          const capture = await caches.match("/capture");
-          if (capture) return capture;
-        }
-
-        throw new Error("OFFLINE_RESOURCE_UNAVAILABLE");
-      }),
+    (async () => {
+      const cache = await caches.open(CACHE);
+      const cached = await cache.match(request);
+      if (cached) return cached;
+      const response = await fetch(request);
+      if (response.ok && !response.redirected) await cache.put(request, response.clone());
+      return response;
+    })(),
   );
 });

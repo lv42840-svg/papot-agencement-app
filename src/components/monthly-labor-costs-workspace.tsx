@@ -1,6 +1,9 @@
 "use client";
 
+import { EditHistory, type EditEvent } from "./edit-history";
+
 import { useCallback, useEffect, useState } from "react";
+import { EDIT_CONFLICT_MESSAGE } from "@/lib/edit-history";
 import { parisCurrentMonth } from "@/lib/payroll/monthly-labor-costs";
 
 type Person = { id: string; name: string };
@@ -14,6 +17,8 @@ type MonthlyRow = {
   updatedBy: string;
 };
 type Snapshot = {
+  editHistory: EditEvent[];
+  editRevisions: Record<string, number>;
   month: string;
   editable: boolean;
   people: Person[];
@@ -105,6 +110,7 @@ export function MonthlyLaborCostsWorkspace() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           action: "saveMonthlyLaborCost",
+          expectedRevision: snapshot.editRevisions?.[`${month}:${personId}`] ?? 0,
           month,
           personId,
           employerCostCents: Math.round(cost * 100),
@@ -112,8 +118,27 @@ export function MonthlyLaborCostsWorkspace() {
         }),
       });
       const body = (await response.json()) as Snapshot & { error?: string };
-      if (!response.ok) throw new Error(body.error ?? "Enregistrement impossible.");
-      setSnapshot(body);
+      if (!response.ok)
+        throw new Error(
+          body.error === "EDIT_VERSION_CONFLICT"
+            ? EDIT_CONFLICT_MESSAGE
+            : (body.error ?? "Enregistrement impossible."),
+        );
+      setSnapshot((old) =>
+        old
+          ? {
+              ...body,
+              records: [
+                ...old.records.filter((row) => row.personId !== personId),
+                ...body.records.filter((row) => row.personId === personId),
+              ],
+              editRevisions: {
+                ...old.editRevisions,
+                [`${month}:${personId}`]: body.editRevisions[`${month}:${personId}`],
+              },
+            }
+          : body,
+      );
       setDrafts((old) => {
         const next = { ...old };
         delete next[personId];
@@ -274,6 +299,9 @@ export function MonthlyLaborCostsWorkspace() {
         <p className="monthlyCostsNotice" role="status">
           {message}
         </p>
+      ) : null}
+      {snapshot ? (
+        <EditHistory events={snapshot.editHistory ?? []} people={snapshot.people} />
       ) : null}
       <style jsx global>{`
         .papotMonthlyCosts {

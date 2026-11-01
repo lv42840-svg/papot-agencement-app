@@ -1,4 +1,5 @@
 export type OfflineEntryDraft = {
+  ownerUserId: string;
   id: string;
   createdAt: string;
   rawText: string;
@@ -38,7 +39,7 @@ export async function queueOfflineEntry(draft: OfflineEntryDraft): Promise<void>
   db.close();
 }
 
-export async function listOfflineEntries(): Promise<OfflineEntryDraft[]> {
+export async function listOfflineEntries(ownerUserId: string): Promise<OfflineEntryDraft[]> {
   const db = await openDb();
   const result = await new Promise<OfflineEntryDraft[]>((resolve, reject) => {
     const request = db.transaction(STORE, "readonly").objectStore(STORE).getAll();
@@ -46,14 +47,20 @@ export async function listOfflineEntries(): Promise<OfflineEntryDraft[]> {
     request.onerror = () => reject(request.error ?? new Error("OFFLINE_DB_READ_FAILED"));
   });
   db.close();
-  return result.sort((a, b) => a.createdAt.localeCompare(b.createdAt));
+  return result
+    .filter((draft) => draft.ownerUserId === ownerUserId)
+    .sort((a, b) => a.createdAt.localeCompare(b.createdAt));
 }
 
-export async function removeOfflineEntry(id: string): Promise<void> {
+export async function removeOfflineEntry(id: string, ownerUserId: string): Promise<void> {
   const db = await openDb();
   await new Promise<void>((resolve, reject) => {
     const tx = db.transaction(STORE, "readwrite");
-    tx.objectStore(STORE).delete(id);
+    const store = tx.objectStore(STORE);
+    const current = store.get(id);
+    current.onsuccess = () => {
+      if (current.result?.ownerUserId === ownerUserId) store.delete(id);
+    };
     tx.oncomplete = () => resolve();
     tx.onerror = () => reject(tx.error ?? new Error("OFFLINE_DB_DELETE_FAILED"));
   });
@@ -61,6 +68,8 @@ export async function removeOfflineEntry(id: string): Promise<void> {
 }
 
 export type MobileEntryCapturePayload = {
+  requestId: string;
+  ownerUserId: string;
   rawText: string;
   priority: "NORMAL" | "URGENT";
   tagIds: string[];
@@ -96,6 +105,8 @@ export async function draftToJsonPayload(
   }
 
   return {
+    requestId: draft.id,
+    ownerUserId: draft.ownerUserId,
     rawText: draft.rawText,
     priority: draft.priority,
     tagIds: draft.tagIds,
