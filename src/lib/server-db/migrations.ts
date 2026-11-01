@@ -1,3 +1,4 @@
+import { ensureSplitStorage } from "./split-state";
 import type { Pool, PoolClient } from "pg";
 
 import { getServerDbPool } from "./pool";
@@ -741,6 +742,10 @@ export async function runServerDbMigrations(
       await ensureFreshWebBootstrap(client);
     }
 
+    await ensureSplitStorage(client);
+    await client.query(
+      "INSERT INTO papot_schema_migrations(version,name) VALUES (17, 'split-hours-and-labor-storage') ON CONFLICT(version) DO NOTHING",
+    );
     await client.query("COMMIT");
   } catch (error) {
     try {

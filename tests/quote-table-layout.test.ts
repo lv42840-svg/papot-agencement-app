@@ -1,14 +1,19 @@
 import { readFileSync } from "node:fs";
 import { describe, expect, it } from "vitest";
 
-const source = readFileSync(
-  new URL("../src/components/quote-structured-lines-editor.tsx", import.meta.url),
-  "utf-8",
-);
+const source =
+  readFileSync(
+    new URL("../src/components/quote-structured-lines-editor.tsx", import.meta.url),
+    "utf-8",
+  ) +
+  readFileSync(
+    new URL("../src/components/quote-structured-lines-editor.css", import.meta.url),
+    "utf-8",
+  );
 
 describe("quote table layout", () => {
   it("keeps inline quote editing styled as a table without hiding Total HT", () => {
-    expect(source).toContain("<style jsx global>");
+    expect(source).toContain('import "./quote-structured-lines-editor.css"');
     expect(source).toContain(
       "grid-template-columns: 44px minmax(250px, 1fr) 64px 56px 104px 100px 126px 220px;",
     );
