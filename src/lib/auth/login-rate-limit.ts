@@ -1,3 +1,4 @@
+import { lockAuthMutation } from "./transaction-lock";
 import "server-only";
 
 import { createHash, randomBytes, randomUUID } from "node:crypto";
@@ -171,6 +172,7 @@ export async function authenticateLogin(input: {
     return await withServerDbTransaction(async (client): Promise<LoginResult> => {
       await client.query("SET LOCAL lock_timeout = '3s'");
       await client.query("SET LOCAL statement_timeout = '8s'");
+      await lockAuthMutation(client);
       await client.query("SELECT pg_advisory_xact_lock(hashtextextended($1::text, 0))", [
         `papot-agencement-login:${accountHash}`,
       ]);
@@ -265,4 +267,29 @@ export async function clearAdminResetRequirement(accountKey: string): Promise<vo
     "DELETE FROM papot_auth_account_lock_state WHERE account_hash = $1",
     [keyHash(key)],
   );
+}
+
+export async function allowPasswordSetupRequest(request: Request): Promise<boolean> {
+  const key = keyHash("password-setup:" + loginClientIp(request));
+  if (isLocalStorageMode()) {
+    const now = Date.now();
+    const old = localIpAttempts.get(key);
+    const bucket =
+      !old || now - old.startedAt >= LOGIN_WINDOW_MS ? { attempts: 0, startedAt: now } : old;
+    bucket.attempts += 1;
+    localIpAttempts.set(key, bucket);
+    return bucket.attempts <= 10;
+  }
+  await runServerDbMigrations();
+  const result = await getServerDbPool().query<{ attempts: number }>(
+    `
+    INSERT INTO papot_auth_ip_attempts AS bucket (ip_hash, attempts, window_started_at)
+    VALUES ($1, 1, clock_timestamp())
+    ON CONFLICT (ip_hash) DO UPDATE SET
+      attempts = CASE WHEN bucket.window_started_at <= clock_timestamp() - INTERVAL '15 minutes' THEN 1 ELSE LEAST(bucket.attempts + 1, 11) END,
+      window_started_at = CASE WHEN bucket.window_started_at <= clock_timestamp() - INTERVAL '15 minutes' THEN clock_timestamp() ELSE bucket.window_started_at END
+    RETURNING attempts`,
+    [key],
+  );
+  return result.rows[0].attempts <= 10;
 }

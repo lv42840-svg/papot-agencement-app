@@ -12,7 +12,7 @@ import {
   type AuthUserRecord,
 } from "./domain";
 
-const AUTH_MUTATION_LOCK_ID = 7_332_170_416_238_507;
+import { lockAuthMutation } from "./transaction-lock";
 
 type AuthQueryable = Pool | PoolClient;
 
@@ -298,13 +298,14 @@ export function createPostgresAuthRepository(
 
     async replaceSnapshot(payload) {
       await withServerDbTransaction(async (client) => {
+        await lockAuthMutation(client);
         await replaceAuthSnapshotOnClient(client, payload);
       }, pool);
     },
 
     async mutate<T>(mutate: (payload: AuthPayload) => T | Promise<T>) {
       return withServerDbTransaction(async (client) => {
-        await client.query("SELECT pg_advisory_xact_lock($1)", [AUTH_MUTATION_LOCK_ID]);
+        await lockAuthMutation(client);
         const payload = await loadAuthPayloadFromQueryable(client);
         pruneExpiredSessions(payload);
         const result = await mutate(payload);

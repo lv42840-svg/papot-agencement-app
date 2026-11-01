@@ -1,6 +1,9 @@
 "use client";
 
+import { EditHistory, type EditEvent } from "./edit-history";
+
 import Link from "next/link";
+import { EDIT_CONFLICT_MESSAGE } from "@/lib/edit-history";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { isoWeekKey, isoWeekMonday, weekDateRangeLabel } from "@/lib/planning/time-markers";
 
@@ -37,6 +40,8 @@ type IndirectRecord = {
   hours: number;
 };
 type HoursSnapshot = {
+  editHistory: EditEvent[];
+  editRevisions: Record<string, number>;
   week: string;
   editable: boolean;
   weekIsPast: boolean;
@@ -226,6 +231,7 @@ export function ActualHoursWorkspace() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           action: "saveActualHoursRow",
+          expectedRevision: data.editRevisions?.[`${week}:${personId}:${chantierId}`] ?? 0,
           week,
           userId: personId,
           chantierId,
@@ -235,8 +241,33 @@ export function ActualHoursWorkspace() {
         }),
       });
       const json = (await response.json()) as HoursSnapshot & { error?: string };
-      if (!response.ok) throw new Error(json.error ?? "Enregistrement impossible.");
-      setData(json);
+      if (!response.ok)
+        throw new Error(
+          json.error === "EDIT_VERSION_CONFLICT"
+            ? EDIT_CONFLICT_MESSAGE
+            : (json.error ?? "Enregistrement impossible."),
+        );
+      setData((old) =>
+        old
+          ? {
+              ...json,
+              records: [
+                ...old.records.filter(
+                  (row) => !(row.userId === personId && row.chantierId === chantierId),
+                ),
+                ...json.records.filter(
+                  (row) => row.userId === personId && row.chantierId === chantierId,
+                ),
+              ],
+              indirectRecords: old.indirectRecords,
+              editRevisions: {
+                ...old.editRevisions,
+                [`${week}:${personId}:${chantierId}`]:
+                  json.editRevisions[`${week}:${personId}:${chantierId}`],
+              },
+            }
+          : json,
+      );
       setDrafts((old) => {
         const next = { ...old };
         for (const activity of ACTIVITIES) delete next[keyFor(chantierId, activity)];
@@ -265,6 +296,7 @@ export function ActualHoursWorkspace() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           action: "saveIndirectHoursRow",
+          expectedRevision: data.editRevisions?.[`${week}:${personId}:indirect:${category}`] ?? 0,
           week,
           userId: personId,
           category,
@@ -272,8 +304,33 @@ export function ActualHoursWorkspace() {
         }),
       });
       const json = (await response.json()) as HoursSnapshot & { error?: string };
-      if (!response.ok) throw new Error(json.error ?? "Enregistrement impossible.");
-      setData(json);
+      if (!response.ok)
+        throw new Error(
+          json.error === "EDIT_VERSION_CONFLICT"
+            ? EDIT_CONFLICT_MESSAGE
+            : (json.error ?? "Enregistrement impossible."),
+        );
+      setData((old) =>
+        old
+          ? {
+              ...json,
+              records: old.records,
+              indirectRecords: [
+                ...old.indirectRecords.filter(
+                  (row) => !(row.userId === personId && row.category === category),
+                ),
+                ...json.indirectRecords.filter(
+                  (row) => row.userId === personId && row.category === category,
+                ),
+              ],
+              editRevisions: {
+                ...old.editRevisions,
+                [`${week}:${personId}:indirect:${category}`]:
+                  json.editRevisions[`${week}:${personId}:indirect:${category}`],
+              },
+            }
+          : json,
+      );
       setIndirectDrafts((old) => {
         const next = { ...old };
         delete next[category];
@@ -624,6 +681,7 @@ export function ActualHoursWorkspace() {
         </p>
       ) : null}
 
+      {data ? <EditHistory events={data.editHistory ?? []} people={data.people} /> : null}
       <style jsx global>{`
         .papotActualHours {
           display: grid;

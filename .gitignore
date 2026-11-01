@@ -14,3 +14,7 @@ build/*.png
 *.tsbuildinfo
 
 .dev.vars*
+
+.papot-e2e/
+playwright-report/
+test-results/

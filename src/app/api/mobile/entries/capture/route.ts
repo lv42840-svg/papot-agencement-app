@@ -1,4 +1,5 @@
-import { randomUUID } from "node:crypto";
+import { withBusinessTransaction } from "@/lib/server-db/business-transaction";
+import { createHash } from "node:crypto";
 import { NextResponse } from "next/server";
 import { z } from "zod";
 import { requireModuleRequestContext } from "@/lib/auth/module-request-context";
@@ -30,6 +31,8 @@ const fileSchema = z.object({
 });
 
 const captureSchema = z.object({
+  requestId: z.string().uuid(),
+  ownerUserId: z.string().uuid(),
   rawText: z.string().trim().min(1).max(4000),
   priority: z.enum(["NORMAL", "URGENT"]).default("NORMAL"),
   tagIds: z.array(z.string().min(1).max(100)).max(12).default([]),
@@ -68,6 +71,11 @@ export async function POST(request: Request) {
     const repository = await createEntriesRepository();
 
     const parsed = captureSchema.parse(await request.json());
+    if (parsed.ownerUserId !== context.user.id) throw new Error("CAPTURE_OWNER_FORBIDDEN");
+    const digest = createHash("sha256")
+      .update(context.user.id + ":" + parsed.requestId)
+      .digest("hex");
+    const entryId = `${digest.slice(0, 8)}-${digest.slice(8, 12)}-4${digest.slice(13, 16)}-a${digest.slice(17, 20)}-${digest.slice(20, 32)}`;
     const files = decodeFiles(parsed.files);
 
     let clientId = parsed.clientId ?? null;
@@ -101,30 +109,38 @@ export async function POST(request: Request) {
       });
     }
 
-    const entryId = randomUUID();
-    const created = await repository.mutate(
-      {
-        action: "create",
-        entryId,
-        rawText: parsed.rawText,
-        priority: parsed.priority,
-        tagIds: parsed.tagIds,
-        clientId,
-        commercialCaseId,
-      },
-      actor,
+    if (transport && files.length > 0)
+      uploaded = await uploadEntryAttachments(transport, entryId, files);
+    const mutation = await withBusinessTransaction(async () => {
+      const created = await repository.mutate(
+        {
+          action: "create",
+          entryId,
+          rawText: parsed.rawText,
+          priority: parsed.priority,
+          tagIds: parsed.tagIds,
+          clientId,
+          commercialCaseId,
+        },
+        actor,
+      );
+      const existing = created.payload.entries.find((entry) => entry.id === entryId)!;
+      if (existing.attachments.length > 0 || uploaded.length === 0) return created;
+      return repository.registerAttachments(entryId, uploaded, actor);
+    });
+    // Another retry may already have committed attachments; remove only our unused files.
+    const used = new Set(
+      mutation.payload.entries
+        .find((entry) => entry.id === entryId)!
+        .attachments.map((file) => file.id),
     );
-
-    if (!transport || files.length === 0) {
-      return NextResponse.json(snapshot(created.payload, actor, created.focusEntryId), {
-        headers: { "Cache-Control": "no-store" },
-      });
-    }
-
-    uploaded = await uploadEntryAttachments(transport, entryId, files);
-    const mutation = await repository.registerAttachments(entryId, uploaded, actor);
-
-    return NextResponse.json(snapshot(mutation.payload, actor, mutation.focusEntryId), {
+    if (transport)
+      await cleanupEntryAttachments(
+        transport,
+        uploaded.filter((file) => !used.has(file.id)),
+      );
+    uploaded = [];
+    return NextResponse.json(snapshot(mutation.payload, actor, entryId), {
       headers: { "Cache-Control": "no-store" },
     });
   } catch (error) {
@@ -140,7 +156,7 @@ export async function POST(request: Request) {
     return NextResponse.json(
       { error: code },
       {
-        status: code.endsWith("_NOT_FOUND") ? 404 : 400,
+        status: code.endsWith("_FORBIDDEN") ? 403 : code.endsWith("_NOT_FOUND") ? 404 : 400,
         headers: { "Cache-Control": "no-store" },
       },
     );
