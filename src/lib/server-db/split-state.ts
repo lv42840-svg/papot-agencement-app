@@ -26,6 +26,7 @@ export async function saveSplitState(
   table: StateTable,
   collections: readonly string[],
   value: Record<string, unknown>,
+  bumpVersion = true,
 ) {
   const metadata: Record<string, unknown> = {
     ...value,
@@ -55,7 +56,7 @@ export async function saveSplitState(
     delete metadata[collection];
   }
   await client.query(
-    `UPDATE ${table} SET payload=$1::jsonb,version=version+1,updated_at=NOW() WHERE scope='global'`,
+    `UPDATE ${table} SET payload=$1::jsonb,version=version+${bumpVersion ? 1 : 0},updated_at=NOW() WHERE scope='global'`,
     [JSON.stringify(metadata)],
   );
 }
@@ -75,7 +76,7 @@ export async function loadSplitState(
       `INSERT INTO papot_state_migration_backups(resource,payload) VALUES($1,$2::jsonb) ON CONFLICT(resource) DO NOTHING`,
       [table, JSON.stringify(payload)],
     );
-    await saveSplitState(client, table, collections, payload);
+    await saveSplitState(client, table, collections, payload, false);
     return payload;
   }
   const rows = await client.query<{ collection: string; payload: unknown }>(

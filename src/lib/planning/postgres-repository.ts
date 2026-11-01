@@ -17,7 +17,7 @@ export function createPostgresPlanningRepository(
         );
         if (!hasUnfrozenHours(current)) return current;
         const frozen = freezeHourSchedules(current);
-        await saveSplitState(client, "papot_planning_state", planningCollections, frozen);
+        await saveSplitState(client, "papot_planning_state", planningCollections, frozen, false);
         return frozen;
       }, pool);
     },
