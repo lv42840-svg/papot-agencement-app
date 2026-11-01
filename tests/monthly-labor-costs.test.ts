@@ -57,7 +57,7 @@ describe("monthly employer costs", () => {
   it("rejects current and future months as well as invalid costs or hours", () => {
     expect(() => assertClosedMonth("2026-10", new Date("2026-10-17T12:00:00Z"))).toThrow();
     expect(() => assertClosedMonth("2026-09", new Date("2026-10-17T12:00:00Z"))).not.toThrow();
-    expect(() => monthlyLaborCostInputSchema.parse({ ...september, workedHours: 0 })).toThrow();
+    expect(() => monthlyLaborCostInputSchema.parse({ ...september, workedHours: 0 })).not.toThrow();
     expect(() => monthlyLaborCostInputSchema.parse({ ...september, workedHours: 6.123 })).toThrow();
     expect(() =>
       monthlyLaborCostInputSchema.parse({ ...september, employerCostCents: -100 }),

@@ -2,9 +2,10 @@
 
 import { useState, type ReactNode } from "react";
 import { MonthlyLaborCostsWorkspace } from "@/components/monthly-labor-costs-workspace";
+import { PayrollPreparationWorkspace } from "@/components/payroll-preparation-workspace";
 
 export function HeuresTabs({ hours }: { hours: ReactNode }) {
-  const [tab, setTab] = useState<"actual" | "monthly">("actual");
+  const [tab, setTab] = useState<"actual" | "monthly" | "preparation">("actual");
 
   return (
     <div className="papotHeuresTabs">
@@ -25,8 +26,21 @@ export function HeuresTabs({ hours }: { hours: ReactNode }) {
         >
           Coûts mensuels
         </button>
+        <button
+          type="button"
+          className={tab === "preparation" ? "isSelected" : ""}
+          onClick={() => setTab("preparation")}
+        >
+          Préparation de la paie
+        </button>
       </nav>
-      {tab === "actual" ? hours : <MonthlyLaborCostsWorkspace />}
+      {tab === "actual" ? (
+        hours
+      ) : tab === "monthly" ? (
+        <MonthlyLaborCostsWorkspace />
+      ) : (
+        <PayrollPreparationWorkspace />
+      )}
       <style jsx global>{`
         .papotHeuresTabs {
           display: grid;

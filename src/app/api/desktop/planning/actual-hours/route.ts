@@ -1,6 +1,7 @@
+import { payrollWeekSignature } from "@/lib/planning/payroll-confirmation";
 import { assertEditRevision } from "@/lib/edit-history";
 import { NextResponse } from "next/server";
-import { ZodError } from "zod";
+import { ZodError, z } from "zod";
 import { requireSpecialPermission, hasEffectiveSpecialPermission } from "@/lib/auth/permissions";
 import { readAuthPayload } from "@/lib/auth/store";
 import { createChantiersRepository } from "@/lib/chantiers/create-repository";
@@ -127,6 +128,9 @@ async function snapshot(
   );
   return {
     week,
+    payrollWeekSignatures: Object.fromEntries(
+      personnel.map((person) => [person.id, payrollWeekSignature(planning, person.id, week)]),
+    ),
     editRevisions: planning.editRevisions ?? {},
     editHistory: (planning.editHistory ?? []).filter((entry) => entry.key.includes(week)),
     editable: context.moduleAccess.canWrite && canEnter && isPlanningWeekPast(week),
@@ -156,6 +160,29 @@ export async function POST(request: Request) {
     const context = await requireModuleRequestContext("planning", "WRITE");
     await requireSpecialPermission(context.user, "planning.enter_actual_hours");
     const raw = await request.json();
+    if (raw.action === "confirmPayrollWeek") {
+      const input = z
+        .object({
+          userId: z.string().uuid(),
+          week: actualHoursWeekSchema,
+          expectedSignature: z.string().max(1000000),
+        })
+        .parse(raw);
+      if (!isPlanningWeekPast(input.week)) throw new Error("PLANNING_ACTUAL_HOURS_WEEK_NOT_PAST");
+      await createPlanningRepository().mutate((payload) => {
+        const signature = payrollWeekSignature(payload, input.userId, input.week);
+        if (signature !== input.expectedSignature) throw new Error("EDIT_VERSION_CONFLICT");
+        return {
+          ...payload,
+          payrollWeekConfirmations: {
+            ...payload.payrollWeekConfirmations,
+            [input.userId + ":" + input.week]: signature,
+          },
+        };
+      });
+      return noStoreJson(await snapshot(input.week, context));
+    }
+
     const input =
       raw?.action === "saveIndirectHoursRow"
         ? indirectHoursRowSchema.parse(raw)

@@ -1,5 +1,8 @@
 import "server-only";
 
+import { createPlanningRepository } from "@/lib/planning/create-repository";
+import { holdingRecordedHoursForMonth } from "@/lib/payroll/holding-hours";
+
 import { isLocalStorageMode } from "@/lib/local-db/runtime";
 import { mutateLocalSnapshot, readLocalSnapshot } from "@/lib/local-db/runtime";
 import { getServerDbPool, runServerDbMigrations } from "@/lib/server-db";
@@ -13,9 +16,34 @@ type Mutation = (current: MonthlyLaborCostsPayload) => MonthlyLaborCostsPayload;
 
 const LOCAL_KEY = "monthly-labor-costs";
 
+async function withCurrentHoldingHours(
+  payload: MonthlyLaborCostsPayload,
+): Promise<MonthlyLaborCostsPayload> {
+  if (!payload.records.some((record) => record.sourceType === "HOLDING")) return payload;
+  const planning = await createPlanningRepository().load();
+  return {
+    ...payload,
+    records: payload.records.map((record) =>
+      record.sourceType === "HOLDING"
+        ? {
+            ...record,
+            workedHours: holdingRecordedHoursForMonth(
+              record.month,
+              record.personId,
+              planning,
+              planning.peopleCapacity,
+            ),
+          }
+        : record,
+    ),
+  };
+}
+
 export async function readMonthlyLaborCosts(): Promise<MonthlyLaborCostsPayload> {
   if (isLocalStorageMode()) {
-    return readLocalSnapshot(LOCAL_KEY, parseMonthlyLaborCostsPayload).payload;
+    return withCurrentHoldingHours(
+      readLocalSnapshot(LOCAL_KEY, parseMonthlyLaborCostsPayload).payload,
+    );
   }
 
   const pool = getServerDbPool();
@@ -23,7 +51,7 @@ export async function readMonthlyLaborCosts(): Promise<MonthlyLaborCostsPayload>
   const result = await pool.query<{ payload: unknown }>(
     "SELECT payload FROM papot_monthly_labor_costs_state WHERE scope = 'global'",
   );
-  return parseMonthlyLaborCostsPayload(result.rows[0]?.payload);
+  return withCurrentHoldingHours(parseMonthlyLaborCostsPayload(result.rows[0]?.payload));
 }
 
 export async function mutateMonthlyLaborCosts(

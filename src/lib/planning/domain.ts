@@ -116,6 +116,7 @@ export type PlanningStaff = z.infer<typeof planningStaffSchema>;
 export const planningPayloadSchema = z
   .object({
     schemaVersion: z.literal(1),
+    payrollWeekConfirmations: z.record(z.string()).optional(),
     editRevisions: z.record(z.number().int().nonnegative()).optional(),
     editHistory: z.array(editHistorySchema).optional(),
     macroAllocations: z.array(planningMacroAllocationSchema),

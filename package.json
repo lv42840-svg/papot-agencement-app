@@ -20,6 +20,7 @@
     "test:e2e": "playwright test"
   },
   "dependencies": {
+    "exceljs": "4.4.0",
     "lucide-react": "0.468.0",
     "next": "15.5.24",
     "pg": "8.16.3",
@@ -58,6 +59,7 @@
     "productName": "PAPOT AGENCEMENT",
     "asar": true,
     "ignoredProductionDependencies": [
+      "exceljs",
       "lucide-react",
       "next",
       "pg",

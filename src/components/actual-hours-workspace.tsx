@@ -40,6 +40,7 @@ type IndirectRecord = {
   hours: number;
 };
 type HoursSnapshot = {
+  payrollWeekSignatures: Record<string, string>;
   editHistory: EditEvent[];
   editRevisions: Record<string, number>;
   week: string;
@@ -682,6 +683,40 @@ export function ActualHoursWorkspace() {
       ) : null}
 
       {data ? <EditHistory events={data.editHistory ?? []} people={data.people} /> : null}
+      {data?.editable && personId ? (
+        <button
+          type="button"
+          className="secondaryButton"
+          disabled={
+            !!saving || Object.keys(drafts).length > 0 || Object.keys(indirectDrafts).length > 0
+          }
+          onClick={async () => {
+            const response = await fetch("/api/desktop/planning/actual-hours", {
+              method: "POST",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({
+                action: "confirmPayrollWeek",
+                week,
+                userId: personId,
+                expectedSignature: data.payrollWeekSignatures[personId],
+              }),
+            });
+            const result = await response.json();
+            if (!response.ok) {
+              setMessage(
+                result.error === "EDIT_VERSION_CONFLICT"
+                  ? EDIT_CONFLICT_MESSAGE
+                  : "Validation impossible.",
+              );
+              return;
+            }
+            setData(result);
+            setMessage("Semaine validée pour la préparation de paie.");
+          }}
+        >
+          Valider la semaine pour la paie
+        </button>
+      ) : null}
       <style jsx global>{`
         .papotActualHours {
           display: grid;
