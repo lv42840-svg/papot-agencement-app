@@ -1,3 +1,4 @@
+import { payrollWeekSignature } from "../planning/payroll-confirmation";
 import { z } from "zod";
 import { isoWeekDates, scheduleHoursForDate } from "../planning/capacity";
 import { isoWeekKey } from "../planning/time-markers";
@@ -71,6 +72,7 @@ const monthStateSchema = z.object({
 export type PayrollMonthState = z.infer<typeof monthStateSchema>;
 const prepPayloadSchema = z.object({
   schemaVersion: z.literal(1),
+  templateBase64: z.string().max(7000000).optional(),
   rules: overtimeRulesSchema.default(DEFAULT_OVERTIME_RULES),
   months: z.array(monthStateSchema),
 });
@@ -152,9 +154,13 @@ export function buildPayrollSummary(
           planning.indirectHours
             .filter((entry) => entry.userId === person.userId && entry.week === week)
             .reduce((sum, row) => sum + row.hours, 0);
-        const source = state.validatedWeeks.includes(person.userId + ":" + week)
-          ? ("REAL" as const)
-          : ("CONTRACT" as const);
+        const source =
+          planning.payrollWeekConfirmations?.[person.userId + ":" + week] ===
+            payrollWeekSignature(planning, person.userId, week) ||
+          (!planning.payrollWeekConfirmations &&
+            state.validatedWeeks.includes(person.userId + ":" + week))
+            ? ("REAL" as const)
+            : ("CONTRACT" as const);
         const selected = source === "REAL" ? realHours : Math.max(0, baseHours - absenceHours);
         const extra25 = Math.max(0, Math.min(selected, rules.start50) - rules.start25);
         const extra50 = Math.max(0, selected - rules.start50);

@@ -1,3 +1,4 @@
+import { withBusinessTransaction } from "@/lib/server-db/business-transaction";
 import { NextResponse } from "next/server";
 import { ZodError } from "zod";
 import { requireSpecialPermission } from "@/lib/auth/permissions";
@@ -59,28 +60,33 @@ export async function POST(request: Request) {
     const quotes = await createQuotesRepository().load();
     const launchHours = deriveChantierLaunchHours(affair, quotes);
 
+    const planningRepository = createPlanningRepository();
+    await Promise.all([chantiersRepository.load(), planningRepository.load()]);
     stage = "apply-and-save-launch";
-    const mutation = await chantiersRepository.mutate((payload) =>
-      launchChantierFromAffair(
-        payload,
-        affair,
-        {
-          ...input,
-          be: launchHours.hours.be,
-          workshop: launchHours.hours.workshop,
-          install: launchHours.hours.install,
-        },
-        actor,
-      ),
-    );
-
-    const launchedChantierId = mutation.focusChantierId;
-    if (!launchedChantierId) throw new Error("CHANTIER_LAUNCH_FOCUS_MISSING");
-
-    stage = "convert-planning-provision";
-    await createPlanningRepository().mutate((payload) =>
-      convertPlanningProvisionToFirm(payload, affair.id, launchedChantierId),
-    );
+    const mutation = await withBusinessTransaction(async () => {
+      const result = await chantiersRepository.mutate((payload) => {
+        const existing = payload.chantiers.find(
+          (site) => site.sourceCommercialCaseId === affair.id,
+        );
+        if (existing) return { payload, focusChantierId: existing.id, shouldPersist: false };
+        return launchChantierFromAffair(
+          payload,
+          affair,
+          {
+            ...input,
+            be: launchHours.hours.be,
+            workshop: launchHours.hours.workshop,
+            install: launchHours.hours.install,
+          },
+          actor,
+        );
+      });
+      if (!result.focusChantierId) throw new Error("CHANTIER_LAUNCH_FOCUS_MISSING");
+      await planningRepository.mutate((payload) =>
+        convertPlanningProvisionToFirm(payload, affair.id, result.focusChantierId!),
+      );
+      return result;
+    });
 
     console.info("[PAPOT][Chantiers] launch from affair saved", { ms: Date.now() - startedAt });
     return noStoreJson({

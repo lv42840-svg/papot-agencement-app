@@ -1,3 +1,4 @@
+import { assertEditRevision } from "@/lib/edit-history";
 import { NextResponse } from "next/server";
 import { ZodError, z } from "zod";
 import { hasEffectiveSpecialPermission, requireSpecialPermission } from "@/lib/auth/permissions";
@@ -240,9 +241,37 @@ export async function POST(request: Request) {
       const activeUserIds = new Set(
         auth.users.filter((candidate) => candidate.isActive).map((candidate) => candidate.id),
       );
-      await planningRepository.mutate((payload) =>
-        applyPlanningActualHoursMutation(payload, input, activeChantierIds, activeUserIds),
-      );
+      await planningRepository.mutate((payload) => {
+        const key = `${input.week}:${input.userId}:${input.chantierId}`;
+        const revision = payload.editRevisions?.[key] ?? 0;
+        assertEditRevision(body.expectedRevision, revision);
+        const before = payload.actualHours.filter(
+          (row) =>
+            row.week === input.week &&
+            row.userId === input.userId &&
+            row.chantierId === input.chantierId,
+        );
+        const next = applyPlanningActualHoursMutation(
+          payload,
+          input,
+          activeChantierIds,
+          activeUserIds,
+        );
+        next.editRevisions = { ...payload.editRevisions, [key]: revision + 1 };
+        next.editHistory = [
+          ...(payload.editHistory ?? []),
+          {
+            key,
+            revision: revision + 1,
+            at: new Date().toISOString(),
+            actorId: context.user.id,
+            actorName: context.user.displayName,
+            before,
+            after: input,
+          },
+        ];
+        return next;
+      });
     } else if (input.action === "setChantierOrder") {
       await requireSpecialPermission(context.user, "planning.edit_macro");
       const chantiers = await createChantiersRepository(context).load();

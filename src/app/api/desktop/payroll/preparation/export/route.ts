@@ -38,7 +38,10 @@ export async function GET(request: Request) {
       );
     const workbook = new ExcelJS.Workbook();
     workbook.creator = "PAPOT AGENCEMENT";
-    const sheet = workbook.addWorksheet("Synthèse");
+    if (state.templateBase64)
+      await workbook.xlsx.load(Buffer.from(state.templateBase64, "base64") as never);
+    const sheet = workbook.getWorksheet("Synthèse") ?? workbook.addWorksheet("Synthèse");
+    if (sheet.rowCount) sheet.spliceRows(1, sheet.rowCount);
     sheet.addRow([
       `Préparation paie ${month} · ${selected ? `V${selected.number}` : period.status === "REOPENED" ? "BROUILLON" : "DONNÉES ACTUELLES"}`,
     ]);
@@ -73,16 +76,17 @@ export async function GET(request: Request) {
         row.note,
       ]);
     sheet.getRow(4).font = { bold: true };
-    sheet.columns = [
-      { width: 29 },
-      { width: 18 },
-      { width: 18 },
-      { width: 18 },
-      { width: 19 },
-      { width: 35 },
-      { width: 45 },
-      { width: 45 },
-    ];
+    if (!state.templateBase64)
+      sheet.columns = [
+        { width: 29 },
+        { width: 18 },
+        { width: 18 },
+        { width: 18 },
+        { width: 19 },
+        { width: 35 },
+        { width: 45 },
+        { width: 45 },
+      ];
     sheet.views = [{ state: "frozen", ySplit: 4 }];
     const bytes = await workbook.xlsx.writeBuffer();
     const filename = `Paie_${month.replace("-", "_")}_${selected ? `V${selected.number}` : period.status === "REOPENED" ? "BROUILLON" : "ACTUEL"}.xlsx`;

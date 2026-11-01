@@ -1,3 +1,4 @@
+import { safePreviewType, documentSecurityHeaders } from "@/lib/server-files/preview";
 import { NextResponse } from "next/server";
 import { createCommercialRepository } from "@/lib/commercial/create-repository";
 import { createCommercialDocumentTransport } from "@/lib/commercial/document-file-runtime";
@@ -42,16 +43,16 @@ export async function GET(request: Request, context: RouteContext) {
     });
     const bytes = await readCommercialDocument(transport, document);
     const download = new URL(request.url).searchParams.get("download") === "1";
-    const canInline =
-      document.contentType.startsWith("image/") || document.contentType === "application/pdf";
+    const previewType = safePreviewType(bytes);
+    const canInline = previewType !== null;
 
     return new NextResponse(new Uint8Array(bytes), {
       status: 200,
       headers: {
-        "Content-Type": document.contentType || "application/octet-stream",
+        "Content-Type": previewType ?? "application/octet-stream",
         "Content-Length": String(bytes.length),
         "Content-Disposition": contentDisposition(document.fileName, download || !canInline),
-        "Cache-Control": "private, max-age=60",
+        ...documentSecurityHeaders,
         "X-Content-Type-Options": "nosniff",
       },
     });

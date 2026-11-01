@@ -1,3 +1,4 @@
+import { editHistorySchema } from "../edit-history";
 import { z } from "zod";
 
 const monthlyKeySchema = z.string().regex(/^(20\d{2}|2100)-(0[1-9]|1[0-2])$/);
@@ -41,6 +42,8 @@ const historyEntrySchema = z.object({
 
 const monthlyLaborCostsPayloadSchema = z.object({
   schemaVersion: z.literal(1),
+  editRevisions: z.record(z.number().int().nonnegative()).optional(),
+  editHistory: z.array(editHistorySchema).optional(),
   records: z.array(monthlyLaborCostRecordSchema),
   history: z.array(historyEntrySchema).default([]),
 });

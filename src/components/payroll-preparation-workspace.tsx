@@ -294,25 +294,7 @@ export function PayrollPreparationWorkspace() {
                     <span>{number(week.hours)} h</span>
                     <span>{week.source === "REAL" ? "Heures validées" : "Base contrat"}</span>
                     <span>Absences : {number(week.absenceHours)} h</span>
-                    {isEditing && (
-                      <button
-                        className="secondaryButton"
-                        type="button"
-                        disabled={busy}
-                        onClick={() =>
-                          void mutate({
-                            action: "setWeekValidated",
-                            personId: row.personId,
-                            week: week.week,
-                            validated: week.source !== "REAL",
-                          })
-                        }
-                      >
-                        {week.source === "REAL"
-                          ? "Revenir à la base contrat"
-                          : "Confirmer heures réelles"}
-                      </button>
-                    )}
+                    <span>Validation depuis la saisie des heures du Planning</span>
                   </div>
                 ))}
                 {row.absences.map((abs, index) => (
@@ -432,6 +414,36 @@ export function PayrollPreparationWorkspace() {
           )}
         </>
       ) : null}
+      <details style={{ marginTop: 16 }}>
+        <summary>Modèle Excel de paie (administration)</summary>
+        <p>
+          La feuille Synthèse reçoit les données de paie. Les largeurs de colonnes et les autres
+          feuilles sont conservées. Personnalise le fichier dans Excel puis remplace le modèle.
+        </p>
+        <a href="/api/desktop/payroll/preparation/template">Télécharger le modèle Excel</a>
+        <label>
+          Remplacer le modèle{" "}
+          <input
+            type="file"
+            accept=".xlsx"
+            onChange={async (event) => {
+              const file = event.target.files?.[0];
+              if (!file) return;
+              const form = new FormData();
+              form.set("file", file);
+              const response = await fetch("/api/desktop/payroll/preparation/template", {
+                method: "POST",
+                body: form,
+              });
+              const body = await response.json();
+              window.alert(
+                response.ok ? "Modèle enregistré." : (body.error ?? "Enregistrement impossible."),
+              );
+              event.target.value = "";
+            }}
+          />
+        </label>
+      </details>
     </section>
   );
 }

@@ -1,6 +1,9 @@
 "use client";
 
+import { EditHistory, type EditEvent } from "./edit-history";
+
 import Link from "next/link";
+import { EDIT_CONFLICT_MESSAGE } from "@/lib/edit-history";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { isoWeekKey, isoWeekMonday, weekDateRangeLabel } from "@/lib/planning/time-markers";
 
@@ -37,6 +40,9 @@ type IndirectRecord = {
   hours: number;
 };
 type HoursSnapshot = {
+  payrollWeekSignatures: Record<string, string>;
+  editHistory: EditEvent[];
+  editRevisions: Record<string, number>;
   week: string;
   editable: boolean;
   weekIsPast: boolean;
@@ -226,6 +232,7 @@ export function ActualHoursWorkspace() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           action: "saveActualHoursRow",
+          expectedRevision: data.editRevisions?.[`${week}:${personId}:${chantierId}`] ?? 0,
           week,
           userId: personId,
           chantierId,
@@ -235,8 +242,33 @@ export function ActualHoursWorkspace() {
         }),
       });
       const json = (await response.json()) as HoursSnapshot & { error?: string };
-      if (!response.ok) throw new Error(json.error ?? "Enregistrement impossible.");
-      setData(json);
+      if (!response.ok)
+        throw new Error(
+          json.error === "EDIT_VERSION_CONFLICT"
+            ? EDIT_CONFLICT_MESSAGE
+            : (json.error ?? "Enregistrement impossible."),
+        );
+      setData((old) =>
+        old
+          ? {
+              ...json,
+              records: [
+                ...old.records.filter(
+                  (row) => !(row.userId === personId && row.chantierId === chantierId),
+                ),
+                ...json.records.filter(
+                  (row) => row.userId === personId && row.chantierId === chantierId,
+                ),
+              ],
+              indirectRecords: old.indirectRecords,
+              editRevisions: {
+                ...old.editRevisions,
+                [`${week}:${personId}:${chantierId}`]:
+                  json.editRevisions[`${week}:${personId}:${chantierId}`],
+              },
+            }
+          : json,
+      );
       setDrafts((old) => {
         const next = { ...old };
         for (const activity of ACTIVITIES) delete next[keyFor(chantierId, activity)];
@@ -265,6 +297,7 @@ export function ActualHoursWorkspace() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           action: "saveIndirectHoursRow",
+          expectedRevision: data.editRevisions?.[`${week}:${personId}:indirect:${category}`] ?? 0,
           week,
           userId: personId,
           category,
@@ -272,8 +305,33 @@ export function ActualHoursWorkspace() {
         }),
       });
       const json = (await response.json()) as HoursSnapshot & { error?: string };
-      if (!response.ok) throw new Error(json.error ?? "Enregistrement impossible.");
-      setData(json);
+      if (!response.ok)
+        throw new Error(
+          json.error === "EDIT_VERSION_CONFLICT"
+            ? EDIT_CONFLICT_MESSAGE
+            : (json.error ?? "Enregistrement impossible."),
+        );
+      setData((old) =>
+        old
+          ? {
+              ...json,
+              records: old.records,
+              indirectRecords: [
+                ...old.indirectRecords.filter(
+                  (row) => !(row.userId === personId && row.category === category),
+                ),
+                ...json.indirectRecords.filter(
+                  (row) => row.userId === personId && row.category === category,
+                ),
+              ],
+              editRevisions: {
+                ...old.editRevisions,
+                [`${week}:${personId}:indirect:${category}`]:
+                  json.editRevisions[`${week}:${personId}:indirect:${category}`],
+              },
+            }
+          : json,
+      );
       setIndirectDrafts((old) => {
         const next = { ...old };
         delete next[category];
@@ -624,6 +682,41 @@ export function ActualHoursWorkspace() {
         </p>
       ) : null}
 
+      {data ? <EditHistory events={data.editHistory ?? []} people={data.people} /> : null}
+      {data?.editable && personId ? (
+        <button
+          type="button"
+          className="secondaryButton"
+          disabled={
+            !!saving || Object.keys(drafts).length > 0 || Object.keys(indirectDrafts).length > 0
+          }
+          onClick={async () => {
+            const response = await fetch("/api/desktop/planning/actual-hours", {
+              method: "POST",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({
+                action: "confirmPayrollWeek",
+                week,
+                userId: personId,
+                expectedSignature: data.payrollWeekSignatures[personId],
+              }),
+            });
+            const result = await response.json();
+            if (!response.ok) {
+              setMessage(
+                result.error === "EDIT_VERSION_CONFLICT"
+                  ? EDIT_CONFLICT_MESSAGE
+                  : "Validation impossible.",
+              );
+              return;
+            }
+            setData(result);
+            setMessage("Semaine validée pour la préparation de paie.");
+          }}
+        >
+          Valider la semaine pour la paie
+        </button>
+      ) : null}
       <style jsx global>{`
         .papotActualHours {
           display: grid;

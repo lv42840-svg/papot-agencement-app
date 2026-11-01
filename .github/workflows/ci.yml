@@ -50,6 +50,7 @@ jobs:
       - run: npm test -- tests/clients-concurrency.integration.test.ts
       - run: npm test -- tests/quotes-postgres.integration.test.ts
       - run: npm test -- tests/planning-postgres.integration.test.ts
+      - run: npm test -- tests/audit-postgres.integration.test.ts
 
   pdf-integration:
     runs-on: ubuntu-latest
@@ -75,3 +76,43 @@ jobs:
           name: quote-word-v2-pdf-qa
           path: tmp/pdf-qa
           if-no-files-found: error
+
+  browser:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - run: npx playwright install --with-deps chromium
+      - run: npm run test:e2e
+      - uses: actions/upload-artifact@v4
+        if: failure()
+        with:
+          name: browser-failure-traces
+          path: test-results
+
+  restore-drill:
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_DB: restore_test
+          POSTGRES_USER: papot
+          POSTGRES_PASSWORD: papot
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U papot -d restore_test"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+    env:
+      PAPOT_DATABASE_URL: postgresql://papot:papot@localhost:5432/restore_test
+    steps:
+      - uses: actions/checkout@v4
+      - run: sudo apt-get update && sudo apt-get install -y postgresql-client
+      - run: bash scripts/ops/test-backup.sh

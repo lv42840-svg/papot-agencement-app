@@ -1,3 +1,4 @@
+import { assertEditRevision } from "@/lib/edit-history";
 import { NextResponse } from "next/server";
 import { ZodError } from "zod";
 import {
@@ -35,7 +36,7 @@ function failure(error: unknown) {
         desktopRequestErrorStatus(code) ??
         (code.includes("NOT_FOUND")
           ? 404
-          : code.includes("NOT_CLOSED") || code.includes("VERSION_CONFLICT")
+          : code.includes("NOT_CLOSED") || code.includes("CONFLICT")
             ? 409
             : 400),
     },
@@ -58,6 +59,8 @@ async function snapshot(month: string, editable: boolean) {
       byId.set(staff.id, staff.firstName + " " + staff.lastName);
   return {
     month,
+    editRevisions: ledger.editRevisions ?? {},
+    editHistory: (ledger.editHistory ?? []).filter((entry) => entry.key.startsWith(month + ":")),
     editable,
     people: [...byId]
       .map(([id, name]) => ({
@@ -96,7 +99,8 @@ export async function GET(request: Request) {
 export async function POST(request: Request) {
   try {
     const ctx = await requireModuleRequestContext("payroll", "WRITE");
-    const input = monthlyLaborCostInputSchema.parse(await request.json());
+    const raw = await request.json();
+    const input = monthlyLaborCostInputSchema.parse(raw);
     const [planning, auth] = await Promise.all([
       createPlanningRepository().load(),
       readAuthPayload(),
@@ -120,9 +124,35 @@ export async function POST(request: Request) {
             ),
           }
         : input;
-    await mutateMonthlyLaborCosts((source) =>
-      saveMonthlyLaborCost(source, selected, ids, ctx.user.displayName),
-    );
+    await mutateMonthlyLaborCosts((source) => {
+      const key = `${input.month}:${input.personId}`;
+      const revision = source.editRevisions?.[key] ?? 0;
+      assertEditRevision(raw.expectedRevision, revision);
+      const before =
+        source.records.find(
+          (row) => row.month === input.month && row.personId === input.personId,
+        ) ?? null;
+      const next = saveMonthlyLaborCost(
+        source,
+        { ...selected, expectedRevision: before?.revision ?? null },
+        ids,
+        ctx.user.displayName,
+      );
+      next.editRevisions = { ...source.editRevisions, [key]: revision + 1 };
+      next.editHistory = [
+        ...(source.editHistory ?? []),
+        {
+          key,
+          revision: revision + 1,
+          at: new Date().toISOString(),
+          actorId: ctx.user.id,
+          actorName: ctx.user.displayName,
+          before,
+          after: input,
+        },
+      ];
+      return next;
+    });
     return NextResponse.json(await snapshot(input.month, true), {
       headers: { "Cache-Control": "no-store" },
     });

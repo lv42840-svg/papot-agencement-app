@@ -1,3 +1,4 @@
+import { lockAuthMutation } from "./transaction-lock";
 import "server-only";
 
 import { createHash, randomBytes, randomUUID } from "node:crypto";
@@ -63,6 +64,7 @@ export async function createPasswordSetupToken(input: {
 
   await runServerDbMigrations();
   await withServerDbTransaction(async (client) => {
+    await lockAuthMutation(client);
     await client.query(
       `UPDATE papot_auth_password_setup_tokens
        SET used_at = NOW()
@@ -121,6 +123,7 @@ export async function consumePasswordSetupToken(input: {
 
   await runServerDbMigrations();
   return withServerDbTransaction(async (client) => {
+    await lockAuthMutation(client);
     const result = await client.query<{
       user_id: string;
       username: string;

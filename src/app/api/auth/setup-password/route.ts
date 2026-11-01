@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { z } from "zod";
 
-import { clearAdminResetRequirement } from "@/lib/auth/login-rate-limit";
+import { allowPasswordSetupRequest, clearAdminResetRequirement } from "@/lib/auth/login-rate-limit";
 import { consumePasswordSetupToken, passwordSetupTokenHash } from "@/lib/auth/password-setup";
 
 const schema = z
@@ -16,6 +16,11 @@ const schema = z
   });
 
 export async function POST(request: Request) {
+  if (!(await allowPasswordSetupRequest(request)))
+    return NextResponse.json(
+      { error: "Trop de tentatives. Réessayez dans 15 minutes." },
+      { status: 429, headers: { "Retry-After": "900" } },
+    );
   const parsed = schema.safeParse(await request.json().catch(() => null));
   if (!parsed.success) {
     return NextResponse.json(
