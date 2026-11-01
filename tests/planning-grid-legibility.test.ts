@@ -5,10 +5,12 @@ const gridSource = readFileSync(
   new URL("../src/components/planning-excel-grid.tsx", import.meta.url),
   "utf-8",
 );
-const workspaceSource = readFileSync(
-  new URL("../src/components/grand-planning-workspace.tsx", import.meta.url),
-  "utf-8",
-);
+const workspaceSource =
+  readFileSync(
+    new URL("../src/components/grand-planning-workspace.tsx", import.meta.url),
+    "utf-8",
+  ) +
+  readFileSync(new URL("../src/components/grand-planning-workspace.css", import.meta.url), "utf-8");
 
 describe("grand planning compact grid legibility", () => {
   it("only displays firm and provisional availability above the activity totals", () => {

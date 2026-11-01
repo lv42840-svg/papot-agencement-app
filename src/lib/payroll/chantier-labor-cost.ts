@@ -62,7 +62,10 @@ export function calculateChantierLaborCostEstimate(
   let provisional = false;
 
   for (const entry of entries) {
-    for (const split of monthlySharesForWeek(entry.week, byPerson.get(entry.userId))) {
+    for (const split of monthlySharesForWeek(
+      entry.week,
+      entry.scheduleAtEntry ?? byPerson.get(entry.userId),
+    )) {
       const resolved = resolveLaborCostForWorkedMonth(
         entry.userId,
         split.month,

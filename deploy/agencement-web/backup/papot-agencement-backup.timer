@@ -1,0 +1,11 @@
+[Unit]
+Description=Sauvegarde quotidienne PAPOT AGENCEMENT
+
+[Timer]
+OnCalendar=*-*-* 02:30:00 Europe/Paris
+Persistent=true
+RandomizedDelaySec=10m
+Unit=papot-agencement-backup.service
+
+[Install]
+WantedBy=timers.target
