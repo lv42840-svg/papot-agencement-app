@@ -99,7 +99,7 @@ def restore(args):
     staging = Path(tempfile.mkdtemp(prefix='.papot-restore-', dir=target.parent))
     try:
         shutil.copytree(source / 'files', staging / 'files')
-        run(['pg_restore', '--exit-on-error', '--single-transaction', '--no-owner', '--no-acl', str(source / 'database.dump')], env)
+        run(['pg_restore', '--dbname', env['PGDATABASE'], '--exit-on-error', '--single-transaction', '--no-owner', '--no-acl', str(source / 'database.dump')], env)
         if target.exists():
             target.rmdir()
         (staging / 'files').rename(target)

@@ -53,6 +53,8 @@ test("connexion, modules métier, capture sans doublon et déconnexion", async (
   await page.getByLabel("Date prévue d’envoi", { exact: true }).fill("2026-12-01");
   await page.getByRole("button", { name: "Créer et ouvrir Base V1" }).click();
   await expect(page).toHaveURL(/\/devis\/[0-9a-f-]{36}$/);
+  await expect(page.locator("body")).not.toContainText("Une erreur est survenue");
+  await expect(page.locator("body")).toContainText("Devis navigateur audit");
   const commercial = await (await page.request.get("/api/desktop/commercial")).json();
   const current = commercial.payload.cases.find(
     (item: { id: string }) => item.id === affair.focusCaseId,
