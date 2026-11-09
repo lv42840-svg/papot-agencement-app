@@ -1,6 +1,6 @@
 "use client";
 
-import { ExternalLink, Eye, FolderOpen } from "lucide-react";
+import { Download, ExternalLink, Eye, FolderOpen } from "lucide-react";
 import { useEffect, useState } from "react";
 import { canPreviewCommercialDocument } from "@/lib/commercial/document-preview";
 import type { CommercialDocument } from "@/lib/commercial/domain";
@@ -105,6 +105,7 @@ export function CommercialOpenFolderButton({
 }
 
 export function CommercialDocumentActions({
+  caseId,
   document,
   previewOpen,
   onTogglePreview,
@@ -159,6 +160,14 @@ export function CommercialDocumentActions({
             <Eye size={13} /> {previewOpen ? "Masquer" : "Visualiser"}
           </button>
         ) : null}
+        <a
+          className="secondaryButton"
+          href={`/api/desktop/commercial/${caseId}/documents/${document.id}?download=1`}
+          download={document.fileName}
+          aria-label={`Télécharger ${document.fileName}`}
+        >
+          <Download size={13} /> Télécharger
+        </a>
         {fileOpenAvailable ? (
           <button
             className="secondaryButton"
@@ -186,7 +195,8 @@ export function CommercialDocumentActions({
           justify-content: flex-end;
           gap: 5px;
         }
-        .commercialDocumentRowActions button {
+        .commercialDocumentRowActions button,
+        .commercialDocumentRowActions a {
           min-height: 30px;
           padding: 5px 8px;
           font-size: 8px;

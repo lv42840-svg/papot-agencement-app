@@ -16,7 +16,9 @@ function normalizedRepository(repository: QuotesRepository): QuotesRepository {
         const mutation = await transform(payload);
         return {
           ...mutation,
-          payload: normalizeQuotePricingAfterModelMutation(mutation.payload, mutation.focusQuoteId),
+          payload: mutation.focusQuoteId
+            ? normalizeQuotePricingAfterModelMutation(mutation.payload, mutation.focusQuoteId)
+            : mutation.payload,
         };
       }),
   };

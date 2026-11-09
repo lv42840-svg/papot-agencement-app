@@ -35,6 +35,11 @@ const createDraftMutationSchema = z.object({
   paymentTerms: z.string().trim().min(1).max(1000),
 });
 
+const deleteDraftMutationSchema = z.object({
+  action: z.literal("deleteDraft"),
+  quoteId: z.string().uuid(),
+});
+
 const upsertLineMutationSchema = z.object({
   action: z.literal("upsertLine"),
   quoteId: z.string().uuid(),
@@ -135,6 +140,7 @@ const upsertSubsectionMutationSchema = z.object({
 
 export const quotesMutationSchema = z.discriminatedUnion("action", [
   createDraftMutationSchema,
+  deleteDraftMutationSchema,
   upsertLineMutationSchema,
   upsertOuvrageMutationSchema,
   duplicateLineMutationSchema,
@@ -779,6 +785,12 @@ export function applyQuotesMutation(
   const payload = structuredClone(parseNativeQuotesPayload(source));
   if (input.action === "createDraft") {
     return createDraft(payload, input, actor, clientId, now);
+  }
+  if (input.action === "deleteDraft") {
+    const { quoteIndex } = findDraftQuote(payload, input.quoteId);
+    payload.quotes.splice(quoteIndex, 1);
+    // No quote remains selected after deleting a draft, including the last draft.
+    return { payload, focusQuoteId: "" };
   }
   if (input.action === "upsertSection" || input.action === "upsertSubsection") {
     return upsertDraftHeading(payload, input, actor, now);
