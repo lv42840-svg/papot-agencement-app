@@ -1,6 +1,6 @@
 "use client";
 
-import { Copy, GitBranch, History } from "lucide-react";
+import { Copy, GitBranch, History, Trash2 } from "lucide-react";
 import { useState } from "react";
 import { quoteHref } from "@/lib/quotes/navigation";
 import { quoteRevisionHeaders } from "@/lib/quotes/concurrency";
@@ -34,7 +34,7 @@ export function QuoteLifecycleActions({
   quote: NativeQuoteRecord;
   canWrite: boolean;
 }) {
-  const [working, setWorking] = useState<LifecycleAction | null>(null);
+  const [working, setWorking] = useState<LifecycleAction | "deleteDraft" | null>(null);
   const [error, setError] = useState("");
   const isPrevious = quote.status === "SUPERSEDED";
 
@@ -59,6 +59,44 @@ export function QuoteLifecycleActions({
       window.location.assign(quoteHref(data.focusQuoteId));
     } catch {
       setError("La nouvelle copie du devis n’a pas pu être créée.");
+    } finally {
+      setWorking(null);
+    }
+  }
+
+  async function deleteDraft() {
+    if (!canWrite || working || quote.status !== "DRAFT") return;
+    if (
+      !window.confirm(
+        `Supprimer définitivement le brouillon « ${quote.model.subject} » (${quote.variantName}, V${quote.version}) ? Cette action est irréversible.`,
+      )
+    )
+      return;
+    setWorking("deleteDraft");
+    setError("");
+    try {
+      const response = await fetch("/api/desktop/quotes", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          ...quoteRevisionHeaders(quote.updatedAt),
+        },
+        body: JSON.stringify({ action: "deleteDraft", quoteId: quote.id }),
+      });
+      const data = (await response.json()) as LifecycleResponse;
+      if (!response.ok || !data.payload) {
+        setError(
+          data.error === "QUOTE_NOT_EDITABLE"
+            ? "Ce devis n’est plus un brouillon et ne peut pas être supprimé."
+            : data.error === "QUOTE_VERSION_CONFLICT" || data.error === "MODULE_FORBIDDEN"
+              ? errorLabel(data.error)
+              : "Le brouillon n’a pas pu être supprimé. Recharge la page avant de réessayer.",
+        );
+        return;
+      }
+      window.location.assign("/devis");
+    } catch {
+      setError("La suppression n’a pas pu être confirmée. Recharge la page avant de réessayer.");
     } finally {
       setWorking(null);
     }
@@ -129,6 +167,17 @@ export function QuoteLifecycleActions({
         >
           <Copy size={14} /> {working === "duplicateQuote" ? "Duplication…" : "Dupliquer"}
         </button>
+        {canWrite && quote.status === "DRAFT" ? (
+          <button
+            className="secondaryButton quoteDeleteDraft"
+            type="button"
+            disabled={Boolean(working)}
+            onClick={() => void deleteDraft()}
+          >
+            <Trash2 size={14} />{" "}
+            {working === "deleteDraft" ? "Suppression…" : "Supprimer le brouillon"}
+          </button>
+        ) : null}
       </div>
       {error ? <div className="quoteLifecycleError">{error}</div> : null}
 
@@ -165,6 +214,10 @@ export function QuoteLifecycleActions({
           display: inline-flex;
           align-items: center;
           gap: 5px;
+        }
+        .quoteLifecycleButtons .quoteDeleteDraft {
+          color: #9c3434;
+          border-color: #e8bcbc;
         }
         .quoteLifecycleError {
           grid-column: 1 / -1;
