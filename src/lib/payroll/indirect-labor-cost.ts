@@ -1,10 +1,7 @@
 import type { PlanningPersonCapacity } from "../planning/capacity";
 import type { PlanningIndirectHours } from "../planning/domain";
 import { monthlySharesForWeek } from "./chantier-labor-cost";
-import {
-  resolveLaborCostForWorkedMonth,
-  type MonthlyLaborCostRecord,
-} from "./monthly-labor-costs";
+import { resolveLaborCostForWorkedMonth, type MonthlyLaborCostRecord } from "./monthly-labor-costs";
 
 export type IndirectLaborCostsPeriod = {
   savHours: number;
@@ -44,26 +41,17 @@ export function calculateIndirectLaborCostsForPeriod(
     ]),
   );
   const horaires = new Map(
-    capacitesPersonnes.map((personne) => [
-      personne.userId,
-      personne.weeklySchedule,
-    ]),
+    capacitesPersonnes.map((personne) => [personne.userId, personne.weeklySchedule]),
   );
   let provisoire = false;
-  const compartiments: Record<
-    PlanningIndirectHours["category"],
-    InternalBucket
-  > = {
+  const compartiments: Record<PlanningIndirectHours["category"], InternalBucket> = {
     SAV: { hours: 0, costCents: 0, complete: true },
     GENERAL: { hours: 0, costCents: 0, complete: true },
   };
 
   for (const entree of entrees) {
     if (entree.hours <= 0) continue;
-    for (const repartition of monthlySharesForWeek(
-      entree.week,
-      horaires.get(entree.userId),
-    )) {
+    for (const repartition of monthlySharesForWeek(entree.week, horaires.get(entree.userId))) {
       if (!repartition.month.startsWith(periode)) continue;
       const compartiment = compartiments[entree.category];
       const heures = entree.hours * repartition.fraction;
@@ -79,9 +67,7 @@ export function calculateIndirectLaborCostsForPeriod(
       } else {
         provisoire ||= coutResolue.provisional;
         compartiment.costCents +=
-          heures *
-          (coutResolue.record.employerCostCents /
-            coutResolue.record.workedHours);
+          heures * (coutResolue.record.employerCostCents / coutResolue.record.workedHours);
       }
     }
   }
@@ -98,13 +84,9 @@ export function calculateIndirectLaborCostsForPeriod(
     generalHours: sumHours(compartiments.GENERAL.hours),
     savCostCents: coutSavCentimes,
     generalCostCents: coutFraisGenerauxCentimes,
-    provisional:
-      provisoire &&
-      coutSavCentimes !== null &&
-      coutFraisGenerauxCentimes !== null,
+    provisional: provisoire && coutSavCentimes !== null && coutFraisGenerauxCentimes !== null,
     totalCostCents:
-      coutSavCentimes === null ||
-      coutFraisGenerauxCentimes === null
+      coutSavCentimes === null || coutFraisGenerauxCentimes === null
         ? null
         : coutSavCentimes + coutFraisGenerauxCentimes,
   };
@@ -119,8 +101,7 @@ export function calculateIndicativeCompanyMarginCents(
   margePrevueCentimes: number | null,
   coutsIndirects: IndirectLaborCostsPeriod,
 ): number | null {
-  return margePrevueCentimes === null ||
-    coutsIndirects.totalCostCents === null
+  return margePrevueCentimes === null || coutsIndirects.totalCostCents === null
     ? null
     : margePrevueCentimes - coutsIndirects.totalCostCents;
 }

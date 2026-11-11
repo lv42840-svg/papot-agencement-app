@@ -1,14 +1,7 @@
-import {
-  DEFAULT_WEEKLY_SCHEDULE,
-  isoWeekDates,
-  scheduleHoursForDate,
-} from "../planning/capacity";
+import { DEFAULT_WEEKLY_SCHEDULE, isoWeekDates, scheduleHoursForDate } from "../planning/capacity";
 import type { PlanningActualHours } from "../planning/domain";
 import type { PlanningPersonCapacity } from "@/lib/planning/capacity";
-import {
-  resolveLaborCostForWorkedMonth,
-  type MonthlyLaborCostRecord,
-} from "./monthly-labor-costs";
+import { resolveLaborCostForWorkedMonth, type MonthlyLaborCostRecord } from "./monthly-labor-costs";
 
 /**
  * Weekly actual hours are recorded without dates. For a week spanning two months,
@@ -32,10 +25,7 @@ export function monthlySharesForWeek(
   const parMois = new Map<string, number>();
   dates.forEach((date, indice) => {
     const mois = date.toISOString().slice(0, 7);
-    parMois.set(
-      mois,
-      (parMois.get(mois) ?? 0) + poids[indice] / sommePoids,
-    );
+    parMois.set(mois, (parMois.get(mois) ?? 0) + poids[indice] / sommePoids);
   });
   return [...parMois]
     .filter(([, fraction]) => fraction > 0)
@@ -73,10 +63,7 @@ export function calculateChantierLaborCostEstimate(
     ]),
   );
   const horairesParPersonne = new Map(
-    capacitesPersonnes.map((personne) => [
-      personne.userId,
-      personne.weeklySchedule,
-    ]),
+    capacitesPersonnes.map((personne) => [personne.userId, personne.weeklySchedule]),
   );
   let totalCentimes = 0;
   let provisoire = false;
@@ -99,8 +86,7 @@ export function calculateChantierLaborCostEstimate(
       totalCentimes +=
         entree.hours *
         repartition.fraction *
-        (coutResolue.record.employerCostCents /
-          coutResolue.record.workedHours);
+        (coutResolue.record.employerCostCents / coutResolue.record.workedHours);
     }
   }
   return {

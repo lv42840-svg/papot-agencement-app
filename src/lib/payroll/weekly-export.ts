@@ -9,10 +9,7 @@ const absenceLabels = {
 };
 
 /** Use the selected summary only, so a frozen payroll version stays reproducible. */
-export function addPayrollWeeklySheets(
-  classeur: ExcelJS.Workbook,
-  resume: PayrollSummary,
-) {
+export function addPayrollWeeklySheets(classeur: ExcelJS.Workbook, resume: PayrollSummary) {
   for (const personne of resume.rows) {
     const base = `Paie - ${personne.name}`
       .replace(/[\\/*?:\[\]]/g, " ")
@@ -23,18 +20,14 @@ export function addPayrollWeeklySheets(
     let suffixe = 2;
     while (
       classeur.worksheets.some(
-        (feuille) =>
-          feuille.name.toLocaleLowerCase() ===
-          nom.toLocaleLowerCase(),
+        (feuille) => feuille.name.toLocaleLowerCase() === nom.toLocaleLowerCase(),
       )
     ) {
       const finNom = ` (${suffixe++})`;
       nom = base.slice(0, 31 - finNom.length) + finNom;
     }
     const feuille = classeur.addWorksheet(nom);
-    feuille.addRow([
-      `Détail de paie · ${personne.name} · ${resume.month}`,
-    ]);
+    feuille.addRow([`Détail de paie · ${personne.name} · ${resume.month}`]);
     feuille.addRow([
       "Semaines entières rattachées au mois de leur dimanche. Les heures majorées sont incluses dans les heures retenues.",
     ]);
@@ -53,33 +46,21 @@ export function addPayrollWeeklySheets(
       "Détail des absences",
     ]);
     for (const semaine of personne.weeks) {
-      const dates = isoWeekDates(semaine.week).map((date) =>
-        date.toISOString().slice(0, 10),
-      );
-      const absences = personne.absences.filter((absence) =>
-        dates.includes(absence.date),
-      );
+      const dates = isoWeekDates(semaine.week).map((date) => date.toISOString().slice(0, 10));
+      const absences = personne.absences.filter((absence) => dates.includes(absence.date));
       feuille.addRow([
         semaine.week,
         dates[0],
         dates[6],
-        semaine.source === "REAL"
-          ? "Réalisé validé"
-          : "Base contrat · à confirmer",
+        semaine.source === "REAL" ? "Réalisé validé" : "Base contrat · à confirmer",
         semaine.baseHours,
         semaine.absenceHours,
         semaine.hours,
-        Math.max(
-          0,
-          semaine.hours - semaine.extra25 - semaine.extra50,
-        ),
+        Math.max(0, semaine.hours - semaine.extra25 - semaine.extra50),
         semaine.extra25,
         semaine.extra50,
         absences
-          .map(
-            (absence) =>
-              `${absence.date} · ${absenceLabels[absence.type]} · ${absence.hours} h`,
-          )
+          .map((absence) => `${absence.date} · ${absenceLabels[absence.type]} · ${absence.hours} h`)
           .join(" ; "),
       ]);
     }
@@ -94,10 +75,7 @@ export function addPayrollWeeklySheets(
             semaine.baseHours,
             semaine.absenceHours,
             semaine.hours,
-            Math.max(
-              0,
-              semaine.hours - semaine.extra25 - semaine.extra50,
-            ),
+            Math.max(0, semaine.hours - semaine.extra25 - semaine.extra50),
             semaine.extra25,
             semaine.extra50,
           ][colonne - 5],
@@ -110,9 +88,9 @@ export function addPayrollWeeklySheets(
           }
         : 0;
     }
-    feuille.columns = [
-      14, 14, 14, 32, 19, 18, 20, 23, 16, 16, 65,
-    ].map((largeur) => ({ width: largeur }));
+    feuille.columns = [14, 14, 14, 32, 19, 18, 20, 23, 16, 16, 65].map((largeur) => ({
+      width: largeur,
+    }));
     feuille.getRow(4).font = {
       bold: true,
       color: { argb: "FFFFFFFF" },

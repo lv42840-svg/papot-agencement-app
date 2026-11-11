@@ -9,16 +9,10 @@ export function holdingRecordedHoursForMonth(
   planning: Pick<PlanningPayload, "actualHours" | "indirectHours">,
   capacites: readonly PlanningPersonCapacity[],
 ): number {
-  const horaire = capacites.find(
-    (ligne) => ligne.userId === idPersonne,
-  )?.weeklySchedule;
+  const horaire = capacites.find((ligne) => ligne.userId === idPersonne)?.weeklySchedule;
   const lignes = [
-    ...planning.actualHours.filter(
-      (ligne) => ligne.userId === idPersonne,
-    ),
-    ...planning.indirectHours.filter(
-      (ligne) => ligne.userId === idPersonne,
-    ),
+    ...planning.actualHours.filter((ligne) => ligne.userId === idPersonne),
+    ...planning.indirectHours.filter((ligne) => ligne.userId === idPersonne),
   ];
   let heures = 0;
   for (const entree of lignes) {
