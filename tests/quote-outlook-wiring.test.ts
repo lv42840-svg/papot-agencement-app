@@ -16,7 +16,7 @@ describe("quote Outlook desktop wiring", () => {
 
   it("n'expose au renderer qu'une action Outlook dédiée", () => {
     expect(preload).toContain(
-      'composeOutlookMail: (saisie) => ipcRenderer.invoke("papot:outlook:compose", saisie)',
+      'composeOutlookMail: (input) => ipcRenderer.invoke("papot:outlook:compose", input)',
     );
     expect(desktopTypes).toContain('kind: "quote-email"');
     expect(desktopTypes).toContain('method: "CLASSIC_OUTLOOK" | "OUTLOOK_PROTOCOL"');

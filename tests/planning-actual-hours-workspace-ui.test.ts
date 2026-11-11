@@ -46,7 +46,7 @@ describe("actual hours interface and chantier bridge", () => {
     );
     expect(route).toContain("if (!isPlanningWeekPast(saisie.week))");
     expect(route).toContain("applyActualHoursRow");
-    expect(route).toContain("effectivePlanningPeople(payload, auth.users)");
+    expect(route).toContain("effectivePlanningPeople(contenu, auth.users)");
     expect(route).toContain("Cache-Control");
   });
 

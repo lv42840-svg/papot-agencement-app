@@ -36,7 +36,7 @@ describe("paramétrage des intitulés de factures", () => {
     expect(settings).toContain("Ajouter un intitulé");
     const api = readFileSync("src/app/api/desktop/billing/route.ts", "utf8");
     expect(api).toContain('z.literal("SET_TITLES")');
-    expect(api).toContain("...current, brouillons");
-    expect(api).toContain("...current, invoiceTitles");
+    expect(api).toContain("...courant, drafts: brouillons");
+    expect(api).toContain("...courant, invoiceTitles");
   });
 });

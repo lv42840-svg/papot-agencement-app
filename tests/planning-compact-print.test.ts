@@ -45,7 +45,7 @@ describe("compact weekly print and independent personnel visibility", () => {
 
   it("hides people only from the weekly board, never from actual team capacity", () => {
     expect(api).toContain("!personne.hiddenInWeeklyBoard");
-    expect(api).toMatch(/buildWeeklyCapacityIndicators\(\s*\[week\],\s*allPeople,/);
+    expect(api).toMatch(/buildWeeklyCapacityIndicators\(\s*\[semaine\],\s*allPeople,/);
     expect(personnel).toContain("Masquer une personne du petit planning ne retire pas ses heures");
     expect(personnel).toContain("Visible au petit planning");
   });

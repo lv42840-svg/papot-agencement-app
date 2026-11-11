@@ -11,7 +11,7 @@ describe("écran Bons de commande", () => {
     expect(ui).toContain("Ajouter un chantier");
     expect(ui).toContain("Montant HT ligne chantier");
     expect(ui).toContain("allocations: entrees.map");
-    expect(ui).toContain("order.allocations.map");
+    expect(ui).toContain("commande.allocations.map");
     expect(ui).toContain("Désignation ligne");
     expect(ui).toContain("Prix unitaire ligne");
     expect(ui).toContain("Ajouter une ligne");
