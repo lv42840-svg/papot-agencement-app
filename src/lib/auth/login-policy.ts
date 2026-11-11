@@ -20,26 +20,30 @@ export function emptyLoginState(): LoginState {
   };
 }
 
-export function loginBlock(state: LoginState, now: number) {
-  if (state.requiresAdminReset) return "admin_reset_required" as const;
-  if (state.blockedUntil !== null && state.blockedUntil > now) return "temporary" as const;
+export function loginBlock(etat: LoginState, maintenant: number) {
+  if (etat.requiresAdminReset) return "admin_reset_required" as const;
+  if (etat.blockedUntil !== null && etat.blockedUntil > maintenant) {
+    return "temporary" as const;
+  }
   return "allowed" as const;
 }
 
-export function failedLogin(state: LoginState, now: number): LoginState {
-  if (loginBlock(state, now) !== "allowed") return { ...state };
-  const expired = state.firstFailureAt === null || now - state.firstFailureAt >= LOGIN_WINDOW_MS;
-  const failures = expired ? 1 : state.failures + 1;
-  const result: LoginState = {
-    ...state,
-    failures,
-    firstFailureAt: expired ? now : state.firstFailureAt,
+export function failedLogin(etat: LoginState, maintenant: number): LoginState {
+  if (loginBlock(etat, maintenant) !== "allowed") return { ...etat };
+  const expire =
+    etat.firstFailureAt === null ||
+    maintenant - etat.firstFailureAt >= LOGIN_WINDOW_MS;
+  const echecs = expire ? 1 : etat.failures + 1;
+  const resultat: LoginState = {
+    ...etat,
+    failures: echecs,
+    firstFailureAt: expire ? maintenant : etat.firstFailureAt,
     blockedUntil: null,
   };
-  if (failures >= LOGIN_MAX_FAILURES) {
-    result.lockCycles += 1;
-    result.requiresAdminReset = result.lockCycles >= 2;
-    result.blockedUntil = now + LOGIN_WINDOW_MS;
+  if (echecs >= LOGIN_MAX_FAILURES) {
+    resultat.lockCycles += 1;
+    resultat.requiresAdminReset = resultat.lockCycles >= 2;
+    resultat.blockedUntil = maintenant + LOGIN_WINDOW_MS;
   }
-  return result;
+  return resultat;
 }
