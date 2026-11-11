@@ -33,115 +33,120 @@ export type GrandPlanningMonthGroup = {
   span: number;
 };
 
-export function isoWeekMonday(week: string): Date {
-  const match = /^(\d{4})-W(\d{2})$/.exec(week);
-  if (!match) throw new Error(`Invalid ISO week: ${week}`);
+export function isoWeekMonday(semaine: string): Date {
+  const correspondance = /^(\d{4})-W(\d{2})$/.exec(semaine);
+  if (!correspondance) throw new Error(`Invalid ISO week: ${semaine}`);
 
-  const year = Number(match[1]);
-  const weekNumber = Number(match[2]);
-  const januaryFourth = new Date(Date.UTC(year, 0, 4));
-  const dayFromMonday = (januaryFourth.getUTCDay() + 6) % 7;
-  const firstMonday = new Date(januaryFourth.getTime() - dayFromMonday * DAY_MS);
+  const annee = Number(correspondance[1]);
+  const numeroSemaine = Number(correspondance[2]);
+  const quatreJanvier = new Date(Date.UTC(annee, 0, 4));
+  const jourDepuisLundi = (quatreJanvier.getUTCDay() + 6) % 7;
+  const premierLundi = new Date(quatreJanvier.getTime() - jourDepuisLundi * DAY_MS);
 
-  return new Date(firstMonday.getTime() + (weekNumber - 1) * 7 * DAY_MS);
+  return new Date(premierLundi.getTime() + (numeroSemaine - 1) * 7 * DAY_MS);
 }
 
 export function isoWeekKey(date: Date): string {
-  const calendarDate = new Date(Date.UTC(date.getFullYear(), date.getMonth(), date.getDate()));
-  const isoDay = calendarDate.getUTCDay() || 7;
-  calendarDate.setUTCDate(calendarDate.getUTCDate() + 4 - isoDay);
+  const dateCalendrier = new Date(Date.UTC(date.getFullYear(), date.getMonth(), date.getDate()));
+  const jourIso = dateCalendrier.getUTCDay() || 7;
+  dateCalendrier.setUTCDate(dateCalendrier.getUTCDate() + 4 - jourIso);
 
-  const isoYear = calendarDate.getUTCFullYear();
-  const yearStart = new Date(Date.UTC(isoYear, 0, 1));
-  const weekNumber = Math.ceil(((calendarDate.getTime() - yearStart.getTime()) / DAY_MS + 1) / 7);
+  const anneeIso = dateCalendrier.getUTCFullYear();
+  const debutAnnee = new Date(Date.UTC(anneeIso, 0, 1));
+  const numeroSemaine = Math.ceil(
+    ((dateCalendrier.getTime() - debutAnnee.getTime()) / DAY_MS + 1) / 7,
+  );
 
-  return `${isoYear}-W${String(weekNumber).padStart(2, "0")}`;
+  return `${anneeIso}-W${String(numeroSemaine).padStart(2, "0")}`;
 }
 
 function shortDate(date: Date): string {
-  return `${String(date.getUTCDate()).padStart(2, "0")}/${String(date.getUTCMonth() + 1).padStart(
-    2,
-    "0",
-  )}`;
+  return `${String(date.getUTCDate()).padStart(2, "0")}/${String(
+    date.getUTCMonth() + 1,
+  ).padStart(2, "0")}`;
 }
 
-export function weekDateRangeLabel(week: string): string {
-  const monday = isoWeekMonday(week);
-  const sunday = new Date(monday.getTime() + 6 * DAY_MS);
-  return `${shortDate(monday)} au ${shortDate(sunday)}`;
+export function weekDateRangeLabel(semaine: string): string {
+  const lundi = isoWeekMonday(semaine);
+  const dimanche = new Date(lundi.getTime() + 6 * DAY_MS);
+  return `${shortDate(lundi)} au ${shortDate(dimanche)}`;
 }
 
 export function buildGrandPlanningWeekMeta(
-  weeks: string[],
-  now = new Date(),
+  semaines: string[],
+  maintenant = new Date(),
 ): GrandPlanningWeekMeta[] {
-  const currentWeek = isoWeekKey(now);
-  const currentMonday = isoWeekMonday(currentWeek);
+  const semaineCourante = isoWeekKey(maintenant);
+  const lundiCourant = isoWeekMonday(semaineCourante);
 
-  return weeks.map((week, index) => {
-    const monday = isoWeekMonday(week);
-    const previousMonday = index > 0 ? isoWeekMonday(weeks[index - 1]) : null;
-    const monthIndex = monday.getUTCMonth();
+  return semaines.map((semaine, indice) => {
+    const lundi = isoWeekMonday(semaine);
+    const lundiPrecedent = indice > 0 ? isoWeekMonday(semaines[indice - 1]) : null;
+    const indiceMois = lundi.getUTCMonth();
 
     return {
-      week,
-      monday,
-      dateRangeLabel: weekDateRangeLabel(week),
-      monthIndex,
-      monthLabel: FRENCH_MONTHS[monthIndex],
-      startsMonth: previousMonday == null || previousMonday.getUTCMonth() !== monthIndex,
-      isCurrent: week === currentWeek,
-      isPast: monday.getTime() < currentMonday.getTime(),
+      week: semaine,
+      monday: lundi,
+      dateRangeLabel: weekDateRangeLabel(semaine),
+      monthIndex: indiceMois,
+      monthLabel: FRENCH_MONTHS[indiceMois],
+      startsMonth: lundiPrecedent == null || lundiPrecedent.getUTCMonth() !== indiceMois,
+      isCurrent: semaine === semaineCourante,
+      isPast: lundi.getTime() < lundiCourant.getTime(),
     };
   });
 }
 
 export function groupGrandPlanningMonths(
-  weeks: GrandPlanningWeekMeta[],
+  semaines: GrandPlanningWeekMeta[],
 ): GrandPlanningMonthGroup[] {
-  const groups: GrandPlanningMonthGroup[] = [];
+  const groupes: GrandPlanningMonthGroup[] = [];
 
-  for (const week of weeks) {
-    const previous = groups.at(-1);
+  for (const semaine of semaines) {
+    const precedent = groupes.at(-1);
     if (
-      previous &&
-      previous.label === week.monthLabel &&
-      previous.year === week.monday.getUTCFullYear()
+      precedent &&
+      precedent.label === semaine.monthLabel &&
+      precedent.year === semaine.monday.getUTCFullYear()
     ) {
-      previous.span += 1;
+      precedent.span += 1;
       continue;
     }
 
-    groups.push({
-      key: `${week.week}:${week.monthLabel}`,
-      label: week.monthLabel,
-      year: week.monday.getUTCFullYear(),
+    groupes.push({
+      key: `${semaine.week}:${semaine.monthLabel}`,
+      label: semaine.monthLabel,
+      year: semaine.monday.getUTCFullYear(),
       span: 1,
     });
   }
 
-  return groups;
+  return groupes;
 }
 
-function planningLocalCalendarDate(now: Date): Date {
-  const parts = new Intl.DateTimeFormat("en-CA", {
+function planningLocalCalendarDate(maintenant: Date): Date {
+  const parties = new Intl.DateTimeFormat("en-CA", {
     timeZone: "Europe/Paris",
     year: "numeric",
     month: "2-digit",
     day: "2-digit",
-  }).formatToParts(now);
-  const values = Object.fromEntries(parts.map((part) => [part.type, part.value]));
-  return new Date(Date.UTC(Number(values.year), Number(values.month) - 1, Number(values.day)));
+  }).formatToParts(maintenant);
+  const valeurs = Object.fromEntries(parties.map((partie) => [partie.type, partie.value]));
+  return new Date(Date.UTC(Number(valeurs.year), Number(valeurs.month) - 1, Number(valeurs.day)));
 }
 
-export function isPlanningWeekPast(week: string, now = new Date()): boolean {
-  const planningDate = planningLocalCalendarDate(now);
-  const currentWeek = isoWeekKey(
-    new Date(planningDate.getUTCFullYear(), planningDate.getUTCMonth(), planningDate.getUTCDate()),
+export function isPlanningWeekPast(semaine: string, maintenant = new Date()): boolean {
+  const datePlanning = planningLocalCalendarDate(maintenant);
+  const semaineCourante = isoWeekKey(
+    new Date(
+      datePlanning.getUTCFullYear(),
+      datePlanning.getUTCMonth(),
+      datePlanning.getUTCDate(),
+    ),
   );
-  return isoWeekMonday(week).getTime() < isoWeekMonday(currentWeek).getTime();
+  return isoWeekMonday(semaine).getTime() < isoWeekMonday(semaineCourante).getTime();
 }
 
-export function assertPlanningWeekEditable(week: string, now = new Date()): void {
-  if (isPlanningWeekPast(week, now)) throw new Error("PLANNING_PAST_WEEK_LOCKED");
+export function assertPlanningWeekEditable(semaine: string, maintenant = new Date()): void {
+  if (isPlanningWeekPast(semaine, maintenant)) throw new Error("PLANNING_PAST_WEEK_LOCKED");
 }

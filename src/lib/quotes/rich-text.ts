@@ -14,14 +14,14 @@ export const EMPTY_QUOTE_RICH_TEXT_STYLE: QuoteRichTextRunStyle = {
   fontSizePx: null,
 };
 
-function sameStyle(left: QuoteRichTextRunStyle, right: QuoteRichTextRunStyle): boolean {
+function sameStyle(gauche: QuoteRichTextRunStyle, droite: QuoteRichTextRunStyle): boolean {
   return (
-    left.bold === right.bold &&
-    left.italic === right.italic &&
-    left.underline === right.underline &&
-    left.textColor === right.textColor &&
-    left.highlightColor === right.highlightColor &&
-    left.fontSizePx === right.fontSizePx
+    gauche.bold === droite.bold &&
+    gauche.italic === droite.italic &&
+    gauche.underline === droite.underline &&
+    gauche.textColor === droite.textColor &&
+    gauche.highlightColor === droite.highlightColor &&
+    gauche.fontSizePx === droite.fontSizePx
   );
 }
 
@@ -44,142 +44,154 @@ export function quoteRichTextStyleFromLegacy(
 }
 
 export function quoteRichTextFromPlainText(
-  text: string,
+  texte: string,
   style: QuoteRichTextRunStyle = EMPTY_QUOTE_RICH_TEXT_STYLE,
 ): QuoteRichText {
   return {
-    runs: text.length > 0 ? [{ text, style: cloneStyle(style) }] : [],
+    runs: texte.length > 0 ? [{ text: texte, style: cloneStyle(style) }] : [],
   };
 }
 
-export function normalizeQuoteRichText(richText: QuoteRichText): QuoteRichText {
-  const runs: QuoteRichTextRun[] = [];
-  for (const candidate of richText.runs) {
-    if (!candidate.text) continue;
-    const run: QuoteRichTextRun = {
-      text: candidate.text,
-      style: cloneStyle(candidate.style),
+export function normalizeQuoteRichText(texteEnrichi: QuoteRichText): QuoteRichText {
+  const segments: QuoteRichTextRun[] = [];
+  for (const candidat of texteEnrichi.runs) {
+    if (!candidat.text) continue;
+    const segment: QuoteRichTextRun = {
+      text: candidat.text,
+      style: cloneStyle(candidat.style),
     };
-    const previous = runs.at(-1);
-    if (previous && sameStyle(previous.style, run.style)) previous.text += run.text;
-    else runs.push(run);
+    const precedent = segments.at(-1);
+    if (precedent && sameStyle(precedent.style, segment.style)) precedent.text += segment.text;
+    else segments.push(segment);
   }
-  return { runs };
+  return { runs: segments };
 }
 
-export function quoteRichTextToPlainText(richText: QuoteRichText | undefined): string {
-  return richText?.runs.map((run) => run.text).join("") ?? "";
+export function quoteRichTextToPlainText(texteEnrichi: QuoteRichText | undefined): string {
+  return texteEnrichi?.runs.map((segment) => segment.text).join("") ?? "";
 }
 
 export function resolveQuoteRichText(
-  text: string,
-  richText: QuoteRichText | undefined,
-  legacyStyle?: QuoteItemTextStyle,
+  texte: string,
+  texteEnrichi: QuoteRichText | undefined,
+  styleHistorique?: QuoteItemTextStyle,
 ): QuoteRichText {
-  if (richText && quoteRichTextToPlainText(richText) === text) {
-    return normalizeQuoteRichText(richText);
+  if (texteEnrichi && quoteRichTextToPlainText(texteEnrichi) === texte) {
+    return normalizeQuoteRichText(texteEnrichi);
   }
 
-  let result = quoteRichTextFromPlainText(text, quoteRichTextStyleFromLegacy(legacyStyle));
-  for (const mark of legacyStyle?.textColorMarks ?? []) {
-    result = applyQuoteRichTextStyle(result, mark.start, mark.end, { textColor: mark.color });
+  let resultat = quoteRichTextFromPlainText(
+    texte,
+    quoteRichTextStyleFromLegacy(styleHistorique),
+  );
+  for (const marque of styleHistorique?.textColorMarks ?? []) {
+    resultat = applyQuoteRichTextStyle(resultat, marque.start, marque.end, {
+      textColor: marque.color,
+    });
   }
-  return result;
+  return resultat;
 }
 
 export function applyQuoteRichTextStyle(
-  richText: QuoteRichText,
-  start: number,
-  end: number,
-  patch: Partial<QuoteRichTextRunStyle>,
+  texteEnrichi: QuoteRichText,
+  debut: number,
+  fin: number,
+  modification: Partial<QuoteRichTextRunStyle>,
 ): QuoteRichText {
-  if (end <= start) return normalizeQuoteRichText(richText);
+  if (fin <= debut) return normalizeQuoteRichText(texteEnrichi);
 
-  const textLength = quoteRichTextToPlainText(richText).length;
-  const safeStart = Math.max(0, Math.min(start, textLength));
-  const safeEnd = Math.max(safeStart, Math.min(end, textLength));
-  if (safeEnd <= safeStart) return normalizeQuoteRichText(richText);
+  const longueurTexte = quoteRichTextToPlainText(texteEnrichi).length;
+  const debutSecurise = Math.max(0, Math.min(debut, longueurTexte));
+  const finSecurisee = Math.max(debutSecurise, Math.min(fin, longueurTexte));
+  if (finSecurisee <= debutSecurise) return normalizeQuoteRichText(texteEnrichi);
 
-  const runs: QuoteRichTextRun[] = [];
-  let cursor = 0;
+  const segments: QuoteRichTextRun[] = [];
+  let curseur = 0;
 
-  for (const run of richText.runs) {
-    const runStart = cursor;
-    const runEnd = cursor + run.text.length;
-    cursor = runEnd;
+  for (const segment of texteEnrichi.runs) {
+    const debutSegment = curseur;
+    const finSegment = curseur + segment.text.length;
+    curseur = finSegment;
 
-    if (runEnd <= safeStart || runStart >= safeEnd) {
-      runs.push({ text: run.text, style: cloneStyle(run.style) });
+    if (finSegment <= debutSecurise || debutSegment >= finSecurisee) {
+      segments.push({ text: segment.text, style: cloneStyle(segment.style) });
       continue;
     }
 
-    const localStart = Math.max(0, safeStart - runStart);
-    const localEnd = Math.min(run.text.length, safeEnd - runStart);
+    const debutLocal = Math.max(0, debutSecurise - debutSegment);
+    const finLocale = Math.min(segment.text.length, finSecurisee - debutSegment);
 
-    if (localStart > 0) {
-      runs.push({ text: run.text.slice(0, localStart), style: cloneStyle(run.style) });
+    if (debutLocal > 0) {
+      segments.push({
+        text: segment.text.slice(0, debutLocal),
+        style: cloneStyle(segment.style),
+      });
     }
 
-    runs.push({
-      text: run.text.slice(localStart, localEnd),
-      style: { ...run.style, ...patch },
+    segments.push({
+      text: segment.text.slice(debutLocal, finLocale),
+      style: { ...segment.style, ...modification },
     });
 
-    if (localEnd < run.text.length) {
-      runs.push({ text: run.text.slice(localEnd), style: cloneStyle(run.style) });
+    if (finLocale < segment.text.length) {
+      segments.push({
+        text: segment.text.slice(finLocale),
+        style: cloneStyle(segment.style),
+      });
     }
   }
 
-  return normalizeQuoteRichText({ runs });
+  return normalizeQuoteRichText({ runs: segments });
 }
 
 export function quoteRichTextSelectionStyle(
-  richText: QuoteRichText,
-  start: number,
-  end: number,
+  texteEnrichi: QuoteRichText,
+  debut: number,
+  fin: number,
 ): QuoteRichTextRunStyle | null {
-  if (end <= start) return null;
-  let cursor = 0;
-  let common: QuoteRichTextRunStyle | null = null;
+  if (fin <= debut) return null;
+  let curseur = 0;
+  let styleCommun: QuoteRichTextRunStyle | null = null;
 
-  for (const run of richText.runs) {
-    const runStart = cursor;
-    const runEnd = cursor + run.text.length;
-    cursor = runEnd;
-    if (runEnd <= start || runStart >= end) continue;
+  for (const segment of texteEnrichi.runs) {
+    const debutSegment = curseur;
+    const finSegment = curseur + segment.text.length;
+    curseur = finSegment;
+    if (finSegment <= debut || debutSegment >= fin) continue;
 
-    if (!common) common = cloneStyle(run.style);
+    if (!styleCommun) styleCommun = cloneStyle(segment.style);
     else {
-      if (common.bold !== run.style.bold) common.bold = false;
-      if (common.italic !== run.style.italic) common.italic = false;
-      if (common.underline !== run.style.underline) common.underline = false;
-      if (common.textColor !== run.style.textColor) common.textColor = null;
-      if (common.highlightColor !== run.style.highlightColor) common.highlightColor = null;
-      if (common.fontSizePx !== run.style.fontSizePx) common.fontSizePx = null;
+      if (styleCommun.bold !== segment.style.bold) styleCommun.bold = false;
+      if (styleCommun.italic !== segment.style.italic) styleCommun.italic = false;
+      if (styleCommun.underline !== segment.style.underline) styleCommun.underline = false;
+      if (styleCommun.textColor !== segment.style.textColor) styleCommun.textColor = null;
+      if (styleCommun.highlightColor !== segment.style.highlightColor)
+        styleCommun.highlightColor = null;
+      if (styleCommun.fontSizePx !== segment.style.fontSizePx) styleCommun.fontSizePx = null;
     }
   }
 
-  return common;
+  return styleCommun;
 }
 
 export function quoteRichTextHasUniformBooleanStyle(
-  richText: QuoteRichText,
-  start: number,
-  end: number,
-  key: "bold" | "italic" | "underline",
+  texteEnrichi: QuoteRichText,
+  debut: number,
+  fin: number,
+  cle: "bold" | "italic" | "underline",
 ): boolean {
-  if (end <= start) return false;
-  let cursor = 0;
-  let sawSelectedText = false;
+  if (fin <= debut) return false;
+  let curseur = 0;
+  let texteSelectionneTrouve = false;
 
-  for (const run of richText.runs) {
-    const runStart = cursor;
-    const runEnd = cursor + run.text.length;
-    cursor = runEnd;
-    if (runEnd <= start || runStart >= end) continue;
-    sawSelectedText = true;
-    if (!run.style[key]) return false;
+  for (const segment of texteEnrichi.runs) {
+    const debutSegment = curseur;
+    const finSegment = curseur + segment.text.length;
+    curseur = finSegment;
+    if (finSegment <= debut || debutSegment >= fin) continue;
+    texteSelectionneTrouve = true;
+    if (!segment.style[cle]) return false;
   }
 
-  return sawSelectedText;
+  return texteSelectionneTrouve;
 }
