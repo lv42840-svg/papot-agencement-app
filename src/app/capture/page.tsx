@@ -5,6 +5,6 @@ import { requireUser } from "@/lib/auth/session";
 export const dynamic = "force-dynamic";
 
 export default async function CapturePage() {
-  const user = await requireUser();
-  return <MobileEntryCapture userId={user.id} />;
+  const utilisateur = await requireUser();
+  return <MobileEntryCapture userId={utilisateur.id} />;
 }

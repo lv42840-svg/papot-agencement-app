@@ -19,24 +19,24 @@ function errorMessage(code: string) {
 
 export function CompanyProfileWorkspace() {
   const [profile, setProfile] = useState<CompanyProfile | null>(null);
-  const [error, setError] = useState("");
+  const [erreur, setError] = useState("");
   const [saved, setSaved] = useState(false);
   const [busy, setBusy] = useState(false);
 
   useEffect(() => {
     void (async () => {
-      const response = await fetch("/api/admin/company-profile", { cache: "no-store" });
-      const body = (await response.json().catch(() => null)) as ApiResponse | null;
-      if (!response.ok || !body?.profile) {
-        setError(errorMessage(body?.error ?? "Chargement impossible."));
+      const reponse = await fetch("/api/admin/company-profile", { cache: "no-store" });
+      const corps = (await reponse.json().catch(() => null)) as ApiResponse | null;
+      if (!reponse.ok || !corps?.profile) {
+        setError(errorMessage(corps?.error ?? "Chargement impossible."));
         return;
       }
-      setProfile(body.profile);
+      setProfile(corps.profile);
     })();
   }, []);
 
-  function update<K extends keyof CompanyProfile>(key: K, value: CompanyProfile[K]) {
-    setProfile((current) => (current ? { ...current, [key]: value } : current));
+  function update<K extends keyof CompanyProfile>(cle: K, valeur: CompanyProfile[K]) {
+    setProfile((courant) => (courant ? { ...courant, [cle]: valeur } : courant));
     setSaved(false);
   }
 
@@ -46,17 +46,17 @@ export function CompanyProfileWorkspace() {
     setError("");
     setSaved(false);
     try {
-      const response = await fetch("/api/admin/company-profile", {
+      const reponse = await fetch("/api/admin/company-profile", {
         method: "POST",
         headers: { "content-type": "application/json" },
         body: JSON.stringify(profile),
       });
-      const body = (await response.json().catch(() => null)) as ApiResponse | null;
-      if (!response.ok || !body?.profile) {
-        setError(errorMessage(body?.error ?? "Enregistrement impossible."));
+      const corps = (await reponse.json().catch(() => null)) as ApiResponse | null;
+      if (!reponse.ok || !corps?.profile) {
+        setError(errorMessage(corps?.error ?? "Enregistrement impossible."));
         return;
       }
-      setProfile(body.profile);
+      setProfile(corps.profile);
       setSaved(true);
     } finally {
       setBusy(false);
@@ -76,9 +76,9 @@ export function CompanyProfileWorkspace() {
         </div>
       </div>
 
-      {error && (
+      {erreur && (
         <p className="formError" role="alert">
-          {error}
+          {erreur}
         </p>
       )}
       {saved && <p className="companySaved">Fiche société enregistrée.</p>}
@@ -91,29 +91,33 @@ export function CompanyProfileWorkspace() {
             <Field
               label="Raison sociale"
               value={profile.name}
-              onChange={(value) => update("name", value)}
+              onChange={(valeur) => update("name", valeur)}
             />
             <Field
               label="Adresse"
               value={profile.addressLine1}
-              onChange={(value) => update("addressLine1", value)}
+              onChange={(valeur) => update("addressLine1", valeur)}
             />
             <Field
               label="Code postal"
               value={profile.postalCode}
-              onChange={(value) => update("postalCode", value)}
+              onChange={(valeur) => update("postalCode", valeur)}
             />
-            <Field label="Ville" value={profile.city} onChange={(value) => update("city", value)} />
+            <Field
+              label="Ville"
+              value={profile.city}
+              onChange={(valeur) => update("city", valeur)}
+            />
             <Field
               label="Téléphone"
               value={profile.phone}
-              onChange={(value) => update("phone", value)}
+              onChange={(valeur) => update("phone", valeur)}
             />
             <Field
               label="E-mail"
               type="email"
               value={profile.email}
-              onChange={(value) => update("email", value)}
+              onChange={(valeur) => update("email", valeur)}
             />
           </CompanySection>
 
@@ -121,24 +125,24 @@ export function CompanyProfileWorkspace() {
             <Field
               label="Forme juridique"
               value={profile.legalForm}
-              onChange={(value) => update("legalForm", value)}
+              onChange={(valeur) => update("legalForm", valeur)}
             />
             <Field
               label="Capital"
               value={profile.capital}
-              onChange={(value) => update("capital", value)}
+              onChange={(valeur) => update("capital", valeur)}
             />
             <Field
               label="SIRET"
               value={profile.siret}
-              onChange={(value) => update("siret", value)}
+              onChange={(valeur) => update("siret", valeur)}
             />
-            <Field label="RCS" value={profile.rcs} onChange={(value) => update("rcs", value)} />
-            <Field label="APE" value={profile.ape} onChange={(value) => update("ape", value)} />
+            <Field label="RCS" value={profile.rcs} onChange={(valeur) => update("rcs", valeur)} />
+            <Field label="APE" value={profile.ape} onChange={(valeur) => update("ape", valeur)} />
             <Field
               label="TVA intracommunautaire"
               value={profile.vatNumber}
-              onChange={(value) => update("vatNumber", value)}
+              onChange={(valeur) => update("vatNumber", valeur)}
             />
           </CompanySection>
 
@@ -146,17 +150,17 @@ export function CompanyProfileWorkspace() {
             <Field
               label="Assureur"
               value={profile.insurerName}
-              onChange={(value) => update("insurerName", value)}
+              onChange={(valeur) => update("insurerName", valeur)}
             />
             <Field
               label="Adresse assureur"
               value={profile.insurerAddress}
-              onChange={(value) => update("insurerAddress", value)}
+              onChange={(valeur) => update("insurerAddress", valeur)}
             />
             <Field
               label="Couverture"
               value={profile.insuranceCoverage}
-              onChange={(value) => update("insuranceCoverage", value)}
+              onChange={(valeur) => update("insuranceCoverage", valeur)}
               wide
             />
           </CompanySection>
@@ -165,25 +169,29 @@ export function CompanyProfileWorkspace() {
             <Field
               label="Moyens de paiement"
               value={profile.paymentMethods}
-              onChange={(value) => update("paymentMethods", value)}
+              onChange={(valeur) => update("paymentMethods", valeur)}
             />
             <Field
               label="Libellé des chèques"
               value={profile.chequePayee}
-              onChange={(value) => update("chequePayee", value)}
+              onChange={(valeur) => update("chequePayee", valeur)}
             />
             <Field
               label="Banque"
               value={profile.bankName}
-              onChange={(value) => update("bankName", value)}
+              onChange={(valeur) => update("bankName", valeur)}
             />
             <Field
               label="Titulaire du compte"
               value={profile.bankAccountHolder}
-              onChange={(value) => update("bankAccountHolder", value)}
+              onChange={(valeur) => update("bankAccountHolder", valeur)}
             />
-            <Field label="IBAN" value={profile.iban} onChange={(value) => update("iban", value)} />
-            <Field label="BIC" value={profile.bic} onChange={(value) => update("bic", value)} />
+            <Field
+              label="IBAN"
+              value={profile.iban}
+              onChange={(valeur) => update("iban", valeur)}
+            />
+            <Field label="BIC" value={profile.bic} onChange={(valeur) => update("bic", valeur)} />
           </CompanySection>
 
           <div className="companyProfileActions">
@@ -257,32 +265,36 @@ export function CompanyProfileWorkspace() {
   );
 }
 
-function CompanySection({ title, children }: { title: string; children: React.ReactNode }) {
+function CompanySection({ title: titre, children }: { title: string; children: React.ReactNode }) {
   return (
     <article className="companyProfileCard">
-      <h2>{title}</h2>
+      <h2>{titre}</h2>
       <div className="companyProfileGrid">{children}</div>
     </article>
   );
 }
 
 function Field({
-  label,
-  value,
+  label: libelle,
+  value: valeur,
   onChange,
   type = "text",
   wide = false,
 }: {
   label: string;
   value: string;
-  onChange: (value: string) => void;
+  onChange: (valeur: string) => void;
   type?: "text" | "email";
   wide?: boolean;
 }) {
   return (
     <label className={`companyField${wide ? " isWide" : ""}`}>
-      {label}
-      <input type={type} value={value} onChange={(event) => onChange(event.target.value)} />
+      {libelle}
+      <input
+        type={type}
+        value={valeur}
+        onChange={(evenement) => onChange(evenement.target.value)}
+      />
     </label>
   );
 }

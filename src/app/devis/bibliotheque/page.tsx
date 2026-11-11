@@ -7,13 +7,13 @@ import { createLibraryRepository } from "@/lib/library/create-repository";
 export const dynamic = "force-dynamic";
 
 export default async function QuoteLibraryPage() {
-  const context = await requireModuleRequestContext("quotes", "READ");
-  const snapshot = await createLibraryRepository(context).load();
+  const contexte = await requireModuleRequestContext("quotes", "READ");
+  const snapshot = await createLibraryRepository(contexte).load();
 
   return (
     <DesktopAppShell>
       <QuoteModuleNav />
-      <LibraryWorkspace initialSnapshot={snapshot} canWrite={context.moduleAccess.canWrite} />
+      <LibraryWorkspace initialSnapshot={snapshot} canWrite={contexte.moduleAccess.canWrite} />
     </DesktopAppShell>
   );
 }

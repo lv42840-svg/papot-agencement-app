@@ -17,20 +17,20 @@ import { calculateMonthlyConsumption } from "@/lib/pilotage/monthly-consumption"
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
-const headers = { "Cache-Control": "private, no-store" };
+const entetes = { "Cache-Control": "private, no-store" };
 
-export async function GET(request: Request) {
+export async function GET(requete: Request) {
   try {
-    const context = await requireModuleRequestContext("pilotage", "READ");
-    await requireSpecialPermission(context.user, "dashboard.view_global");
-    const now = new Date();
-    const month = financialMonthSchema.parse(
-      new URL(request.url).searchParams.get("month") ?? parisCurrentMonth(now),
+    const contexte = await requireModuleRequestContext("pilotage", "READ");
+    await requireSpecialPermission(contexte.user, "dashboard.view_global");
+    const maintenant = new Date();
+    const mois = financialMonthSchema.parse(
+      new URL(requete.url).searchParams.get("month") ?? parisCurrentMonth(maintenant),
     );
     const [canReadPurchases, canReadPlanning, payrollAccess] = await Promise.all([
-      hasModuleAccess(context.user.id, "purchases", "READ"),
-      hasModuleAccess(context.user.id, "planning", "READ"),
-      hasModuleAccess(context.user.id, "payroll", "READ"),
+      hasModuleAccess(contexte.user.id, "purchases", "READ"),
+      hasModuleAccess(contexte.user.id, "planning", "READ"),
+      hasModuleAccess(contexte.user.id, "payroll", "READ"),
     ]);
     const canReadPayroll = canReadPlanning && payrollAccess;
     const [purchases, planning, payroll] = await Promise.all([
@@ -40,33 +40,33 @@ export async function GET(request: Request) {
     ]);
     return NextResponse.json(
       {
-        month,
-        asOf: now.toISOString(),
+        month: mois,
+        asOf: maintenant.toISOString(),
         sourcesConnected: false,
         // No provider exists yet. Never substitute approved drafts, BCs or a partial payroll.
         financial: calculateMonthlyFinancialResult({
-          month,
+          month: mois,
           customerInvoices: null,
           supplierInvoices: null,
           payroll: null,
         }),
         commitments: purchases ? committedPurchasesByDestination(purchases) : null,
         consumption: planning
-          ? calculateMonthlyConsumption(month, planning, payroll?.records ?? null, now)
+          ? calculateMonthlyConsumption(mois, planning, payroll?.records ?? null, maintenant)
           : null,
         canReadPurchases,
         canReadPlanning,
         canReadPayroll,
       },
-      { headers },
+      { headers: entetes },
     );
-  } catch (error) {
-    const code = error instanceof Error ? error.message : "MONTHLY_POSITION_FAILED";
+  } catch (erreur) {
+    const code = erreur instanceof Error ? erreur.message : "MONTHLY_POSITION_FAILED";
     return NextResponse.json(
       { error: "Impossible de charger la situation mensuelle." },
       {
         status: desktopRequestErrorStatus(code) ?? 400,
-        headers,
+        headers: entetes,
       },
     );
   }

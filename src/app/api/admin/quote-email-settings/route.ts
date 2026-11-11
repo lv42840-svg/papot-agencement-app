@@ -7,38 +7,38 @@ import { quoteEmailSettingsSchema } from "@/lib/quote-email-settings/domain";
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
-function noStoreJson(body: unknown, init?: ResponseInit) {
-  const response = NextResponse.json(body, init);
-  response.headers.set("Cache-Control", "no-store");
-  return response;
+function noStoreJson(corps: unknown, init?: ResponseInit) {
+  const reponse = NextResponse.json(corps, init);
+  reponse.headers.set("Cache-Control", "no-store");
+  return reponse;
 }
 
 export async function GET() {
   try {
     await requirePermissionAdministrator();
-    const settings = await createQuoteEmailSettingsRepository().load();
-    return noStoreJson({ settings });
-  } catch (error) {
-    const code = error instanceof Error ? error.message : "QUOTE_EMAIL_SETTINGS_LOAD_FAILED";
+    const reglages = await createQuoteEmailSettingsRepository().load();
+    return noStoreJson({ settings: reglages });
+  } catch (erreur) {
+    const code = erreur instanceof Error ? erreur.message : "QUOTE_EMAIL_SETTINGS_LOAD_FAILED";
     return noStoreJson({ error: code }, { status: userAdminErrorStatus(code) });
   }
 }
 
-export async function POST(request: Request) {
+export async function POST(requete: Request) {
   try {
     await requirePermissionAdministrator();
-    const settings = quoteEmailSettingsSchema.parse(await request.json().catch(() => null));
-    const saved = await createQuoteEmailSettingsRepository().replace(settings);
+    const reglages = quoteEmailSettingsSchema.parse(await requete.json().catch(() => null));
+    const saved = await createQuoteEmailSettingsRepository().replace(reglages);
     return noStoreJson({ settings: saved });
-  } catch (error) {
+  } catch (erreur) {
     const code =
-      error instanceof z.ZodError
+      erreur instanceof z.ZodError
         ? "QUOTE_EMAIL_SETTINGS_REQUEST_INVALID"
-        : error instanceof Error
-          ? error.message
+        : erreur instanceof Error
+          ? erreur.message
           : "QUOTE_EMAIL_SETTINGS_SAVE_FAILED";
-    const status =
+    const statut =
       code === "QUOTE_EMAIL_SETTINGS_REQUEST_INVALID" ? 400 : userAdminErrorStatus(code);
-    return noStoreJson({ error: code }, { status });
+    return noStoreJson({ error: code }, { status: statut });
   }
 }

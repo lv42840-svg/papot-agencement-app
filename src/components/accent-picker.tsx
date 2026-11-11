@@ -9,20 +9,20 @@ export function AccentPicker({ initialAccent }: { initialAccent: string }) {
   );
   const [busy, setBusy] = useState(false);
 
-  async function choose(next: AccentKey) {
-    if (busy || next === accent) return;
+  async function choose(suivant: AccentKey) {
+    if (busy || suivant === accent) return;
     setBusy(true);
-    const response = await fetch("/api/me/accent", {
+    const reponse = await fetch("/api/me/accent", {
       method: "PATCH",
       headers: { "content-type": "application/json" },
-      body: JSON.stringify({ accentKey: next }),
+      body: JSON.stringify({ accentKey: suivant }),
     });
-    if (response.ok) {
-      setAccent(next);
-      document.documentElement.style.setProperty("--accent", accentPalette[next].value);
+    if (reponse.ok) {
+      setAccent(suivant);
+      document.documentElement.style.setProperty("--accent", accentPalette[suivant].value);
       document.documentElement.style.setProperty(
         "--accent-foreground",
-        accentPalette[next].foreground,
+        accentPalette[suivant].foreground,
       );
     }
     setBusy(false);
@@ -30,17 +30,17 @@ export function AccentPicker({ initialAccent }: { initialAccent: string }) {
 
   return (
     <div className="accentPicker" aria-label="Couleur d’accent">
-      {Object.entries(accentPalette).map(([key, item]) => (
+      {Object.entries(accentPalette).map(([cle, element]) => (
         <button
-          key={key}
+          key={cle}
           type="button"
-          className={key === accent ? "accentDot selected" : "accentDot"}
-          style={{ background: item.value }}
-          title={item.label}
-          aria-label={item.label}
-          aria-pressed={key === accent}
+          className={cle === accent ? "accentDot selected" : "accentDot"}
+          style={{ background: element.value }}
+          title={element.label}
+          aria-label={element.label}
+          aria-pressed={cle === accent}
           disabled={busy}
-          onClick={() => void choose(key as AccentKey)}
+          onClick={() => void choose(cle as AccentKey)}
         />
       ))}
     </div>

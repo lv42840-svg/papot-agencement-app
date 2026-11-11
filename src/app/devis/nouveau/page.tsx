@@ -17,7 +17,7 @@ export default async function NewQuotePage({
   searchParams: Promise<{ affaire?: string; chantier?: string }>;
 }) {
   const { affaire: requestedAffairId, chantier } = await searchParams;
-  const context = await requireModuleRequestContext("quotes", "READ");
+  const contexte = await requireModuleRequestContext("quotes", "READ");
   const commercialRepository = createCommercialRepository();
   const clientsRepository = await createClientsRepository();
   const [commercial, clients, quoteOwners, quotes] = await Promise.all([
@@ -65,7 +65,7 @@ export default async function NewQuotePage({
     <DesktopAppShell>
       <QuoteCreateWorkspace
         affairs={affairs}
-        canWrite={context.moduleAccess.canWrite}
+        canWrite={contexte.moduleAccess.canWrite}
         today={commercialParisDateKey()}
         initialAffairId={initialAffairId}
         initialVariantName={initialVariantName}
@@ -75,7 +75,7 @@ export default async function NewQuotePage({
         }
         paymentTermOptions={paymentTermOptions}
         quoteOwners={quoteOwners}
-        defaultQuoteOwnerName={context.user.displayName}
+        defaultQuoteOwnerName={contexte.user.displayName}
       />
     </DesktopAppShell>
   );

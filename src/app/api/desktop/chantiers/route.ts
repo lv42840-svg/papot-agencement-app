@@ -48,66 +48,69 @@ export const dynamic = "force-dynamic";
 type Owner = { userId: string; deviceId: string; displayName: string };
 type PermissionUser = { id: string };
 
-function mutationNeedsCommercialOrigin(input: { action: string }): boolean {
+function mutationNeedsCommercialOrigin(saisie: { action: string }): boolean {
   return (
-    input.action === "createBeItem" ||
-    input.action === "createWorkshopItem" ||
-    input.action === "setQuoteLineProgress"
+    saisie.action === "createBeItem" ||
+    saisie.action === "createWorkshopItem" ||
+    saisie.action === "setQuoteLineProgress"
   );
 }
 
-function noStoreJson(body: unknown, init?: ResponseInit) {
-  const response = NextResponse.json(body, init);
-  response.headers.set("Cache-Control", "no-store");
-  return response;
+function noStoreJson(corps: unknown, init?: ResponseInit) {
+  const reponse = NextResponse.json(corps, init);
+  reponse.headers.set("Cache-Control", "no-store");
+  return reponse;
 }
 
 async function snapshot(
-  payload: ChantiersPayload,
+  contenu: ChantiersPayload,
   owner: Owner,
-  user: PermissionUser,
+  utilisateur: PermissionUser,
   canWrite: boolean,
   focusChantierId?: string,
 ) {
-  const actor = { userId: owner.userId, displayName: owner.displayName };
-  const baseCapabilities = chantierCapabilities(actor);
+  const auteur = { userId: owner.userId, displayName: owner.displayName };
+  const baseCapabilities = chantierCapabilities(auteur);
   const planningPayload = await createPlanningRepository().load();
-  const now = new Date();
-  const canViewLaborCosts = await hasModuleAccess(user.id, "payroll", "READ");
+  const maintenant = new Date();
+  const canViewLaborCosts = await hasModuleAccess(utilisateur.id, "payroll", "READ");
   const monthlyCosts = canViewLaborCosts ? await readMonthlyLaborCosts() : null;
   const [canLaunchSpecial, canCloseReopenSpecial, canArchiveSpecial] = await Promise.all([
-    hasEffectiveSpecialPermission(user, "commercial.confirm_launch"),
-    hasEffectiveSpecialPermission(user, "chantiers.close_reopen"),
-    hasEffectiveSpecialPermission(user, "chantiers.archive_reactivate"),
+    hasEffectiveSpecialPermission(utilisateur, "commercial.confirm_launch"),
+    hasEffectiveSpecialPermission(utilisateur, "chantiers.close_reopen"),
+    hasEffectiveSpecialPermission(utilisateur, "chantiers.archive_reactivate"),
   ]);
   const canReadPurchases =
-    (await hasModuleAccess(user.id, "purchases", "READ")) || (canWrite && canCloseReopenSpecial);
+    (await hasModuleAccess(utilisateur.id, "purchases", "READ")) ||
+    (canWrite && canCloseReopenSpecial);
   const purchasePayload = canReadPurchases ? await createPurchaseOrdersRepository().load() : null;
   // Reconcile the chantier's read-only production metrics from the real hours register.
   // Do not write the projection into the chantier repository: the planning ledger is the source.
-  const realizedChantierIds = new Set(planningPayload.actualHours.map((entry) => entry.chantierId));
+  const realizedChantierIds = new Set(
+    planningPayload.actualHours.map((entree) => entree.chantierId),
+  );
   const viewPayload: ChantiersPayload = {
-    ...payload,
-    chantiers: payload.chantiers.map((chantier) => {
+    ...contenu,
+    chantiers: contenu.chantiers.map((chantier) => {
       if (!realizedChantierIds.has(chantier.id)) return chantier;
       return {
         ...chantier,
         actualHours: actualHoursByActivity(
-          planningPayload.actualHours.filter((entry) => entry.chantierId === chantier.id),
+          planningPayload.actualHours.filter((entree) => entree.chantierId === chantier.id),
         ),
       };
     }),
   };
   const laborEstimates = monthlyCosts
     ? new Map(
-        payload.chantiers.map((chantier) => [
+        contenu.chantiers.map((chantier) => [
           chantier.id,
           calculateChantierLaborCostEstimate(
             chantier.id,
             planningPayload.actualHours,
             monthlyCosts.records,
             planningPayload.peopleCapacity,
-            now,
+            maintenant,
           ),
         ]),
       )
@@ -115,22 +118,22 @@ async function snapshot(
   return {
     payload: viewPayload,
     actualLaborCostsByChantier: Object.fromEntries(
-      payload.chantiers.map((chantier) => [
+      contenu.chantiers.map((chantier) => [
         chantier.id,
         laborEstimates?.get(chantier.id)?.costCents ?? null,
       ]),
     ),
     provisionalLaborCostsByChantier: Object.fromEntries(
-      payload.chantiers.map((chantier) => [
+      contenu.chantiers.map((chantier) => [
         chantier.id,
         laborEstimates?.get(chantier.id)?.provisional ?? false,
       ]),
     ),
-    actor,
-    canRemovePurchaseCommitments: await hasModuleAccess(user.id, "purchases", "WRITE"),
+    actor: auteur,
+    canRemovePurchaseCommitments: await hasModuleAccess(utilisateur.id, "purchases", "WRITE"),
     committedPurchasesByChantier: purchasePayload
       ? Object.fromEntries(
-          payload.chantiers.map((chantier) => [
+          contenu.chantiers.map((chantier) => [
             chantier.id,
             committedPurchaseTotal(purchasePayload, chantier.id),
           ]),
@@ -138,14 +141,17 @@ async function snapshot(
       : null,
     purchaseCloseWarnings: purchasePayload
       ? Object.fromEntries(
-          payload.chantiers.map((chantier) => {
+          contenu.chantiers.map((chantier) => {
             const orders = committedOrdersForChantier(purchasePayload, chantier.id);
             return [
               chantier.id,
               {
                 orders,
                 count: orders.length,
-                amountHtCents: orders.reduce((total, order) => total + order.amountHtCents, 0),
+                amountHtCents: orders.reduce(
+                  (total, commande) => total + commande.amountHtCents,
+                  0,
+                ),
                 token: purchaseCloseReviewToken(orders),
               },
             ];
@@ -162,12 +168,12 @@ async function snapshot(
     },
     focusChantierId,
     planningCloseWarnings: Object.fromEntries(
-      payload.chantiers.map((chantier) => [
+      contenu.chantiers.map((chantier) => [
         chantier.id,
-        buildChantierPlanningCloseWarning(chantier, planningPayload, now),
+        buildChantierPlanningCloseWarning(chantier, planningPayload, maintenant),
       ]),
     ),
-    serverNow: now.toISOString(),
+    serverNow: maintenant.toISOString(),
   };
 }
 
@@ -183,94 +189,96 @@ function statusFor(code: string): number {
 
 export async function GET() {
   try {
-    const context = await requireModuleRequestContext("chantiers", "READ");
-    const repository = createChantiersRepository(context);
-    const payload = await repository.load();
+    const contexte = await requireModuleRequestContext("chantiers", "READ");
+    const repository = createChantiersRepository(contexte);
+    const contenu = await repository.load();
 
     const owner = {
-      userId: context.user.id,
-      deviceId: context.user.id,
-      displayName: context.user.displayName,
+      userId: contexte.user.id,
+      deviceId: contexte.user.id,
+      displayName: contexte.user.displayName,
     };
-    return noStoreJson(await snapshot(payload, owner, context.user, context.moduleAccess.canWrite));
-  } catch (error) {
-    const code = error instanceof Error ? error.message : "CHANTIERS_LOAD_FAILED";
+    return noStoreJson(
+      await snapshot(contenu, owner, contexte.user, contexte.moduleAccess.canWrite),
+    );
+  } catch (erreur) {
+    const code = erreur instanceof Error ? erreur.message : "CHANTIERS_LOAD_FAILED";
     return noStoreJson({ error: code }, { status: statusFor(code) });
   }
 }
 
-export async function POST(request: Request) {
+export async function POST(requete: Request) {
   const startedAt = Date.now();
   let stage = "parse-request";
 
   try {
-    const raw = (await request.json()) as Record<string, unknown>;
-    const input = chantierMutationSchema.parse(raw);
+    const raw = (await requete.json()) as Record<string, unknown>;
+    const saisie = chantierMutationSchema.parse(raw);
     const expectedUpdatedAt =
       typeof raw.expectedUpdatedAt === "string" ? raw.expectedUpdatedAt.trim() : "";
     if (!expectedUpdatedAt) throw new Error("CHANTIERS_VERSION_REQUIRED");
     stage = "create-runtime";
-    const context = await requireModuleRequestContext("chantiers", "WRITE");
-    const requiredSpecialPermission = chantierSpecialPermissionForMutation(input);
+    const contexte = await requireModuleRequestContext("chantiers", "WRITE");
+    const requiredSpecialPermission = chantierSpecialPermissionForMutation(saisie);
     if (requiredSpecialPermission) {
-      await requireSpecialPermission(context.user, requiredSpecialPermission);
+      await requireSpecialPermission(contexte.user, requiredSpecialPermission);
     }
 
-    const repository = createChantiersRepository(context);
+    const repository = createChantiersRepository(contexte);
     const owner = {
-      userId: context.user.id,
-      deviceId: context.user.id,
-      displayName: context.user.displayName,
+      userId: contexte.user.id,
+      deviceId: contexte.user.id,
+      displayName: contexte.user.displayName,
     };
-    const actor = { userId: owner.userId, displayName: owner.displayName };
-    const commercialRepository = mutationNeedsCommercialOrigin(input)
+    const auteur = { userId: owner.userId, displayName: owner.displayName };
+    const commercialRepository = mutationNeedsCommercialOrigin(saisie)
       ? createCommercialRepository()
       : null;
     const commercial = commercialRepository ? await commercialRepository.load() : null;
-    const quotes = mutationNeedsCommercialOrigin(input)
+    const quotes = mutationNeedsCommercialOrigin(saisie)
       ? await createQuotesRepository().load()
       : null;
 
     // The Pennylane reconciliation is not connected yet: all active BC allocations
     // are unverified. Require an explicit keep/remove decision before closing.
-    if (input.action === "markDone") {
+    if (saisie.action === "markDone") {
       stage = "review-purchase-orders";
       const chantierBefore = (await repository.load()).chantiers.find(
-        (candidate) => candidate.id === input.chantierId,
+        (candidat) => candidat.id === saisie.chantierId,
       );
       if (!chantierBefore) throw new Error("CHANTIER_NOT_FOUND");
       assertChantierRevision(chantierBefore, expectedUpdatedAt);
       if (chantierBefore.status !== "ACTIVE") throw new Error("CHANTIER_NOT_ACTIVE");
       const purchasesRepo = createPurchaseOrdersRepository();
-      const outstanding = committedOrdersForChantier(await purchasesRepo.load(), input.chantierId);
+      const outstanding = committedOrdersForChantier(await purchasesRepo.load(), saisie.chantierId);
       const token = purchaseCloseReviewToken(outstanding);
       if (outstanding.length > 0) {
-        if (!input.purchaseReview) throw new Error("CHANTIER_PURCHASE_REVIEW_REQUIRED");
-        if (input.purchaseReview.token !== token) {
+        if (!saisie.purchaseReview) throw new Error("CHANTIER_PURCHASE_REVIEW_REQUIRED");
+        if (saisie.purchaseReview.token !== token) {
           throw new Error("CHANTIER_PURCHASE_REVIEW_CONFLICT");
         }
-        if (input.purchaseReview.decision === "REMOVE") {
-          if (input.purchaseReview.confirmRemove !== true) {
+        if (saisie.purchaseReview.decision === "REMOVE") {
+          if (saisie.purchaseReview.confirmRemove !== true) {
             throw new Error("CHANTIER_PURCHASE_REMOVE_CONFIRMATION_REQUIRED");
           }
-          if (!(await hasModuleAccess(context.user.id, "purchases", "WRITE"))) {
+          if (!(await hasModuleAccess(contexte.user.id, "purchases", "WRITE"))) {
             throw new Error("CHANTIER_PURCHASE_REMOVE_FORBIDDEN");
           }
           // Preserve other chantier allocations and the original BC audit trail.
           // This operation precedes closing so failure cannot silently mark the
           // chantier done while leaving purchases unresolved. A concurrent change
           // to the chantier itself may still require the operator to retry.
-          await purchasesRepo.mutate((current) => {
+          await purchasesRepo.mutate((courant) => {
             if (
-              purchaseCloseReviewToken(committedOrdersForChantier(current, input.chantierId)) !==
+              purchaseCloseReviewToken(committedOrdersForChantier(courant, saisie.chantierId)) !==
               token
             ) {
               throw new Error("CHANTIER_PURCHASE_REVIEW_CONFLICT");
             }
             return removeChantierPurchaseCommitments(
-              current,
-              input.chantierId,
-              context.user.displayName,
+              courant,
+              saisie.chantierId,
+              contexte.user.displayName,
             );
           });
         }
@@ -278,36 +286,36 @@ export async function POST(request: Request) {
     }
 
     stage = "apply-and-save-mutation";
-    const mutation = await repository.mutate((payload) => {
-      const openedChantier = payload.chantiers.find(
-        (candidate) => candidate.id === input.chantierId,
+    const mutation = await repository.mutate((contenu) => {
+      const openedChantier = contenu.chantiers.find(
+        (candidat) => candidat.id === saisie.chantierId,
       );
       if (!openedChantier) throw new Error("CHANTIER_NOT_FOUND");
       assertChantierRevision(openedChantier, expectedUpdatedAt);
 
-      let normalizedInput = input;
+      let normalizedInput = saisie;
 
-      if (mutationNeedsCommercialOrigin(input)) {
-        const chantier = payload.chantiers.find((candidate) => candidate.id === input.chantierId);
+      if (mutationNeedsCommercialOrigin(saisie)) {
+        const chantier = contenu.chantiers.find((candidat) => candidat.id === saisie.chantierId);
         if (!chantier) throw new Error("CHANTIER_NOT_FOUND");
         const affair = commercial?.cases.find(
-          (candidate) => candidate.id === chantier.sourceCommercialCaseId,
+          (candidat) => candidat.id === chantier.sourceCommercialCaseId,
         );
         if (!affair) throw new Error("CHANTIER_COMMERCIAL_CASE_NOT_FOUND");
         if (!quotes) throw new Error("CHANTIER_QUOTES_UNAVAILABLE");
 
-        if (input.action === "createBeItem" || input.action === "createWorkshopItem") {
-          if (!input.sourceQuoteId || !input.sourceQuoteLineId) {
+        if (saisie.action === "createBeItem" || saisie.action === "createWorkshopItem") {
+          if (!saisie.sourceQuoteId || !saisie.sourceQuoteLineId) {
             throw new Error("CHANTIER_QUOTE_LINE_REQUIRED");
           }
           const reference = resolveRetainedChantierQuoteLine(
             affair,
             quotes,
-            input.sourceQuoteId,
-            input.sourceQuoteLineId,
+            saisie.sourceQuoteId,
+            saisie.sourceQuoteLineId,
           );
           normalizedInput = {
-            ...input,
+            ...saisie,
             originKind: reference.quoteKind === "TS" ? "TS" : "QUOTE_LINE",
             originLabel: chantierQuoteLineDisplay(reference),
             sourceQuoteId: reference.quoteId,
@@ -315,15 +323,15 @@ export async function POST(request: Request) {
           };
         }
 
-        if (input.action === "setQuoteLineProgress") {
+        if (saisie.action === "setQuoteLineProgress") {
           const reference = resolveRetainedChantierQuoteLine(
             affair,
             quotes,
-            input.quoteId,
-            input.quoteLineId,
+            saisie.quoteId,
+            saisie.quoteLineId,
           );
           normalizedInput = {
-            ...input,
+            ...saisie,
             quoteId: reference.quoteId,
             quoteLineId: reference.quoteLineId,
             quoteLineLabel: chantierQuoteLineDisplay(reference),
@@ -331,40 +339,40 @@ export async function POST(request: Request) {
         }
       }
 
-      return applyChantierMutation(payload, normalizedInput, actor);
+      return applyChantierMutation(contenu, normalizedInput, auteur);
     });
 
     if (
-      input.action === "markDone" ||
-      input.action === "cancel" ||
-      input.action === "reactivate" ||
-      input.action === "unarchive"
+      saisie.action === "markDone" ||
+      saisie.action === "cancel" ||
+      saisie.action === "reactivate" ||
+      saisie.action === "unarchive"
     ) {
       stage = "sync-planning-lifecycle";
-      await createPlanningRepository().mutate((payload) => {
-        if (input.action === "markDone" || input.action === "cancel") {
-          return removeFirmPlanningForChantier(payload, input.chantierId);
+      await createPlanningRepository().mutate((contenu) => {
+        if (saisie.action === "markDone" || saisie.action === "cancel") {
+          return removeFirmPlanningForChantier(contenu, saisie.chantierId);
         }
-        return restoreFirmPlanningOrderForChantier(payload, input.chantierId);
+        return restoreFirmPlanningOrderForChantier(contenu, saisie.chantierId);
       });
     }
 
     console.info("[PAPOT][Chantiers] POST saved", { ms: Date.now() - startedAt });
     return noStoreJson(
-      await snapshot(mutation.payload, owner, context.user, true, mutation.focusChantierId),
+      await snapshot(mutation.payload, owner, contexte.user, true, mutation.focusChantierId),
     );
-  } catch (error) {
+  } catch (erreur) {
     const code =
-      error instanceof ZodError
+      erreur instanceof ZodError
         ? "CHANTIERS_REQUEST_INVALID"
-        : error instanceof Error
-          ? error.message
+        : erreur instanceof Error
+          ? erreur.message
           : "CHANTIERS_MUTATION_FAILED";
     console.error("[PAPOT][Chantiers] POST failed", { stage, code, ms: Date.now() - startedAt });
-    const body =
-      error instanceof ChantiersRepositoryError && error.details?.lockedBy
-        ? { error: code, lockedBy: error.details.lockedBy }
+    const corps =
+      erreur instanceof ChantiersRepositoryError && erreur.details?.lockedBy
+        ? { error: code, lockedBy: erreur.details.lockedBy }
         : { error: code };
-    return noStoreJson(body, { status: statusFor(code) });
+    return noStoreJson(corps, { status: statusFor(code) });
   }
 }

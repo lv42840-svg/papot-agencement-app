@@ -47,10 +47,10 @@ type EntriesTab = "TO_QUALIFY" | "ASSIGNED" | "DONE";
 type EntryDetailTab = "INFO" | "AFFAIR" | "ATTACHMENTS" | "HISTORY";
 type MutationBody = Record<string, unknown> & { action: string };
 type MutationFn = (
-  body: MutationBody,
+  corps: MutationBody,
   successMessage?: string,
 ) => Promise<EntriesApiSnapshot | null>;
-type UploadFn = (entryId: string, files: File[]) => Promise<boolean>;
+type UploadFn = (idEntree: string, fichiers: File[]) => Promise<boolean>;
 type NextActionDraft = {
   id: string;
   text: string;
@@ -78,54 +78,57 @@ const errorMessages: Record<string, string> = {
   ENTRY_ATTACHMENTS_REQUIRED: "Aucune pièce jointe n'a été sélectionnée.",
 };
 
-function formatDateTime(value: string): string {
+function formatDateTime(valeur: string): string {
   return new Intl.DateTimeFormat("fr-FR", { dateStyle: "short", timeStyle: "short" }).format(
-    new Date(value),
+    new Date(valeur),
   );
 }
 
-function formatDateOnly(value: string | null): string {
-  if (!value) return "Sans date";
-  const [year, month, day] = value.split("-").map(Number);
+function formatDateOnly(valeur: string | null): string {
+  if (!valeur) return "Sans date";
+  const [annee, mois, jour] = valeur.split("-").map(Number);
   return new Intl.DateTimeFormat("fr-FR", { dateStyle: "medium" }).format(
-    new Date(year, month - 1, day, 12),
+    new Date(annee, mois - 1, jour, 12),
   );
 }
 
-function formatBytes(value: number): string {
-  if (value < 1024) return `${value} o`;
-  if (value < 1024 * 1024) return `${Math.round(value / 1024)} Ko`;
-  return `${(value / (1024 * 1024)).toFixed(value >= 10 * 1024 * 1024 ? 0 : 1)} Mo`;
+function formatBytes(valeur: number): string {
+  if (valeur < 1024) return `${valeur} o`;
+  if (valeur < 1024 * 1024) return `${Math.round(valeur / 1024)} Ko`;
+  return `${(valeur / (1024 * 1024)).toFixed(valeur >= 10 * 1024 * 1024 ? 0 : 1)} Mo`;
 }
 
-function entryTagLabels(entry: EntryRecord, tags: EntriesTag[]): EntriesTag[] {
-  const selected = new Set(entry.tagIds);
-  return tags.filter((tag) => selected.has(tag.id)).sort((a, b) => a.sortOrder - b.sortOrder);
+function entryTagLabels(entree: EntryRecord, etiquettes: EntriesTag[]): EntriesTag[] {
+  const selectionne = new Set(entree.tagIds);
+  return etiquettes
+    .filter((etiquette) => selectionne.has(etiquette.id))
+    .sort((a, b) => a.sortOrder - b.sortOrder);
 }
 
-function attentionText(entry: EntryRecord): string | null {
-  if (entry.status !== "TO_QUALIFY") return null;
-  if (entry.snoozedUntilDate) return `Reportée jusqu'au ${formatDateOnly(entry.snoozedUntilDate)}`;
-  return `Remontée à partir du ${formatDateTime(qualificationAttentionAt(entry).toISOString())}`;
+function attentionText(entree: EntryRecord): string | null {
+  if (entree.status !== "TO_QUALIFY") return null;
+  if (entree.snoozedUntilDate)
+    return `Reportée jusqu'au ${formatDateOnly(entree.snoozedUntilDate)}`;
+  return `Remontée à partir du ${formatDateTime(qualificationAttentionAt(entree).toISOString())}`;
 }
 
 export function EntriesWorkspace() {
   const [snapshot, setSnapshot] = useState<EntriesApiSnapshot | null>(null);
   const [tab, setTab] = useState<EntriesTab>("TO_QUALIFY");
   const [selectedId, setSelectedId] = useState<string | null>(null);
-  const [loading, setLoading] = useState(true);
+  const [chargement, setLoading] = useState(true);
   const [busy, setBusy] = useState(false);
-  const [error, setError] = useState<string | null>(null);
+  const [erreur, setError] = useState<string | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
 
   const load = useCallback(async () => {
     setLoading(true);
     setError(null);
     try {
-      const response = await fetch("/api/desktop/entries", { cache: "no-store" });
-      const body = (await response.json()) as EntriesApiSnapshot & { error?: string };
-      if (!response.ok) throw new Error(body.error ?? "ENTRIES_LOAD_FAILED");
-      setSnapshot(body);
+      const reponse = await fetch("/api/desktop/entries", { cache: "no-store" });
+      const corps = (await reponse.json()) as EntriesApiSnapshot & { error?: string };
+      if (!reponse.ok) throw new Error(corps.error ?? "ENTRIES_LOAD_FAILED");
+      setSnapshot(corps);
     } catch (loadError) {
       const code = loadError instanceof Error ? loadError.message : "ENTRIES_LOAD_FAILED";
       setError(errorMessages[code] ?? "Impossible de charger les entrées pour le moment.");
@@ -139,28 +142,31 @@ export function EntriesWorkspace() {
   }, [load]);
 
   const mutate = useCallback<MutationFn>(
-    async (body, successMessage) => {
+    async (corps, successMessage) => {
       setBusy(true);
       setError(null);
       setNotice(null);
       try {
-        const response = await fetch("/api/desktop/entries", {
+        const reponse = await fetch("/api/desktop/entries", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify(body),
+          body: JSON.stringify(corps),
         });
-        const result = (await response.json()) as EntriesApiSnapshot & {
+        const resultat = (await reponse.json()) as EntriesApiSnapshot & {
           error?: string;
           lockedBy?: string;
         };
-        if (!response.ok) {
-          const base = errorMessages[result.error ?? ""] ?? "L'action n'a pas pu être enregistrée.";
-          throw new Error(result.lockedBy ? `${base} Poste en cours : ${result.lockedBy}.` : base);
+        if (!reponse.ok) {
+          const base =
+            errorMessages[resultat.error ?? ""] ?? "L'action n'a pas pu être enregistrée.";
+          throw new Error(
+            resultat.lockedBy ? `${base} Poste en cours : ${resultat.lockedBy}.` : base,
+          );
         }
-        setSnapshot(result);
-        if (result.focusEntryId) setSelectedId(result.focusEntryId);
+        setSnapshot(resultat);
+        if (resultat.focusEntryId) setSelectedId(resultat.focusEntryId);
         if (successMessage) setNotice(successMessage);
-        return result;
+        return resultat;
       } catch (mutationError) {
         const message =
           mutationError instanceof Error ? mutationError.message : "L'action a échoué.";
@@ -174,28 +180,29 @@ export function EntriesWorkspace() {
     [load],
   );
 
-  const uploadAttachments = useCallback<UploadFn>(async (entryId, files) => {
-    if (files.length === 0) return true;
+  const uploadAttachments = useCallback<UploadFn>(async (idEntree, fichiers) => {
+    if (fichiers.length === 0) return true;
     setBusy(true);
     setError(null);
     setNotice(null);
     try {
       const form = new FormData();
-      files.forEach((file) => form.append("files", file));
-      const response = await fetch(`/api/desktop/entries/${entryId}/attachments`, {
+      fichiers.forEach((fichier) => form.append("files", fichier));
+      const reponse = await fetch(`/api/desktop/entries/${idEntree}/attachments`, {
         method: "POST",
         body: form,
       });
-      const result = (await response.json()) as EntriesApiSnapshot & { error?: string };
-      if (!response.ok) {
+      const resultat = (await reponse.json()) as EntriesApiSnapshot & { error?: string };
+      if (!reponse.ok) {
         throw new Error(
-          errorMessages[result.error ?? ""] ?? "Les pièces jointes n'ont pas pu être enregistrées.",
+          errorMessages[resultat.error ?? ""] ??
+            "Les pièces jointes n'ont pas pu être enregistrées.",
         );
       }
-      setSnapshot(result);
-      setSelectedId(entryId);
+      setSnapshot(resultat);
+      setSelectedId(idEntree);
       setNotice(
-        `${files.length} pièce${files.length > 1 ? "s" : ""} jointe${files.length > 1 ? "s" : ""} ajoutée${files.length > 1 ? "s" : ""}.`,
+        `${fichiers.length} pièce${fichiers.length > 1 ? "s" : ""} jointe${fichiers.length > 1 ? "s" : ""} ajoutée${fichiers.length > 1 ? "s" : ""}.`,
       );
       return true;
     } catch (uploadError) {
@@ -208,45 +215,48 @@ export function EntriesWorkspace() {
     }
   }, []);
 
-  const payload = snapshot?.payload;
-  const now = useMemo(() => new Date(snapshot?.serverNow ?? Date.now()), [snapshot?.serverNow]);
+  const contenu = snapshot?.payload;
+  const maintenant = useMemo(
+    () => new Date(snapshot?.serverNow ?? Date.now()),
+    [snapshot?.serverNow],
+  );
   const qualifyEntries = useMemo(
     () =>
-      (payload?.entries ?? [])
-        .filter((entry) => entry.status === "TO_QUALIFY")
+      (contenu?.entries ?? [])
+        .filter((entree) => entree.status === "TO_QUALIFY")
         .sort((a, b) => {
           const attentionDelta =
-            Number(isQualificationAttentionDue(b, now)) -
-            Number(isQualificationAttentionDue(a, now));
+            Number(isQualificationAttentionDue(b, maintenant)) -
+            Number(isQualificationAttentionDue(a, maintenant));
           return attentionDelta || a.createdAt.localeCompare(b.createdAt);
         }),
-    [payload?.entries, now],
+    [contenu?.entries, maintenant],
   );
   const assignedEntries = useMemo(
     () =>
-      (payload?.entries ?? [])
-        .filter((entry) => entry.status === "ASSIGNED")
+      (contenu?.entries ?? [])
+        .filter((entree) => entree.status === "ASSIGNED")
         .sort((a, b) => {
           const overdueDelta =
-            Number(isAssignedOverdue(b, now)) - Number(isAssignedOverdue(a, now));
+            Number(isAssignedOverdue(b, maintenant)) - Number(isAssignedOverdue(a, maintenant));
           return (
             overdueDelta || (a.dueDate ?? "9999-12-31").localeCompare(b.dueDate ?? "9999-12-31")
           );
         }),
-    [payload?.entries, now],
+    [contenu?.entries, maintenant],
   );
   const doneEntries = useMemo(
     () =>
-      (payload?.entries ?? [])
-        .filter((entry) => entry.status === "DONE")
+      (contenu?.entries ?? [])
+        .filter((entree) => entree.status === "DONE")
         .sort((a, b) => (b.completedAt ?? b.createdAt).localeCompare(a.completedAt ?? a.createdAt)),
-    [payload?.entries],
+    [contenu?.entries],
   );
 
   const visibleEntries =
     tab === "TO_QUALIFY" ? qualifyEntries : tab === "ASSIGNED" ? assignedEntries : doneEntries;
   const selectedEntry =
-    payload?.entries.find((entry) => entry.id === selectedId) ?? visibleEntries[0] ?? null;
+    contenu?.entries.find((entree) => entree.id === selectedId) ?? visibleEntries[0] ?? null;
 
   useEffect(() => {
     if (selectedEntry && selectedEntry.id !== selectedId) setSelectedId(selectedEntry.id);
@@ -255,16 +265,16 @@ export function EntriesWorkspace() {
 
   const unreadNotifications = useMemo(() => {
     if (!snapshot) return [];
-    const actor = normalizePersonName(snapshot.actor.displayName);
+    const auteur = normalizePersonName(snapshot.actor.displayName);
     return snapshot.payload.notifications
       .filter(
         (notification) =>
-          !notification.readAt && normalizePersonName(notification.recipientName) === actor,
+          !notification.readAt && normalizePersonName(notification.recipientName) === auteur,
       )
       .sort((a, b) => b.createdAt.localeCompare(a.createdAt));
   }, [snapshot]);
 
-  if (loading && !snapshot) {
+  if (chargement && !snapshot) {
     return (
       <div className="entriesLoading">
         <RefreshCw className="entriesSpin" size={20} /> Chargement des entrées…
@@ -294,7 +304,7 @@ export function EntriesWorkspace() {
         </div>
       </section>
 
-      {error ? <div className="entriesMessage entriesMessageError">{error}</div> : null}
+      {erreur ? <div className="entriesMessage entriesMessageError">{erreur}</div> : null}
       {notice ? <div className="entriesMessage entriesMessageSuccess">{notice}</div> : null}
 
       {snapshot && unreadNotifications.length > 0 ? (
@@ -336,7 +346,8 @@ export function EntriesWorkspace() {
                 label="À qualifier"
                 count={qualifyEntries.length}
                 alertCount={
-                  qualifyEntries.filter((entry) => isQualificationAttentionDue(entry, now)).length
+                  qualifyEntries.filter((entree) => isQualificationAttentionDue(entree, maintenant))
+                    .length
                 }
                 onClick={() => setTab("TO_QUALIFY")}
               />
@@ -344,7 +355,9 @@ export function EntriesWorkspace() {
                 active={tab === "ASSIGNED"}
                 label="Affectées"
                 count={assignedEntries.length}
-                alertCount={assignedEntries.filter((entry) => isAssignedOverdue(entry, now)).length}
+                alertCount={
+                  assignedEntries.filter((entree) => isAssignedOverdue(entree, maintenant)).length
+                }
                 onClick={() => setTab("ASSIGNED")}
               />
               <TabButton
@@ -363,14 +376,14 @@ export function EntriesWorkspace() {
                   <span>La liste se remplira au fil des captures et traitements.</span>
                 </div>
               ) : (
-                visibleEntries.map((entry) => (
+                visibleEntries.map((entree) => (
                   <EntryListRow
-                    key={entry.id}
-                    entry={entry}
+                    key={entree.id}
+                    entry={entree}
                     tags={snapshot.payload.tags}
-                    now={now}
-                    selected={entry.id === selectedEntry?.id}
-                    onClick={() => setSelectedId(entry.id)}
+                    now={maintenant}
+                    selected={entree.id === selectedEntry?.id}
+                    onClick={() => setSelectedId(entree.id)}
                   />
                 ))
               )}
@@ -386,7 +399,7 @@ export function EntriesWorkspace() {
                 capabilities={snapshot.capabilities}
                 suggestedAssignees={snapshot.suggestedAssignees}
                 busy={busy}
-                now={now}
+                now={maintenant}
                 mutate={mutate}
                 uploadAttachments={uploadAttachments}
                 onOpenEntry={setSelectedId}
@@ -407,8 +420,8 @@ export function EntriesWorkspace() {
 
 function TabButton({
   active,
-  label,
-  count,
+  label: libelle,
+  count: nombre,
   alertCount,
   onClick,
 }: {
@@ -420,18 +433,18 @@ function TabButton({
 }) {
   return (
     <button type="button" className={active ? "isActive" : ""} onClick={onClick}>
-      <span>{label}</span>
-      <strong>{count}</strong>
+      <span>{libelle}</span>
+      <strong>{nombre}</strong>
       {alertCount > 0 ? <em>{alertCount}</em> : null}
     </button>
   );
 }
 
 function EntryListRow({
-  entry,
-  tags,
-  now,
-  selected,
+  entry: entree,
+  tags: etiquettes,
+  now: maintenant,
+  selected: selectionne,
   onClick,
 }: {
   entry: EntryRecord;
@@ -440,53 +453,53 @@ function EntryListRow({
   selected: boolean;
   onClick: () => void;
 }) {
-  const attention = isQualificationAttentionDue(entry, now);
-  const overdue = isAssignedOverdue(entry, now);
+  const attention = isQualificationAttentionDue(entree, maintenant);
+  const overdue = isAssignedOverdue(entree, maintenant);
   return (
     <button
       type="button"
-      className={`entriesListRow${selected ? " isSelected" : ""}${attention || overdue ? " isAlert" : ""}`}
+      className={`entriesListRow${selectionne ? " isSelected" : ""}${attention || overdue ? " isAlert" : ""}`}
       onClick={onClick}
     >
       <div className="entriesListRowTop">
-        <strong>{entry.rawText}</strong>
-        {entry.priority === "URGENT" ? (
+        <strong>{entree.rawText}</strong>
+        {entree.priority === "URGENT" ? (
           <span className="entriesBadge entriesBadgeUrgent">Urgent</span>
         ) : null}
         {attention ? <span className="entriesBadge entriesBadgeAlert">À remonter</span> : null}
         {overdue ? <span className="entriesBadge entriesBadgeAlert">En retard</span> : null}
       </div>
       <div className="entriesListTags">
-        {entryTagLabels(entry, tags).map((tag) => (
-          <span key={tag.id}>{tag.label}</span>
+        {entryTagLabels(entree, etiquettes).map((etiquette) => (
+          <span key={etiquette.id}>{etiquette.label}</span>
         ))}
       </div>
       <div className="entriesListMeta">
-        {entry.attachments.length > 0 ? (
+        {entree.attachments.length > 0 ? (
           <span>
-            <Paperclip size={12} /> {entry.attachments.length}
+            <Paperclip size={12} /> {entree.attachments.length}
           </span>
         ) : null}
-        {entry.status === "TO_QUALIFY" ? (
+        {entree.status === "TO_QUALIFY" ? (
           <span>
             <Clock3 size={12} />{" "}
-            {entry.snoozedUntilDate
-              ? attentionText(entry)
-              : `Créée ${formatDateTime(entry.createdAt)}`}
+            {entree.snoozedUntilDate
+              ? attentionText(entree)
+              : `Créée ${formatDateTime(entree.createdAt)}`}
           </span>
-        ) : entry.status === "ASSIGNED" ? (
+        ) : entree.status === "ASSIGNED" ? (
           <>
             <span>
-              <UserRound size={12} /> {entry.assigneeName}
+              <UserRound size={12} /> {entree.assigneeName}
             </span>
             <span>
-              <Clock3 size={12} /> {formatDateOnly(entry.dueDate)}
+              <Clock3 size={12} /> {formatDateOnly(entree.dueDate)}
             </span>
           </>
         ) : (
           <span>
             <Check size={12} /> Terminée{" "}
-            {entry.completedAt ? formatDateTime(entry.completedAt) : ""}
+            {entree.completedAt ? formatDateTime(entree.completedAt) : ""}
           </span>
         )}
       </div>
@@ -495,13 +508,13 @@ function EntryListRow({
 }
 
 function EntryDetail({
-  entry,
-  payload,
+  entry: entree,
+  payload: contenu,
   actorName,
   capabilities,
   suggestedAssignees,
   busy,
-  now,
+  now: maintenant,
   mutate,
   uploadAttachments,
   onOpenEntry,
@@ -515,20 +528,20 @@ function EntryDetail({
   now: Date;
   mutate: MutationFn;
   uploadAttachments: UploadFn;
-  onOpenEntry: (entryId: string) => void;
+  onOpenEntry: (idEntree: string) => void;
 }) {
-  const [description, setDescription] = useState(entry.structuredDescription ?? entry.rawText);
-  const nextAction = entry.nextAction ?? "";
-  const [tagIds, setTagIds] = useState(entry.tagIds);
+  const [description, setDescription] = useState(entree.structuredDescription ?? entree.rawText);
+  const nextAction = entree.nextAction ?? "";
+  const [tagIds, setTagIds] = useState(entree.tagIds);
   const [actionDrafts, setActionDrafts] = useState<NextActionDraft[]>(() => [
     {
-      id: `action-${entry.id}-1`,
-      text: entry.status === "TO_QUALIFY" ? (entry.nextAction ?? "") : "",
+      id: `action-${entree.id}-1`,
+      text: entree.status === "TO_QUALIFY" ? (entree.nextAction ?? "") : "",
       assigneeName: "",
       dueDate: "",
     },
   ]);
-  const [result, setResult] = useState(entry.result ?? "");
+  const [resultat, setResult] = useState(entree.result ?? "");
   const [snoozeDate, setSnoozeDate] = useState("");
   const [snoozeReason, setSnoozeReason] = useState("");
   const [postponeDate, setPostponeDate] = useState("");
@@ -539,30 +552,30 @@ function EntryDetail({
   const [detailTab, setDetailTab] = useState<EntryDetailTab>("INFO");
 
   const canActAssigned =
-    entry.status === "ASSIGNED" &&
-    Boolean(entry.assigneeName) &&
-    normalizePersonName(entry.assigneeName ?? "") === normalizePersonName(actorName);
-  const attentionDue = isQualificationAttentionDue(entry, now);
-  const overdue = isAssignedOverdue(entry, now);
-  const visibleTags = payload.tags
-    .filter((tag) => tag.active || tagIds.includes(tag.id))
+    entree.status === "ASSIGNED" &&
+    Boolean(entree.assigneeName) &&
+    normalizePersonName(entree.assigneeName ?? "") === normalizePersonName(actorName);
+  const attentionDue = isQualificationAttentionDue(entree, maintenant);
+  const overdue = isAssignedOverdue(entree, maintenant);
+  const visibleTags = contenu.tags
+    .filter((etiquette) => etiquette.active || tagIds.includes(etiquette.id))
     .sort((a, b) => a.sortOrder - b.sortOrder);
-  const latestReassignment = [...entry.history]
+  const latestReassignment = [...entree.history]
     .reverse()
-    .find((event) => event.type === "REASSIGNED");
+    .find((evenement) => evenement.type === "REASSIGNED");
 
   return (
     <div className="entriesDetail">
       <div className="entriesDetailHeader">
         <div className="entriesDetailBadges">
-          <StatusBadge entry={entry} now={now} />
-          {entry.priority === "URGENT" ? (
+          <StatusBadge entry={entree} now={maintenant} />
+          {entree.priority === "URGENT" ? (
             <span className="entriesBadge entriesBadgeUrgent">Urgent</span>
           ) : null}
         </div>
-        <h2>{entry.rawText}</h2>
+        <h2>{entree.rawText}</h2>
         <p>
-          Créée par {entry.createdByName} le {formatDateTime(entry.createdAt)}
+          Créée par {entree.createdByName} le {formatDateTime(entree.createdAt)}
         </p>
       </div>
 
@@ -587,7 +600,7 @@ function EntryDetail({
           onClick={() => setDetailTab("ATTACHMENTS")}
         >
           Pièces jointes
-          {entry.attachments.length > 0 ? <span>{entry.attachments.length}</span> : null}
+          {entree.attachments.length > 0 ? <span>{entree.attachments.length}</span> : null}
         </button>
         <button
           type="button"
@@ -602,33 +615,33 @@ function EntryDetail({
         <>
           <div className="entriesRawText">
             <span>Texte d'origine</span>
-            <p>{entry.rawText}</p>
+            <p>{entree.rawText}</p>
           </div>
 
-          {entry.parentEntryId ? (
+          {entree.parentEntryId ? (
             <button
               type="button"
               className="entriesLinkedButton"
-              onClick={() => onOpenEntry(entry.parentEntryId!)}
+              onClick={() => onOpenEntry(entree.parentEntryId!)}
             >
               Entrée d'origine
             </button>
           ) : null}
-          {entry.derivedEntryIds.length > 0 ? (
+          {entree.derivedEntryIds.length > 0 ? (
             <div className="entriesLinkedGroup">
               <span>
-                Entrée{entry.derivedEntryIds.length > 1 ? "s" : ""} dérivée
-                {entry.derivedEntryIds.length > 1 ? "s" : ""}
+                Entrée{entree.derivedEntryIds.length > 1 ? "s" : ""} dérivée
+                {entree.derivedEntryIds.length > 1 ? "s" : ""}
               </span>
-              {entry.derivedEntryIds.map((id, index) => (
+              {entree.derivedEntryIds.map((id, indice) => (
                 <button type="button" key={id} onClick={() => onOpenEntry(id)}>
-                  Ouvrir #{index + 1}
+                  Ouvrir #{indice + 1}
                 </button>
               ))}
             </div>
           ) : null}
 
-          {entry.status === "TO_QUALIFY" ? (
+          {entree.status === "TO_QUALIFY" ? (
             <>
               <section className="entriesDetailSection">
                 <div className="entriesSectionTitle">
@@ -637,21 +650,21 @@ function EntryDetail({
                 {capabilities.canQualify ? (
                   <>
                     <div className="entriesDetailTags">
-                      {visibleTags.map((tag) => (
+                      {visibleTags.map((etiquette) => (
                         <button
-                          key={tag.id}
+                          key={etiquette.id}
                           type="button"
-                          className={`entriesTagChoice${tagIds.includes(tag.id) ? " isSelected" : ""}`}
+                          className={`entriesTagChoice${tagIds.includes(etiquette.id) ? " isSelected" : ""}`}
                           onClick={() =>
-                            setTagIds((current) =>
-                              current.includes(tag.id)
-                                ? current.filter((id) => id !== tag.id)
-                                : [...current, tag.id],
+                            setTagIds((courant) =>
+                              courant.includes(etiquette.id)
+                                ? courant.filter((id) => id !== etiquette.id)
+                                : [...courant, etiquette.id],
                             )
                           }
                         >
-                          {tag.label}
-                          {!tag.active ? " (désactivé)" : ""}
+                          {etiquette.label}
+                          {!etiquette.active ? " (désactivé)" : ""}
                         </button>
                       ))}
                     </div>
@@ -660,7 +673,7 @@ function EntryDetail({
                       <textarea
                         rows={3}
                         value={description}
-                        onChange={(event) => setDescription(event.target.value)}
+                        onChange={(evenement) => setDescription(evenement.target.value)}
                       />
                     </label>
 
@@ -672,7 +685,7 @@ function EntryDetail({
                         void mutate(
                           {
                             action: "qualifyDraft",
-                            entryId: entry.id,
+                            entryId: entree.id,
                             description,
                             nextAction: "",
                             tagIds,
@@ -697,18 +710,18 @@ function EntryDetail({
                     <UserRound size={15} /> Actions suivantes
                   </div>
                   <div className="entriesNextActions">
-                    {actionDrafts.map((actionDraft, index) => (
+                    {actionDrafts.map((actionDraft, indice) => (
                       <div className="entriesNextActionCard" key={actionDraft.id}>
                         <div className="entriesNextActionHeader">
-                          <strong>Action suivante {index + 1}</strong>
+                          <strong>Action suivante {indice + 1}</strong>
                           {actionDrafts.length > 1 ? (
                             <button
                               type="button"
                               className="entriesIconButton"
                               title="Supprimer cette action"
                               onClick={() =>
-                                setActionDrafts((current) =>
-                                  current.filter((item) => item.id !== actionDraft.id),
+                                setActionDrafts((courant) =>
+                                  courant.filter((element) => element.id !== actionDraft.id),
                                 )
                               }
                             >
@@ -721,12 +734,12 @@ function EntryDetail({
                           <textarea
                             rows={2}
                             value={actionDraft.text}
-                            onChange={(event) =>
-                              setActionDrafts((current) =>
-                                current.map((item) =>
-                                  item.id === actionDraft.id
-                                    ? { ...item, text: event.target.value }
-                                    : item,
+                            onChange={(evenement) =>
+                              setActionDrafts((courant) =>
+                                courant.map((element) =>
+                                  element.id === actionDraft.id
+                                    ? { ...element, text: evenement.target.value }
+                                    : element,
                                 ),
                               )
                             }
@@ -737,14 +750,14 @@ function EntryDetail({
                           <label className="entriesField">
                             <span>Responsable</span>
                             <input
-                              list={`entry-assignees-${entry.id}`}
+                              list={`entry-assignees-${entree.id}`}
                               value={actionDraft.assigneeName}
-                              onChange={(event) =>
-                                setActionDrafts((current) =>
-                                  current.map((item) =>
-                                    item.id === actionDraft.id
-                                      ? { ...item, assigneeName: event.target.value }
-                                      : item,
+                              onChange={(evenement) =>
+                                setActionDrafts((courant) =>
+                                  courant.map((element) =>
+                                    element.id === actionDraft.id
+                                      ? { ...element, assigneeName: evenement.target.value }
+                                      : element,
                                   ),
                                 )
                               }
@@ -756,12 +769,12 @@ function EntryDetail({
                             <input
                               type="date"
                               value={actionDraft.dueDate}
-                              onChange={(event) =>
-                                setActionDrafts((current) =>
-                                  current.map((item) =>
-                                    item.id === actionDraft.id
-                                      ? { ...item, dueDate: event.target.value }
-                                      : item,
+                              onChange={(evenement) =>
+                                setActionDrafts((courant) =>
+                                  courant.map((element) =>
+                                    element.id === actionDraft.id
+                                      ? { ...element, dueDate: evenement.target.value }
+                                      : element,
                                   ),
                                 )
                               }
@@ -770,9 +783,9 @@ function EntryDetail({
                         </div>
                       </div>
                     ))}
-                    <datalist id={`entry-assignees-${entry.id}`}>
-                      {suggestedAssignees.map((name) => (
-                        <option value={name} key={name} />
+                    <datalist id={`entry-assignees-${entree.id}`}>
+                      {suggestedAssignees.map((nom) => (
+                        <option value={nom} key={nom} />
                       ))}
                     </datalist>
                     <button
@@ -780,8 +793,8 @@ function EntryDetail({
                       className="secondaryButton"
                       disabled={busy || actionDrafts.length >= 20}
                       onClick={() =>
-                        setActionDrafts((current) => [
-                          ...current,
+                        setActionDrafts((courant) => [
+                          ...courant,
                           {
                             id: crypto.randomUUID(),
                             text: "",
@@ -801,20 +814,23 @@ function EntryDetail({
                         !description.trim() ||
                         actionDrafts.length === 0 ||
                         actionDrafts.some(
-                          (item) => !item.text.trim() || !item.assigneeName.trim() || !item.dueDate,
+                          (element) =>
+                            !element.text.trim() ||
+                            !element.assigneeName.trim() ||
+                            !element.dueDate,
                         )
                       }
                       onClick={() =>
                         void mutate(
                           {
                             action: "qualifyActions",
-                            entryId: entry.id,
+                            entryId: entree.id,
                             description,
                             tagIds,
-                            actions: actionDrafts.map((item) => ({
-                              text: item.text,
-                              assigneeName: item.assigneeName,
-                              dueDate: item.dueDate,
+                            actions: actionDrafts.map((element) => ({
+                              text: element.text,
+                              assigneeName: element.assigneeName,
+                              dueDate: element.dueDate,
                             })),
                           },
                           `Note validée et ${actionDrafts.length} action${actionDrafts.length > 1 ? "s" : ""} créée${actionDrafts.length > 1 ? "s" : ""}.`,
@@ -829,8 +845,8 @@ function EntryDetail({
                     <span>Résultat facultatif</span>
                     <textarea
                       rows={2}
-                      value={result}
-                      onChange={(event) => setResult(event.target.value)}
+                      value={resultat}
+                      onChange={(evenement) => setResult(evenement.target.value)}
                     />
                   </label>
                   <button
@@ -839,7 +855,7 @@ function EntryDetail({
                     disabled={busy}
                     onClick={() =>
                       void mutate(
-                        { action: "qualifyDone", entryId: entry.id, result, tagIds },
+                        { action: "qualifyDone", entryId: entree.id, result: resultat, tagIds },
                         "Entrée traitée et terminée.",
                       )
                     }
@@ -864,14 +880,14 @@ function EntryDetail({
                       <input
                         type="date"
                         value={snoozeDate}
-                        onChange={(event) => setSnoozeDate(event.target.value)}
+                        onChange={(evenement) => setSnoozeDate(evenement.target.value)}
                       />
                     </label>
                     <label className="entriesField">
                       <span>Motif obligatoire</span>
                       <input
                         value={snoozeReason}
-                        onChange={(event) => setSnoozeReason(event.target.value)}
+                        onChange={(evenement) => setSnoozeReason(evenement.target.value)}
                       />
                     </label>
                   </div>
@@ -883,7 +899,7 @@ function EntryDetail({
                       void mutate(
                         {
                           action: "snooze",
-                          entryId: entry.id,
+                          entryId: entree.id,
                           untilDate: snoozeDate,
                           reason: snoozeReason,
                         },
@@ -905,7 +921,7 @@ function EntryDetail({
                   <textarea
                     rows={2}
                     value={derivedText}
-                    onChange={(event) => setDerivedText(event.target.value)}
+                    onChange={(evenement) => setDerivedText(evenement.target.value)}
                   />
                   <button
                     type="button"
@@ -913,7 +929,7 @@ function EntryDetail({
                     disabled={busy || !derivedText.trim()}
                     onClick={() =>
                       void mutate(
-                        { action: "derive", entryId: entry.id, rawText: derivedText },
+                        { action: "derive", entryId: entree.id, rawText: derivedText },
                         "Entrée liée créée.",
                       )
                     }
@@ -925,16 +941,16 @@ function EntryDetail({
             </>
           ) : null}
 
-          {entry.status === "ASSIGNED" ? (
+          {entree.status === "ASSIGNED" ? (
             <>
               <section className={`entriesAssignmentSummary${overdue ? " isOverdue" : ""}`}>
                 <div>
                   <span>Responsable</span>
-                  <strong>{entry.assigneeName}</strong>
+                  <strong>{entree.assigneeName}</strong>
                 </div>
                 <div>
                   <span>Échéance</span>
-                  <strong>{formatDateOnly(entry.dueDate)}</strong>
+                  <strong>{formatDateOnly(entree.dueDate)}</strong>
                 </div>
                 {overdue ? (
                   <div className="entriesOverdueLabel">
@@ -951,12 +967,12 @@ function EntryDetail({
                   </span>
                 </section>
               ) : null}
-              {entry.structuredDescription ? (
+              {entree.structuredDescription ? (
                 <section className="entriesDetailSection entriesCompactSection">
                   <strong>C'est quoi ?</strong>
-                  <p>{entry.structuredDescription}</p>
+                  <p>{entree.structuredDescription}</p>
                   <strong>J'en fais quoi ?</strong>
-                  <p>{entry.nextAction || "Non renseigné"}</p>
+                  <p>{entree.nextAction || "Non renseigné"}</p>
                 </section>
               ) : null}
               {canActAssigned ? (
@@ -965,18 +981,18 @@ function EntryDetail({
                     <Clock3 size={15} /> Mes actions
                   </div>
                   <div className="entriesNextActions">
-                    {actionDrafts.map((actionDraft, index) => (
+                    {actionDrafts.map((actionDraft, indice) => (
                       <div className="entriesNextActionCard" key={actionDraft.id}>
                         <div className="entriesNextActionHeader">
-                          <strong>Nouvelle action {index + 1}</strong>
+                          <strong>Nouvelle action {indice + 1}</strong>
                           {actionDrafts.length > 1 ? (
                             <button
                               type="button"
                               className="entriesIconButton"
                               title="Supprimer cette action"
                               onClick={() =>
-                                setActionDrafts((current) =>
-                                  current.filter((item) => item.id !== actionDraft.id),
+                                setActionDrafts((courant) =>
+                                  courant.filter((element) => element.id !== actionDraft.id),
                                 )
                               }
                             >
@@ -989,12 +1005,12 @@ function EntryDetail({
                           <textarea
                             rows={2}
                             value={actionDraft.text}
-                            onChange={(event) =>
-                              setActionDrafts((current) =>
-                                current.map((item) =>
-                                  item.id === actionDraft.id
-                                    ? { ...item, text: event.target.value }
-                                    : item,
+                            onChange={(evenement) =>
+                              setActionDrafts((courant) =>
+                                courant.map((element) =>
+                                  element.id === actionDraft.id
+                                    ? { ...element, text: evenement.target.value }
+                                    : element,
                                 ),
                               )
                             }
@@ -1005,14 +1021,14 @@ function EntryDetail({
                           <label className="entriesField">
                             <span>Responsable</span>
                             <input
-                              list={`entry-assigned-actions-${entry.id}`}
+                              list={`entry-assigned-actions-${entree.id}`}
                               value={actionDraft.assigneeName}
-                              onChange={(event) =>
-                                setActionDrafts((current) =>
-                                  current.map((item) =>
-                                    item.id === actionDraft.id
-                                      ? { ...item, assigneeName: event.target.value }
-                                      : item,
+                              onChange={(evenement) =>
+                                setActionDrafts((courant) =>
+                                  courant.map((element) =>
+                                    element.id === actionDraft.id
+                                      ? { ...element, assigneeName: evenement.target.value }
+                                      : element,
                                   ),
                                 )
                               }
@@ -1024,12 +1040,12 @@ function EntryDetail({
                             <input
                               type="date"
                               value={actionDraft.dueDate}
-                              onChange={(event) =>
-                                setActionDrafts((current) =>
-                                  current.map((item) =>
-                                    item.id === actionDraft.id
-                                      ? { ...item, dueDate: event.target.value }
-                                      : item,
+                              onChange={(evenement) =>
+                                setActionDrafts((courant) =>
+                                  courant.map((element) =>
+                                    element.id === actionDraft.id
+                                      ? { ...element, dueDate: evenement.target.value }
+                                      : element,
                                   ),
                                 )
                               }
@@ -1038,9 +1054,9 @@ function EntryDetail({
                         </div>
                       </div>
                     ))}
-                    <datalist id={`entry-assigned-actions-${entry.id}`}>
-                      {suggestedAssignees.map((name) => (
-                        <option value={name} key={name} />
+                    <datalist id={`entry-assigned-actions-${entree.id}`}>
+                      {suggestedAssignees.map((nom) => (
+                        <option value={nom} key={nom} />
                       ))}
                     </datalist>
                     <div className="buttonRow">
@@ -1049,8 +1065,8 @@ function EntryDetail({
                         className="secondaryButton"
                         disabled={busy || actionDrafts.length >= 20}
                         onClick={() =>
-                          setActionDrafts((current) => [
-                            ...current,
+                          setActionDrafts((courant) => [
+                            ...courant,
                             {
                               id: crypto.randomUUID(),
                               text: "",
@@ -1069,19 +1085,21 @@ function EntryDetail({
                           busy ||
                           actionDrafts.length === 0 ||
                           actionDrafts.some(
-                            (item) =>
-                              !item.text.trim() || !item.assigneeName.trim() || !item.dueDate,
+                            (element) =>
+                              !element.text.trim() ||
+                              !element.assigneeName.trim() ||
+                              !element.dueDate,
                           )
                         }
                         onClick={() =>
                           void mutate(
                             {
                               action: "assignedActions",
-                              entryId: entry.id,
-                              actions: actionDrafts.map((item) => ({
-                                text: item.text,
-                                assigneeName: item.assigneeName,
-                                dueDate: item.dueDate,
+                              entryId: entree.id,
+                              actions: actionDrafts.map((element) => ({
+                                text: element.text,
+                                assigneeName: element.assigneeName,
+                                dueDate: element.dueDate,
                               })),
                             },
                             `${actionDrafts.length} action${actionDrafts.length > 1 ? "s" : ""} créée${actionDrafts.length > 1 ? "s" : ""}. La tâche reste ouverte.`,
@@ -1108,8 +1126,8 @@ function EntryDetail({
                     <span>Résultat facultatif</span>
                     <textarea
                       rows={2}
-                      value={result}
-                      onChange={(event) => setResult(event.target.value)}
+                      value={resultat}
+                      onChange={(evenement) => setResult(evenement.target.value)}
                     />
                   </label>
                   <button
@@ -1118,7 +1136,7 @@ function EntryDetail({
                     disabled={busy}
                     onClick={() =>
                       void mutate(
-                        { action: "complete", entryId: entry.id, result },
+                        { action: "complete", entryId: entree.id, result: resultat },
                         "Action terminée.",
                       )
                     }
@@ -1132,14 +1150,14 @@ function EntryDetail({
                       <input
                         type="date"
                         value={postponeDate}
-                        onChange={(event) => setPostponeDate(event.target.value)}
+                        onChange={(evenement) => setPostponeDate(evenement.target.value)}
                       />
                     </label>
                     <label className="entriesField">
                       <span>Motif obligatoire</span>
                       <input
                         value={postponeReason}
-                        onChange={(event) => setPostponeReason(event.target.value)}
+                        onChange={(evenement) => setPostponeReason(evenement.target.value)}
                       />
                     </label>
                   </div>
@@ -1151,7 +1169,7 @@ function EntryDetail({
                       void mutate(
                         {
                           action: "postpone",
-                          entryId: entry.id,
+                          entryId: entree.id,
                           dueDate: postponeDate,
                           reason: postponeReason,
                         },
@@ -1166,13 +1184,13 @@ function EntryDetail({
                     <label className="entriesField">
                       <span>Nouveau responsable</span>
                       <input
-                        list={`reassign-${entry.id}`}
+                        list={`reassign-${entree.id}`}
                         value={newAssignee}
-                        onChange={(event) => setNewAssignee(event.target.value)}
+                        onChange={(evenement) => setNewAssignee(evenement.target.value)}
                       />
-                      <datalist id={`reassign-${entry.id}`}>
-                        {suggestedAssignees.map((name) => (
-                          <option value={name} key={name} />
+                      <datalist id={`reassign-${entree.id}`}>
+                        {suggestedAssignees.map((nom) => (
+                          <option value={nom} key={nom} />
                         ))}
                       </datalist>
                     </label>
@@ -1180,7 +1198,7 @@ function EntryDetail({
                       <span>Motif obligatoire</span>
                       <input
                         value={reassignReason}
-                        onChange={(event) => setReassignReason(event.target.value)}
+                        onChange={(evenement) => setReassignReason(evenement.target.value)}
                       />
                     </label>
                   </div>
@@ -1192,7 +1210,7 @@ function EntryDetail({
                       void mutate(
                         {
                           action: "reassign",
-                          entryId: entry.id,
+                          entryId: entree.id,
                           assigneeName: newAssignee,
                           reason: reassignReason,
                         },
@@ -1212,13 +1230,13 @@ function EntryDetail({
             </>
           ) : null}
 
-          {entry.status === "DONE" ? (
+          {entree.status === "DONE" ? (
             <section className="entriesDoneSummary">
               <CheckCircle2 size={22} />
               <div>
                 <strong>Terminée</strong>
-                <span>{entry.completedAt ? formatDateTime(entry.completedAt) : ""}</span>
-                {entry.result ? <p>{entry.result}</p> : null}
+                <span>{entree.completedAt ? formatDateTime(entree.completedAt) : ""}</span>
+                {entree.result ? <p>{entree.result}</p> : null}
               </div>
             </section>
           ) : null}
@@ -1226,23 +1244,23 @@ function EntryDetail({
       ) : null}
 
       {detailTab === "AFFAIR" ? (
-        <TaskCommercialBridge task={entry} description={description} nextAction={nextAction} />
+        <TaskCommercialBridge task={entree} description={description} nextAction={nextAction} />
       ) : null}
 
       {detailTab === "ATTACHMENTS" ? (
-        <EntryAttachments entry={entry} busy={busy} uploadAttachments={uploadAttachments} />
+        <EntryAttachments entry={entree} busy={busy} uploadAttachments={uploadAttachments} />
       ) : null}
 
       {detailTab === "HISTORY" ? (
         <section className="entriesHistory">
           <h3>Historique</h3>
-          {[...entry.history].reverse().map((event) => (
-            <div className="entriesHistoryRow" key={event.id}>
+          {[...entree.history].reverse().map((evenement) => (
+            <div className="entriesHistoryRow" key={evenement.id}>
               <span className="entriesHistoryDot" />
               <div>
-                <strong>{event.summary}</strong>
+                <strong>{evenement.summary}</strong>
                 <span>
-                  {event.actorName} · {formatDateTime(event.at)}
+                  {evenement.actorName} · {formatDateTime(evenement.at)}
                 </span>
               </div>
             </div>
@@ -1254,7 +1272,7 @@ function EntryDetail({
 }
 
 function EntryAttachments({
-  entry,
+  entry: entree,
   busy,
   uploadAttachments,
 }: {
@@ -1268,22 +1286,22 @@ function EntryAttachments({
     <section className="entriesDetailSection entriesAttachmentsSection">
       <div className="entriesSectionTitle">
         <Paperclip size={15} /> Pièces jointes{" "}
-        <span className="entriesAttachmentCount">{entry.attachments.length}</span>
+        <span className="entriesAttachmentCount">{entree.attachments.length}</span>
       </div>
-      {entry.attachments.length === 0 ? (
+      {entree.attachments.length === 0 ? (
         <p className="entriesAttachmentEmpty">
           Aucune pièce jointe. Les originaux sont conservés dans le stockage PAPOT.
         </p>
       ) : (
         <div className="entriesAttachmentList">
-          {entry.attachments.map((attachment) => (
+          {entree.attachments.map((pieceJointe) => (
             <AttachmentRow
-              key={attachment.id}
-              entryId={entry.id}
-              attachment={attachment}
-              preview={previewId === attachment.id}
+              key={pieceJointe.id}
+              entryId={entree.id}
+              attachment={pieceJointe}
+              preview={previewId === pieceJointe.id}
               onPreview={() =>
-                setPreviewId((current) => (current === attachment.id ? null : attachment.id))
+                setPreviewId((courant) => (courant === pieceJointe.id ? null : pieceJointe.id))
               }
             />
           ))}
@@ -1302,7 +1320,7 @@ function EntryAttachments({
             className="primaryButton"
             disabled={busy}
             onClick={() =>
-              void uploadAttachments(entry.id, pending).then((ok) => {
+              void uploadAttachments(entree.id, pending).then((ok) => {
                 if (ok) setPending([]);
               })
             }
@@ -1317,9 +1335,9 @@ function EntryAttachments({
 }
 
 function AttachmentRow({
-  entryId,
-  attachment,
-  preview,
+  entryId: idEntree,
+  attachment: pieceJointe,
+  preview: apercu,
   onPreview,
 }: {
   entryId: string;
@@ -1327,9 +1345,9 @@ function AttachmentRow({
   preview: boolean;
   onPreview: () => void;
 }) {
-  const url = `/api/desktop/entries/${entryId}/attachments/${attachment.id}`;
-  const isImage = attachment.contentType.startsWith("image/");
-  const isPdf = attachment.contentType === "application/pdf";
+  const url = `/api/desktop/entries/${idEntree}/attachments/${pieceJointe.id}`;
+  const isImage = pieceJointe.contentType.startsWith("image/");
+  const isPdf = pieceJointe.contentType === "application/pdf";
   return (
     <div className="entriesAttachmentRow">
       {isImage ? (
@@ -1338,7 +1356,7 @@ function AttachmentRow({
           className="entriesAttachmentThumbnail"
           onClick={onPreview}
           title="Voir l’image en grand"
-          aria-label={`Voir ${attachment.fileName} en grand`}
+          aria-label={`Voir ${pieceJointe.fileName} en grand`}
         >
           <img src={url} alt="" />
         </button>
@@ -1348,10 +1366,10 @@ function AttachmentRow({
         </div>
       )}
       <div className="entriesAttachmentMeta">
-        <strong title={attachment.fileName}>{attachment.fileName}</strong>
+        <strong title={pieceJointe.fileName}>{pieceJointe.fileName}</strong>
         <span>
-          {formatBytes(attachment.sizeBytes)} · ajouté par {attachment.uploadedByName} le{" "}
-          {formatDateTime(attachment.uploadedAt)}
+          {formatBytes(pieceJointe.sizeBytes)} · ajouté par {pieceJointe.uploadedByName} le{" "}
+          {formatDateTime(pieceJointe.uploadedAt)}
         </span>
       </div>
       {isPdf ? (
@@ -1372,21 +1390,24 @@ function AttachmentRow({
         className="entriesIconButton"
         title="Télécharger"
         href={`${url}?download=1`}
-        download={attachment.fileName}
+        download={pieceJointe.fileName}
       >
         <Download size={16} />
       </a>
-      {preview && isImage ? (
+      {apercu && isImage ? (
         <div
           className="entriesImageLightbox"
           role="dialog"
           aria-modal="true"
-          aria-label={`Aperçu de ${attachment.fileName}`}
+          aria-label={`Aperçu de ${pieceJointe.fileName}`}
           onClick={onPreview}
         >
-          <div className="entriesImageLightboxContent" onClick={(event) => event.stopPropagation()}>
+          <div
+            className="entriesImageLightboxContent"
+            onClick={(evenement) => evenement.stopPropagation()}
+          >
             <div className="entriesImageLightboxHeader">
-              <strong>{attachment.fileName}</strong>
+              <strong>{pieceJointe.fileName}</strong>
               <button
                 type="button"
                 className="entriesIconButton"
@@ -1396,12 +1417,12 @@ function AttachmentRow({
                 <X size={16} />
               </button>
             </div>
-            <img src={url} alt={attachment.fileName} />
+            <img src={url} alt={pieceJointe.fileName} />
           </div>
         </div>
-      ) : preview && isPdf ? (
+      ) : apercu && isPdf ? (
         <div className="entriesAttachmentPreview">
-          <iframe title={attachment.fileName} src={url} />
+          <iframe title={pieceJointe.fileName} src={url} />
         </div>
       ) : null}
     </div>
@@ -1409,14 +1430,14 @@ function AttachmentRow({
 }
 
 function FilePicker({
-  label,
-  files,
+  label: libelle,
+  files: fichiers,
   onChange,
-  disabled,
+  disabled: desactive,
 }: {
   label: string;
   files: File[];
-  onChange: (files: File[]) => void;
+  onChange: (fichiers: File[]) => void;
   disabled: boolean;
 }) {
   const ref = useRef<HTMLInputElement>(null);
@@ -1427,57 +1448,57 @@ function FilePicker({
         className="entriesFileInput"
         type="file"
         multiple
-        disabled={disabled}
-        onChange={(event) => {
-          const selected = Array.from(event.target.files ?? []);
-          onChange([...files, ...selected].slice(0, 12));
-          event.currentTarget.value = "";
+        disabled={desactive}
+        onChange={(evenement) => {
+          const selectionne = Array.from(evenement.target.files ?? []);
+          onChange([...fichiers, ...selectionne].slice(0, 12));
+          evenement.currentTarget.value = "";
         }}
       />
       <button
         type="button"
         className="entriesFileButton"
-        disabled={disabled}
+        disabled={desactive}
         onClick={() => ref.current?.click()}
       >
-        <Paperclip size={14} /> {label}
-        {files.length > 0 ? ` (${files.length})` : ""}
+        <Paperclip size={14} /> {libelle}
+        {fichiers.length > 0 ? ` (${fichiers.length})` : ""}
       </button>
     </>
   );
 }
 
 function PendingFiles({
-  files,
+  files: fichiers,
   onChange,
   compact = false,
 }: {
   files: File[];
-  onChange: (files: File[]) => void;
+  onChange: (fichiers: File[]) => void;
   compact?: boolean;
 }) {
   return (
     <div className={`entriesPendingFiles${compact ? " isCompact" : ""}`}>
-      {files.map((file, index) => (
+      {fichiers.map((fichier, indice) => (
         <PendingFile
-          key={`${file.name}-${file.lastModified}-${index}`}
-          file={file}
-          onRemove={() => onChange(files.filter((_, fileIndex) => fileIndex !== index))}
+          key={`${fichier.name}-${fichier.lastModified}-${indice}`}
+          file={fichier}
+          onRemove={() => onChange(fichiers.filter((_, fileIndex) => fileIndex !== indice))}
         />
       ))}
     </div>
   );
 }
 
-function PendingFile({ file, onRemove }: { file: File; onRemove: () => void }) {
+function PendingFile({ file: fichier, onRemove }: { file: File; onRemove: () => void }) {
   const [url, setUrl] = useState<string | null>(null);
-  const image = file.type.startsWith("image/");
+  const image = fichier.type.startsWith("image/");
   useEffect(() => {
     if (!image) return;
-    const next = URL.createObjectURL(file);
-    setUrl(next);
-    return () => URL.revokeObjectURL(next);
-  }, [file, image]);
+    const suivant = URL.createObjectURL(fichier);
+    setUrl(suivant);
+    return () => URL.revokeObjectURL(suivant);
+  }, [fichier, image]);
   return (
     <div className="entriesPendingFile">
       {image && url ? (
@@ -1488,8 +1509,8 @@ function PendingFile({ file, onRemove }: { file: File; onRemove: () => void }) {
         </span>
       )}
       <div>
-        <strong>{file.name}</strong>
-        <span>{formatBytes(file.size)}</span>
+        <strong>{fichier.name}</strong>
+        <span>{formatBytes(fichier.size)}</span>
       </div>
       <button type="button" title="Retirer" onClick={onRemove}>
         <X size={15} />
@@ -1498,16 +1519,16 @@ function PendingFile({ file, onRemove }: { file: File; onRemove: () => void }) {
   );
 }
 
-function StatusBadge({ entry, now }: { entry: EntryRecord; now: Date }) {
-  if (entry.status === "DONE")
+function StatusBadge({ entry: entree, now: maintenant }: { entry: EntryRecord; now: Date }) {
+  if (entree.status === "DONE")
     return <span className="entriesBadge entriesBadgeDone">Terminée</span>;
-  if (entry.status === "ASSIGNED")
-    return isAssignedOverdue(entry, now) ? (
+  if (entree.status === "ASSIGNED")
+    return isAssignedOverdue(entree, maintenant) ? (
       <span className="entriesBadge entriesBadgeAlert">En retard</span>
     ) : (
       <span className="entriesBadge entriesBadgeAssigned">Affectée</span>
     );
-  return isQualificationAttentionDue(entry, now) ? (
+  return isQualificationAttentionDue(entree, maintenant) ? (
     <span className="entriesBadge entriesBadgeAlert">À remonter</span>
   ) : (
     <span className="entriesBadge entriesBadgeQualify">À qualifier</span>

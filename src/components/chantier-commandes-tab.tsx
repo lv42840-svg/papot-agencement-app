@@ -17,21 +17,21 @@ const statusLabel = {
 } as const;
 
 export function ChantierCommandesTab({ chantierId }: { chantierId: string }) {
-  const [payload, setPayload] = useState<PurchaseOrdersPayload | null>(null);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState("");
-  const [search, setSearch] = useState("");
-  const [status, setStatus] = useState("ALL");
+  const [contenu, setPayload] = useState<PurchaseOrdersPayload | null>(null);
+  const [chargement, setLoading] = useState(true);
+  const [erreur, setError] = useState("");
+  const [recherche, setSearch] = useState("");
+  const [statut, setStatus] = useState("ALL");
 
   const load = useCallback(async () => {
     setLoading(true);
     setError("");
     try {
-      const response = await fetch("/api/desktop/purchases", { cache: "no-store" });
-      if (!response.ok) throw new Error("PURCHASES_UNAVAILABLE");
-      const result = (await response.json()) as { payload?: PurchaseOrdersPayload };
-      if (!result.payload) throw new Error("PURCHASES_UNAVAILABLE");
-      setPayload(result.payload);
+      const reponse = await fetch("/api/desktop/purchases", { cache: "no-store" });
+      if (!reponse.ok) throw new Error("PURCHASES_UNAVAILABLE");
+      const resultat = (await reponse.json()) as { payload?: PurchaseOrdersPayload };
+      if (!resultat.payload) throw new Error("PURCHASES_UNAVAILABLE");
+      setPayload(resultat.payload);
     } catch {
       setError("Impossible de charger les bons de commande. Vérifie tes droits de lecture Achats.");
       setPayload(null);
@@ -47,29 +47,29 @@ export function ChantierCommandesTab({ chantierId }: { chantierId: string }) {
   const history = useMemo(
     () =>
       purchaseOrderHistoryForChantier(
-        payload ?? { schemaVersion: 1, nextNumber: 1, orders: [] },
+        contenu ?? { schemaVersion: 1, nextNumber: 1, orders: [] },
         chantierId,
       ).sort((a, b) => b.order.createdAt.localeCompare(a.order.createdAt)),
-    [payload, chantierId],
+    [contenu, chantierId],
   );
 
-  const filtered = history.filter(({ order, state }) => {
-    if (status !== "ALL" && status !== state) return false;
-    const needle = search.trim().toLocaleLowerCase("fr-FR");
+  const filtered = history.filter(({ order: commande, state: etat }) => {
+    if (statut !== "ALL" && statut !== etat) return false;
+    const needle = recherche.trim().toLocaleLowerCase("fr-FR");
     if (!needle) return true;
     return [
-      order.reference,
-      order.supplierName,
-      order.description,
-      ...order.lines.map((line) => line.description),
+      commande.reference,
+      commande.supplierName,
+      commande.description,
+      ...commande.lines.map((ligne) => ligne.description),
     ]
       .join(" ")
       .toLocaleLowerCase("fr-FR")
       .includes(needle);
   });
 
-  const committed = history.filter(({ state }) => state === "COMMITTED");
-  const committedHtCents = committed.reduce((sum, item) => sum + item.amountHtCents, 0);
+  const committed = history.filter(({ state: etat }) => etat === "COMMITTED");
+  const committedHtCents = committed.reduce((somme, element) => somme + element.amountHtCents, 0);
   const actions = `/achats?chantierId=${encodeURIComponent(chantierId)}`;
 
   return (
@@ -94,7 +94,7 @@ export function ChantierCommandesTab({ chantierId }: { chantierId: string }) {
           <button
             className="secondaryButton"
             type="button"
-            disabled={loading}
+            disabled={chargement}
             onClick={() => void load()}
           >
             Actualiser
@@ -111,9 +111,9 @@ export function ChantierCommandesTab({ chantierId }: { chantierId: string }) {
         <strong>Facture fournisseur :</strong> rapprochement Pennylane à venir. Aucun lien ni statut
         comptable n&apos;est encore disponible dans PAPOT.
       </p>
-      {error ? <p role="alert">{error}</p> : null}
-      {loading ? <p>Chargement des commandes…</p> : null}
-      {!loading && payload && (
+      {erreur ? <p role="alert">{erreur}</p> : null}
+      {chargement ? <p>Chargement des commandes…</p> : null}
+      {!chargement && contenu && (
         <>
           <div style={{ display: "flex", gap: 20, flexWrap: "wrap" }}>
             <div>
@@ -129,15 +129,15 @@ export function ChantierCommandesTab({ chantierId }: { chantierId: string }) {
           <div style={{ display: "flex", gap: 10, flexWrap: "wrap" }}>
             <input
               aria-label="Rechercher les commandes du chantier"
-              value={search}
-              onChange={(event) => setSearch(event.target.value)}
+              value={recherche}
+              onChange={(evenement) => setSearch(evenement.target.value)}
               placeholder="Référence, fournisseur, article…"
               style={{ minWidth: 220, flex: "2 1 220px" }}
             />
             <select
               aria-label="Filtrer les commandes par statut"
-              value={status}
-              onChange={(event) => setStatus(event.target.value)}
+              value={statut}
+              onChange={(evenement) => setStatus(evenement.target.value)}
               style={{ flex: "1 1 170px" }}
             >
               <option value="ALL">Tous les statuts</option>
@@ -166,20 +166,20 @@ export function ChantierCommandesTab({ chantierId }: { chantierId: string }) {
                   </tr>
                 </thead>
                 <tbody>
-                  {filtered.map(({ order, amountHtCents, state, removedAt }) => (
-                    <tr key={order.id} style={{ borderBottom: "1px solid #ece8f0" }}>
+                  {filtered.map(({ order: commande, amountHtCents, state: etat, removedAt }) => (
+                    <tr key={commande.id} style={{ borderBottom: "1px solid #ece8f0" }}>
                       <td style={{ padding: 8, whiteSpace: "nowrap" }}>
-                        <strong>{order.reference}</strong>
+                        <strong>{commande.reference}</strong>
                       </td>
                       <td style={{ padding: 8, whiteSpace: "nowrap" }}>
-                        {new Date(order.createdAt).toLocaleDateString("fr-FR")}
+                        {new Date(commande.createdAt).toLocaleDateString("fr-FR")}
                       </td>
-                      <td style={{ padding: 8 }}>{order.supplierName}</td>
+                      <td style={{ padding: 8 }}>{commande.supplierName}</td>
                       <td style={{ padding: 8 }}>
-                        {order.mode === "QUICK" ? "Rapide" : "Détaillé"}
+                        {commande.mode === "QUICK" ? "Rapide" : "Détaillé"}
                       </td>
                       <td style={{ padding: 8 }}>
-                        {statusLabel[state]}
+                        {statusLabel[etat]}
                         {removedAt ? (
                           <div style={{ fontSize: 11 }}>
                             {new Date(removedAt).toLocaleDateString("fr-FR")}
@@ -188,27 +188,27 @@ export function ChantierCommandesTab({ chantierId }: { chantierId: string }) {
                       </td>
                       <td style={{ padding: 8, textAlign: "right", whiteSpace: "nowrap" }}>
                         <strong>{euros(amountHtCents)}</strong>
-                        {order.allocations && order.allocations.length > 1 ? (
+                        {commande.allocations && commande.allocations.length > 1 ? (
                           <div style={{ fontSize: 11 }}>
-                            BC global : {euros(order.amountHtCents)}
+                            BC global : {euros(commande.amountHtCents)}
                           </div>
                         ) : null}
                       </td>
                       <td style={{ padding: 8 }}>À raccorder (Pennylane)</td>
                       <td style={{ padding: 8 }}>
                         <div style={{ display: "grid", gap: 6 }}>
-                          {order.mode === "DETAILED" ? (
+                          {commande.mode === "DETAILED" ? (
                             <a
                               className="secondaryButton"
-                              href={`/api/desktop/purchases/${encodeURIComponent(order.id)}/pdf`}
+                              href={`/api/desktop/purchases/${encodeURIComponent(commande.id)}/pdf`}
                             >
                               Télécharger le PDF
                             </a>
                           ) : null}
-                          {state === "COMMITTED" && !order.removedAllocations?.length ? (
+                          {etat === "COMMITTED" && !commande.removedAllocations?.length ? (
                             <Link
                               className="secondaryButton"
-                              href={`/achats/${encodeURIComponent(order.id)}/modifier`}
+                              href={`/achats/${encodeURIComponent(commande.id)}/modifier`}
                             >
                               Modifier le BC
                             </Link>
@@ -216,22 +216,24 @@ export function ChantierCommandesTab({ chantierId }: { chantierId: string }) {
                           <details>
                             <summary>Voir le BC</summary>
                             <div style={{ minWidth: 260, paddingTop: 7 }}>
-                              {order.description ? <p>{order.description}</p> : null}
-                              {order.mode === "DETAILED" ? (
+                              {commande.description ? <p>{commande.description}</p> : null}
+                              {commande.mode === "DETAILED" ? (
                                 <ul>
-                                  {order.lines.map((line) => (
-                                    <li key={line.id}>
-                                      {line.description} : {line.quantity} {line.unit} ×{" "}
-                                      {euros(line.unitPriceHtCents)} ={" "}
-                                      {euros(Math.round(line.quantity * line.unitPriceHtCents))}
+                                  {commande.lines.map((ligne) => (
+                                    <li key={ligne.id}>
+                                      {ligne.description} : {ligne.quantity} {ligne.unit} ×{" "}
+                                      {euros(ligne.unitPriceHtCents)} ={" "}
+                                      {euros(Math.round(ligne.quantity * ligne.unitPriceHtCents))}
                                     </li>
                                   ))}
                                 </ul>
                               ) : (
                                 <p>BC rapide, montant global HT réparti par destination.</p>
                               )}
-                              {order.allocations && order.allocations.length > 1 ? (
-                                <p>{order.allocations.length} destinations dans cette commande.</p>
+                              {commande.allocations && commande.allocations.length > 1 ? (
+                                <p>
+                                  {commande.allocations.length} destinations dans cette commande.
+                                </p>
                               ) : null}
                             </div>
                           </details>

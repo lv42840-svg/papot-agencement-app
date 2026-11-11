@@ -18,8 +18,8 @@ function formatMoney(cents: number): string {
   return moneyFormatter.format(cents / 100);
 }
 
-function formatPercent(value: number | null): string {
-  return value === null ? "n/c" : `${percentFormatter.format(value)} %`;
+function formatPercent(valeur: number | null): string {
+  return valeur === null ? "n/c" : `${percentFormatter.format(valeur)} %`;
 }
 
 function discountLabel(quote: NativeQuoteRecord): string | null {

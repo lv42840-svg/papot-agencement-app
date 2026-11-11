@@ -22,14 +22,14 @@ type MonthlyPosition = {
   canReadPayroll: boolean;
 };
 
-const money = (value: number | null | undefined) =>
-  value == null
+const money = (valeur: number | null | undefined) =>
+  valeur == null
     ? "Non disponible"
-    : (value / 100).toLocaleString("fr-FR", { style: "currency", currency: "EUR" });
-const hours = (value: number | undefined) =>
-  value === undefined
+    : (valeur / 100).toLocaleString("fr-FR", { style: "currency", currency: "EUR" });
+const heures = (valeur: number | undefined) =>
+  valeur === undefined
     ? "Non disponible"
-    : `${value.toLocaleString("fr-FR", { maximumFractionDigits: 2 })} h`;
+    : `${valeur.toLocaleString("fr-FR", { maximumFractionDigits: 2 })} h`;
 
 export function EnterpriseFinanceTabs({ chantierView }: { chantierView: ReactNode }) {
   const [tab, setTab] = useState<"monthly" | "chantiers">("monthly");
@@ -72,61 +72,61 @@ export function EnterpriseFinanceTabs({ chantierView }: { chantierView: ReactNod
 }
 
 function MonthlyCompanyPosition() {
-  const [month, setMonth] = useState(() => parisCurrentMonth());
+  const [mois, setMonth] = useState(() => parisCurrentMonth());
   const [revision, setRevision] = useState(0);
-  const [data, setData] = useState<MonthlyPosition | null>(null);
-  const [error, setError] = useState<{ month: string; text: string } | null>(null);
+  const [donnees, setData] = useState<MonthlyPosition | null>(null);
+  const [erreur, setError] = useState<{ month: string; text: string } | null>(null);
   useEffect(() => {
     const controller = new AbortController();
     void (async () => {
       try {
-        const response = await fetch(
-          `/api/desktop/pilotage/monthly-position?month=${encodeURIComponent(month)}`,
+        const reponse = await fetch(
+          `/api/desktop/pilotage/monthly-position?month=${encodeURIComponent(mois)}`,
           { cache: "no-store", signal: controller.signal },
         );
-        if (!response.ok)
+        if (!reponse.ok)
           throw new Error("Situation mensuelle indisponible. Vérifie tes droits puis actualise.");
-        const result = (await response.json()) as MonthlyPosition;
+        const resultat = (await reponse.json()) as MonthlyPosition;
         if (!controller.signal.aborted) {
-          setData(result);
+          setData(resultat);
           setError(null);
         }
       } catch (cause) {
         if (!controller.signal.aborted) {
           setData(null);
           setError({
-            month,
+            month: mois,
             text: cause instanceof Error ? cause.message : "Chargement impossible.",
           });
         }
       }
     })();
     return () => controller.abort();
-  }, [month, revision]);
-  const current = data?.month === month ? data : null;
-  const activeError = error?.month === month ? error.text : null;
-  const financial = current?.financial;
-  const rows = current
+  }, [mois, revision]);
+  const courant = donnees?.month === mois ? donnees : null;
+  const activeError = erreur?.month === mois ? erreur.text : null;
+  const financial = courant?.financial;
+  const lignesTableau = courant
     ? [
         {
           label: "Chantiers, y compris fermés, archivés et annulés",
-          consumption: current.consumption?.chantier,
-          commitment: current.commitments?.chantierCents,
+          consumption: courant.consumption?.chantier,
+          commitment: courant.commitments?.chantierCents,
         },
         {
           label: "SAV",
-          consumption: current.consumption?.sav,
-          commitment: current.commitments?.savCents,
+          consumption: courant.consumption?.sav,
+          commitment: courant.commitments?.savCents,
         },
         {
           label: "Frais généraux",
-          consumption: current.consumption?.generalExpenses,
-          commitment: current.commitments?.generalExpensesCents,
+          consumption: courant.consumption?.generalExpenses,
+          commitment: courant.commitments?.generalExpensesCents,
         },
         {
           label: "Total unique",
-          consumption: current.consumption?.total,
-          commitment: current.commitments?.totalCents,
+          consumption: courant.consumption?.total,
+          commitment: courant.commitments?.totalCents,
         },
       ]
     : [];
@@ -146,24 +146,24 @@ function MonthlyCompanyPosition() {
             type="month"
             min="2000-01"
             max="2100-12"
-            value={month}
-            onChange={(event) => {
-              if (/^(20\d{2}|2100)-(0[1-9]|1[0-2])$/.test(event.target.value))
-                setMonth(event.target.value);
+            value={mois}
+            onChange={(evenement) => {
+              if (/^(20\d{2}|2100)-(0[1-9]|1[0-2])$/.test(evenement.target.value))
+                setMonth(evenement.target.value);
             }}
           />
         </label>
         <button
           type="button"
           className="secondaryButton"
-          onClick={() => setRevision((value) => value + 1)}
+          onClick={() => setRevision((valeur) => valeur + 1)}
         >
           Actualiser
         </button>
       </div>
       {activeError ? <p role="alert">{activeError}</p> : null}
-      {!current && !activeError ? <p>Chargement…</p> : null}
-      {current && financial ? (
+      {!courant && !activeError ? <p>Chargement…</p> : null}
+      {courant && financial ? (
         <>
           {!financial.complete ? (
             <p role="status">
@@ -185,13 +185,13 @@ function MonthlyCompanyPosition() {
               ["Charges fournisseurs nettes HT", financial.supplierExpenseCents],
               ["Coût total du personnel validé", financial.payrollExpenseCents],
               ["Résultat mensuel facturé", financial.resultCents],
-            ].map(([label, value]) => (
+            ].map(([libelle, valeur]) => (
               <article
-                key={String(label)}
+                key={String(libelle)}
                 style={{ background: "white", borderRadius: 12, padding: 18 }}
               >
-                <h2 style={{ fontSize: 16 }}>{label}</h2>
-                <strong style={{ fontSize: 22 }}>{money(value as number | null)}</strong>
+                <h2 style={{ fontSize: 16 }}>{libelle}</h2>
+                <strong style={{ fontSize: 22 }}>{money(valeur as number | null)}</strong>
               </article>
             ))}
           </section>
@@ -210,14 +210,16 @@ function MonthlyCompanyPosition() {
                   </tr>
                 </thead>
                 <tbody>
-                  {rows.map((row) => (
-                    <tr key={row.label} style={{ borderBottom: "1px solid #eee" }}>
+                  {lignesTableau.map((ligneTableau) => (
+                    <tr key={ligneTableau.label} style={{ borderBottom: "1px solid #eee" }}>
                       <th scope="row" style={{ padding: 12, textAlign: "left" }}>
-                        {row.label}
+                        {ligneTableau.label}
                       </th>
-                      <td style={{ padding: 12 }}>{hours(row.consumption?.hours)}</td>
-                      <td style={{ padding: 12 }}>{money(row.consumption?.valuedCostCents)}</td>
-                      <td style={{ padding: 12 }}>{money(row.commitment)}</td>
+                      <td style={{ padding: 12 }}>{heures(ligneTableau.consumption?.hours)}</td>
+                      <td style={{ padding: 12 }}>
+                        {money(ligneTableau.consumption?.valuedCostCents)}
+                      </td>
+                      <td style={{ padding: 12 }}>{money(ligneTableau.commitment)}</td>
                     </tr>
                   ))}
                 </tbody>
@@ -228,34 +230,34 @@ function MonthlyCompanyPosition() {
               Les engagements représentent les commandes actuellement actives, pas les factures du
               mois. Ces montants ne s’ajoutent pas une seconde fois au résultat facturé.
             </p>
-            {current.consumption?.provisional ? (
+            {courant.consumption?.provisional ? (
               <p>Coût horaire du mois en cours : valeur provisoire du mois précédent.</p>
             ) : null}
-            {current.consumption?.estimatedMonthSplit ? (
+            {courant.consumption?.estimatedMonthSplit ? (
               <p>
                 Semaines à cheval sur deux mois : ventilation estimée selon les horaires habituels,
                 sans modifier les heures saisies.
               </p>
             ) : null}
-            {current.canReadPayroll && (current.consumption?.total.unvaluedHours ?? 0) > 0 ? (
+            {courant.canReadPayroll && (courant.consumption?.total.unvaluedHours ?? 0) > 0 ? (
               <p>
-                {hours(current.consumption?.total.unvaluedHours)} sans coût mensuel disponible. Le
+                {heures(courant.consumption?.total.unvaluedHours)} sans coût mensuel disponible. Le
                 total de valorisation reste indisponible.
               </p>
             ) : null}
-            {!current.canReadPayroll ? (
+            {!courant.canReadPayroll ? (
               <p>Valorisation salariale masquée : accès Planning et Paie requis.</p>
             ) : null}
-            {!current.canReadPlanning ? (
+            {!courant.canReadPlanning ? (
               <p>Heures non consultables : droit Planning requis.</p>
             ) : null}
-            {!current.canReadPurchases ? (
+            {!courant.canReadPurchases ? (
               <p>Engagements non consultables : droit Achats requis.</p>
             ) : null}
           </section>
           <small>
             Lecture des données PAPOT :{" "}
-            {new Date(current.asOf).toLocaleString("fr-FR", { timeZone: "Europe/Paris" })}. Ce n’est
+            {new Date(courant.asOf).toLocaleString("fr-FR", { timeZone: "Europe/Paris" })}. Ce n’est
             pas une synchronisation Pennylane.
           </small>
         </>

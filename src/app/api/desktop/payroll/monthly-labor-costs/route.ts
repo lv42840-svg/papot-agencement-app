@@ -22,12 +22,12 @@ import {
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
-function failure(error: unknown) {
+function failure(erreur: unknown) {
   const code =
-    error instanceof ZodError
+    erreur instanceof ZodError
       ? "MONTHLY_LABOR_COST_INVALID"
-      : error instanceof Error
-        ? error.message
+      : erreur instanceof Error
+        ? erreur.message
         : "MONTHLY_LABOR_COST_FAILED";
   return NextResponse.json(
     { error: code },
@@ -43,120 +43,122 @@ function failure(error: unknown) {
   );
 }
 
-async function snapshot(month: string, editable: boolean) {
+async function snapshot(mois: string, editable: boolean) {
   const [planning, auth, ledger] = await Promise.all([
     createPlanningRepository().load(),
     readAuthPayload(),
     readMonthlyLaborCosts(),
   ]);
-  const people = effectivePlanningPeople(planning, auth.users);
-  const byId = new Map(people.map((person) => [person.userId, person.displayName]));
-  const registeredIds = new Set(ledger.records.map((item) => item.personId));
-  for (const user of auth.users)
-    if (registeredIds.has(user.id) && !byId.has(user.id)) byId.set(user.id, user.displayName);
+  const personnes = effectivePlanningPeople(planning, auth.users);
+  const parId = new Map(personnes.map((personne) => [personne.userId, personne.displayName]));
+  const registeredIds = new Set(ledger.records.map((element) => element.personId));
+  for (const utilisateur of auth.users)
+    if (registeredIds.has(utilisateur.id) && !parId.has(utilisateur.id))
+      parId.set(utilisateur.id, utilisateur.displayName);
   for (const staff of planning.staff)
-    if (registeredIds.has(staff.id) && !byId.has(staff.id))
-      byId.set(staff.id, staff.firstName + " " + staff.lastName);
+    if (registeredIds.has(staff.id) && !parId.has(staff.id))
+      parId.set(staff.id, staff.firstName + " " + staff.lastName);
   return {
-    month,
+    month: mois,
     editRevisions: ledger.editRevisions ?? {},
-    editHistory: (ledger.editHistory ?? []).filter((entry) => entry.key.startsWith(month + ":")),
+    editHistory: (ledger.editHistory ?? []).filter((entree) => entree.key.startsWith(mois + ":")),
     editable,
-    people: [...byId]
-      .map(([id, name]) => ({
+    people: [...parId]
+      .map(([id, nom]) => ({
         id,
-        name,
-        holdingHours: holdingRecordedHoursForMonth(month, id, planning, people),
+        name: nom,
+        holdingHours: holdingRecordedHoursForMonth(mois, id, planning, personnes),
       }))
       .sort((a, b) => a.name.localeCompare(b.name, "fr")),
-    history: ledger.history.filter((entry) => entry.month === month),
+    history: ledger.history.filter((entree) => entree.month === mois),
     records: ledger.records
-      .filter((row) => row.month === month)
-      .map((row) => ({
-        ...row,
+      .filter((ligneTableau) => ligneTableau.month === mois)
+      .map((ligneTableau) => ({
+        ...ligneTableau,
         derivedHoldingHours:
-          row.sourceType === "HOLDING"
-            ? holdingRecordedHoursForMonth(month, row.personId, planning, people)
+          ligneTableau.sourceType === "HOLDING"
+            ? holdingRecordedHoursForMonth(mois, ligneTableau.personId, planning, personnes)
             : null,
-        hourlyRateEuro: monthlyHourlyRateEuro(row),
+        hourlyRateEuro: monthlyHourlyRateEuro(ligneTableau),
       })),
   };
 }
 
-export async function GET(request: Request) {
+export async function GET(requete: Request) {
   try {
     const ctx = await requireModuleRequestContext("payroll", "READ");
-    const month = new URL(request.url).searchParams.get("month") ?? "";
-    if (!/^\d{4}-\d{2}$/.test(month)) throw new Error("MONTHLY_LABOR_COST_MONTH_INVALID");
-    return NextResponse.json(await snapshot(month, ctx.moduleAccess.canWrite), {
+    const mois = new URL(requete.url).searchParams.get("month") ?? "";
+    if (!/^\d{4}-\d{2}$/.test(mois)) throw new Error("MONTHLY_LABOR_COST_MONTH_INVALID");
+    return NextResponse.json(await snapshot(mois, ctx.moduleAccess.canWrite), {
       headers: { "Cache-Control": "no-store" },
     });
-  } catch (error) {
-    return failure(error);
+  } catch (erreur) {
+    return failure(erreur);
   }
 }
 
-export async function POST(request: Request) {
+export async function POST(requete: Request) {
   try {
     const ctx = await requireModuleRequestContext("payroll", "WRITE");
-    const raw = await request.json();
-    const input = monthlyLaborCostInputSchema.parse(raw);
+    const raw = await requete.json();
+    const saisie = monthlyLaborCostInputSchema.parse(raw);
     const [planning, auth] = await Promise.all([
       createPlanningRepository().load(),
       readAuthPayload(),
     ]);
-    const people = effectivePlanningPeople(planning, auth.users);
-    const ids = new Set(people.map((p) => p.userId));
-    for (const person of planning.staff) ids.add(person.id);
+    const personnes = effectivePlanningPeople(planning, auth.users);
+    const identifiants = new Set(personnes.map((p) => p.userId));
+    for (const personne of planning.staff) identifiants.add(personne.id);
     const historical = await readMonthlyLaborCosts();
-    for (const record of historical.records) ids.add(record.personId);
-    if (input.expectedRevision === undefined)
+    for (const enregistrement of historical.records) identifiants.add(enregistrement.personId);
+    if (saisie.expectedRevision === undefined)
       throw new Error("MONTHLY_LABOR_COST_VERSION_REQUIRED");
-    const selected =
-      input.sourceType === "HOLDING"
+    const selectionne =
+      saisie.sourceType === "HOLDING"
         ? {
-            ...input,
+            ...saisie,
             workedHours: holdingRecordedHoursForMonth(
-              input.month,
-              input.personId,
+              saisie.month,
+              saisie.personId,
               planning,
-              people,
+              personnes,
             ),
           }
-        : input;
+        : saisie;
     await mutateMonthlyLaborCosts((source) => {
-      const key = `${input.month}:${input.personId}`;
-      const revision = source.editRevisions?.[key] ?? 0;
+      const cle = `${saisie.month}:${saisie.personId}`;
+      const revision = source.editRevisions?.[cle] ?? 0;
       assertEditRevision(raw.expectedRevision, revision);
       const before =
         source.records.find(
-          (row) => row.month === input.month && row.personId === input.personId,
+          (ligneTableau) =>
+            ligneTableau.month === saisie.month && ligneTableau.personId === saisie.personId,
         ) ?? null;
-      const next = saveMonthlyLaborCost(
+      const suivant = saveMonthlyLaborCost(
         source,
-        { ...selected, expectedRevision: before?.revision ?? null },
-        ids,
+        { ...selectionne, expectedRevision: before?.revision ?? null },
+        identifiants,
         ctx.user.displayName,
       );
-      next.editRevisions = { ...source.editRevisions, [key]: revision + 1 };
-      next.editHistory = [
+      suivant.editRevisions = { ...source.editRevisions, [cle]: revision + 1 };
+      suivant.editHistory = [
         ...(source.editHistory ?? []),
         {
-          key,
+          key: cle,
           revision: revision + 1,
           at: new Date().toISOString(),
           actorId: ctx.user.id,
           actorName: ctx.user.displayName,
           before,
-          after: input,
+          after: saisie,
         },
       ];
-      return next;
+      return suivant;
     });
-    return NextResponse.json(await snapshot(input.month, true), {
+    return NextResponse.json(await snapshot(saisie.month, true), {
       headers: { "Cache-Control": "no-store" },
     });
-  } catch (error) {
-    return failure(error);
+  } catch (erreur) {
+    return failure(erreur);
   }
 }

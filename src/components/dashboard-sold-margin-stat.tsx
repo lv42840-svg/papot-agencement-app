@@ -26,21 +26,21 @@ function money(cents: number | null): string {
 
 export function DashboardSoldMarginStat() {
   const [snapshot, setSnapshot] = useState<FinanceSnapshot | null>(null);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState("");
+  const [chargement, setLoading] = useState(true);
+  const [erreur, setError] = useState("");
 
   useEffect(() => {
     const controller = new AbortController();
     void (async () => {
       try {
-        const response = await fetch("/api/desktop/dashboard/sold-summary", {
+        const reponse = await fetch("/api/desktop/dashboard/sold-summary", {
           cache: "no-store",
           signal: controller.signal,
         });
-        if (response.status === 403) throw new Error("Accès réservé au pilotage global.");
-        if (!response.ok) throw new Error("Indicateurs momentanément indisponibles.");
-        const value = (await response.json()) as FinanceSnapshot;
-        if (!controller.signal.aborted) setSnapshot(value);
+        if (reponse.status === 403) throw new Error("Accès réservé au pilotage global.");
+        if (!reponse.ok) throw new Error("Indicateurs momentanément indisponibles.");
+        const valeur = (await reponse.json()) as FinanceSnapshot;
+        if (!controller.signal.aborted) setSnapshot(valeur);
       } catch (cause) {
         if (!controller.signal.aborted) {
           setError(cause instanceof Error ? cause.message : "Indicateurs indisponibles.");
@@ -59,9 +59,9 @@ export function DashboardSoldMarginStat() {
       </span>
       <div className="dashboardSoldBody">
         <strong className="dashboardSoldTitle">Vendu &amp; rentabilité</strong>
-        {loading ? <small>Chargement…</small> : null}
-        {error && !loading ? <small role="status">{error}</small> : null}
-        {snapshot && !loading ? (
+        {chargement ? <small>Chargement…</small> : null}
+        {erreur && !chargement ? <small role="status">{erreur}</small> : null}
+        {snapshot && !chargement ? (
           <>
             <div className="dashboardSoldLine">
               <span>Année {snapshot.year}</span>

@@ -20,16 +20,16 @@ export function EntriesSettingsWorkspace() {
   const [snapshot, setSnapshot] = useState<EntriesSettingsSnapshot | null>(null);
   const [newLabel, setNewLabel] = useState("");
   const [busy, setBusy] = useState(false);
-  const [error, setError] = useState<string | null>(null);
+  const [erreur, setError] = useState<string | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
 
   const load = useCallback(async () => {
     setError(null);
     try {
-      const response = await fetch("/api/desktop/entries", { cache: "no-store" });
-      const body = (await response.json()) as EntriesSettingsSnapshot & { error?: string };
-      if (!response.ok) throw new Error(body.error ?? "ENTRIES_SETTINGS_LOAD_FAILED");
-      setSnapshot(body);
+      const reponse = await fetch("/api/desktop/entries", { cache: "no-store" });
+      const corps = (await reponse.json()) as EntriesSettingsSnapshot & { error?: string };
+      if (!reponse.ok) throw new Error(corps.error ?? "ENTRIES_SETTINGS_LOAD_FAILED");
+      setSnapshot(corps);
     } catch (loadError) {
       const code = loadError instanceof Error ? loadError.message : "ENTRIES_SETTINGS_LOAD_FAILED";
       setError(errorMessages[code] ?? "Impossible de charger les tags.");
@@ -40,24 +40,24 @@ export function EntriesSettingsWorkspace() {
     void load();
   }, [load]);
 
-  const tags = useMemo(
+  const etiquettes = useMemo(
     () => [...(snapshot?.payload.tags ?? [])].sort((a, b) => a.sortOrder - b.sortOrder),
     [snapshot?.payload.tags],
   );
 
-  async function mutate(body: Record<string, unknown>, successMessage?: string) {
+  async function mutate(corps: Record<string, unknown>, successMessage?: string) {
     setBusy(true);
     setError(null);
     setNotice(null);
     try {
-      const response = await fetch("/api/desktop/entries", {
+      const reponse = await fetch("/api/desktop/entries", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(body),
+        body: JSON.stringify(corps),
       });
-      const result = (await response.json()) as EntriesSettingsSnapshot & { error?: string };
-      if (!response.ok) throw new Error(result.error ?? "ENTRIES_SETTINGS_SAVE_FAILED");
-      setSnapshot(result);
+      const resultat = (await reponse.json()) as EntriesSettingsSnapshot & { error?: string };
+      if (!reponse.ok) throw new Error(resultat.error ?? "ENTRIES_SETTINGS_SAVE_FAILED");
+      setSnapshot(resultat);
       if (successMessage) setNotice(successMessage);
       return true;
     } catch (mutationError) {
@@ -70,8 +70,8 @@ export function EntriesSettingsWorkspace() {
     }
   }
 
-  async function addTag(event: FormEvent<HTMLFormElement>) {
-    event.preventDefault();
+  async function addTag(evenement: FormEvent<HTMLFormElement>) {
+    evenement.preventDefault();
     if (!newLabel.trim()) return;
     const ok = await mutate({ action: "tagAdd", label: newLabel }, "Tag ajouté.");
     if (ok) setNewLabel("");
@@ -84,13 +84,13 @@ export function EntriesSettingsWorkspace() {
         <p className="muted">Gère les tags proposés dans Capture et lors de la qualification.</p>
       </div>
 
-      {error ? <div className="formError">{error}</div> : null}
+      {erreur ? <div className="formError">{erreur}</div> : null}
       {notice ? <div className="entriesSettingsSuccess">{notice}</div> : null}
 
       <form className="entriesSettingsAdd" onSubmit={addTag}>
         <input
           value={newLabel}
-          onChange={(event) => setNewLabel(event.target.value)}
+          onChange={(evenement) => setNewLabel(evenement.target.value)}
           placeholder="Nouveau tag"
           disabled={busy}
         />
@@ -100,16 +100,19 @@ export function EntriesSettingsWorkspace() {
       </form>
 
       <div className="entriesSettingsList">
-        {tags.map((tag, index) => (
+        {etiquettes.map((etiquette, indice) => (
           <TagRow
-            key={tag.id}
-            tag={tag}
-            first={index === 0}
-            last={index === tags.length - 1}
+            key={etiquette.id}
+            tag={etiquette}
+            first={indice === 0}
+            last={indice === etiquettes.length - 1}
             busy={busy}
-            onMove={(direction) => mutate({ action: "tagMove", tagId: tag.id, direction })}
-            onSave={(label, active) =>
-              mutate({ action: "tagUpdate", tagId: tag.id, label, active }, "Tag enregistré.")
+            onMove={(direction) => mutate({ action: "tagMove", tagId: etiquette.id, direction })}
+            onSave={(libelle, active) =>
+              mutate(
+                { action: "tagUpdate", tagId: etiquette.id, label: libelle, active },
+                "Tag enregistré.",
+              )
             }
           />
         ))}
@@ -188,7 +191,7 @@ export function EntriesSettingsWorkspace() {
 }
 
 function TagRow({
-  tag,
+  tag: etiquette,
   first,
   last,
   busy,
@@ -200,24 +203,28 @@ function TagRow({
   last: boolean;
   busy: boolean;
   onMove: (direction: "up" | "down") => Promise<boolean>;
-  onSave: (label: string, active: boolean) => Promise<boolean>;
+  onSave: (libelle: string, active: boolean) => Promise<boolean>;
 }) {
-  const [label, setLabel] = useState(tag.label);
-  const [active, setActive] = useState(tag.active);
+  const [libelle, setLabel] = useState(etiquette.label);
+  const [active, setActive] = useState(etiquette.active);
 
   useEffect(() => {
-    setLabel(tag.label);
-    setActive(tag.active);
-  }, [tag.label, tag.active]);
+    setLabel(etiquette.label);
+    setActive(etiquette.active);
+  }, [etiquette.label, etiquette.active]);
 
   return (
     <div className="entriesSettingsRow">
-      <input value={label} onChange={(event) => setLabel(event.target.value)} disabled={busy} />
+      <input
+        value={libelle}
+        onChange={(evenement) => setLabel(evenement.target.value)}
+        disabled={busy}
+      />
       <label className="entriesSettingsActive">
         <input
           type="checkbox"
           checked={active}
-          onChange={(event) => setActive(event.target.checked)}
+          onChange={(evenement) => setActive(evenement.target.checked)}
           disabled={busy}
         />
         Actif
@@ -243,8 +250,8 @@ function TagRow({
       <button
         className="secondaryButton"
         type="button"
-        disabled={busy || !label.trim()}
-        onClick={() => void onSave(label, active)}
+        disabled={busy || !libelle.trim()}
+        onClick={() => void onSave(libelle, active)}
       >
         <Save size={14} /> Enregistrer
       </button>

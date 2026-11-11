@@ -26,24 +26,24 @@ function statusFor(code: string): number {
   return 400;
 }
 
-export async function GET(request: Request, context: RouteContext) {
+export async function GET(requete: Request, contexte: RouteContext) {
   try {
-    const { entryId, attachmentId } = await context.params;
+    const { entryId: idEntree, attachmentId } = await contexte.params;
     const requestContext = await requireModuleRequestContext("capture", "READ");
     const repository = await createEntriesRepository();
-    const payload = await repository.load();
-    const entry = payload.entries.find((candidate) => candidate.id === entryId);
-    if (!entry) return NextResponse.json({ error: "ENTRY_NOT_FOUND" }, { status: 404 });
-    const attachment = entry.attachments.find((candidate) => candidate.id === attachmentId);
-    if (!attachment) {
+    const contenu = await repository.load();
+    const entree = contenu.entries.find((candidat) => candidat.id === idEntree);
+    if (!entree) return NextResponse.json({ error: "ENTRY_NOT_FOUND" }, { status: 404 });
+    const pieceJointe = entree.attachments.find((candidat) => candidat.id === attachmentId);
+    if (!pieceJointe) {
       return NextResponse.json({ error: "ENTRY_ATTACHMENT_NOT_FOUND" }, { status: 404 });
     }
 
     const transport = await createEntryAttachmentTransport({
       owner: { displayName: requestContext.user.displayName },
     });
-    const bytes = await readEntryAttachment(transport, attachment);
-    const download = new URL(request.url).searchParams.get("download") === "1";
+    const bytes = await readEntryAttachment(transport, pieceJointe);
+    const download = new URL(requete.url).searchParams.get("download") === "1";
     const previewType = safePreviewType(bytes);
     const canInline = previewType !== null;
 
@@ -52,13 +52,13 @@ export async function GET(request: Request, context: RouteContext) {
       headers: {
         "Content-Type": previewType ?? "application/octet-stream",
         "Content-Length": String(bytes.length),
-        "Content-Disposition": contentDisposition(attachment.fileName, download || !canInline),
+        "Content-Disposition": contentDisposition(pieceJointe.fileName, download || !canInline),
         ...documentSecurityHeaders,
         "X-Content-Type-Options": "nosniff",
       },
     });
-  } catch (error) {
-    const code = error instanceof Error ? error.message : "ENTRY_ATTACHMENT_READ_FAILED";
+  } catch (erreur) {
+    const code = erreur instanceof Error ? erreur.message : "ENTRY_ATTACHMENT_READ_FAILED";
     return NextResponse.json({ error: code }, { status: statusFor(code) });
   }
 }

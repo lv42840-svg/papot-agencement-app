@@ -19,9 +19,9 @@ const schema = z.object({
   password: z.string().min(12).max(512),
 });
 
-export async function POST(request: Request) {
-  const parsed = schema.safeParse(await request.json().catch(() => null));
-  if (!parsed.success) {
+export async function POST(requete: Request) {
+  const analyse = schema.safeParse(await requete.json().catch(() => null));
+  if (!analyse.success) {
     return NextResponse.json(
       {
         error:
@@ -31,7 +31,7 @@ export async function POST(request: Request) {
     );
   }
 
-  if (!verifyBootstrapToken(parsed.data.bootstrapToken)) {
+  if (!verifyBootstrapToken(analyse.data.bootstrapToken)) {
     return NextResponse.json({ error: "Initialisation non autorisée." }, { status: 403 });
   }
 
@@ -40,14 +40,14 @@ export async function POST(request: Request) {
   }
 
   const id = randomUUID();
-  const passwordHash = await hashPassword(parsed.data.password);
-  await mutateAuthPayload(id, (payload) => {
-    if (payload.users.length > 0) throw new Error("INITIAL_ADMIN_ALREADY_EXISTS");
-    payload.users.push({
+  const passwordHash = await hashPassword(analyse.data.password);
+  await mutateAuthPayload(id, (contenu) => {
+    if (contenu.users.length > 0) throw new Error("INITIAL_ADMIN_ALREADY_EXISTS");
+    contenu.users.push({
       id,
-      username: parsed.data.username.toLowerCase(),
-      displayName: parsed.data.displayName,
-      email: parsed.data.email.toLowerCase(),
+      username: analyse.data.username.toLowerCase(),
+      displayName: analyse.data.displayName,
+      email: analyse.data.email.toLowerCase(),
       passwordHash,
       isActive: true,
       canManagePermissions: true,

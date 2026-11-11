@@ -28,13 +28,13 @@ export async function GET() {
       .sort((a, b) => a.name.localeCompare(b.name, "fr-FR", { sensitivity: "base" }));
 
     const cases = commercialPayload.cases
-      .filter((item) => !isCommercialClosed(item))
-      .map((item) => ({
-        id: item.id,
-        name: item.name,
-        clientId: item.clientId ?? null,
-        clientName: item.clientName ?? "",
-        status: item.status,
+      .filter((element) => !isCommercialClosed(element))
+      .map((element) => ({
+        id: element.id,
+        name: element.name,
+        clientId: element.clientId ?? null,
+        clientName: element.clientName ?? "",
+        status: element.status,
       }))
       .sort((a, b) => a.name.localeCompare(b.name, "fr-FR", { sensitivity: "base" }));
 
@@ -42,8 +42,8 @@ export async function GET() {
       { clients, cases, tags: activeTags(entriesPayload) },
       { headers: { "Cache-Control": "no-store" } },
     );
-  } catch (error) {
-    const code = error instanceof Error ? error.message : "MOBILE_ENTRY_CONTEXT_FAILED";
+  } catch (erreur) {
+    const code = erreur instanceof Error ? erreur.message : "MOBILE_ENTRY_CONTEXT_FAILED";
     return NextResponse.json({ error: code }, { status: 400 });
   }
 }

@@ -7,8 +7,8 @@ import { requireModuleRequestContext } from "@/lib/desktop/request-context";
 export const dynamic = "force-dynamic";
 
 export default async function EnterpriseProfitabilityPage() {
-  const context = await requireModuleRequestContext("pilotage", "READ");
-  await requireSpecialPermission(context.user, "dashboard.view_global");
+  const contexte = await requireModuleRequestContext("pilotage", "READ");
+  await requireSpecialPermission(contexte.user, "dashboard.view_global");
   return (
     <DesktopAppShell>
       <EnterpriseFinanceTabs chantierView={<EnterpriseProfitabilityWorkspace />} />

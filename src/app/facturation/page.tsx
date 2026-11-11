@@ -8,13 +8,13 @@ export default async function BillingPage({
   searchParams: Promise<{ quoteId?: string; chantierId?: string; tab?: string }>;
 }) {
   await requireModuleRequestContext("billing", "READ");
-  const params = await searchParams;
+  const parametres = await searchParams;
   return (
     <DesktopAppShell>
       <BillingWorkspace
-        quoteId={params.quoteId}
-        chantierId={params.chantierId}
-        initialTab={params.tab}
+        quoteId={parametres.quoteId}
+        chantierId={parametres.chantierId}
+        initialTab={parametres.tab}
       />
     </DesktopAppShell>
   );

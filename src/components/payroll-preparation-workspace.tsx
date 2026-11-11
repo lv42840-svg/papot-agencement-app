@@ -32,28 +32,28 @@ const statusLabel = {
 } as const;
 
 export function PayrollPreparationWorkspace() {
-  const [month, setMonth] = useState(() => parisCurrentMonth());
-  const [data, setData] = useState<Snapshot | null>(null);
+  const [mois, setMonth] = useState(() => parisCurrentMonth());
+  const [donnees, setData] = useState<Snapshot | null>(null);
   const [revision, setRevision] = useState(0);
   const [showCurrent, setShowCurrent] = useState(false);
   const [busy, setBusy] = useState(false);
-  const [error, setError] = useState("");
+  const [erreur, setError] = useState("");
   const [noteDrafts, setNoteDrafts] = useState<Record<string, string>>({});
   const [reopenReason, setReopenReason] = useState("");
   const [onlyChanged, setOnlyChanged] = useState(true);
   const load = useCallback(
     async (signal: AbortSignal) => {
       setError("");
-      const response = await fetch(`/api/desktop/payroll/preparation?month=${month}`, {
+      const reponse = await fetch(`/api/desktop/payroll/preparation?month=${mois}`, {
         cache: "no-store",
         signal,
       });
-      const body = (await response.json()) as Snapshot & { error?: string };
-      if (!response.ok) throw new Error(body.error ?? "Chargement impossible");
-      setData(body);
+      const corps = (await reponse.json()) as Snapshot & { error?: string };
+      if (!reponse.ok) throw new Error(corps.error ?? "Chargement impossible");
+      setData(corps);
       setNoteDrafts({});
     },
-    [month],
+    [mois],
   );
   useEffect(() => {
     const controller = new AbortController();
@@ -65,19 +65,19 @@ export function PayrollPreparationWorkspace() {
     });
     return () => controller.abort();
   }, [load, revision]);
-  async function mutate(input: Record<string, unknown>) {
-    if (!data || !data.canWrite || busy) return;
+  async function mutate(saisie: Record<string, unknown>) {
+    if (!donnees || !donnees.canWrite || busy) return;
     setBusy(true);
     setError("");
     try {
-      const response = await fetch("/api/desktop/payroll/preparation", {
+      const reponse = await fetch("/api/desktop/payroll/preparation", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ ...input, month, expectedRevision: data.state.revision }),
+        body: JSON.stringify({ ...saisie, month: mois, expectedRevision: donnees.state.revision }),
       });
-      const body = (await response.json()) as Snapshot & { error?: string };
-      if (!response.ok) throw new Error(body.error ?? "Modification impossible");
-      setData(body);
+      const corps = (await reponse.json()) as Snapshot & { error?: string };
+      if (!reponse.ok) throw new Error(corps.error ?? "Modification impossible");
+      setData(corps);
       setNoteDrafts({});
       setShowCurrent(false);
     } catch (cause) {
@@ -86,12 +86,12 @@ export function PayrollPreparationWorkspace() {
       setBusy(false);
     }
   }
-  const valid = data?.month === month ? data : null;
+  const valid = donnees?.month === mois ? donnees : null;
   const frozen = valid?.state.status === "PREPARED" && !showCurrent;
   const summary = frozen && valid?.latest ? valid.latest.summary : valid?.current;
   const isEditing = !!valid?.canWrite && valid.state.status !== "PREPARED";
   const download = (version: string) =>
-    `/api/desktop/payroll/preparation/export?month=${encodeURIComponent(month)}&version=${encodeURIComponent(version)}`;
+    `/api/desktop/payroll/preparation/export?month=${encodeURIComponent(mois)}&version=${encodeURIComponent(version)}`;
 
   return (
     <section
@@ -110,7 +110,7 @@ export function PayrollPreparationWorkspace() {
           Mois de paie{" "}
           <input
             type="month"
-            value={month}
+            value={mois}
             onChange={(e) => {
               if (/^\d{4}-\d{2}$/.test(e.target.value)) {
                 setMonth(e.target.value);
@@ -130,9 +130,9 @@ export function PayrollPreparationWorkspace() {
           </strong>
         ) : null}
       </div>
-      {error ? (
+      {erreur ? (
         <p role="alert" style={{ color: "#a22" }}>
-          {error}
+          {erreur}
         </p>
       ) : null}
       {!valid ? <p>Chargement…</p> : null}
@@ -230,35 +230,38 @@ export function PayrollPreparationWorkspace() {
                 </tr>
               </thead>
               <tbody>
-                {summary.rows.map((row) => {
-                  const draft = noteDrafts[row.personId] ?? row.note;
+                {summary.rows.map((ligneTableau) => {
+                  const brouillon = noteDrafts[ligneTableau.personId] ?? ligneTableau.note;
                   return (
-                    <tr key={row.personId} style={{ borderTop: "1px solid #ddd" }}>
-                      <th style={{ textAlign: "left", padding: 8 }}>{row.name}</th>
-                      <td>{number(row.workedHours)} h</td>
-                      <td>{number(row.overtime25)} h</td>
-                      <td>{number(row.overtime50)} h</td>
-                      <td>{number(row.vacationDays)}</td>
-                      <td>{row.contractWeeks.join(", ") || "Aucune"}</td>
+                    <tr key={ligneTableau.personId} style={{ borderTop: "1px solid #ddd" }}>
+                      <th style={{ textAlign: "left", padding: 8 }}>{ligneTableau.name}</th>
+                      <td>{number(ligneTableau.workedHours)} h</td>
+                      <td>{number(ligneTableau.overtime25)} h</td>
+                      <td>{number(ligneTableau.overtime50)} h</td>
+                      <td>{number(ligneTableau.vacationDays)}</td>
+                      <td>{ligneTableau.contractWeeks.join(", ") || "Aucune"}</td>
                       <td>
                         {isEditing ? (
                           <div style={{ display: "flex", gap: 4 }}>
                             <input
-                              aria-label={`Note paie ${row.name}`}
-                              value={draft}
+                              aria-label={`Note paie ${ligneTableau.name}`}
+                              value={brouillon}
                               onChange={(e) =>
-                                setNoteDrafts((x) => ({ ...x, [row.personId]: e.target.value }))
+                                setNoteDrafts((x) => ({
+                                  ...x,
+                                  [ligneTableau.personId]: e.target.value,
+                                }))
                               }
                             />
                             <button
                               type="button"
                               className="secondaryButton"
-                              disabled={busy || draft === row.note}
+                              disabled={busy || brouillon === ligneTableau.note}
                               onClick={() =>
                                 void mutate({
                                   action: "setNote",
-                                  personId: row.personId,
-                                  note: draft,
+                                  personId: ligneTableau.personId,
+                                  note: brouillon,
                                 })
                               }
                             >
@@ -266,7 +269,7 @@ export function PayrollPreparationWorkspace() {
                             </button>
                           </div>
                         ) : (
-                          row.note
+                          ligneTableau.note
                         )}
                       </td>
                     </tr>
@@ -277,12 +280,15 @@ export function PayrollPreparationWorkspace() {
           </div>
           <details>
             <summary>Détail des semaines et des absences</summary>
-            {summary.rows.map((row) => (
-              <div key={row.personId} style={{ padding: 12, borderBottom: "1px solid #ddd" }}>
-                <h3>{row.name}</h3>
-                {row.weeks.map((week) => (
+            {summary.rows.map((ligneTableau) => (
+              <div
+                key={ligneTableau.personId}
+                style={{ padding: 12, borderBottom: "1px solid #ddd" }}
+              >
+                <h3>{ligneTableau.name}</h3>
+                {ligneTableau.weeks.map((semaine) => (
                   <div
-                    key={week.week}
+                    key={semaine.week}
                     style={{
                       display: "flex",
                       gap: 12,
@@ -291,15 +297,15 @@ export function PayrollPreparationWorkspace() {
                       flexWrap: "wrap",
                     }}
                   >
-                    <strong>{week.week}</strong>
-                    <span>{number(week.hours)} h</span>
-                    <span>{week.source === "REAL" ? "Heures validées" : "Base contrat"}</span>
-                    <span>Absences : {number(week.absenceHours)} h</span>
+                    <strong>{semaine.week}</strong>
+                    <span>{number(semaine.hours)} h</span>
+                    <span>{semaine.source === "REAL" ? "Heures validées" : "Base contrat"}</span>
+                    <span>Absences : {number(semaine.absenceHours)} h</span>
                     <span>Validation depuis la saisie des heures du Planning</span>
                   </div>
                 ))}
-                {row.absences.map((abs, index) => (
-                  <p key={`${abs.date}:${index}`}>
+                {ligneTableau.absences.map((abs, indice) => (
+                  <p key={`${abs.date}:${indice}`}>
                     {abs.date} · {abs.type} · {number(abs.hours)} h
                   </p>
                 ))}
@@ -323,18 +329,18 @@ export function PayrollPreparationWorkspace() {
               {(onlyChanged
                 ? valid.differences
                 : summary.rows.map(
-                    (row) =>
-                      valid.differences.find((d) => d.personId === row.personId) ?? {
-                        personId: row.personId,
-                        name: row.name,
+                    (ligneTableau) =>
+                      valid.differences.find((d) => d.personId === ligneTableau.personId) ?? {
+                        personId: ligneTableau.personId,
+                        name: ligneTableau.name,
                         changes: [],
                       },
                   )
-              ).map((row) => (
-                <p key={row.personId}>
-                  <strong>{row.name} :</strong>{" "}
-                  {row.changes.length
-                    ? row.changes
+              ).map((ligneTableau) => (
+                <p key={ligneTableau.personId}>
+                  <strong>{ligneTableau.name} :</strong>{" "}
+                  {ligneTableau.changes.length
+                    ? ligneTableau.changes
                         .map(
                           (c) =>
                             `${c.field} (${JSON.stringify(c.before)} → ${JSON.stringify(c.after)})`,
@@ -354,13 +360,13 @@ export function PayrollPreparationWorkspace() {
                 onClick={() => {
                   if (
                     window.confirm(
-                      `Confirmer « Paie préparée » pour ${month} en V${valid.state.versions.length + 1} ?`,
+                      `Confirmer « Paie préparée » pour ${mois} en V${valid.state.versions.length + 1} ?`,
                     )
                   )
                     void mutate({ action: "validate" });
                 }}
               >
-                Valider {month} en V{valid.state.versions.length + 1}
+                Valider {mois} en V{valid.state.versions.length + 1}
               </button>
             )}
             {valid.state.status === "PREPARED" && valid.canWrite && (
@@ -395,12 +401,15 @@ export function PayrollPreparationWorkspace() {
           {valid.state.versions.length > 0 && (
             <details>
               <summary>Historique de validation ({valid.state.versions.length} versions)</summary>
-              {valid.state.versions.map((item) => (
-                <p key={item.number}>
-                  <strong>V{item.number}</strong> · {euroDate(item.validatedAt)} ·{" "}
-                  {item.validatedBy} {item.reopenReason ? `· Motif : ${item.reopenReason}` : ""}{" "}
+              {valid.state.versions.map((element) => (
+                <p key={element.number}>
+                  <strong>V{element.number}</strong> · {euroDate(element.validatedAt)} ·{" "}
+                  {element.validatedBy}{" "}
+                  {element.reopenReason ? `· Motif : ${element.reopenReason}` : ""}{" "}
                   {valid.canWrite && (
-                    <a href={download(String(item.number))}>Télécharger Excel V{item.number}</a>
+                    <a href={download(String(element.number))}>
+                      Télécharger Excel V{element.number}
+                    </a>
                   )}
                 </p>
               ))}
@@ -427,20 +436,20 @@ export function PayrollPreparationWorkspace() {
           <input
             type="file"
             accept=".xlsx"
-            onChange={async (event) => {
-              const file = event.target.files?.[0];
-              if (!file) return;
+            onChange={async (evenement) => {
+              const fichier = evenement.target.files?.[0];
+              if (!fichier) return;
               const form = new FormData();
-              form.set("file", file);
-              const response = await fetch("/api/desktop/payroll/preparation/template", {
+              form.set("file", fichier);
+              const reponse = await fetch("/api/desktop/payroll/preparation/template", {
                 method: "POST",
                 body: form,
               });
-              const body = await response.json();
+              const corps = await reponse.json();
               window.alert(
-                response.ok ? "Modèle enregistré." : (body.error ?? "Enregistrement impossible."),
+                reponse.ok ? "Modèle enregistré." : (corps.error ?? "Enregistrement impossible."),
               );
-              event.target.value = "";
+              evenement.target.value = "";
             }}
           />
         </label>

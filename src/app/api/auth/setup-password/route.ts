@@ -10,23 +10,23 @@ const schema = z
     password: z.string().min(12).max(512),
     confirmPassword: z.string().min(12).max(512),
   })
-  .refine((value) => value.password === value.confirmPassword, {
+  .refine((valeur) => valeur.password === valeur.confirmPassword, {
     message: "Les mots de passe ne correspondent pas.",
     path: ["confirmPassword"],
   });
 
-export async function POST(request: Request) {
-  if (!(await allowPasswordSetupRequest(request)))
+export async function POST(requete: Request) {
+  if (!(await allowPasswordSetupRequest(requete)))
     return NextResponse.json(
       { error: "Trop de tentatives. Réessayez dans 15 minutes." },
       { status: 429, headers: { "Retry-After": "900" } },
     );
-  const parsed = schema.safeParse(await request.json().catch(() => null));
-  if (!parsed.success) {
+  const analyse = schema.safeParse(await requete.json().catch(() => null));
+  if (!analyse.success) {
     return NextResponse.json(
       {
         error:
-          parsed.error.issues[0]?.message ??
+          analyse.error.issues[0]?.message ??
           "Le mot de passe doit contenir au moins 12 caractères.",
       },
       { status: 400 },
@@ -34,8 +34,8 @@ export async function POST(request: Request) {
   }
 
   const consumed = await consumePasswordSetupToken({
-    tokenHash: passwordSetupTokenHash(parsed.data.token),
-    password: parsed.data.password,
+    tokenHash: passwordSetupTokenHash(analyse.data.token),
+    password: analyse.data.password,
   });
 
   if (!consumed) {

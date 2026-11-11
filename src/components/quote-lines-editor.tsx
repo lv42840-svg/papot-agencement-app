@@ -76,25 +76,25 @@ function formatMoney(cents: number): string {
   return moneyFormatter.format(cents / 100);
 }
 
-function formatPercent(value: number | null): string {
-  return value === null ? "n/c" : `${percentFormatter.format(value)} %`;
+function formatPercent(valeur: number | null): string {
+  return valeur === null ? "n/c" : `${percentFormatter.format(valeur)} %`;
 }
 
 function centsToInput(cents: number): string {
   return (cents / 100).toFixed(2).replace(".", ",");
 }
 
-function eurosToCents(value: string): number {
-  const euros = Number(value.trim().replace(",", "."));
+function eurosToCents(valeur: string): number {
+  const euros = Number(valeur.trim().replace(",", "."));
   if (!Number.isFinite(euros) || euros < 0) throw new Error("PRICE_INVALID");
   const cents = Math.round(euros * 100);
   if (!Number.isSafeInteger(cents)) throw new Error("PRICE_INVALID");
   return cents;
 }
 
-function optionalEurosToCents(value: string): number | undefined {
-  if (!value.trim()) return undefined;
-  return eurosToCents(value);
+function optionalEurosToCents(valeur: string): number | undefined {
+  if (!valeur.trim()) return undefined;
+  return eurosToCents(valeur);
 }
 
 function newComponentForm(): OuvrageComponentForm {
@@ -120,8 +120,8 @@ function formFromLibraryComponent(component: LibraryComponent): OuvrageComponent
   };
 }
 
-function formsFromLine(line: QuoteLine): OuvrageComponentForm[] {
-  const lineComponents = line.components ?? [];
+function formsFromLine(ligne: QuoteLine): OuvrageComponentForm[] {
+  const lineComponents = ligne.components ?? [];
   if (lineComponents.length > 0) {
     return lineComponents.map((component) => {
       const costPriceCents = quoteOuvrageComponentCostPriceCents(component);
@@ -139,12 +139,12 @@ function formsFromLine(line: QuoteLine): OuvrageComponentForm[] {
 
   return [
     {
-      key: `legacy-${line.id}`,
-      description: line.description,
-      unit: line.unit || "u",
+      key: `legacy-${ligne.id}`,
+      description: ligne.description,
+      unit: ligne.unit || "u",
       quantityInput: "1",
       costPriceEuros: "",
-      unitPriceEuros: centsToInput(line.unitPriceCents ?? 0),
+      unitPriceEuros: centsToInput(ligne.unitPriceCents ?? 0),
     },
   ];
 }
@@ -243,26 +243,26 @@ function libraryErrorLabel(code: string): string {
   return "La Bibliothèque n’a pas pu être mise à jour.";
 }
 
-function normalizeSearch(value: string): string {
-  return value
+function normalizeSearch(valeur: string): string {
+  return valeur
     .normalize("NFD")
     .replace(/[\u0300-\u036f]/g, "")
     .toLocaleLowerCase("fr-FR")
     .trim();
 }
 
-async function postLibrary(body: Record<string, unknown>) {
-  const response = await fetch("/api/desktop/library", {
+async function postLibrary(corps: Record<string, unknown>) {
+  const reponse = await fetch("/api/desktop/library", {
     method: "POST",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify(body),
+    body: JSON.stringify(corps),
   });
-  const data = (await response.json()) as LibraryOpenResponse | LibrarySaveResponse;
-  if (!response.ok) {
-    const error = "error" in data ? data.error : "LIBRARY_REQUEST_FAILED";
-    throw new Error(error);
+  const donnees = (await reponse.json()) as LibraryOpenResponse | LibrarySaveResponse;
+  if (!reponse.ok) {
+    const erreur = "error" in donnees ? donnees.error : "LIBRARY_REQUEST_FAILED";
+    throw new Error(erreur);
   }
-  return data;
+  return donnees;
 }
 
 export function QuoteLinesEditor({
@@ -273,7 +273,7 @@ export function QuoteLinesEditor({
 }: {
   quote: NativeQuoteRecord | null;
   canWrite: boolean;
-  onSaved: (payload: NativeQuotesPayload) => void;
+  onSaved: (contenu: NativeQuotesPayload) => void;
   headerActions?: ReactNode;
 }) {
   const [formOpen, setFormOpen] = useState(false);
@@ -284,8 +284,8 @@ export function QuoteLinesEditor({
   const [components, setComponents] = useState<OuvrageComponentForm[]>([newComponentForm()]);
   const [priceForced, setPriceForced] = useState(false);
   const [forcedUnitPriceEuros, setForcedUnitPriceEuros] = useState("0,00");
-  const [saving, setSaving] = useState(false);
-  const [error, setError] = useState("");
+  const [sauvegardeEnCours, setSaving] = useState(false);
+  const [erreur, setError] = useState("");
   const [notice, setNotice] = useState("");
   const [libraryPayload, setLibraryPayload] = useState<LibraryPayload | null>(null);
   const [libraryPickerOpen, setLibraryPickerOpen] = useState(false);
@@ -294,8 +294,9 @@ export function QuoteLinesEditor({
   const [librarySavingLineId, setLibrarySavingLineId] = useState<string | null>(null);
   const [publishedLineIds, setPublishedLineIds] = useState<Set<string>>(new Set());
 
-  const lines = useMemo(
-    () => quote?.model.items.filter((item): item is QuoteLine => item.kind === "LINE") ?? [],
+  const lignes = useMemo(
+    () =>
+      quote?.model.items.filter((element): element is QuoteLine => element.kind === "LINE") ?? [],
     [quote],
   );
   const editable = canWrite && quote?.status === "DRAFT";
@@ -321,14 +322,16 @@ export function QuoteLinesEditor({
 
   const visibleLibraryComponents = useMemo(() => {
     if (!libraryPayload) return [];
-    const query = normalizeSearch(libraryQuery);
+    const requeteRecherche = normalizeSearch(libraryQuery);
     return libraryPayload.components
       .filter((component) =>
         normalizeSearch([component.name, component.description, component.unit].join(" ")).includes(
-          query,
+          requeteRecherche,
         ),
       )
-      .sort((left, right) => left.name.localeCompare(right.name, "fr-FR", { sensitivity: "base" }));
+      .sort((gauche, droite) =>
+        gauche.name.localeCompare(droite.name, "fr-FR", { sensitivity: "base" }),
+      );
   }, [libraryPayload, libraryQuery]);
 
   useEffect(() => {
@@ -364,14 +367,14 @@ export function QuoteLinesEditor({
     setFormOpen(true);
   }
 
-  function openEditOuvrage(line: QuoteLine) {
-    setEditingLineId(line.id);
-    setDescription(line.description);
-    setUnit(line.unit || "u");
-    setQuantityInput(line.quantityFormula ?? String(line.quantity).replace(".", ","));
-    setComponents(formsFromLine(line));
-    setPriceForced(line.forcedUnitPriceCents !== undefined);
-    setForcedUnitPriceEuros(centsToInput(line.forcedUnitPriceCents ?? line.unitPriceCents ?? 0));
+  function openEditOuvrage(ligne: QuoteLine) {
+    setEditingLineId(ligne.id);
+    setDescription(ligne.description);
+    setUnit(ligne.unit || "u");
+    setQuantityInput(ligne.quantityFormula ?? String(ligne.quantity).replace(".", ","));
+    setComponents(formsFromLine(ligne));
+    setPriceForced(ligne.forcedUnitPriceCents !== undefined);
+    setForcedUnitPriceEuros(centsToInput(ligne.forcedUnitPriceCents ?? ligne.unitPriceCents ?? 0));
     setLibraryPickerOpen(false);
     setLibraryQuery("");
     setError("");
@@ -383,23 +386,23 @@ export function QuoteLinesEditor({
     resetForm();
   }
 
-  function updateComponent(index: number, patch: Partial<OuvrageComponentForm>) {
-    setComponents((current) =>
-      current.map((component, componentIndex) =>
-        componentIndex === index ? { ...component, ...patch } : component,
+  function updateComponent(indice: number, patch: Partial<OuvrageComponentForm>) {
+    setComponents((courant) =>
+      courant.map((component, componentIndex) =>
+        componentIndex === indice ? { ...component, ...patch } : component,
       ),
     );
   }
 
   function addComponent() {
-    setComponents((current) => [...current, newComponentForm()]);
+    setComponents((courant) => [...courant, newComponentForm()]);
     setLibraryPickerOpen(false);
   }
 
-  function removeComponent(index: number) {
-    setComponents((current) => {
-      if (current.length <= 1) return current;
-      return current.filter((_, componentIndex) => componentIndex !== index);
+  function removeComponent(indice: number) {
+    setComponents((courant) => {
+      if (courant.length <= 1) return courant;
+      return courant.filter((_, componentIndex) => componentIndex !== indice);
     });
   }
 
@@ -415,12 +418,12 @@ export function QuoteLinesEditor({
 
     setLibraryLoading(true);
     try {
-      const response = await fetch("/api/desktop/library", { cache: "no-store" });
-      const data = (await response.json()) as LibraryGetResponse;
-      if (!response.ok || !data.payload) {
-        throw new Error(data.error ?? "LIBRARY_REQUEST_FAILED");
+      const reponse = await fetch("/api/desktop/library", { cache: "no-store" });
+      const donnees = (await reponse.json()) as LibraryGetResponse;
+      if (!reponse.ok || !donnees.payload) {
+        throw new Error(donnees.error ?? "LIBRARY_REQUEST_FAILED");
       }
-      setLibraryPayload(data.payload);
+      setLibraryPayload(donnees.payload);
     } catch {
       setError("Impossible de charger les composants de la Bibliothèque.");
       setLibraryPickerOpen(false);
@@ -430,29 +433,29 @@ export function QuoteLinesEditor({
   }
 
   function chooseLibraryComponent(component: LibraryComponent) {
-    const selected = formFromLibraryComponent(component);
-    setComponents((current) => {
+    const selectionne = formFromLibraryComponent(component);
+    setComponents((courant) => {
       if (
-        current.length === 1 &&
-        !current[0].description.trim() &&
-        !current[0].costPriceEuros.trim()
+        courant.length === 1 &&
+        !courant[0].description.trim() &&
+        !courant[0].costPriceEuros.trim()
       ) {
-        return [selected];
+        return [selectionne];
       }
-      return [...current, selected];
+      return [...courant, selectionne];
     });
     setLibraryPickerOpen(false);
     setLibraryQuery("");
   }
 
-  async function saveOuvrage(event: FormEvent<HTMLFormElement>) {
-    event.preventDefault();
+  async function saveOuvrage(evenement: FormEvent<HTMLFormElement>) {
+    evenement.preventDefault();
     if (!quote) return;
     setSaving(true);
     setError("");
 
     try {
-      const response = await fetch("/api/desktop/quotes", {
+      const reponse = await fetch("/api/desktop/quotes", {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
@@ -477,13 +480,13 @@ export function QuoteLinesEditor({
           })),
         }),
       });
-      const data = (await response.json()) as QuotesApiResponse;
-      if (!response.ok || !data.payload) {
-        setError(lineErrorLabel(data.error ?? "QUOTES_MUTATION_FAILED"));
+      const donnees = (await reponse.json()) as QuotesApiResponse;
+      if (!reponse.ok || !donnees.payload) {
+        setError(lineErrorLabel(donnees.error ?? "QUOTES_MUTATION_FAILED"));
         return;
       }
 
-      onSaved(data.payload);
+      onSaved(donnees.payload);
       setNotice(editingLineId ? "Ouvrage modifié." : "Ouvrage ajouté au devis.");
       closeForm();
     } catch {
@@ -493,9 +496,9 @@ export function QuoteLinesEditor({
     }
   }
 
-  async function addOuvrageToLibrary(line: QuoteLine) {
+  async function addOuvrageToLibrary(ligne: QuoteLine) {
     if (!editable || librarySavingLineId) return;
-    setLibrarySavingLineId(line.id);
+    setLibrarySavingLineId(ligne.id);
     setError("");
     setNotice("");
     const leaseId = globalThis.crypto.randomUUID();
@@ -510,7 +513,7 @@ export function QuoteLinesEditor({
       const basePayload = opened.resource
         ? parseLibraryPayload(opened.resource.payload)
         : createInitialLibraryPayload();
-      const published = publishQuoteOuvrageToLibrary(basePayload, line);
+      const published = publishQuoteOuvrageToLibrary(basePayload, ligne);
       const saved = (await postLibrary({
         action: "save",
         leaseId,
@@ -522,7 +525,7 @@ export function QuoteLinesEditor({
       if (saved.status === "conflict") throw new Error("LIBRARY_VERSION_CONFLICT");
 
       setLibraryPayload(parseLibraryPayload(saved.resource.payload));
-      setPublishedLineIds((current) => new Set(current).add(line.id));
+      setPublishedLineIds((courant) => new Set(courant).add(ligne.id));
       setNotice("Ouvrage ajouté à la Bibliothèque.");
     } catch (publishError) {
       const code = publishError instanceof Error ? publishError.message : "LIBRARY_REQUEST_FAILED";
@@ -569,29 +572,29 @@ export function QuoteLinesEditor({
     });
   }
 
-  function renderReadOuvrage(line: QuoteLine) {
-    const lineComponents = line.components ?? [];
-    const salePriceCents = line.unitPriceCents ?? 0;
+  function renderReadOuvrage(ligne: QuoteLine) {
+    const lineComponents = ligne.components ?? [];
+    const salePriceCents = ligne.unitPriceCents ?? 0;
     const costPriceCents = calculateQuoteOuvrageUnitCostCents(lineComponents);
     const marginAmountCents = costPriceCents === null ? null : salePriceCents - costPriceCents;
     const marginPercent = calculateQuoteOuvrageMarginPercent(salePriceCents, costPriceCents);
-    const libraryAlreadyLinked = line.librarySource?.kind === "OUVRAGE";
-    const publishedNow = publishedLineIds.has(line.id);
+    const libraryAlreadyLinked = ligne.librarySource?.kind === "OUVRAGE";
+    const publishedNow = publishedLineIds.has(ligne.id);
 
     return (
-      <div className="quoteOuvrageGroup" key={line.id}>
+      <div className="quoteOuvrageGroup" key={ligne.id}>
         <div className="quoteLineRow">
           <div className="quoteLineDescription">
-            <strong>{line.description}</strong>
+            <strong>{ligne.description}</strong>
             <small>
               {lineComponents.length} composant{lineComponents.length === 1 ? "" : "s"}
             </small>
           </div>
-          <span>{line.quantityFormula ?? line.quantity}</span>
-          <span>{line.unit || "—"}</span>
+          <span>{ligne.quantityFormula ?? ligne.quantity}</span>
+          <span>{ligne.unit || "—"}</span>
           <div className="quotePriceCell">
             <strong>{formatMoney(salePriceCents)}</strong>
-            {line.forcedUnitPriceCents !== undefined ? (
+            {ligne.forcedUnitPriceCents !== undefined ? (
               <small className="quoteForcedBadge">
                 <LockKeyhole size={10} aria-hidden="true" /> Forcé
               </small>
@@ -621,23 +624,23 @@ export function QuoteLinesEditor({
                 <button
                   type="button"
                   className="miniLibraryButton"
-                  onClick={() => void addOuvrageToLibrary(line)}
+                  onClick={() => void addOuvrageToLibrary(ligne)}
                   disabled={librarySavingLineId !== null || libraryAlreadyLinked || publishedNow}
-                  aria-label={`Ajouter ${line.description} à la Bibliothèque`}
+                  aria-label={`Ajouter ${ligne.description} à la Bibliothèque`}
                   title={
                     libraryAlreadyLinked || publishedNow
                       ? "Ouvrage déjà ajouté à la Bibliothèque"
                       : "Ajouter l’ouvrage à la Bibliothèque"
                   }
                 >
-                  {librarySavingLineId === line.id ? "…" : "+B"}
+                  {librarySavingLineId === ligne.id ? "…" : "+B"}
                 </button>
                 <button
                   type="button"
                   className="iconButton"
-                  onClick={() => openEditOuvrage(line)}
-                  disabled={formOpen && editingLineId !== line.id}
-                  aria-label={`Modifier ${line.description}`}
+                  onClick={() => openEditOuvrage(ligne)}
+                  disabled={formOpen && editingLineId !== ligne.id}
+                  aria-label={`Modifier ${ligne.description}`}
                   title="Modifier l’ouvrage dans le tableau"
                 >
                   <Pencil size={14} aria-hidden="true" />
@@ -664,7 +667,7 @@ export function QuoteLinesEditor({
     );
   }
 
-  function renderEditingOuvrage(key: string) {
+  function renderEditingOuvrage(cle: string) {
     const retainedPriceInput = priceForced
       ? forcedUnitPriceEuros
       : calculatedUnitPrice === null
@@ -672,12 +675,12 @@ export function QuoteLinesEditor({
         : centsToInput(calculatedUnitPrice);
 
     return (
-      <form className="quoteOuvrageGroup quoteOuvrageEditing" key={key} onSubmit={saveOuvrage}>
+      <form className="quoteOuvrageGroup quoteOuvrageEditing" key={cle} onSubmit={saveOuvrage}>
         <div className="quoteLineRow quoteLineRowEditing">
           <input
             className="quoteInlineInput quoteDescriptionInput"
             value={description}
-            onChange={(event) => setDescription(event.target.value)}
+            onChange={(evenement) => setDescription(evenement.target.value)}
             maxLength={4000}
             required
             aria-label="Désignation de l’ouvrage"
@@ -685,14 +688,14 @@ export function QuoteLinesEditor({
           <input
             className="quoteInlineInput"
             value={quantityInput}
-            onChange={(event) => setQuantityInput(event.target.value)}
+            onChange={(evenement) => setQuantityInput(evenement.target.value)}
             required
             aria-label="Quantité de l’ouvrage"
           />
           <input
             className="quoteInlineInput"
             value={unit}
-            onChange={(event) => setUnit(event.target.value)}
+            onChange={(evenement) => setUnit(evenement.target.value)}
             maxLength={40}
             aria-label="Unité de l’ouvrage"
           />
@@ -701,9 +704,9 @@ export function QuoteLinesEditor({
               className="quoteInlineInput"
               inputMode="decimal"
               value={retainedPriceInput}
-              onChange={(event) => {
+              onChange={(evenement) => {
                 setPriceForced(true);
-                setForcedUnitPriceEuros(event.target.value);
+                setForcedUnitPriceEuros(evenement.target.value);
               }}
               required
               aria-label="Prix unitaire HT de l’ouvrage"
@@ -743,7 +746,7 @@ export function QuoteLinesEditor({
             <button
               type="submit"
               className="iconButton quoteSaveButton"
-              disabled={saving}
+              disabled={sauvegardeEnCours}
               aria-label="Enregistrer l’ouvrage"
               title="Enregistrer"
             >
@@ -753,7 +756,7 @@ export function QuoteLinesEditor({
               type="button"
               className="iconButton"
               onClick={closeForm}
-              disabled={saving}
+              disabled={sauvegardeEnCours}
               aria-label="Annuler la modification"
               title="Annuler"
             >
@@ -794,7 +797,7 @@ export function QuoteLinesEditor({
             <span />
           </div>
 
-          {components.map((component, index) => {
+          {components.map((component, indice) => {
             const total = componentTotalCents(component);
             const marginPercent = componentMarginPercent(component);
             const marginNegative = marginPercent !== null && marginPercent < 0;
@@ -804,40 +807,42 @@ export function QuoteLinesEditor({
                   <input
                     className="quoteInlineInput"
                     value={component.description}
-                    onChange={(event) =>
-                      updateComponent(index, { description: event.target.value })
+                    onChange={(evenement) =>
+                      updateComponent(indice, { description: evenement.target.value })
                     }
                     maxLength={4000}
                     required
-                    aria-label={`Désignation du composant ${index + 1}`}
+                    aria-label={`Désignation du composant ${indice + 1}`}
                   />
                   {component.libraryComponentId ? <small>B</small> : null}
                 </div>
                 <input
                   className="quoteInlineInput"
                   value={component.quantityInput}
-                  onChange={(event) =>
-                    updateComponent(index, { quantityInput: event.target.value })
+                  onChange={(evenement) =>
+                    updateComponent(indice, { quantityInput: evenement.target.value })
                   }
                   required
-                  aria-label={`Quantité du composant ${index + 1}`}
+                  aria-label={`Quantité du composant ${indice + 1}`}
                 />
                 <input
                   className="quoteInlineInput"
                   value={component.unit}
-                  onChange={(event) => updateComponent(index, { unit: event.target.value })}
+                  onChange={(evenement) =>
+                    updateComponent(indice, { unit: evenement.target.value })
+                  }
                   maxLength={40}
-                  aria-label={`Unité du composant ${index + 1}`}
+                  aria-label={`Unité du composant ${indice + 1}`}
                 />
                 <input
                   className="quoteInlineInput"
                   inputMode="decimal"
                   value={component.costPriceEuros}
-                  onChange={(event) =>
-                    updateComponent(index, { costPriceEuros: event.target.value })
+                  onChange={(evenement) =>
+                    updateComponent(indice, { costPriceEuros: evenement.target.value })
                   }
                   placeholder="—"
-                  aria-label={`Coût unitaire HT du composant ${index + 1}`}
+                  aria-label={`Coût unitaire HT du composant ${indice + 1}`}
                 />
                 <span className={marginNegative ? "quoteNegative" : "quotePositive"}>
                   {formatPercent(marginPercent)}
@@ -846,19 +851,19 @@ export function QuoteLinesEditor({
                   className="quoteInlineInput"
                   inputMode="decimal"
                   value={component.unitPriceEuros}
-                  onChange={(event) =>
-                    updateComponent(index, { unitPriceEuros: event.target.value })
+                  onChange={(evenement) =>
+                    updateComponent(indice, { unitPriceEuros: evenement.target.value })
                   }
                   required
-                  aria-label={`Prix de vente unitaire HT du composant ${index + 1}`}
+                  aria-label={`Prix de vente unitaire HT du composant ${indice + 1}`}
                 />
                 <strong>{total === null ? "—" : formatMoney(total)}</strong>
                 <button
                   type="button"
                   className="quoteDeleteComponent"
-                  onClick={() => removeComponent(index)}
+                  onClick={() => removeComponent(indice)}
                   disabled={components.length === 1}
-                  aria-label={`Supprimer le composant ${index + 1}`}
+                  aria-label={`Supprimer le composant ${indice + 1}`}
                   title="Supprimer le composant"
                 >
                   <Trash2 size={13} aria-hidden="true" />
@@ -874,7 +879,7 @@ export function QuoteLinesEditor({
                   <Search size={14} aria-hidden="true" />
                   <input
                     value={libraryQuery}
-                    onChange={(event) => setLibraryQuery(event.target.value)}
+                    onChange={(evenement) => setLibraryQuery(evenement.target.value)}
                     placeholder="Rechercher un composant…"
                     autoFocus
                   />
@@ -952,8 +957,8 @@ export function QuoteLinesEditor({
           <p className="eyebrow">Devis</p>
           <h2>{quote.model.subject}</h2>
           <p className="muted">
-            {quote.variantName} · V{quote.version} · {lines.length} ouvrage
-            {lines.length === 1 ? "" : "s"}
+            {quote.variantName} · V{quote.version} · {lignes.length} ouvrage
+            {lignes.length === 1 ? "" : "s"}
           </p>
         </div>
         <div className="quoteLinesHeaderActions">
@@ -963,7 +968,7 @@ export function QuoteLinesEditor({
               type="button"
               className="primaryButton"
               onClick={openNewOuvrage}
-              disabled={saving || formOpen}
+              disabled={sauvegardeEnCours || formOpen}
             >
               <Plus size={16} aria-hidden="true" />
               Ajouter un ouvrage
@@ -972,10 +977,10 @@ export function QuoteLinesEditor({
         </div>
       </div>
 
-      {error ? <div className="quoteLineMessage quoteLineError">{error}</div> : null}
+      {erreur ? <div className="quoteLineMessage quoteLineError">{erreur}</div> : null}
       {notice ? <div className="quoteLineMessage quoteLineNotice">{notice}</div> : null}
 
-      {lines.length === 0 && !formOpen ? (
+      {lignes.length === 0 && !formOpen ? (
         <div className="quoteLinesNoData">
           <strong>Le devis est vide.</strong>
           <span>Ajoute son premier ouvrage. Il sera ensuite modifiable directement ici.</span>
@@ -990,10 +995,10 @@ export function QuoteLinesEditor({
             <span>Marge</span>
             <span />
           </div>
-          {lines.map((line) =>
-            formOpen && editingLineId === line.id
-              ? renderEditingOuvrage(line.id)
-              : renderReadOuvrage(line),
+          {lignes.map((ligne) =>
+            formOpen && editingLineId === ligne.id
+              ? renderEditingOuvrage(ligne.id)
+              : renderReadOuvrage(ligne),
           )}
           {formOpen && editingLineId === null ? renderEditingOuvrage("new-ouvrage") : null}
         </div>

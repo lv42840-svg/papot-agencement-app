@@ -5,29 +5,29 @@ import { useRouter } from "next/navigation";
 
 export function ChangePasswordForm() {
   const router = useRouter();
-  const [error, setError] = useState("");
+  const [erreur, setError] = useState("");
   const [busy, setBusy] = useState(false);
 
-  async function submit(event: FormEvent<HTMLFormElement>) {
-    event.preventDefault();
+  async function submit(evenement: FormEvent<HTMLFormElement>) {
+    evenement.preventDefault();
     setError("");
-    const data = new FormData(event.currentTarget);
-    const password = String(data.get("password") ?? "");
-    const confirmation = String(data.get("confirmation") ?? "");
+    const donnees = new FormData(evenement.currentTarget);
+    const password = String(donnees.get("password") ?? "");
+    const confirmation = String(donnees.get("confirmation") ?? "");
     if (password !== confirmation) {
       setError("Les deux mots de passe ne correspondent pas.");
       return;
     }
 
     setBusy(true);
-    const response = await fetch("/api/auth/change-password", {
+    const reponse = await fetch("/api/auth/change-password", {
       method: "POST",
       headers: { "content-type": "application/json" },
       body: JSON.stringify({ password }),
     });
-    if (!response.ok) {
-      const body = (await response.json().catch(() => null)) as { error?: string } | null;
-      setError(body?.error ?? "Modification impossible.");
+    if (!reponse.ok) {
+      const corps = (await reponse.json().catch(() => null)) as { error?: string } | null;
+      setError(corps?.error ?? "Modification impossible.");
       setBusy(false);
       return;
     }
@@ -58,9 +58,9 @@ export function ChangePasswordForm() {
           required
         />
       </label>
-      {error && (
+      {erreur && (
         <p className="formError" role="alert">
-          {error}
+          {erreur}
         </p>
       )}
       <button className="primaryButton" type="submit" disabled={busy}>

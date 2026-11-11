@@ -16,9 +16,10 @@ function readDesktopDeviceIdentity(): DesktopDeviceIdentity {
   }
 
   try {
-    const config = JSON.parse(rawConfig) as { device_label?: unknown };
+    const configuration = JSON.parse(rawConfig) as { device_label?: unknown };
     return {
-      deviceLabel: typeof config.device_label === "string" ? config.device_label : "Poste PAPOT",
+      deviceLabel:
+        typeof configuration.device_label === "string" ? configuration.device_label : "Poste PAPOT",
     };
   } catch {
     return {
@@ -28,10 +29,10 @@ function readDesktopDeviceIdentity(): DesktopDeviceIdentity {
 }
 
 export async function DesktopAppShell({ children }: { children: React.ReactNode }) {
-  const user = await requireUser();
+  const utilisateur = await requireUser();
   const device = readDesktopDeviceIdentity();
-  const allowedModules = await listReadableModules(user.id);
-  const initials = user.displayName
+  const allowedModules = await listReadableModules(utilisateur.id);
+  const initials = utilisateur.displayName
     .split(/\s+/)
     .map((part) => part[0])
     .join("")
@@ -42,12 +43,12 @@ export async function DesktopAppShell({ children }: { children: React.ReactNode 
     <div className="desktopAppShellV2">
       <DesktopSidebar
         allowedModules={allowedModules}
-        canManagePermissions={user.canManagePermissions}
+        canManagePermissions={utilisateur.canManagePermissions}
       />
 
       <div className="desktopWorkspace">
         <DesktopTopbar
-          displayName={user.displayName}
+          displayName={utilisateur.displayName}
           deviceLabel={device.deviceLabel}
           initials={initials}
         />

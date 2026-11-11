@@ -17,12 +17,12 @@ export const dynamic = "force-dynamic";
 
 type RouteContext = { params: Promise<{ entryId: string }> };
 
-function snapshot(payload: EntriesPayload, actor: EntriesActor, focusEntryId?: string) {
+function snapshot(contenu: EntriesPayload, auteur: EntriesActor, focusEntryId?: string) {
   return {
-    payload,
-    actor: { userId: actor.userId, displayName: actor.displayName },
-    capabilities: entriesCapabilities(actor),
-    suggestedAssignees: listSuggestedAssignees(payload, actor),
+    payload: contenu,
+    actor: { userId: auteur.userId, displayName: auteur.displayName },
+    capabilities: entriesCapabilities(auteur),
+    suggestedAssignees: listSuggestedAssignees(contenu, auteur),
     focusEntryId,
     serverNow: new Date().toISOString(),
   };
@@ -39,20 +39,22 @@ function statusFor(code: string): number {
   return 400;
 }
 
-export async function POST(request: Request, context: RouteContext) {
+export async function POST(requete: Request, contexte: RouteContext) {
   try {
-    const { entryId } = await context.params;
+    const { entryId: idEntree } = await contexte.params;
     const requestContext = await requireModuleRequestContext("capture", "WRITE");
-    const actor = await buildEntriesActor(requestContext);
+    const auteur = await buildEntriesActor(requestContext);
     const repository = await createEntriesRepository();
-    const form = await request.formData();
-    const files = form.getAll("files").filter((value): value is File => value instanceof File);
-    if (files.length === 0) {
+    const form = await requete.formData();
+    const fichiers = form
+      .getAll("files")
+      .filter((valeur): valeur is File => valeur instanceof File);
+    if (fichiers.length === 0) {
       return NextResponse.json({ error: "ENTRY_ATTACHMENTS_REQUIRED" }, { status: 400 });
     }
 
     const currentPayload = await repository.load();
-    if (!currentPayload.entries.some((entry) => entry.id === entryId)) {
+    if (!currentPayload.entries.some((entree) => entree.id === idEntree)) {
       return NextResponse.json({ error: "ENTRY_NOT_FOUND" }, { status: 404 });
     }
 
@@ -61,17 +63,17 @@ export async function POST(request: Request, context: RouteContext) {
     });
     let uploaded = [] as Awaited<ReturnType<typeof uploadEntryAttachments>>;
     try {
-      uploaded = await uploadEntryAttachments(transport, entryId, files);
-      const mutation = await repository.registerAttachments(entryId, uploaded, actor);
-      return NextResponse.json(snapshot(mutation.payload, actor, mutation.focusEntryId), {
+      uploaded = await uploadEntryAttachments(transport, idEntree, fichiers);
+      const mutation = await repository.registerAttachments(idEntree, uploaded, auteur);
+      return NextResponse.json(snapshot(mutation.payload, auteur, mutation.focusEntryId), {
         headers: { "Cache-Control": "no-store" },
       });
-    } catch (error) {
+    } catch (erreur) {
       if (uploaded.length > 0) await cleanupEntryAttachments(transport, uploaded);
-      throw error;
+      throw erreur;
     }
-  } catch (error) {
-    const code = error instanceof Error ? error.message : "ENTRY_ATTACHMENTS_FAILED";
+  } catch (erreur) {
+    const code = erreur instanceof Error ? erreur.message : "ENTRY_ATTACHMENTS_FAILED";
     return NextResponse.json(
       { error: code },
       { status: statusFor(code), headers: { "Cache-Control": "no-store" } },

@@ -115,13 +115,13 @@ const errorMessages: Record<string, string> = {
   LOCK_CHANGED: "Le verrou de la bibliothèque a changé. Recharge avant de recommencer.",
 };
 
-function messageForError(error: unknown, fallback: string): string {
-  const code = error instanceof Error ? error.message : String(error);
+function messageForError(erreur: unknown, fallback: string): string {
+  const code = erreur instanceof Error ? erreur.message : String(erreur);
   return errorMessages[code] ?? fallback;
 }
 
-function normalizeSearch(value: string): string {
-  return value
+function normalizeSearch(valeur: string): string {
+  return valeur
     .normalize("NFD")
     .replace(/[\u0300-\u036f]/g, "")
     .toLocaleLowerCase("fr-FR")
@@ -136,14 +136,14 @@ function centsToInput(cents: number): string {
   return (cents / 100).toFixed(2).replace(".", ",");
 }
 
-function parseDecimal(value: string): number {
-  const parsed = Number(value.trim().replace(",", "."));
-  if (!Number.isFinite(parsed)) throw new Error("LIBRARY_COMPONENT_PRICING_INVALID");
-  return parsed;
+function parseDecimal(valeur: string): number {
+  const analyse = Number(valeur.trim().replace(",", "."));
+  if (!Number.isFinite(analyse)) throw new Error("LIBRARY_COMPONENT_PRICING_INVALID");
+  return analyse;
 }
 
-function eurosToCents(value: string): number {
-  const euros = parseDecimal(value);
+function eurosToCents(valeur: string): number {
+  const euros = parseDecimal(valeur);
   if (euros < 0) throw new Error("LIBRARY_COMPONENT_PRICING_INVALID");
   const cents = Math.round(euros * 100);
   if (!Number.isSafeInteger(cents)) throw new Error("LIBRARY_COMPONENT_PRICING_INVALID");
@@ -175,18 +175,18 @@ function emptyComponentDraft(): ComponentDraft {
   };
 }
 
-function componentFromDraft(draft: ComponentDraft): LibraryComponent {
-  const costPriceCents = eurosToCents(draft.costPriceEuros);
-  const marginPercent = parseDecimal(draft.marginPercent);
-  const salePriceCents = eurosToCents(draft.salePriceEuros);
+function componentFromDraft(brouillon: ComponentDraft): LibraryComponent {
+  const costPriceCents = eurosToCents(brouillon.costPriceEuros);
+  const marginPercent = parseDecimal(brouillon.marginPercent);
+  const salePriceCents = eurosToCents(brouillon.salePriceEuros);
   if (marginPercent < 0) throw new Error("LIBRARY_COMPONENT_PRICING_INVALID");
 
   return {
-    id: draft.id,
-    name: draft.name,
-    description: draft.description,
-    unit: draft.unit,
-    ...(draft.activity ? { activity: draft.activity } : {}),
+    id: brouillon.id,
+    name: brouillon.name,
+    description: brouillon.description,
+    unit: brouillon.unit,
+    ...(brouillon.activity ? { activity: brouillon.activity } : {}),
     costPriceCents,
     marginPercent,
     salePriceCents,
@@ -198,25 +198,25 @@ function ouvrageToDraft(ouvrage: LibraryOuvrage): OuvrageDraft {
     id: ouvrage.id,
     name: ouvrage.name,
     description: ouvrage.description,
-    components: ouvrage.components.map((line) => ({
-      id: line.id,
-      componentId: line.componentId,
-      quantity: String(line.quantity).replace(".", ","),
+    components: ouvrage.components.map((ligne) => ({
+      id: ligne.id,
+      componentId: ligne.componentId,
+      quantity: String(ligne.quantity).replace(".", ","),
     })),
   };
 }
 
-function emptyOuvrageDraft(payload: LibraryPayload): OuvrageDraft {
+function emptyOuvrageDraft(contenu: LibraryPayload): OuvrageDraft {
   return {
     id: crypto.randomUUID(),
     name: "",
     description: "",
     components:
-      payload.components.length > 0
+      contenu.components.length > 0
         ? [
             {
               id: crypto.randomUUID(),
-              componentId: payload.components[0].id,
+              componentId: contenu.components[0].id,
               quantity: "1",
             },
           ]
@@ -224,17 +224,17 @@ function emptyOuvrageDraft(payload: LibraryPayload): OuvrageDraft {
   };
 }
 
-function ouvrageFromDraft(draft: OuvrageDraft): LibraryOuvrage {
+function ouvrageFromDraft(brouillon: OuvrageDraft): LibraryOuvrage {
   return {
-    id: draft.id,
-    name: draft.name,
-    description: draft.description,
-    components: draft.components.map((line) => {
-      const quantity = parseDecimal(line.quantity);
+    id: brouillon.id,
+    name: brouillon.name,
+    description: brouillon.description,
+    components: brouillon.components.map((ligne) => {
+      const quantity = parseDecimal(ligne.quantity);
       if (quantity <= 0) throw new Error("LIBRARY_OUVRAGE_INVALID");
       return {
-        id: line.id,
-        componentId: line.componentId,
+        id: ligne.id,
+        componentId: ligne.componentId,
         quantity,
       };
     }),
@@ -242,22 +242,22 @@ function ouvrageFromDraft(draft: OuvrageDraft): LibraryOuvrage {
 }
 
 function snapshotFromEnvelope(envelope: ResourceEnvelope | null): LibrarySnapshot {
-  const payload = envelope ? parseLibraryPayload(envelope.payload) : createInitialLibraryPayload();
+  const contenu = envelope ? parseLibraryPayload(envelope.payload) : createInitialLibraryPayload();
   return {
     version: envelope?.version ?? 0,
-    payload: ensureRequiredLaborComponents(payload),
+    payload: ensureRequiredLaborComponents(contenu),
   };
 }
 
-async function sharedResourceRequest(body: Record<string, unknown>) {
-  const response = await fetch("/api/desktop/library", {
+async function sharedResourceRequest(corps: Record<string, unknown>) {
+  const reponse = await fetch("/api/desktop/library", {
     method: "POST",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify(body),
+    body: JSON.stringify(corps),
   });
-  const result = (await response.json()) as { status?: string; error?: string };
-  if (!response.ok) throw new Error(result.error ?? "LIBRARY_REQUEST_FAILED");
-  return result;
+  const resultat = (await reponse.json()) as { status?: string; error?: string };
+  if (!reponse.ok) throw new Error(resultat.error ?? "LIBRARY_REQUEST_FAILED");
+  return resultat;
 }
 
 export function LibraryWorkspace({
@@ -272,14 +272,14 @@ export function LibraryWorkspace({
     payload: ensureRequiredLaborComponents(initialSnapshot.payload),
   }));
   const [activeTab, setActiveTab] = useState<LibraryTab>("components");
-  const [query, setQuery] = useState("");
+  const [requeteRecherche, setQuery] = useState("");
   const [editor, setEditor] = useState<EditorState>(null);
   const [session, setSession] = useState<EditSession | null>(null);
   const [busy, setBusy] = useState(false);
-  const [error, setError] = useState<string | null>(null);
+  const [erreur, setError] = useState<string | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
 
-  const normalizedQuery = normalizeSearch(query);
+  const normalizedQuery = normalizeSearch(requeteRecherche);
 
   const visibleComponents = useMemo(
     () =>
@@ -303,8 +303,8 @@ export function LibraryWorkspace({
       snapshot.payload.ouvrages
         .filter((ouvrage) => {
           const componentNames = ouvrage.components.map(
-            (line) =>
-              snapshot.payload.components.find((component) => component.id === line.componentId)
+            (ligne) =>
+              snapshot.payload.components.find((component) => component.id === ligne.componentId)
                 ?.name ?? "",
           );
           return normalizeSearch(
@@ -323,12 +323,12 @@ export function LibraryWorkspace({
 
   useEffect(() => {
     if (!session) return;
-    const current = session;
+    const courant = session;
     const interval = window.setInterval(() => {
       void sharedResourceRequest({
         action: "renew",
         resource: LIBRARY_RESOURCE_REF,
-        leaseId: current.leaseId,
+        leaseId: courant.leaseId,
       }).catch((renewError) => {
         setError(
           messageForError(
@@ -337,7 +337,7 @@ export function LibraryWorkspace({
           ),
         );
         setEditor(null);
-        setSession((active) => (active?.leaseId === current.leaseId ? null : active));
+        setSession((active) => (active?.leaseId === courant.leaseId ? null : active));
       });
     }, 120_000);
     return () => window.clearInterval(interval);
@@ -345,7 +345,7 @@ export function LibraryWorkspace({
 
   useEffect(() => {
     if (!session) return;
-    const current = session;
+    const courant = session;
     return () => {
       void fetch("/api/desktop/library", {
         method: "POST",
@@ -353,7 +353,7 @@ export function LibraryWorkspace({
         body: JSON.stringify({
           action: "release",
           resource: LIBRARY_RESOURCE_REF,
-          leaseId: current.leaseId,
+          leaseId: courant.leaseId,
         }),
         keepalive: true,
       });
@@ -370,22 +370,22 @@ export function LibraryWorkspace({
     setNotice(null);
     try {
       const leaseId = crypto.randomUUID();
-      const result = (await sharedResourceRequest({
+      const resultat = (await sharedResourceRequest({
         action: "open",
         resource: LIBRARY_RESOURCE_REF,
         leaseId,
       })) as OpenResourceResponse;
 
-      if (result.status === "error") throw new Error(result.error);
-      if (result.status === "read-only") {
+      if (resultat.status === "error") throw new Error(resultat.error);
+      if (resultat.status === "read-only") {
         setError(
-          `Bibliothèque en cours de modification par ${result.lock.owner_display_name}. Réessaie dans quelques instants.`,
+          `Bibliothèque en cours de modification par ${resultat.lock.owner_display_name}. Réessaie dans quelques instants.`,
         );
         return null;
       }
 
-      const latest = snapshotFromEnvelope(result.resource);
-      const nextSession = { leaseId, baseVersion: result.baseVersion };
+      const latest = snapshotFromEnvelope(resultat.resource);
+      const nextSession = { leaseId, baseVersion: resultat.baseVersion };
       setSnapshot(latest);
       setSession(nextSession);
       return { session: nextSession, snapshot: latest };
@@ -427,7 +427,7 @@ export function LibraryWorkspace({
     setError(null);
     setNotice(null);
     try {
-      const result = (await sharedResourceRequest({
+      const resultat = (await sharedResourceRequest({
         action: "save",
         resource: LIBRARY_RESOURCE_REF,
         leaseId: currentSession.leaseId,
@@ -435,9 +435,9 @@ export function LibraryWorkspace({
         payload: nextPayload,
       })) as SaveResourceResponse;
 
-      if (result.status === "error") throw new Error(result.error);
-      if (result.status === "conflict") {
-        setSnapshot(snapshotFromEnvelope(result.current));
+      if (resultat.status === "error") throw new Error(resultat.error);
+      if (resultat.status === "conflict") {
+        setSnapshot(snapshotFromEnvelope(resultat.current));
         setError(
           "La bibliothèque a changé sur un autre poste. La version la plus récente a été rechargée.",
         );
@@ -447,7 +447,7 @@ export function LibraryWorkspace({
         return false;
       }
 
-      setSnapshot(snapshotFromEnvelope(result.resource));
+      setSnapshot(snapshotFromEnvelope(resultat.resource));
       await releaseLease(currentSession);
       setEditor(null);
       setSession(null);
@@ -476,7 +476,9 @@ export function LibraryWorkspace({
   async function startEditComponent(componentId: string) {
     const acquired = await acquireEditSession();
     if (!acquired) return;
-    const component = acquired.snapshot.payload.components.find((item) => item.id === componentId);
+    const component = acquired.snapshot.payload.components.find(
+      (element) => element.id === componentId,
+    );
     if (!component) {
       await releaseLease(acquired.session);
       setSession(null);
@@ -511,7 +513,7 @@ export function LibraryWorkspace({
   async function startEditOuvrage(ouvrageId: string) {
     const acquired = await acquireEditSession();
     if (!acquired) return;
-    const ouvrage = acquired.snapshot.payload.ouvrages.find((item) => item.id === ouvrageId);
+    const ouvrage = acquired.snapshot.payload.ouvrages.find((element) => element.id === ouvrageId);
     if (!ouvrage) {
       await releaseLease(acquired.session);
       setSession(null);
@@ -557,49 +559,49 @@ export function LibraryWorkspace({
     setEditor({ ...editor, draft: { ...editor.draft, ...patch } });
   }
 
-  function updateComponentCost(value: string) {
+  function updateComponentCost(valeur: string) {
     if (editor?.kind !== "component") return;
-    const next = { ...editor.draft, costPriceEuros: value };
+    const suivant = { ...editor.draft, costPriceEuros: valeur };
     try {
       const salePriceCents = calculateLibraryComponentSalePriceCents(
-        eurosToCents(value),
-        parseDecimal(next.marginPercent),
+        eurosToCents(valeur),
+        parseDecimal(suivant.marginPercent),
       );
-      next.salePriceEuros = centsToInput(salePriceCents);
+      suivant.salePriceEuros = centsToInput(salePriceCents);
     } catch {
       // Keep the user's partial value while typing. Validation happens on save.
     }
-    setEditor({ ...editor, draft: next });
+    setEditor({ ...editor, draft: suivant });
   }
 
-  function updateComponentMargin(value: string) {
+  function updateComponentMargin(valeur: string) {
     if (editor?.kind !== "component") return;
-    const next = { ...editor.draft, marginPercent: value };
+    const suivant = { ...editor.draft, marginPercent: valeur };
     try {
       const salePriceCents = calculateLibraryComponentSalePriceCents(
-        eurosToCents(next.costPriceEuros),
-        parseDecimal(value),
+        eurosToCents(suivant.costPriceEuros),
+        parseDecimal(valeur),
       );
-      next.salePriceEuros = centsToInput(salePriceCents);
+      suivant.salePriceEuros = centsToInput(salePriceCents);
     } catch {
       // Keep the user's partial value while typing. Validation happens on save.
     }
-    setEditor({ ...editor, draft: next });
+    setEditor({ ...editor, draft: suivant });
   }
 
-  function updateComponentSalePrice(value: string) {
+  function updateComponentSalePrice(valeur: string) {
     if (editor?.kind !== "component") return;
-    const next = { ...editor.draft, salePriceEuros: value };
+    const suivant = { ...editor.draft, salePriceEuros: valeur };
     try {
       const marginPercent = calculateLibraryComponentMarginPercent(
-        eurosToCents(next.costPriceEuros),
-        eurosToCents(value),
+        eurosToCents(suivant.costPriceEuros),
+        eurosToCents(valeur),
       );
-      next.marginPercent = String(marginPercent).replace(".", ",");
+      suivant.marginPercent = String(marginPercent).replace(".", ",");
     } catch {
       // Keep the user's partial value while typing. Validation happens on save.
     }
-    setEditor({ ...editor, draft: next });
+    setEditor({ ...editor, draft: suivant });
   }
 
   function updateOuvrageDraft(patch: Partial<OuvrageDraft>) {
@@ -607,11 +609,11 @@ export function LibraryWorkspace({
     setEditor({ ...editor, draft: { ...editor.draft, ...patch } });
   }
 
-  function updateOuvrageLine(index: number, patch: Partial<OuvrageDraftLine>) {
+  function updateOuvrageLine(indice: number, patch: Partial<OuvrageDraftLine>) {
     if (editor?.kind !== "ouvrage") return;
     updateOuvrageDraft({
-      components: editor.draft.components.map((line, lineIndex) =>
-        lineIndex === index ? { ...line, ...patch } : line,
+      components: editor.draft.components.map((ligne, lineIndex) =>
+        lineIndex === indice ? { ...ligne, ...patch } : ligne,
       ),
     });
   }
@@ -630,15 +632,15 @@ export function LibraryWorkspace({
     });
   }
 
-  function removeOuvrageLine(index: number) {
+  function removeOuvrageLine(indice: number) {
     if (editor?.kind !== "ouvrage") return;
     updateOuvrageDraft({
-      components: editor.draft.components.filter((_, lineIndex) => lineIndex !== index),
+      components: editor.draft.components.filter((_, lineIndex) => lineIndex !== indice),
     });
   }
 
-  async function submitEditor(event: FormEvent<HTMLFormElement>) {
-    event.preventDefault();
+  async function submitEditor(evenement: FormEvent<HTMLFormElement>) {
+    evenement.preventDefault();
     if (!editor || !session) return;
     try {
       if (editor.kind === "component") {
@@ -695,7 +697,7 @@ export function LibraryWorkspace({
         )}
       </header>
 
-      {error ? <div className="libraryAlert libraryAlertError">{error}</div> : null}
+      {erreur ? <div className="libraryAlert libraryAlertError">{erreur}</div> : null}
       {notice ? <div className="libraryAlert libraryAlertSuccess">{notice}</div> : null}
 
       <div className="libraryTabs" role="tablist" aria-label="Type de bibliothèque">
@@ -737,8 +739,8 @@ export function LibraryWorkspace({
             <div className="librarySearch">
               <Search size={16} aria-hidden="true" />
               <input
-                value={query}
-                onChange={(event) => setQuery(event.target.value)}
+                value={requeteRecherche}
+                onChange={(evenement) => setQuery(evenement.target.value)}
                 placeholder={
                   activeTab === "components" ? "Rechercher un composant…" : "Rechercher un ouvrage…"
                 }
@@ -754,13 +756,13 @@ export function LibraryWorkspace({
             visibleComponents.length === 0 ? (
               <div className="libraryEmpty">
                 <Boxes size={28} aria-hidden="true" />
-                <strong>{query ? "Aucun composant trouvé" : "Aucun composant"}</strong>
+                <strong>{requeteRecherche ? "Aucun composant trouvé" : "Aucun composant"}</strong>
                 <span>
-                  {query
+                  {requeteRecherche
                     ? "Modifie la recherche pour afficher d’autres résultats."
                     : "Ajoute les matières, quincailleries, heures ou prestations réutilisables."}
                 </span>
-                {!query && canWrite ? (
+                {!requeteRecherche && canWrite ? (
                   <button
                     className="secondaryButton"
                     type="button"
@@ -851,15 +853,15 @@ export function LibraryWorkspace({
           ) : visibleOuvrages.length === 0 ? (
             <div className="libraryEmpty">
               <Layers3 size={28} aria-hidden="true" />
-              <strong>{query ? "Aucun ouvrage trouvé" : "Aucun ouvrage"}</strong>
+              <strong>{requeteRecherche ? "Aucun ouvrage trouvé" : "Aucun ouvrage"}</strong>
               <span>
-                {query
+                {requeteRecherche
                   ? "Modifie la recherche pour afficher d’autres résultats."
                   : snapshot.payload.components.length === 0
                     ? "Crée d’abord un composant, puis compose ton premier ouvrage."
                     : "Crée des ensembles réutilisables à partir des composants de la bibliothèque."}
               </span>
-              {!query && canWrite ? (
+              {!requeteRecherche && canWrite ? (
                 <button
                   className="secondaryButton"
                   type="button"
@@ -884,11 +886,11 @@ export function LibraryWorkspace({
                 </thead>
                 <tbody>
                   {visibleOuvrages.map((ouvrage) => {
-                    const names = ouvrage.components
+                    const noms = ouvrage.components
                       .map(
-                        (line) =>
+                        (ligne) =>
                           snapshot.payload.components.find(
-                            (component) => component.id === line.componentId,
+                            (component) => component.id === ligne.componentId,
                           )?.name ?? "Composant manquant",
                       )
                       .slice(0, 3);
@@ -899,7 +901,7 @@ export function LibraryWorkspace({
                           {ouvrage.description ? <small>{ouvrage.description}</small> : null}
                         </td>
                         <td>
-                          {names.join(" · ")}
+                          {noms.join(" · ")}
                           {ouvrage.components.length > 3
                             ? ` · +${ouvrage.components.length - 3}`
                             : ""}
@@ -940,7 +942,7 @@ export function LibraryWorkspace({
 
         {editor ? (
           <section className="panel libraryEditorPanel">
-            <form onSubmit={(event) => void submitEditor(event)}>
+            <form onSubmit={(evenement) => void submitEditor(evenement)}>
               <div className="libraryEditorHeader">
                 <div>
                   <span className="libraryEditorEyebrow">
@@ -975,7 +977,9 @@ export function LibraryWorkspace({
                     Nom du composant
                     <input
                       value={editor.draft.name}
-                      onChange={(event) => updateComponentDraft({ name: event.target.value })}
+                      onChange={(evenement) =>
+                        updateComponentDraft({ name: evenement.target.value })
+                      }
                       required
                       maxLength={240}
                       autoFocus
@@ -993,7 +997,9 @@ export function LibraryWorkspace({
                       Unité
                       <input
                         value={editor.draft.unit}
-                        onChange={(event) => updateComponentDraft({ unit: event.target.value })}
+                        onChange={(evenement) =>
+                          updateComponentDraft({ unit: evenement.target.value })
+                        }
                         required
                         maxLength={40}
                         placeholder="u, m², ml, h…"
@@ -1003,7 +1009,7 @@ export function LibraryWorkspace({
                       Prix d’achat HT
                       <input
                         value={editor.draft.costPriceEuros}
-                        onChange={(event) => updateComponentCost(event.target.value)}
+                        onChange={(evenement) => updateComponentCost(evenement.target.value)}
                         inputMode="decimal"
                         required
                       />
@@ -1013,7 +1019,7 @@ export function LibraryWorkspace({
                       <div className="libraryInputSuffix">
                         <input
                           value={editor.draft.marginPercent}
-                          onChange={(event) => updateComponentMargin(event.target.value)}
+                          onChange={(evenement) => updateComponentMargin(evenement.target.value)}
                           inputMode="decimal"
                           required
                         />
@@ -1025,7 +1031,7 @@ export function LibraryWorkspace({
                       <div className="libraryInputSuffix">
                         <input
                           value={editor.draft.salePriceEuros}
-                          onChange={(event) => updateComponentSalePrice(event.target.value)}
+                          onChange={(evenement) => updateComponentSalePrice(evenement.target.value)}
                           inputMode="decimal"
                           required
                         />
@@ -1043,8 +1049,8 @@ export function LibraryWorkspace({
                     Description
                     <textarea
                       value={editor.draft.description}
-                      onChange={(event) =>
-                        updateComponentDraft({ description: event.target.value })
+                      onChange={(evenement) =>
+                        updateComponentDraft({ description: evenement.target.value })
                       }
                       rows={4}
                       maxLength={4000}
@@ -1057,7 +1063,7 @@ export function LibraryWorkspace({
                     Nom de l’ouvrage
                     <input
                       value={editor.draft.name}
-                      onChange={(event) => updateOuvrageDraft({ name: event.target.value })}
+                      onChange={(evenement) => updateOuvrageDraft({ name: evenement.target.value })}
                       required
                       maxLength={240}
                       autoFocus
@@ -1068,7 +1074,9 @@ export function LibraryWorkspace({
                     Description
                     <textarea
                       value={editor.draft.description}
-                      onChange={(event) => updateOuvrageDraft({ description: event.target.value })}
+                      onChange={(evenement) =>
+                        updateOuvrageDraft({ description: evenement.target.value })
+                      }
                       rows={3}
                       maxLength={4000}
                     />
@@ -1086,24 +1094,25 @@ export function LibraryWorkspace({
                   </div>
 
                   <div className="libraryComposition">
-                    {editor.draft.components.map((line, index) => {
+                    {editor.draft.components.map((ligne, indice) => {
                       const component = snapshot.payload.components.find(
-                        (item) => item.id === line.componentId,
+                        (element) => element.id === ligne.componentId,
                       );
                       return (
-                        <div className="libraryCompositionRow" key={line.id}>
+                        <div className="libraryCompositionRow" key={ligne.id}>
                           <label className="libraryField">
                             Composant
                             <select
-                              value={line.componentId}
-                              onChange={(event) =>
-                                updateOuvrageLine(index, { componentId: event.target.value })
+                              value={ligne.componentId}
+                              onChange={(evenement) =>
+                                updateOuvrageLine(indice, { componentId: evenement.target.value })
                               }
                               required
                             >
-                              {snapshot.payload.components.map((item) => (
-                                <option key={item.id} value={item.id}>
-                                  {item.name} · {item.unit} · {formatMoney(item.salePriceCents)}
+                              {snapshot.payload.components.map((element) => (
+                                <option key={element.id} value={element.id}>
+                                  {element.name} · {element.unit} ·{" "}
+                                  {formatMoney(element.salePriceCents)}
                                 </option>
                               ))}
                             </select>
@@ -1111,9 +1120,9 @@ export function LibraryWorkspace({
                           <label className="libraryField libraryQuantityField">
                             Quantité
                             <input
-                              value={line.quantity}
-                              onChange={(event) =>
-                                updateOuvrageLine(index, { quantity: event.target.value })
+                              value={ligne.quantity}
+                              onChange={(evenement) =>
+                                updateOuvrageLine(indice, { quantity: evenement.target.value })
                               }
                               inputMode="decimal"
                               required
@@ -1127,7 +1136,7 @@ export function LibraryWorkspace({
                                     try {
                                       return formatMoney(
                                         Math.round(
-                                          component.salePriceCents * parseDecimal(line.quantity),
+                                          component.salePriceCents * parseDecimal(ligne.quantity),
                                         ),
                                       );
                                     } catch {
@@ -1140,7 +1149,7 @@ export function LibraryWorkspace({
                           <button
                             className="iconButton libraryDeleteButton"
                             type="button"
-                            onClick={() => removeOuvrageLine(index)}
+                            onClick={() => removeOuvrageLine(indice)}
                             disabled={editor.draft.components.length <= 1}
                             aria-label="Retirer ce composant"
                             title="Retirer"

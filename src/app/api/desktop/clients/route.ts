@@ -10,14 +10,14 @@ import { desktopRequestErrorStatus } from "@/lib/desktop/request-context";
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
-function noStoreJson(body: unknown, init?: ResponseInit) {
-  const response = NextResponse.json(body, init);
-  response.headers.set("Cache-Control", "no-store");
-  return response;
+function noStoreJson(corps: unknown, init?: ResponseInit) {
+  const reponse = NextResponse.json(corps, init);
+  reponse.headers.set("Cache-Control", "no-store");
+  return reponse;
 }
 
-function publicSnapshot(payload: ClientsPayload, canWrite: boolean, focusClientId?: string) {
-  return { payload, canWrite, focusClientId };
+function publicSnapshot(contenu: ClientsPayload, canWrite: boolean, focusClientId?: string) {
+  return { payload: contenu, canWrite, focusClientId };
 }
 
 function errorStatus(code: string): number {
@@ -32,42 +32,42 @@ function errorStatus(code: string): number {
 
 export async function GET() {
   try {
-    const context = await requireModuleRequestContext("clients", "READ");
+    const contexte = await requireModuleRequestContext("clients", "READ");
     const repository = await createClientsRepository();
-    const payload = await repository.load();
-    return noStoreJson(publicSnapshot(payload, context.moduleAccess.canWrite));
-  } catch (error) {
-    const code = error instanceof Error ? error.message : "CLIENTS_LOAD_FAILED";
+    const contenu = await repository.load();
+    return noStoreJson(publicSnapshot(contenu, contexte.moduleAccess.canWrite));
+  } catch (erreur) {
+    const code = erreur instanceof Error ? erreur.message : "CLIENTS_LOAD_FAILED";
     return noStoreJson({ error: code }, { status: errorStatus(code) });
   }
 }
 
-export async function POST(request: Request) {
+export async function POST(requete: Request) {
   const startedAt = Date.now();
   let stage = "parse-request";
 
   try {
-    const input = clientsMutationSchema.parse(await request.json());
+    const saisie = clientsMutationSchema.parse(await requete.json());
     stage = "create-repository";
-    const context = await requireModuleRequestContext("clients", "WRITE");
+    const contexte = await requireModuleRequestContext("clients", "WRITE");
     const repository = await createClientsRepository();
 
     stage = "mutate";
-    const mutation = await repository.mutate(input, {
-      userId: context.user.id,
-      displayName: context.user.displayName,
+    const mutation = await repository.mutate(saisie, {
+      userId: contexte.user.id,
+      displayName: contexte.user.displayName,
     });
 
     console.info("[PAPOT][Clients] POST saved", { ms: Date.now() - startedAt });
     return noStoreJson(
-      publicSnapshot(mutation.payload, context.moduleAccess.canWrite, mutation.focusClientId),
+      publicSnapshot(mutation.payload, contexte.moduleAccess.canWrite, mutation.focusClientId),
     );
-  } catch (error) {
+  } catch (erreur) {
     const code =
-      error instanceof ZodError
+      erreur instanceof ZodError
         ? "CLIENTS_REQUEST_INVALID"
-        : error instanceof Error
-          ? error.message
+        : erreur instanceof Error
+          ? erreur.message
           : "CLIENTS_MUTATION_FAILED";
     console.error("[PAPOT][Clients] POST failed", {
       stage,
@@ -75,10 +75,10 @@ export async function POST(request: Request) {
       ms: Date.now() - startedAt,
     });
 
-    const body =
-      error instanceof ClientsRepositoryError && error.details?.lockedBy
-        ? { error: code, lockedBy: error.details.lockedBy }
+    const corps =
+      erreur instanceof ClientsRepositoryError && erreur.details?.lockedBy
+        ? { error: code, lockedBy: erreur.details.lockedBy }
         : { error: code };
-    return noStoreJson(body, { status: errorStatus(code) });
+    return noStoreJson(corps, { status: errorStatus(code) });
   }
 }

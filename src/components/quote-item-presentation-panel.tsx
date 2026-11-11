@@ -11,22 +11,22 @@ type Props = {
   quoteUpdatedAt: string;
   item: QuoteItem;
   editable: boolean;
-  onSaved: (payload: NativeQuotesPayload) => void;
+  onSaved: (contenu: NativeQuotesPayload) => void;
   onClose: () => void;
 };
 
 type ApiResponse = { payload?: NativeQuotesPayload; error?: string };
 
-function itemLabel(item: QuoteItem): string {
-  if (item.kind === "SECTION" || item.kind === "SUBSECTION") return item.title;
-  if (item.kind === "LINE") return item.description;
-  return item.text;
+function itemLabel(element: QuoteItem): string {
+  if (element.kind === "SECTION" || element.kind === "SUBSECTION") return element.title;
+  if (element.kind === "LINE") return element.description;
+  return element.text;
 }
 
 export function QuoteItemPresentationPanel({
-  quoteId,
+  quoteId: idDevis,
   quoteUpdatedAt,
-  item,
+  item: element,
   editable,
   onSaved,
   onClose,
@@ -34,31 +34,31 @@ export function QuoteItemPresentationPanel({
   const [uploading, setUploading] = useState(false);
   const [busyPhotoId, setBusyPhotoId] = useState<string | null>(null);
   const [previewPhotoId, setPreviewPhotoId] = useState<string | null>(null);
-  const [error, setError] = useState("");
+  const [erreur, setError] = useState("");
 
   useEffect(() => {
     setError("");
-  }, [item]);
+  }, [element]);
 
-  async function uploadPhotos(event: ChangeEvent<HTMLInputElement>) {
-    const files = Array.from(event.target.files ?? []);
-    event.target.value = "";
-    if (!editable || files.length === 0) return;
+  async function uploadPhotos(evenement: ChangeEvent<HTMLInputElement>) {
+    const fichiers = Array.from(evenement.target.files ?? []);
+    evenement.target.value = "";
+    if (!editable || fichiers.length === 0) return;
     setUploading(true);
     setError("");
     try {
       const form = new FormData();
-      for (const file of files) form.append("files", file);
-      const response = await fetch(`/api/desktop/quotes/${quoteId}/items/${item.id}/photos`, {
+      for (const fichier of fichiers) form.append("files", fichier);
+      const reponse = await fetch(`/api/desktop/quotes/${idDevis}/items/${element.id}/photos`, {
         method: "POST",
         headers: quoteRevisionHeaders(quoteUpdatedAt),
         body: form,
       });
-      const data = (await response.json()) as ApiResponse;
-      if (!response.ok || !data.payload) {
-        throw new Error(data.error ?? "QUOTE_ITEM_PHOTO_UPLOAD_FAILED");
+      const donnees = (await reponse.json()) as ApiResponse;
+      if (!reponse.ok || !donnees.payload) {
+        throw new Error(donnees.error ?? "QUOTE_ITEM_PHOTO_UPLOAD_FAILED");
       }
-      onSaved(data.payload);
+      onSaved(donnees.payload);
     } catch (uploadError) {
       const code = uploadError instanceof Error ? uploadError.message : "";
       setError(
@@ -78,8 +78,8 @@ export function QuoteItemPresentationPanel({
     setBusyPhotoId(photoId);
     setError("");
     try {
-      const response = await fetch(
-        `/api/desktop/quotes/${quoteId}/items/${item.id}/photos/${photoId}`,
+      const reponse = await fetch(
+        `/api/desktop/quotes/${idDevis}/items/${element.id}/photos/${photoId}`,
         {
           method: "PATCH",
           headers: {
@@ -89,9 +89,9 @@ export function QuoteItemPresentationPanel({
           body: JSON.stringify({ clientVisible }),
         },
       );
-      const data = (await response.json()) as ApiResponse;
-      if (!response.ok || !data.payload) throw new Error();
-      onSaved(data.payload);
+      const donnees = (await reponse.json()) as ApiResponse;
+      if (!reponse.ok || !donnees.payload) throw new Error();
+      onSaved(donnees.payload);
     } catch {
       setError("La visibilité client de la photo n’a pas pu être modifiée.");
     } finally {
@@ -104,16 +104,16 @@ export function QuoteItemPresentationPanel({
     setBusyPhotoId(photoId);
     setError("");
     try {
-      const response = await fetch(
-        `/api/desktop/quotes/${quoteId}/items/${item.id}/photos/${photoId}`,
+      const reponse = await fetch(
+        `/api/desktop/quotes/${idDevis}/items/${element.id}/photos/${photoId}`,
         {
           method: "DELETE",
           headers: quoteRevisionHeaders(quoteUpdatedAt),
         },
       );
-      const data = (await response.json()) as ApiResponse;
-      if (!response.ok || !data.payload) throw new Error();
-      onSaved(data.payload);
+      const donnees = (await reponse.json()) as ApiResponse;
+      if (!reponse.ok || !donnees.payload) throw new Error();
+      onSaved(donnees.payload);
     } catch {
       setError("La photo n’a pas pu être supprimée.");
     } finally {
@@ -121,16 +121,16 @@ export function QuoteItemPresentationPanel({
     }
   }
 
-  const photos = item.presentation?.photos ?? [];
+  const photos = element.presentation?.photos ?? [];
   const previewPhoto = photos.find((photo) => photo.id === previewPhotoId) ?? null;
-  const label = itemLabel(item);
+  const libelle = itemLabel(element);
 
   return (
     <div className="quotePresentationPanel">
       <div className="quotePresentationHeader">
         <div>
           <strong>Photos</strong>
-          <small>{label}</small>
+          <small>{libelle}</small>
         </div>
         <button type="button" className="iconButton" onClick={onClose} aria-label="Fermer">
           <X size={14} aria-hidden="true" />
@@ -152,7 +152,7 @@ export function QuoteItemPresentationPanel({
                 type="file"
                 accept="image/jpeg,image/png,image/webp"
                 multiple
-                onChange={(event) => void uploadPhotos(event)}
+                onChange={(evenement) => void uploadPhotos(evenement)}
                 disabled={uploading}
               />
             </label>
@@ -172,7 +172,7 @@ export function QuoteItemPresentationPanel({
                   aria-label={`Voir ${photo.fileName} en grand`}
                 >
                   <img
-                    src={`/api/desktop/quotes/${quoteId}/items/${item.id}/photos/${photo.id}`}
+                    src={`/api/desktop/quotes/${idDevis}/items/${element.id}/photos/${photo.id}`}
                     alt={photo.fileName}
                   />
                 </button>
@@ -182,7 +182,9 @@ export function QuoteItemPresentationPanel({
                     <input
                       type="checkbox"
                       checked={photo.clientVisible}
-                      onChange={(event) => void setPhotoVisible(photo.id, event.target.checked)}
+                      onChange={(evenement) =>
+                        void setPhotoVisible(photo.id, evenement.target.checked)
+                      }
                       disabled={!editable || busyPhotoId === photo.id}
                     />
                     Visible client
@@ -205,7 +207,7 @@ export function QuoteItemPresentationPanel({
           </div>
         )}
       </div>
-      {error ? <div className="quotePresentationError">{error}</div> : null}
+      {erreur ? <div className="quotePresentationError">{erreur}</div> : null}
 
       {previewPhoto ? (
         <div
@@ -215,7 +217,10 @@ export function QuoteItemPresentationPanel({
           aria-label={`Aperçu de ${previewPhoto.fileName}`}
           onClick={() => setPreviewPhotoId(null)}
         >
-          <div className="quotePhotoLightboxContent" onClick={(event) => event.stopPropagation()}>
+          <div
+            className="quotePhotoLightboxContent"
+            onClick={(evenement) => evenement.stopPropagation()}
+          >
             <div className="quotePhotoLightboxHeader">
               <strong>{previewPhoto.fileName}</strong>
               <button
@@ -228,7 +233,7 @@ export function QuoteItemPresentationPanel({
               </button>
             </div>
             <img
-              src={`/api/desktop/quotes/${quoteId}/items/${item.id}/photos/${previewPhoto.id}`}
+              src={`/api/desktop/quotes/${idDevis}/items/${element.id}/photos/${previewPhoto.id}`}
               alt={previewPhoto.fileName}
             />
           </div>

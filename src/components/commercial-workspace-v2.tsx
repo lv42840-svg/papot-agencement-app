@@ -69,7 +69,7 @@ type Snapshot = {
 type Mutation = Record<string, unknown> & { action: string };
 type DetailTab = "affair" | "follow" | "documents" | "history";
 
-const errors: Record<string, string> = {
+const erreurs: Record<string, string> = {
   COMMERCIAL_REQUEST_INVALID: "Certains champs sont invalides.",
   COMMERCIAL_CASE_NOT_FOUND: "Cette affaire n’existe plus.",
   COMMERCIAL_CLIENT_NOT_FOUND: "Ce client n’existe plus.",
@@ -98,42 +98,42 @@ const errors: Record<string, string> = {
   MODULE_FORBIDDEN: "Ton profil n’autorise pas cette action.",
 };
 
-function dateLabel(value: string | null): string {
-  if (!value) return "Sans date";
-  const [year, month, day] = value.split("-").map(Number);
+function dateLabel(valeur: string | null): string {
+  if (!valeur) return "Sans date";
+  const [annee, mois, jour] = valeur.split("-").map(Number);
   return new Intl.DateTimeFormat("fr-FR", {
     day: "numeric",
     month: "short",
     year: "numeric",
-  }).format(new Date(year, month - 1, day, 12));
+  }).format(new Date(annee, mois - 1, jour, 12));
 }
 
-function dateTime(value: string): string {
+function dateTime(valeur: string): string {
   return new Intl.DateTimeFormat("fr-FR", { dateStyle: "short", timeStyle: "short" }).format(
-    new Date(value),
+    new Date(valeur),
   );
 }
 
-function bytes(value: number): string {
-  if (value < 1024 * 1024) return `${Math.max(1, Math.round(value / 1024))} Ko`;
-  return `${(value / (1024 * 1024)).toFixed(1)} Mo`;
+function bytes(valeur: number): string {
+  if (valeur < 1024 * 1024) return `${Math.max(1, Math.round(valeur / 1024))} Ko`;
+  return `${(valeur / (1024 * 1024)).toFixed(1)} Mo`;
 }
 
-function statusTone(status: CommercialStatus): string {
-  if (status === "FOLLOW_UP") return "follow";
-  if (status === "SENT") return "sent";
-  if (status === "CHIFFRAGE") return "quote";
-  if (status === "LIKELY") return "likely";
-  if (status === "CONFIRMED") return "confirmed";
-  if (status === "LOST" || status === "ABANDONED") return "closed";
-  if (status === "WAITING") return "waiting";
+function statusTone(statut: CommercialStatus): string {
+  if (statut === "FOLLOW_UP") return "follow";
+  if (statut === "SENT") return "sent";
+  if (statut === "CHIFFRAGE") return "quote";
+  if (statut === "LIKELY") return "likely";
+  if (statut === "CONFIRMED") return "confirmed";
+  if (statut === "LOST" || statut === "ABANDONED") return "closed";
+  if (statut === "WAITING") return "waiting";
   return "lead";
 }
 
-function followStatusForUi(status: CommercialStatus): CommercialStatus {
-  if (status === "CHIFFRAGE") return "PISTE";
-  if (status === "LIKELY") return "WAITING";
-  return status;
+function followStatusForUi(statut: CommercialStatus): CommercialStatus {
+  if (statut === "CHIFFRAGE") return "PISTE";
+  if (statut === "LIKELY") return "WAITING";
+  return statut;
 }
 
 function siteAddressFromForm(form: FormData): CommercialSiteAddress {
@@ -154,22 +154,22 @@ function clientAddressLabel(client: CommercialClient | undefined): string {
 
 function useCommercial() {
   const [snapshot, setSnapshot] = useState<Snapshot | null>(null);
-  const [loading, setLoading] = useState(true);
+  const [chargement, setLoading] = useState(true);
   const [busy, setBusy] = useState(false);
-  const [error, setError] = useState<string | null>(null);
+  const [erreur, setError] = useState<string | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
 
   const load = useCallback(async () => {
     setLoading(true);
     setError(null);
     try {
-      const response = await fetch("/api/desktop/commercial", { cache: "no-store" });
-      const body = (await response.json()) as Snapshot;
-      if (!response.ok) throw new Error(body.error ?? "COMMERCIAL_LOAD_FAILED");
-      setSnapshot(body);
+      const reponse = await fetch("/api/desktop/commercial", { cache: "no-store" });
+      const corps = (await reponse.json()) as Snapshot;
+      if (!reponse.ok) throw new Error(corps.error ?? "COMMERCIAL_LOAD_FAILED");
+      setSnapshot(corps);
     } catch (loadError) {
       const code = loadError instanceof Error ? loadError.message : "COMMERCIAL_LOAD_FAILED";
-      setError(errors[code] ?? "Impossible de charger les affaires.");
+      setError(erreurs[code] ?? "Impossible de charger les affaires.");
     } finally {
       setLoading(false);
     }
@@ -182,20 +182,20 @@ function useCommercial() {
     setError(null);
     setNotice(null);
     try {
-      const response = await fetch("/api/desktop/commercial", {
+      const reponse = await fetch("/api/desktop/commercial", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(mutation),
       });
-      const body = (await response.json()) as Snapshot;
-      if (!response.ok) throw new Error(body.error ?? "COMMERCIAL_MUTATION_FAILED");
-      setSnapshot(body);
+      const corps = (await reponse.json()) as Snapshot;
+      if (!reponse.ok) throw new Error(corps.error ?? "COMMERCIAL_MUTATION_FAILED");
+      setSnapshot(corps);
       setNotice(success);
-      return body;
+      return corps;
     } catch (mutationError) {
       const code =
         mutationError instanceof Error ? mutationError.message : "COMMERCIAL_MUTATION_FAILED";
-      setError(errors[code] ?? "L’action n’a pas pu être enregistrée.");
+      setError(erreurs[code] ?? "L’action n’a pas pu être enregistrée.");
       return null;
     } finally {
       setBusy(false);
@@ -204,38 +204,38 @@ function useCommercial() {
 
   const upload = useCallback(
     async (
-      caseId: string,
-      files: File[],
+      idAffaire: string,
+      fichiers: File[],
       category: CommercialDocumentCategory,
       expectedUpdatedAt: string,
       isSignedQuote = false,
     ) => {
-      if (!files.length) return null;
+      if (!fichiers.length) return null;
       setBusy(true);
       setError(null);
       setNotice(null);
       try {
         const form = new FormData();
-        files.forEach((file) => form.append("files", file));
+        fichiers.forEach((fichier) => form.append("files", fichier));
         form.set("category", category);
         form.set("isCurrent", "1");
         form.set("isSignedQuote", isSignedQuote ? "1" : "0");
         form.set("expectedUpdatedAt", expectedUpdatedAt);
-        const response = await fetch(`/api/desktop/commercial/${caseId}/documents`, {
+        const reponse = await fetch(`/api/desktop/commercial/${idAffaire}/documents`, {
           method: "POST",
           body: form,
         });
-        const body = (await response.json()) as Snapshot;
-        if (!response.ok) throw new Error(body.error ?? "COMMERCIAL_DOCUMENT_UPLOAD_FAILED");
-        setSnapshot(body);
+        const corps = (await reponse.json()) as Snapshot;
+        if (!reponse.ok) throw new Error(corps.error ?? "COMMERCIAL_DOCUMENT_UPLOAD_FAILED");
+        setSnapshot(corps);
         setNotice(
-          `${files.length} document${files.length > 1 ? "s" : ""} ajouté${files.length > 1 ? "s" : ""}.`,
+          `${fichiers.length} document${fichiers.length > 1 ? "s" : ""} ajouté${fichiers.length > 1 ? "s" : ""}.`,
         );
-        return body;
+        return corps;
       } catch (uploadError) {
         const code =
           uploadError instanceof Error ? uploadError.message : "COMMERCIAL_DOCUMENT_UPLOAD_FAILED";
-        setError(errors[code] ?? "Les documents n’ont pas pu être ajoutés.");
+        setError(erreurs[code] ?? "Les documents n’ont pas pu être ajoutés.");
         return null;
       } finally {
         setBusy(false);
@@ -244,56 +244,68 @@ function useCommercial() {
     [],
   );
 
-  return { snapshot, loading, busy, error, notice, load, mutate, upload };
+  return { snapshot, loading: chargement, busy, error: erreur, notice, load, mutate, upload };
 }
 
 export function CommercialWorkspaceV2({ affairId }: { affairId?: string }) {
   const router = useRouter();
   const searchParams = useSearchParams();
   const focus = searchParams.get("focus");
-  const { snapshot, loading, busy, error, notice, load, mutate, upload } = useCommercial();
+  const {
+    snapshot,
+    loading: chargement,
+    busy,
+    error: erreur,
+    notice,
+    load,
+    mutate,
+    upload,
+  } = useCommercial();
   const [mode, setMode] = useState<CommercialListFilter>("active");
-  const [query, setQuery] = useState("");
+  const [requeteRecherche, setQuery] = useState("");
   const [createOpen, setCreateOpen] = useState(false);
 
   const clients = snapshot?.payload.clients ?? [];
   const cases = useMemo(() => snapshot?.payload.cases ?? [], [snapshot?.payload.cases]);
-  const now = useMemo(() => new Date(snapshot?.serverNow ?? Date.now()), [snapshot?.serverNow]);
-  const normalized = query.trim().toLocaleLowerCase("fr-FR");
+  const maintenant = useMemo(
+    () => new Date(snapshot?.serverNow ?? Date.now()),
+    [snapshot?.serverNow],
+  );
+  const normalized = requeteRecherche.trim().toLocaleLowerCase("fr-FR");
   const visible = useMemo(() => {
-    let list = filterCommercialCases(cases, mode, now);
+    let list = filterCommercialCases(cases, mode, maintenant);
     if (normalized) {
-      list = list.filter((item) =>
+      list = list.filter((element) =>
         [
-          item.name,
-          item.clientName,
-          item.siteLabel,
-          item.siteAddressOverride?.addressLine1,
-          item.siteAddressOverride?.addressLine2,
-          item.siteAddressOverride?.postalCode,
-          item.siteAddressOverride?.city,
-          item.contactName,
-          item.description,
-          item.nextAction,
+          element.name,
+          element.clientName,
+          element.siteLabel,
+          element.siteAddressOverride?.addressLine1,
+          element.siteAddressOverride?.addressLine2,
+          element.siteAddressOverride?.postalCode,
+          element.siteAddressOverride?.city,
+          element.contactName,
+          element.description,
+          element.nextAction,
         ]
           .filter(Boolean)
-          .some((value) => String(value).toLocaleLowerCase("fr-FR").includes(normalized)),
+          .some((valeur) => String(valeur).toLocaleLowerCase("fr-FR").includes(normalized)),
       );
     }
     return list;
-  }, [cases, mode, normalized, now]);
+  }, [cases, mode, normalized, maintenant]);
 
-  const selected = affairId ? (cases.find((item) => item.id === affairId) ?? null) : null;
+  const selectionne = affairId ? (cases.find((element) => element.id === affairId) ?? null) : null;
 
   useEffect(() => {
-    if (affairId || !focus || !cases.some((item) => item.id === focus)) return;
+    if (affairId || !focus || !cases.some((element) => element.id === focus)) return;
     router.replace(commercialAffairHref(focus));
   }, [affairId, cases, focus, router]);
 
-  const active = filterCommercialCases(cases, "active", now).length;
-  const due = filterCommercialCases(cases, "follow-up", now).length;
-  const confirmed = filterCommercialCases(cases, "confirmed", now).length;
-  const archived = filterCommercialCases(cases, "archives", now).length;
+  const active = filterCommercialCases(cases, "active", maintenant).length;
+  const due = filterCommercialCases(cases, "follow-up", maintenant).length;
+  const confirmed = filterCommercialCases(cases, "confirmed", maintenant).length;
+  const archived = filterCommercialCases(cases, "archives", maintenant).length;
 
   if (affairId) {
     return (
@@ -312,28 +324,28 @@ export function CommercialWorkspaceV2({ affairId }: { affairId?: string }) {
           </button>
         </div>
 
-        {error ? <div className="commercialV2Message error">{error}</div> : null}
+        {erreur ? <div className="commercialV2Message error">{erreur}</div> : null}
         {notice ? <div className="commercialV2Message success">{notice}</div> : null}
 
-        {loading && !snapshot ? (
+        {chargement && !snapshot ? (
           <div className="commercialV2Loading">
             <RefreshCw size={18} /> Chargement…
           </div>
-        ) : selected && snapshot ? (
+        ) : selectionne && snapshot ? (
           <main className="commercialV2Detail commercialV2DetailStandalone">
             <AffairDetail
-              key={selected.id}
-              item={selected}
+              key={selectionne.id}
+              item={selectionne}
               clients={clients}
               busy={busy}
               canModify={snapshot.capabilities.canModify}
               canConfirm={snapshot.capabilities.canConfirm}
               canProvision={snapshot.capabilities.canProvision}
-              mutate={(body, success) =>
-                mutate({ ...body, expectedUpdatedAt: selected.updatedAt }, success)
+              mutate={(corps, success) =>
+                mutate({ ...corps, expectedUpdatedAt: selectionne.updatedAt }, success)
               }
-              upload={(caseId, files, category, isSignedQuote) =>
-                upload(caseId, files, category, selected.updatedAt, isSignedQuote)
+              upload={(idAffaire, fichiers, category, isSignedQuote) =>
+                upload(idAffaire, fichiers, category, selectionne.updatedAt, isSignedQuote)
               }
             />
           </main>
@@ -362,7 +374,7 @@ export function CommercialWorkspaceV2({ affairId }: { affairId?: string }) {
             <button
               className="primaryButton"
               type="button"
-              onClick={() => setCreateOpen((value) => !value)}
+              onClick={() => setCreateOpen((valeur) => !valeur)}
             >
               <Plus size={16} /> Nouvelle affaire
             </button>
@@ -378,7 +390,7 @@ export function CommercialWorkspaceV2({ affairId }: { affairId?: string }) {
         </div>
       </header>
 
-      {error ? <div className="commercialV2Message error">{error}</div> : null}
+      {erreur ? <div className="commercialV2Message error">{erreur}</div> : null}
       {notice ? <div className="commercialV2Message success">{notice}</div> : null}
 
       {createOpen && snapshot ? (
@@ -386,12 +398,12 @@ export function CommercialWorkspaceV2({ affairId }: { affairId?: string }) {
           clients={clients}
           busy={busy}
           onCancel={() => setCreateOpen(false)}
-          onSubmit={async (body) => {
-            const result = await mutate(body, "Affaire créée.");
-            if (result?.focusCaseId) {
+          onSubmit={async (corps) => {
+            const resultat = await mutate(corps, "Affaire créée.");
+            if (resultat?.focusCaseId) {
               setMode("active");
               setCreateOpen(false);
-              router.push(commercialAffairHref(result.focusCaseId));
+              router.push(commercialAffairHref(resultat.focusCaseId));
             }
           }}
         />
@@ -433,11 +445,11 @@ export function CommercialWorkspaceV2({ affairId }: { affairId?: string }) {
         <label className="commercialV2Search">
           <Search size={14} />
           <input
-            value={query}
-            onChange={(event) => setQuery(event.target.value)}
+            value={requeteRecherche}
+            onChange={(evenement) => setQuery(evenement.target.value)}
             placeholder="Rechercher affaire ou client…"
           />
-          {query ? (
+          {requeteRecherche ? (
             <button type="button" onClick={() => setQuery("")}>
               <X size={13} />
             </button>
@@ -445,7 +457,7 @@ export function CommercialWorkspaceV2({ affairId }: { affairId?: string }) {
         </label>
       </section>
 
-      {loading && !snapshot ? (
+      {chargement && !snapshot ? (
         <div className="commercialV2Loading">
           <RefreshCw size={18} /> Chargement…
         </div>
@@ -453,21 +465,21 @@ export function CommercialWorkspaceV2({ affairId }: { affairId?: string }) {
         <div className="commercialV2ListShell">
           <aside className="commercialV2List commercialV2ListFull">
             {visible.length ? (
-              visible.map((item) => (
+              visible.map((element) => (
                 <Link
-                  key={item.id}
-                  href={commercialAffairHref(item.id)}
+                  key={element.id}
+                  href={commercialAffairHref(element.id)}
                   className="commercialV2ListRow"
                 >
                   <div>
-                    <strong>{item.name}</strong>
-                    <span>{item.clientName || "Client à préciser"}</span>
+                    <strong>{element.name}</strong>
+                    <span>{element.clientName || "Client à préciser"}</span>
                   </div>
                   <div className="commercialV2ListMeta">
-                    <span className={`commercialV2Badge ${statusTone(item.status)}`}>
-                      {COMMERCIAL_STATUS_LABELS[item.status]}
+                    <span className={`commercialV2Badge ${statusTone(element.status)}`}>
+                      {COMMERCIAL_STATUS_LABELS[element.status]}
                     </span>
-                    <small>{dateLabel(nextCommercialDeadline(item))}</small>
+                    <small>{dateLabel(nextCommercialDeadline(element))}</small>
                   </div>
                 </Link>
               ))
@@ -488,10 +500,10 @@ export function CommercialWorkspaceV2({ affairId }: { affairId?: string }) {
 
 function Stat({
   icon: Icon,
-  label,
-  value,
+  label: libelle,
+  value: valeur,
   alert = false,
-  selected,
+  selected: selectionne,
   onClick,
 }: {
   icon: typeof BriefcaseBusiness;
@@ -504,14 +516,14 @@ function Stat({
   return (
     <button
       type="button"
-      className={`${alert ? "alert " : ""}${selected ? "active" : ""}`}
-      aria-pressed={selected}
+      className={`${alert ? "alert " : ""}${selectionne ? "active" : ""}`}
+      aria-pressed={selectionne}
       onClick={onClick}
     >
       <Icon size={18} />
       <div>
-        <strong>{value}</strong>
-        <span>{label}</span>
+        <strong>{valeur}</strong>
+        <span>{libelle}</span>
       </div>
     </button>
   );
@@ -526,23 +538,23 @@ function CreateAffair({
   clients: CommercialClient[];
   busy: boolean;
   onCancel: () => void;
-  onSubmit: (body: Mutation) => Promise<void>;
+  onSubmit: (corps: Mutation) => Promise<void>;
 }) {
   const [clientMode, setClientMode] = useState<"existing" | "new">(
     clients.length ? "existing" : "new",
   );
-  const [clientId, setClientId] = useState(clients[0]?.id ?? "");
+  const [idClient, setClientId] = useState(clients[0]?.id ?? "");
   const [differentSiteAddress, setDifferentSiteAddress] = useState(false);
   const selectedClient =
-    clientMode === "existing" ? clients.find((client) => client.id === clientId) : undefined;
+    clientMode === "existing" ? clients.find((client) => client.id === idClient) : undefined;
 
-  async function submit(event: FormEvent<HTMLFormElement>) {
-    event.preventDefault();
-    const form = new FormData(event.currentTarget);
+  async function submit(evenement: FormEvent<HTMLFormElement>) {
+    evenement.preventDefault();
+    const form = new FormData(evenement.currentTarget);
     await onSubmit({
       action: "create",
       name: String(form.get("name") ?? ""),
-      existingClientId: clientMode === "existing" && clientId ? clientId : undefined,
+      existingClientId: clientMode === "existing" && idClient ? idClient : undefined,
       clientName: clientMode === "new" ? String(form.get("clientName") ?? "") : "",
       siteLabel: "",
       siteAddressOverride: differentSiteAddress ? siteAddressFromForm(form) : null,
@@ -552,7 +564,7 @@ function CreateAffair({
     });
   }
   return (
-    <form className="commercialV2Create" onSubmit={(event) => void submit(event)}>
+    <form className="commercialV2Create" onSubmit={(evenement) => void submit(evenement)}>
       <div className="commercialV2CreateTitle">
         <strong>Nouvelle affaire</strong>
         <button type="button" onClick={onCancel}>
@@ -563,7 +575,7 @@ function CreateAffair({
         <span>Client</span>
         <select
           value={clientMode}
-          onChange={(event) => setClientMode(event.target.value as "existing" | "new")}
+          onChange={(evenement) => setClientMode(evenement.target.value as "existing" | "new")}
         >
           <option value="existing" disabled={!clients.length}>
             Client existant
@@ -574,7 +586,11 @@ function CreateAffair({
       {clientMode === "existing" ? (
         <label>
           <span>Fiche client *</span>
-          <select value={clientId} onChange={(event) => setClientId(event.target.value)} required>
+          <select
+            value={idClient}
+            onChange={(evenement) => setClientId(evenement.target.value)}
+            required
+          >
             {clients.map((client) => (
               <option key={client.id} value={client.id}>
                 {client.displayName}
@@ -623,11 +639,11 @@ function SiteAddressFields({
   different,
   onDifferentChange,
   client,
-  address,
-  disabled,
+  address: adresse,
+  disabled: desactive,
 }: {
   different: boolean;
-  onDifferentChange: (value: boolean) => void;
+  onDifferentChange: (valeur: boolean) => void;
   client: CommercialClient | undefined;
   address: CommercialSiteAddress | null;
   disabled: boolean;
@@ -642,8 +658,8 @@ function SiteAddressFields({
         <input
           type="checkbox"
           checked={different}
-          onChange={(event) => onDifferentChange(event.target.checked)}
-          disabled={disabled}
+          onChange={(evenement) => onDifferentChange(evenement.target.checked)}
+          disabled={desactive}
         />
         <span>Adresse de chantier différente de l’adresse du client</span>
       </label>
@@ -652,32 +668,32 @@ function SiteAddressFields({
           <span>Adresse chantier</span>
           <input
             name="siteAddressLine1"
-            defaultValue={address?.addressLine1 ?? ""}
-            disabled={disabled || !different}
+            defaultValue={adresse?.addressLine1 ?? ""}
+            disabled={desactive || !different}
           />
         </label>
         <label className="wide">
           <span>Complément d’adresse</span>
           <input
             name="siteAddressLine2"
-            defaultValue={address?.addressLine2 ?? ""}
-            disabled={disabled || !different}
+            defaultValue={adresse?.addressLine2 ?? ""}
+            disabled={desactive || !different}
           />
         </label>
         <label>
           <span>Code postal</span>
           <input
             name="sitePostalCode"
-            defaultValue={address?.postalCode ?? ""}
-            disabled={disabled || !different}
+            defaultValue={adresse?.postalCode ?? ""}
+            disabled={desactive || !different}
           />
         </label>
         <label>
           <span>Ville</span>
           <input
             name="siteCity"
-            defaultValue={address?.city ?? ""}
-            disabled={disabled || !different}
+            defaultValue={adresse?.city ?? ""}
+            disabled={desactive || !different}
           />
         </label>
       </div>
@@ -686,7 +702,7 @@ function SiteAddressFields({
 }
 
 function AffairDetail({
-  item,
+  item: element,
   clients,
   busy,
   canModify,
@@ -701,10 +717,10 @@ function AffairDetail({
   canModify: boolean;
   canConfirm: boolean;
   canProvision: boolean;
-  mutate: (body: Mutation, success: string) => Promise<Snapshot | null>;
+  mutate: (corps: Mutation, success: string) => Promise<Snapshot | null>;
   upload: (
-    caseId: string,
-    files: File[],
+    idAffaire: string,
+    fichiers: File[],
     category: CommercialDocumentCategory,
     isSignedQuote?: boolean,
   ) => Promise<Snapshot | null>;
@@ -714,27 +730,27 @@ function AffairDetail({
     <div>
       <header className="commercialV2DetailHeader">
         <div>
-          <span className={`commercialV2Badge ${statusTone(item.status)}`}>
-            {COMMERCIAL_STATUS_LABELS[item.status]}
+          <span className={`commercialV2Badge ${statusTone(element.status)}`}>
+            {COMMERCIAL_STATUS_LABELS[element.status]}
           </span>
-          <h2>{item.name}</h2>
+          <h2>{element.name}</h2>
           <p>
-            {item.clientId ? (
+            {element.clientId ? (
               <a
                 className="commercialV2ClientLink"
-                href={clientWorkspaceHref(item.clientId)}
+                href={clientWorkspaceHref(element.clientId)}
                 title="Ouvrir la fiche client"
               >
-                {item.clientName || "Fiche client"} <ExternalLink size={11} />
+                {element.clientName || "Fiche client"} <ExternalLink size={11} />
               </a>
             ) : (
-              item.clientName || "Client à préciser"
+              element.clientName || "Client à préciser"
             )}
           </p>
         </div>
-        {item.clientId && !isCommercialClosed(item) ? (
+        {element.clientId && !isCommercialClosed(element) ? (
           <Link
-            href={`/devis/nouveau?affaire=${encodeURIComponent(item.id)}`}
+            href={`/devis/nouveau?affaire=${encodeURIComponent(element.id)}`}
             className="primaryButton commercialV2CreateQuote"
           >
             <FilePlus2 size={14} /> Créer un devis
@@ -749,7 +765,7 @@ function AffairDetail({
           <Clock3 size={14} /> Suivi
         </button>
         <button className={tab === "documents" ? "active" : ""} onClick={() => setTab("documents")}>
-          <Paperclip size={14} /> Documents <small>{item.documents.length}</small>
+          <Paperclip size={14} /> Documents <small>{element.documents.length}</small>
         </button>
         <button className={tab === "history" ? "active" : ""} onClick={() => setTab("history")}>
           <History size={14} /> Historique
@@ -758,7 +774,7 @@ function AffairDetail({
       <div className="commercialV2TabBody">
         {tab === "affair" ? (
           <AffairForm
-            item={item}
+            item={element}
             clients={clients}
             busy={busy}
             canModify={canModify}
@@ -767,7 +783,7 @@ function AffairDetail({
         ) : null}
         {tab === "follow" ? (
           <FollowForm
-            item={item}
+            item={element}
             busy={busy}
             canModify={canModify}
             canConfirm={canConfirm}
@@ -776,16 +792,16 @@ function AffairDetail({
           />
         ) : null}
         {tab === "documents" ? (
-          <Documents item={item} busy={busy} canModify={canModify} upload={upload} />
+          <Documents item={element} busy={busy} canModify={canModify} upload={upload} />
         ) : null}
-        {tab === "history" ? <HistoryPanel item={item} /> : null}
+        {tab === "history" ? <HistoryPanel item={element} /> : null}
       </div>
     </div>
   );
 }
 
 function AffairForm({
-  item,
+  item: element,
   clients,
   busy,
   canModify,
@@ -795,42 +811,42 @@ function AffairForm({
   clients: CommercialClient[];
   busy: boolean;
   canModify: boolean;
-  mutate: (body: Mutation, success: string) => Promise<Snapshot | null>;
+  mutate: (corps: Mutation, success: string) => Promise<Snapshot | null>;
 }) {
-  const [clientId, setClientId] = useState(item.clientId ?? "");
+  const [idClient, setClientId] = useState(element.clientId ?? "");
   const [differentSiteAddress, setDifferentSiteAddress] = useState(
-    item.siteAddressOverride !== null,
+    element.siteAddressOverride !== null,
   );
-  const selectedClient = clients.find((client) => client.id === clientId);
+  const selectedClient = clients.find((client) => client.id === idClient);
 
-  async function submit(event: FormEvent<HTMLFormElement>) {
-    event.preventDefault();
-    const form = new FormData(event.currentTarget);
+  async function submit(evenement: FormEvent<HTMLFormElement>) {
+    evenement.preventDefault();
+    const form = new FormData(evenement.currentTarget);
     await mutate(
       {
         action: "updateDetails",
-        caseId: item.id,
-        name: item.name,
-        existingClientId: clientId || undefined,
-        clientName: clientId ? "" : String(form.get("clientName") ?? ""),
-        siteLabel: item.siteLabel ?? "",
+        caseId: element.id,
+        name: element.name,
+        existingClientId: idClient || undefined,
+        clientName: idClient ? "" : String(form.get("clientName") ?? ""),
+        siteLabel: element.siteLabel ?? "",
         siteAddressOverride: differentSiteAddress ? siteAddressFromForm(form) : null,
-        contactName: item.contactName ?? "",
-        contactPhone: item.contactPhone ?? "",
-        contactEmail: item.contactEmail ?? "",
+        contactName: element.contactName ?? "",
+        contactPhone: element.contactPhone ?? "",
+        contactEmail: element.contactEmail ?? "",
         description: String(form.get("description") ?? ""),
-        nextAction: item.nextAction ?? "",
+        nextAction: element.nextAction ?? "",
       },
       "Affaire mise à jour.",
     );
   }
   return (
-    <form className="commercialV2Form" onSubmit={(event) => void submit(event)}>
+    <form className="commercialV2Form" onSubmit={(evenement) => void submit(evenement)}>
       <label className="wide">
         <span>Client</span>
         <select
-          value={clientId}
-          onChange={(event) => setClientId(event.target.value)}
+          value={idClient}
+          onChange={(evenement) => setClientId(evenement.target.value)}
           disabled={!canModify}
         >
           <option value="">Nouveau / à préciser</option>
@@ -841,10 +857,10 @@ function AffairForm({
           ))}
         </select>
       </label>
-      {!clientId ? (
+      {!idClient ? (
         <label className="wide">
           <span>Nouveau client</span>
-          <input name="clientName" defaultValue={item.clientName ?? ""} disabled={!canModify} />
+          <input name="clientName" defaultValue={element.clientName ?? ""} disabled={!canModify} />
         </label>
       ) : null}
       <label className="wide">
@@ -852,7 +868,7 @@ function AffairForm({
         <textarea
           name="description"
           rows={3}
-          defaultValue={item.description ?? ""}
+          defaultValue={element.description ?? ""}
           disabled={!canModify}
         />
       </label>
@@ -860,7 +876,7 @@ function AffairForm({
         different={differentSiteAddress}
         onDifferentChange={setDifferentSiteAddress}
         client={selectedClient}
-        address={item.siteAddressOverride}
+        address={element.siteAddressOverride}
         disabled={!canModify}
       />
       {canModify ? (
@@ -873,7 +889,7 @@ function AffairForm({
 }
 
 function FollowForm({
-  item,
+  item: element,
   busy,
   canModify,
   canConfirm,
@@ -885,36 +901,41 @@ function FollowForm({
   canModify: boolean;
   canConfirm: boolean;
   canProvision: boolean;
-  mutate: (body: Mutation, success: string) => Promise<Snapshot | null>;
+  mutate: (corps: Mutation, success: string) => Promise<Snapshot | null>;
 }) {
-  const [status, setStatus] = useState<CommercialStatus>(followStatusForUi(item.status));
+  const [statut, setStatus] = useState<CommercialStatus>(followStatusForUi(element.status));
   const [confirmOpen, setConfirmOpen] = useState(false);
-  const [date, setDate] = useState(nextCommercialDeadline(item) ?? item.plannedInstallDate ?? "");
-  const open = !isCommercialClosed(item);
+  const [date, setDate] = useState(
+    nextCommercialDeadline(element) ?? element.plannedInstallDate ?? "",
+  );
+  const open = !isCommercialClosed(element);
   const dateTitle =
-    status === "SENT"
+    statut === "SENT"
       ? "Date de relance"
-      : status === "CONFIRMED"
+      : statut === "CONFIRMED"
         ? "Pose prévue"
-        : status === "FOLLOW_UP"
+        : statut === "FOLLOW_UP"
           ? "Pas de date obligatoire"
           : "Prochaine revue";
 
   async function saveStatus() {
-    if (status === "LOST" || status === "ABANDONED") {
-      await mutate({ action: "close", caseId: item.id, status, reason: "" }, "Affaire clôturée.");
+    if (statut === "LOST" || statut === "ABANDONED") {
+      await mutate(
+        { action: "close", caseId: element.id, status: statut, reason: "" },
+        "Affaire clôturée.",
+      );
       return;
     }
-    if (status === "CONFIRMED") {
+    if (statut === "CONFIRMED") {
       setConfirmOpen(true);
       return;
     }
     await mutate(
       {
         action: "setStatus",
-        caseId: item.id,
-        status,
-        reviewDate: ["PISTE", "SENT", "WAITING"].includes(status) ? date : undefined,
+        caseId: element.id,
+        status: statut,
+        reviewDate: ["PISTE", "SENT", "WAITING"].includes(statut) ? date : undefined,
       },
       "Suivi commercial mis à jour.",
     );
@@ -924,7 +945,7 @@ function FollowForm({
     return (
       <section className="commercialV2Section">
         <h3>Affaire clôturée</h3>
-        <p>{item.closingReason || "Sans motif saisi."}</p>
+        <p>{element.closingReason || "Sans motif saisi."}</p>
         {canModify ? (
           <button
             className="secondaryButton"
@@ -932,7 +953,7 @@ function FollowForm({
               void mutate(
                 {
                   action: "reopen",
-                  caseId: item.id,
+                  caseId: element.id,
                   reviewDate: new Date().toISOString().slice(0, 10),
                 },
                 "Affaire rouverte.",
@@ -948,7 +969,12 @@ function FollowForm({
 
   return (
     <div className="commercialV2FollowGrid">
-      <CommercialAffairQuotes item={item} busy={busy} canProvision={canProvision} mutate={mutate} />
+      <CommercialAffairQuotes
+        item={element}
+        busy={busy}
+        canProvision={canProvision}
+        mutate={mutate}
+      />
       <section className="commercialV2Section">
         <h3>
           <CalendarClock size={15} /> Suivi global
@@ -956,24 +982,24 @@ function FollowForm({
         <label>
           <span>Statut</span>
           <select
-            value={status}
-            onChange={(event) => setStatus(event.target.value as CommercialStatus)}
+            value={statut}
+            onChange={(evenement) => setStatus(evenement.target.value as CommercialStatus)}
             disabled={!canModify}
           >
-            {COMMERCIAL_FOLLOW_STATUS_OPTIONS.map((value) => (
-              <option key={value} value={value} disabled={value === "CONFIRMED" && !canConfirm}>
-                {COMMERCIAL_STATUS_LABELS[value]}
+            {COMMERCIAL_FOLLOW_STATUS_OPTIONS.map((valeur) => (
+              <option key={valeur} value={valeur} disabled={valeur === "CONFIRMED" && !canConfirm}>
+                {COMMERCIAL_STATUS_LABELS[valeur]}
               </option>
             ))}
           </select>
         </label>
-        {status !== "FOLLOW_UP" ? (
+        {statut !== "FOLLOW_UP" ? (
           <label>
             <span>{dateTitle}</span>
             <input
               type="date"
               value={date}
-              onChange={(event) => setDate(event.target.value)}
+              onChange={(evenement) => setDate(evenement.target.value)}
               disabled={!canModify}
             />
           </label>
@@ -990,7 +1016,7 @@ function FollowForm({
         ) : null}
       </section>
       <FollowUp
-        item={item}
+        item={element}
         busy={busy}
         canModify={canModify}
         canConfirm={canConfirm}
@@ -998,15 +1024,15 @@ function FollowForm({
       />
       {confirmOpen ? (
         <CommercialConfirmationDialog
-          item={item}
+          item={element}
           plannedInstallDate={date}
           busy={busy}
           onCancel={() => setConfirmOpen(false)}
           onConfirm={async (retainedQuoteIds, confirmWithoutQuote) => {
-            const result = await mutate(
+            const resultat = await mutate(
               {
                 action: "setStatus",
-                caseId: item.id,
+                caseId: element.id,
                 status: "CONFIRMED",
                 plannedInstallDate: date,
                 retainedQuoteIds,
@@ -1014,8 +1040,8 @@ function FollowForm({
               },
               "Affaire confirmée avec les devis retenus.",
             );
-            if (result) setConfirmOpen(false);
-            return !!result;
+            if (resultat) setConfirmOpen(false);
+            return !!resultat;
           }}
         />
       ) : null}
@@ -1024,7 +1050,7 @@ function FollowForm({
 }
 
 function FollowUp({
-  item,
+  item: element,
   busy,
   canModify,
   canConfirm,
@@ -1034,7 +1060,7 @@ function FollowUp({
   busy: boolean;
   canModify: boolean;
   canConfirm: boolean;
-  mutate: (body: Mutation, success: string) => Promise<Snapshot | null>;
+  mutate: (corps: Mutation, success: string) => Promise<Snapshot | null>;
 }) {
   const [summary, setSummary] = useState("");
   const [nextStatus, setNextStatus] = useState<CommercialStatus>("WAITING");
@@ -1049,7 +1075,7 @@ function FollowUp({
     await mutate(
       {
         action: "recordFollowUp",
-        caseId: item.id,
+        caseId: element.id,
         summary,
         nextStatus,
         nextDate: nextDate || undefined,
@@ -1068,7 +1094,7 @@ function FollowUp({
         <textarea
           rows={3}
           value={summary}
-          onChange={(event) => setSummary(event.target.value)}
+          onChange={(evenement) => setSummary(evenement.target.value)}
           disabled={!canModify}
         />
       </label>
@@ -1076,12 +1102,12 @@ function FollowUp({
         <span>Suite</span>
         <select
           value={nextStatus}
-          onChange={(event) => setNextStatus(event.target.value as CommercialStatus)}
+          onChange={(evenement) => setNextStatus(evenement.target.value as CommercialStatus)}
           disabled={!canModify}
         >
-          {COMMERCIAL_FOLLOW_STATUS_OPTIONS.map((value) => (
-            <option key={value} value={value} disabled={value === "CONFIRMED" && !canConfirm}>
-              {COMMERCIAL_STATUS_LABELS[value]}
+          {COMMERCIAL_FOLLOW_STATUS_OPTIONS.map((valeur) => (
+            <option key={valeur} value={valeur} disabled={valeur === "CONFIRMED" && !canConfirm}>
+              {COMMERCIAL_STATUS_LABELS[valeur]}
             </option>
           ))}
         </select>
@@ -1092,7 +1118,7 @@ function FollowUp({
           <input
             type="date"
             value={nextDate}
-            onChange={(event) => setNextDate(event.target.value)}
+            onChange={(evenement) => setNextDate(evenement.target.value)}
             disabled={!canModify}
           />
         </label>
@@ -1108,15 +1134,15 @@ function FollowUp({
       ) : null}
       {confirmOpen ? (
         <CommercialConfirmationDialog
-          item={item}
+          item={element}
           plannedInstallDate={nextDate}
           busy={busy}
           onCancel={() => setConfirmOpen(false)}
           onConfirm={async (retainedQuoteIds, confirmWithoutQuote) => {
-            const result = await mutate(
+            const resultat = await mutate(
               {
                 action: "recordFollowUp",
-                caseId: item.id,
+                caseId: element.id,
                 summary,
                 nextStatus: "CONFIRMED",
                 plannedInstallDate: nextDate,
@@ -1125,8 +1151,8 @@ function FollowUp({
               },
               "Relance enregistrée et affaire confirmée.",
             );
-            if (result) setConfirmOpen(false);
-            return !!result;
+            if (resultat) setConfirmOpen(false);
+            return !!resultat;
           }}
         />
       ) : null}
@@ -1135,7 +1161,7 @@ function FollowUp({
 }
 
 function Documents({
-  item,
+  item: element,
   busy,
   canModify,
   upload,
@@ -1144,8 +1170,8 @@ function Documents({
   busy: boolean;
   canModify: boolean;
   upload: (
-    caseId: string,
-    files: File[],
+    idAffaire: string,
+    fichiers: File[],
     category: CommercialDocumentCategory,
     isSignedQuote?: boolean,
   ) => Promise<Snapshot | null>;
@@ -1153,20 +1179,20 @@ function Documents({
   const inputRef = useRef<HTMLInputElement>(null);
   const dragDepth = useRef(0);
   const [category, setCategory] = useState<CommercialDocumentCategory>("RECEIVED");
-  const [filter, setFilter] = useState<CommercialDocumentFilter>("ALL");
+  const [filtre, setFilter] = useState<CommercialDocumentFilter>("ALL");
   const [isSignedQuote, setIsSignedQuote] = useState(false);
   const [dragging, setDragging] = useState(false);
   const [previewDocumentId, setPreviewDocumentId] = useState<string | null>(null);
   const categoryLabel = COMMERCIAL_DOCUMENT_CATEGORY_LABELS[category];
-  const visibleDocuments = filterCommercialDocuments(item.documents, filter).reverse();
+  const visibleDocuments = filterCommercialDocuments(element.documents, filtre).reverse();
 
-  function uploadFiles(files: File[]) {
-    if (busy || files.length === 0) return;
-    void upload(item.id, files, category, category === "QUOTE" && isSignedQuote);
+  function uploadFiles(fichiers: File[]) {
+    if (busy || fichiers.length === 0) return;
+    void upload(element.id, fichiers, category, category === "QUOTE" && isSignedQuote);
   }
 
-  function togglePreview(documentId: string) {
-    setPreviewDocumentId((current) => (current === documentId ? null : documentId));
+  function togglePreview(idDocument: string) {
+    setPreviewDocumentId((courant) => (courant === idDocument ? null : idDocument));
   }
 
   return (
@@ -1179,9 +1205,9 @@ function Documents({
         automatiquement dans le dossier de l’affaire.
       </p>
       <CommercialOpenFolderButton
-        caseId={item.id}
-        createdAt={item.createdAt}
-        hasDocuments={item.documents.length > 0}
+        caseId={element.id}
+        createdAt={element.createdAt}
+        hasDocuments={element.documents.length > 0}
       />
       {canModify ? (
         <>
@@ -1190,16 +1216,16 @@ function Documents({
               <span>Classer dans</span>
               <select
                 value={category}
-                onChange={(event) => {
-                  const nextCategory = event.target.value as CommercialDocumentCategory;
+                onChange={(evenement) => {
+                  const nextCategory = evenement.target.value as CommercialDocumentCategory;
                   setCategory(nextCategory);
                   if (nextCategory !== "QUOTE") setIsSignedQuote(false);
                 }}
                 disabled={busy}
               >
-                {Object.entries(COMMERCIAL_DOCUMENT_CATEGORY_LABELS).map(([value, label]) => (
-                  <option key={value} value={value}>
-                    {label}
+                {Object.entries(COMMERCIAL_DOCUMENT_CATEGORY_LABELS).map(([valeur, libelle]) => (
+                  <option key={valeur} value={valeur}>
+                    {libelle}
                   </option>
                 ))}
               </select>
@@ -1209,7 +1235,7 @@ function Documents({
                 <span>Type de devis</span>
                 <select
                   value={isSignedQuote ? "SIGNED" : "UNSIGNED"}
-                  onChange={(event) => setIsSignedQuote(event.target.value === "SIGNED")}
+                  onChange={(evenement) => setIsSignedQuote(evenement.target.value === "SIGNED")}
                   disabled={busy}
                 >
                   <option value="UNSIGNED">Devis</option>
@@ -1222,10 +1248,10 @@ function Documents({
               type="file"
               multiple
               hidden
-              onChange={(event) => {
-                const files = Array.from(event.target.files ?? []);
-                event.currentTarget.value = "";
-                uploadFiles(files);
+              onChange={(evenement) => {
+                const fichiers = Array.from(evenement.target.files ?? []);
+                evenement.currentTarget.value = "";
+                uploadFiles(fichiers);
               }}
             />
             <button
@@ -1241,29 +1267,31 @@ function Documents({
             className={`commercialV2DropZone${dragging ? " dragging" : ""}${busy ? " busy" : ""}`}
             aria-label={`Déposer des documents dans ${categoryLabel}`}
             aria-disabled={busy}
-            onDragEnter={(event) => {
-              if (busy || !Array.from(event.dataTransfer.types).includes("Files")) return;
-              event.preventDefault();
+            onDragEnter={(evenement) => {
+              if (busy || !Array.from(evenement.dataTransfer.types).includes("Files")) return;
+              evenement.preventDefault();
               dragDepth.current += 1;
               setDragging(true);
             }}
-            onDragOver={(event) => {
-              if (busy || !Array.from(event.dataTransfer.types).includes("Files")) return;
-              event.preventDefault();
-              event.dataTransfer.dropEffect = "copy";
+            onDragOver={(evenement) => {
+              if (busy || !Array.from(evenement.dataTransfer.types).includes("Files")) return;
+              evenement.preventDefault();
+              evenement.dataTransfer.dropEffect = "copy";
             }}
-            onDragLeave={(event) => {
+            onDragLeave={(evenement) => {
               if (!dragging) return;
-              event.preventDefault();
+              evenement.preventDefault();
               dragDepth.current = Math.max(0, dragDepth.current - 1);
               if (dragDepth.current === 0) setDragging(false);
             }}
-            onDrop={(event) => {
-              event.preventDefault();
+            onDrop={(evenement) => {
+              evenement.preventDefault();
               dragDepth.current = 0;
               setDragging(false);
               if (busy) return;
-              uploadFiles(collectDroppedFiles(event.dataTransfer.items, event.dataTransfer.files));
+              uploadFiles(
+                collectDroppedFiles(evenement.dataTransfer.items, evenement.dataTransfer.files),
+              );
             }}
           >
             <Upload size={24} />
@@ -1279,13 +1307,13 @@ function Documents({
       <label className="commercialV2UploadCategory">
         <span>Afficher</span>
         <select
-          value={filter}
-          onChange={(event) => setFilter(event.target.value as CommercialDocumentFilter)}
+          value={filtre}
+          onChange={(evenement) => setFilter(evenement.target.value as CommercialDocumentFilter)}
         >
-          <option value="ALL">Tous les documents ({item.documents.length})</option>
-          {Object.entries(COMMERCIAL_DOCUMENT_CATEGORY_LABELS).map(([value, label]) => (
-            <option key={value} value={value}>
-              {label}
+          <option value="ALL">Tous les documents ({element.documents.length})</option>
+          {Object.entries(COMMERCIAL_DOCUMENT_CATEGORY_LABELS).map(([valeur, libelle]) => (
+            <option key={valeur} value={valeur}>
+              {libelle}
             </option>
           ))}
         </select>
@@ -1305,7 +1333,7 @@ function Documents({
                   </span>
                 </div>
                 <CommercialDocumentActions
-                  caseId={item.id}
+                  caseId={element.id}
                   document={document}
                   previewOpen={previewOpen}
                   onTogglePreview={() => togglePreview(document.id)}
@@ -1314,7 +1342,7 @@ function Documents({
                   <div className="commercialV2DocPreview">
                     <div className="commercialV2DocPreviewFrame">
                       <iframe
-                        src={`/api/desktop/affaires/${item.id}/documents/${document.id}`}
+                        src={`/api/desktop/affaires/${element.id}/documents/${document.id}`}
                         title={`Aperçu de ${document.fileName}`}
                       />
                     </div>
@@ -1327,7 +1355,7 @@ function Documents({
         ) : (
           <div className="commercialV2Empty">
             <Paperclip size={24} />
-            {item.documents.length ? "Aucun document pour ce type" : "Aucun document"}
+            {element.documents.length ? "Aucun document pour ce type" : "Aucun document"}
           </div>
         )}
       </div>
@@ -1335,22 +1363,22 @@ function Documents({
   );
 }
 
-function HistoryPanel({ item }: { item: CommercialCase }) {
+function HistoryPanel({ item: element }: { item: CommercialCase }) {
   return (
     <section className="commercialV2Section">
       <h3>
         <History size={15} /> Historique
       </h3>
       <div className="commercialV2History">
-        {item.history
+        {element.history
           .slice()
           .reverse()
-          .map((event) => (
-            <article key={event.id}>
-              <time>{dateTime(event.at)}</time>
+          .map((evenement) => (
+            <article key={evenement.id}>
+              <time>{dateTime(evenement.at)}</time>
               <div>
-                <strong>{event.actorName}</strong>
-                <p>{event.summary}</p>
+                <strong>{evenement.actorName}</strong>
+                <p>{evenement.summary}</p>
               </div>
             </article>
           ))}

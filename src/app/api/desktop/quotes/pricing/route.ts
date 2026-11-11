@@ -19,14 +19,14 @@ import type { NativeQuotesPayload } from "@/lib/quotes/store";
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
-function noStoreJson(body: unknown, init?: ResponseInit) {
-  const response = NextResponse.json(body, init);
-  response.headers.set("Cache-Control", "no-store");
-  return response;
+function noStoreJson(corps: unknown, init?: ResponseInit) {
+  const reponse = NextResponse.json(corps, init);
+  reponse.headers.set("Cache-Control", "no-store");
+  return reponse;
 }
 
-function publicSnapshot(payload: NativeQuotesPayload, canWrite: boolean, focusQuoteId?: string) {
-  return { payload, canWrite, focusQuoteId };
+function publicSnapshot(contenu: NativeQuotesPayload, canWrite: boolean, focusQuoteId?: string) {
+  return { payload: contenu, canWrite, focusQuoteId };
 }
 
 function errorStatus(code: string): number {
@@ -45,27 +45,27 @@ function errorStatus(code: string): number {
   return 400;
 }
 
-export async function POST(request: Request) {
+export async function POST(requete: Request) {
   try {
-    const input = quotePricingMutationSchema.parse(await request.json());
-    const context = await requireModuleRequestContext("quotes", "WRITE");
-    const actor = { userId: context.user.id, displayName: context.user.displayName };
+    const saisie = quotePricingMutationSchema.parse(await requete.json());
+    const contexte = await requireModuleRequestContext("quotes", "WRITE");
+    const auteur = { userId: contexte.user.id, displayName: contexte.user.displayName };
     const repository = createQuotesRepository();
-    const expectedRevision = expectedQuoteRevision(request);
-    const mutation = await repository.mutate((payload) => {
-      assertQuoteRevision(payload, input.quoteId, expectedRevision);
-      return applyQuotePricingMutation(payload, input, actor);
+    const expectedRevision = expectedQuoteRevision(requete);
+    const mutation = await repository.mutate((contenu) => {
+      assertQuoteRevision(contenu, saisie.quoteId, expectedRevision);
+      return applyQuotePricingMutation(contenu, saisie, auteur);
     });
 
     return noStoreJson(
-      publicSnapshot(mutation.payload, context.moduleAccess.canWrite, mutation.focusQuoteId),
+      publicSnapshot(mutation.payload, contexte.moduleAccess.canWrite, mutation.focusQuoteId),
     );
-  } catch (error) {
+  } catch (erreur) {
     const code =
-      error instanceof ZodError
+      erreur instanceof ZodError
         ? "QUOTES_PRICING_REQUEST_INVALID"
-        : error instanceof Error
-          ? error.message
+        : erreur instanceof Error
+          ? erreur.message
           : "QUOTES_PRICING_MUTATION_FAILED";
     return noStoreJson({ error: code }, { status: errorStatus(code) });
   }

@@ -6,15 +6,15 @@ import { useRouter } from "next/navigation";
 export function FirstAdminForm() {
   const router = useRouter();
   const [busy, setBusy] = useState(false);
-  const [error, setError] = useState("");
+  const [erreur, setError] = useState("");
 
-  async function submit(event: FormEvent<HTMLFormElement>) {
-    event.preventDefault();
-    const form = new FormData(event.currentTarget);
+  async function submit(evenement: FormEvent<HTMLFormElement>) {
+    evenement.preventDefault();
+    const form = new FormData(evenement.currentTarget);
     setBusy(true);
     setError("");
 
-    const response = await fetch("/api/auth/bootstrap-admin", {
+    const reponse = await fetch("/api/auth/bootstrap-admin", {
       method: "POST",
       headers: { "content-type": "application/json" },
       body: JSON.stringify({
@@ -25,9 +25,9 @@ export function FirstAdminForm() {
         password: String(form.get("password") ?? ""),
       }),
     });
-    const body = (await response.json().catch(() => null)) as { error?: string } | null;
-    if (!response.ok) {
-      setError(body?.error ?? "Impossible de créer l’administrateur PAPOT.");
+    const corps = (await reponse.json().catch(() => null)) as { error?: string } | null;
+    if (!reponse.ok) {
+      setError(corps?.error ?? "Impossible de créer l’administrateur PAPOT.");
       setBusy(false);
       return;
     }
@@ -77,7 +77,7 @@ export function FirstAdminForm() {
         12 caractères minimum. Ce compte pourra ensuite créer les autres utilisateurs et leurs
         droits.
       </p>
-      {error ? <p className="formError">{error}</p> : null}
+      {erreur ? <p className="formError">{erreur}</p> : null}
       <button className="primaryButton" type="submit" disabled={busy}>
         {busy ? "Création…" : "Créer l’administrateur PAPOT"}
       </button>

@@ -63,45 +63,45 @@ const errorMessages: Record<string, string> = {
   ENTRY_ATTACHMENTS_REQUIRED: "Aucune pièce jointe n'a été sélectionnée.",
 };
 
-function formatDateOnly(value: string | null): string {
-  if (!value) return "Sans date";
-  const [year, month, day] = value.split("-").map(Number);
+function formatDateOnly(valeur: string | null): string {
+  if (!valeur) return "Sans date";
+  const [annee, mois, jour] = valeur.split("-").map(Number);
   return new Intl.DateTimeFormat("fr-FR", {
     weekday: "short",
     day: "numeric",
     month: "short",
-  }).format(new Date(year, month - 1, day, 12));
+  }).format(new Date(annee, mois - 1, jour, 12));
 }
 
-function formatDateTime(value: string): string {
+function formatDateTime(valeur: string): string {
   return new Intl.DateTimeFormat("fr-FR", {
     dateStyle: "short",
     timeStyle: "short",
-  }).format(new Date(value));
+  }).format(new Date(valeur));
 }
 
-function formatBytes(value: number): string {
-  if (value < 1024) return `${value} o`;
-  if (value < 1024 * 1024) return `${Math.round(value / 1024)} Ko`;
-  return `${(value / (1024 * 1024)).toFixed(value >= 10 * 1024 * 1024 ? 0 : 1)} Mo`;
+function formatBytes(valeur: number): string {
+  if (valeur < 1024) return `${valeur} o`;
+  if (valeur < 1024 * 1024) return `${Math.round(valeur / 1024)} Ko`;
+  return `${(valeur / (1024 * 1024)).toFixed(valeur >= 10 * 1024 * 1024 ? 0 : 1)} Mo`;
 }
 
-function addDaysKey(dateKey: string, days: number): string {
-  const [year, month, day] = dateKey.split("-").map(Number);
-  const date = new Date(Date.UTC(year, month - 1, day + days, 12));
+function addDaysKey(dateKey: string, jours: number): string {
+  const [annee, mois, jour] = dateKey.split("-").map(Number);
+  const date = new Date(Date.UTC(annee, mois - 1, jour + jours, 12));
   return `${date.getUTCFullYear().toString().padStart(4, "0")}-${(date.getUTCMonth() + 1)
     .toString()
     .padStart(2, "0")}-${date.getUTCDate().toString().padStart(2, "0")}`;
 }
 
-function endOfWeekKey(today: string): string {
-  const [year, month, day] = today.split("-").map(Number);
-  const weekday = new Date(Date.UTC(year, month - 1, day, 12)).getUTCDay();
-  return addDaysKey(today, weekday === 0 ? 0 : 7 - weekday);
+function endOfWeekKey(aujourdhui: string): string {
+  const [annee, mois, jour] = aujourdhui.split("-").map(Number);
+  const weekday = new Date(Date.UTC(annee, mois - 1, jour, 12)).getUTCDay();
+  return addDaysKey(aujourdhui, weekday === 0 ? 0 : 7 - weekday);
 }
 
-function taskTitle(task: EntryRecord): string {
-  return task.nextAction?.trim() || task.structuredDescription?.trim() || task.rawText;
+function taskTitle(tache: EntryRecord): string {
+  return tache.nextAction?.trim() || tache.structuredDescription?.trim() || tache.rawText;
 }
 
 function taskSort(a: EntryRecord, b: EntryRecord): number {
@@ -113,20 +113,20 @@ function taskSort(a: EntryRecord, b: EntryRecord): number {
 
 function personalTasks(snapshot: TasksSnapshot | null): EntryRecord[] {
   if (!snapshot) return [];
-  const actor = normalizePersonName(snapshot.actor.displayName);
+  const auteur = normalizePersonName(snapshot.actor.displayName);
   return snapshot.payload.entries
     .filter(
-      (entry) =>
-        entry.status === "ASSIGNED" &&
-        Boolean(entry.assigneeName) &&
-        normalizePersonName(entry.assigneeName ?? "") === actor,
+      (entree) =>
+        entree.status === "ASSIGNED" &&
+        Boolean(entree.assigneeName) &&
+        normalizePersonName(entree.assigneeName ?? "") === auteur,
     )
     .sort(taskSort);
 }
 
-function groupTasks(tasks: EntryRecord[], now: Date): TaskGroup[] {
-  const today = parisDateKey(now);
-  const endOfWeek = endOfWeekKey(today);
+function groupTasks(taches: EntryRecord[], maintenant: Date): TaskGroup[] {
+  const aujourdhui = parisDateKey(maintenant);
+  const endOfWeek = endOfWeekKey(aujourdhui);
   const buckets: Record<TaskGroupKey, EntryRecord[]> = {
     overdue: [],
     today: [],
@@ -135,38 +135,42 @@ function groupTasks(tasks: EntryRecord[], now: Date): TaskGroup[] {
     undated: [],
   };
 
-  for (const task of tasks) {
-    if (!task.dueDate) buckets.undated.push(task);
-    else if (task.dueDate < today) buckets.overdue.push(task);
-    else if (task.dueDate === today) buckets.today.push(task);
-    else if (task.dueDate <= endOfWeek) buckets.week.push(task);
-    else buckets.later.push(task);
+  for (const tache of taches) {
+    if (!tache.dueDate) buckets.undated.push(tache);
+    else if (tache.dueDate < aujourdhui) buckets.overdue.push(tache);
+    else if (tache.dueDate === aujourdhui) buckets.today.push(tache);
+    else if (tache.dueDate <= endOfWeek) buckets.week.push(tache);
+    else buckets.later.push(tache);
   }
 
   return (["overdue", "today", "week", "later", "undated"] as TaskGroupKey[])
-    .map((key) => ({ key, label: groupLabels[key], tasks: buckets[key] }))
+    .map((cle) => ({ key: cle, label: groupLabels[cle], tasks: buckets[cle] }))
     .filter((group) => group.tasks.length > 0);
 }
 
-function attachmentHref(task: EntryRecord, attachment: EntryAttachment, download = false): string {
-  return `/api/desktop/entries/${task.id}/attachments/${attachment.id}${download ? "?download=1" : ""}`;
+function attachmentHref(
+  tache: EntryRecord,
+  pieceJointe: EntryAttachment,
+  download = false,
+): string {
+  return `/api/desktop/entries/${tache.id}/attachments/${pieceJointe.id}${download ? "?download=1" : ""}`;
 }
 
 function useTasksData() {
   const [snapshot, setSnapshot] = useState<TasksSnapshot | null>(null);
-  const [loading, setLoading] = useState(true);
+  const [chargement, setLoading] = useState(true);
   const [busy, setBusy] = useState(false);
-  const [error, setError] = useState<string | null>(null);
+  const [erreur, setError] = useState<string | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
 
   const load = useCallback(async () => {
     setLoading(true);
     setError(null);
     try {
-      const response = await fetch("/api/desktop/entries", { cache: "no-store" });
-      const body = (await response.json()) as TasksSnapshot & { error?: string };
-      if (!response.ok) throw new Error(body.error ?? "TASKS_LOAD_FAILED");
-      setSnapshot(body);
+      const reponse = await fetch("/api/desktop/entries", { cache: "no-store" });
+      const corps = (await reponse.json()) as TasksSnapshot & { error?: string };
+      if (!reponse.ok) throw new Error(corps.error ?? "TASKS_LOAD_FAILED");
+      setSnapshot(corps);
     } catch (loadError) {
       const code = loadError instanceof Error ? loadError.message : "TASKS_LOAD_FAILED";
       setError(errorMessages[code] ?? "Impossible de charger les tâches pour le moment.");
@@ -179,23 +183,24 @@ function useTasksData() {
     void load();
   }, [load]);
 
-  const mutate = useCallback(async (body: MutationBody, successMessage: string) => {
+  const mutate = useCallback(async (corps: MutationBody, successMessage: string) => {
     setBusy(true);
     setError(null);
     setNotice(null);
     try {
-      const response = await fetch("/api/desktop/entries", {
+      const reponse = await fetch("/api/desktop/entries", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(body),
+        body: JSON.stringify(corps),
       });
-      const result = (await response.json()) as TasksSnapshot & { error?: string };
-      if (!response.ok) {
+      const resultat = (await reponse.json()) as TasksSnapshot & { error?: string };
+      if (!reponse.ok) {
         throw new Error(
-          errorMessages[result.error ?? ""] ?? "L'action sur la tâche n'a pas pu être enregistrée.",
+          errorMessages[resultat.error ?? ""] ??
+            "L'action sur la tâche n'a pas pu être enregistrée.",
         );
       }
-      setSnapshot(result);
+      setSnapshot(resultat);
       setNotice(successMessage);
       return true;
     } catch (mutationError) {
@@ -210,27 +215,27 @@ function useTasksData() {
     }
   }, []);
 
-  const upload = useCallback(async (entryId: string, files: File[]) => {
-    if (files.length === 0) return true;
+  const upload = useCallback(async (idEntree: string, fichiers: File[]) => {
+    if (fichiers.length === 0) return true;
     setBusy(true);
     setError(null);
     setNotice(null);
     try {
       const form = new FormData();
-      files.forEach((file) => form.append("files", file));
-      const response = await fetch(`/api/desktop/entries/${entryId}/attachments`, {
+      fichiers.forEach((fichier) => form.append("files", fichier));
+      const reponse = await fetch(`/api/desktop/entries/${idEntree}/attachments`, {
         method: "POST",
         body: form,
       });
-      const result = (await response.json()) as TasksSnapshot & { error?: string };
-      if (!response.ok) {
+      const resultat = (await reponse.json()) as TasksSnapshot & { error?: string };
+      if (!reponse.ok) {
         throw new Error(
-          errorMessages[result.error ?? ""] ?? "Les pièces jointes n'ont pas pu être ajoutées.",
+          errorMessages[resultat.error ?? ""] ?? "Les pièces jointes n'ont pas pu être ajoutées.",
         );
       }
-      setSnapshot(result);
+      setSnapshot(resultat);
       setNotice(
-        `${files.length} pièce${files.length > 1 ? "s" : ""} jointe${files.length > 1 ? "s" : ""} ajoutée${files.length > 1 ? "s" : ""}.`,
+        `${fichiers.length} pièce${fichiers.length > 1 ? "s" : ""} jointe${fichiers.length > 1 ? "s" : ""} ajoutée${fichiers.length > 1 ? "s" : ""}.`,
       );
       return true;
     } catch (uploadError) {
@@ -243,33 +248,45 @@ function useTasksData() {
     }
   }, []);
 
-  return { snapshot, loading, busy, error, notice, load, mutate, upload };
+  return { snapshot, loading: chargement, busy, error: erreur, notice, load, mutate, upload };
 }
 
 export function TasksDetailWorkspace() {
   const searchParams = useSearchParams();
   const focusId = searchParams.get("focus");
-  const { snapshot, loading, busy, error, notice, load, mutate, upload } = useTasksData();
+  const {
+    snapshot,
+    loading: chargement,
+    busy,
+    error: erreur,
+    notice,
+    load,
+    mutate,
+    upload,
+  } = useTasksData();
   const [selectedId, setSelectedId] = useState<string | null>(focusId);
 
-  const now = useMemo(() => new Date(snapshot?.serverNow ?? Date.now()), [snapshot?.serverNow]);
-  const tasks = useMemo(() => personalTasks(snapshot), [snapshot]);
-  const groups = useMemo(() => groupTasks(tasks, now), [tasks, now]);
-  const selectedTask = tasks.find((task) => task.id === selectedId) ?? tasks[0] ?? null;
-  const today = parisDateKey(now);
-  const overdueCount = tasks.filter((task) => isAssignedOverdue(task, now)).length;
-  const todayCount = tasks.filter((task) => task.dueDate === today).length;
-  const urgentCount = tasks.filter((task) => task.priority === "URGENT").length;
+  const maintenant = useMemo(
+    () => new Date(snapshot?.serverNow ?? Date.now()),
+    [snapshot?.serverNow],
+  );
+  const taches = useMemo(() => personalTasks(snapshot), [snapshot]);
+  const groups = useMemo(() => groupTasks(taches, maintenant), [taches, maintenant]);
+  const selectedTask = taches.find((tache) => tache.id === selectedId) ?? taches[0] ?? null;
+  const aujourdhui = parisDateKey(maintenant);
+  const overdueCount = taches.filter((tache) => isAssignedOverdue(tache, maintenant)).length;
+  const todayCount = taches.filter((tache) => tache.dueDate === aujourdhui).length;
+  const urgentCount = taches.filter((tache) => tache.priority === "URGENT").length;
 
   useEffect(() => {
-    if (focusId && tasks.some((task) => task.id === focusId)) {
+    if (focusId && taches.some((tache) => tache.id === focusId)) {
       setSelectedId(focusId);
       return;
     }
-    if (!selectedId || !tasks.some((task) => task.id === selectedId)) {
-      setSelectedId(tasks[0]?.id ?? null);
+    if (!selectedId || !taches.some((tache) => tache.id === selectedId)) {
+      setSelectedId(taches[0]?.id ?? null);
     }
-  }, [focusId, selectedId, tasks]);
+  }, [focusId, selectedId, taches]);
 
   return (
     <div className="taskDetailWorkspace">
@@ -290,11 +307,11 @@ export function TasksDetailWorkspace() {
         </button>
       </section>
 
-      {error ? <div className="taskMessage taskMessageError">{error}</div> : null}
+      {erreur ? <div className="taskMessage taskMessageError">{erreur}</div> : null}
       {notice ? <div className="taskMessage taskMessageSuccess">{notice}</div> : null}
 
       <section className="taskSummary" aria-label="Résumé des tâches">
-        <SummaryCard value={tasks.length} label="Actives" />
+        <SummaryCard value={taches.length} label="Actives" />
         <SummaryCard
           value={overdueCount}
           label="En retard"
@@ -308,11 +325,11 @@ export function TasksDetailWorkspace() {
         />
       </section>
 
-      {loading && !snapshot ? (
+      {chargement && !snapshot ? (
         <div className="taskLoading">
           <RefreshCw size={18} className="taskSpin" /> Chargement des tâches…
         </div>
-      ) : tasks.length === 0 ? (
+      ) : taches.length === 0 ? (
         <div className="taskEmpty">
           <CheckCircle2 size={36} />
           <strong>Aucune tâche active</strong>
@@ -327,28 +344,28 @@ export function TasksDetailWorkspace() {
                   <strong>{group.label}</strong>
                   <span>{group.tasks.length}</span>
                 </div>
-                {group.tasks.map((task) => (
+                {group.tasks.map((tache) => (
                   <button
                     type="button"
-                    key={task.id}
-                    className={`taskListRow${task.id === selectedTask?.id ? " isSelected" : ""}${group.key === "overdue" ? " isOverdue" : ""}`}
-                    onClick={() => setSelectedId(task.id)}
+                    key={tache.id}
+                    className={`taskListRow${tache.id === selectedTask?.id ? " isSelected" : ""}${group.key === "overdue" ? " isOverdue" : ""}`}
+                    onClick={() => setSelectedId(tache.id)}
                   >
                     <div className="taskListRowTop">
                       <span className={`taskDatePill taskDatePill-${group.key}`}>
-                        <CalendarClock size={11} /> {formatDateOnly(task.dueDate)}
+                        <CalendarClock size={11} /> {formatDateOnly(tache.dueDate)}
                       </span>
-                      {task.priority === "URGENT" ? (
+                      {tache.priority === "URGENT" ? (
                         <span className="taskUrgentPill">Urgent</span>
                       ) : null}
-                      {task.attachments.length > 0 ? (
+                      {tache.attachments.length > 0 ? (
                         <span className="taskAttachmentPill">
-                          <Paperclip size={10} /> {task.attachments.length}
+                          <Paperclip size={10} /> {tache.attachments.length}
                         </span>
                       ) : null}
                     </div>
-                    <strong>{taskTitle(task)}</strong>
-                    <small>{task.rawText}</small>
+                    <strong>{taskTitle(tache)}</strong>
+                    <small>{tache.rawText}</small>
                   </button>
                 ))}
               </section>
@@ -376,8 +393,8 @@ export function TasksDetailWorkspace() {
 }
 
 function SummaryCard({
-  value,
-  label,
+  value: valeur,
+  label: libelle,
   tone,
 }: {
   value: number;
@@ -386,15 +403,15 @@ function SummaryCard({
 }) {
   return (
     <div className={tone ? `is-${tone}` : ""}>
-      <strong>{value}</strong>
-      <span>{label}</span>
+      <strong>{valeur}</strong>
+      <span>{libelle}</span>
     </div>
   );
 }
 
 function TaskDetail({
-  task,
-  tags,
+  task: tache,
+  tags: etiquettes,
   busy,
   mutate,
   upload,
@@ -402,27 +419,27 @@ function TaskDetail({
   task: EntryRecord;
   tags: EntriesTag[];
   busy: boolean;
-  mutate: (body: MutationBody, successMessage: string) => Promise<boolean>;
-  upload: (entryId: string, files: File[]) => Promise<boolean>;
+  mutate: (corps: MutationBody, successMessage: string) => Promise<boolean>;
+  upload: (idEntree: string, fichiers: File[]) => Promise<boolean>;
 }) {
-  const [description, setDescription] = useState(task.structuredDescription ?? task.rawText);
-  const [nextAction, setNextAction] = useState(task.nextAction ?? task.rawText);
-  const [priority, setPriority] = useState<"NORMAL" | "URGENT">(task.priority);
-  const [tagIds, setTagIds] = useState<string[]>(task.tagIds);
+  const [description, setDescription] = useState(tache.structuredDescription ?? tache.rawText);
+  const [nextAction, setNextAction] = useState(tache.nextAction ?? tache.rawText);
+  const [priority, setPriority] = useState<"NORMAL" | "URGENT">(tache.priority);
+  const [tagIds, setTagIds] = useState<string[]>(tache.tagIds);
   const [postponeDate, setPostponeDate] = useState("");
   const [postponeReason, setPostponeReason] = useState("");
-  const [result, setResult] = useState("");
-  const [files, setFiles] = useState<File[]>([]);
+  const [resultat, setResult] = useState("");
+  const [fichiers, setFiles] = useState<File[]>([]);
 
-  const visibleTags = tags
-    .filter((tag) => tag.active || tagIds.includes(tag.id))
+  const visibleTags = etiquettes
+    .filter((etiquette) => etiquette.active || tagIds.includes(etiquette.id))
     .sort((a, b) => a.sortOrder - b.sortOrder);
 
   async function saveDetails() {
     await mutate(
       {
         action: "updateAssigned",
-        entryId: task.id,
+        entryId: tache.id,
         description,
         nextAction,
         priority,
@@ -432,12 +449,12 @@ function TaskDetail({
     );
   }
 
-  async function submitPostpone(event: FormEvent<HTMLFormElement>) {
-    event.preventDefault();
+  async function submitPostpone(evenement: FormEvent<HTMLFormElement>) {
+    evenement.preventDefault();
     const ok = await mutate(
       {
         action: "postpone",
-        entryId: task.id,
+        entryId: tache.id,
         dueDate: postponeDate,
         reason: postponeReason,
       },
@@ -450,8 +467,8 @@ function TaskDetail({
   }
 
   async function submitFiles() {
-    if (files.length === 0) return;
-    const ok = await upload(task.id, files);
+    if (fichiers.length === 0) return;
+    const ok = await upload(tache.id, fichiers);
     if (ok) setFiles([]);
   }
 
@@ -461,13 +478,13 @@ function TaskDetail({
         <div>
           <div className="taskDetailBadges">
             <span className="taskDatePill">
-              <CalendarClock size={12} /> {formatDateOnly(task.dueDate)}
+              <CalendarClock size={12} /> {formatDateOnly(tache.dueDate)}
             </span>
-            {task.priority === "URGENT" ? <span className="taskUrgentPill">Urgent</span> : null}
+            {tache.priority === "URGENT" ? <span className="taskUrgentPill">Urgent</span> : null}
           </div>
-          <h2>{taskTitle(task)}</h2>
+          <h2>{taskTitle(tache)}</h2>
           <p>
-            Responsable : <strong>{task.assigneeName}</strong>
+            Responsable : <strong>{tache.assigneeName}</strong>
           </p>
         </div>
         <Link href="/entrees" className="taskOpenEntries">
@@ -477,10 +494,10 @@ function TaskDetail({
 
       <section className="taskOriginBox">
         <span>Texte d&apos;origine</span>
-        <p>{task.rawText}</p>
+        <p>{tache.rawText}</p>
       </section>
 
-      <TaskCommercialBridge task={task} description={description} nextAction={nextAction} />
+      <TaskCommercialBridge task={tache} description={description} nextAction={nextAction} />
 
       <section className="taskDetailSection">
         <div className="taskSectionTitle">
@@ -491,7 +508,7 @@ function TaskDetail({
           <textarea
             rows={3}
             value={description}
-            onChange={(event) => setDescription(event.target.value)}
+            onChange={(evenement) => setDescription(evenement.target.value)}
           />
         </label>
         <label className="taskField">
@@ -499,7 +516,7 @@ function TaskDetail({
           <textarea
             rows={3}
             value={nextAction}
-            onChange={(event) => setNextAction(event.target.value)}
+            onChange={(evenement) => setNextAction(evenement.target.value)}
           />
         </label>
 
@@ -507,25 +524,25 @@ function TaskDetail({
           <button
             type="button"
             className={`taskPriorityButton${priority === "URGENT" ? " isUrgent" : ""}`}
-            onClick={() => setPriority((current) => (current === "URGENT" ? "NORMAL" : "URGENT"))}
+            onClick={() => setPriority((courant) => (courant === "URGENT" ? "NORMAL" : "URGENT"))}
           >
             <AlertTriangle size={13} /> {priority === "URGENT" ? "Urgent" : "Passer en urgent"}
           </button>
-          {visibleTags.map((tag) => (
+          {visibleTags.map((etiquette) => (
             <button
               type="button"
-              key={tag.id}
-              className={`taskTagButton${tagIds.includes(tag.id) ? " isSelected" : ""}`}
+              key={etiquette.id}
+              className={`taskTagButton${tagIds.includes(etiquette.id) ? " isSelected" : ""}`}
               onClick={() =>
-                setTagIds((current) =>
-                  current.includes(tag.id)
-                    ? current.filter((tagId) => tagId !== tag.id)
-                    : [...current, tag.id],
+                setTagIds((courant) =>
+                  courant.includes(etiquette.id)
+                    ? courant.filter((tagId) => tagId !== etiquette.id)
+                    : [...courant, etiquette.id],
                 )
               }
             >
-              {tag.label}
-              {!tag.active ? " (désactivé)" : ""}
+              {etiquette.label}
+              {!etiquette.active ? " (désactivé)" : ""}
             </button>
           ))}
         </div>
@@ -542,14 +559,14 @@ function TaskDetail({
 
       <section className="taskDetailSection">
         <div className="taskSectionTitle">
-          <Paperclip size={15} /> Pièces jointes ({task.attachments.length})
+          <Paperclip size={15} /> Pièces jointes ({tache.attachments.length})
         </div>
-        {task.attachments.length === 0 ? (
+        {tache.attachments.length === 0 ? (
           <p className="taskMuted">Aucune pièce jointe sur cette tâche.</p>
         ) : (
           <div className="taskAttachments">
-            {task.attachments.map((attachment) => (
-              <AttachmentRow key={attachment.id} task={task} attachment={attachment} />
+            {tache.attachments.map((pieceJointe) => (
+              <AttachmentRow key={pieceJointe.id} task={tache} attachment={pieceJointe} />
             ))}
           </div>
         )}
@@ -559,14 +576,14 @@ function TaskDetail({
             <input
               type="file"
               multiple
-              onChange={(event) => setFiles(Array.from(event.target.files ?? []))}
+              onChange={(evenement) => setFiles(Array.from(evenement.target.files ?? []))}
               disabled={busy}
             />
           </label>
-          {files.length > 0 ? (
+          {fichiers.length > 0 ? (
             <div className="taskSelectedFiles">
-              {files.map((file) => (
-                <span key={`${file.name}-${file.size}`}>{file.name}</span>
+              {fichiers.map((fichier) => (
+                <span key={`${fichier.name}-${fichier.size}`}>{fichier.name}</span>
               ))}
               <button
                 type="button"
@@ -574,7 +591,7 @@ function TaskDetail({
                 disabled={busy}
                 onClick={() => void submitFiles()}
               >
-                Envoyer {files.length} pièce{files.length > 1 ? "s" : ""}
+                Envoyer {fichiers.length} pièce{fichiers.length > 1 ? "s" : ""}
               </button>
             </div>
           ) : null}
@@ -586,16 +603,16 @@ function TaskDetail({
           <Clock3 size={15} /> Échéance
         </div>
         <p className="taskCurrentDeadline">
-          Échéance actuelle : <strong>{formatDateOnly(task.dueDate)}</strong>
+          Échéance actuelle : <strong>{formatDateOnly(tache.dueDate)}</strong>
         </p>
-        <form className="taskPostponeForm" onSubmit={(event) => void submitPostpone(event)}>
+        <form className="taskPostponeForm" onSubmit={(evenement) => void submitPostpone(evenement)}>
           <label className="taskField">
             <span>Nouvelle échéance</span>
             <input
               type="date"
-              min={task.dueDate ? addDaysKey(task.dueDate, 1) : undefined}
+              min={tache.dueDate ? addDaysKey(tache.dueDate, 1) : undefined}
               value={postponeDate}
-              onChange={(event) => setPostponeDate(event.target.value)}
+              onChange={(evenement) => setPostponeDate(evenement.target.value)}
               required
             />
           </label>
@@ -603,7 +620,7 @@ function TaskDetail({
             <span>Motif obligatoire</span>
             <input
               value={postponeReason}
-              onChange={(event) => setPostponeReason(event.target.value)}
+              onChange={(evenement) => setPostponeReason(evenement.target.value)}
               placeholder="Pourquoi la date est repoussée ?"
               required
             />
@@ -624,14 +641,21 @@ function TaskDetail({
         </div>
         <label className="taskField">
           <span>Résultat facultatif</span>
-          <textarea rows={2} value={result} onChange={(event) => setResult(event.target.value)} />
+          <textarea
+            rows={2}
+            value={resultat}
+            onChange={(evenement) => setResult(evenement.target.value)}
+          />
         </label>
         <button
           type="button"
           className="taskCompleteButton"
           disabled={busy}
           onClick={() =>
-            void mutate({ action: "complete", entryId: task.id, result }, "Tâche terminée.")
+            void mutate(
+              { action: "complete", entryId: tache.id, result: resultat },
+              "Tâche terminée.",
+            )
           }
         >
           <Check size={15} /> Marquer comme terminée
@@ -640,13 +664,13 @@ function TaskDetail({
 
       <section className="taskHistory">
         <h3>Historique</h3>
-        {[...task.history].reverse().map((event) => (
-          <div className="taskHistoryRow" key={event.id}>
+        {[...tache.history].reverse().map((evenement) => (
+          <div className="taskHistoryRow" key={evenement.id}>
             <span />
             <div>
-              <strong>{event.summary}</strong>
+              <strong>{evenement.summary}</strong>
               <small>
-                {event.actorName} · {formatDateTime(event.at)}
+                {evenement.actorName} · {formatDateTime(evenement.at)}
               </small>
             </div>
           </div>
@@ -656,11 +680,17 @@ function TaskDetail({
   );
 }
 
-function AttachmentRow({ task, attachment }: { task: EntryRecord; attachment: EntryAttachment }) {
-  const [preview, setPreview] = useState(false);
-  const url = attachmentHref(task, attachment);
-  const isImage = attachment.contentType.startsWith("image/");
-  const isPdf = attachment.contentType === "application/pdf";
+function AttachmentRow({
+  task: tache,
+  attachment: pieceJointe,
+}: {
+  task: EntryRecord;
+  attachment: EntryAttachment;
+}) {
+  const [apercu, setPreview] = useState(false);
+  const url = attachmentHref(tache, pieceJointe);
+  const isImage = pieceJointe.contentType.startsWith("image/");
+  const isPdf = pieceJointe.contentType === "application/pdf";
   const canPreview = isImage || isPdf;
   const Icon = isImage ? ImageIcon : FileText;
   return (
@@ -669,10 +699,10 @@ function AttachmentRow({ task, attachment }: { task: EntryRecord; attachment: En
         <Icon size={17} />
       </span>
       <div className="taskAttachmentInfo">
-        <strong>{attachment.fileName}</strong>
+        <strong>{pieceJointe.fileName}</strong>
         <small>
-          {formatBytes(attachment.sizeBytes)} · {attachment.uploadedByName} ·{" "}
-          {formatDateTime(attachment.uploadedAt)}
+          {formatBytes(pieceJointe.sizeBytes)} · {pieceJointe.uploadedByName} ·{" "}
+          {formatDateTime(pieceJointe.uploadedAt)}
         </small>
       </div>
       <div className="taskAttachmentActions">
@@ -680,19 +710,19 @@ function AttachmentRow({ task, attachment }: { task: EntryRecord; attachment: En
           <button
             type="button"
             className="secondaryButton"
-            onClick={() => setPreview((current) => !current)}
+            onClick={() => setPreview((courant) => !courant)}
           >
-            <Eye size={14} /> {preview ? "Fermer" : "Aperçu"}
+            <Eye size={14} /> {apercu ? "Fermer" : "Aperçu"}
           </button>
         ) : null}
-        <a href={attachmentHref(task, attachment, true)} className="secondaryButton">
+        <a href={attachmentHref(tache, pieceJointe, true)} className="secondaryButton">
           <Download size={14} /> Télécharger
         </a>
       </div>
-      {preview ? (
+      {apercu ? (
         <div className="taskAttachmentPreview">
-          {isImage ? <img src={url} alt={attachment.fileName} /> : null}
-          {isPdf ? <iframe title={attachment.fileName} src={url} /> : null}
+          {isImage ? <img src={url} alt={pieceJointe.fileName} /> : null}
+          {isPdf ? <iframe title={pieceJointe.fileName} src={url} /> : null}
         </div>
       ) : null}
     </div>

@@ -23,22 +23,22 @@ import type { NativeQuoteRecord, NativeQuotesPayload } from "@/lib/quotes/store"
 
 function quoteWithAdjustedDisplayPrices(quote: NativeQuoteRecord): NativeQuoteRecord {
   const pricing = calculateQuoteAdjustedPricing(quote.model.items, quote.pricingConfig);
-  const adjustedByLineId = new Map(pricing.lines.map((line) => [line.lineId, line]));
+  const adjustedByLineId = new Map(pricing.lines.map((ligne) => [ligne.lineId, ligne]));
 
   return {
     ...quote,
     model: {
       ...quote.model,
-      items: quote.model.items.map((item) => {
-        if (item.kind !== "LINE") return item;
-        const adjusted = adjustedByLineId.get(item.id);
-        if (!adjusted || item.quantity <= 0) return item;
+      items: quote.model.items.map((element) => {
+        if (element.kind !== "LINE") return element;
+        const adjusted = adjustedByLineId.get(element.id);
+        if (!adjusted || element.quantity <= 0) return element;
         return {
-          ...item,
+          ...element,
           // Vue uniquement : conserve le total de ligne exact, y compris les centimes
           // distribués par le moteur. Les composants et prix de base restent inchangés
           // et sont réutilisés dès qu'on ouvre l'édition de l'ouvrage.
-          unitPriceCents: adjusted.saleCents / item.quantity,
+          unitPriceCents: adjusted.saleCents / element.quantity,
         };
       }),
     },
@@ -47,7 +47,7 @@ function quoteWithAdjustedDisplayPrices(quote: NativeQuoteRecord): NativeQuoteRe
 
 export function QuoteDirectEditor({
   initialPayload,
-  quoteId,
+  quoteId: idDevis,
   canWrite,
   clientName,
   affairName,
@@ -68,10 +68,10 @@ export function QuoteDirectEditor({
   paymentTermOptions: string[];
   contractState: QuoteContractSelectionState;
 }) {
-  const [payload, setPayload] = useState(initialPayload);
+  const [contenu, setPayload] = useState(initialPayload);
   const quote = useMemo(
-    () => payload.quotes.find((candidate) => candidate.id === quoteId) ?? null,
-    [payload.quotes, quoteId],
+    () => contenu.quotes.find((candidat) => candidat.id === idDevis) ?? null,
+    [contenu.quotes, idDevis],
   );
   const displayQuote = useMemo(
     () => (quote ? quoteWithAdjustedDisplayPrices(quote) : null),

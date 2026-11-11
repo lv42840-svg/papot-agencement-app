@@ -29,35 +29,35 @@ function errorStatus(code: string): number {
 }
 
 export async function PATCH(
-  request: Request,
-  { params }: { params: Promise<{ quoteId: string }> },
+  requete: Request,
+  { params: parametres }: { params: Promise<{ quoteId: string }> },
 ) {
   try {
-    const { quoteId } = await params;
-    const input = quoteInternalNotesSchema.parse(await request.json());
-    const context = await requireModuleRequestContext("quotes", "WRITE");
+    const { quoteId: idDevis } = await parametres;
+    const saisie = quoteInternalNotesSchema.parse(await requete.json());
+    const contexte = await requireModuleRequestContext("quotes", "WRITE");
     const repository = createQuotesRepository();
-    const expectedRevision = expectedQuoteRevision(request);
-    const mutation = await repository.mutate((payload) => {
-      assertQuoteRevision(payload, quoteId, expectedRevision);
-      return updateDraftQuoteInternalNotes(payload, quoteId, input, {
-        displayName: context.user.displayName,
+    const expectedRevision = expectedQuoteRevision(requete);
+    const mutation = await repository.mutate((contenu) => {
+      assertQuoteRevision(contenu, idDevis, expectedRevision);
+      return updateDraftQuoteInternalNotes(contenu, idDevis, saisie, {
+        displayName: contexte.user.displayName,
       });
     });
 
-    const response = NextResponse.json({
+    const reponse = NextResponse.json({
       payload: mutation.payload,
-      canWrite: context.moduleAccess.canWrite,
+      canWrite: contexte.moduleAccess.canWrite,
       focusQuoteId: mutation.focusQuoteId,
     });
-    response.headers.set("Cache-Control", "no-store");
-    return response;
-  } catch (error) {
+    reponse.headers.set("Cache-Control", "no-store");
+    return reponse;
+  } catch (erreur) {
     const code =
-      error instanceof ZodError
+      erreur instanceof ZodError
         ? "QUOTE_INTERNAL_NOTES_INVALID"
-        : error instanceof Error
-          ? error.message
+        : erreur instanceof Error
+          ? erreur.message
           : "QUOTE_INTERNAL_NOTES_UPDATE_FAILED";
     return NextResponse.json({ error: code }, { status: errorStatus(code) });
   }

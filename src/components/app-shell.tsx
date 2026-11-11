@@ -5,11 +5,17 @@ import { accentPalette, isAccentKey } from "@/lib/theme/palette";
 import { Brand } from "@/components/brand";
 import { AccentPicker } from "@/components/accent-picker";
 
-export function AppShell({ user, children }: { user: CurrentUser; children: React.ReactNode }) {
-  const accent = isAccentKey(user.accentKey)
-    ? accentPalette[user.accentKey]
+export function AppShell({
+  user: utilisateur,
+  children,
+}: {
+  user: CurrentUser;
+  children: React.ReactNode;
+}) {
+  const accent = isAccentKey(utilisateur.accentKey)
+    ? accentPalette[utilisateur.accentKey]
     : accentPalette.lavender;
-  const initials = user.displayName
+  const initials = utilisateur.displayName
     .split(/\s+/)
     .map((part) => part[0])
     .join("")
@@ -45,12 +51,12 @@ export function AppShell({ user, children }: { user: CurrentUser; children: Reac
           </span>
         </nav>
         <div className="sidebarBottom">
-          <AccentPicker initialAccent={user.accentKey} />
+          <AccentPicker initialAccent={utilisateur.accentKey} />
           <div className="profileLine">
             <span className="avatar" aria-hidden="true">
               {initials}
             </span>
-            <span className="profileName">{user.displayName}</span>
+            <span className="profileName">{utilisateur.displayName}</span>
             <form action="/api/auth/logout" method="post">
               <button className="iconButton" type="submit" title="Se déconnecter">
                 <LogOut size={17} />

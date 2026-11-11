@@ -196,18 +196,12 @@ function estDeclarationExportee(noeud) {
   return false;
 }
 
-const cheminConfig = ts.findConfigFile(
-  RACINE,
-  ts.sys.fileExists,
-  "tsconfig.json",
-);
+const cheminConfig = ts.findConfigFile(RACINE, ts.sys.fileExists, "tsconfig.json");
 if (!cheminConfig) throw new Error("tsconfig.json introuvable");
 
 const fichierConfig = ts.readConfigFile(cheminConfig, ts.sys.readFile);
 if (fichierConfig.error) {
-  throw new Error(
-    ts.flattenDiagnosticMessageText(fichierConfig.error.messageText, "\n"),
-  );
+  throw new Error(ts.flattenDiagnosticMessageText(fichierConfig.error.messageText, "\n"));
 }
 const configuration = ts.parseJsonConfigFileContent(
   fichierConfig.config,
@@ -220,18 +214,11 @@ const programme = ts.createProgram({
 });
 const verificateur = programme.getTypeChecker();
 
-const fichiersSources = programme
-  .getSourceFiles()
-  .filter((fichier) => {
-    if (fichier.isDeclarationFile) return false;
-    const relatif = path
-      .relative(RACINE, fichier.fileName)
-      .replaceAll("\\", "/");
-    return (
-      relatif.startsWith("src/app/") ||
-      relatif.startsWith("src/components/")
-    );
-  });
+const fichiersSources = programme.getSourceFiles().filter((fichier) => {
+  if (fichier.isDeclarationFile) return false;
+  const relatif = path.relative(RACINE, fichier.fileName).replaceAll("\\", "/");
+  return relatif.startsWith("src/app/") || relatif.startsWith("src/components/");
+});
 
 const renommagesParSymbole = new Map();
 
@@ -268,10 +255,7 @@ for (const fichier of fichiersSources) {
   const visiter = (noeud) => {
     if (ts.isIdentifier(noeud)) {
       let symbole;
-      if (
-        ts.isShorthandPropertyAssignment(noeud.parent) &&
-        noeud.parent.name === noeud
-      ) {
+      if (ts.isShorthandPropertyAssignment(noeud.parent) && noeud.parent.name === noeud) {
         symbole =
           verificateur.getShorthandAssignmentValueSymbol(noeud.parent) ||
           verificateur.getSymbolAtLocation(noeud);
@@ -316,9 +300,7 @@ for (const fichier of fichiersSources) {
   let contenu = fichier.getFullText();
   for (const remplacement of remplacements) {
     contenu =
-      contenu.slice(0, remplacement.debut) +
-      remplacement.texte +
-      contenu.slice(remplacement.fin);
+      contenu.slice(0, remplacement.debut) + remplacement.texte + contenu.slice(remplacement.fin);
   }
 
   fs.writeFileSync(fichier.fileName, contenu, "utf8");

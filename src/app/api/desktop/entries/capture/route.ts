@@ -32,12 +32,12 @@ const captureSchema = z.object({
   commercialCaseId: z.string().uuid().nullable().optional(),
 });
 
-function snapshot(payload: EntriesPayload, actor: EntriesActor, focusEntryId?: string) {
+function snapshot(contenu: EntriesPayload, auteur: EntriesActor, focusEntryId?: string) {
   return {
-    payload,
-    actor: { userId: actor.userId, displayName: actor.displayName },
-    capabilities: entriesCapabilities(actor),
-    suggestedAssignees: listSuggestedAssignees(payload, actor),
+    payload: contenu,
+    actor: { userId: auteur.userId, displayName: auteur.displayName },
+    capabilities: entriesCapabilities(auteur),
+    suggestedAssignees: listSuggestedAssignees(contenu, auteur),
     focusEntryId,
     serverNow: new Date().toISOString(),
   };
@@ -54,16 +54,18 @@ function statusFor(code: string): number {
   return 400;
 }
 
-export async function POST(request: Request) {
+export async function POST(requete: Request) {
   let uploaded = [] as Awaited<ReturnType<typeof uploadEntryAttachments>>;
   let transport: EntryAttachmentTransport | null = null;
 
   try {
-    const context = await requireModuleRequestContext("capture", "WRITE");
-    const actor = await buildEntriesActor(context);
+    const contexte = await requireModuleRequestContext("capture", "WRITE");
+    const auteur = await buildEntriesActor(contexte);
     const repository = await createEntriesRepository();
-    const form = await request.formData();
-    const files = form.getAll("files").filter((value): value is File => value instanceof File);
+    const form = await requete.formData();
+    const fichiers = form
+      .getAll("files")
+      .filter((valeur): valeur is File => valeur instanceof File);
 
     let rawTagIds: unknown = [];
     try {
@@ -74,74 +76,74 @@ export async function POST(request: Request) {
 
     const rawClientId = String(form.get("clientId") ?? "").trim();
     const rawCommercialCaseId = String(form.get("commercialCaseId") ?? "").trim();
-    const parsed = captureSchema.safeParse({
+    const analyse = captureSchema.safeParse({
       rawText: String(form.get("rawText") ?? ""),
       priority: String(form.get("priority") ?? "NORMAL"),
       tagIds: rawTagIds,
       clientId: rawClientId || null,
       commercialCaseId: rawCommercialCaseId || null,
     });
-    if (!parsed.success) {
+    if (!analyse.success) {
       return NextResponse.json({ error: "ENTRIES_REQUEST_INVALID" }, { status: 400 });
     }
 
-    let clientId = parsed.data.clientId ?? null;
-    const commercialCaseId = parsed.data.commercialCaseId ?? null;
+    let idClient = analyse.data.clientId ?? null;
+    const commercialCaseId = analyse.data.commercialCaseId ?? null;
 
-    if (clientId || commercialCaseId) {
+    if (idClient || commercialCaseId) {
       const [clientsPayload, commercialPayload] = await Promise.all([
         createClientsRepository().then((clients) => clients.load()),
         createCommercialRepository().load(),
       ]);
 
-      if (clientId) {
+      if (idClient) {
         const client = clientsPayload.clients.find(
-          (candidate) => candidate.id === clientId && !candidate.isArchived,
+          (candidat) => candidat.id === idClient && !candidat.isArchived,
         );
         if (!client) throw new Error("CLIENT_NOT_FOUND");
       }
 
       if (commercialCaseId) {
         const commercialCase = commercialPayload.cases.find(
-          (candidate) => candidate.id === commercialCaseId && !isCommercialClosed(candidate),
+          (candidat) => candidat.id === commercialCaseId && !isCommercialClosed(candidat),
         );
         if (!commercialCase) throw new Error("COMMERCIAL_CASE_NOT_FOUND");
-        if (commercialCase.clientId) clientId = commercialCase.clientId;
+        if (commercialCase.clientId) idClient = commercialCase.clientId;
       }
     }
 
-    if (files.length > 0) {
+    if (fichiers.length > 0) {
       transport = await createEntryAttachmentTransport({
-        owner: { displayName: context.user.displayName },
+        owner: { displayName: contexte.user.displayName },
       });
     }
 
-    const entryId = randomUUID();
+    const idEntree = randomUUID();
     const created = await repository.mutate(
       {
         action: "create",
-        entryId,
-        ...parsed.data,
-        clientId,
+        entryId: idEntree,
+        ...analyse.data,
+        clientId: idClient,
         commercialCaseId,
       },
-      actor,
+      auteur,
     );
 
-    if (!transport || files.length === 0) {
-      return NextResponse.json(snapshot(created.payload, actor, created.focusEntryId), {
+    if (!transport || fichiers.length === 0) {
+      return NextResponse.json(snapshot(created.payload, auteur, created.focusEntryId), {
         headers: { "Cache-Control": "no-store" },
       });
     }
 
-    uploaded = await uploadEntryAttachments(transport, entryId, files);
-    const mutation = await repository.registerAttachments(entryId, uploaded, actor);
-    return NextResponse.json(snapshot(mutation.payload, actor, mutation.focusEntryId), {
+    uploaded = await uploadEntryAttachments(transport, idEntree, fichiers);
+    const mutation = await repository.registerAttachments(idEntree, uploaded, auteur);
+    return NextResponse.json(snapshot(mutation.payload, auteur, mutation.focusEntryId), {
       headers: { "Cache-Control": "no-store" },
     });
-  } catch (error) {
+  } catch (erreur) {
     if (transport && uploaded.length > 0) await cleanupEntryAttachments(transport, uploaded);
-    const code = error instanceof Error ? error.message : "ENTRIES_CAPTURE_FAILED";
+    const code = erreur instanceof Error ? erreur.message : "ENTRIES_CAPTURE_FAILED";
     return NextResponse.json(
       { error: code },
       { status: statusFor(code), headers: { "Cache-Control": "no-store" } },

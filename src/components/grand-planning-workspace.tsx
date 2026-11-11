@@ -78,17 +78,17 @@ function cellKey(
   kind: "firm" | "provisional",
   id: string,
   activity: PlanningActivity,
-  week: string,
+  semaine: string,
 ) {
-  return `${kind}:${id}:${activity}:${week}`;
+  return `${kind}:${id}:${activity}:${semaine}`;
 }
 
-function weekLabel(week: string) {
-  return `S${week.slice(-2)}`;
+function weekLabel(semaine: string) {
+  return `S${semaine.slice(-2)}`;
 }
 
-function formatHours(value: number) {
-  return Number.isInteger(value) ? String(value) : String(value).replace(".", ",");
+function formatHours(valeur: number) {
+  return Number.isInteger(valeur) ? String(valeur) : String(valeur).replace(".", ",");
 }
 
 const WEEKDAYS = [
@@ -101,12 +101,12 @@ const WEEKDAYS = [
   ["sunday", "Dim"],
 ] as const;
 
-function parseHours(value: string): number | null {
-  const normalized = value.trim().replace(",", ".");
+function parseHours(valeur: string): number | null {
+  const normalized = valeur.trim().replace(",", ".");
   if (!normalized) return 0;
-  const parsed = Number(normalized);
-  if (!Number.isFinite(parsed) || parsed < 0) return null;
-  return parsed;
+  const analyse = Number(normalized);
+  if (!Number.isFinite(analyse) || analyse < 0) return null;
+  return analyse;
 }
 
 export function GrandPlanningWorkspace({
@@ -124,7 +124,7 @@ export function GrandPlanningWorkspace({
   const [hiddenProvisional, setHiddenProvisional] = useState(false);
   const [activeTab, setActiveTab] = useState<"planning" | "personnel">(initialTab);
   const [message, setMessage] = useState("Chargement du planning…");
-  const [drafts, setDrafts] = useState<Record<string, string>>({});
+  const [brouillons, setDrafts] = useState<Record<string, string>>({});
   const [savingKey, setSavingKey] = useState<string | null>(null);
   const [scheduleDrafts, setScheduleDrafts] = useState<Record<string, string>>({});
   const [staffFirstName, setStaffFirstName] = useState("");
@@ -164,19 +164,19 @@ export function GrandPlanningWorkspace({
 
   const load = useCallback(async () => {
     setMessage("Chargement du planning…");
-    const response = await fetch(
+    const reponse = await fetch(
       `/api/desktop/planning?year=${initialYear}&endYear=${Math.min(2100, initialYear + 1)}`,
       {
         cache: "no-store",
       },
     );
-    const result = (await response.json()) as PlanningSnapshot & { error?: string };
-    if (!response.ok) {
-      setMessage(result.error ?? "Impossible de charger le planning.");
+    const resultat = (await reponse.json()) as PlanningSnapshot & { error?: string };
+    if (!reponse.ok) {
+      setMessage(resultat.error ?? "Impossible de charger le planning.");
       return;
     }
-    setSnapshot(result);
-    setAbsenceUserId((current) => current || result.peopleCapacity[0]?.userId || "");
+    setSnapshot(resultat);
+    setAbsenceUserId((courant) => courant || resultat.peopleCapacity[0]?.userId || "");
     setMessage("");
   }, [initialYear]);
 
@@ -185,9 +185,9 @@ export function GrandPlanningWorkspace({
   }, [load]);
 
   const suggestedAbsenceHours = useMemo(() => {
-    const person = snapshot?.peopleCapacity.find((entry) => entry.userId === absenceUserId);
-    if (!person) return 0;
-    return suggestedAbsenceHoursForDate(person.weeklySchedule, absenceDate);
+    const personne = snapshot?.peopleCapacity.find((entree) => entree.userId === absenceUserId);
+    if (!personne) return 0;
+    return suggestedAbsenceHoursForDate(personne.weeklySchedule, absenceDate);
   }, [snapshot?.peopleCapacity, absenceUserId, absenceDate]);
   const displayedAbsenceHours = absenceHours ?? formatHours(suggestedAbsenceHours);
 
@@ -197,14 +197,14 @@ export function GrandPlanningWorkspace({
   );
   const absencePeople = useMemo(() => {
     const listed =
-      snapshot?.peopleCapacity.map((person) => ({
-        id: person.userId,
-        displayName: person.displayName,
+      snapshot?.peopleCapacity.map((personne) => ({
+        id: personne.userId,
+        displayName: personne.displayName,
       })) ?? [];
-    const ids = new Set(listed.map((person) => person.id));
+    const identifiants = new Set(listed.map((personne) => personne.id));
     for (const absence of snapshot?.absences ?? []) {
-      if (ids.has(absence.userId)) continue;
-      ids.add(absence.userId);
+      if (identifiants.has(absence.userId)) continue;
+      identifiants.add(absence.userId);
       listed.push({ id: absence.userId, displayName: absence.displayName });
     }
     return listed;
@@ -214,7 +214,7 @@ export function GrandPlanningWorkspace({
   );
 
   const capacityByWeek = useMemo(
-    () => new Map(snapshot?.weeklyCapacity.map((item) => [item.week, item]) ?? []),
+    () => new Map(snapshot?.weeklyCapacity.map((element) => [element.week, element]) ?? []),
     [snapshot],
   );
 
@@ -223,7 +223,7 @@ export function GrandPlanningWorkspace({
     [snapshot?.weeks],
   );
   const weekMetaByWeek = useMemo(
-    () => new Map(weekMeta.map((item) => [item.week, item])),
+    () => new Map(weekMeta.map((element) => [element.week, element])),
     [weekMeta],
   );
   const monthGroups = useMemo(() => groupGrandPlanningMonths(weekMeta), [weekMeta]);
@@ -254,21 +254,21 @@ export function GrandPlanningWorkspace({
     // Keep at most three years rendered; older years remain accessible via annual navigation.
     const nextStartYear = Math.max(snapshot.year, nextEndYear - 2);
     const removedWeeks = snapshot.weeks.filter(
-      (week) => Number(week.slice(0, 4)) < nextStartYear,
+      (semaine) => Number(semaine.slice(0, 4)) < nextStartYear,
     ).length;
     const previousScrollLeft = planningScrollerRef.current?.scrollLeft ?? 0;
     try {
-      const response = await fetch(
+      const reponse = await fetch(
         `/api/desktop/planning?year=${nextStartYear}&endYear=${nextEndYear}`,
         { cache: "no-store" },
       );
-      const result = (await response.json()) as PlanningSnapshot & { error?: string };
-      if (!response.ok) {
-        setMessage(result.error ?? "Impossible de charger la suite du planning.");
+      const resultat = (await reponse.json()) as PlanningSnapshot & { error?: string };
+      if (!reponse.ok) {
+        setMessage(resultat.error ?? "Impossible de charger la suite du planning.");
         return;
       }
       restoreScrollRef.current = Math.max(0, previousScrollLeft - removedWeeks * 150);
-      setSnapshot(result);
+      setSnapshot(resultat);
       setMessage("");
     } catch {
       setMessage("Impossible de charger la suite du planning.");
@@ -286,8 +286,8 @@ export function GrandPlanningWorkspace({
     }
   }
 
-  function weekClassName(week: string) {
-    const meta = weekMetaByWeek.get(week);
+  function weekClassName(semaine: string) {
+    const meta = weekMetaByWeek.get(semaine);
     return [
       meta?.startsMonth ? "planningMonthStart" : "",
       meta?.isPast ? "planningPastWeek" : "",
@@ -311,103 +311,103 @@ export function GrandPlanningWorkspace({
   const provisionalUnallocated = useMemo(() => {
     if (!snapshot) return [];
     return snapshot.provisionalRows
-      .map((item) => ({
-        ...item,
-        activities: item.activities.filter((activity) => activity.remainingHours !== 0),
+      .map((element) => ({
+        ...element,
+        activities: element.activities.filter((activity) => activity.remainingHours !== 0),
       }))
-      .filter((item) => item.activities.length > 0);
+      .filter((element) => element.activities.length > 0);
   }, [snapshot]);
 
-  function scheduleDraftKey(userId: string, day: keyof PersonCapacity["weeklySchedule"]) {
-    return `${userId}:${day}`;
+  function scheduleDraftKey(idUtilisateur: string, jour: keyof PersonCapacity["weeklySchedule"]) {
+    return `${idUtilisateur}:${jour}`;
   }
 
   async function saveScheduleDay(
-    person: PersonCapacity,
-    day: keyof PersonCapacity["weeklySchedule"],
+    personne: PersonCapacity,
+    jour: keyof PersonCapacity["weeklySchedule"],
   ) {
     if (!snapshot?.capabilities.canManageSchedules) return;
-    const key = scheduleDraftKey(person.userId, day);
-    const raw = scheduleDrafts[key] ?? formatHours(person.weeklySchedule[day]);
-    const hours = parseHours(raw);
-    if (hours == null || hours > 24) {
-      setScheduleDrafts((current) => {
-        const next = { ...current };
-        delete next[key];
-        return next;
+    const cle = scheduleDraftKey(personne.userId, jour);
+    const raw = scheduleDrafts[cle] ?? formatHours(personne.weeklySchedule[jour]);
+    const heures = parseHours(raw);
+    if (heures == null || heures > 24) {
+      setScheduleDrafts((courant) => {
+        const suivant = { ...courant };
+        delete suivant[cle];
+        return suivant;
       });
       setMessage("Horaire invalide : saisissez entre 0 et 24 h.");
       return;
     }
-    if (hours === person.weeklySchedule[day]) {
-      setScheduleDrafts((current) => {
-        const next = { ...current };
-        delete next[key];
-        return next;
+    if (heures === personne.weeklySchedule[jour]) {
+      setScheduleDrafts((courant) => {
+        const suivant = { ...courant };
+        delete suivant[cle];
+        return suivant;
       });
       return;
     }
     await savePersonCapacity({
-      ...person,
-      weeklySchedule: { ...person.weeklySchedule, [day]: hours },
+      ...personne,
+      weeklySchedule: { ...personne.weeklySchedule, [jour]: heures },
     });
-    setScheduleDrafts((current) => {
-      const next = { ...current };
-      delete next[key];
-      return next;
+    setScheduleDrafts((courant) => {
+      const suivant = { ...courant };
+      delete suivant[cle];
+      return suivant;
     });
   }
 
-  async function savePersonCapacity(person: PersonCapacity) {
+  async function savePersonCapacity(personne: PersonCapacity) {
     if (!snapshot?.capabilities.canManageSchedules) return;
-    setSavingKey(`capacity:${person.userId}`);
+    setSavingKey(`capacity:${personne.userId}`);
     setMessage("Enregistrement de la capacité…");
-    const response = await fetch("/api/desktop/planning", {
+    const reponse = await fetch("/api/desktop/planning", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
         action: "setPersonCapacity",
         year: snapshot.year,
         endYear: snapshot.endYear,
-        userId: person.userId,
-        countsInMacroCapacity: person.countsInMacroCapacity,
-        weeklySchedule: person.weeklySchedule,
+        userId: personne.userId,
+        countsInMacroCapacity: personne.countsInMacroCapacity,
+        weeklySchedule: personne.weeklySchedule,
       }),
     });
-    const result = (await response.json()) as PlanningSnapshot & { error?: string };
-    if (!response.ok) {
-      setMessage(result.error ?? "Enregistrement impossible.");
+    const resultat = (await reponse.json()) as PlanningSnapshot & { error?: string };
+    if (!reponse.ok) {
+      setMessage(resultat.error ?? "Enregistrement impossible.");
       setSavingKey(null);
       return;
     }
-    setSnapshot(result);
+    setSnapshot(resultat);
     setSavingKey(null);
     setMessage("Capacité enregistrée.");
   }
 
-  async function postPlanningMutation(body: Record<string, unknown>, successMessage: string) {
+  async function postPlanningMutation(corps: Record<string, unknown>, successMessage: string) {
     if (!snapshot) return false;
     setSavingKey("planning-mutation");
     setMessage("Enregistrement…");
-    const response = await fetch("/api/desktop/planning", {
+    const reponse = await fetch("/api/desktop/planning", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ ...body, year: snapshot.year, endYear: snapshot.endYear }),
+      body: JSON.stringify({ ...corps, year: snapshot.year, endYear: snapshot.endYear }),
     });
-    const result = (await response.json()) as PlanningSnapshot & { error?: string };
-    if (!response.ok) {
-      setMessage(result.error ?? "Enregistrement impossible.");
+    const resultat = (await reponse.json()) as PlanningSnapshot & { error?: string };
+    if (!reponse.ok) {
+      setMessage(resultat.error ?? "Enregistrement impossible.");
       setSavingKey(null);
       return false;
     }
-    setSnapshot(result);
+    setSnapshot(resultat);
     setMessage(successMessage);
     setSavingKey(null);
     return true;
   }
 
-  async function saveStaff(event: FormEvent<HTMLFormElement>) {
-    event.preventDefault();
+  async function saveStaff(evenement: FormEvent<HTMLFormElement>) {
+    evenement.preventDefault();
     const firstName = staffFirstName.trim();
     const lastName = staffLastName.trim();
     if (!firstName || !lastName) {
@@ -425,11 +425,11 @@ export function GrandPlanningWorkspace({
     }
   }
 
-  function editStaff(person: PersonCapacity) {
-    if (person.kind !== "staff") return;
-    setEditingStaffId(person.userId);
-    setStaffFirstName(person.firstName ?? "");
-    setStaffLastName(person.lastName ?? "");
+  function editStaff(personne: PersonCapacity) {
+    if (personne.kind !== "staff") return;
+    setEditingStaffId(personne.userId);
+    setStaffFirstName(personne.firstName ?? "");
+    setStaffLastName(personne.lastName ?? "");
   }
 
   async function linkStaffAccount(personId: string, linkedUserId: string | null) {
@@ -439,36 +439,36 @@ export function GrandPlanningWorkspace({
     );
   }
 
-  async function setPersonHidden(person: PersonCapacity) {
+  async function setPersonHidden(personne: PersonCapacity) {
     await postPlanningMutation(
-      { action: "setPersonHidden", id: person.userId, hidden: !person.hiddenInWeeklyBoard },
-      person.hiddenInWeeklyBoard
+      { action: "setPersonHidden", id: personne.userId, hidden: !personne.hiddenInWeeklyBoard },
+      personne.hiddenInWeeklyBoard
         ? "Personne visible au petit planning."
         : "Personne masquée du petit planning.",
     );
   }
 
   async function staffAction(
-    person: PersonCapacity,
+    personne: PersonCapacity,
     action: "deactivateStaff" | "reactivateStaff" | "deleteStaff",
   ) {
-    if (person.kind !== "staff") return;
+    if (personne.kind !== "staff") return;
     if (
       action === "deleteStaff" &&
       !window.confirm(
-        `Supprimer définitivement ${person.displayName} ? Possible uniquement sans historique ni compte lié.`,
+        `Supprimer définitivement ${personne.displayName} ? Possible uniquement sans historique ni compte lié.`,
       )
     )
       return;
     if (
       action === "deactivateStaff" &&
       !window.confirm(
-        `Désactiver ${person.displayName} dès aujourd'hui ? Les anciennes semaines restent conservées.`,
+        `Désactiver ${personne.displayName} dès aujourd'hui ? Les anciennes semaines restent conservées.`,
       )
     )
       return;
     await postPlanningMutation(
-      { action, id: person.userId },
+      { action, id: personne.userId },
       action === "deleteStaff"
         ? "Fiche supprimée."
         : action === "reactivateStaff"
@@ -479,16 +479,16 @@ export function GrandPlanningWorkspace({
 
   async function togglePotentialCollapsed() {
     if (potentialPreferenceSaving) return;
-    const next = !potentialCollapsed;
-    setPotentialCollapsed(next);
+    const suivant = !potentialCollapsed;
+    setPotentialCollapsed(suivant);
     setPotentialPreferenceSaving(true);
-    const response = await fetch("/api/me/planning-preferences", {
+    const reponse = await fetch("/api/me/planning-preferences", {
       method: "PATCH",
       headers: { "content-type": "application/json" },
-      body: JSON.stringify({ planningPotentialCollapsed: next }),
+      body: JSON.stringify({ planningPotentialCollapsed: suivant }),
     });
-    if (!response.ok) {
-      setPotentialCollapsed(!next);
+    if (!reponse.ok) {
+      setPotentialCollapsed(!suivant);
       setMessage("Impossible d’enregistrer la préférence d’affichage.");
     }
     setPotentialPreferenceSaving(false);
@@ -496,7 +496,7 @@ export function GrandPlanningWorkspace({
 
   async function moveFirm(chantierId: string, direction: -1 | 1) {
     if (!snapshot?.capabilities.canEditMacro) return;
-    const orderedChantierIds = snapshot.rows.map((item) => item.chantierId);
+    const orderedChantierIds = snapshot.rows.map((element) => element.chantierId);
     const currentIndex = orderedChantierIds.indexOf(chantierId);
     const nextIndex = currentIndex + direction;
     if (currentIndex < 0 || nextIndex < 0 || nextIndex >= orderedChantierIds.length) return;
@@ -512,10 +512,10 @@ export function GrandPlanningWorkspace({
     );
   }
 
-  async function movePotential(caseId: string, direction: -1 | 1) {
+  async function movePotential(idAffaire: string, direction: -1 | 1) {
     if (!snapshot?.capabilities.canEditMacro) return;
-    const orderedCaseIds = snapshot.provisionalRows.map((item) => item.caseId);
-    const currentIndex = orderedCaseIds.indexOf(caseId);
+    const orderedCaseIds = snapshot.provisionalRows.map((element) => element.caseId);
+    const currentIndex = orderedCaseIds.indexOf(idAffaire);
     const nextIndex = currentIndex + direction;
     if (currentIndex < 0 || nextIndex < 0 || nextIndex >= orderedCaseIds.length) return;
 
@@ -532,8 +532,8 @@ export function GrandPlanningWorkspace({
 
   async function saveAbsence() {
     if (!snapshot?.capabilities.canManageSchedules || !absenceUserId) return;
-    const hours = parseHours(displayedAbsenceHours);
-    if (hours == null || hours <= 0 || hours > 24) {
+    const heures = parseHours(displayedAbsenceHours);
+    if (heures == null || heures <= 0 || heures > 24) {
       setMessage("Absence invalide : saisissez entre 0 et 24 h.");
       return;
     }
@@ -544,7 +544,7 @@ export function GrandPlanningWorkspace({
         userId: absenceUserId,
         type: absenceType,
         date: absenceDate,
-        hours,
+        hours: heures,
       },
       "Absence enregistrée.",
     );
@@ -576,10 +576,10 @@ export function GrandPlanningWorkspace({
     await postPlanningMutation({ action: "deleteAbsence", absenceId }, "Absence supprimée.");
   }
 
-  async function deleteAbsenceWeek(ids: string[]) {
+  async function deleteAbsenceWeek(identifiants: string[]) {
     if (!snapshot?.capabilities.canManageSchedules) return;
     await postPlanningMutation(
-      { action: "deleteAbsenceBatch", absenceIds: ids },
+      { action: "deleteAbsenceBatch", absenceIds: identifiants },
       "Semaine d’absence supprimée.",
     );
   }
@@ -606,36 +606,36 @@ export function GrandPlanningWorkspace({
   async function saveCell(
     chantierId: string,
     activity: PlanningActivity,
-    week: string,
+    semaine: string,
     displayedValue: number,
   ) {
     if (!snapshot?.capabilities.canEditMacro) return;
-    const key = cellKey("firm", chantierId, activity, week);
-    const raw = drafts[key] ?? formatHours(displayedValue);
-    const hours = parseHours(raw);
+    const cle = cellKey("firm", chantierId, activity, semaine);
+    const raw = brouillons[cle] ?? formatHours(displayedValue);
+    const heures = parseHours(raw);
 
-    if (hours == null) {
-      setDrafts((current) => {
-        const next = { ...current };
-        delete next[key];
-        return next;
+    if (heures == null) {
+      setDrafts((courant) => {
+        const suivant = { ...courant };
+        delete suivant[cle];
+        return suivant;
       });
       setMessage("Valeur invalide : saisissez un nombre d’heures positif.");
       return;
     }
 
-    if (hours === displayedValue) {
-      setDrafts((current) => {
-        const next = { ...current };
-        delete next[key];
-        return next;
+    if (heures === displayedValue) {
+      setDrafts((courant) => {
+        const suivant = { ...courant };
+        delete suivant[cle];
+        return suivant;
       });
       return;
     }
 
-    setSavingKey(key);
+    setSavingKey(cle);
     setMessage("Enregistrement…");
-    const response = await fetch("/api/desktop/planning", {
+    const reponse = await fetch("/api/desktop/planning", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
@@ -644,86 +644,86 @@ export function GrandPlanningWorkspace({
         endYear: snapshot.endYear,
         chantierId,
         activity,
-        week,
-        hours,
+        week: semaine,
+        hours: heures,
       }),
     });
-    const result = (await response.json()) as PlanningSnapshot & { error?: string };
+    const resultat = (await reponse.json()) as PlanningSnapshot & { error?: string };
 
-    if (!response.ok) {
-      setMessage(result.error ?? "Enregistrement impossible.");
+    if (!reponse.ok) {
+      setMessage(resultat.error ?? "Enregistrement impossible.");
       setSavingKey(null);
       return;
     }
 
-    setSnapshot(result);
-    setDrafts((current) => {
-      const next = { ...current };
-      delete next[key];
-      return next;
+    setSnapshot(resultat);
+    setDrafts((courant) => {
+      const suivant = { ...courant };
+      delete suivant[cle];
+      return suivant;
     });
     setSavingKey(null);
     setMessage("Planning enregistré.");
   }
 
   async function saveProvisionalCell(
-    caseId: string,
+    idAffaire: string,
     activity: PlanningActivity,
-    week: string,
+    semaine: string,
     displayedValue: number,
   ) {
     if (!snapshot?.capabilities.canEditMacro) return;
-    const key = cellKey("provisional", caseId, activity, week);
-    const raw = drafts[key] ?? formatHours(displayedValue);
-    const hours = parseHours(raw);
+    const cle = cellKey("provisional", idAffaire, activity, semaine);
+    const raw = brouillons[cle] ?? formatHours(displayedValue);
+    const heures = parseHours(raw);
 
-    if (hours == null) {
-      setDrafts((current) => {
-        const next = { ...current };
-        delete next[key];
-        return next;
+    if (heures == null) {
+      setDrafts((courant) => {
+        const suivant = { ...courant };
+        delete suivant[cle];
+        return suivant;
       });
       setMessage("Valeur invalide : saisissez un nombre d’heures positif.");
       return;
     }
 
-    if (hours === displayedValue) {
-      setDrafts((current) => {
-        const next = { ...current };
-        delete next[key];
-        return next;
+    if (heures === displayedValue) {
+      setDrafts((courant) => {
+        const suivant = { ...courant };
+        delete suivant[cle];
+        return suivant;
       });
       return;
     }
 
-    setSavingKey(key);
+    setSavingKey(cle);
     setMessage("Enregistrement du provisionnel…");
-    const response = await fetch("/api/desktop/planning", {
+    const reponse = await fetch("/api/desktop/planning", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
         action: "setProvisionHours",
         year: snapshot.year,
         endYear: snapshot.endYear,
-        caseId,
+        caseId: idAffaire,
         activity,
-        week,
-        hours,
+        week: semaine,
+        hours: heures,
       }),
     });
-    const result = (await response.json()) as PlanningSnapshot & { error?: string };
+    const resultat = (await reponse.json()) as PlanningSnapshot & { error?: string };
 
-    if (!response.ok) {
-      setMessage(result.error ?? "Enregistrement impossible.");
+    if (!reponse.ok) {
+      setMessage(resultat.error ?? "Enregistrement impossible.");
       setSavingKey(null);
       return;
     }
 
-    setSnapshot(result);
-    setDrafts((current) => {
-      const next = { ...current };
-      delete next[key];
-      return next;
+    setSnapshot(resultat);
+    setDrafts((courant) => {
+      const suivant = { ...courant };
+      delete suivant[cle];
+      return suivant;
     });
     setSavingKey(null);
     setMessage("Charge provisionnelle enregistrée.");
@@ -734,7 +734,7 @@ export function GrandPlanningWorkspace({
     setSavingKey("planning-mutation");
     setMessage(`Enregistrement de ${updates.length} case(s)…`);
     try {
-      const response = await fetch("/api/desktop/planning", {
+      const reponse = await fetch("/api/desktop/planning", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
@@ -744,18 +744,18 @@ export function GrandPlanningWorkspace({
           updates,
         }),
       });
-      const result = (await response.json()) as PlanningSnapshot & { error?: string };
-      if (!response.ok) {
-        setMessage(result.error ?? "Collage refusé : aucune heure n’a été modifiée.");
+      const resultat = (await reponse.json()) as PlanningSnapshot & { error?: string };
+      if (!reponse.ok) {
+        setMessage(resultat.error ?? "Collage refusé : aucune heure n’a été modifiée.");
         return;
       }
-      setSnapshot(result);
-      setDrafts((current) => {
-        const next = { ...current };
+      setSnapshot(resultat);
+      setDrafts((courant) => {
+        const suivant = { ...courant };
         for (const update of updates) {
-          delete next[cellKey(update.kind, update.id, update.activity, update.week)];
+          delete suivant[cellKey(update.kind, update.id, update.activity, update.week)];
         }
-        return next;
+        return suivant;
       });
       setMessage(`${updates.length} case(s) collée(s) et enregistrée(s).`);
     } catch {
@@ -895,9 +895,9 @@ export function GrandPlanningWorkspace({
                 <strong>
                   {formatHours(
                     provisionalUnallocated.reduce(
-                      (total, item) =>
+                      (total, element) =>
                         total +
-                        item.activities.reduce(
+                        element.activities.reduce(
                           (subtotal, activity) => subtotal + activity.remainingHours,
                           0,
                         ),
@@ -916,17 +916,17 @@ export function GrandPlanningWorkspace({
                 ✕
               </button>
               <div className="planningUnallocatedList">
-                {provisionalUnallocated.map((item) => (
-                  <div className="planningUnallocatedRow" key={item.caseId}>
+                {provisionalUnallocated.map((element) => (
+                  <div className="planningUnallocatedRow" key={element.caseId}>
                     <div className="planningProvisionCaseMeta">
-                      <strong>{item.name}</strong>
-                      <span>{item.statusLabel}</span>
-                      {item.expectedConfirmationDate ? (
-                        <small>Confirmation prévue {item.expectedConfirmationDate}</small>
+                      <strong>{element.name}</strong>
+                      <span>{element.statusLabel}</span>
+                      {element.expectedConfirmationDate ? (
+                        <small>Confirmation prévue {element.expectedConfirmationDate}</small>
                       ) : null}
                     </div>
                     <div>
-                      {item.activities.map((activity) => (
+                      {element.activities.map((activity) => (
                         <span key={activity.activity}>
                           {activity.label} {formatHours(activity.remainingHours)} h
                         </span>
@@ -954,7 +954,10 @@ export function GrandPlanningWorkspace({
                 ) : null}
               </div>
               {snapshot.capabilities.canManageSchedules ? (
-                <form className="planningStaffForm" onSubmit={(event) => void saveStaff(event)}>
+                <form
+                  className="planningStaffForm"
+                  onSubmit={(evenement) => void saveStaff(evenement)}
+                >
                   <label>
                     Prénom
                     <input
@@ -962,7 +965,7 @@ export function GrandPlanningWorkspace({
                       maxLength={100}
                       required
                       placeholder="Prénom"
-                      onChange={(event) => setStaffFirstName(event.target.value)}
+                      onChange={(evenement) => setStaffFirstName(evenement.target.value)}
                     />
                   </label>
                   <label>
@@ -972,7 +975,7 @@ export function GrandPlanningWorkspace({
                       maxLength={100}
                       required
                       placeholder="Nom"
-                      onChange={(event) => setStaffLastName(event.target.value)}
+                      onChange={(evenement) => setStaffLastName(evenement.target.value)}
                     />
                   </label>
                   <button type="submit" className="primaryButton fit" disabled={savingKey !== null}>
@@ -1005,18 +1008,18 @@ export function GrandPlanningWorkspace({
                     <tr>
                       <th>Personne</th>
                       <th>Capacité</th>
-                      {WEEKDAYS.map(([, label]) => (
-                        <th key={label}>{label}</th>
+                      {WEEKDAYS.map(([, libelle]) => (
+                        <th key={libelle}>{libelle}</th>
                       ))}
                       <th>Total</th>
                     </tr>
                   </thead>
                   <tbody>
-                    {snapshot.peopleCapacity.map((person) => (
-                      <tr key={person.userId}>
+                    {snapshot.peopleCapacity.map((personne) => (
+                      <tr key={personne.userId}>
                         <th scope="row">
                           <div className="planningStaffIdentity">
-                            <strong>{person.displayName}</strong>
+                            <strong>{personne.displayName}</strong>
                             {snapshot.capabilities.canManageSchedules ? (
                               <label
                                 className="planningStaffHide"
@@ -1024,24 +1027,24 @@ export function GrandPlanningWorkspace({
                               >
                                 <input
                                   type="checkbox"
-                                  checked={!person.hiddenInWeeklyBoard}
+                                  checked={!personne.hiddenInWeeklyBoard}
                                   disabled={savingKey !== null}
-                                  onChange={() => void setPersonHidden(person)}
+                                  onChange={() => void setPersonHidden(personne)}
                                 />
                                 Visible au petit planning
                               </label>
                             ) : null}
-                            {person.kind === "staff" ? (
+                            {personne.kind === "staff" ? (
                               <>
                                 <small>
-                                  {person.inactiveSince
+                                  {personne.inactiveSince
                                     ? "Désactivé"
-                                    : person.endDate
-                                      ? `Fin prévue : ${person.endDate.split("-").reverse().join("/")}`
+                                    : personne.endDate
+                                      ? `Fin prévue : ${personne.endDate.split("-").reverse().join("/")}`
                                       : "Sans date de fin"}
                                 </small>
                                 <small>
-                                  {person.linkedUserId
+                                  {personne.linkedUserId
                                     ? "Compte PAPOT associé"
                                     : "Sans compte PAPOT"}
                                 </small>
@@ -1051,27 +1054,29 @@ export function GrandPlanningWorkspace({
                                       Fin de présence (préavis, intérim)
                                       <input
                                         type="date"
-                                        aria-label={`Date de fin de ${person.displayName}`}
-                                        value={person.endDate ?? ""}
+                                        aria-label={`Date de fin de ${personne.displayName}`}
+                                        value={personne.endDate ?? ""}
                                         disabled={savingKey !== null}
-                                        onChange={(event) =>
+                                        onChange={(evenement) =>
                                           void postPlanningMutation(
                                             {
                                               action: "setStaffEndDate",
-                                              id: person.userId,
-                                              endDate: event.target.value || null,
+                                              id: personne.userId,
+                                              endDate: evenement.target.value || null,
                                             },
                                             "Date de fin de présence enregistrée.",
                                           )
                                         }
                                       />
                                     </label>
-                                    {person.inactiveSince ? (
+                                    {personne.inactiveSince ? (
                                       <button
                                         type="button"
                                         className="secondaryButton"
                                         disabled={savingKey !== null}
-                                        onClick={() => void staffAction(person, "reactivateStaff")}
+                                        onClick={() =>
+                                          void staffAction(personne, "reactivateStaff")
+                                        }
                                       >
                                         Réactiver
                                       </button>
@@ -1080,7 +1085,9 @@ export function GrandPlanningWorkspace({
                                         type="button"
                                         className="secondaryButton"
                                         disabled={savingKey !== null}
-                                        onClick={() => void staffAction(person, "deactivateStaff")}
+                                        onClick={() =>
+                                          void staffAction(personne, "deactivateStaff")
+                                        }
                                       >
                                         Désactiver
                                       </button>
@@ -1090,7 +1097,7 @@ export function GrandPlanningWorkspace({
                                       className="secondaryButton"
                                       disabled={savingKey !== null}
                                       title="Suppression autorisée uniquement si aucun historique ni compte lié"
-                                      onClick={() => void staffAction(person, "deleteStaff")}
+                                      onClick={() => void staffAction(personne, "deleteStaff")}
                                     >
                                       Supprimer
                                     </button>
@@ -1098,22 +1105,22 @@ export function GrandPlanningWorkspace({
                                       type="button"
                                       className="secondaryButton"
                                       disabled={savingKey !== null}
-                                      onClick={() => editStaff(person)}
+                                      onClick={() => editStaff(personne)}
                                     >
                                       Modifier
                                     </button>
                                     <label>
                                       <span className="sr-only">
-                                        Rattacher un compte à {person.displayName}
+                                        Rattacher un compte à {personne.displayName}
                                       </span>
                                       <select
-                                        aria-label={`Compte PAPOT associé à ${person.displayName}`}
-                                        value={person.linkedUserId ?? ""}
+                                        aria-label={`Compte PAPOT associé à ${personne.displayName}`}
+                                        value={personne.linkedUserId ?? ""}
                                         disabled={savingKey !== null}
-                                        onChange={(event) =>
+                                        onChange={(evenement) =>
                                           void linkStaffAccount(
-                                            person.userId,
-                                            event.target.value || null,
+                                            personne.userId,
+                                            evenement.target.value || null,
                                           )
                                         }
                                       >
@@ -1125,7 +1132,7 @@ export function GrandPlanningWorkspace({
                                             disabled={snapshot.peopleCapacity.some(
                                               (other) =>
                                                 other.kind === "staff" &&
-                                                other.userId !== person.userId &&
+                                                other.userId !== personne.userId &&
                                                 other.linkedUserId === account.id,
                                             )}
                                           >
@@ -1146,52 +1153,52 @@ export function GrandPlanningWorkspace({
                           <label className="planningCapacityToggle">
                             <input
                               type="checkbox"
-                              checked={person.countsInMacroCapacity}
+                              checked={personne.countsInMacroCapacity}
                               disabled={
                                 !snapshot.capabilities.canManageSchedules ||
-                                savingKey === `capacity:${person.userId}`
+                                savingKey === `capacity:${personne.userId}`
                               }
-                              onChange={(event) =>
+                              onChange={(evenement) =>
                                 void savePersonCapacity({
-                                  ...person,
-                                  countsInMacroCapacity: event.target.checked,
+                                  ...personne,
+                                  countsInMacroCapacity: evenement.target.checked,
                                 })
                               }
                             />
-                            <span>{person.countsInMacroCapacity ? "Oui" : "Non"}</span>
+                            <span>{personne.countsInMacroCapacity ? "Oui" : "Non"}</span>
                           </label>
                         </td>
-                        {WEEKDAYS.map(([day, label]) => {
-                          const key = scheduleDraftKey(person.userId, day);
+                        {WEEKDAYS.map(([jour, libelle]) => {
+                          const cle = scheduleDraftKey(personne.userId, jour);
                           return (
-                            <td key={day}>
+                            <td key={jour}>
                               <input
-                                aria-label={`${person.displayName} ${label}`}
+                                aria-label={`${personne.displayName} ${libelle}`}
                                 className="planningScheduleHours"
                                 disabled={
                                   !snapshot.capabilities.canManageSchedules ||
-                                  savingKey === `capacity:${person.userId}`
+                                  savingKey === `capacity:${personne.userId}`
                                 }
                                 inputMode="decimal"
                                 value={
-                                  scheduleDrafts[key] ?? formatHours(person.weeklySchedule[day])
+                                  scheduleDrafts[cle] ?? formatHours(personne.weeklySchedule[jour])
                                 }
-                                onChange={(event) =>
-                                  setScheduleDrafts((current) => ({
-                                    ...current,
-                                    [key]: event.target.value,
+                                onChange={(evenement) =>
+                                  setScheduleDrafts((courant) => ({
+                                    ...courant,
+                                    [cle]: evenement.target.value,
                                   }))
                                 }
-                                onBlur={() => void saveScheduleDay(person, day)}
-                                onKeyDown={(event) => {
-                                  if (event.key === "Enter") event.currentTarget.blur();
-                                  if (event.key === "Escape") {
-                                    setScheduleDrafts((current) => {
-                                      const next = { ...current };
-                                      delete next[key];
-                                      return next;
+                                onBlur={() => void saveScheduleDay(personne, jour)}
+                                onKeyDown={(evenement) => {
+                                  if (evenement.key === "Enter") evenement.currentTarget.blur();
+                                  if (evenement.key === "Escape") {
+                                    setScheduleDrafts((courant) => {
+                                      const suivant = { ...courant };
+                                      delete suivant[cle];
+                                      return suivant;
                                     });
-                                    event.currentTarget.blur();
+                                    evenement.currentTarget.blur();
                                   }
                                 }}
                               />
@@ -1200,8 +1207,8 @@ export function GrandPlanningWorkspace({
                         })}
                         <td className="planningScheduleTotal">
                           {formatHours(
-                            Object.values(person.weeklySchedule).reduce(
-                              (sum, hours) => sum + hours,
+                            Object.values(personne.weeklySchedule).reduce(
+                              (somme, heures) => somme + heures,
                               0,
                             ),
                           )}{" "}
@@ -1233,14 +1240,14 @@ export function GrandPlanningWorkspace({
                   <select
                     value={absenceUserId}
                     disabled={!snapshot.capabilities.canManageSchedules}
-                    onChange={(event) => {
-                      setAbsenceUserId(event.target.value);
+                    onChange={(evenement) => {
+                      setAbsenceUserId(evenement.target.value);
                       setAbsenceHours(null);
                     }}
                   >
-                    {snapshot.peopleCapacity.map((person) => (
-                      <option key={person.userId} value={person.userId}>
-                        {person.displayName}
+                    {snapshot.peopleCapacity.map((personne) => (
+                      <option key={personne.userId} value={personne.userId}>
+                        {personne.displayName}
                       </option>
                     ))}
                   </select>
@@ -1250,8 +1257,8 @@ export function GrandPlanningWorkspace({
                   <select
                     value={absenceType}
                     disabled={!snapshot.capabilities.canManageSchedules}
-                    onChange={(event) =>
-                      setAbsenceType(event.target.value as PlanningAbsence["type"])
+                    onChange={(evenement) =>
+                      setAbsenceType(evenement.target.value as PlanningAbsence["type"])
                     }
                   >
                     <option value="VACATION">Congés</option>
@@ -1265,8 +1272,8 @@ export function GrandPlanningWorkspace({
                     type="date"
                     value={absenceDate}
                     disabled={!snapshot.capabilities.canManageSchedules}
-                    onChange={(event) => {
-                      setAbsenceDate(event.target.value);
+                    onChange={(evenement) => {
+                      setAbsenceDate(evenement.target.value);
                       setAbsenceHours(null);
                     }}
                   />
@@ -1278,7 +1285,7 @@ export function GrandPlanningWorkspace({
                     inputMode="decimal"
                     value={displayedAbsenceHours}
                     disabled={!snapshot.capabilities.canManageSchedules}
-                    onChange={(event) => setAbsenceHours(event.target.value)}
+                    onChange={(evenement) => setAbsenceHours(evenement.target.value)}
                   />
                 </label>
                 <span className="planningAbsenceSuggestion">
@@ -1317,7 +1324,7 @@ export function GrandPlanningWorkspace({
                     type="week"
                     value={absenceWeek}
                     disabled={!snapshot.capabilities.canManageSchedules}
-                    onChange={(event) => setAbsenceWeek(event.target.value)}
+                    onChange={(evenement) => setAbsenceWeek(evenement.target.value)}
                   />
                 </label>
                 <button
@@ -1337,25 +1344,25 @@ export function GrandPlanningWorkspace({
                 role="tablist"
                 aria-label="Absences par personne"
               >
-                {absencePeople.map((person) => {
-                  const selected = (absenceUserId || absencePeople[0]?.id) === person.id;
-                  const count = groupedAbsences.filter(
-                    (absence) => absence.userId === person.id,
+                {absencePeople.map((personne) => {
+                  const selectionne = (absenceUserId || absencePeople[0]?.id) === personne.id;
+                  const nombre = groupedAbsences.filter(
+                    (absence) => absence.userId === personne.id,
                   ).length;
                   return (
                     <button
-                      key={person.id}
+                      key={personne.id}
                       type="button"
                       role="tab"
-                      aria-selected={selected}
-                      className={selected ? "isActive" : ""}
+                      aria-selected={selectionne}
+                      className={selectionne ? "isActive" : ""}
                       onClick={() => {
-                        setAbsenceUserId(person.id);
+                        setAbsenceUserId(personne.id);
                         setAbsenceEditId(null);
                         setAbsenceHours(null);
                       }}
                     >
-                      {person.displayName} <span>({count})</span>
+                      {personne.displayName} <span>({nombre})</span>
                     </button>
                   );
                 })}
@@ -1398,7 +1405,7 @@ export function GrandPlanningWorkspace({
                                 editAbsenceWeek(absence);
                               } else {
                                 const detail = snapshot.absences.find(
-                                  (entry) => entry.id === absence.absenceIds[0],
+                                  (entree) => entree.id === absence.absenceIds[0],
                                 );
                                 if (detail) editAbsence(detail);
                               }
@@ -1460,18 +1467,18 @@ export function GrandPlanningWorkspace({
               >
                 <PlanningExcelGrid
                   snapshot={snapshot}
-                  drafts={drafts}
+                  drafts={brouillons}
                   savingKey={savingKey}
                   potentialCollapsed={potentialCollapsed}
                   potentialPreferenceSaving={potentialPreferenceSaving}
-                  onDraftChange={(key, value) =>
-                    setDrafts((current) => ({ ...current, [key]: value }))
+                  onDraftChange={(cle, valeur) =>
+                    setDrafts((courant) => ({ ...courant, [cle]: valeur }))
                   }
-                  onDraftClear={(key) =>
-                    setDrafts((current) => {
-                      const next = { ...current };
-                      delete next[key];
-                      return next;
+                  onDraftClear={(cle) =>
+                    setDrafts((courant) => {
+                      const suivant = { ...courant };
+                      delete suivant[cle];
+                      return suivant;
                     })
                   }
                   onSaveFirm={saveCell}

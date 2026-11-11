@@ -13,42 +13,44 @@ import { readPayrollPreparation } from "@/lib/payroll/preparation-repository";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
-export async function GET(request: Request) {
+export async function GET(requete: Request) {
   try {
     await requireModuleRequestContext("payroll", "WRITE");
-    const url = new URL(request.url);
-    const month = url.searchParams.get("month") ?? "";
+    const url = new URL(requete.url);
+    const mois = url.searchParams.get("month") ?? "";
     const version = url.searchParams.get("version") ?? "current";
-    const [planning, auth, state] = await Promise.all([
+    const [planning, auth, etat] = await Promise.all([
       createPlanningRepository().load(),
       readAuthPayload(),
       readPayrollPreparation(),
     ]);
-    const period = getMonthState(state, month);
-    const selected =
-      version === "current" ? null : period.versions.find((row) => String(row.number) === version);
-    if (version !== "current" && !selected) throw new Error("PAYROLL_VERSION_NOT_FOUND");
+    const period = getMonthState(etat, mois);
+    const selectionne =
+      version === "current"
+        ? null
+        : period.versions.find((ligneTableau) => String(ligneTableau.number) === version);
+    if (version !== "current" && !selectionne) throw new Error("PAYROLL_VERSION_NOT_FOUND");
     const summary =
-      selected?.summary ??
+      selectionne?.summary ??
       buildPayrollSummary(
-        month,
+        mois,
         planning,
         effectivePlanningPeople(planning, auth.users),
         period,
-        state.rules,
+        etat.rules,
       );
     const workbook = new ExcelJS.Workbook();
     workbook.creator = "PAPOT AGENCEMENT";
-    if (state.templateBase64)
-      await workbook.xlsx.load(Buffer.from(state.templateBase64, "base64") as never);
+    if (etat.templateBase64)
+      await workbook.xlsx.load(Buffer.from(etat.templateBase64, "base64") as never);
     const sheet = workbook.getWorksheet("Synthèse") ?? workbook.addWorksheet("Synthèse");
     if (sheet.rowCount) sheet.spliceRows(1, sheet.rowCount);
     sheet.addRow([
-      `Préparation paie ${month} · ${selected ? `V${selected.number}` : period.status === "REOPENED" ? "BROUILLON" : "DONNÉES ACTUELLES"}`,
+      `Préparation paie ${mois} · ${selectionne ? `V${selectionne.number}` : period.status === "REOPENED" ? "BROUILLON" : "DONNÉES ACTUELLES"}`,
     ]);
     sheet.addRow([
-      selected
-        ? `Validée le ${selected.validatedAt} par ${selected.validatedBy}`
+      selectionne
+        ? `Validée le ${selectionne.validatedAt} par ${selectionne.validatedBy}`
         : "Document de travail, non validé",
     ]);
     sheet.addRow([]);
@@ -62,22 +64,22 @@ export async function GET(request: Request) {
       "Autres absences",
       "Note paie",
     ]);
-    for (const row of summary.rows)
+    for (const ligneTableau of summary.rows)
       sheet.addRow([
-        row.name,
-        row.workedHours,
-        row.overtime25,
-        row.overtime50,
-        row.vacationDays,
-        row.contractWeeks.join(", "),
-        row.absences
+        ligneTableau.name,
+        ligneTableau.workedHours,
+        ligneTableau.overtime25,
+        ligneTableau.overtime50,
+        ligneTableau.vacationDays,
+        ligneTableau.contractWeeks.join(", "),
+        ligneTableau.absences
           .filter((abs) => abs.type !== "VACATION")
           .map((abs) => `${abs.date} ${abs.type} ${abs.hours} h`)
           .join(" ; "),
-        row.note,
+        ligneTableau.note,
       ]);
     sheet.getRow(4).font = { bold: true };
-    if (!state.templateBase64)
+    if (!etat.templateBase64)
       sheet.columns = [
         { width: 29 },
         { width: 18 },
@@ -91,7 +93,7 @@ export async function GET(request: Request) {
     sheet.views = [{ state: "frozen", ySplit: 4 }];
     addPayrollWeeklySheets(workbook, summary);
     const bytes = await workbook.xlsx.writeBuffer();
-    const filename = `Paie_${month.replace("-", "_")}_${selected ? `V${selected.number}` : period.status === "REOPENED" ? "BROUILLON" : "ACTUEL"}.xlsx`;
+    const filename = `Paie_${mois.replace("-", "_")}_${selectionne ? `V${selectionne.number}` : period.status === "REOPENED" ? "BROUILLON" : "ACTUEL"}.xlsx`;
     return new NextResponse(new Uint8Array(bytes), {
       headers: {
         "Content-Type": "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
@@ -99,8 +101,8 @@ export async function GET(request: Request) {
         "Cache-Control": "no-store",
       },
     });
-  } catch (error) {
-    const code = error instanceof Error ? error.message : "PAYROLL_EXPORT_FAILED";
+  } catch (erreur) {
+    const code = erreur instanceof Error ? erreur.message : "PAYROLL_EXPORT_FAILED";
     return NextResponse.json({ error: code }, { status: desktopRequestErrorStatus(code) ?? 400 });
   }
 }

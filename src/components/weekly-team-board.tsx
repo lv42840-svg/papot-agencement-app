@@ -50,47 +50,47 @@ type WeekData = {
 
 const WEEKDAY_NAMES = ["Lundi", "Mardi", "Mercredi", "Jeudi", "Vendredi"];
 const WEEKDAY_KEYS = ["monday", "tuesday", "wednesday", "thursday", "friday"];
-const formatHours = (hours: number) =>
-  new Intl.NumberFormat("fr-FR", { maximumFractionDigits: 1 }).format(hours);
-const cellKey = (userId: string, date: string) => userId + ":" + date;
+const formatHours = (heures: number) =>
+  new Intl.NumberFormat("fr-FR", { maximumFractionDigits: 1 }).format(heures);
+const cellKey = (idUtilisateur: string, date: string) => idUtilisateur + ":" + date;
 
-function adjacentWeek(week: string, step: number) {
-  const monday = isoWeekMonday(week);
+function adjacentWeek(semaine: string, step: number) {
+  const monday = isoWeekMonday(semaine);
   monday.setUTCDate(monday.getUTCDate() + step * 7);
   const thursday = new Date(monday);
   thursday.setUTCDate(monday.getUTCDate() + 3);
-  const year = thursday.getUTCFullYear();
-  const januaryFourth = new Date(Date.UTC(year, 0, 4));
+  const annee = thursday.getUTCFullYear();
+  const januaryFourth = new Date(Date.UTC(annee, 0, 4));
   const firstMonday = new Date(januaryFourth);
   firstMonday.setUTCDate(4 - ((januaryFourth.getUTCDay() + 6) % 7));
   const number = Math.floor((monday.getTime() - firstMonday.getTime()) / (7 * 86400000)) + 1;
-  return `${year}-W${String(number).padStart(2, "0")}`;
+  return `${annee}-W${String(number).padStart(2, "0")}`;
 }
 
-export function WeeklyTeamBoard({ week }: { week: string }) {
-  const [data, setData] = useState<WeekData | null>(null);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState("");
+export function WeeklyTeamBoard({ week: semaine }: { week: string }) {
+  const [donnees, setData] = useState<WeekData | null>(null);
+  const [chargement, setLoading] = useState(true);
+  const [erreur, setError] = useState("");
   const [message, setMessage] = useState("");
-  const [saving, setSaving] = useState<string | null>(null);
+  const [sauvegardeEnCours, setSaving] = useState<string | null>(null);
   const [copiedDay, setCopiedDay] = useState<Array<Pick<BoardEntry, "label" | "activity">>>([]);
 
   useEffect(() => {
     try {
       const saved = window.sessionStorage.getItem("papot.agencement.weekly-copied-day");
       if (!saved) return;
-      const parsed: unknown = JSON.parse(saved);
-      if (!Array.isArray(parsed) || parsed.length > 20) return;
-      const valid = parsed.every(
-        (entry) =>
-          entry &&
-          typeof entry === "object" &&
-          typeof entry.label === "string" &&
-          entry.label.trim().length > 0 &&
-          entry.label.length <= 160 &&
-          ["BE", "WORKSHOP", "INSTALL", "NOTE"].includes(entry.activity),
+      const analyse: unknown = JSON.parse(saved);
+      if (!Array.isArray(analyse) || analyse.length > 20) return;
+      const valid = analyse.every(
+        (entree) =>
+          entree &&
+          typeof entree === "object" &&
+          typeof entree.label === "string" &&
+          entree.label.trim().length > 0 &&
+          entree.label.length <= 160 &&
+          ["BE", "WORKSHOP", "INSTALL", "NOTE"].includes(entree.activity),
       );
-      if (valid) setCopiedDay(parsed as Array<Pick<BoardEntry, "label" | "activity">>);
+      if (valid) setCopiedDay(analyse as Array<Pick<BoardEntry, "label" | "activity">>);
     } catch {
       window.sessionStorage.removeItem("papot.agencement.weekly-copied-day");
     }
@@ -99,11 +99,11 @@ export function WeeklyTeamBoard({ week }: { week: string }) {
   const load = useCallback(async () => {
     setLoading(true);
     try {
-      const response = await fetch(`/api/desktop/planning/weekly-board?week=${week}`, {
+      const reponse = await fetch(`/api/desktop/planning/weekly-board?week=${semaine}`, {
         cache: "no-store",
       });
-      const json = (await response.json()) as WeekData & { error?: string };
-      if (!response.ok) throw new Error(json.error ?? "Impossible de charger le petit planning.");
+      const json = (await reponse.json()) as WeekData & { error?: string };
+      if (!reponse.ok) throw new Error(json.error ?? "Impossible de charger le petit planning.");
       setData(json);
       setError("");
     } catch (cause) {
@@ -111,7 +111,7 @@ export function WeeklyTeamBoard({ week }: { week: string }) {
     } finally {
       setLoading(false);
     }
-  }, [week]);
+  }, [semaine]);
 
   useEffect(() => {
     void load();
@@ -119,42 +119,53 @@ export function WeeklyTeamBoard({ week }: { week: string }) {
 
   const assignments = useMemo(() => {
     const byDay = new Map<string, BoardEntry[]>();
-    for (const row of data?.assignments ?? []) {
-      const key = cellKey(row.userId, row.date);
-      const existing = byDay.get(key) ?? [];
-      existing.push(row);
-      byDay.set(key, existing);
+    for (const ligneTableau of donnees?.assignments ?? []) {
+      const cle = cellKey(ligneTableau.userId, ligneTableau.date);
+      const existing = byDay.get(cle) ?? [];
+      existing.push(ligneTableau);
+      byDay.set(cle, existing);
     }
     return byDay;
-  }, [data?.assignments]);
+  }, [donnees?.assignments]);
   const absences = useMemo(
-    () => new Map((data?.absences ?? []).map((row) => [cellKey(row.userId, row.date), row])),
-    [data?.absences],
+    () =>
+      new Map(
+        (donnees?.absences ?? []).map((ligneTableau) => [
+          cellKey(ligneTableau.userId, ligneTableau.date),
+          ligneTableau,
+        ]),
+      ),
+    [donnees?.absences],
   );
   const holidays = useMemo(
-    () => new Map((data?.holidays ?? []).map((row) => [row.date, row.label])),
-    [data?.holidays],
+    () =>
+      new Map(
+        (donnees?.holidays ?? []).map((ligneTableau) => [ligneTableau.date, ligneTableau.label]),
+      ),
+    [donnees?.holidays],
   );
   const dayLabel = (date: string) => {
-    const [, month, day] = date.split("-");
-    return day + "/" + month;
+    const [, mois, jour] = date.split("-");
+    return jour + "/" + mois;
   };
 
-  async function changeEntry(input: BoardEntryMutation): Promise<boolean> {
-    if (!data?.editable || saving) return false;
-    setSaving(cellKey(input.userId, input.date));
+  async function changeEntry(saisie: BoardEntryMutation): Promise<boolean> {
+    if (!donnees?.editable || sauvegardeEnCours) return false;
+    setSaving(cellKey(saisie.userId, saisie.date));
     setMessage("");
     try {
-      const response = await fetch("/api/desktop/planning/weekly-board", {
+      const reponse = await fetch("/api/desktop/planning/weekly-board", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ ...input, week }),
+        body: JSON.stringify({ ...saisie, week: semaine }),
       });
-      const json = (await response.json()) as WeekData & { error?: string };
-      if (!response.ok) throw new Error(json.error ?? "Enregistrement impossible.");
+      const json = (await reponse.json()) as WeekData & { error?: string };
+      if (!reponse.ok) throw new Error(json.error ?? "Enregistrement impossible.");
       setData(json);
       setMessage(
-        input.action === "deleteDailyEntry" ? "Affectation supprimée." : "Affectation enregistrée.",
+        saisie.action === "deleteDailyEntry"
+          ? "Affectation supprimée."
+          : "Affectation enregistrée.",
       );
       return true;
     } catch (cause) {
@@ -165,37 +176,40 @@ export function WeeklyTeamBoard({ week }: { week: string }) {
     }
   }
 
-  function copyDay(rows: BoardEntry[]) {
-    if (rows.length === 0) return;
-    const entries = rows.map((row) => ({ label: row.label, activity: row.activity }));
-    setCopiedDay(entries);
-    window.sessionStorage.setItem("papot.agencement.weekly-copied-day", JSON.stringify(entries));
+  function copyDay(lignesTableau: BoardEntry[]) {
+    if (lignesTableau.length === 0) return;
+    const entrees = lignesTableau.map((ligneTableau) => ({
+      label: ligneTableau.label,
+      activity: ligneTableau.activity,
+    }));
+    setCopiedDay(entrees);
+    window.sessionStorage.setItem("papot.agencement.weekly-copied-day", JSON.stringify(entrees));
     setMessage(
-      `${entries.length} affectation(s) copiée(s). Sélectionne la journée de destination.`,
+      `${entrees.length} affectation(s) copiée(s). Sélectionne la journée de destination.`,
     );
   }
 
-  async function pasteDay(userId: string, date: string) {
-    if (!data?.editable || saving || copiedDay.length === 0) return;
-    const key = cellKey(userId, date);
-    setSaving(key);
+  async function pasteDay(idUtilisateur: string, date: string) {
+    if (!donnees?.editable || sauvegardeEnCours || copiedDay.length === 0) return;
+    const cle = cellKey(idUtilisateur, date);
+    setSaving(cle);
     setMessage("");
     try {
-      const response = await fetch("/api/desktop/planning/weekly-board", {
+      const reponse = await fetch("/api/desktop/planning/weekly-board", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           action: "pasteDailyEntries",
-          week,
-          userId,
+          week: semaine,
+          userId: idUtilisateur,
           date,
           entries: copiedDay,
         }),
       });
-      const result = (await response.json()) as WeekData & { error?: string };
-      if (!response.ok)
-        throw new Error(result.error ?? "Collage refusé, aucune affectation modifiée.");
-      setData(result);
+      const resultat = (await reponse.json()) as WeekData & { error?: string };
+      if (!reponse.ok)
+        throw new Error(resultat.error ?? "Collage refusé, aucune affectation modifiée.");
+      setData(resultat);
       setMessage(
         `${copiedDay.length} affectation(s) collée(s), sans effacer celles déjà présentes.`,
       );
@@ -206,15 +220,15 @@ export function WeeklyTeamBoard({ week }: { week: string }) {
     }
   }
 
-  const previous = adjacentWeek(week, -1);
-  const next = adjacentWeek(week, 1);
-  const period = weekDateRangeLabel(week);
-  const totalPeople = data?.people.length ?? 0;
+  const precedent = adjacentWeek(semaine, -1);
+  const suivant = adjacentWeek(semaine, 1);
+  const period = weekDateRangeLabel(semaine);
+  const totalPeople = donnees?.people.length ?? 0;
 
   return (
     <div className="weeklyBoard">
       <div className="weeklyBoardPrintWeek" aria-hidden="true">
-        S{week.slice(-2)} · {week.slice(0, 4)}
+        S{semaine.slice(-2)} · {semaine.slice(0, 4)}
       </div>
       <div className="weeklyBoardTop">
         <div>
@@ -222,7 +236,7 @@ export function WeeklyTeamBoard({ week }: { week: string }) {
           <h1>
             Petit planning{" "}
             <span>
-              · S{week.slice(-2)} / {week.slice(0, 4)}
+              · S{semaine.slice(-2)} / {semaine.slice(0, 4)}
             </span>
           </h1>
           <p>Du {period} · affectations journalières de l&apos;équipe</p>
@@ -235,41 +249,43 @@ export function WeeklyTeamBoard({ week }: { week: string }) {
           >
             Imprimer la semaine
           </button>
-          <Link className="secondaryButton" href={`/planning/${previous}`}>
+          <Link className="secondaryButton" href={`/planning/${precedent}`}>
             ← Semaine précédente
           </Link>
-          <Link className="secondaryButton" href={`/planning/${next}`}>
+          <Link className="secondaryButton" href={`/planning/${suivant}`}>
             Semaine suivante →
           </Link>
-          <Link className="secondaryButton" href={`/planning?year=${week.slice(0, 4)}`}>
+          <Link className="secondaryButton" href={`/planning?year=${semaine.slice(0, 4)}`}>
             Grand planning
           </Link>
         </div>
       </div>
 
       <nav className="weeklyBoardTabs" aria-label="Modules du planning">
-        <Link href={`/planning?year=${week.slice(0, 4)}`}>Grand planning</Link>
-        <Link className="isActive" href={`/planning/${week}`} aria-current="page">
+        <Link href={`/planning?year=${semaine.slice(0, 4)}`}>Grand planning</Link>
+        <Link className="isActive" href={`/planning/${semaine}`} aria-current="page">
           Petit planning
         </Link>
-        <Link href={`/planning?year=${week.slice(0, 4)}&tab=personnel`}>Gestion du personnel</Link>
+        <Link href={`/planning?year=${semaine.slice(0, 4)}&tab=personnel`}>
+          Gestion du personnel
+        </Link>
       </nav>
 
-      {loading ? <p className="weeklyBoardMessage">Chargement des équipes…</p> : null}
-      {error ? (
+      {chargement ? <p className="weeklyBoardMessage">Chargement des équipes…</p> : null}
+      {erreur ? (
         <div className="weeklyBoardMessage" role="alert">
-          {error}{" "}
+          {erreur}{" "}
           <button type="button" onClick={() => void load()}>
             Réessayer
           </button>
         </div>
       ) : null}
 
-      {data && !loading ? (
+      {donnees && !chargement ? (
         <>
           <div className="weeklyBoardTopline">
             <div className="weeklyBoardIntro">
-              <strong>S{week.slice(-2)}</strong>
+              <strong>S{semaine.slice(-2)}</strong>
               <span>Du {period}</span>
               <small>
                 {totalPeople} personne{totalPeople > 1 ? "s" : ""} · lundi à vendredi
@@ -280,7 +296,7 @@ export function WeeklyTeamBoard({ week }: { week: string }) {
               aria-label="Extrait du grand planning pour la semaine"
             >
               <div className="weeklyBoardHoursHeading">
-                <strong>Extrait du grand planning · S{week.slice(-2)}</strong>
+                <strong>Extrait du grand planning · S{semaine.slice(-2)}</strong>
                 <span>Heures prévues cette semaine</span>
               </div>
               <div className="weeklyBoardChantierScroll">
@@ -295,51 +311,51 @@ export function WeeklyTeamBoard({ week }: { week: string }) {
                     </tr>
                   </thead>
                   <tbody>
-                    {data.firmChantiers.map((row) => (
-                      <tr key={`firm:${row.id}`}>
-                        <th scope="row">{row.name}</th>
-                        <td>{formatHours(row.be)}</td>
-                        <td>{formatHours(row.workshop)}</td>
-                        <td>{formatHours(row.install)}</td>
+                    {donnees.firmChantiers.map((ligneTableau) => (
+                      <tr key={`firm:${ligneTableau.id}`}>
+                        <th scope="row">{ligneTableau.name}</th>
+                        <td>{formatHours(ligneTableau.be)}</td>
+                        <td>{formatHours(ligneTableau.workshop)}</td>
+                        <td>{formatHours(ligneTableau.install)}</td>
                         <td>
-                          <strong>{formatHours(row.total)}</strong>
+                          <strong>{formatHours(ligneTableau.total)}</strong>
                         </td>
                       </tr>
                     ))}
-                    {data.provisionalChantiers.map((row) => (
-                      <tr className="isProvisional" key={`provisional:${row.id}`}>
+                    {donnees.provisionalChantiers.map((ligneTableau) => (
+                      <tr className="isProvisional" key={`provisional:${ligneTableau.id}`}>
                         <th scope="row">
-                          {row.name} <small>Provisionnel</small>
+                          {ligneTableau.name} <small>Provisionnel</small>
                         </th>
-                        <td>{formatHours(row.be)}</td>
-                        <td>{formatHours(row.workshop)}</td>
-                        <td>{formatHours(row.install)}</td>
+                        <td>{formatHours(ligneTableau.be)}</td>
+                        <td>{formatHours(ligneTableau.workshop)}</td>
+                        <td>{formatHours(ligneTableau.install)}</td>
                         <td>
-                          <strong>{formatHours(row.total)}</strong>
+                          <strong>{formatHours(ligneTableau.total)}</strong>
                         </td>
                       </tr>
                     ))}
-                    {data.firmChantiers.length + data.provisionalChantiers.length === 0 ? (
+                    {donnees.firmChantiers.length + donnees.provisionalChantiers.length === 0 ? (
                       <tr>
                         <td colSpan={5}>Aucune heure positionnée cette semaine.</td>
                       </tr>
                     ) : null}
                     <tr className="weeklyBoardTotalRow">
                       <th scope="row">Total ferme</th>
-                      <td>{formatHours(data.firm.be)}</td>
-                      <td>{formatHours(data.firm.workshop)}</td>
-                      <td>{formatHours(data.firm.install)}</td>
+                      <td>{formatHours(donnees.firm.be)}</td>
+                      <td>{formatHours(donnees.firm.workshop)}</td>
+                      <td>{formatHours(donnees.firm.install)}</td>
                       <td>
-                        <strong>{formatHours(data.firm.total)}</strong>
+                        <strong>{formatHours(donnees.firm.total)}</strong>
                       </td>
                     </tr>
                     <tr className="weeklyBoardTotalRow isProvisional">
                       <th scope="row">Total provisionnel</th>
-                      <td>{formatHours(data.provisional.be)}</td>
-                      <td>{formatHours(data.provisional.workshop)}</td>
-                      <td>{formatHours(data.provisional.install)}</td>
+                      <td>{formatHours(donnees.provisional.be)}</td>
+                      <td>{formatHours(donnees.provisional.workshop)}</td>
+                      <td>{formatHours(donnees.provisional.install)}</td>
                       <td>
-                        <strong>{formatHours(data.provisional.total)}</strong>
+                        <strong>{formatHours(donnees.provisional.total)}</strong>
                       </td>
                     </tr>
                   </tbody>
@@ -347,10 +363,11 @@ export function WeeklyTeamBoard({ week }: { week: string }) {
               </div>
               <div className="weeklyBoardAvailable">
                 <span>
-                  Disponible ferme <b>{formatHours(data.capacity.firmAvailableHours)} h</b>
+                  Disponible ferme <b>{formatHours(donnees.capacity.firmAvailableHours)} h</b>
                 </span>
                 <span>
-                  Avec potentiel <b>{formatHours(data.capacity.availableWithProvisionHours)} h</b>
+                  Avec potentiel{" "}
+                  <b>{formatHours(donnees.capacity.availableWithProvisionHours)} h</b>
                 </span>
               </div>
             </aside>
@@ -363,7 +380,7 @@ export function WeeklyTeamBoard({ week }: { week: string }) {
                   <th scope="col" className="weeklyBoardNameHead">
                     Personnel
                   </th>
-                  {data.dates.map((date, index) => {
+                  {donnees.dates.map((date, indice) => {
                     const holiday = holidays.get(date);
                     return (
                       <th
@@ -372,7 +389,7 @@ export function WeeklyTeamBoard({ week }: { week: string }) {
                         title={holiday ?? undefined}
                         className={holiday ? "weeklyBoardDayHead isHoliday" : "weeklyBoardDayHead"}
                       >
-                        {WEEKDAY_NAMES[index]}
+                        {WEEKDAY_NAMES[indice]}
                         <small>{dayLabel(date)}</small>
                         {holiday ? (
                           <small className="weeklyBoardHolidayHeader">Jour férié</small>
@@ -383,32 +400,32 @@ export function WeeklyTeamBoard({ week }: { week: string }) {
                 </tr>
               </thead>
               <tbody>
-                {data.people.length === 0 ? (
+                {donnees.people.length === 0 ? (
                   <tr>
                     <td colSpan={6} className="weeklyBoardEmpty">
                       Aucun salarié. Ajoute des personnes dans Gestion du personnel.
                     </td>
                   </tr>
                 ) : (
-                  data.people.map((person, index) => (
-                    <tr key={person.userId}>
+                  donnees.people.map((personne, indice) => (
+                    <tr key={personne.userId}>
                       <th
                         scope="row"
                         className={
-                          index % 2 ? "weeklyBoardPerson isAlternate" : "weeklyBoardPerson"
+                          indice % 2 ? "weeklyBoardPerson isAlternate" : "weeklyBoardPerson"
                         }
                       >
-                        <strong>{person.displayName}</strong>
+                        <strong>{personne.displayName}</strong>
                         <small>
-                          {person.countsInMacroCapacity
+                          {personne.countsInMacroCapacity
                             ? "Compté dans la capacité"
                             : "Hors capacité"}
                         </small>
                       </th>
-                      {data.dates.map((date, dayIndex) => {
-                        const key = cellKey(person.userId, date);
-                        const absence = absences.get(key);
-                        const schedule = person.weeklySchedule[WEEKDAY_KEYS[dayIndex]] ?? 0;
+                      {donnees.dates.map((date, dayIndex) => {
+                        const cle = cellKey(personne.userId, date);
+                        const absence = absences.get(cle);
+                        const schedule = personne.weeklySchedule[WEEKDAY_KEYS[dayIndex]] ?? 0;
                         const dayOff = absence != null && absence.hours >= schedule && schedule > 0;
                         const holiday = holidays.get(date) ?? null;
                         return (
@@ -417,22 +434,22 @@ export function WeeklyTeamBoard({ week }: { week: string }) {
                             className={["weeklyBoardCell", holiday ? "isHoliday" : ""].join(" ")}
                           >
                             <WeeklyBoardDayCell
-                              userId={person.userId}
+                              userId={personne.userId}
                               date={date}
-                              name={person.displayName}
-                              rows={assignments.get(key) ?? []}
+                              name={personne.displayName}
+                              rows={assignments.get(cle) ?? []}
                               holiday={holiday}
                               absence={absence}
                               isAbsent={dayOff}
                               isPresent={
-                                (!person.endDate || date <= person.endDate) &&
-                                (!person.inactiveSince || date < person.inactiveSince)
+                                (!personne.endDate || date <= personne.endDate) &&
+                                (!personne.inactiveSince || date < personne.inactiveSince)
                               }
                               canPaste={copiedDay.length > 0}
-                              onCopyDay={() => copyDay(assignments.get(key) ?? [])}
-                              onPasteDay={() => void pasteDay(person.userId, date)}
-                              editable={data.editable}
-                              busy={saving !== null}
+                              onCopyDay={() => copyDay(assignments.get(cle) ?? [])}
+                              onPasteDay={() => void pasteDay(personne.userId, date)}
+                              editable={donnees.editable}
+                              busy={sauvegardeEnCours !== null}
                               onChange={changeEntry}
                             />
                           </td>
@@ -444,7 +461,7 @@ export function WeeklyTeamBoard({ week }: { week: string }) {
               </tbody>
             </table>
             <datalist id="weekly-board-site-suggestions">
-              {data.sites.map((site) => (
+              {donnees.sites.map((site) => (
                 <option key={site.id} value={site.name} />
               ))}
             </datalist>
@@ -473,7 +490,7 @@ export function WeeklyTeamBoard({ week }: { week: string }) {
             </span>
             <span>Les affectations ne modifient pas les heures du grand planning.</span>
           </div>
-          {!data.editable ? (
+          {!donnees.editable ? (
             <p className="weeklyBoardMessage">
               Lecture seule : semaine passée ou droits insuffisants.
             </p>

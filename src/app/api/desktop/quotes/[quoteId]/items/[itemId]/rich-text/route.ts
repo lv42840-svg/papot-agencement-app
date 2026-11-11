@@ -33,22 +33,26 @@ function statusFor(code: string): number {
   return 400;
 }
 
-export async function POST(request: Request, context: RouteContext) {
+export async function POST(requete: Request, contexte: RouteContext) {
   try {
-    const { quoteId, itemId } = await context.params;
+    const { quoteId: idDevis, itemId: idElement } = await contexte.params;
     const requestContext = await requireModuleRequestContext("quotes", "WRITE");
-    const body = requestSchema.parse(await request.json());
+    const corps = requestSchema.parse(await requete.json());
     const repository = createQuotesRepository();
-    const expectedRevision = expectedQuoteRevision(request);
-    const actor = {
+    const expectedRevision = expectedQuoteRevision(requete);
+    const auteur = {
       userId: requestContext.user.id,
       displayName: requestContext.user.displayName,
     };
-    const mutation = await repository.mutate((payload) => {
-      assertQuoteRevision(payload, quoteId, expectedRevision);
+    const mutation = await repository.mutate((contenu) => {
+      assertQuoteRevision(contenu, idDevis, expectedRevision);
       return {
-        payload: applyQuoteRichTextUpdate(payload, { quoteId, itemId, ...body }, actor),
-        focusQuoteId: quoteId,
+        payload: applyQuoteRichTextUpdate(
+          contenu,
+          { quoteId: idDevis, itemId: idElement, ...corps },
+          auteur,
+        ),
+        focusQuoteId: idDevis,
       };
     });
 
@@ -56,8 +60,8 @@ export async function POST(request: Request, context: RouteContext) {
       { payload: mutation.payload },
       { headers: { "Cache-Control": "no-store" } },
     );
-  } catch (error) {
-    const code = error instanceof Error ? error.message : "QUOTE_RICH_TEXT_SAVE_FAILED";
+  } catch (erreur) {
+    const code = erreur instanceof Error ? erreur.message : "QUOTE_RICH_TEXT_SAVE_FAILED";
     return NextResponse.json(
       { error: code },
       { status: statusFor(code), headers: { "Cache-Control": "no-store" } },

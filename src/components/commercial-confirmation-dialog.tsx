@@ -35,8 +35,8 @@ function moneyLabel(cents: number | null): string {
   return cents === null ? "À compléter" : moneyFormatter.format(cents / 100);
 }
 
-function hoursLabel(hours: number): string {
-  return `${hoursFormatter.format(hours)} h`;
+function hoursLabel(heures: number): string {
+  return `${hoursFormatter.format(heures)} h`;
 }
 
 function quoteIdentity(quote: NativeQuoteRecord): string {
@@ -44,7 +44,7 @@ function quoteIdentity(quote: NativeQuoteRecord): string {
 }
 
 export function CommercialConfirmationDialog({
-  item,
+  item: element,
   plannedInstallDate,
   busy,
   onCancel,
@@ -56,12 +56,12 @@ export function CommercialConfirmationDialog({
   onCancel: () => void;
   onConfirm: (retainedQuoteIds: string[], confirmWithoutQuote: boolean) => Promise<boolean>;
 }) {
-  const [payload, setPayload] = useState<NativeQuotesPayload | null>(null);
-  const [selectedIds, setSelectedIds] = useState<string[]>(item.retainedQuoteIds);
+  const [contenu, setPayload] = useState<NativeQuotesPayload | null>(null);
+  const [selectedIds, setSelectedIds] = useState<string[]>(element.retainedQuoteIds);
   const [confirmWithoutQuote, setConfirmWithoutQuote] = useState(false);
-  const [loading, setLoading] = useState(true);
+  const [chargement, setLoading] = useState(true);
   const [submitting, setSubmitting] = useState(false);
-  const [error, setError] = useState("");
+  const [erreur, setError] = useState("");
 
   useEffect(() => {
     let cancelled = false;
@@ -69,17 +69,17 @@ export function CommercialConfirmationDialog({
     setError("");
 
     void fetch("/api/desktop/quotes", { cache: "no-store" })
-      .then(async (response) => {
-        const body = (await response.json()) as QuotesApiResponse;
-        if (!response.ok || !body.payload) throw new Error(body.error ?? "QUOTES_LOAD_FAILED");
+      .then(async (reponse) => {
+        const corps = (await reponse.json()) as QuotesApiResponse;
+        if (!reponse.ok || !corps.payload) throw new Error(corps.error ?? "QUOTES_LOAD_FAILED");
         if (cancelled) return;
-        setPayload(body.payload);
+        setPayload(corps.payload);
 
-        const caseQuotes = body.payload.quotes.filter(
-          (quote) => quote.commercialCaseId === item.id,
+        const caseQuotes = corps.payload.quotes.filter(
+          (quote) => quote.commercialCaseId === element.id,
         );
         const selectable = caseQuotes.filter(quoteCanBeRetained);
-        if (item.retainedQuoteIds.length === 0 && selectable.length === 1) {
+        if (element.retainedQuoteIds.length === 0 && selectable.length === 1) {
           setSelectedIds([selectable[0].id]);
         }
         if (selectable.length === 0) setConfirmWithoutQuote(true);
@@ -94,14 +94,14 @@ export function CommercialConfirmationDialog({
     return () => {
       cancelled = true;
     };
-  }, [item.id, item.retainedQuoteIds]);
+  }, [element.id, element.retainedQuoteIds]);
 
   const quotes = useMemo(
     () =>
-      (payload?.quotes ?? [])
-        .filter((quote) => quote.commercialCaseId === item.id)
-        .sort((left, right) => right.updatedAt.localeCompare(left.updatedAt)),
-    [item.id, payload?.quotes],
+      (contenu?.quotes ?? [])
+        .filter((quote) => quote.commercialCaseId === element.id)
+        .sort((gauche, droite) => droite.updatedAt.localeCompare(gauche.updatedAt)),
+    [element.id, contenu?.quotes],
   );
   const selectableCount = quotes.filter(quoteCanBeRetained).length;
   const contract = useMemo(
@@ -109,17 +109,17 @@ export function CommercialConfirmationDialog({
     [quotes, selectedIds],
   );
   const canSubmit =
-    !loading &&
-    !error &&
+    !chargement &&
+    !erreur &&
     !!plannedInstallDate &&
     ((selectableCount > 0 && selectedIds.length > 0) ||
       (selectableCount === 0 && confirmWithoutQuote));
 
-  function toggleQuote(quoteId: string) {
-    setSelectedIds((current) =>
-      current.includes(quoteId)
-        ? current.filter((candidate) => candidate !== quoteId)
-        : [...current, quoteId],
+  function toggleQuote(idDevis: string) {
+    setSelectedIds((courant) =>
+      courant.includes(idDevis)
+        ? courant.filter((candidat) => candidat !== idDevis)
+        : [...courant, idDevis],
     );
   }
 
@@ -153,30 +153,30 @@ export function CommercialConfirmationDialog({
           comptés dans le contrat.
         </p>
 
-        {loading ? (
+        {chargement ? (
           <div className="commercialConfirmState">
             <RefreshCw size={15} /> Chargement des devis…
           </div>
-        ) : error ? (
-          <div className="commercialConfirmState error">{error}</div>
+        ) : erreur ? (
+          <div className="commercialConfirmState error">{erreur}</div>
         ) : quotes.length > 0 ? (
           <div className="commercialConfirmQuotes">
             {quotes.map((quote) => {
               const selectable = quoteCanBeRetained(quote);
-              const checked = selectedIds.includes(quote.id);
+              const coche = selectedIds.includes(quote.id);
               const summary = calculateCommercialQuoteSummary(quote);
               const displayStatus = commercialQuoteDisplayStatus(quote.status, quote.followUpDate);
 
               return (
                 <label
                   key={quote.id}
-                  className={`commercialConfirmQuote${checked ? " selected" : ""}${
+                  className={`commercialConfirmQuote${coche ? " selected" : ""}${
                     selectable ? "" : " disabled"
                   }`}
                 >
                   <input
                     type="checkbox"
-                    checked={checked}
+                    checked={coche}
                     disabled={!selectable || submitting}
                     onChange={() => toggleQuote(quote.id)}
                   />
@@ -206,12 +206,12 @@ export function CommercialConfirmationDialog({
           <div className="commercialConfirmState">Aucun devis natif lié à cette affaire.</div>
         )}
 
-        {selectableCount === 0 && !loading && !error ? (
+        {selectableCount === 0 && !chargement && !erreur ? (
           <label className="commercialConfirmWithoutQuote">
             <input
               type="checkbox"
               checked={confirmWithoutQuote}
-              onChange={(event) => setConfirmWithoutQuote(event.target.checked)}
+              onChange={(evenement) => setConfirmWithoutQuote(evenement.target.checked)}
               disabled={submitting}
             />
             <span>

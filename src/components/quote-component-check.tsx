@@ -16,12 +16,12 @@ const hourFormatter = new Intl.NumberFormat("fr-FR", {
   maximumFractionDigits: 2,
 });
 
-function formatQuantity(value: number): string {
-  return quantityFormatter.format(value);
+function formatQuantity(valeur: number): string {
+  return quantityFormatter.format(valeur);
 }
 
-function formatHours(value: number): string {
-  return `${hourFormatter.format(value)} h`;
+function formatHours(valeur: number): string {
+  return `${hourFormatter.format(valeur)} h`;
 }
 
 export function QuoteComponentCheck({ quote }: { quote: NativeQuoteRecord }) {
@@ -32,14 +32,16 @@ export function QuoteComponentCheck({ quote }: { quote: NativeQuoteRecord }) {
   );
 
   const hasPendingOptions =
-    check.pendingOptionHours.total > 0 || check.rows.some((row) => row.pendingOptionQuantity > 0);
+    check.pendingOptionHours.total > 0 ||
+    check.rows.some((ligneTableau) => ligneTableau.pendingOptionQuantity > 0);
   const hasRejectedOptions =
-    check.rejectedOptionHours.total > 0 || check.rows.some((row) => row.rejectedOptionQuantity > 0);
+    check.rejectedOptionHours.total > 0 ||
+    check.rows.some((ligneTableau) => ligneTableau.rejectedOptionQuantity > 0);
 
   useEffect(() => {
     if (!open) return;
-    const onKeyDown = (event: KeyboardEvent) => {
-      if (event.key === "Escape") setOpen(false);
+    const onKeyDown = (evenement: KeyboardEvent) => {
+      if (evenement.key === "Escape") setOpen(false);
     };
     window.addEventListener("keydown", onKeyDown);
     return () => window.removeEventListener("keydown", onKeyDown);
@@ -55,8 +57,8 @@ export function QuoteComponentCheck({ quote }: { quote: NativeQuoteRecord }) {
         <div
           className="quoteCheckBackdrop"
           role="presentation"
-          onMouseDown={(event) => {
-            if (event.target === event.currentTarget) setOpen(false);
+          onMouseDown={(evenement) => {
+            if (evenement.target === evenement.currentTarget) setOpen(false);
           }}
         >
           <section
@@ -131,27 +133,33 @@ export function QuoteComponentCheck({ quote }: { quote: NativeQuoteRecord }) {
                       </td>
                     </tr>
                   ) : (
-                    check.rows.map((row) => (
-                      <tr key={row.key}>
-                        <td className="quoteCheckName">{row.name}</td>
-                        <td>{row.activity ? productionActivityLabel(row.activity) : "—"}</td>
-                        <td>{row.unit || "u"}</td>
-                        <td className="isNumber isStrong">{formatQuantity(row.plannedQuantity)}</td>
+                    check.rows.map((ligneTableau) => (
+                      <tr key={ligneTableau.key}>
+                        <td className="quoteCheckName">{ligneTableau.name}</td>
+                        <td>
+                          {ligneTableau.activity
+                            ? productionActivityLabel(ligneTableau.activity)
+                            : "—"}
+                        </td>
+                        <td>{ligneTableau.unit || "u"}</td>
+                        <td className="isNumber isStrong">
+                          {formatQuantity(ligneTableau.plannedQuantity)}
+                        </td>
                         {hasPendingOptions ? (
                           <td className="isNumber">
-                            {row.pendingOptionQuantity > 0
-                              ? formatQuantity(row.pendingOptionQuantity)
+                            {ligneTableau.pendingOptionQuantity > 0
+                              ? formatQuantity(ligneTableau.pendingOptionQuantity)
                               : "—"}
                           </td>
                         ) : null}
                         {hasRejectedOptions ? (
                           <td className="isNumber">
-                            {row.rejectedOptionQuantity > 0
-                              ? formatQuantity(row.rejectedOptionQuantity)
+                            {ligneTableau.rejectedOptionQuantity > 0
+                              ? formatQuantity(ligneTableau.rejectedOptionQuantity)
                               : "—"}
                           </td>
                         ) : null}
-                        <td className="isNumber">{row.ouvrageCount}</td>
+                        <td className="isNumber">{ligneTableau.ouvrageCount}</td>
                       </tr>
                     ))
                   )}

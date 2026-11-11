@@ -5,26 +5,29 @@ import { useRouter } from "next/navigation";
 
 export function LoginForm() {
   const router = useRouter();
-  const [error, setError] = useState("");
+  const [erreur, setError] = useState("");
   const [busy, setBusy] = useState(false);
 
-  async function submit(event: FormEvent<HTMLFormElement>) {
-    event.preventDefault();
+  async function submit(evenement: FormEvent<HTMLFormElement>) {
+    evenement.preventDefault();
     setError("");
     setBusy(true);
-    const data = new FormData(event.currentTarget);
-    const response = await fetch("/api/auth/login", {
+    const donnees = new FormData(evenement.currentTarget);
+    const reponse = await fetch("/api/auth/login", {
       method: "POST",
       headers: { "content-type": "application/json" },
-      body: JSON.stringify({ username: data.get("username"), password: data.get("password") }),
+      body: JSON.stringify({
+        username: donnees.get("username"),
+        password: donnees.get("password"),
+      }),
     });
-    if (!response.ok) {
-      const body = (await response.json().catch(() => null)) as { error?: string } | null;
-      setError(body?.error ?? "Connexion impossible.");
+    if (!reponse.ok) {
+      const corps = (await reponse.json().catch(() => null)) as { error?: string } | null;
+      setError(corps?.error ?? "Connexion impossible.");
       setBusy(false);
       return;
     }
-    await response.json();
+    await reponse.json();
     router.replace("/");
     router.refresh();
   }
@@ -39,9 +42,9 @@ export function LoginForm() {
         Mot de passe
         <input name="password" type="password" autoComplete="current-password" required />
       </label>
-      {error && (
+      {erreur && (
         <p className="formError" role="alert">
-          {error}
+          {erreur}
         </p>
       )}
       <button className="primaryButton" type="submit" disabled={busy}>

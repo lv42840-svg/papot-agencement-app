@@ -22,53 +22,53 @@ type Snapshot = {
 };
 type Allocated = { id: string; chantierId: string; amount: string };
 type Line = { id: string; description: string; quantity: string; unit: string; unitPrice: string };
-const euros = (value: number) =>
-  (value / 100).toLocaleString("fr-FR", { style: "currency", currency: "EUR" });
+const euros = (valeur: number) =>
+  (valeur / 100).toLocaleString("fr-FR", { style: "currency", currency: "EUR" });
 const amountText = (cents: number) => (cents / 100).toFixed(2).replace(".", ",");
-const parseAmount = (text: string) => {
-  const value = text.trim().replace(",", ".");
-  if (!/^\d+(?:\.\d{1,2})?$/.test(value)) return null;
-  const cents = Math.round(Number(value) * 100);
+const parseAmount = (texte: string) => {
+  const valeur = texte.trim().replace(",", ".");
+  if (!/^\d+(?:\.\d{1,2})?$/.test(valeur)) return null;
+  const cents = Math.round(Number(valeur) * 100);
   return Number.isSafeInteger(cents) && cents >= 0 ? cents : null;
 };
-const parseQuantity = (text: string) => {
-  const value = text.trim().replace(",", ".");
-  if (!/^\d+(?:\.\d{1,6})?$/.test(value)) return null;
-  const number = Number(value);
+const parseQuantity = (texte: string) => {
+  const valeur = texte.trim().replace(",", ".");
+  if (!/^\d+(?:\.\d{1,6})?$/.test(valeur)) return null;
+  const number = Number(valeur);
   return Number.isFinite(number) && number > 0 && number <= 1_000_000 ? number : null;
 };
 
-export function PurchaseOrderEditWorkspace({ orderId }: { orderId: string }) {
-  const [data, setData] = useState<Snapshot | null>(null);
+export function PurchaseOrderEditWorkspace({ orderId: idCommande }: { orderId: string }) {
+  const [donnees, setData] = useState<Snapshot | null>(null);
   const [original, setOriginal] = useState<PurchaseOrder | null>(null);
   const [supplier, setSupplier] = useState("");
   const [description, setDescription] = useState("");
   const [allocations, setAllocations] = useState<Allocated[]>([]);
-  const [lines, setLines] = useState<Line[]>([]);
+  const [lignes, setLines] = useState<Line[]>([]);
   const [siteId, setSiteId] = useState("");
   const [busy, setBusy] = useState(false);
-  const [error, setError] = useState("");
+  const [erreur, setError] = useState("");
   const [notice, setNotice] = useState("");
 
-  function initialize(order: PurchaseOrder) {
-    setOriginal(order);
-    setSupplier(order.supplierName);
-    setDescription(order.description);
-    setSiteId(order.chantierId ?? "");
+  function initialize(commande: PurchaseOrder) {
+    setOriginal(commande);
+    setSupplier(commande.supplierName);
+    setDescription(commande.description);
+    setSiteId(commande.chantierId ?? "");
     setAllocations(
-      purchaseOrderAllocations(order).map((item) => ({
+      purchaseOrderAllocations(commande).map((element) => ({
         id: crypto.randomUUID(),
-        chantierId: purchaseDestinationKey(item),
-        amount: amountText(item.amountHtCents),
+        chantierId: purchaseDestinationKey(element),
+        amount: amountText(element.amountHtCents),
       })),
     );
     setLines(
-      order.lines.map((line) => ({
-        id: line.id,
-        description: line.description,
-        quantity: String(line.quantity).replace(".", ","),
-        unit: line.unit,
-        unitPrice: amountText(line.unitPriceHtCents),
+      commande.lines.map((ligne) => ({
+        id: ligne.id,
+        description: ligne.description,
+        quantity: String(ligne.quantity).replace(".", ","),
+        unit: ligne.unit,
+        unitPrice: amountText(ligne.unitPriceHtCents),
       })),
     );
   }
@@ -77,17 +77,17 @@ export function PurchaseOrderEditWorkspace({ orderId }: { orderId: string }) {
     const controller = new AbortController();
     void (async () => {
       try {
-        const response = await fetch("/api/desktop/purchases", {
+        const reponse = await fetch("/api/desktop/purchases", {
           cache: "no-store",
           signal: controller.signal,
         });
-        if (!response.ok) throw new Error("Impossible de charger les commandes.");
-        const payload = (await response.json()) as Snapshot;
-        const order = payload.payload.orders.find((entry) => entry.id === orderId);
-        if (!order) throw new Error("Bon de commande introuvable.");
+        if (!reponse.ok) throw new Error("Impossible de charger les commandes.");
+        const contenu = (await reponse.json()) as Snapshot;
+        const commande = contenu.payload.orders.find((entree) => entree.id === idCommande);
+        if (!commande) throw new Error("Bon de commande introuvable.");
         if (!controller.signal.aborted) {
-          setData(payload);
-          initialize(order);
+          setData(contenu);
+          initialize(commande);
         }
       } catch (cause) {
         if (!controller.signal.aborted)
@@ -95,120 +95,125 @@ export function PurchaseOrderEditWorkspace({ orderId }: { orderId: string }) {
       }
     })();
     return () => controller.abort();
-  }, [orderId]);
+  }, [idCommande]);
 
-  const sites = data?.chantiers ?? [];
+  const sites = donnees?.chantiers ?? [];
   const destinations = [
     ...sites.map((site) => ({ id: site.id, name: site.name, active: site.status === "ACTIVE" })),
     { id: "SAV", name: "SAV (hors chantier)", active: true },
     { id: "GENERAL_EXPENSES", name: "Frais généraux (hors chantier)", active: true },
   ];
   const suppliers = useMemo(
-    () => [...new Set(data?.payload.orders.map((order) => order.supplierName) ?? [])].sort(),
-    [data],
+    () =>
+      [...new Set(donnees?.payload.orders.map((commande) => commande.supplierName) ?? [])].sort(),
+    [donnees],
   );
   const readOnly =
     original?.status !== "COMMITTED" ||
     Boolean(original.removedAllocations?.length) ||
-    !data?.canWrite;
-  const quickTotal = allocations.reduce<number | null>((sum, line) => {
-    const amount = parseAmount(line.amount);
-    return sum === null || amount === null ? null : sum + amount;
+    !donnees?.canWrite;
+  const quickTotal = allocations.reduce<number | null>((somme, ligne) => {
+    const montant = parseAmount(ligne.amount);
+    return somme === null || montant === null ? null : somme + montant;
   }, 0);
-  const detailedTotal = lines.reduce<number | null>((sum, line) => {
-    const quantity = parseQuantity(line.quantity);
-    const price = parseAmount(line.unitPrice);
-    return sum === null || quantity === null || price === null
+  const detailedTotal = lignes.reduce<number | null>((somme, ligne) => {
+    const quantity = parseQuantity(ligne.quantity);
+    const prix = parseAmount(ligne.unitPrice);
+    return somme === null || quantity === null || prix === null
       ? null
-      : sum + Math.round(quantity * price);
+      : somme + Math.round(quantity * prix);
   }, 0);
-  const preview = original?.mode === "QUICK" ? quickTotal : detailedTotal;
+  const apercu = original?.mode === "QUICK" ? quickTotal : detailedTotal;
 
   async function save() {
-    if (!data || !original || busy || readOnly) return;
+    if (!donnees || !original || busy || readOnly) return;
     setError("");
     if (!supplier.trim()) {
       setError("Le fournisseur est obligatoire.");
       return;
     }
-    let input: PurchaseOrderInput;
+    let saisie: PurchaseOrderInput;
     if (original.mode === "QUICK") {
-      const rows = allocations.map((row) => ({
-        chantierId: row.chantierId,
-        amountHtCents: parseAmount(row.amount),
+      const lignesTableau = allocations.map((ligneTableau) => ({
+        chantierId: ligneTableau.chantierId,
+        amountHtCents: parseAmount(ligneTableau.amount),
       }));
       if (
-        !rows.length ||
-        rows.some(
-          (row) =>
-            !destinations.some((item) => item.id === row.chantierId) ||
-            row.amountHtCents === null ||
-            row.amountHtCents <= 0,
+        !lignesTableau.length ||
+        lignesTableau.some(
+          (ligneTableau) =>
+            !destinations.some((element) => element.id === ligneTableau.chantierId) ||
+            ligneTableau.amountHtCents === null ||
+            ligneTableau.amountHtCents <= 0,
         ) ||
-        new Set(rows.map((row) => row.chantierId)).size !== rows.length ||
-        preview === null ||
-        preview <= 0
+        new Set(lignesTableau.map((ligneTableau) => ligneTableau.chantierId)).size !==
+          lignesTableau.length ||
+        apercu === null ||
+        apercu <= 0
       ) {
         setError("Indique une destination distincte et un montant HT positif par ligne.");
         return;
       }
-      input = {
+      saisie = {
         mode: "QUICK",
         supplierName: supplier.trim(),
         description: description.trim(),
-        allocations: rows.map((row) =>
-          purchaseAllocationFromSelection(row.chantierId, row.amountHtCents!),
+        allocations: lignesTableau.map((ligneTableau) =>
+          purchaseAllocationFromSelection(ligneTableau.chantierId, ligneTableau.amountHtCents!),
         ),
       };
     } else {
-      const parsed: PurchaseOrderLine[] = [];
-      for (const line of lines) {
-        const quantity = parseQuantity(line.quantity);
-        const unitPriceHtCents = parseAmount(line.unitPrice);
+      const analyse: PurchaseOrderLine[] = [];
+      for (const ligne of lignes) {
+        const quantity = parseQuantity(ligne.quantity);
+        const unitPriceHtCents = parseAmount(ligne.unitPrice);
         if (
-          !line.description.trim() ||
-          !line.unit.trim() ||
+          !ligne.description.trim() ||
+          !ligne.unit.trim() ||
           quantity === null ||
           unitPriceHtCents === null
         ) {
           setError("Chaque article doit avoir une désignation, quantité, unité et un prix valide.");
           return;
         }
-        parsed.push({
-          id: line.id,
-          description: line.description.trim(),
+        analyse.push({
+          id: ligne.id,
+          description: ligne.description.trim(),
           quantity,
-          unit: line.unit.trim(),
+          unit: ligne.unit.trim(),
           unitPriceHtCents,
         });
       }
-      if (!parsed.length || preview === null || preview <= 0) {
+      if (!analyse.length || apercu === null || apercu <= 0) {
         setError("Le BC détaillé doit comporter des articles et un montant HT positif.");
         return;
       }
-      input = {
+      saisie = {
         mode: "DETAILED",
         chantierId: siteId,
         supplierName: supplier.trim(),
         description: description.trim(),
-        lines: parsed,
+        lines: analyse,
       };
     }
     setBusy(true);
     try {
-      const response = await fetch("/api/desktop/purchases", {
+      const reponse = await fetch("/api/desktop/purchases", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           action: "UPDATE",
           orderId: original.id,
           expectedUpdatedAt: original.updatedAt,
-          order: input,
+          order: saisie,
         }),
       });
-      const result = (await response.json()) as { payload?: PurchaseOrdersPayload; error?: string };
-      if (!response.ok || !result.payload) {
-        const errors: Record<string, string> = {
+      const resultat = (await reponse.json()) as {
+        payload?: PurchaseOrdersPayload;
+        error?: string;
+      };
+      if (!reponse.ok || !resultat.payload) {
+        const erreurs: Record<string, string> = {
           PURCHASE_ORDER_VERSION_CONFLICT:
             "Ce BC a été modifié depuis ton ouverture. Actualise la page.",
           PURCHASE_ORDER_NOT_EDITABLE:
@@ -218,12 +223,12 @@ export function PurchaseOrderEditWorkspace({ orderId }: { orderId: string }) {
             "Aucun nouvel engagement sur un chantier fermé ou annulé. Les affectations historiques inchangées restent conservées.",
         };
         throw new Error(
-          errors[result.error ?? ""] ?? "Enregistrement impossible. Vérifie les données.",
+          erreurs[resultat.error ?? ""] ?? "Enregistrement impossible. Vérifie les données.",
         );
       }
-      const updated = result.payload.orders.find((order) => order.id === original.id);
+      const updated = resultat.payload.orders.find((commande) => commande.id === original.id);
       if (!updated) throw new Error("Le BC enregistré est introuvable.");
-      setData({ ...data, payload: result.payload });
+      setData({ ...donnees, payload: resultat.payload });
       initialize(updated);
       setNotice("Modifications enregistrées. Les engagements et le PDF sont actualisés.");
     } catch (cause) {
@@ -239,9 +244,9 @@ export function PurchaseOrderEditWorkspace({ orderId }: { orderId: string }) {
         Retour aux bons de commande
       </Link>
       <h1>Modifier un bon de commande</h1>
-      {error ? (
+      {erreur ? (
         <p role="alert" style={{ color: "#b33138" }}>
-          {error}
+          {erreur}
         </p>
       ) : null}
       {notice ? (
@@ -249,7 +254,7 @@ export function PurchaseOrderEditWorkspace({ orderId }: { orderId: string }) {
           {notice}
         </p>
       ) : null}
-      {!data && !error ? <p>Chargement du BC…</p> : null}
+      {!donnees && !erreur ? <p>Chargement du BC…</p> : null}
       {original ? (
         <section
           style={{ background: "white", padding: 20, borderRadius: 12, display: "grid", gap: 16 }}
@@ -273,11 +278,11 @@ export function PurchaseOrderEditWorkspace({ orderId }: { orderId: string }) {
               list="edit-bc-suppliers"
               value={supplier}
               disabled={readOnly || busy}
-              onChange={(event) => setSupplier(event.target.value)}
+              onChange={(evenement) => setSupplier(evenement.target.value)}
             />
             <datalist id="edit-bc-suppliers">
-              {suppliers.map((name) => (
-                <option key={name} value={name} />
+              {suppliers.map((nom) => (
+                <option key={nom} value={nom} />
               ))}
             </datalist>
           </label>
@@ -288,51 +293,55 @@ export function PurchaseOrderEditWorkspace({ orderId }: { orderId: string }) {
               maxLength={2000}
               value={description}
               disabled={readOnly || busy}
-              onChange={(event) => setDescription(event.target.value)}
+              onChange={(evenement) => setDescription(evenement.target.value)}
             />
           </label>
           {original.mode === "QUICK" ? (
             <div style={{ display: "grid", gap: 10 }}>
               <h2>Montants par chantier, SAV ou frais généraux</h2>
-              {allocations.map((row, index) => (
+              {allocations.map((ligneTableau, indice) => (
                 <div
-                  key={row.id}
+                  key={ligneTableau.id}
                   style={{ display: "flex", gap: 12, flexWrap: "wrap", alignItems: "center" }}
                 >
                   <select
-                    aria-label={`Destination ligne ${index + 1}`}
-                    value={row.chantierId}
+                    aria-label={`Destination ligne ${indice + 1}`}
+                    value={ligneTableau.chantierId}
                     disabled={readOnly || busy}
-                    onChange={(event) =>
-                      setAllocations((items) =>
-                        items.map((item) =>
-                          item.id === row.id ? { ...item, chantierId: event.target.value } : item,
+                    onChange={(evenement) =>
+                      setAllocations((elements) =>
+                        elements.map((element) =>
+                          element.id === ligneTableau.id
+                            ? { ...element, chantierId: evenement.target.value }
+                            : element,
                         ),
                       )
                     }
                   >
-                    {destinations.map((item) => (
+                    {destinations.map((element) => (
                       <option
-                        key={item.id}
-                        value={item.id}
-                        disabled={!item.active && item.id !== row.chantierId}
+                        key={element.id}
+                        value={element.id}
+                        disabled={!element.active && element.id !== ligneTableau.chantierId}
                       >
-                        {item.name}
-                        {item.active ? "" : " (fermé / annulé)"}
+                        {element.name}
+                        {element.active ? "" : " (fermé / annulé)"}
                       </option>
                     ))}
                   </select>
                   <label>
                     Montant HT (€)
                     <input
-                      aria-label={`Montant HT ligne ${index + 1}`}
+                      aria-label={`Montant HT ligne ${indice + 1}`}
                       inputMode="decimal"
-                      value={row.amount}
+                      value={ligneTableau.amount}
                       disabled={readOnly || busy}
-                      onChange={(event) =>
-                        setAllocations((items) =>
-                          items.map((item) =>
-                            item.id === row.id ? { ...item, amount: event.target.value } : item,
+                      onChange={(evenement) =>
+                        setAllocations((elements) =>
+                          elements.map((element) =>
+                            element.id === ligneTableau.id
+                              ? { ...element, amount: evenement.target.value }
+                              : element,
                           ),
                         )
                       }
@@ -343,7 +352,9 @@ export function PurchaseOrderEditWorkspace({ orderId }: { orderId: string }) {
                     type="button"
                     disabled={readOnly || busy || allocations.length === 1}
                     onClick={() =>
-                      setAllocations((items) => items.filter((item) => item.id !== row.id))
+                      setAllocations((elements) =>
+                        elements.filter((element) => element.id !== ligneTableau.id),
+                      )
                     }
                   >
                     Retirer la ligne
@@ -356,13 +367,13 @@ export function PurchaseOrderEditWorkspace({ orderId }: { orderId: string }) {
                 disabled={readOnly || busy || allocations.length >= 100}
                 onClick={() => {
                   const destination = destinations.find(
-                    (candidate) =>
-                      candidate.active &&
-                      !allocations.some((row) => row.chantierId === candidate.id),
+                    (candidat) =>
+                      candidat.active &&
+                      !allocations.some((ligneTableau) => ligneTableau.chantierId === candidat.id),
                   );
                   if (destination)
-                    setAllocations((rows) => [
-                      ...rows,
+                    setAllocations((lignesTableau) => [
+                      ...lignesTableau,
                       { id: crypto.randomUUID(), chantierId: destination.id, amount: "" },
                     ]);
                 }}
@@ -377,7 +388,7 @@ export function PurchaseOrderEditWorkspace({ orderId }: { orderId: string }) {
                 <select
                   value={siteId}
                   disabled={readOnly || busy}
-                  onChange={(event) => setSiteId(event.target.value)}
+                  onChange={(evenement) => setSiteId(evenement.target.value)}
                 >
                   {sites.map((site) => (
                     <option
@@ -391,24 +402,24 @@ export function PurchaseOrderEditWorkspace({ orderId }: { orderId: string }) {
                 </select>
               </label>
               <h2>Articles</h2>
-              {lines.map((line, index) => (
+              {lignes.map((ligne, indice) => (
                 <div
-                  key={line.id}
+                  key={ligne.id}
                   style={{ display: "flex", flexWrap: "wrap", alignItems: "end", gap: 8 }}
                 >
                   <label style={{ flex: "3 1 200px" }}>
                     Désignation
                     <input
-                      aria-label={`Désignation ligne ${index + 1}`}
-                      value={line.description}
+                      aria-label={`Désignation ligne ${indice + 1}`}
+                      value={ligne.description}
                       disabled={readOnly || busy}
                       style={{ width: "100%" }}
-                      onChange={(event) =>
+                      onChange={(evenement) =>
                         setLines((list) =>
-                          list.map((item) =>
-                            item.id === line.id
-                              ? { ...item, description: event.target.value }
-                              : item,
+                          list.map((element) =>
+                            element.id === ligne.id
+                              ? { ...element, description: evenement.target.value }
+                              : element,
                           ),
                         )
                       }
@@ -418,14 +429,16 @@ export function PurchaseOrderEditWorkspace({ orderId }: { orderId: string }) {
                     <label key={field}>
                       {field === "quantity" ? "Qté" : field === "unit" ? "Unité" : "PU HT (€)"}
                       <input
-                        aria-label={`${field} ligne ${index + 1}`}
-                        value={line[field]}
+                        aria-label={`${field} ligne ${indice + 1}`}
+                        value={ligne[field]}
                         disabled={readOnly || busy}
                         style={{ width: 95 }}
-                        onChange={(event) =>
+                        onChange={(evenement) =>
                           setLines((list) =>
-                            list.map((item) =>
-                              item.id === line.id ? { ...item, [field]: event.target.value } : item,
+                            list.map((element) =>
+                              element.id === ligne.id
+                                ? { ...element, [field]: evenement.target.value }
+                                : element,
                             ),
                           )
                         }
@@ -435,8 +448,10 @@ export function PurchaseOrderEditWorkspace({ orderId }: { orderId: string }) {
                   <button
                     type="button"
                     className="secondaryButton"
-                    disabled={readOnly || busy || lines.length === 1}
-                    onClick={() => setLines((list) => list.filter((item) => item.id !== line.id))}
+                    disabled={readOnly || busy || lignes.length === 1}
+                    onClick={() =>
+                      setLines((list) => list.filter((element) => element.id !== ligne.id))
+                    }
                   >
                     Retirer
                   </button>
@@ -445,7 +460,7 @@ export function PurchaseOrderEditWorkspace({ orderId }: { orderId: string }) {
               <button
                 type="button"
                 className="secondaryButton"
-                disabled={readOnly || busy || lines.length >= 200}
+                disabled={readOnly || busy || lignes.length >= 200}
                 onClick={() =>
                   setLines((list) => [
                     ...list,
@@ -472,7 +487,7 @@ export function PurchaseOrderEditWorkspace({ orderId }: { orderId: string }) {
               justifyContent: "space-between",
             }}
           >
-            <strong>Total HT : {preview === null ? "À renseigner" : euros(preview)}</strong>
+            <strong>Total HT : {apercu === null ? "À renseigner" : euros(apercu)}</strong>
             <button
               type="button"
               className="primaryButton"

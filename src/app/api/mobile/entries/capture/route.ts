@@ -41,116 +41,116 @@ const captureSchema = z.object({
   files: z.array(fileSchema).max(12).default([]),
 });
 
-function snapshot(payload: EntriesPayload, actor: EntriesActor, focusEntryId?: string) {
+function snapshot(contenu: EntriesPayload, auteur: EntriesActor, focusEntryId?: string) {
   return {
-    payload,
-    actor: { userId: actor.userId, displayName: actor.displayName },
-    capabilities: entriesCapabilities(actor),
-    suggestedAssignees: listSuggestedAssignees(payload, actor),
+    payload: contenu,
+    actor: { userId: auteur.userId, displayName: auteur.displayName },
+    capabilities: entriesCapabilities(auteur),
+    suggestedAssignees: listSuggestedAssignees(contenu, auteur),
     focusEntryId,
     serverNow: new Date().toISOString(),
   };
 }
 
-function decodeFiles(files: Array<{ name: string; type: string; base64: string }>): File[] {
-  return files.map((item) => {
-    const bytes = Buffer.from(item.base64, "base64");
-    return new File([bytes], item.name, {
-      type: item.type || "application/octet-stream",
+function decodeFiles(fichiers: Array<{ name: string; type: string; base64: string }>): File[] {
+  return fichiers.map((element) => {
+    const bytes = Buffer.from(element.base64, "base64");
+    return new File([bytes], element.name, {
+      type: element.type || "application/octet-stream",
     });
   });
 }
 
-export async function POST(request: Request) {
+export async function POST(requete: Request) {
   let uploaded = [] as Awaited<ReturnType<typeof uploadEntryAttachments>>;
   let transport: EntryAttachmentTransport | null = null;
 
   try {
-    const context = await requireModuleRequestContext("capture", "WRITE");
-    const actor = await buildEntriesActor(context);
+    const contexte = await requireModuleRequestContext("capture", "WRITE");
+    const auteur = await buildEntriesActor(contexte);
     const repository = await createEntriesRepository();
 
-    const parsed = captureSchema.parse(await request.json());
-    if (parsed.ownerUserId !== context.user.id) throw new Error("CAPTURE_OWNER_FORBIDDEN");
+    const analyse = captureSchema.parse(await requete.json());
+    if (analyse.ownerUserId !== contexte.user.id) throw new Error("CAPTURE_OWNER_FORBIDDEN");
     const digest = createHash("sha256")
-      .update(context.user.id + ":" + parsed.requestId)
+      .update(contexte.user.id + ":" + analyse.requestId)
       .digest("hex");
-    const entryId = `${digest.slice(0, 8)}-${digest.slice(8, 12)}-4${digest.slice(13, 16)}-a${digest.slice(17, 20)}-${digest.slice(20, 32)}`;
-    const files = decodeFiles(parsed.files);
+    const idEntree = `${digest.slice(0, 8)}-${digest.slice(8, 12)}-4${digest.slice(13, 16)}-a${digest.slice(17, 20)}-${digest.slice(20, 32)}`;
+    const fichiers = decodeFiles(analyse.files);
 
-    let clientId = parsed.clientId ?? null;
-    const commercialCaseId = parsed.commercialCaseId ?? null;
+    let idClient = analyse.clientId ?? null;
+    const commercialCaseId = analyse.commercialCaseId ?? null;
 
-    if (clientId || commercialCaseId) {
+    if (idClient || commercialCaseId) {
       const [clientsPayload, commercialPayload] = await Promise.all([
         createClientsRepository().then((clients) => clients.load()),
         createCommercialRepository().load(),
       ]);
 
-      if (clientId) {
+      if (idClient) {
         const client = clientsPayload.clients.find(
-          (candidate) => candidate.id === clientId && !candidate.isArchived,
+          (candidat) => candidat.id === idClient && !candidat.isArchived,
         );
         if (!client) throw new Error("CLIENT_NOT_FOUND");
       }
 
       if (commercialCaseId) {
         const commercialCase = commercialPayload.cases.find(
-          (candidate) => candidate.id === commercialCaseId && !isCommercialClosed(candidate),
+          (candidat) => candidat.id === commercialCaseId && !isCommercialClosed(candidat),
         );
         if (!commercialCase) throw new Error("COMMERCIAL_CASE_NOT_FOUND");
-        if (commercialCase.clientId) clientId = commercialCase.clientId;
+        if (commercialCase.clientId) idClient = commercialCase.clientId;
       }
     }
 
-    if (files.length > 0) {
+    if (fichiers.length > 0) {
       transport = await createEntryAttachmentTransport({
-        owner: { displayName: context.user.displayName },
+        owner: { displayName: contexte.user.displayName },
       });
     }
 
-    if (transport && files.length > 0)
-      uploaded = await uploadEntryAttachments(transport, entryId, files);
+    if (transport && fichiers.length > 0)
+      uploaded = await uploadEntryAttachments(transport, idEntree, fichiers);
     const mutation = await withBusinessTransaction(async () => {
       const created = await repository.mutate(
         {
           action: "create",
-          entryId,
-          rawText: parsed.rawText,
-          priority: parsed.priority,
-          tagIds: parsed.tagIds,
-          clientId,
+          entryId: idEntree,
+          rawText: analyse.rawText,
+          priority: analyse.priority,
+          tagIds: analyse.tagIds,
+          clientId: idClient,
           commercialCaseId,
         },
-        actor,
+        auteur,
       );
-      const existing = created.payload.entries.find((entry) => entry.id === entryId)!;
+      const existing = created.payload.entries.find((entree) => entree.id === idEntree)!;
       if (existing.attachments.length > 0 || uploaded.length === 0) return created;
-      return repository.registerAttachments(entryId, uploaded, actor);
+      return repository.registerAttachments(idEntree, uploaded, auteur);
     });
     // Another retry may already have committed attachments; remove only our unused files.
     const used = new Set(
       mutation.payload.entries
-        .find((entry) => entry.id === entryId)!
-        .attachments.map((file) => file.id),
+        .find((entree) => entree.id === idEntree)!
+        .attachments.map((fichier) => fichier.id),
     );
     if (transport)
       await cleanupEntryAttachments(
         transport,
-        uploaded.filter((file) => !used.has(file.id)),
+        uploaded.filter((fichier) => !used.has(fichier.id)),
       );
     uploaded = [];
-    return NextResponse.json(snapshot(mutation.payload, actor, entryId), {
+    return NextResponse.json(snapshot(mutation.payload, auteur, idEntree), {
       headers: { "Cache-Control": "no-store" },
     });
-  } catch (error) {
+  } catch (erreur) {
     if (transport && uploaded.length > 0) await cleanupEntryAttachments(transport, uploaded);
 
     const code =
-      error instanceof z.ZodError
+      erreur instanceof z.ZodError
         ? "ENTRIES_REQUEST_INVALID"
-        : error instanceof Error
-          ? error.message
+        : erreur instanceof Error
+          ? erreur.message
           : "ENTRIES_CAPTURE_FAILED";
 
     return NextResponse.json(

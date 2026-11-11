@@ -17,24 +17,24 @@ function statusFor(code: string): number {
   return 400;
 }
 
-export async function GET(_request: Request, context: RouteContext) {
+export async function GET(_request: Request, contexte: RouteContext) {
   try {
-    const { caseId } = await context.params;
+    const { caseId: idAffaire } = await contexte.params;
     await requireModuleRequestContext("commercial", "READ");
     const repository = createCommercialRepository();
-    const payload = await repository.load();
-    const item = payload.cases.find((candidate) => candidate.id === caseId);
-    if (!item) throw new Error("COMMERCIAL_CASE_NOT_FOUND");
+    const contenu = await repository.load();
+    const element = contenu.cases.find((candidat) => candidat.id === idAffaire);
+    if (!element) throw new Error("COMMERCIAL_CASE_NOT_FOUND");
 
-    const latestDocument = item.documents[item.documents.length - 1];
+    const latestDocument = element.documents[element.documents.length - 1];
     if (!latestDocument) throw new Error("COMMERCIAL_FOLDER_NOT_FOUND");
 
     return NextResponse.json(
       { storagePath: latestDocument.storagePath },
       { headers: { "Cache-Control": "no-store" } },
     );
-  } catch (error) {
-    const code = error instanceof Error ? error.message : "COMMERCIAL_FOLDER_LOOKUP_FAILED";
+  } catch (erreur) {
+    const code = erreur instanceof Error ? erreur.message : "COMMERCIAL_FOLDER_LOOKUP_FAILED";
     return NextResponse.json(
       { error: code },
       { status: statusFor(code), headers: { "Cache-Control": "no-store" } },

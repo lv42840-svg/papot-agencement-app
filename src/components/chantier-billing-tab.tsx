@@ -9,16 +9,16 @@ const money = (cents: number) =>
 
 export function ChantierBillingTab({ chantierId }: { chantierId: string }) {
   const [snapshot, setSnapshot] = useState<BillingPayload | null>(null);
-  const [error, setError] = useState("");
+  const [erreur, setError] = useState("");
 
   useEffect(() => {
     void (async () => {
       try {
-        const response = await fetch("/api/desktop/billing", { cache: "no-store" });
-        const result = (await response.json()) as { payload?: BillingPayload; error?: string };
-        if (!response.ok || !result.payload)
-          throw new Error(result.error ?? "Chargement impossible");
-        setSnapshot(result.payload);
+        const reponse = await fetch("/api/desktop/billing", { cache: "no-store" });
+        const resultat = (await reponse.json()) as { payload?: BillingPayload; error?: string };
+        if (!reponse.ok || !resultat.payload)
+          throw new Error(resultat.error ?? "Chargement impossible");
+        setSnapshot(resultat.payload);
         setError("");
       } catch {
         setError("Impossible d'afficher les projets de facture. Vérifie les droits Facturation.");
@@ -27,8 +27,8 @@ export function ChantierBillingTab({ chantierId }: { chantierId: string }) {
   }, [chantierId]);
 
   const projects = (snapshot?.drafts ?? [])
-    .filter((draft) => draft.chantierId === chantierId)
-    .sort((left, right) => right.createdAt.localeCompare(left.createdAt));
+    .filter((brouillon) => brouillon.chantierId === chantierId)
+    .sort((gauche, droite) => droite.createdAt.localeCompare(gauche.createdAt));
 
   return (
     <section style={{ display: "grid", gap: 15 }}>
@@ -51,8 +51,8 @@ export function ChantierBillingTab({ chantierId }: { chantierId: string }) {
         ni numéro légal ni facture officielle sans le raccordement Pennylane. Les projets validés en
         interne ne sont pas des factures émises.
       </p>
-      {error ? <p role="alert">{error}</p> : null}
-      {!error && !snapshot ? <p>Chargement des projets…</p> : null}
+      {erreur ? <p role="alert">{erreur}</p> : null}
+      {!erreur && !snapshot ? <p>Chargement des projets…</p> : null}
       {snapshot && (
         <>
           <h3>Projets de facture ({projects.length})</h3>
@@ -73,26 +73,26 @@ export function ChantierBillingTab({ chantierId }: { chantierId: string }) {
                   </tr>
                 </thead>
                 <tbody>
-                  {projects.map((draft) => (
-                    <tr key={draft.id} style={{ borderBottom: "1px solid #ece8f0" }}>
+                  {projects.map((brouillon) => (
+                    <tr key={brouillon.id} style={{ borderBottom: "1px solid #ece8f0" }}>
                       <td style={{ padding: 8 }}>
-                        {new Date(draft.createdAt).toLocaleDateString("fr-FR")}
+                        {new Date(brouillon.createdAt).toLocaleDateString("fr-FR")}
                       </td>
-                      <td style={{ padding: 8 }}>{draft.quoteLabel}</td>
-                      <td style={{ padding: 8 }}>{draft.label}</td>
+                      <td style={{ padding: 8 }}>{brouillon.quoteLabel}</td>
+                      <td style={{ padding: 8 }}>{brouillon.label}</td>
                       <td style={{ padding: 8 }}>
-                        {draft.status === "APPROVED" ? "Validé en interne" : "À préparer"}
+                        {brouillon.status === "APPROVED" ? "Validé en interne" : "À préparer"}
                         <div style={{ fontSize: 11 }}>Non émis</div>
                       </td>
                       <td style={{ padding: 8, textAlign: "right" }}>
-                        {money(draft.amountHtCents)}
+                        {money(brouillon.amountHtCents)}
                       </td>
                       <td style={{ padding: 8, textAlign: "right" }}>
-                        {money(draft.totalTtcCents)}
+                        {money(brouillon.totalTtcCents)}
                       </td>
                       <td style={{ padding: 8 }}>
-                        <Link className="secondaryButton" href={`/facturation/${draft.id}`}>
-                          {draft.status === "APPROVED" ? "Consulter" : "Ouvrir"}
+                        <Link className="secondaryButton" href={`/facturation/${brouillon.id}`}>
+                          {brouillon.status === "APPROVED" ? "Consulter" : "Ouvrir"}
                         </Link>
                       </td>
                     </tr>

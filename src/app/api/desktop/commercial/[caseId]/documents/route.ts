@@ -30,23 +30,23 @@ type RouteContext = { params: Promise<{ caseId: string }> };
 type Owner = { userId: string; deviceId: string; displayName: string };
 
 async function snapshot(
-  payload: CommercialPayload,
+  contenu: CommercialPayload,
   owner: Owner,
-  user: { id: string },
+  utilisateur: { id: string },
   clients: ClientsRepository,
   focusCaseId?: string,
 ) {
-  const actor = { userId: owner.userId, displayName: owner.displayName };
+  const auteur = { userId: owner.userId, displayName: owner.displayName };
   const [canCreate, canProvision, canConfirm, canonicalClients] = await Promise.all([
-    hasEffectiveSpecialPermission(user, "commercial.create"),
-    hasEffectiveSpecialPermission(user, "commercial.provision"),
-    hasEffectiveSpecialPermission(user, "commercial.confirm_launch"),
+    hasEffectiveSpecialPermission(utilisateur, "commercial.create"),
+    hasEffectiveSpecialPermission(utilisateur, "commercial.provision"),
+    hasEffectiveSpecialPermission(utilisateur, "commercial.confirm_launch"),
     listCanonicalCommercialClients(clients),
   ]);
-  const payloadForUi = hydrateCommercialPayloadWithCanonicalClients(payload, canonicalClients);
+  const payloadForUi = hydrateCommercialPayloadWithCanonicalClients(contenu, canonicalClients);
   return {
     payload: payloadForUi,
-    actor,
+    actor: auteur,
     capabilities: {
       canCreate,
       canRead: true,
@@ -54,7 +54,7 @@ async function snapshot(
       canProvision,
       canConfirm,
     },
-    suggestedPeople: listCommercialPeople(payloadForUi, actor),
+    suggestedPeople: listCommercialPeople(payloadForUi, auteur),
     focusCaseId,
     serverNow: new Date().toISOString(),
   };
@@ -72,20 +72,22 @@ function statusFor(code: string): number {
   return 400;
 }
 
-export async function POST(request: Request, context: RouteContext) {
+export async function POST(requete: Request, contexte: RouteContext) {
   try {
-    const { caseId } = await context.params;
+    const { caseId: idAffaire } = await contexte.params;
     const requestContext = await requireModuleRequestContext("commercial", "WRITE");
-    const { user } = requestContext;
+    const { user: utilisateur } = requestContext;
     const owner = {
-      userId: user.id,
-      deviceId: user.id,
-      displayName: user.displayName,
+      userId: utilisateur.id,
+      deviceId: utilisateur.id,
+      displayName: utilisateur.displayName,
     };
     const repository = createCommercialRepository();
     const clients = await createClientsRepository();
-    const form = await request.formData();
-    const files = form.getAll("files").filter((value): value is File => value instanceof File);
+    const form = await requete.formData();
+    const fichiers = form
+      .getAll("files")
+      .filter((valeur): valeur is File => valeur instanceof File);
     const category = commercialDocumentCategorySchema.parse(form.get("category"));
     const versionLabel = String(form.get("versionLabel") ?? "").trim();
     const variantLabel = String(form.get("variantLabel") ?? "").trim();
@@ -95,44 +97,47 @@ export async function POST(request: Request, context: RouteContext) {
     if (!expectedUpdatedAt) throw new Error("COMMERCIAL_VERSION_REQUIRED");
 
     const currentPayload = await repository.load();
-    const item = currentPayload.cases.find((candidate) => candidate.id === caseId);
-    if (!item) {
+    const element = currentPayload.cases.find((candidat) => candidat.id === idAffaire);
+    if (!element) {
       return NextResponse.json({ error: "COMMERCIAL_CASE_NOT_FOUND" }, { status: 404 });
     }
-    assertCommercialRevision(item, expectedUpdatedAt);
+    assertCommercialRevision(element, expectedUpdatedAt);
 
-    const creationYear = new Date(item.createdAt).getFullYear();
-    const actor = { userId: owner.userId, displayName: owner.displayName };
+    const creationYear = new Date(element.createdAt).getFullYear();
+    const auteur = { userId: owner.userId, displayName: owner.displayName };
     const transport = await createCommercialDocumentTransport({
-      displayName: user.displayName,
+      displayName: utilisateur.displayName,
     });
 
     let uploaded = [] as Awaited<ReturnType<typeof uploadCommercialDocuments>>;
     try {
       uploaded = await uploadCommercialDocuments(transport, {
         creationYear,
-        clientName: item.clientName,
-        caseName: item.name,
-        files,
+        clientName: element.clientName,
+        caseName: element.name,
+        files: fichiers,
         options: { category, versionLabel, variantLabel, isCurrent, isSignedQuote },
       });
 
-      const mutation = await repository.mutate((payload) => {
-        const current = payload.cases.find((candidate) => candidate.id === caseId);
-        if (!current) throw new Error("COMMERCIAL_CASE_NOT_FOUND");
-        assertCommercialRevision(current, expectedUpdatedAt);
-        return registerCommercialDocuments(payload, caseId, uploaded, actor);
+      const mutation = await repository.mutate((contenu) => {
+        const courant = contenu.cases.find((candidat) => candidat.id === idAffaire);
+        if (!courant) throw new Error("COMMERCIAL_CASE_NOT_FOUND");
+        assertCommercialRevision(courant, expectedUpdatedAt);
+        return registerCommercialDocuments(contenu, idAffaire, uploaded, auteur);
       });
 
-      return NextResponse.json(await snapshot(mutation.payload, owner, user, clients, caseId), {
-        headers: { "Cache-Control": "no-store" },
-      });
-    } catch (error) {
+      return NextResponse.json(
+        await snapshot(mutation.payload, owner, utilisateur, clients, idAffaire),
+        {
+          headers: { "Cache-Control": "no-store" },
+        },
+      );
+    } catch (erreur) {
       if (uploaded.length > 0) await cleanupCommercialDocuments(transport, uploaded);
-      throw error;
+      throw erreur;
     }
-  } catch (error) {
-    const code = error instanceof Error ? error.message : "COMMERCIAL_DOCUMENT_UPLOAD_FAILED";
+  } catch (erreur) {
+    const code = erreur instanceof Error ? erreur.message : "COMMERCIAL_DOCUMENT_UPLOAD_FAILED";
     return NextResponse.json(
       { error: code },
       { status: statusFor(code), headers: { "Cache-Control": "no-store" } },

@@ -22,10 +22,10 @@ import { createQuotesRepository } from "@/lib/quotes/create-repository";
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
-function noStoreJson(body: unknown, init?: ResponseInit) {
-  const response = NextResponse.json(body, init);
-  response.headers.set("Cache-Control", "no-store");
-  return response;
+function noStoreJson(corps: unknown, init?: ResponseInit) {
+  const reponse = NextResponse.json(corps, init);
+  reponse.headers.set("Cache-Control", "no-store");
+  return reponse;
 }
 
 function statusFor(code: string): number {
@@ -38,22 +38,22 @@ function statusFor(code: string): number {
   return 400;
 }
 
-export async function POST(request: Request) {
+export async function POST(requete: Request) {
   const startedAt = Date.now();
   let stage = "parse-request";
 
   try {
-    const input = launchChantierFromAffairSchema.parse(await request.json());
+    const saisie = launchChantierFromAffairSchema.parse(await requete.json());
     stage = "create-runtime";
-    const context = await requireModuleRequestContext("chantiers", "WRITE");
-    await requireSpecialPermission(context.user, "commercial.confirm_launch");
+    const contexte = await requireModuleRequestContext("chantiers", "WRITE");
+    await requireSpecialPermission(contexte.user, "commercial.confirm_launch");
     const commercialRepository = createCommercialRepository();
-    const chantiersRepository = createChantiersRepository(context);
-    const actor = { userId: context.user.id, displayName: context.user.displayName };
+    const chantiersRepository = createChantiersRepository(contexte);
+    const auteur = { userId: contexte.user.id, displayName: contexte.user.displayName };
 
     stage = "read-affair";
     const commercial = await commercialRepository.load();
-    const affair = commercial.cases.find((item) => item.id === input.commercialCaseId);
+    const affair = commercial.cases.find((element) => element.id === saisie.commercialCaseId);
     if (!affair) throw new Error("CHANTIER_COMMERCIAL_CASE_NOT_FOUND");
 
     stage = "derive-launch-hours";
@@ -64,36 +64,37 @@ export async function POST(request: Request) {
     await Promise.all([chantiersRepository.load(), planningRepository.load()]);
     stage = "apply-and-save-launch";
     const mutation = await withBusinessTransaction(async () => {
-      const result = await chantiersRepository.mutate((payload) => {
-        const existing = payload.chantiers.find(
+      const resultat = await chantiersRepository.mutate((contenu) => {
+        const existing = contenu.chantiers.find(
           (site) => site.sourceCommercialCaseId === affair.id,
         );
-        if (existing) return { payload, focusChantierId: existing.id, shouldPersist: false };
+        if (existing)
+          return { payload: contenu, focusChantierId: existing.id, shouldPersist: false };
         return launchChantierFromAffair(
-          payload,
+          contenu,
           affair,
           {
-            ...input,
+            ...saisie,
             be: launchHours.hours.be,
             workshop: launchHours.hours.workshop,
             install: launchHours.hours.install,
           },
-          actor,
+          auteur,
         );
       });
-      if (!result.focusChantierId) throw new Error("CHANTIER_LAUNCH_FOCUS_MISSING");
-      await planningRepository.mutate((payload) =>
-        convertPlanningProvisionToFirm(payload, affair.id, result.focusChantierId!),
+      if (!resultat.focusChantierId) throw new Error("CHANTIER_LAUNCH_FOCUS_MISSING");
+      await planningRepository.mutate((contenu) =>
+        convertPlanningProvisionToFirm(contenu, affair.id, resultat.focusChantierId!),
       );
-      return result;
+      return resultat;
     });
 
     console.info("[PAPOT][Chantiers] launch from affair saved", { ms: Date.now() - startedAt });
     return noStoreJson({
       payload: mutation.payload,
-      actor,
+      actor: auteur,
       capabilities: {
-        ...chantierCapabilities(actor),
+        ...chantierCapabilities(auteur),
         canRead: true,
         canModify: true,
         canLaunch: true,
@@ -102,18 +103,18 @@ export async function POST(request: Request) {
       focusChantierId: mutation.focusChantierId,
       serverNow: new Date().toISOString(),
     });
-  } catch (error) {
+  } catch (erreur) {
     const code =
-      error instanceof ZodError
+      erreur instanceof ZodError
         ? "CHANTIER_LAUNCH_REQUEST_INVALID"
-        : error instanceof Error
-          ? error.message
+        : erreur instanceof Error
+          ? erreur.message
           : "CHANTIER_LAUNCH_FAILED";
     console.error("[PAPOT][Chantiers] launch failed", { stage, code, ms: Date.now() - startedAt });
-    const body =
-      error instanceof ChantiersRepositoryError && error.details?.lockedBy
-        ? { error: code, lockedBy: error.details.lockedBy }
+    const corps =
+      erreur instanceof ChantiersRepositoryError && erreur.details?.lockedBy
+        ? { error: code, lockedBy: erreur.details.lockedBy }
         : { error: code };
-    return noStoreJson(body, { status: statusFor(code) });
+    return noStoreJson(corps, { status: statusFor(code) });
   }
 }
