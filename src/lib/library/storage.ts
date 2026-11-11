@@ -1,14 +1,6 @@
 import { z } from "zod";
-import {
-  libraryComponentSchema,
-  parseLibraryComponent,
-  type LibraryComponent,
-} from "./component";
-import {
-  libraryOuvrageSchema,
-  parseLibraryOuvrage,
-  type LibraryOuvrage,
-} from "./ouvrage";
+import { libraryComponentSchema, parseLibraryComponent, type LibraryComponent } from "./component";
+import { libraryOuvrageSchema, parseLibraryOuvrage, type LibraryOuvrage } from "./ouvrage";
 
 export const LIBRARY_STORAGE_SCHEMA_VERSION = 1 as const;
 
@@ -39,10 +31,7 @@ export function createInitialLibraryPayload(): LibraryPayload {
   };
 }
 
-function ensureUniqueIds(
-  elements: Array<{ id: string }>,
-  codeErreur: string,
-): void {
+function ensureUniqueIds(elements: Array<{ id: string }>, codeErreur: string): void {
   const identifiants = new Set<string>();
   for (const element of elements) {
     if (identifiants.has(element.id)) throw new Error(codeErreur);
@@ -54,23 +43,17 @@ function validateComponentReferences(
   composants: LibraryComponent[],
   ouvrages: LibraryOuvrage[],
 ): void {
-  const identifiantsComposants = new Set(
-    composants.map((composant) => composant.id),
-  );
+  const identifiantsComposants = new Set(composants.map((composant) => composant.id));
   for (const ouvrage of ouvrages) {
     for (const ligne of ouvrage.components) {
       if (!identifiantsComposants.has(ligne.componentId)) {
-        throw new Error(
-          "LIBRARY_OUVRAGE_COMPONENT_NOT_FOUND",
-        );
+        throw new Error("LIBRARY_OUVRAGE_COMPONENT_NOT_FOUND");
       }
     }
   }
 }
 
-export function parseLibraryPayload(
-  valeur: unknown,
-): LibraryPayload {
+export function parseLibraryPayload(valeur: unknown): LibraryPayload {
   if (valeur == null) return createInitialLibraryPayload();
 
   const analyse = libraryPayloadSchema.safeParse(valeur);
@@ -83,18 +66,9 @@ export function parseLibraryPayload(
     parseLibraryOuvrage(ouvrage);
   }
 
-  ensureUniqueIds(
-    analyse.data.components,
-    "LIBRARY_COMPONENT_ID_DUPLICATE",
-  );
-  ensureUniqueIds(
-    analyse.data.ouvrages,
-    "LIBRARY_OUVRAGE_ID_DUPLICATE",
-  );
-  validateComponentReferences(
-    analyse.data.components,
-    analyse.data.ouvrages,
-  );
+  ensureUniqueIds(analyse.data.components, "LIBRARY_COMPONENT_ID_DUPLICATE");
+  ensureUniqueIds(analyse.data.ouvrages, "LIBRARY_OUVRAGE_ID_DUPLICATE");
+  validateComponentReferences(analyse.data.components, analyse.data.ouvrages);
 
   return analyse.data;
 }

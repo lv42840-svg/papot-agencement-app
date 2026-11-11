@@ -13,14 +13,10 @@ export const libraryOuvrageSchema = z.object({
   components: z.array(libraryOuvrageComponentLineSchema).min(1),
 });
 
-export type LibraryOuvrageComponentLine = z.infer<
-  typeof libraryOuvrageComponentLineSchema
->;
+export type LibraryOuvrageComponentLine = z.infer<typeof libraryOuvrageComponentLineSchema>;
 export type LibraryOuvrage = z.infer<typeof libraryOuvrageSchema>;
 
-export function parseLibraryOuvrage(
-  valeur: unknown,
-): LibraryOuvrage {
+export function parseLibraryOuvrage(valeur: unknown): LibraryOuvrage {
   const analyse = libraryOuvrageSchema.safeParse(valeur);
   if (!analyse.success) throw new Error("LIBRARY_OUVRAGE_INVALID");
 

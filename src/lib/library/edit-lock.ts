@@ -68,10 +68,7 @@ export type SaveLibraryEditResult =
   | { status: "saved"; resource: LibraryEnvelope }
   | { status: "conflict"; current: LibraryEnvelope };
 
-export function isLibraryLockExpired(
-  verrou: LibraryEditLock,
-  maintenant = new Date(),
-): boolean {
+export function isLibraryLockExpired(verrou: LibraryEditLock, maintenant = new Date()): boolean {
   const verrouValide = libraryEditLockSchema.parse(verrou);
   return Date.parse(verrouValide.expires_at) <= maintenant.getTime();
 }
@@ -97,8 +94,7 @@ export function createLibraryLock(parametres: {
   ttlMs?: number;
 }): LibraryEditLock {
   const maintenant = parametres.now ?? new Date();
-  const dureeMs =
-    parametres.ttlMs ?? DEFAULT_LIBRARY_LOCK_TTL_MS;
+  const dureeMs = parametres.ttlMs ?? DEFAULT_LIBRARY_LOCK_TTL_MS;
   if (!Number.isFinite(dureeMs) || dureeMs <= 0) {
     throw new Error("LOCK_TTL_INVALID");
   }
@@ -112,9 +108,7 @@ export function createLibraryLock(parametres: {
     base_version: parametres.baseVersion,
     acquired_at: horodatage,
     renewed_at: horodatage,
-    expires_at: new Date(
-      maintenant.getTime() + dureeMs,
-    ).toISOString(),
+    expires_at: new Date(maintenant.getTime() + dureeMs).toISOString(),
   });
 }
 
@@ -126,22 +120,13 @@ export function renewLibraryLock(parametres: {
   ttlMs?: number;
 }): LibraryEditLock {
   const maintenant = parametres.now ?? new Date();
-  const dureeMs =
-    parametres.ttlMs ?? DEFAULT_LIBRARY_LOCK_TTL_MS;
-  const verrouCourant = libraryEditLockSchema.parse(
-    parametres.current,
-  );
+  const dureeMs = parametres.ttlMs ?? DEFAULT_LIBRARY_LOCK_TTL_MS;
+  const verrouCourant = libraryEditLockSchema.parse(parametres.current);
 
   if (isLibraryLockExpired(verrouCourant, maintenant)) {
     throw new Error("LOCK_EXPIRED");
   }
-  if (
-    !isLibraryLockOwnedBy(
-      verrouCourant,
-      parametres.leaseId,
-      parametres.owner,
-    )
-  ) {
+  if (!isLibraryLockOwnedBy(verrouCourant, parametres.leaseId, parametres.owner)) {
     throw new Error("LOCK_NOT_OWNED");
   }
   if (!Number.isFinite(dureeMs) || dureeMs <= 0) {
@@ -151,8 +136,6 @@ export function renewLibraryLock(parametres: {
   return libraryEditLockSchema.parse({
     ...verrouCourant,
     renewed_at: maintenant.toISOString(),
-    expires_at: new Date(
-      maintenant.getTime() + dureeMs,
-    ).toISOString(),
+    expires_at: new Date(maintenant.getTime() + dureeMs).toISOString(),
   });
 }

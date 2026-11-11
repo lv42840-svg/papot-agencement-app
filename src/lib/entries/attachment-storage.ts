@@ -36,11 +36,7 @@ function validateFiles(fichiers: File[]): void {
 
 function validateAttachmentPath(pieceJointe: EntryAttachment): string[] {
   const prefixesAutorises = ["documents/entries/", "documents/captures/"];
-  if (
-    !prefixesAutorises.some((prefixe) =>
-      pieceJointe.storagePath.startsWith(prefixe),
-    )
-  ) {
+  if (!prefixesAutorises.some((prefixe) => pieceJointe.storagePath.startsWith(prefixe))) {
     throw new Error("ENTRY_ATTACHMENT_PATH_INVALID");
   }
   const segments = pieceJointe.storagePath.split("/").filter(Boolean);
@@ -65,10 +61,7 @@ export async function uploadEntryAttachments(
       const nomObjet = safeFileName(fichier.name);
       const cheminStockage = `documents/entries/${idEntree}/${id}/${nomObjet}`;
       const octets = Buffer.from(await fichier.arrayBuffer());
-      const ecriture = await transport.store.writeBytes(
-        cheminStockage,
-        octets,
-      );
+      const ecriture = await transport.store.writeBytes(cheminStockage, octets);
 
       piecesJointesEnvoyees.push({
         id,
@@ -94,10 +87,7 @@ export async function readEntryAttachment(
   pieceJointe: EntryAttachment,
 ): Promise<Buffer> {
   validateAttachmentPath(pieceJointe);
-  const octets = await transport.store.readBytes(
-    pieceJointe.storagePath,
-    pieceJointe.sha256,
-  );
+  const octets = await transport.store.readBytes(pieceJointe.storagePath, pieceJointe.sha256);
   if (octets.length !== pieceJointe.sizeBytes) {
     throw new Error("ENTRY_ATTACHMENT_INTEGRITY_MISMATCH");
   }
@@ -110,9 +100,7 @@ export async function cleanupEntryAttachments(
 ): Promise<void> {
   await Promise.all(
     piecesJointes.map((pieceJointe) =>
-      transport.store
-        .deleteFile(pieceJointe.storagePath)
-        .catch(() => undefined),
+      transport.store.deleteFile(pieceJointe.storagePath).catch(() => undefined),
     ),
   );
 }

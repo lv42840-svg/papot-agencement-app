@@ -19,9 +19,7 @@ type EntriesStateRow = {
 
 type Queryable = Pick<Pool, "query"> | Pick<PoolClient, "query">;
 
-async function loadState(
-  sourceRequete: Queryable,
-): Promise<EntriesStateRow> {
+async function loadState(sourceRequete: Queryable): Promise<EntriesStateRow> {
   const resultat = await sourceRequete.query<EntriesStateRow>(
     "SELECT version, payload FROM papot_entries_state WHERE scope = 'global'",
   );
@@ -30,9 +28,7 @@ async function loadState(
   return ligne;
 }
 
-export function createPostgresEntriesRepository(
-  pool: Pool = getServerDbPool(),
-): EntriesRepository {
+export function createPostgresEntriesRepository(pool: Pool = getServerDbPool()): EntriesRepository {
   async function enregistrer(
     transformation: (donnees: EntriesPayload) => EntriesMutationResult,
   ): Promise<EntriesMutationResult> {
@@ -77,18 +73,11 @@ export function createPostgresEntriesRepository(
       return parseEntriesPayload(ligne.payload);
     },
     async mutate(saisie, auteur) {
-      return enregistrer((donnees) =>
-        applyEntriesMutation(donnees, saisie, auteur),
-      );
+      return enregistrer((donnees) => applyEntriesMutation(donnees, saisie, auteur));
     },
     async registerAttachments(idEntree, piecesJointes, auteur) {
       return enregistrer((donnees) =>
-        registerEntryAttachments(
-          donnees,
-          idEntree,
-          piecesJointes,
-          auteur,
-        ),
+        registerEntryAttachments(donnees, idEntree, piecesJointes, auteur),
       );
     },
   };

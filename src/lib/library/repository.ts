@@ -1,8 +1,4 @@
-import type {
-  LibraryEditLock,
-  OpenLibraryResult,
-  SaveLibraryEditResult,
-} from "./edit-lock";
+import type { LibraryEditLock, OpenLibraryResult, SaveLibraryEditResult } from "./edit-lock";
 import type { LibrarySnapshot } from "./storage";
 
 export interface LibraryRepository {

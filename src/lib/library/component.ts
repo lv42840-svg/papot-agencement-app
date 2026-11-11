@@ -66,17 +66,14 @@ export function calculateLibraryComponentMarginPercent(
   return ((prixVente - cout) / cout) * 100;
 }
 
-export function parseLibraryComponent(
-  valeur: unknown,
-): LibraryComponent {
+export function parseLibraryComponent(valeur: unknown): LibraryComponent {
   const analyse = libraryComponentSchema.safeParse(valeur);
   if (!analyse.success) throw new Error("LIBRARY_COMPONENT_INVALID");
 
-  const prixVenteAttenduCentimes =
-    calculateLibraryComponentSalePriceCents(
-      analyse.data.costPriceCents,
-      analyse.data.marginPercent,
-    );
+  const prixVenteAttenduCentimes = calculateLibraryComponentSalePriceCents(
+    analyse.data.costPriceCents,
+    analyse.data.marginPercent,
+  );
   if (prixVenteAttenduCentimes !== analyse.data.salePriceCents) {
     throw new Error("LIBRARY_COMPONENT_PRICING_MISMATCH");
   }
