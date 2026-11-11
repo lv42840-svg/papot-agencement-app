@@ -1,79 +1,102 @@
-import { parseLibraryComponent, type LibraryComponent } from "./component";
+import {
+  parseLibraryComponent,
+  type LibraryComponent,
+} from "./component";
 import { parseLibraryOuvrage, type LibraryOuvrage } from "./ouvrage";
 import { isRequiredLaborComponentId } from "./required-labor-components";
 import { parseLibraryPayload, type LibraryPayload } from "./storage";
 
 export function upsertLibraryComponent(
-  payload: LibraryPayload,
-  componentValue: unknown,
+  donnees: LibraryPayload,
+  valeurComposant: unknown,
 ): LibraryPayload {
-  const component = parseLibraryComponent(componentValue);
-  const existingIndex = payload.components.findIndex((item) => item.id === component.id);
-  const components = [...payload.components];
+  const composant = parseLibraryComponent(valeurComposant);
+  const indiceExistant = donnees.components.findIndex(
+    (element) => element.id === composant.id,
+  );
+  const composants = [...donnees.components];
 
-  if (existingIndex >= 0) {
-    components[existingIndex] = component;
+  if (indiceExistant >= 0) {
+    composants[indiceExistant] = composant;
   } else {
-    components.push(component);
+    composants.push(composant);
   }
 
-  return parseLibraryPayload({ ...payload, components });
+  return parseLibraryPayload({ ...donnees, components: composants });
 }
 
 export function removeLibraryComponent(
-  payload: LibraryPayload,
-  componentId: string,
+  donnees: LibraryPayload,
+  idComposant: string,
 ): LibraryPayload {
-  const component = payload.components.find((item) => item.id === componentId);
-  if (!component) throw new Error("LIBRARY_COMPONENT_NOT_FOUND");
-  if (isRequiredLaborComponentId(componentId)) throw new Error("LIBRARY_COMPONENT_REQUIRED");
-
-  const usedByOuvrage = payload.ouvrages.some((ouvrage) =>
-    ouvrage.components.some((line) => line.componentId === componentId),
+  const composant = donnees.components.find(
+    (element) => element.id === idComposant,
   );
-  if (usedByOuvrage) throw new Error("LIBRARY_COMPONENT_IN_USE");
+  if (!composant) throw new Error("LIBRARY_COMPONENT_NOT_FOUND");
+  if (isRequiredLaborComponentId(idComposant)) {
+    throw new Error("LIBRARY_COMPONENT_REQUIRED");
+  }
+
+  const utiliseParOuvrage = donnees.ouvrages.some((ouvrage) =>
+    ouvrage.components.some(
+      (ligne) => ligne.componentId === idComposant,
+    ),
+  );
+  if (utiliseParOuvrage) throw new Error("LIBRARY_COMPONENT_IN_USE");
 
   return parseLibraryPayload({
-    ...payload,
-    components: payload.components.filter((item) => item.id !== componentId),
+    ...donnees,
+    components: donnees.components.filter(
+      (element) => element.id !== idComposant,
+    ),
   });
 }
 
 export function upsertLibraryOuvrage(
-  payload: LibraryPayload,
-  ouvrageValue: unknown,
+  donnees: LibraryPayload,
+  valeurOuvrage: unknown,
 ): LibraryPayload {
-  const ouvrage = parseLibraryOuvrage(ouvrageValue);
-  const existingIndex = payload.ouvrages.findIndex((item) => item.id === ouvrage.id);
-  const ouvrages = [...payload.ouvrages];
+  const ouvrage = parseLibraryOuvrage(valeurOuvrage);
+  const indiceExistant = donnees.ouvrages.findIndex(
+    (element) => element.id === ouvrage.id,
+  );
+  const ouvrages = [...donnees.ouvrages];
 
-  if (existingIndex >= 0) {
-    ouvrages[existingIndex] = ouvrage;
+  if (indiceExistant >= 0) {
+    ouvrages[indiceExistant] = ouvrage;
   } else {
     ouvrages.push(ouvrage);
   }
 
-  return parseLibraryPayload({ ...payload, ouvrages });
+  return parseLibraryPayload({ ...donnees, ouvrages });
 }
 
-export function removeLibraryOuvrage(payload: LibraryPayload, ouvrageId: string): LibraryPayload {
-  if (!payload.ouvrages.some((item) => item.id === ouvrageId)) {
+export function removeLibraryOuvrage(
+  donnees: LibraryPayload,
+  idOuvrage: string,
+): LibraryPayload {
+  if (!donnees.ouvrages.some((element) => element.id === idOuvrage)) {
     throw new Error("LIBRARY_OUVRAGE_NOT_FOUND");
   }
 
   return parseLibraryPayload({
-    ...payload,
-    ouvrages: payload.ouvrages.filter((item) => item.id !== ouvrageId),
+    ...donnees,
+    ouvrages: donnees.ouvrages.filter(
+      (element) => element.id !== idOuvrage,
+    ),
   });
 }
 
 export function libraryComponentUsageCount(
   ouvrages: LibraryOuvrage[],
-  component: Pick<LibraryComponent, "id">,
+  composant: Pick<LibraryComponent, "id">,
 ): number {
   return ouvrages.reduce(
     (total, ouvrage) =>
-      total + ouvrage.components.filter((line) => line.componentId === component.id).length,
+      total +
+      ouvrage.components.filter(
+        (ligne) => ligne.componentId === composant.id,
+      ).length,
     0,
   );
 }

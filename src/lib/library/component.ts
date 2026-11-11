@@ -17,60 +17,69 @@ export const libraryComponentSchema = z.object({
 
 export type LibraryComponent = z.infer<typeof libraryComponentSchema>;
 
-function parsePriceCents(value: number): number {
-  const parsed = priceCentsSchema.safeParse(value);
-  if (!parsed.success) throw new Error("LIBRARY_COMPONENT_PRICING_INVALID");
-  return parsed.data;
+function parsePriceCents(valeur: number): number {
+  const analyse = priceCentsSchema.safeParse(valeur);
+  if (!analyse.success) {
+    throw new Error("LIBRARY_COMPONENT_PRICING_INVALID");
+  }
+  return analyse.data;
 }
 
-function parseMarginPercent(value: number): number {
-  const parsed = marginPercentSchema.safeParse(value);
-  if (!parsed.success) throw new Error("LIBRARY_COMPONENT_PRICING_INVALID");
-  return parsed.data;
+function parseMarginPercent(valeur: number): number {
+  const analyse = marginPercentSchema.safeParse(valeur);
+  if (!analyse.success) {
+    throw new Error("LIBRARY_COMPONENT_PRICING_INVALID");
+  }
+  return analyse.data;
 }
 
 export function calculateLibraryComponentSalePriceCents(
-  costPriceCents: number,
-  marginPercent: number,
+  prixRevientCentimes: number,
+  margePourcent: number,
 ): number {
-  const cost = parsePriceCents(costPriceCents);
-  const margin = parseMarginPercent(marginPercent);
-  const salePriceCents = Math.round(cost * (1 + margin / 100));
+  const cout = parsePriceCents(prixRevientCentimes);
+  const marge = parseMarginPercent(margePourcent);
+  const prixVenteCentimes = Math.round(cout * (1 + marge / 100));
 
-  if (!Number.isSafeInteger(salePriceCents)) {
+  if (!Number.isSafeInteger(prixVenteCentimes)) {
     throw new Error("LIBRARY_COMPONENT_PRICING_INVALID");
   }
 
-  return salePriceCents;
+  return prixVenteCentimes;
 }
 
 export function calculateLibraryComponentMarginPercent(
-  costPriceCents: number,
-  salePriceCents: number,
+  prixRevientCentimes: number,
+  prixVenteCentimes: number,
 ): number {
-  const cost = parsePriceCents(costPriceCents);
-  const salePrice = parsePriceCents(salePriceCents);
+  const cout = parsePriceCents(prixRevientCentimes);
+  const prixVente = parsePriceCents(prixVenteCentimes);
 
-  if (salePrice < cost) throw new Error("LIBRARY_COMPONENT_PRICING_INVALID");
-  if (cost === 0) {
-    if (salePrice === 0) return 0;
+  if (prixVente < cout) {
+    throw new Error("LIBRARY_COMPONENT_PRICING_INVALID");
+  }
+  if (cout === 0) {
+    if (prixVente === 0) return 0;
     throw new Error("LIBRARY_COMPONENT_MARGIN_UNDEFINED");
   }
 
-  return ((salePrice - cost) / cost) * 100;
+  return ((prixVente - cout) / cout) * 100;
 }
 
-export function parseLibraryComponent(value: unknown): LibraryComponent {
-  const parsed = libraryComponentSchema.safeParse(value);
-  if (!parsed.success) throw new Error("LIBRARY_COMPONENT_INVALID");
+export function parseLibraryComponent(
+  valeur: unknown,
+): LibraryComponent {
+  const analyse = libraryComponentSchema.safeParse(valeur);
+  if (!analyse.success) throw new Error("LIBRARY_COMPONENT_INVALID");
 
-  const expectedSalePriceCents = calculateLibraryComponentSalePriceCents(
-    parsed.data.costPriceCents,
-    parsed.data.marginPercent,
-  );
-  if (expectedSalePriceCents !== parsed.data.salePriceCents) {
+  const prixVenteAttenduCentimes =
+    calculateLibraryComponentSalePriceCents(
+      analyse.data.costPriceCents,
+      analyse.data.marginPercent,
+    );
+  if (prixVenteAttenduCentimes !== analyse.data.salePriceCents) {
     throw new Error("LIBRARY_COMPONENT_PRICING_MISMATCH");
   }
 
-  return parsed.data;
+  return analyse.data;
 }

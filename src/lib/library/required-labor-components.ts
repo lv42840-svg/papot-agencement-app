@@ -1,6 +1,9 @@
 import type { ProductionActivity } from "../production-activity";
 import type { LibraryComponent } from "./component";
-import { parseLibraryPayload, type LibraryPayload } from "./storage";
+import {
+  parseLibraryPayload,
+  type LibraryPayload,
+} from "./storage";
 
 export const REQUIRED_LABOR_COMPONENT_IDS = {
   BE: "00000000-0000-4000-8000-0000000000b1",
@@ -12,7 +15,8 @@ const REQUIRED_LABOR_COMPONENTS: LibraryComponent[] = [
   {
     id: REQUIRED_LABOR_COMPONENT_IDS.BE,
     name: "Heure BE",
-    description: "Temps de bureau d’études réutilisable pour les devis et le planning.",
+    description:
+      "Temps de bureau d’études réutilisable pour les devis et le planning.",
     unit: "h",
     costPriceCents: 0,
     marginPercent: 0,
@@ -22,7 +26,8 @@ const REQUIRED_LABOR_COMPONENTS: LibraryComponent[] = [
   {
     id: REQUIRED_LABOR_COMPONENT_IDS.ATELIER,
     name: "Heure atelier",
-    description: "Temps d’atelier réutilisable pour les devis et le planning.",
+    description:
+      "Temps d’atelier réutilisable pour les devis et le planning.",
     unit: "h",
     costPriceCents: 0,
     marginPercent: 0,
@@ -32,7 +37,8 @@ const REQUIRED_LABOR_COMPONENTS: LibraryComponent[] = [
   {
     id: REQUIRED_LABOR_COMPONENT_IDS.POSE,
     name: "Heure pose",
-    description: "Temps de pose réutilisable pour les devis et le planning.",
+    description:
+      "Temps de pose réutilisable pour les devis et le planning.",
     unit: "h",
     costPriceCents: 0,
     marginPercent: 0,
@@ -42,32 +48,47 @@ const REQUIRED_LABOR_COMPONENTS: LibraryComponent[] = [
 ];
 
 export function requiredLaborComponents(): LibraryComponent[] {
-  return REQUIRED_LABOR_COMPONENTS.map((component) => ({ ...component }));
+  return REQUIRED_LABOR_COMPONENTS.map((composant) => ({
+    ...composant,
+  }));
 }
 
-export function isRequiredLaborComponentId(componentId: string): boolean {
+export function isRequiredLaborComponentId(
+  idComposant: string,
+): boolean {
   return Object.values(REQUIRED_LABOR_COMPONENT_IDS).includes(
-    componentId as (typeof REQUIRED_LABOR_COMPONENT_IDS)[ProductionActivity],
+    idComposant as (typeof REQUIRED_LABOR_COMPONENT_IDS)[ProductionActivity],
   );
 }
 
-export function ensureRequiredLaborComponents(payload: LibraryPayload): LibraryPayload {
-  const components = [...payload.components];
+export function ensureRequiredLaborComponents(
+  donnees: LibraryPayload,
+): LibraryPayload {
+  const composants = [...donnees.components];
 
-  for (const required of REQUIRED_LABOR_COMPONENTS) {
-    const existingForActivity = components.find(
-      (component) => component.activity === required.activity,
+  for (const composantRequis of REQUIRED_LABOR_COMPONENTS) {
+    const existantPourActivite = composants.find(
+      (composant) =>
+        composant.activity === composantRequis.activity,
     );
-    if (existingForActivity) continue;
+    if (existantPourActivite) continue;
 
-    const fixedIdIndex = components.findIndex((component) => component.id === required.id);
-    if (fixedIdIndex >= 0) {
-      components[fixedIdIndex] = { ...components[fixedIdIndex], activity: required.activity };
+    const indiceIdFixe = composants.findIndex(
+      (composant) => composant.id === composantRequis.id,
+    );
+    if (indiceIdFixe >= 0) {
+      composants[indiceIdFixe] = {
+        ...composants[indiceIdFixe],
+        activity: composantRequis.activity,
+      };
       continue;
     }
 
-    components.push({ ...required });
+    composants.push({ ...composantRequis });
   }
 
-  return parseLibraryPayload({ ...payload, components });
+  return parseLibraryPayload({
+    ...donnees,
+    components: composants,
+  });
 }

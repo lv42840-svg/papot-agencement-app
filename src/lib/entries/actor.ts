@@ -4,23 +4,31 @@ import type { ModuleRequestContext } from "@/lib/auth/module-request-context";
 import { readAuthPayload } from "@/lib/auth/store";
 import type { EntriesActor } from "./mutations";
 
-export async function buildEntriesActor(context: ModuleRequestContext): Promise<EntriesActor> {
-  const auth = await readAuthPayload();
+export async function buildEntriesActor(
+  contexte: ModuleRequestContext,
+): Promise<EntriesActor> {
+  const authentification = await readAuthPayload();
 
-  const assignmentCandidates = auth.users
-    .filter((user) => user.isActive && Boolean(user.modulePermissions.capture))
-    .map((user) => user.displayName);
+  const candidatsAffectation = authentification.users
+    .filter(
+      (utilisateur) =>
+        utilisateur.isActive && Boolean(utilisateur.modulePermissions.capture),
+    )
+    .map((utilisateur) => utilisateur.displayName);
 
-  const notificationRecipients = auth.users
-    .filter((user) => user.isActive && user.canManagePermissions)
-    .map((user) => user.displayName);
+  const destinatairesNotifications = authentification.users
+    .filter(
+      (utilisateur) =>
+        utilisateur.isActive && utilisateur.canManagePermissions,
+    )
+    .map((utilisateur) => utilisateur.displayName);
 
   return {
-    userId: context.user.id,
-    displayName: context.user.displayName,
-    canQualify: context.moduleAccess.canWrite,
-    canManageTags: context.user.canManagePermissions,
-    assignmentCandidates,
-    notificationRecipients,
+    userId: contexte.user.id,
+    displayName: contexte.user.displayName,
+    canQualify: contexte.moduleAccess.canWrite,
+    canManageTags: contexte.user.canManagePermissions,
+    assignmentCandidates: candidatsAffectation,
+    notificationRecipients: destinatairesNotifications,
   };
 }

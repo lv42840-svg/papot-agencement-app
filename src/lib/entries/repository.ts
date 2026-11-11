@@ -1,12 +1,19 @@
 import type { EntriesPayload, EntryAttachment } from "./domain";
-import type { EntriesActor, EntriesMutation, EntriesMutationResult } from "./mutations";
+import type {
+  EntriesActor,
+  EntriesMutation,
+  EntriesMutationResult,
+} from "./mutations";
 
 export interface EntriesRepository {
   load(): Promise<EntriesPayload>;
-  mutate(input: EntriesMutation, actor: EntriesActor): Promise<EntriesMutationResult>;
+  mutate(
+    saisie: EntriesMutation,
+    auteur: EntriesActor,
+  ): Promise<EntriesMutationResult>;
   registerAttachments(
-    entryId: string,
-    attachments: EntryAttachment[],
-    actor: EntriesActor,
+    idEntree: string,
+    piecesJointes: EntryAttachment[],
+    auteur: EntriesActor,
   ): Promise<EntriesMutationResult>;
 }
