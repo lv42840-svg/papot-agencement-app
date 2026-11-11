@@ -8,7 +8,9 @@ export function currentDashboardPlanningWeek(maintenant = new Date()): string {
     month: "2-digit",
     day: "2-digit",
   }).formatToParts(maintenant);
-  const valeurs = Object.fromEntries(parties.map((partie) => [partie.type, partie.value]));
+  const valeurs = Object.fromEntries(
+    parties.map((partie) => [partie.type, partie.value]),
+  );
   return isoWeekKey(
     new Date(Number(valeurs.year), Number(valeurs.month) - 1, Number(valeurs.day), 12),
   );
