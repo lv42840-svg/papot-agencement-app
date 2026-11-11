@@ -3,7 +3,10 @@ import "server-only";
 import type { Pool } from "pg";
 import { getServerDbPool } from "@/lib/server-db/pool";
 import { withServerDbTransaction } from "@/lib/server-db/transaction";
-import { parseQuoteEmailSettings, type QuoteEmailSettings } from "./domain";
+import {
+  parseQuoteEmailSettings,
+  type QuoteEmailSettings,
+} from "./domain";
 import type { QuoteEmailSettingsRepository } from "./repository";
 
 type Row = { payload: unknown };
@@ -13,18 +16,23 @@ export function createPostgresQuoteEmailSettingsRepository(
 ): QuoteEmailSettingsRepository {
   return {
     async load() {
-      const result = await pool.query<Row>(
+      const resultat = await pool.query<Row>(
         "SELECT payload FROM papot_quote_email_settings WHERE scope = 'global'",
       );
-      const row = result.rows[0];
-      if (!row) throw new Error("QUOTE_EMAIL_SETTINGS_STORAGE_NOT_INITIALIZED");
-      return parseQuoteEmailSettings(row.payload);
+      const ligne = resultat.rows[0];
+      if (!ligne) {
+        throw new Error(
+          "QUOTE_EMAIL_SETTINGS_STORAGE_NOT_INITIALIZED",
+        );
+      }
+      return parseQuoteEmailSettings(ligne.payload);
     },
 
-    async replace(settings: QuoteEmailSettings) {
-      const parsed = parseQuoteEmailSettings(settings);
+    async replace(parametres: QuoteEmailSettings) {
+      const parametresValides =
+        parseQuoteEmailSettings(parametres);
       return withServerDbTransaction(async (client) => {
-        const result = await client.query<Row>(
+        const resultat = await client.query<Row>(
           `
             UPDATE papot_quote_email_settings
             SET version = version + 1,
@@ -33,11 +41,15 @@ export function createPostgresQuoteEmailSettingsRepository(
             WHERE scope = 'global'
             RETURNING payload
           `,
-          [parsed],
+          [parametresValides],
         );
-        const row = result.rows[0];
-        if (!row) throw new Error("QUOTE_EMAIL_SETTINGS_STORAGE_NOT_INITIALIZED");
-        return parseQuoteEmailSettings(row.payload);
+        const ligne = resultat.rows[0];
+        if (!ligne) {
+          throw new Error(
+            "QUOTE_EMAIL_SETTINGS_STORAGE_NOT_INITIALIZED",
+          );
+        }
+        return parseQuoteEmailSettings(ligne.payload);
       }, pool);
     },
   };

@@ -7,31 +7,30 @@ type GlobalServerDb = typeof globalThis & {
 };
 
 export function getServerDbPool(): Pool {
-  const globalServerDb = globalThis as GlobalServerDb;
+  const baseGlobale = globalThis as GlobalServerDb;
 
-  if (!globalServerDb.__papotServerDbPool) {
-    const config = getServerDbConfig();
+  if (!baseGlobale.__papotServerDbPool) {
+    const configuration = getServerDbConfig();
 
-    globalServerDb.__papotServerDbPool = new Pool({
-      connectionString: config.connectionString,
-      application_name: config.applicationName,
-      max: config.maxConnections,
-      connectionTimeoutMillis: config.connectionTimeoutMillis,
-      idleTimeoutMillis: config.idleTimeoutMillis,
+    baseGlobale.__papotServerDbPool = new Pool({
+      connectionString: configuration.connectionString,
+      application_name: configuration.applicationName,
+      max: configuration.maxConnections,
+      connectionTimeoutMillis:
+        configuration.connectionTimeoutMillis,
+      idleTimeoutMillis: configuration.idleTimeoutMillis,
     });
   }
 
-  return globalServerDb.__papotServerDbPool;
+  return baseGlobale.__papotServerDbPool;
 }
 
 export async function closeServerDbPool(): Promise<void> {
-  const globalServerDb = globalThis as GlobalServerDb;
-  const pool = globalServerDb.__papotServerDbPool;
+  const baseGlobale = globalThis as GlobalServerDb;
+  const pool = baseGlobale.__papotServerDbPool;
 
-  if (!pool) {
-    return;
-  }
+  if (!pool) return;
 
-  globalServerDb.__papotServerDbPool = undefined;
+  baseGlobale.__papotServerDbPool = undefined;
   await pool.end();
 }

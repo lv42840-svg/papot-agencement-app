@@ -11,15 +11,22 @@ type PlanningStateRow = {
   payload: unknown;
 };
 
-type Queryable = Pick<Pool, "query"> | Pick<PoolClient, "query">;
+type Queryable =
+  | Pick<Pool, "query">
+  | Pick<PoolClient, "query">;
 
-async function loadState(queryable: Queryable): Promise<PlanningStateRow> {
-  const result = await queryable.query<PlanningStateRow>(
-    "SELECT version, payload FROM papot_planning_state WHERE scope = 'global'",
-  );
-  const row = result.rows[0];
-  if (!row) throw new Error("PLANNING_STORAGE_NOT_INITIALIZED");
-  return row;
+async function loadState(
+  sourceRequete: Queryable,
+): Promise<PlanningStateRow> {
+  const resultat =
+    await sourceRequete.query<PlanningStateRow>(
+      "SELECT version, payload FROM papot_planning_state WHERE scope = 'global'",
+    );
+  const ligne = resultat.rows[0];
+  if (!ligne) {
+    throw new Error("PLANNING_STORAGE_NOT_INITIALIZED");
+  }
+  return ligne;
 }
 
 export function createPostgresPlanningRepository(
@@ -27,28 +34,39 @@ export function createPostgresPlanningRepository(
 ): PlanningRepository {
   return {
     async load() {
-      const row = await loadState(pool);
-      return parsePlanningPayload(row.payload);
+      const ligne = await loadState(pool);
+      return parsePlanningPayload(ligne.payload);
     },
 
-    async mutate(transform) {
+    async mutate(transformation) {
       return withServerDbTransaction(async (client) => {
-        const locked = await client.query<PlanningStateRow>(
-          `
+        const verrouillage =
+          await client.query<PlanningStateRow>(
+            `
             SELECT version, payload
             FROM papot_planning_state
             WHERE scope = 'global'
             FOR UPDATE
           `,
-        );
-        const row = locked.rows[0];
-        if (!row) throw new Error("PLANNING_STORAGE_NOT_INITIALIZED");
+          );
+        const ligne = verrouillage.rows[0];
+        if (!ligne) {
+          throw new Error(
+            "PLANNING_STORAGE_NOT_INITIALIZED",
+          );
+        }
 
-        const next = parsePlanningPayload(
-          await transform(structuredClone(parsePlanningPayload(row.payload))),
+        const donneesSuivantes = parsePlanningPayload(
+          await transformation(
+            structuredClone(
+              parsePlanningPayload(ligne.payload),
+            ),
+          ),
         );
 
-        const saved = await client.query<{ payload: unknown }>(
+        const sauvegarde = await client.query<{
+          payload: unknown;
+        }>(
           `
             UPDATE papot_planning_state
             SET version = version + 1,
@@ -57,10 +75,14 @@ export function createPostgresPlanningRepository(
             WHERE scope = 'global' AND version = $2
             RETURNING payload
           `,
-          [next, row.version],
+          [donneesSuivantes, ligne.version],
         );
-        if (saved.rowCount === 0) throw new Error("PLANNING_VERSION_CONFLICT");
-        return parsePlanningPayload(saved.rows[0]?.payload);
+        if (sauvegarde.rowCount === 0) {
+          throw new Error("PLANNING_VERSION_CONFLICT");
+        }
+        return parsePlanningPayload(
+          sauvegarde.rows[0]?.payload,
+        );
       }, pool);
     },
   };

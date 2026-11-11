@@ -10,50 +10,75 @@ type DesktopFileRuntimeConfig = {
   shared_data_path?: unknown;
 };
 
-let cached: { cacheKey: string; store: ServerFileStore } | undefined;
+let cache:
+  | { cacheKey: string; store: ServerFileStore }
+  | undefined;
 
-function cachedStore(cacheKey: string, rootPath: string): ServerFileStore {
-  if (cached?.cacheKey === cacheKey) return cached.store;
+function cachedStore(
+  cleCache: string,
+  cheminRacine: string,
+): ServerFileStore {
+  if (cache?.cacheKey === cleCache) return cache.store;
 
-  fs.mkdirSync(rootPath, { recursive: true });
-  const store = new ServerFileStore(rootPath);
-  cached = { cacheKey, store };
-  return store;
+  fs.mkdirSync(cheminRacine, { recursive: true });
+  const stockage = new ServerFileStore(cheminRacine);
+  cache = { cacheKey: cleCache, store: stockage };
+  return stockage;
 }
 
 export function getServerFileStore(): ServerFileStore {
   if (isLocalStorageMode()) {
-    const rootPath = path.resolve(
-      process.env.PAPOT_LOCAL_FILES_PATH?.trim() || path.join(process.cwd(), ".papot-dev", "files"),
+    const cheminRacine = path.resolve(
+      process.env.PAPOT_LOCAL_FILES_PATH?.trim() ||
+        path.join(process.cwd(), ".papot-dev", "files"),
     );
-    return cachedStore(`local:${rootPath}`, rootPath);
+    return cachedStore(
+      `local:${cheminRacine}`,
+      cheminRacine,
+    );
   }
 
-  const configuredServerRoot = process.env.PAPOT_SERVER_FILES_ROOT?.trim();
-  if (configuredServerRoot) {
-    if (!path.isAbsolute(configuredServerRoot)) {
+  const racineServeurConfiguree =
+    process.env.PAPOT_SERVER_FILES_ROOT?.trim();
+  if (racineServeurConfiguree) {
+    if (!path.isAbsolute(racineServeurConfiguree)) {
       throw new Error("SERVER_FILE_ROOT_INVALID");
     }
-    const rootPath = path.resolve(configuredServerRoot);
-    return cachedStore(`server:${rootPath}`, rootPath);
+    const cheminRacine = path.resolve(
+      racineServeurConfiguree,
+    );
+    return cachedStore(
+      `server:${cheminRacine}`,
+      cheminRacine,
+    );
   }
 
-  const rawConfig = process.env.PAPOT_DESKTOP_CONFIG_JSON;
-  if (!rawConfig) throw new Error("SERVER_FILE_RUNTIME_NOT_CONFIGURED");
-  const cacheKey = `desktop:${rawConfig}`;
-  if (cached?.cacheKey === cacheKey) return cached.store;
+  const configurationBrute =
+    process.env.PAPOT_DESKTOP_CONFIG_JSON;
+  if (!configurationBrute) {
+    throw new Error("SERVER_FILE_RUNTIME_NOT_CONFIGURED");
+  }
+  const cleCache = `desktop:${configurationBrute}`;
+  if (cache?.cacheKey === cleCache) return cache.store;
 
-  let config: DesktopFileRuntimeConfig;
+  let configuration: DesktopFileRuntimeConfig;
   try {
-    config = JSON.parse(rawConfig) as DesktopFileRuntimeConfig;
+    configuration = JSON.parse(
+      configurationBrute,
+    ) as DesktopFileRuntimeConfig;
   } catch {
     throw new Error("DESKTOP_RUNTIME_CONFIG_INVALID");
   }
 
-  if (typeof config.shared_data_path !== "string" || !config.shared_data_path.trim()) {
+  if (
+    typeof configuration.shared_data_path !== "string" ||
+    !configuration.shared_data_path.trim()
+  ) {
     throw new Error("DESKTOP_SHARED_PATH_REQUIRED");
   }
 
-  const rootPath = path.resolve(config.shared_data_path);
-  return cachedStore(cacheKey, rootPath);
+  const cheminRacine = path.resolve(
+    configuration.shared_data_path,
+  );
+  return cachedStore(cleCache, cheminRacine);
 }
