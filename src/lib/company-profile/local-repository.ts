@@ -13,11 +13,7 @@ export function createLocalCompanyProfileRepository(): CompanyProfileRepository 
     },
 
     async replace(profil: CompanyProfile) {
-      const sauvegarde = await replaceLocalSnapshot(
-        RESOURCE_KEY,
-        parseCompanyProfile,
-        profil,
-      );
+      const sauvegarde = await replaceLocalSnapshot(RESOURCE_KEY, parseCompanyProfile, profil);
       return sauvegarde.payload;
     },
   };

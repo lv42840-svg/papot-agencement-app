@@ -32,8 +32,7 @@ export function calculateDashboardSoldSummary(
     month: "2-digit",
   }).formatToParts(maintenant);
   const annee = parties.find((partie) => partie.type === "year")?.value ?? "";
-  const mois =
-    annee + "-" + (parties.find((partie) => partie.type === "month")?.value ?? "");
+  const mois = annee + "-" + (parties.find((partie) => partie.type === "month")?.value ?? "");
   const devisParId = new Map(devis.map((unDevis) => [unDevis.id, unDevis]));
   const formatDateParis = new Intl.DateTimeFormat("en-CA", {
     timeZone: "Europe/Paris",
@@ -56,17 +55,14 @@ export function calculateDashboardSoldSummary(
       const valeursDate = Object.fromEntries(
         partiesDate.map((partie) => [partie.type, partie.value]),
       );
-      const date =
-        valeursDate.year + "-" + valeursDate.month + "-" + valeursDate.day;
+      const date = valeursDate.year + "-" + valeursDate.month + "-" + valeursDate.day;
       if (!date.startsWith(periode)) continue;
       affairesConfirmees += 1;
 
       const devisRetenus = affaire.retainedQuoteIds.map((id) => devisParId.get(id));
       if (
         devisRetenus.length === 0 ||
-        devisRetenus.some(
-          (unDevis) => !unDevis || unDevis.commercialCaseId !== affaire.id,
-        )
+        devisRetenus.some((unDevis) => !unDevis || unDevis.commercialCaseId !== affaire.id)
       ) {
         venduComplet = false;
         margeComplete = false;
@@ -75,9 +71,7 @@ export function calculateDashboardSoldSummary(
       }
 
       const resume = calculateCommercialContractSummary(
-        devisRetenus.filter(
-          (unDevis): unDevis is NativeQuoteRecord => Boolean(unDevis),
-        ),
+        devisRetenus.filter((unDevis): unDevis is NativeQuoteRecord => Boolean(unDevis)),
         affaire.retainedQuoteIds,
       );
       venduCentimes += resume.totalHtCents;
@@ -90,8 +84,7 @@ export function calculateDashboardSoldSummary(
 
     return {
       soldCents: venduComplet ? venduCentimes : null,
-      plannedMarginCents:
-        margeComplete && venduComplet ? margePrevueCentimes : null,
+      plannedMarginCents: margeComplete && venduComplet ? margePrevueCentimes : null,
       confirmedCases: affairesConfirmees,
       incompleteCases: affairesIncompletes,
     };
