@@ -3,24 +3,39 @@ import "server-only";
 import { createHash, randomUUID } from "node:crypto";
 import { cookies } from "next/headers";
 import { redirect } from "next/navigation";
-import { mutateAuthPayload, readAuthPayload, readSessionIdentity } from "@/lib/auth/store";
+import {
+  mutateAuthPayload,
+  readAuthPayload,
+  readSessionIdentity,
+} from "@/lib/auth/store";
 import { newSessionToken } from "@/lib/auth/session-token";
 
 const cookieName = process.env.SESSION_COOKIE_NAME ?? "papot_session";
 
-function tokenHash(token: string) {
-  return createHash("sha256").update(token).digest("hex");
+function tokenHash(jeton: string) {
+  return createHash("sha256").update(jeton).digest("hex");
 }
 
-function desktopDeviceIdentity(): { deviceId: string | null; deviceLabel: string | null } {
-  const raw = process.env.PAPOT_DESKTOP_CONFIG_JSON;
-  if (!raw) return { deviceId: null, deviceLabel: null };
+function desktopDeviceIdentity(): {
+  deviceId: string | null;
+  deviceLabel: string | null;
+} {
+  const brut = process.env.PAPOT_DESKTOP_CONFIG_JSON;
+  if (!brut) return { deviceId: null, deviceLabel: null };
   try {
-    const parsed = JSON.parse(raw) as { device_id?: unknown; device_label?: unknown };
+    const donnees = JSON.parse(brut) as {
+      device_id?: unknown;
+      device_label?: unknown;
+    };
     return {
-      deviceId: typeof parsed.device_id === "string" && parsed.device_id ? parsed.device_id : null,
+      deviceId:
+        typeof donnees.device_id === "string" && donnees.device_id
+          ? donnees.device_id
+          : null,
       deviceLabel:
-        typeof parsed.device_label === "string" && parsed.device_label ? parsed.device_label : null,
+        typeof donnees.device_label === "string" && donnees.device_label
+          ? donnees.device_label
+          : null,
     };
   } catch {
     return { deviceId: null, deviceLabel: null };
@@ -38,30 +53,32 @@ export type CurrentUser = {
   mustChangePassword: boolean;
 };
 
-export async function setSessionCookie(token: string, expiresAt: Date) {
-  const store = await cookies();
-  store.set(cookieName, token, {
+export async function setSessionCookie(jeton: string, expiration: Date) {
+  const cookiesServeur = await cookies();
+  cookiesServeur.set(cookieName, jeton, {
     httpOnly: true,
     sameSite: "lax",
     secure: process.env.NODE_ENV === "production",
     path: "/",
-    expires: expiresAt,
+    expires: expiration,
   });
 }
 
-export async function createSession(userId: string) {
+export async function createSession(idUtilisateur: string) {
   const session = newSessionToken();
-  const device = desktopDeviceIdentity();
+  const appareil = desktopDeviceIdentity();
 
-  await mutateAuthPayload(userId, (payload) => {
-    const user = payload.users.find((candidate) => candidate.id === userId && candidate.isActive);
-    if (!user) throw new Error("AUTH_USER_NOT_FOUND");
-    payload.sessions.push({
+  await mutateAuthPayload(idUtilisateur, (donnees) => {
+    const utilisateur = donnees.users.find(
+      (candidat) => candidat.id === idUtilisateur && candidat.isActive,
+    );
+    if (!utilisateur) throw new Error("AUTH_USER_NOT_FOUND");
+    donnees.sessions.push({
       id: randomUUID(),
       tokenHash: session.tokenHash,
-      userId,
-      deviceId: device.deviceId,
-      deviceLabel: device.deviceLabel,
+      userId: idUtilisateur,
+      deviceId: appareil.deviceId,
+      deviceLabel: appareil.deviceLabel,
       createdAt: session.createdAt.toISOString(),
       expiresAt: session.expiresAt.toISOString(),
     });
@@ -71,37 +88,43 @@ export async function createSession(userId: string) {
 }
 
 export async function destroySession() {
-  const store = await cookies();
-  const token = store.get(cookieName)?.value;
-  if (token) {
-    const hash = tokenHash(token);
-    const payload = await readAuthPayload();
-    const session = payload.sessions.find((candidate) => candidate.tokenHash === hash);
+  const cookiesServeur = await cookies();
+  const jeton = cookiesServeur.get(cookieName)?.value;
+  if (jeton) {
+    const empreinte = tokenHash(jeton);
+    const donnees = await readAuthPayload();
+    const session = donnees.sessions.find(
+      (candidat) => candidat.tokenHash === empreinte,
+    );
     if (session) {
-      await mutateAuthPayload(session.userId, (draft) => {
-        draft.sessions = draft.sessions.filter((candidate) => candidate.tokenHash !== hash);
+      await mutateAuthPayload(session.userId, (brouillon) => {
+        brouillon.sessions = brouillon.sessions.filter(
+          (candidat) => candidat.tokenHash !== empreinte,
+        );
       });
     }
   }
-  store.delete(cookieName);
+  cookiesServeur.delete(cookieName);
 }
 
-export async function destroyAllSessionsForUser(userId: string) {
-  await mutateAuthPayload(userId, (payload) => {
-    payload.sessions = payload.sessions.filter((session) => session.userId !== userId);
+export async function destroyAllSessionsForUser(idUtilisateur: string) {
+  await mutateAuthPayload(idUtilisateur, (donnees) => {
+    donnees.sessions = donnees.sessions.filter(
+      (session) => session.userId !== idUtilisateur,
+    );
   });
 }
 
 export async function getCurrentUser(): Promise<CurrentUser | null> {
-  const token = (await cookies()).get(cookieName)?.value;
-  if (!token) return null;
+  const jeton = (await cookies()).get(cookieName)?.value;
+  if (!jeton) return null;
 
-  return readSessionIdentity(tokenHash(token));
+  return readSessionIdentity(tokenHash(jeton));
 }
 
 export async function requireUser(): Promise<CurrentUser> {
-  const user = await getCurrentUser();
-  if (!user) redirect("/login");
-  if (user.mustChangePassword) redirect("/change-password");
-  return user;
+  const utilisateur = await getCurrentUser();
+  if (!utilisateur) redirect("/login");
+  if (utilisateur.mustChangePassword) redirect("/change-password");
+  return utilisateur;
 }

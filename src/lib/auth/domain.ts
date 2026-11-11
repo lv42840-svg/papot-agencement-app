@@ -55,57 +55,71 @@ export function emptyAuthPayload(): AuthPayload {
 }
 
 function normalizedUsernameBase(email: string, id: string): string {
-  const local = email.split("@")[0]?.toLowerCase() ?? "";
-  const cleaned = local.replace(/[^a-z0-9._-]/g, "").replace(/^[._-]+|[._-]+$/g, "");
-  if (cleaned.length >= 3) return cleaned.slice(0, 70);
+  const partieLocale = email.split("@")[0]?.toLowerCase() ?? "";
+  const nettoye = partieLocale
+    .replace(/[^a-z0-9._-]/g, "")
+    .replace(/^[._-]+|[._-]+$/g, "");
+  if (nettoye.length >= 3) return nettoye.slice(0, 70);
   return `user-${id.replace(/-/g, "").slice(0, 8)}`;
 }
 
-function ensureUsernames(users: Array<z.infer<typeof storedUserSchema>>): AuthUserRecord[] {
-  const used = new Set<string>();
-  return users.map((user) => {
-    const requested = user.username?.toLowerCase();
+function ensureUsernames(
+  utilisateurs: Array<z.infer<typeof storedUserSchema>>,
+): AuthUserRecord[] {
+  const nomsUtilises = new Set<string>();
+  return utilisateurs.map((utilisateur) => {
+    const nomDemande = utilisateur.username?.toLowerCase();
     const base =
-      requested && requested.length >= 3 ? requested : normalizedUsernameBase(user.email, user.id);
-    let username = base;
-    let suffix = 2;
-    while (used.has(username.toLowerCase())) {
-      username = `${base.slice(0, Math.max(3, 78 - String(suffix).length))}-${suffix}`;
-      suffix += 1;
+      nomDemande && nomDemande.length >= 3
+        ? nomDemande
+        : normalizedUsernameBase(utilisateur.email, utilisateur.id);
+    let nomUtilisateur = base;
+    let suffixe = 2;
+    while (nomsUtilises.has(nomUtilisateur.toLowerCase())) {
+      nomUtilisateur = `${base.slice(
+        0,
+        Math.max(3, 78 - String(suffixe).length),
+      )}-${suffixe}`;
+      suffixe += 1;
     }
-    used.add(username.toLowerCase());
-    return { ...user, username };
+    nomsUtilises.add(nomUtilisateur.toLowerCase());
+    return { ...utilisateur, username: nomUtilisateur };
   });
 }
 
-function preserveLegacyFullAccess(payload: AuthPayload): void {
-  const legacyModuleKeys = MODULE_PERMISSIONS.map((module) => module.key).filter(
-    (moduleKey) => moduleKey !== "clients",
+function preserveLegacyFullAccess(donnees: AuthPayload): void {
+  const clesModulesHistoriques = MODULE_PERMISSIONS.map((module) => module.key).filter(
+    (cleModule) => cleModule !== "clients",
   );
 
-  for (const user of payload.users) {
-    if (user.modulePermissions.clients) continue;
-    const hadFullWriteAccess = legacyModuleKeys.every(
-      (moduleKey) => user.modulePermissions[moduleKey] === "WRITE",
+  for (const utilisateur of donnees.users) {
+    if (utilisateur.modulePermissions.clients) continue;
+    const avaitAccesComplet = clesModulesHistoriques.every(
+      (cleModule) => utilisateur.modulePermissions[cleModule] === "WRITE",
     );
-    if (hadFullWriteAccess) user.modulePermissions.clients = "WRITE";
+    if (avaitAccesComplet) utilisateur.modulePermissions.clients = "WRITE";
   }
 }
 
-export function parseAuthPayload(value: unknown): AuthPayload {
-  if (value == null) return emptyAuthPayload();
-  const parsed = storedAuthPayloadSchema.safeParse(value);
-  if (!parsed.success) throw new Error("AUTH_STORE_INVALID");
-  const payload: AuthPayload = {
+export function parseAuthPayload(valeur: unknown): AuthPayload {
+  if (valeur == null) return emptyAuthPayload();
+  const analyse = storedAuthPayloadSchema.safeParse(valeur);
+  if (!analyse.success) throw new Error("AUTH_STORE_INVALID");
+  const donnees: AuthPayload = {
     schemaVersion: 1,
-    users: ensureUsernames(parsed.data.users),
-    sessions: parsed.data.sessions,
+    users: ensureUsernames(analyse.data.users),
+    sessions: analyse.data.sessions,
   };
-  preserveLegacyFullAccess(payload);
-  return payload;
+  preserveLegacyFullAccess(donnees);
+  return donnees;
 }
 
-export function pruneExpiredSessions(payload: AuthPayload, now = new Date()): void {
-  const cutoff = now.getTime();
-  payload.sessions = payload.sessions.filter((session) => Date.parse(session.expiresAt) > cutoff);
+export function pruneExpiredSessions(
+  donnees: AuthPayload,
+  maintenant = new Date(),
+): void {
+  const limite = maintenant.getTime();
+  donnees.sessions = donnees.sessions.filter(
+    (session) => Date.parse(session.expiresAt) > limite,
+  );
 }

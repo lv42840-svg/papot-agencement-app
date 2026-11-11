@@ -1,10 +1,17 @@
 import { readSessionIdentityFromDb, readUserPermissionsFromDb } from "./read-model";
 import "server-only";
 
-import { isLocalStorageMode, mutateLocalSnapshot, readLocalSnapshot } from "../local-db/runtime";
+import {
+  isLocalStorageMode,
+  mutateLocalSnapshot,
+  readLocalSnapshot,
+} from "../local-db/runtime";
 import { getServerDbPool, runServerDbMigrations } from "../server-db";
 import { parseAuthPayload, pruneExpiredSessions, type AuthPayload } from "./domain";
-import { createPostgresAuthRepository, type PostgresAuthRepository } from "./postgres-repository";
+import {
+  createPostgresAuthRepository,
+  type PostgresAuthRepository,
+} from "./postgres-repository";
 
 const LOCAL_AUTH_RESOURCE = "auth";
 let repositoryPromise: Promise<PostgresAuthRepository> | undefined;
@@ -17,9 +24,9 @@ async function initializeAuthRepository(): Promise<PostgresAuthRepository> {
 
 async function getAuthRepository(): Promise<PostgresAuthRepository> {
   if (!repositoryPromise) {
-    repositoryPromise = initializeAuthRepository().catch((error: unknown) => {
+    repositoryPromise = initializeAuthRepository().catch((erreur: unknown) => {
       repositoryPromise = undefined;
-      throw error;
+      throw erreur;
     });
   }
   return repositoryPromise;
@@ -27,72 +34,86 @@ async function getAuthRepository(): Promise<PostgresAuthRepository> {
 
 export async function readAuthPayload(): Promise<AuthPayload> {
   if (isLocalStorageMode()) {
-    const payload = readLocalSnapshot(LOCAL_AUTH_RESOURCE, parseAuthPayload).payload;
-    pruneExpiredSessions(payload);
-    return payload;
+    const donnees = readLocalSnapshot(LOCAL_AUTH_RESOURCE, parseAuthPayload).payload;
+    pruneExpiredSessions(donnees);
+    return donnees;
   }
 
-  const repository = await getAuthRepository();
-  const payload = await repository.load();
-  pruneExpiredSessions(payload);
-  return payload;
+  const depot = await getAuthRepository();
+  const donnees = await depot.load();
+  pruneExpiredSessions(donnees);
+  return donnees;
 }
 
 export async function mutateAuthPayload<T>(
-  actorUserId: string,
-  mutate: (payload: AuthPayload) => T | Promise<T>,
+  idUtilisateurAuteur: string,
+  modifier: (donnees: AuthPayload) => T | Promise<T>,
 ): Promise<{ payload: AuthPayload; result: T }> {
-  void actorUserId;
+  void idUtilisateurAuteur;
 
   if (isLocalStorageMode()) {
-    return mutateLocalSnapshot(LOCAL_AUTH_RESOURCE, parseAuthPayload, async ({ payload }) => {
-      const next = structuredClone(payload);
-      pruneExpiredSessions(next);
-      const result = await mutate(next);
-      return {
-        payload: next,
-        result: { payload: next, result },
-      };
-    });
+    return mutateLocalSnapshot(
+      LOCAL_AUTH_RESOURCE,
+      parseAuthPayload,
+      async ({ payload: donnees }) => {
+        const donneesSuivantes = structuredClone(donnees);
+        pruneExpiredSessions(donneesSuivantes);
+        const resultat = await modifier(donneesSuivantes);
+        return {
+          payload: donneesSuivantes,
+          result: { payload: donneesSuivantes, result: resultat },
+        };
+      },
+    );
   }
 
-  const repository = await getAuthRepository();
-  return repository.mutate(mutate);
+  const depot = await getAuthRepository();
+  return depot.mutate(modifier);
 }
 
 export async function authHasUsers(): Promise<boolean> {
   return (await readAuthPayload()).users.length > 0;
 }
 
-export async function readSessionIdentity(hash: string) {
+export async function readSessionIdentity(empreinte: string) {
   if (!isLocalStorageMode()) {
     await getAuthRepository();
-    return readSessionIdentityFromDb(getServerDbPool(), hash);
+    return readSessionIdentityFromDb(getServerDbPool(), empreinte);
   }
-  const payload = await readAuthPayload();
-  const session = payload.sessions.find(
-    (row) => row.tokenHash === hash && Date.parse(row.expiresAt) > Date.now(),
+  const donnees = await readAuthPayload();
+  const session = donnees.sessions.find(
+    (ligne) =>
+      ligne.tokenHash === empreinte && Date.parse(ligne.expiresAt) > Date.now(),
   );
-  const user = session && payload.users.find((row) => row.id === session.userId && row.isActive);
-  if (!user) return null;
+  const utilisateur =
+    session &&
+    donnees.users.find(
+      (ligne) => ligne.id === session.userId && ligne.isActive,
+    );
+  if (!utilisateur) return null;
   return {
-    id: user.id,
-    username: user.username,
-    displayName: user.displayName,
-    email: user.email,
-    accentKey: user.accentKey,
-    planningPotentialCollapsed: user.planningPotentialCollapsed ?? false,
-    canManagePermissions: user.canManagePermissions,
-    mustChangePassword: user.mustChangePassword,
+    id: utilisateur.id,
+    username: utilisateur.username,
+    displayName: utilisateur.displayName,
+    email: utilisateur.email,
+    accentKey: utilisateur.accentKey,
+    planningPotentialCollapsed: utilisateur.planningPotentialCollapsed ?? false,
+    canManagePermissions: utilisateur.canManagePermissions,
+    mustChangePassword: utilisateur.mustChangePassword,
   };
 }
-export async function readUserPermissions(userId: string) {
+export async function readUserPermissions(idUtilisateur: string) {
   if (!isLocalStorageMode()) {
     await getAuthRepository();
-    return readUserPermissionsFromDb(getServerDbPool(), userId);
+    return readUserPermissionsFromDb(getServerDbPool(), idUtilisateur);
   }
-  const user = (await readAuthPayload()).users.find((row) => row.id === userId && row.isActive);
-  return user
-    ? { modulePermissions: user.modulePermissions, specialPermissions: user.specialPermissions }
+  const utilisateur = (await readAuthPayload()).users.find(
+    (ligne) => ligne.id === idUtilisateur && ligne.isActive,
+  );
+  return utilisateur
+    ? {
+        modulePermissions: utilisateur.modulePermissions,
+        specialPermissions: utilisateur.specialPermissions,
+      }
     : null;
 }
