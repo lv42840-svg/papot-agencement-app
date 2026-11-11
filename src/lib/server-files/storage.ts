@@ -13,25 +13,17 @@ export type ServerFileWriteResult = {
 };
 
 function errorCode(erreur: unknown): string | undefined {
-  return typeof erreur === "object" &&
-    erreur !== null &&
-    "code" in erreur
+  return typeof erreur === "object" && erreur !== null && "code" in erreur
     ? String((erreur as { code?: unknown }).code ?? "")
     : undefined;
 }
 
-export function normalizeServerStoragePath(
-  valeur: string,
-): string {
+export function normalizeServerStoragePath(valeur: string): string {
   if (typeof valeur !== "string") {
     throw new Error("SERVER_FILE_PATH_INVALID");
   }
   const normalise = valeur.trim().replace(/\\/g, "/");
-  if (
-    !normalise ||
-    normalise.startsWith("/") ||
-    /^[A-Za-z]:/.test(normalise)
-  ) {
+  if (!normalise || normalise.startsWith("/") || /^[A-Za-z]:/.test(normalise)) {
     throw new Error("SERVER_FILE_PATH_INVALID");
   }
 
@@ -53,19 +45,14 @@ export function normalizeServerStoragePath(
 }
 
 export function sha256Bytes(octets: Uint8Array): string {
-  return createHash("sha256")
-    .update(octets)
-    .digest("hex");
+  return createHash("sha256").update(octets).digest("hex");
 }
 
 export class ServerFileStore {
   readonly rootPath: string;
 
   constructor(cheminRacine: string) {
-    if (
-      typeof cheminRacine !== "string" ||
-      !cheminRacine.trim()
-    ) {
+    if (typeof cheminRacine !== "string" || !cheminRacine.trim()) {
       throw new Error("SERVER_FILE_ROOT_REQUIRED");
     }
     if (!path.isAbsolute(cheminRacine)) {
@@ -74,21 +61,11 @@ export class ServerFileStore {
     this.rootPath = path.resolve(cheminRacine);
   }
 
-  private resolve(
-    cheminStockage: string,
-  ): { logical: string; absolute: string } {
-    const logique =
-      normalizeServerStoragePath(cheminStockage);
-    const absolu = path.resolve(
-      this.rootPath,
-      ...logique.split("/"),
-    );
+  private resolve(cheminStockage: string): { logical: string; absolute: string } {
+    const logique = normalizeServerStoragePath(cheminStockage);
+    const absolu = path.resolve(this.rootPath, ...logique.split("/"));
     const relatif = path.relative(this.rootPath, absolu);
-    if (
-      !relatif ||
-      relatif.startsWith("..") ||
-      path.isAbsolute(relatif)
-    ) {
+    if (!relatif || relatif.startsWith("..") || path.isAbsolute(relatif)) {
       throw new Error("SERVER_FILE_PATH_INVALID");
     }
     return { logical: logique, absolute: absolu };
@@ -96,27 +73,19 @@ export class ServerFileStore {
 
   async assertReady(): Promise<void> {
     try {
-      await fs.access(
-        this.rootPath,
-        constants.R_OK | constants.W_OK,
-      );
+      await fs.access(this.rootPath, constants.R_OK | constants.W_OK);
     } catch {
       throw new Error("SERVER_FILE_ROOT_UNAVAILABLE");
     }
   }
 
-  async writeBytes(
-    cheminStockage: string,
-    octets: Uint8Array,
-  ): Promise<ServerFileWriteResult> {
+  async writeBytes(cheminStockage: string, octets: Uint8Array): Promise<ServerFileWriteResult> {
     const cible = this.resolve(cheminStockage);
     await fs.mkdir(path.dirname(cible.absolute), {
       recursive: true,
     });
 
-    let fichierOuvert:
-      | Awaited<ReturnType<typeof fs.open>>
-      | undefined;
+    let fichierOuvert: Awaited<ReturnType<typeof fs.open>> | undefined;
     let cree = false;
     try {
       fichierOuvert = await fs.open(cible.absolute, "wx");
@@ -128,13 +97,9 @@ export class ServerFileStore {
         throw new Error("SERVER_FILE_EXISTS");
       }
       if (cree) {
-        await fichierOuvert
-          ?.close()
-          .catch(() => undefined);
+        await fichierOuvert?.close().catch(() => undefined);
         fichierOuvert = undefined;
-        await fs
-          .unlink(cible.absolute)
-          .catch(() => undefined);
+        await fs.unlink(cible.absolute).catch(() => undefined);
       }
       throw erreur;
     } finally {
@@ -148,10 +113,7 @@ export class ServerFileStore {
     };
   }
 
-  async readBytes(
-    cheminStockage: string,
-    sha256Attendu?: string,
-  ): Promise<Buffer> {
+  async readBytes(cheminStockage: string, sha256Attendu?: string): Promise<Buffer> {
     const cible = this.resolve(cheminStockage);
     let octets: Buffer;
     try {
@@ -163,18 +125,13 @@ export class ServerFileStore {
       throw erreur;
     }
 
-    if (
-      sha256Attendu &&
-      sha256Bytes(octets) !== sha256Attendu.toLowerCase()
-    ) {
+    if (sha256Attendu && sha256Bytes(octets) !== sha256Attendu.toLowerCase()) {
       throw new Error("SERVER_FILE_INTEGRITY_MISMATCH");
     }
     return octets;
   }
 
-  async deleteFile(
-    cheminStockage: string,
-  ): Promise<boolean> {
+  async deleteFile(cheminStockage: string): Promise<boolean> {
     const cible = this.resolve(cheminStockage);
     try {
       await fs.unlink(cible.absolute);

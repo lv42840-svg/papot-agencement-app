@@ -28,8 +28,6 @@ export const accentPalette = {
 
 export type AccentKey = keyof typeof accentPalette;
 
-export function isAccentKey(
-  valeur: string,
-): valeur is AccentKey {
+export function isAccentKey(valeur: string): valeur is AccentKey {
   return valeur in accentPalette;
 }

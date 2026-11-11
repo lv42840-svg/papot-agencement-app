@@ -1,9 +1,6 @@
 import "server-only";
 
-import {
-  mutateLocalSnapshot,
-  readLocalSnapshot,
-} from "@/lib/local-db/runtime";
+import { mutateLocalSnapshot, readLocalSnapshot } from "@/lib/local-db/runtime";
 import { parsePlanningPayload } from "./domain";
 import type { PlanningRepository } from "./repository";
 
@@ -12,10 +9,7 @@ const RESOURCE_KEY = "planning";
 export function createLocalPlanningRepository(): PlanningRepository {
   return {
     async load() {
-      return readLocalSnapshot(
-        RESOURCE_KEY,
-        parsePlanningPayload,
-      ).payload;
+      return readLocalSnapshot(RESOURCE_KEY, parsePlanningPayload).payload;
     },
 
     async mutate(transformation) {
@@ -24,9 +18,7 @@ export function createLocalPlanningRepository(): PlanningRepository {
         parsePlanningPayload,
         async ({ payload: donnees }) => {
           const donneesSuivantes = parsePlanningPayload(
-            await transformation(
-              structuredClone(donnees),
-            ),
+            await transformation(structuredClone(donnees)),
           );
           return {
             payload: donneesSuivantes,

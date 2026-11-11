@@ -16,8 +16,7 @@ export function getServerDbPool(): Pool {
       connectionString: configuration.connectionString,
       application_name: configuration.applicationName,
       max: configuration.maxConnections,
-      connectionTimeoutMillis:
-        configuration.connectionTimeoutMillis,
+      connectionTimeoutMillis: configuration.connectionTimeoutMillis,
       idleTimeoutMillis: configuration.idleTimeoutMillis,
     });
   }

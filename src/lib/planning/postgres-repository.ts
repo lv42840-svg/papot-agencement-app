@@ -11,17 +11,12 @@ type PlanningStateRow = {
   payload: unknown;
 };
 
-type Queryable =
-  | Pick<Pool, "query">
-  | Pick<PoolClient, "query">;
+type Queryable = Pick<Pool, "query"> | Pick<PoolClient, "query">;
 
-async function loadState(
-  sourceRequete: Queryable,
-): Promise<PlanningStateRow> {
-  const resultat =
-    await sourceRequete.query<PlanningStateRow>(
-      "SELECT version, payload FROM papot_planning_state WHERE scope = 'global'",
-    );
+async function loadState(sourceRequete: Queryable): Promise<PlanningStateRow> {
+  const resultat = await sourceRequete.query<PlanningStateRow>(
+    "SELECT version, payload FROM papot_planning_state WHERE scope = 'global'",
+  );
   const ligne = resultat.rows[0];
   if (!ligne) {
     throw new Error("PLANNING_STORAGE_NOT_INITIALIZED");
@@ -40,28 +35,21 @@ export function createPostgresPlanningRepository(
 
     async mutate(transformation) {
       return withServerDbTransaction(async (client) => {
-        const verrouillage =
-          await client.query<PlanningStateRow>(
-            `
+        const verrouillage = await client.query<PlanningStateRow>(
+          `
             SELECT version, payload
             FROM papot_planning_state
             WHERE scope = 'global'
             FOR UPDATE
           `,
-          );
+        );
         const ligne = verrouillage.rows[0];
         if (!ligne) {
-          throw new Error(
-            "PLANNING_STORAGE_NOT_INITIALIZED",
-          );
+          throw new Error("PLANNING_STORAGE_NOT_INITIALIZED");
         }
 
         const donneesSuivantes = parsePlanningPayload(
-          await transformation(
-            structuredClone(
-              parsePlanningPayload(ligne.payload),
-            ),
-          ),
+          await transformation(structuredClone(parsePlanningPayload(ligne.payload))),
         );
 
         const sauvegarde = await client.query<{
@@ -80,9 +68,7 @@ export function createPostgresPlanningRepository(
         if (sauvegarde.rowCount === 0) {
           throw new Error("PLANNING_VERSION_CONFLICT");
         }
-        return parsePlanningPayload(
-          sauvegarde.rows[0]?.payload,
-        );
+        return parsePlanningPayload(sauvegarde.rows[0]?.payload);
       }, pool);
     },
   };

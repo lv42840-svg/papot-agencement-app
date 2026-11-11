@@ -3,10 +3,7 @@ import "server-only";
 import type { Pool } from "pg";
 import { getServerDbPool } from "@/lib/server-db/pool";
 import { withServerDbTransaction } from "@/lib/server-db/transaction";
-import {
-  parseQuoteEmailSettings,
-  type QuoteEmailSettings,
-} from "./domain";
+import { parseQuoteEmailSettings, type QuoteEmailSettings } from "./domain";
 import type { QuoteEmailSettingsRepository } from "./repository";
 
 type Row = { payload: unknown };
@@ -21,16 +18,13 @@ export function createPostgresQuoteEmailSettingsRepository(
       );
       const ligne = resultat.rows[0];
       if (!ligne) {
-        throw new Error(
-          "QUOTE_EMAIL_SETTINGS_STORAGE_NOT_INITIALIZED",
-        );
+        throw new Error("QUOTE_EMAIL_SETTINGS_STORAGE_NOT_INITIALIZED");
       }
       return parseQuoteEmailSettings(ligne.payload);
     },
 
     async replace(parametres: QuoteEmailSettings) {
-      const parametresValides =
-        parseQuoteEmailSettings(parametres);
+      const parametresValides = parseQuoteEmailSettings(parametres);
       return withServerDbTransaction(async (client) => {
         const resultat = await client.query<Row>(
           `
@@ -45,9 +39,7 @@ export function createPostgresQuoteEmailSettingsRepository(
         );
         const ligne = resultat.rows[0];
         if (!ligne) {
-          throw new Error(
-            "QUOTE_EMAIL_SETTINGS_STORAGE_NOT_INITIALIZED",
-          );
+          throw new Error("QUOTE_EMAIL_SETTINGS_STORAGE_NOT_INITIALIZED");
         }
         return parseQuoteEmailSettings(ligne.payload);
       }, pool);

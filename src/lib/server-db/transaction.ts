@@ -25,9 +25,7 @@ export async function withServerDbTransaction<T>(
   const contexte = { client, pool, failed: false };
   try {
     await client.query("BEGIN");
-    const resultat = await active.run(contexte, () =>
-      rappel(client),
-    );
+    const resultat = await active.run(contexte, () => rappel(client));
     if (contexte.failed) throw new Error("TRANSACTION_ABORTED");
     await client.query("COMMIT");
     return resultat;
