@@ -34,7 +34,7 @@ export function newPasswordSetupToken(ttlMinutes = 60) {
   };
 }
 
-export async function createPasswordSetupToken(input: {
+export async function createPasswordSetupToken(saisie: {
   userId: string;
   tokenHash: string;
   purpose: SetupPurpose;
@@ -42,22 +42,22 @@ export async function createPasswordSetupToken(input: {
   expiresAt: Date;
 }): Promise<void> {
   if (isLocalStorageMode()) {
-    for (const value of localTokens.values()) {
-      if (value.userId === input.userId && !value.used) value.used = true;
+    for (const valeur of localTokens.values()) {
+      if (valeur.userId === saisie.userId && !valeur.used) valeur.used = true;
     }
-    localTokens.set(input.tokenHash, {
-      userId: input.userId,
-      tokenHash: input.tokenHash,
-      purpose: input.purpose,
-      createdByUserId: input.createdByUserId ?? null,
-      expiresAt: input.expiresAt.getTime(),
+    localTokens.set(saisie.tokenHash, {
+      userId: saisie.userId,
+      tokenHash: saisie.tokenHash,
+      purpose: saisie.purpose,
+      createdByUserId: saisie.createdByUserId ?? null,
+      expiresAt: saisie.expiresAt.getTime(),
       used: false,
     });
-    await mutateAuthPayload(input.createdByUserId ?? input.userId, (payload) => {
-      const user = payload.users.find((candidate) => candidate.id === input.userId);
-      if (!user) throw new Error("USER_NOT_FOUND");
-      user.mustChangePassword = true;
-      payload.sessions = payload.sessions.filter((session) => session.userId !== input.userId);
+    await mutateAuthPayload(saisie.createdByUserId ?? saisie.userId, (contenu) => {
+      const utilisateur = contenu.users.find((candidat) => candidat.id === saisie.userId);
+      if (!utilisateur) throw new Error("USER_NOT_FOUND");
+      utilisateur.mustChangePassword = true;
+      contenu.sessions = contenu.sessions.filter((session) => session.userId !== saisie.userId);
     });
     return;
   }
@@ -69,7 +69,7 @@ export async function createPasswordSetupToken(input: {
       `UPDATE papot_auth_password_setup_tokens
        SET used_at = NOW()
        WHERE user_id = $1 AND used_at IS NULL`,
-      [input.userId],
+      [saisie.userId],
     );
     await client.query(
       `INSERT INTO papot_auth_password_setup_tokens
@@ -77,46 +77,46 @@ export async function createPasswordSetupToken(input: {
        VALUES ($1, $2, $3, $4, $5, $6)`,
       [
         randomUUID(),
-        input.userId,
-        input.tokenHash,
-        input.purpose,
-        input.createdByUserId ?? null,
-        input.expiresAt,
+        saisie.userId,
+        saisie.tokenHash,
+        saisie.purpose,
+        saisie.createdByUserId ?? null,
+        saisie.expiresAt,
       ],
     );
-    await client.query("DELETE FROM papot_auth_sessions WHERE user_id = $1", [input.userId]);
+    await client.query("DELETE FROM papot_auth_sessions WHERE user_id = $1", [saisie.userId]);
     const updated = await client.query(
       "UPDATE papot_auth_users SET must_change_password = TRUE WHERE id = $1",
-      [input.userId],
+      [saisie.userId],
     );
     if (updated.rowCount !== 1) throw new Error("USER_NOT_FOUND");
   });
 }
 
-export async function consumePasswordSetupToken(input: {
+export async function consumePasswordSetupToken(saisie: {
   tokenHash: string;
   password: string;
 }): Promise<{ userId: string; username: string } | null> {
-  const passwordHash = await hashPassword(input.password);
+  const passwordHash = await hashPassword(saisie.password);
 
   if (isLocalStorageMode()) {
-    const token = localTokens.get(input.tokenHash);
+    const token = localTokens.get(saisie.tokenHash);
     if (!token || token.used || token.expiresAt <= Date.now()) return null;
-    const payload = await readAuthPayload();
-    const existing = payload.users.find(
-      (candidate) => candidate.id === token.userId && candidate.isActive,
+    const contenu = await readAuthPayload();
+    const existing = contenu.users.find(
+      (candidat) => candidat.id === token.userId && candidat.isActive,
     );
     if (!existing) return null;
     token.used = true;
-    for (const value of localTokens.values()) {
-      if (value.userId === token.userId) value.used = true;
+    for (const valeur of localTokens.values()) {
+      if (valeur.userId === token.userId) valeur.used = true;
     }
-    await mutateAuthPayload(token.userId, (draft) => {
-      const user = draft.users.find((candidate) => candidate.id === token.userId);
-      if (!user || !user.isActive) throw new Error("AUTH_USER_NOT_FOUND");
-      user.passwordHash = passwordHash;
-      user.mustChangePassword = false;
-      draft.sessions = draft.sessions.filter((session) => session.userId !== token.userId);
+    await mutateAuthPayload(token.userId, (brouillon) => {
+      const utilisateur = brouillon.users.find((candidat) => candidat.id === token.userId);
+      if (!utilisateur || !utilisateur.isActive) throw new Error("AUTH_USER_NOT_FOUND");
+      utilisateur.passwordHash = passwordHash;
+      utilisateur.mustChangePassword = false;
+      brouillon.sessions = brouillon.sessions.filter((session) => session.userId !== token.userId);
     });
     return { userId: existing.id, username: existing.username };
   }
@@ -124,7 +124,7 @@ export async function consumePasswordSetupToken(input: {
   await runServerDbMigrations();
   return withServerDbTransaction(async (client) => {
     await lockAuthMutation(client);
-    const result = await client.query<{
+    const resultat = await client.query<{
       user_id: string;
       username: string;
     }>(
@@ -136,24 +136,26 @@ export async function consumePasswordSetupToken(input: {
          AND token.expires_at > NOW()
          AND users.is_active = TRUE
        FOR UPDATE`,
-      [input.tokenHash],
+      [saisie.tokenHash],
     );
-    const row = result.rows[0];
-    if (!row) return null;
+    const ligneTableau = resultat.rows[0];
+    if (!ligneTableau) return null;
 
     await client.query(
       `UPDATE papot_auth_users
        SET password_hash = $2, must_change_password = FALSE
        WHERE id = $1`,
-      [row.user_id, passwordHash],
+      [ligneTableau.user_id, passwordHash],
     );
     await client.query(
       `UPDATE papot_auth_password_setup_tokens
        SET used_at = NOW()
        WHERE user_id = $1 AND used_at IS NULL`,
-      [row.user_id],
+      [ligneTableau.user_id],
     );
-    await client.query("DELETE FROM papot_auth_sessions WHERE user_id = $1", [row.user_id]);
-    return { userId: row.user_id, username: row.username };
+    await client.query("DELETE FROM papot_auth_sessions WHERE user_id = $1", [
+      ligneTableau.user_id,
+    ]);
+    return { userId: ligneTableau.user_id, username: ligneTableau.username };
   });
 }

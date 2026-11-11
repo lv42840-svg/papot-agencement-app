@@ -10,8 +10,8 @@ export const QUOTE_INLINE_TEXT_COLOR_PRESETS = [
   { label: "Orange", value: "#c2410c" },
 ] as const;
 
-function clamp(value: number, minimum: number, maximum: number): number {
-  return Math.min(Math.max(value, minimum), maximum);
+function clamp(valeur: number, minimum: number, maximum: number): number {
+  return Math.min(Math.max(valeur, minimum), maximum);
 }
 
 function normalizeMarks(
@@ -26,13 +26,13 @@ function normalizeMarks(
       color: mark.color,
     }))
     .filter((mark) => mark.end > mark.start)
-    .sort((left, right) => left.start - right.start || left.end - right.end);
+    .sort((gauche, droite) => gauche.start - droite.start || gauche.end - droite.end);
 
   const merged: QuoteItemTextColorMark[] = [];
   for (const mark of sorted) {
-    const previous = merged.at(-1);
-    if (previous && previous.color === mark.color && previous.end === mark.start) {
-      previous.end = mark.end;
+    const precedent = merged.at(-1);
+    if (precedent && precedent.color === mark.color && precedent.end === mark.start) {
+      precedent.end = mark.end;
       continue;
     }
     merged.push({ ...mark });
@@ -43,30 +43,30 @@ function normalizeMarks(
 export function applyQuoteInlineTextColor(
   textLength: number,
   marks: readonly QuoteItemTextColorMark[],
-  start: number,
-  end: number,
+  debut: number,
+  fin: number,
   color: string | null,
 ): QuoteItemTextColorMark[] {
-  const safeStart = clamp(Math.min(start, end), 0, textLength);
-  const safeEnd = clamp(Math.max(start, end), 0, textLength);
+  const safeStart = clamp(Math.min(debut, fin), 0, textLength);
+  const safeEnd = clamp(Math.max(debut, fin), 0, textLength);
   if (safeEnd <= safeStart) return normalizeMarks(textLength, marks);
 
-  const next: QuoteItemTextColorMark[] = [];
+  const suivant: QuoteItemTextColorMark[] = [];
   for (const mark of normalizeMarks(textLength, marks)) {
     if (mark.end <= safeStart || mark.start >= safeEnd) {
-      next.push(mark);
+      suivant.push(mark);
       continue;
     }
     if (mark.start < safeStart) {
-      next.push({ ...mark, end: safeStart });
+      suivant.push({ ...mark, end: safeStart });
     }
     if (mark.end > safeEnd) {
-      next.push({ ...mark, start: safeEnd });
+      suivant.push({ ...mark, start: safeEnd });
     }
   }
 
-  if (color) next.push({ start: safeStart, end: safeEnd, color });
-  return normalizeMarks(textLength, next);
+  if (color) suivant.push({ start: safeStart, end: safeEnd, color });
+  return normalizeMarks(textLength, suivant);
 }
 
 export type QuoteInlineTextSegment = {
@@ -77,13 +77,13 @@ export type QuoteInlineTextSegment = {
 };
 
 export function buildQuoteInlineTextSegments(
-  text: string,
+  texte: string,
   marks: readonly QuoteItemTextColorMark[],
 ): QuoteInlineTextSegment[] {
-  if (!text) return [];
-  const normalized = normalizeMarks(text.length, marks);
+  if (!texte) return [];
+  const normalized = normalizeMarks(texte.length, marks);
   if (normalized.length === 0) {
-    return [{ start: 0, end: text.length, text, color: null }];
+    return [{ start: 0, end: texte.length, text: texte, color: null }];
   }
 
   const segments: QuoteInlineTextSegment[] = [];
@@ -93,23 +93,23 @@ export function buildQuoteInlineTextSegments(
       segments.push({
         start: cursor,
         end: mark.start,
-        text: text.slice(cursor, mark.start),
+        text: texte.slice(cursor, mark.start),
         color: null,
       });
     }
     segments.push({
       start: mark.start,
       end: mark.end,
-      text: text.slice(mark.start, mark.end),
+      text: texte.slice(mark.start, mark.end),
       color: mark.color,
     });
     cursor = mark.end;
   }
-  if (cursor < text.length) {
+  if (cursor < texte.length) {
     segments.push({
       start: cursor,
-      end: text.length,
-      text: text.slice(cursor),
+      end: texte.length,
+      text: texte.slice(cursor),
       color: null,
     });
   }

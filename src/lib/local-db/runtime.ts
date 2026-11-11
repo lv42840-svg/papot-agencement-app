@@ -18,7 +18,7 @@ type SnapshotMutation<T, R> = {
   persist?: boolean;
 };
 
-type SnapshotParser<T> = (value: unknown) => T;
+type SnapshotParser<T> = (valeur: unknown) => T;
 
 let database: DatabaseSync | undefined;
 let databasePath: string | undefined;
@@ -29,8 +29,8 @@ function resolveDatabasePath(): string {
   return path.join(process.cwd(), ".papot-dev", "papot-local.sqlite");
 }
 
-function ensureLocalSchema(target: DatabaseSync): void {
-  target.exec(`
+function ensureLocalSchema(cible: DatabaseSync): void {
+  cible.exec(`
     CREATE TABLE IF NOT EXISTS local_business_snapshots (
       resource_key TEXT PRIMARY KEY,
       version INTEGER NOT NULL DEFAULT 0 CHECK (version >= 0),
@@ -57,20 +57,20 @@ export function getLocalDatabase(): DatabaseSync {
   return database;
 }
 
-function decodeJson(text: string, errorCode: string): unknown {
+function decodeJson(texte: string, errorCode: string): unknown {
   try {
-    return JSON.parse(text) as unknown;
+    return JSON.parse(texte) as unknown;
   } catch {
     throw new Error(errorCode);
   }
 }
 
 function readSnapshotFromDatabase<T>(
-  target: DatabaseSync,
+  cible: DatabaseSync,
   resourceKey: string,
   parse: SnapshotParser<T>,
 ): LocalSnapshot<T> {
-  const row = target
+  const ligneTableau = cible
     .prepare(
       `
         SELECT version, payload_json
@@ -80,10 +80,10 @@ function readSnapshotFromDatabase<T>(
     )
     .get(resourceKey) as { version: number; payload_json: string } | undefined;
 
-  if (!row) return { version: 0, payload: parse(null) };
+  if (!ligneTableau) return { version: 0, payload: parse(null) };
   return {
-    version: row.version,
-    payload: parse(decodeJson(row.payload_json, "LOCAL_SNAPSHOT_INVALID_JSON")),
+    version: ligneTableau.version,
+    payload: parse(decodeJson(ligneTableau.payload_json, "LOCAL_SNAPSHOT_INVALID_JSON")),
   };
 }
 
@@ -95,14 +95,14 @@ export function readLocalSnapshot<T>(
 }
 
 function persistSnapshot<T>(
-  target: DatabaseSync,
+  cible: DatabaseSync,
   resourceKey: string,
   previousVersion: number,
-  payload: T,
+  contenu: T,
 ): LocalSnapshot<T> {
   const version = previousVersion + 1;
   const updatedAt = new Date().toISOString();
-  target
+  cible
     .prepare(
       `
         INSERT INTO local_business_snapshots (resource_key, version, payload_json, updated_at)
@@ -113,19 +113,19 @@ function persistSnapshot<T>(
           updated_at = excluded.updated_at
       `,
     )
-    .run(resourceKey, version, JSON.stringify(payload), updatedAt);
-  return { version, payload };
+    .run(resourceKey, version, JSON.stringify(contenu), updatedAt);
+  return { version, payload: contenu };
 }
 
 const executeLocalDatabaseWrite = createSerializedReentrantWriteExecutor<DatabaseSync>({
   getTarget: getLocalDatabase,
-  begin: (target) => target.exec("BEGIN IMMEDIATE"),
-  commit: (target) => target.exec("COMMIT"),
-  rollback: (target) => target.exec("ROLLBACK"),
+  begin: (cible) => cible.exec("BEGIN IMMEDIATE"),
+  commit: (cible) => cible.exec("COMMIT"),
+  rollback: (cible) => cible.exec("ROLLBACK"),
 });
 
 export function withLocalDatabaseWrite<T>(
-  work: (target: DatabaseSync) => T | Promise<T>,
+  work: (cible: DatabaseSync) => T | Promise<T>,
 ): Promise<T> {
   return executeLocalDatabaseWrite(work);
 }
@@ -137,12 +137,12 @@ export async function mutateLocalSnapshot<T, R>(
     snapshot: LocalSnapshot<T>,
   ) => SnapshotMutation<T, R> | Promise<SnapshotMutation<T, R>>,
 ): Promise<R> {
-  return withLocalDatabaseWrite(async (target) => {
-    const current = readSnapshotFromDatabase(target, resourceKey, parse);
-    const mutation = await transform(current);
+  return withLocalDatabaseWrite(async (cible) => {
+    const courant = readSnapshotFromDatabase(cible, resourceKey, parse);
+    const mutation = await transform(courant);
     const parsedPayload = parse(mutation.payload);
     if (mutation.persist !== false) {
-      persistSnapshot(target, resourceKey, current.version, parsedPayload);
+      persistSnapshot(cible, resourceKey, courant.version, parsedPayload);
     }
     return mutation.result;
   });
@@ -151,10 +151,10 @@ export async function mutateLocalSnapshot<T, R>(
 export async function replaceLocalSnapshot<T>(
   resourceKey: string,
   parse: SnapshotParser<T>,
-  payload: T,
+  contenu: T,
 ): Promise<LocalSnapshot<T>> {
-  return withLocalDatabaseWrite((target) => {
-    const current = readSnapshotFromDatabase(target, resourceKey, parse);
-    return persistSnapshot(target, resourceKey, current.version, parse(payload));
+  return withLocalDatabaseWrite((cible) => {
+    const courant = readSnapshotFromDatabase(cible, resourceKey, parse);
+    return persistSnapshot(cible, resourceKey, courant.version, parse(contenu));
   });
 }

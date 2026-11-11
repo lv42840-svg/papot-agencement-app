@@ -161,50 +161,50 @@ export type PlanningDeleteAbsenceBatchMutation = Extract<
 
 export function applyPlanningMacroMutation(
   source: PlanningPayload,
-  input: PlanningMacroMutation,
+  saisie: PlanningMacroMutation,
   activeChantierIds: ReadonlySet<string>,
 ): PlanningPayload {
-  if (!activeChantierIds.has(input.chantierId)) {
+  if (!activeChantierIds.has(saisie.chantierId)) {
     throw new Error("PLANNING_CHANTIER_NOT_ACTIVE");
   }
 
-  const payload = structuredClone(parsePlanningPayload(source));
-  const key = allocationKey(input.chantierId, input.activity, input.week);
-  const index = payload.macroAllocations.findIndex(
+  const contenu = structuredClone(parsePlanningPayload(source));
+  const cle = allocationKey(saisie.chantierId, saisie.activity, saisie.week);
+  const indice = contenu.macroAllocations.findIndex(
     (allocation) =>
-      allocationKey(allocation.chantierId, allocation.activity, allocation.week) === key,
+      allocationKey(allocation.chantierId, allocation.activity, allocation.week) === cle,
   );
 
-  if (input.hours === 0) {
-    if (index >= 0) payload.macroAllocations.splice(index, 1);
-    return parsePlanningPayload(payload);
+  if (saisie.hours === 0) {
+    if (indice >= 0) contenu.macroAllocations.splice(indice, 1);
+    return parsePlanningPayload(contenu);
   }
 
-  const next = {
-    chantierId: input.chantierId,
-    activity: input.activity,
-    week: input.week,
-    hours: input.hours,
+  const suivant = {
+    chantierId: saisie.chantierId,
+    activity: saisie.activity,
+    week: saisie.week,
+    hours: saisie.hours,
   };
 
-  if (index >= 0) payload.macroAllocations[index] = next;
-  else payload.macroAllocations.push(next);
+  if (indice >= 0) contenu.macroAllocations[indice] = suivant;
+  else contenu.macroAllocations.push(suivant);
 
-  return parsePlanningPayload(payload);
+  return parsePlanningPayload(contenu);
 }
 
 export function applyPlanningHoursBatchMutation(
   source: PlanningPayload,
-  input: PlanningHoursBatchMutation,
+  saisie: PlanningHoursBatchMutation,
   activeChantierIds: ReadonlySet<string>,
   activeCommercialCaseIds: ReadonlySet<string>,
 ): PlanningPayload {
   // Check every cell before changing anything. The repository commits this payload atomically.
   const seen = new Set<string>();
-  for (const update of input.updates) {
-    const key = [update.kind, update.id, update.activity, update.week].join(":");
-    if (seen.has(key)) throw new Error("PLANNING_BATCH_DUPLICATE_INVALID");
-    seen.add(key);
+  for (const update of saisie.updates) {
+    const cle = [update.kind, update.id, update.activity, update.week].join(":");
+    if (seen.has(cle)) throw new Error("PLANNING_BATCH_DUPLICATE_INVALID");
+    seen.add(cle);
     if (update.kind === "firm" && !activeChantierIds.has(update.id)) {
       throw new Error("PLANNING_CHANTIER_NOT_ACTIVE");
     }
@@ -213,171 +213,172 @@ export function applyPlanningHoursBatchMutation(
     }
   }
 
-  const payload = structuredClone(parsePlanningPayload(source));
+  const contenu = structuredClone(parsePlanningPayload(source));
   const firm = new Map<string, PlanningPayload["macroAllocations"][number]>(
-    payload.macroAllocations.map((item) => [
-      allocationKey(item.chantierId, item.activity, item.week),
-      item,
+    contenu.macroAllocations.map((element) => [
+      allocationKey(element.chantierId, element.activity, element.week),
+      element,
     ]),
   );
   const provisional = new Map<string, PlanningPayload["provisionalAllocations"][number]>(
-    payload.provisionalAllocations.map((item) => [
-      provisionalAllocationKey(item.caseId, item.activity, item.week),
-      item,
+    contenu.provisionalAllocations.map((element) => [
+      provisionalAllocationKey(element.caseId, element.activity, element.week),
+      element,
     ]),
   );
 
-  for (const update of input.updates) {
+  for (const update of saisie.updates) {
     if (update.kind === "firm") {
-      const key = allocationKey(update.id, update.activity, update.week);
-      if (update.hours === 0) firm.delete(key);
+      const cle = allocationKey(update.id, update.activity, update.week);
+      if (update.hours === 0) firm.delete(cle);
       else
-        firm.set(key, {
+        firm.set(cle, {
           chantierId: update.id,
           activity: update.activity,
           week: update.week,
           hours: update.hours,
         });
     } else {
-      const key = provisionalAllocationKey(update.id, update.activity, update.week);
-      if (update.hours === 0) provisional.delete(key);
+      const cle = provisionalAllocationKey(update.id, update.activity, update.week);
+      if (update.hours === 0) provisional.delete(cle);
       else {
-        provisional.set(key, {
+        provisional.set(cle, {
           caseId: update.id,
           activity: update.activity,
           week: update.week,
           hours: update.hours,
         });
-        if (!payload.provisionalOrder.includes(update.id)) {
-          payload.provisionalOrder.unshift(update.id);
+        if (!contenu.provisionalOrder.includes(update.id)) {
+          contenu.provisionalOrder.unshift(update.id);
         }
       }
     }
   }
 
-  payload.macroAllocations = [...firm.values()];
-  payload.provisionalAllocations = [...provisional.values()];
-  return parsePlanningPayload(payload);
+  contenu.macroAllocations = [...firm.values()];
+  contenu.provisionalAllocations = [...provisional.values()];
+  return parsePlanningPayload(contenu);
 }
 
 export function applyPlanningActualHoursMutation(
   source: PlanningPayload,
-  input: PlanningActualHoursMutation,
+  saisie: PlanningActualHoursMutation,
   activeChantierIds: ReadonlySet<string>,
   activeUserIds: ReadonlySet<string>,
 ): PlanningPayload {
-  if (!activeChantierIds.has(input.chantierId)) {
+  if (!activeChantierIds.has(saisie.chantierId)) {
     throw new Error("PLANNING_CHANTIER_NOT_ACTIVE");
   }
-  if (!activeUserIds.has(input.userId)) {
+  if (!activeUserIds.has(saisie.userId)) {
     throw new Error("PLANNING_USER_NOT_ACTIVE");
   }
 
-  const payload = structuredClone(parsePlanningPayload(source));
-  const key = actualHoursKey(input.chantierId, input.userId, input.activity, input.week);
-  const index = payload.actualHours.findIndex(
-    (entry) => actualHoursKey(entry.chantierId, entry.userId, entry.activity, entry.week) === key,
+  const contenu = structuredClone(parsePlanningPayload(source));
+  const cle = actualHoursKey(saisie.chantierId, saisie.userId, saisie.activity, saisie.week);
+  const indice = contenu.actualHours.findIndex(
+    (entree) =>
+      actualHoursKey(entree.chantierId, entree.userId, entree.activity, entree.week) === cle,
   );
 
-  if (input.hours === 0) {
-    if (index >= 0) payload.actualHours.splice(index, 1);
-    return parsePlanningPayload(payload);
+  if (saisie.hours === 0) {
+    if (indice >= 0) contenu.actualHours.splice(indice, 1);
+    return parsePlanningPayload(contenu);
   }
 
-  const next = {
-    chantierId: input.chantierId,
-    userId: input.userId,
-    activity: input.activity,
-    week: input.week,
-    hours: input.hours,
+  const suivant = {
+    chantierId: saisie.chantierId,
+    userId: saisie.userId,
+    activity: saisie.activity,
+    week: saisie.week,
+    hours: saisie.hours,
   };
 
-  if (index >= 0) payload.actualHours[index] = next;
-  else payload.actualHours.push(next);
-  assertCombinedPersonWeekLimit(payload, input.userId, input.week);
+  if (indice >= 0) contenu.actualHours[indice] = suivant;
+  else contenu.actualHours.push(suivant);
+  assertCombinedPersonWeekLimit(contenu, saisie.userId, saisie.week);
 
-  return parsePlanningPayload(payload);
+  return parsePlanningPayload(contenu);
 }
 
 export function applyPlanningChantierOrderMutation(
   source: PlanningPayload,
-  input: PlanningChantierOrderMutation,
+  saisie: PlanningChantierOrderMutation,
   activeChantierIds: ReadonlySet<string>,
 ): PlanningPayload {
-  if (new Set(input.orderedChantierIds).size !== input.orderedChantierIds.length) {
+  if (new Set(saisie.orderedChantierIds).size !== saisie.orderedChantierIds.length) {
     throw new Error("PLANNING_CHANTIER_ORDER_DUPLICATE");
   }
   if (
-    input.orderedChantierIds.length !== activeChantierIds.size ||
-    input.orderedChantierIds.some((chantierId) => !activeChantierIds.has(chantierId))
+    saisie.orderedChantierIds.length !== activeChantierIds.size ||
+    saisie.orderedChantierIds.some((chantierId) => !activeChantierIds.has(chantierId))
   ) {
     throw new Error("PLANNING_CHANTIER_ORDER_INVALID");
   }
 
-  const payload = structuredClone(parsePlanningPayload(source));
-  payload.chantierOrder = [...input.orderedChantierIds];
-  return parsePlanningPayload(payload);
+  const contenu = structuredClone(parsePlanningPayload(source));
+  contenu.chantierOrder = [...saisie.orderedChantierIds];
+  return parsePlanningPayload(contenu);
 }
 
 export function applyPlanningProvisionalMutation(
   source: PlanningPayload,
-  input: PlanningProvisionalMutation,
+  saisie: PlanningProvisionalMutation,
   activeCommercialCaseIds: ReadonlySet<string>,
 ): PlanningPayload {
-  if (!activeCommercialCaseIds.has(input.caseId)) {
+  if (!activeCommercialCaseIds.has(saisie.caseId)) {
     throw new Error("PLANNING_COMMERCIAL_CASE_NOT_ACTIVE");
   }
 
-  const payload = structuredClone(parsePlanningPayload(source));
-  const key = provisionalAllocationKey(input.caseId, input.activity, input.week);
-  const index = payload.provisionalAllocations.findIndex(
+  const contenu = structuredClone(parsePlanningPayload(source));
+  const cle = provisionalAllocationKey(saisie.caseId, saisie.activity, saisie.week);
+  const indice = contenu.provisionalAllocations.findIndex(
     (allocation) =>
-      provisionalAllocationKey(allocation.caseId, allocation.activity, allocation.week) === key,
+      provisionalAllocationKey(allocation.caseId, allocation.activity, allocation.week) === cle,
   );
 
-  if (input.hours === 0) {
-    if (index >= 0) payload.provisionalAllocations.splice(index, 1);
-    return parsePlanningPayload(payload);
+  if (saisie.hours === 0) {
+    if (indice >= 0) contenu.provisionalAllocations.splice(indice, 1);
+    return parsePlanningPayload(contenu);
   }
 
-  const next = {
-    caseId: input.caseId,
-    activity: input.activity,
-    week: input.week,
-    hours: input.hours,
+  const suivant = {
+    caseId: saisie.caseId,
+    activity: saisie.activity,
+    week: saisie.week,
+    hours: saisie.hours,
   };
 
-  if (index >= 0) payload.provisionalAllocations[index] = next;
-  else payload.provisionalAllocations.push(next);
+  if (indice >= 0) contenu.provisionalAllocations[indice] = suivant;
+  else contenu.provisionalAllocations.push(suivant);
 
-  if (!payload.provisionalOrder.includes(input.caseId)) {
-    payload.provisionalOrder = [
-      input.caseId,
-      ...payload.provisionalOrder.filter((candidate) => candidate !== input.caseId),
+  if (!contenu.provisionalOrder.includes(saisie.caseId)) {
+    contenu.provisionalOrder = [
+      saisie.caseId,
+      ...contenu.provisionalOrder.filter((candidat) => candidat !== saisie.caseId),
     ];
   }
 
-  return parsePlanningPayload(payload);
+  return parsePlanningPayload(contenu);
 }
 
 export function applyPlanningPotentialOrderMutation(
   source: PlanningPayload,
-  input: PlanningPotentialOrderMutation,
+  saisie: PlanningPotentialOrderMutation,
   activePotentialCaseIds: ReadonlySet<string>,
 ): PlanningPayload {
-  if (new Set(input.orderedCaseIds).size !== input.orderedCaseIds.length) {
+  if (new Set(saisie.orderedCaseIds).size !== saisie.orderedCaseIds.length) {
     throw new Error("PLANNING_POTENTIAL_ORDER_DUPLICATE");
   }
   if (
-    input.orderedCaseIds.length !== activePotentialCaseIds.size ||
-    input.orderedCaseIds.some((caseId) => !activePotentialCaseIds.has(caseId))
+    saisie.orderedCaseIds.length !== activePotentialCaseIds.size ||
+    saisie.orderedCaseIds.some((idAffaire) => !activePotentialCaseIds.has(idAffaire))
   ) {
     throw new Error("PLANNING_POTENTIAL_ORDER_INVALID");
   }
 
-  const payload = structuredClone(parsePlanningPayload(source));
-  payload.provisionalOrder = [...input.orderedCaseIds];
-  return parsePlanningPayload(payload);
+  const contenu = structuredClone(parsePlanningPayload(source));
+  contenu.provisionalOrder = [...saisie.orderedCaseIds];
+  return parsePlanningPayload(contenu);
 }
 
 export function convertPlanningProvisionToFirm(
@@ -385,16 +386,15 @@ export function convertPlanningProvisionToFirm(
   commercialCaseId: string,
   chantierId: string,
 ): PlanningPayload {
-  const payload = structuredClone(parsePlanningPayload(source));
-  const matching = payload.provisionalAllocations.filter(
+  const contenu = structuredClone(parsePlanningPayload(source));
+  const matching = contenu.provisionalAllocations.filter(
     (allocation) => allocation.caseId === commercialCaseId,
   );
 
   for (const allocation of matching) {
-    const key = allocationKey(chantierId, allocation.activity, allocation.week);
-    const existingIndex = payload.macroAllocations.findIndex(
-      (candidate) =>
-        allocationKey(candidate.chantierId, candidate.activity, candidate.week) === key,
+    const cle = allocationKey(chantierId, allocation.activity, allocation.week);
+    const existingIndex = contenu.macroAllocations.findIndex(
+      (candidat) => allocationKey(candidat.chantierId, candidat.activity, candidat.week) === cle,
     );
     const firmAllocation = {
       chantierId,
@@ -403,36 +403,36 @@ export function convertPlanningProvisionToFirm(
       hours: allocation.hours,
     };
 
-    if (existingIndex >= 0) payload.macroAllocations[existingIndex] = firmAllocation;
-    else payload.macroAllocations.push(firmAllocation);
+    if (existingIndex >= 0) contenu.macroAllocations[existingIndex] = firmAllocation;
+    else contenu.macroAllocations.push(firmAllocation);
   }
 
-  payload.provisionalAllocations = payload.provisionalAllocations.filter(
+  contenu.provisionalAllocations = contenu.provisionalAllocations.filter(
     (allocation) => allocation.caseId !== commercialCaseId,
   );
-  payload.provisionalOrder = payload.provisionalOrder.filter(
-    (candidate) => candidate !== commercialCaseId,
+  contenu.provisionalOrder = contenu.provisionalOrder.filter(
+    (candidat) => candidat !== commercialCaseId,
   );
-  payload.chantierOrder = [
+  contenu.chantierOrder = [
     chantierId,
-    ...payload.chantierOrder.filter((candidate) => candidate !== chantierId),
+    ...contenu.chantierOrder.filter((candidat) => candidat !== chantierId),
   ];
 
-  return parsePlanningPayload(payload);
+  return parsePlanningPayload(contenu);
 }
 
 export function clearPlanningProvisionForCommercialCase(
   source: PlanningPayload,
   commercialCaseId: string,
 ): PlanningPayload {
-  const payload = structuredClone(parsePlanningPayload(source));
-  payload.provisionalAllocations = payload.provisionalAllocations.filter(
+  const contenu = structuredClone(parsePlanningPayload(source));
+  contenu.provisionalAllocations = contenu.provisionalAllocations.filter(
     (allocation) => allocation.caseId !== commercialCaseId,
   );
-  payload.provisionalOrder = payload.provisionalOrder.filter(
-    (candidate) => candidate !== commercialCaseId,
+  contenu.provisionalOrder = contenu.provisionalOrder.filter(
+    (candidat) => candidat !== commercialCaseId,
   );
-  return parsePlanningPayload(payload);
+  return parsePlanningPayload(contenu);
 }
 
 export function syncPlanningPotentialOrderForCommercialCase(
@@ -440,193 +440,196 @@ export function syncPlanningPotentialOrderForCommercialCase(
   commercialCaseId: string,
   hasProvisionReference: boolean,
 ): PlanningPayload {
-  const payload = structuredClone(parsePlanningPayload(source));
-  const isKnown = payload.provisionalOrder.includes(commercialCaseId);
-  const hasWeeklyAllocation = payload.provisionalAllocations.some(
+  const contenu = structuredClone(parsePlanningPayload(source));
+  const isKnown = contenu.provisionalOrder.includes(commercialCaseId);
+  const hasWeeklyAllocation = contenu.provisionalAllocations.some(
     (allocation) => allocation.caseId === commercialCaseId,
   );
 
   if (hasProvisionReference) {
     if (!isKnown) {
-      payload.provisionalOrder = [
+      contenu.provisionalOrder = [
         commercialCaseId,
-        ...payload.provisionalOrder.filter((candidate) => candidate !== commercialCaseId),
+        ...contenu.provisionalOrder.filter((candidat) => candidat !== commercialCaseId),
       ];
     }
   } else if (!hasWeeklyAllocation) {
-    payload.provisionalOrder = payload.provisionalOrder.filter(
-      (candidate) => candidate !== commercialCaseId,
+    contenu.provisionalOrder = contenu.provisionalOrder.filter(
+      (candidat) => candidat !== commercialCaseId,
     );
   }
 
-  return parsePlanningPayload(payload);
+  return parsePlanningPayload(contenu);
 }
 
 export function removeFirmPlanningForChantier(
   source: PlanningPayload,
   chantierId: string,
 ): PlanningPayload {
-  const payload = structuredClone(parsePlanningPayload(source));
-  payload.macroAllocations = payload.macroAllocations.filter(
+  const contenu = structuredClone(parsePlanningPayload(source));
+  contenu.macroAllocations = contenu.macroAllocations.filter(
     (allocation) => allocation.chantierId !== chantierId,
   );
-  payload.chantierOrder = payload.chantierOrder.filter((candidate) => candidate !== chantierId);
-  return parsePlanningPayload(payload);
+  contenu.chantierOrder = contenu.chantierOrder.filter((candidat) => candidat !== chantierId);
+  return parsePlanningPayload(contenu);
 }
 
 export function restoreFirmPlanningOrderForChantier(
   source: PlanningPayload,
   chantierId: string,
 ): PlanningPayload {
-  const payload = structuredClone(parsePlanningPayload(source));
-  payload.macroAllocations = payload.macroAllocations.filter(
+  const contenu = structuredClone(parsePlanningPayload(source));
+  contenu.macroAllocations = contenu.macroAllocations.filter(
     (allocation) => allocation.chantierId !== chantierId,
   );
-  payload.chantierOrder = [
+  contenu.chantierOrder = [
     chantierId,
-    ...payload.chantierOrder.filter((candidate) => candidate !== chantierId),
+    ...contenu.chantierOrder.filter((candidat) => candidat !== chantierId),
   ];
-  return parsePlanningPayload(payload);
+  return parsePlanningPayload(contenu);
 }
 
 export function applyPlanningPersonCapacityMutation(
   source: PlanningPayload,
-  input: PlanningPersonCapacityMutation,
+  saisie: PlanningPersonCapacityMutation,
   activeUserIds: ReadonlySet<string>,
 ): PlanningPayload {
-  if (!activeUserIds.has(input.userId)) throw new Error("PLANNING_USER_NOT_ACTIVE");
+  if (!activeUserIds.has(saisie.userId)) throw new Error("PLANNING_USER_NOT_ACTIVE");
 
-  const payload = structuredClone(parsePlanningPayload(source));
-  const index = payload.peopleCapacity.findIndex((person) => person.userId === input.userId);
-  const next = {
-    userId: input.userId,
-    countsInMacroCapacity: input.countsInMacroCapacity,
-    weeklySchedule: input.weeklySchedule ?? DEFAULT_WEEKLY_SCHEDULE,
+  const contenu = structuredClone(parsePlanningPayload(source));
+  const indice = contenu.peopleCapacity.findIndex((personne) => personne.userId === saisie.userId);
+  const suivant = {
+    userId: saisie.userId,
+    countsInMacroCapacity: saisie.countsInMacroCapacity,
+    weeklySchedule: saisie.weeklySchedule ?? DEFAULT_WEEKLY_SCHEDULE,
   };
 
-  if (index >= 0) payload.peopleCapacity[index] = next;
-  else payload.peopleCapacity.push(next);
+  if (indice >= 0) contenu.peopleCapacity[indice] = suivant;
+  else contenu.peopleCapacity.push(suivant);
 
-  return parsePlanningPayload(payload);
+  return parsePlanningPayload(contenu);
 }
 
-function effectiveSchedule(payload: PlanningPayload, userId: string) {
+function effectiveSchedule(contenu: PlanningPayload, idUtilisateur: string) {
   return (
-    payload.peopleCapacity.find((person) => person.userId === userId)?.weeklySchedule ??
+    contenu.peopleCapacity.find((personne) => personne.userId === idUtilisateur)?.weeklySchedule ??
     DEFAULT_WEEKLY_SCHEDULE
   );
 }
 
 export function applyPlanningAbsenceMutation(
   source: PlanningPayload,
-  input: PlanningAbsenceMutation,
+  saisie: PlanningAbsenceMutation,
   activeUserIds: ReadonlySet<string>,
 ): PlanningPayload {
-  if (!activeUserIds.has(input.userId)) throw new Error("PLANNING_USER_NOT_ACTIVE");
+  if (!activeUserIds.has(saisie.userId)) throw new Error("PLANNING_USER_NOT_ACTIVE");
 
-  const payload = structuredClone(parsePlanningPayload(source));
-  const sameDateIndex = payload.absences.findIndex(
-    (absence) => absence.userId === input.userId && absence.date === input.date,
+  const contenu = structuredClone(parsePlanningPayload(source));
+  const sameDateIndex = contenu.absences.findIndex(
+    (absence) => absence.userId === saisie.userId && absence.date === saisie.date,
   );
-  const byIdIndex = input.id
-    ? payload.absences.findIndex((absence) => absence.id === input.id)
+  const byIdIndex = saisie.id
+    ? contenu.absences.findIndex((absence) => absence.id === saisie.id)
     : -1;
-  const index = byIdIndex >= 0 ? byIdIndex : sameDateIndex;
+  const indice = byIdIndex >= 0 ? byIdIndex : sameDateIndex;
   // Editing a day in a generated week breaks that original group into
   // individual dates. No remaining day is mislabeled as a whole week.
-  const oldGroup = index >= 0 ? payload.absences[index].weekGroupId : undefined;
+  const oldGroup = indice >= 0 ? contenu.absences[indice].weekGroupId : undefined;
   if (oldGroup) {
-    payload.absences = payload.absences.map((absence) =>
+    contenu.absences = contenu.absences.map((absence) =>
       absence.weekGroupId === oldGroup ? { ...absence, weekGroupId: undefined } : absence,
     );
   }
-  const next = {
-    id: index >= 0 ? payload.absences[index].id : crypto.randomUUID(),
-    userId: input.userId,
-    type: input.type,
-    date: input.date,
-    hours: input.hours,
+  const suivant = {
+    id: indice >= 0 ? contenu.absences[indice].id : crypto.randomUUID(),
+    userId: saisie.userId,
+    type: saisie.type,
+    date: saisie.date,
+    hours: saisie.hours,
   };
 
-  if (index >= 0) payload.absences[index] = next;
-  else payload.absences.push(next);
+  if (indice >= 0) contenu.absences[indice] = suivant;
+  else contenu.absences.push(suivant);
 
-  return parsePlanningPayload(payload);
+  return parsePlanningPayload(contenu);
 }
 
 export function applyPlanningFullWeekAbsenceMutation(
   source: PlanningPayload,
-  input: PlanningFullWeekAbsenceMutation,
+  saisie: PlanningFullWeekAbsenceMutation,
   activeUserIds: ReadonlySet<string>,
 ): PlanningPayload {
-  if (!activeUserIds.has(input.userId)) throw new Error("PLANNING_USER_NOT_ACTIVE");
+  if (!activeUserIds.has(saisie.userId)) throw new Error("PLANNING_USER_NOT_ACTIVE");
 
-  const payload = structuredClone(parsePlanningPayload(source));
-  const schedule = effectiveSchedule(payload, input.userId);
-  const weekDates = isoWeekDates(input.week);
+  const contenu = structuredClone(parsePlanningPayload(source));
+  const schedule = effectiveSchedule(contenu, saisie.userId);
+  const weekDates = isoWeekDates(saisie.week);
   const weekDateIds = new Set(weekDates.map((date) => date.toISOString().slice(0, 10)));
 
-  payload.absences = payload.absences.filter(
-    (absence) => absence.userId !== input.userId || !weekDateIds.has(absence.date),
+  contenu.absences = contenu.absences.filter(
+    (absence) => absence.userId !== saisie.userId || !weekDateIds.has(absence.date),
   );
 
   const weekGroupId = crypto.randomUUID();
   for (const date of weekDates) {
-    const hours = scheduleHoursForDate(schedule, date);
-    if (hours <= 0) continue;
-    payload.absences.push({
+    const heures = scheduleHoursForDate(schedule, date);
+    if (heures <= 0) continue;
+    contenu.absences.push({
       id: crypto.randomUUID(),
-      userId: input.userId,
-      type: input.type,
+      userId: saisie.userId,
+      type: saisie.type,
       date: date.toISOString().slice(0, 10),
-      hours,
+      hours: heures,
       weekGroupId,
     });
   }
 
-  return parsePlanningPayload(payload);
+  return parsePlanningPayload(contenu);
 }
 
 export function applyPlanningDeleteAbsenceMutation(
   source: PlanningPayload,
-  input: PlanningDeleteAbsenceMutation,
+  saisie: PlanningDeleteAbsenceMutation,
 ): PlanningPayload {
-  const payload = structuredClone(parsePlanningPayload(source));
-  const selected = payload.absences.find((absence) => absence.id === input.absenceId);
-  const groupId = selected?.weekGroupId;
-  payload.absences = payload.absences
-    .filter((absence) => absence.id !== input.absenceId)
+  const contenu = structuredClone(parsePlanningPayload(source));
+  const selectionne = contenu.absences.find((absence) => absence.id === saisie.absenceId);
+  const groupId = selectionne?.weekGroupId;
+  contenu.absences = contenu.absences
+    .filter((absence) => absence.id !== saisie.absenceId)
     .map((absence) =>
       groupId && absence.weekGroupId === groupId ? { ...absence, weekGroupId: undefined } : absence,
     );
-  return parsePlanningPayload(payload);
+  return parsePlanningPayload(contenu);
 }
 
 export function applyPlanningDeleteAbsenceBatchMutation(
   source: PlanningPayload,
-  input: PlanningDeleteAbsenceBatchMutation,
+  saisie: PlanningDeleteAbsenceBatchMutation,
 ): PlanningPayload {
-  const payload = structuredClone(parsePlanningPayload(source));
-  const ids = new Set(input.absenceIds);
-  if (ids.size !== input.absenceIds.length) throw new Error("PLANNING_ABSENCE_BATCH_DUPLICATE");
-  const selected = payload.absences.filter((absence) => ids.has(absence.id));
-  if (selected.length !== ids.size) throw new Error("PLANNING_ABSENCE_NOT_FOUND");
-  const first = selected[0];
+  const contenu = structuredClone(parsePlanningPayload(source));
+  const identifiants = new Set(saisie.absenceIds);
+  if (identifiants.size !== saisie.absenceIds.length)
+    throw new Error("PLANNING_ABSENCE_BATCH_DUPLICATE");
+  const selectionne = contenu.absences.filter((absence) => identifiants.has(absence.id));
+  if (selectionne.length !== identifiants.size) throw new Error("PLANNING_ABSENCE_NOT_FOUND");
+  const first = selectionne[0];
   const weekDates = new Set(
     isoWeekDates(isoWeekKey(new Date(first.date + "T12:00:00Z"))).map((date) =>
       date.toISOString().slice(0, 10),
     ),
   );
-  if (selected.some((absence) => absence.userId !== first.userId || !weekDates.has(absence.date)))
+  if (
+    selectionne.some((absence) => absence.userId !== first.userId || !weekDates.has(absence.date))
+  )
     throw new Error("PLANNING_ABSENCE_BATCH_INVALID");
-  payload.absences = payload.absences.filter((absence) => !ids.has(absence.id));
+  contenu.absences = contenu.absences.filter((absence) => !identifiants.has(absence.id));
   const orphanGroupIds = new Set(
-    selected.map((absence) => absence.weekGroupId).filter((id): id is string => !!id),
+    selectionne.map((absence) => absence.weekGroupId).filter((id): id is string => !!id),
   );
-  payload.absences = payload.absences.map((absence) =>
+  contenu.absences = contenu.absences.map((absence) =>
     absence.weekGroupId && orphanGroupIds.has(absence.weekGroupId)
       ? { ...absence, weekGroupId: undefined }
       : absence,
   );
-  return parsePlanningPayload(payload);
+  return parsePlanningPayload(contenu);
 }

@@ -8,12 +8,12 @@ import { isoWeekKey } from "./time-markers";
 export const weeklyBoardWeekSchema = z
   .string()
   .regex(/^(?:20\d\d|2100)-W(?:0[1-9]|[1-4]\d|5[0-3])$/, "PLANNING_WEEK_INVALID")
-  .refine((week) => {
-    const firstDate = isoWeekDates(week)[0];
+  .refine((semaine) => {
+    const firstDate = isoWeekDates(semaine)[0];
     return (
       isoWeekKey(
         new Date(firstDate.getUTCFullYear(), firstDate.getUTCMonth(), firstDate.getUTCDate(), 12),
-      ) === week
+      ) === semaine
     );
   }, "PLANNING_WEEK_INVALID");
 
@@ -27,43 +27,44 @@ export const weeklyBoardAssignmentSchema = z.object({
 
 export type WeeklyBoardAssignmentInput = z.infer<typeof weeklyBoardAssignmentSchema>;
 
-export function workingDaysOfWeek(week: string): string[] {
-  weeklyBoardWeekSchema.parse(week);
-  return isoWeekDates(week)
+export function workingDaysOfWeek(semaine: string): string[] {
+  weeklyBoardWeekSchema.parse(semaine);
+  return isoWeekDates(semaine)
     .slice(0, 5)
     .map((date) => date.toISOString().slice(0, 10));
 }
 
 export function applyDailyAssignment(
   source: PlanningPayload,
-  input: WeeklyBoardAssignmentInput,
+  saisie: WeeklyBoardAssignmentInput,
   activePersonIds: ReadonlySet<string>,
   activeChantiers: readonly { id: string; name: string }[],
 ): PlanningPayload {
-  weeklyBoardAssignmentSchema.parse(input);
-  if (!activePersonIds.has(input.userId)) throw new Error("PLANNING_USER_NOT_ACTIVE");
-  if (!workingDaysOfWeek(input.week).includes(input.date)) {
+  weeklyBoardAssignmentSchema.parse(saisie);
+  if (!activePersonIds.has(saisie.userId)) throw new Error("PLANNING_USER_NOT_ACTIVE");
+  if (!workingDaysOfWeek(saisie.week).includes(saisie.date)) {
     throw new Error("PLANNING_DAY_OUTSIDE_WEEK");
   }
-  const payload = structuredClone(parsePlanningPayload(source));
+  const contenu = structuredClone(parsePlanningPayload(source));
   const chantier = activeChantiers.find(
     (site) =>
-      site.name.trim().toLocaleLowerCase("fr-FR") === input.label.trim().toLocaleLowerCase("fr-FR"),
+      site.name.trim().toLocaleLowerCase("fr-FR") ===
+      saisie.label.trim().toLocaleLowerCase("fr-FR"),
   );
-  payload.dailyAssignments = payload.dailyAssignments.filter(
-    (row) => row.userId !== input.userId || row.date !== input.date,
+  contenu.dailyAssignments = contenu.dailyAssignments.filter(
+    (ligneTableau) => ligneTableau.userId !== saisie.userId || ligneTableau.date !== saisie.date,
   );
-  if (input.label.trim()) {
-    payload.dailyAssignments.push({
-      userId: input.userId,
-      date: input.date,
+  if (saisie.label.trim()) {
+    contenu.dailyAssignments.push({
+      userId: saisie.userId,
+      date: saisie.date,
       id: crypto.randomUUID(),
       activity: "NOTE",
       chantierId: chantier?.id ?? null,
-      label: chantier?.name ?? input.label.trim(),
+      label: chantier?.name ?? saisie.label.trim(),
     });
   }
-  return parsePlanningPayload(payload);
+  return parsePlanningPayload(contenu);
 }
 
 export const weeklyBoardEntrySchema = z.discriminatedUnion("action", [
@@ -108,93 +109,102 @@ export type WeeklyBoardPasteInput = z.infer<typeof weeklyBoardPasteSchema>;
 
 export function applyWeeklyBoardPaste(
   source: PlanningPayload,
-  input: WeeklyBoardPasteInput,
+  saisie: WeeklyBoardPasteInput,
   activePersonIds: ReadonlySet<string>,
   sites: readonly { id: string; name: string }[],
 ): PlanningPayload {
-  weeklyBoardPasteSchema.parse(input);
-  if (!activePersonIds.has(input.userId)) throw new Error("PLANNING_USER_NOT_ACTIVE");
-  if (!workingDaysOfWeek(input.week).includes(input.date)) {
+  weeklyBoardPasteSchema.parse(saisie);
+  if (!activePersonIds.has(saisie.userId)) throw new Error("PLANNING_USER_NOT_ACTIVE");
+  if (!workingDaysOfWeek(saisie.week).includes(saisie.date)) {
     throw new Error("PLANNING_DAY_OUTSIDE_WEEK");
   }
-  const payload = structuredClone(parsePlanningPayload(source));
-  const existing = payload.dailyAssignments.filter(
-    (row) => row.userId === input.userId && row.date === input.date,
+  const contenu = structuredClone(parsePlanningPayload(source));
+  const existing = contenu.dailyAssignments.filter(
+    (ligneTableau) => ligneTableau.userId === saisie.userId && ligneTableau.date === saisie.date,
   ).length;
-  if (existing + input.entries.length > 20) throw new Error("PLANNING_DAILY_LIMIT");
-  for (const entry of input.entries) {
+  if (existing + saisie.entries.length > 20) throw new Error("PLANNING_DAILY_LIMIT");
+  for (const entree of saisie.entries) {
     const site = sites.find(
-      (candidate) =>
-        candidate.name.trim().toLocaleLowerCase("fr-FR") ===
-        entry.label.trim().toLocaleLowerCase("fr-FR"),
+      (candidat) =>
+        candidat.name.trim().toLocaleLowerCase("fr-FR") ===
+        entree.label.trim().toLocaleLowerCase("fr-FR"),
     );
-    payload.dailyAssignments.push({
+    contenu.dailyAssignments.push({
       id: crypto.randomUUID(),
-      userId: input.userId,
-      date: input.date,
+      userId: saisie.userId,
+      date: saisie.date,
       chantierId: site?.id ?? null,
-      label: site?.name ?? entry.label.trim(),
-      activity: entry.activity,
+      label: site?.name ?? entree.label.trim(),
+      activity: entree.activity,
     });
   }
-  return parsePlanningPayload(payload);
+  return parsePlanningPayload(contenu);
 }
 
 export function applyWeeklyBoardEntry(
   source: PlanningPayload,
-  input: WeeklyBoardEntryInput,
+  saisie: WeeklyBoardEntryInput,
   activePersonIds: ReadonlySet<string>,
   activeChantiers: readonly { id: string; name: string }[],
 ): PlanningPayload {
-  weeklyBoardEntrySchema.parse(input);
-  if (!activePersonIds.has(input.userId)) throw new Error("PLANNING_USER_NOT_ACTIVE");
-  if (!workingDaysOfWeek(input.week).includes(input.date)) {
+  weeklyBoardEntrySchema.parse(saisie);
+  if (!activePersonIds.has(saisie.userId)) throw new Error("PLANNING_USER_NOT_ACTIVE");
+  if (!workingDaysOfWeek(saisie.week).includes(saisie.date)) {
     throw new Error("PLANNING_DAY_OUTSIDE_WEEK");
   }
-  if (input.id && input.legacy) throw new Error("PLANNING_DAILY_TARGET_INVALID");
+  if (saisie.id && saisie.legacy) throw new Error("PLANNING_DAILY_TARGET_INVALID");
 
-  const payload = structuredClone(parsePlanningPayload(source));
-  const current = payload.dailyAssignments;
-  const index = input.id
-    ? current.findIndex((row) => row.id === input.id)
-    : input.legacy
-      ? current.findIndex(
-          (row) => !row.id && row.userId === input.userId && row.date === input.date,
+  const contenu = structuredClone(parsePlanningPayload(source));
+  const courant = contenu.dailyAssignments;
+  const indice = saisie.id
+    ? courant.findIndex((ligneTableau) => ligneTableau.id === saisie.id)
+    : saisie.legacy
+      ? courant.findIndex(
+          (ligneTableau) =>
+            !ligneTableau.id &&
+            ligneTableau.userId === saisie.userId &&
+            ligneTableau.date === saisie.date,
         )
       : -1;
-  if ((input.id || input.legacy) && index < 0) throw new Error("PLANNING_DAILY_NOT_FOUND");
-  if (index >= 0 && (current[index].userId !== input.userId || current[index].date !== input.date))
+  if ((saisie.id || saisie.legacy) && indice < 0) throw new Error("PLANNING_DAILY_NOT_FOUND");
+  if (
+    indice >= 0 &&
+    (courant[indice].userId !== saisie.userId || courant[indice].date !== saisie.date)
+  )
     throw new Error("PLANNING_DAILY_TARGET_INVALID");
 
-  if (input.action === "deleteDailyEntry") {
-    if (index < 0) throw new Error("PLANNING_DAILY_NOT_FOUND");
-    current.splice(index, 1);
-    return parsePlanningPayload(payload);
+  if (saisie.action === "deleteDailyEntry") {
+    if (indice < 0) throw new Error("PLANNING_DAILY_NOT_FOUND");
+    courant.splice(indice, 1);
+    return parsePlanningPayload(contenu);
   }
 
-  const normalized = input.label.trim();
+  const normalized = saisie.label.trim();
   const chantier = activeChantiers.find(
     (site) => site.name.trim().toLocaleLowerCase("fr-FR") === normalized.toLocaleLowerCase("fr-FR"),
   );
   const newEntry = {
-    id: input.id ?? crypto.randomUUID(),
-    userId: input.userId,
-    date: input.date,
+    id: saisie.id ?? crypto.randomUUID(),
+    userId: saisie.userId,
+    date: saisie.date,
     chantierId: chantier?.id ?? null,
     label: chantier?.name ?? normalized,
-    activity: input.activity as PlanningDailyActivity,
+    activity: saisie.activity as PlanningDailyActivity,
   };
 
-  if (index >= 0) current[index] = newEntry;
+  if (indice >= 0) courant[indice] = newEntry;
   else {
     if (
-      current.filter((row) => row.userId === input.userId && row.date === input.date).length >= 20
+      courant.filter(
+        (ligneTableau) =>
+          ligneTableau.userId === saisie.userId && ligneTableau.date === saisie.date,
+      ).length >= 20
     ) {
       throw new Error("PLANNING_DAILY_LIMIT");
     }
-    current.push(newEntry);
+    courant.push(newEntry);
   }
-  return parsePlanningPayload(payload);
+  return parsePlanningPayload(contenu);
 }
 
 export type WeeklyBoardChantierLine = {
@@ -208,23 +218,23 @@ export type WeeklyBoardChantierLine = {
 };
 
 export function weeklyChantierHours(
-  rows: readonly {
+  lignesTableau: readonly {
     activities: readonly {
       activity: "BE" | "WORKSHOP" | "INSTALL";
       weeklyHours: Record<string, number>;
     }[];
   }[],
-  week: string,
+  semaine: string,
   category: "firm" | "provisional",
-  nameAndId: (index: number) => { id: string; name: string },
+  nameAndId: (indice: number) => { id: string; name: string },
 ): WeeklyBoardChantierLine[] {
-  return rows
-    .map((row, index) => {
-      const hours = weekActivityHours([row], week);
-      const identity = nameAndId(index);
-      return { ...identity, category, ...hours };
+  return lignesTableau
+    .map((ligneTableau, indice) => {
+      const heures = weekActivityHours([ligneTableau], semaine);
+      const identity = nameAndId(indice);
+      return { ...identity, category, ...heures };
     })
-    .filter((line) => line.total !== 0);
+    .filter((ligne) => ligne.total !== 0);
 }
 
 export type WeeklyBoardActivitySummary = {
@@ -235,23 +245,23 @@ export type WeeklyBoardActivitySummary = {
 };
 
 export function weekActivityHours(
-  rows: readonly {
+  lignesTableau: readonly {
     activities: readonly {
       activity: "BE" | "WORKSHOP" | "INSTALL";
       weeklyHours: Record<string, number>;
     }[];
   }[],
-  week: string,
+  semaine: string,
 ): WeeklyBoardActivitySummary {
-  const result = { be: 0, workshop: 0, install: 0, total: 0 };
-  for (const row of rows) {
-    for (const activity of row.activities) {
-      const hours = activity.weeklyHours[week] ?? 0;
-      if (activity.activity === "BE") result.be += hours;
-      if (activity.activity === "WORKSHOP") result.workshop += hours;
-      if (activity.activity === "INSTALL") result.install += hours;
-      result.total += hours;
+  const resultat = { be: 0, workshop: 0, install: 0, total: 0 };
+  for (const ligneTableau of lignesTableau) {
+    for (const activity of ligneTableau.activities) {
+      const heures = activity.weeklyHours[semaine] ?? 0;
+      if (activity.activity === "BE") resultat.be += heures;
+      if (activity.activity === "WORKSHOP") resultat.workshop += heures;
+      if (activity.activity === "INSTALL") resultat.install += heures;
+      resultat.total += heures;
     }
   }
-  return result;
+  return resultat;
 }

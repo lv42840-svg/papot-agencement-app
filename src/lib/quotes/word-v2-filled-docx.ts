@@ -31,8 +31,8 @@ export type GeneratedQuoteWordV2Docx = {
 
 function unresolvedTemplateTokens(docx: Uint8Array): string[] {
   const wordXml = readZipArchive(docx)
-    .filter((entry) => entry.name.startsWith("word/") && entry.name.endsWith(".xml"))
-    .map((entry) => Buffer.from(entry.data).toString("utf8"))
+    .filter((entree) => entree.name.startsWith("word/") && entree.name.endsWith(".xml"))
+    .map((entree) => Buffer.from(entree.data).toString("utf8"))
     .join("\n");
 
   return Array.from(new Set(wordXml.match(/\{\{[A-Za-z0-9_]+\}\}/g) ?? [])).sort();
@@ -42,21 +42,22 @@ function assertBalancedWordXml(xml: string, partName: string): void {
   const tagPattern = /<\/?[A-Za-z_][A-Za-z0-9_.:-]*(?:\s[^<>]*?)?\s*\/?>/g;
   const stack: string[] = [];
 
-  for (const match of xml.matchAll(tagPattern)) {
-    const tag = match[0];
-    if (tag.startsWith("<?") || tag.startsWith("<!") || tag.endsWith("/>")) continue;
-    const closing = tag.startsWith("</");
-    const name = tag.match(/^<\/?([A-Za-z_][A-Za-z0-9_.:-]*)/)?.[1];
-    if (!name) continue;
+  for (const correspondance of xml.matchAll(tagPattern)) {
+    const etiquette = correspondance[0];
+    if (etiquette.startsWith("<?") || etiquette.startsWith("<!") || etiquette.endsWith("/>"))
+      continue;
+    const closing = etiquette.startsWith("</");
+    const nom = etiquette.match(/^<\/?([A-Za-z_][A-Za-z0-9_.:-]*)/)?.[1];
+    if (!nom) continue;
 
     if (!closing) {
-      stack.push(name);
+      stack.push(nom);
       continue;
     }
 
     const open = stack.pop();
-    if (open !== name) {
-      throw new Error(`QUOTE_WORD_V2_XML_UNBALANCED:${partName}:${open ?? "NONE"}:${name}`);
+    if (open !== nom) {
+      throw new Error(`QUOTE_WORD_V2_XML_UNBALANCED:${partName}:${open ?? "NONE"}:${nom}`);
     }
   }
 
@@ -77,43 +78,43 @@ function removeStylesContentType(xml: string): string {
 }
 
 function withoutCorruptLegacyStyles(docx: Uint8Array): Uint8Array {
-  const entries = readZipArchive(docx);
+  const entrees = readZipArchive(docx);
   const normalized: ZipArchiveEntry[] = [];
 
-  for (const entry of entries) {
-    if (entry.name === "word/styles.xml") continue;
-    if (entry.name === "word/_rels/document.xml.rels") {
+  for (const entree of entrees) {
+    if (entree.name === "word/styles.xml") continue;
+    if (entree.name === "word/_rels/document.xml.rels") {
       normalized.push(
         cloneZipEntryWithData(
-          entry,
-          Buffer.from(removeStylesRelationship(Buffer.from(entry.data).toString("utf8")), "utf8"),
+          entree,
+          Buffer.from(removeStylesRelationship(Buffer.from(entree.data).toString("utf8")), "utf8"),
         ),
       );
       continue;
     }
-    if (entry.name === "[Content_Types].xml") {
+    if (entree.name === "[Content_Types].xml") {
       normalized.push(
         cloneZipEntryWithData(
-          entry,
-          Buffer.from(removeStylesContentType(Buffer.from(entry.data).toString("utf8")), "utf8"),
+          entree,
+          Buffer.from(removeStylesContentType(Buffer.from(entree.data).toString("utf8")), "utf8"),
         ),
       );
       continue;
     }
-    normalized.push(entry);
+    normalized.push(entree);
   }
 
   return writeZipArchive(normalized);
 }
 
 export function assertQuoteWordV2FilledDocx(docx: Uint8Array): void {
-  const entries = readZipArchive(docx);
-  const document = entries.find((entry) => entry.name === "word/document.xml");
+  const entrees = readZipArchive(docx);
+  const document = entrees.find((entree) => entree.name === "word/document.xml");
   if (!document) throw new Error("QUOTE_WORD_V2_DOCUMENT_XML_MISSING");
 
-  for (const entry of entries) {
-    if (!entry.name.endsWith(".xml") && !entry.name.endsWith(".rels")) continue;
-    assertBalancedWordXml(Buffer.from(entry.data).toString("utf8"), entry.name);
+  for (const entree of entrees) {
+    if (!entree.name.endsWith(".xml") && !entree.name.endsWith(".rels")) continue;
+    assertBalancedWordXml(Buffer.from(entree.data).toString("utf8"), entree.name);
   }
 
   const unresolved = unresolvedTemplateTokens(docx);
@@ -157,7 +158,10 @@ export async function renderQuoteWordV2FilledDocxWithPhotos(
   document: QuoteDocumentData,
   photoLoader: QuoteWordV2PhotoLoader,
 ): Promise<Uint8Array> {
-  const photoCount = document.items.reduce((sum, item) => sum + item.clientPhotos.length, 0);
+  const photoCount = document.items.reduce(
+    (somme, element) => somme + element.clientPhotos.length,
+    0,
+  );
   if (photoCount === 0) return renderQuoteWordV2FilledDocx(template, document);
 
   let rendered = renderQuoteWordV2Core(template, document, true);
@@ -170,10 +174,10 @@ export async function renderQuoteWordV2FilledDocxWithPhotos(
 
 export async function generateQuoteWordV2FilledDocxFromSources(
   template: Uint8Array,
-  input: QuoteDocumentDataMappingInput,
+  saisie: QuoteDocumentDataMappingInput,
   sources: QuoteDocumentDataSources,
 ): Promise<GeneratedQuoteWordV2Docx> {
-  const document = await loadQuoteDocumentDataFromSources(input, sources);
+  const document = await loadQuoteDocumentDataFromSources(saisie, sources);
   return {
     document,
     docx: renderQuoteWordV2FilledDocx(template, document),

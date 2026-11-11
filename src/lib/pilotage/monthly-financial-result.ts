@@ -47,9 +47,9 @@ const supplierSchema = z.object({
   documentDate: z
     .string()
     .regex(/^\d{4}-\d{2}-\d{2}$/)
-    .refine((value) => {
-      const date = new Date(`${value}T12:00:00Z`);
-      return Number.isFinite(date.getTime()) && date.toISOString().slice(0, 10) === value;
+    .refine((valeur) => {
+      const date = new Date(`${valeur}T12:00:00Z`);
+      return Number.isFinite(date.getTime()) && date.toISOString().slice(0, 10) === valeur;
     }),
   type: z.enum(["INVOICE", "CREDIT_NOTE"]),
   status: z.enum(["VALIDATED", "DRAFT", "CANCELLED"]),
@@ -57,13 +57,13 @@ const supplierSchema = z.object({
   amountHtCents: z.number().int().safe().nonnegative(),
 });
 
-function money(value: number): number {
-  if (!Number.isSafeInteger(value)) throw new Error("MONTHLY_FINANCIAL_AMOUNT_INVALID");
-  return value;
+function money(valeur: number): number {
+  if (!Number.isSafeInteger(valeur)) throw new Error("MONTHLY_FINANCIAL_AMOUNT_INVALID");
+  return valeur;
 }
 
-function isComplete(source: { month: string; complete: boolean } | null, month: string): boolean {
-  return source?.complete === true && source.month === month;
+function isComplete(source: { month: string; complete: boolean } | null, mois: string): boolean {
+  return source?.complete === true && source.month === mois;
 }
 
 /**
@@ -71,44 +71,44 @@ function isComplete(source: { month: string; complete: boolean } | null, month: 
  * There is deliberately no quotes, purchase orders, chantier-status filter, or hour-cost input:
  * commitments must never be added to invoices, nor allocated labor to total payroll.
  */
-export function calculateMonthlyFinancialResult(input: {
+export function calculateMonthlyFinancialResult(saisie: {
   month: string;
   customerInvoices: MonthlySource<IssuedInvoiceRecord> | null;
   supplierInvoices: MonthlySource<RecognizedSupplierInvoice> | null;
   payroll: MonthlyPayrollExpense | null;
 }): MonthlyFinancialResult {
-  const month = financialMonthSchema.parse(input.month);
-  const revenueComplete = isComplete(input.customerInvoices, month);
-  const suppliersComplete = isComplete(input.supplierInvoices, month);
-  const payrollComplete = isComplete(input.payroll, month);
+  const mois = financialMonthSchema.parse(saisie.month);
+  const revenueComplete = isComplete(saisie.customerInvoices, mois);
+  const suppliersComplete = isComplete(saisie.supplierInvoices, mois);
+  const payrollComplete = isComplete(saisie.payroll, mois);
   const invoicedRevenueCents = revenueComplete
     ? summarizeIssuedInvoices(
-        input.customerInvoices!.records,
+        saisie.customerInvoices!.records,
         true,
-        new Date(`${month}-15T12:00:00Z`),
+        new Date(`${mois}-15T12:00:00Z`),
       ).monthly.amountHtCents
     : null;
   let supplierExpenseCents: number | null = null;
   if (suppliersComplete) {
     supplierExpenseCents = 0;
-    const ids = new Set<string>();
-    for (const raw of input.supplierInvoices!.records) {
-      const item = supplierSchema.parse(raw);
-      if (ids.has(item.id)) throw new Error("MONTHLY_SUPPLIER_INVOICE_DUPLICATE");
-      ids.add(item.id);
+    const identifiants = new Set<string>();
+    for (const raw of saisie.supplierInvoices!.records) {
+      const element = supplierSchema.parse(raw);
+      if (identifiants.has(element.id)) throw new Error("MONTHLY_SUPPLIER_INVOICE_DUPLICATE");
+      identifiants.add(element.id);
       if (
-        item.documentDate.slice(0, 7) !== month ||
-        item.status !== "VALIDATED" ||
-        item.recognition !== "EXPENSE"
+        element.documentDate.slice(0, 7) !== mois ||
+        element.status !== "VALIDATED" ||
+        element.recognition !== "EXPENSE"
       )
         continue;
       supplierExpenseCents = money(
         supplierExpenseCents +
-          (item.type === "CREDIT_NOTE" ? -item.amountHtCents : item.amountHtCents),
+          (element.type === "CREDIT_NOTE" ? -element.amountHtCents : element.amountHtCents),
       );
     }
   }
-  const payrollExpenseCents = payrollComplete ? money(input.payroll!.totalExpenseCents) : null;
+  const payrollExpenseCents = payrollComplete ? money(saisie.payroll!.totalExpenseCents) : null;
   if (payrollExpenseCents !== null && payrollExpenseCents < 0)
     throw new Error("MONTHLY_PAYROLL_AMOUNT_INVALID");
   const totalExpenseCents =
@@ -120,7 +120,7 @@ export function calculateMonthlyFinancialResult(input: {
       ? null
       : money(invoicedRevenueCents - totalExpenseCents);
   return {
-    month,
+    month: mois,
     invoicedRevenueCents,
     supplierExpenseCents,
     payrollExpenseCents,

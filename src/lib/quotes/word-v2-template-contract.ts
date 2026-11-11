@@ -37,65 +37,67 @@ export type QuoteWordV2OptionalBlockUsage = {
 
 type XmlRange = { start: number; end: number };
 
-function wordXmlEntries(entries: readonly ZipArchiveEntry[]): ZipArchiveEntry[] {
-  return entries.filter((entry) => entry.name.startsWith("word/") && entry.name.endsWith(".xml"));
+function wordXmlEntries(entrees: readonly ZipArchiveEntry[]): ZipArchiveEntry[] {
+  return entrees.filter(
+    (entree) => entree.name.startsWith("word/") && entree.name.endsWith(".xml"),
+  );
 }
 
-function documentXml(entries: readonly ZipArchiveEntry[]): string {
-  const entry = entries.find((candidate) => candidate.name === "word/document.xml");
-  if (!entry) throw new Error("QUOTE_WORD_V2_DOCUMENT_XML_MISSING");
-  return Buffer.from(entry.data).toString("utf8");
+function documentXml(entrees: readonly ZipArchiveEntry[]): string {
+  const entree = entrees.find((candidat) => candidat.name === "word/document.xml");
+  if (!entree) throw new Error("QUOTE_WORD_V2_DOCUMENT_XML_MISSING");
+  return Buffer.from(entree.data).toString("utf8");
 }
 
-function countOccurrences(value: string, needle: string): number {
+function countOccurrences(valeur: string, needle: string): number {
   if (!needle) return 0;
-  let count = 0;
+  let nombre = 0;
   let offset = 0;
-  while (offset < value.length) {
-    const index = value.indexOf(needle, offset);
-    if (index < 0) break;
-    count += 1;
-    offset = index + needle.length;
+  while (offset < valeur.length) {
+    const indice = valeur.indexOf(needle, offset);
+    if (indice < 0) break;
+    nombre += 1;
+    offset = indice + needle.length;
   }
-  return count;
+  return nombre;
 }
 
-function escapeRegExp(value: string): string {
-  return value.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+function escapeRegExp(valeur: string): string {
+  return valeur.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
 }
 
 function containingRange(xml: string, anchorIndex: number, tagName: string): XmlRange | null {
   const pattern = new RegExp(`<(/?)${escapeRegExp(tagName)}\\b[^>]*?(\\/?)>`, "g");
   const openStarts: number[] = [];
 
-  for (const match of xml.slice(0, anchorIndex + 1).matchAll(pattern)) {
-    const closing = match[1] === "/";
-    const selfClosing = match[2] === "/";
+  for (const correspondance of xml.slice(0, anchorIndex + 1).matchAll(pattern)) {
+    const closing = correspondance[1] === "/";
+    const selfClosing = correspondance[2] === "/";
     if (closing) {
       openStarts.pop();
-    } else if (!selfClosing && match.index !== undefined) {
-      openStarts.push(match.index);
+    } else if (!selfClosing && correspondance.index !== undefined) {
+      openStarts.push(correspondance.index);
     }
   }
 
-  const start = openStarts.at(-1);
-  if (start === undefined) return null;
+  const debut = openStarts.at(-1);
+  if (debut === undefined) return null;
 
   const matchingPattern = new RegExp(`<(/?)${escapeRegExp(tagName)}\\b[^>]*?(\\/?)>`, "g");
-  matchingPattern.lastIndex = start;
+  matchingPattern.lastIndex = debut;
   let depth = 0;
-  let match: RegExpExecArray | null;
+  let correspondance: RegExpExecArray | null;
 
-  while ((match = matchingPattern.exec(xml)) !== null) {
-    const closing = match[1] === "/";
-    const selfClosing = match[2] === "/";
+  while ((correspondance = matchingPattern.exec(xml)) !== null) {
+    const closing = correspondance[1] === "/";
+    const selfClosing = correspondance[2] === "/";
     if (!closing && !selfClosing) {
       depth += 1;
       continue;
     }
     if (!closing) continue;
     depth -= 1;
-    if (depth === 0) return { start, end: matchingPattern.lastIndex };
+    if (depth === 0) return { start: debut, end: matchingPattern.lastIndex };
   }
 
   return null;
@@ -107,11 +109,11 @@ function tableColumnCount(rowXml: string): number {
 
 function fieldInstructions(xml: string): string[] {
   const instructions: string[] = [];
-  for (const match of xml.matchAll(/<w:instrText\b[^>]*>([\s\S]*?)<\/w:instrText>/g)) {
-    instructions.push(match[1] ?? "");
+  for (const correspondance of xml.matchAll(/<w:instrText\b[^>]*>([\s\S]*?)<\/w:instrText>/g)) {
+    instructions.push(correspondance[1] ?? "");
   }
-  for (const match of xml.matchAll(/<w:fldSimple\b[^>]*\bw:instr="([^"]*)"[^>]*>/g)) {
-    instructions.push(match[1] ?? "");
+  for (const correspondance of xml.matchAll(/<w:fldSimple\b[^>]*\bw:instr="([^"]*)"[^>]*>/g)) {
+    instructions.push(correspondance[1] ?? "");
   }
   return instructions;
 }
@@ -126,10 +128,10 @@ function hasExactWordField(instructions: readonly string[], fieldName: string): 
   );
 }
 
-function anchorCountAcrossWordXml(entries: readonly ZipArchiveEntry[], anchorName: string): number {
+function anchorCountAcrossWordXml(entrees: readonly ZipArchiveEntry[], anchorName: string): number {
   const token = `{{${anchorName}}}`;
-  return wordXmlEntries(entries).reduce(
-    (sum, entry) => sum + countOccurrences(Buffer.from(entry.data).toString("utf8"), token),
+  return wordXmlEntries(entrees).reduce(
+    (somme, entree) => somme + countOccurrences(Buffer.from(entree.data).toString("utf8"), token),
     0,
   );
 }
@@ -143,10 +145,10 @@ function anchorRow(document: string, token: string): string {
 }
 
 export function inspectQuoteWordV2Template(template: Uint8Array): QuoteWordV2TemplateInspection {
-  const entries = readZipArchive(template);
-  const document = documentXml(entries);
-  const allWordXml = wordXmlEntries(entries)
-    .map((entry) => Buffer.from(entry.data).toString("utf8"))
+  const entrees = readZipArchive(template);
+  const document = documentXml(entrees);
+  const allWordXml = wordXmlEntries(entrees)
+    .map((entree) => Buffer.from(entree.data).toString("utf8"))
     .join("\n");
   const instructions = fieldInstructions(allWordXml);
 
@@ -161,7 +163,7 @@ export function inspectQuoteWordV2Template(template: Uint8Array): QuoteWordV2Tem
   const anchorCounts = Object.fromEntries(
     QUOTE_WORD_V2_DYNAMIC_ANCHORS.map((anchor) => [
       anchor,
-      anchorCountAcrossWordXml(entries, anchor),
+      anchorCountAcrossWordXml(entrees, anchor),
     ]),
   ) as Record<(typeof QUOTE_WORD_V2_DYNAMIC_ANCHORS)[number], number>;
 
@@ -181,8 +183,8 @@ export function assertQuoteWordV2TemplateContract(template: Uint8Array): void {
   const inspection = inspectQuoteWordV2Template(template);
 
   for (const anchor of QUOTE_WORD_V2_DYNAMIC_ANCHORS) {
-    const count = inspection.anchorCounts[anchor];
-    if (count !== 1) throw new Error(`QUOTE_WORD_V2_ANCHOR_COUNT_INVALID:${anchor}:${count}`);
+    const nombre = inspection.anchorCounts[anchor];
+    if (nombre !== 1) throw new Error(`QUOTE_WORD_V2_ANCHOR_COUNT_INVALID:${anchor}:${nombre}`);
   }
   if (!inspection.hasPageField) throw new Error("QUOTE_WORD_V2_PAGE_FIELD_MISSING");
   if (!inspection.hasNumPagesField) throw new Error("QUOTE_WORD_V2_NUMPAGES_FIELD_MISSING");
@@ -233,27 +235,27 @@ export function replaceQuoteWordV2OptionalBlocks(
   document: string,
   usage: QuoteWordV2OptionalBlockUsage,
 ): string {
-  let next = document;
-  if (!usage.qrActions) next = removeUniqueAnchoredContainer(next, QR_ACTIONS_ANCHOR);
-  if (!usage.annexImages) next = removeUniqueAnchoredContainer(next, ANNEX_IMAGES_ANCHOR);
-  return next;
+  let suivant = document;
+  if (!usage.qrActions) suivant = removeUniqueAnchoredContainer(suivant, QR_ACTIONS_ANCHOR);
+  if (!usage.annexImages) suivant = removeUniqueAnchoredContainer(suivant, ANNEX_IMAGES_ANCHOR);
+  return suivant;
 }
 
 export function renderQuoteWordV2OptionalBlocks(
   template: Uint8Array,
   usage: QuoteWordV2OptionalBlockUsage,
 ): Uint8Array {
-  const entries = readZipArchive(template);
-  let found = false;
-  const rendered = entries.map((entry) => {
-    if (entry.name !== "word/document.xml") return entry;
-    found = true;
-    const xml = Buffer.from(entry.data).toString("utf8");
+  const entrees = readZipArchive(template);
+  let trouve = false;
+  const rendered = entrees.map((entree) => {
+    if (entree.name !== "word/document.xml") return entree;
+    trouve = true;
+    const xml = Buffer.from(entree.data).toString("utf8");
     return cloneZipEntryWithData(
-      entry,
+      entree,
       Buffer.from(replaceQuoteWordV2OptionalBlocks(xml, usage), "utf8"),
     );
   });
-  if (!found) throw new Error("QUOTE_WORD_V2_DOCUMENT_XML_MISSING");
+  if (!trouve) throw new Error("QUOTE_WORD_V2_DOCUMENT_XML_MISSING");
   return writeZipArchive(rendered);
 }

@@ -66,11 +66,11 @@ export async function renderQuoteWordV2PdfWithPhotos(
 
 export async function generateQuoteWordV2PdfFromSources(
   template: Uint8Array,
-  input: QuoteDocumentDataMappingInput,
+  saisie: QuoteDocumentDataMappingInput,
   sources: QuoteDocumentDataSources,
   converter: QuoteWordV2PdfConverter = convertDocxToPdf,
 ): Promise<GeneratedQuoteWordV2Pdf> {
-  const generated = await generateQuoteWordV2FilledDocxFromSources(template, input, sources);
+  const generated = await generateQuoteWordV2FilledDocxFromSources(template, saisie, sources);
   assertQuoteWordV2PdfReady(generated.document);
   const pdf = await converter(generated.docx);
   assertPdfBuffer(pdf);

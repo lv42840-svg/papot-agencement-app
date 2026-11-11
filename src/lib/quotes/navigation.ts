@@ -1,5 +1,5 @@
-export function quoteHref(quoteId: string): string {
-  const normalized = quoteId.trim();
+export function quoteHref(idDevis: string): string {
+  const normalized = idDevis.trim();
   return normalized ? `/devis/${encodeURIComponent(normalized)}` : "/devis";
 }
 

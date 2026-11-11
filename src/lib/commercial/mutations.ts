@@ -139,46 +139,52 @@ export function commercialCapabilities(_actor: CommercialActor): CommercialCapab
   return { canCreate: true, canRead: true, canModify: true, canProvision: true, canConfirm: true };
 }
 
-function text(value: string): string | null {
-  const trimmed = value.trim();
+function text(valeur: string): string | null {
+  const trimmed = valeur.trim();
   return trimmed ? trimmed : null;
 }
 
-function findCase(payload: CommercialPayload, caseId: string): CommercialCase {
-  const item = payload.cases.find((candidate) => candidate.id === caseId);
-  if (!item) throw new Error("COMMERCIAL_CASE_NOT_FOUND");
-  return item;
+function findCase(contenu: CommercialPayload, idAffaire: string): CommercialCase {
+  const element = contenu.cases.find((candidat) => candidat.id === idAffaire);
+  if (!element) throw new Error("COMMERCIAL_CASE_NOT_FOUND");
+  return element;
 }
 
-export function assertCommercialRevision(item: CommercialCase, expectedUpdatedAt: string): void {
-  if (item.updatedAt !== expectedUpdatedAt) {
+export function assertCommercialRevision(element: CommercialCase, expectedUpdatedAt: string): void {
+  if (element.updatedAt !== expectedUpdatedAt) {
     throw new Error("COMMERCIAL_VERSION_CONFLICT");
   }
 }
 
 function history(
-  item: CommercialCase,
+  element: CommercialCase,
   actorName: string,
   type: CommercialCase["history"][number]["type"],
   summary: string,
-  now: Date,
+  maintenant: Date,
 ): void {
-  item.history.push({ id: randomUUID(), type, at: now.toISOString(), actorName, summary });
+  element.history.push({
+    id: randomUUID(),
+    type,
+    at: maintenant.toISOString(),
+    actorName,
+    summary,
+  });
 }
 
-function touch(item: CommercialCase, actor: CommercialActor, now: Date): void {
-  item.updatedAt = now.toISOString();
-  item.updatedByName = actor.displayName;
+function touch(element: CommercialCase, auteur: CommercialActor, maintenant: Date): void {
+  element.updatedAt = maintenant.toISOString();
+  element.updatedByName = auteur.displayName;
 }
 
-function assertOpen(item: CommercialCase): void {
-  if (isCommercialClosed(item)) throw new Error("COMMERCIAL_CASE_CLOSED");
+function assertOpen(element: CommercialCase): void {
+  if (isCommercialClosed(element)) throw new Error("COMMERCIAL_CASE_CLOSED");
 }
 
 function setActiveStatus(
-  item: CommercialCase,
-  status: Exclude<CommercialStatus, "LOST" | "ABANDONED">,
-  params: {
+  element: CommercialCase,
+  statut: Exclude<CommercialStatus, "LOST" | "ABANDONED">,
+  parametres: {
     reviewDate?: string;
     expectedConfirmationDate?: string;
     quoteDueDate?: string;
@@ -186,141 +192,141 @@ function setActiveStatus(
     plannedInstallDate?: string;
     retainedQuoteIds?: string[];
   },
-  actor: CommercialActor,
-  now: Date,
+  auteur: CommercialActor,
+  maintenant: Date,
 ): void {
-  if ((status === "PISTE" || status === "SENT" || status === "WAITING") && !params.reviewDate) {
+  if ((statut === "PISTE" || statut === "SENT" || statut === "WAITING") && !parametres.reviewDate) {
     throw new Error("COMMERCIAL_REVIEW_DATE_REQUIRED");
   }
-  if (status === "LIKELY" && !params.expectedConfirmationDate) {
+  if (statut === "LIKELY" && !parametres.expectedConfirmationDate) {
     throw new Error("COMMERCIAL_CONFIRMATION_DATE_REQUIRED");
   }
-  if (status === "CHIFFRAGE" && (!params.quoteDueDate || !params.quoteOwnerName?.trim())) {
+  if (statut === "CHIFFRAGE" && (!parametres.quoteDueDate || !parametres.quoteOwnerName?.trim())) {
     throw new Error("COMMERCIAL_QUOTE_OWNER_AND_DATE_REQUIRED");
   }
-  if (status === "CONFIRMED" && !params.plannedInstallDate) {
+  if (statut === "CONFIRMED" && !parametres.plannedInstallDate) {
     throw new Error("COMMERCIAL_INSTALL_DATE_REQUIRED");
   }
-  const previous = item.status;
-  item.status = status;
-  item.closedAt = null;
-  item.closingReason = null;
+  const precedent = element.status;
+  element.status = statut;
+  element.closedAt = null;
+  element.closingReason = null;
 
-  if (status === "PISTE" || status === "SENT" || status === "WAITING") {
-    item.reviewDate = params.reviewDate ?? null;
-    item.expectedConfirmationDate = null;
-  } else if (status === "LIKELY") {
-    item.reviewDate = null;
-    item.expectedConfirmationDate = params.expectedConfirmationDate ?? null;
-  } else if (status === "CHIFFRAGE") {
-    item.quoteDueDate = params.quoteDueDate ?? null;
-    item.quoteOwnerName = params.quoteOwnerName?.trim() || null;
-    item.reviewDate = null;
-    item.expectedConfirmationDate = null;
-  } else if (status === "CONFIRMED") {
-    item.plannedInstallDate = params.plannedInstallDate ?? null;
-    item.confirmedAt = now.toISOString();
-    item.retainedQuoteIds = [...new Set(params.retainedQuoteIds ?? [])];
-    item.reviewDate = null;
-    item.expectedConfirmationDate = null;
+  if (statut === "PISTE" || statut === "SENT" || statut === "WAITING") {
+    element.reviewDate = parametres.reviewDate ?? null;
+    element.expectedConfirmationDate = null;
+  } else if (statut === "LIKELY") {
+    element.reviewDate = null;
+    element.expectedConfirmationDate = parametres.expectedConfirmationDate ?? null;
+  } else if (statut === "CHIFFRAGE") {
+    element.quoteDueDate = parametres.quoteDueDate ?? null;
+    element.quoteOwnerName = parametres.quoteOwnerName?.trim() || null;
+    element.reviewDate = null;
+    element.expectedConfirmationDate = null;
+  } else if (statut === "CONFIRMED") {
+    element.plannedInstallDate = parametres.plannedInstallDate ?? null;
+    element.confirmedAt = maintenant.toISOString();
+    element.retainedQuoteIds = [...new Set(parametres.retainedQuoteIds ?? [])];
+    element.reviewDate = null;
+    element.expectedConfirmationDate = null;
     history(
-      item,
-      actor.displayName,
+      element,
+      auteur.displayName,
       "QUOTES_RETAINED",
-      item.retainedQuoteIds.length > 0
-        ? `${item.retainedQuoteIds.length} devis retenu${item.retainedQuoteIds.length > 1 ? "s" : ""} pour la base contractuelle.`
+      element.retainedQuoteIds.length > 0
+        ? `${element.retainedQuoteIds.length} devis retenu${element.retainedQuoteIds.length > 1 ? "s" : ""} pour la base contractuelle.`
         : "Affaire confirmée sans devis retenu.",
-      now,
+      maintenant,
     );
-  } else if (status === "FOLLOW_UP") {
-    item.reviewDate = null;
-    item.expectedConfirmationDate = null;
+  } else if (statut === "FOLLOW_UP") {
+    element.reviewDate = null;
+    element.expectedConfirmationDate = null;
   }
 
-  touch(item, actor, now);
-  if (previous !== status) {
+  touch(element, auteur, maintenant);
+  if (precedent !== statut) {
     history(
-      item,
-      actor.displayName,
+      element,
+      auteur.displayName,
       "STATUS_CHANGED",
-      `Statut : ${COMMERCIAL_STATUS_LABELS[previous]} → ${COMMERCIAL_STATUS_LABELS[status]}.`,
-      now,
+      `Statut : ${COMMERCIAL_STATUS_LABELS[precedent]} → ${COMMERCIAL_STATUS_LABELS[statut]}.`,
+      maintenant,
     );
   }
 }
 
 export function registerCommercialDocuments(
   source: CommercialPayload,
-  caseId: string,
+  idAffaire: string,
   documents: CommercialDocument[],
-  actor: CommercialActor,
-  now: Date = new Date(),
+  auteur: CommercialActor,
+  maintenant: Date = new Date(),
 ): CommercialMutationResult {
-  const payload = structuredClone(source);
-  const item = findCase(payload, caseId);
-  const ids = new Set(item.documents.map((document) => document.id));
-  if (documents.some((document) => ids.has(document.id)))
+  const contenu = structuredClone(source);
+  const element = findCase(contenu, idAffaire);
+  const identifiants = new Set(element.documents.map((document) => document.id));
+  if (documents.some((document) => identifiants.has(document.id)))
     throw new Error("COMMERCIAL_DOCUMENT_DUPLICATE");
 
   for (const document of documents) {
     if (document.isCurrent) {
-      for (const existing of item.documents) {
+      for (const existing of element.documents) {
         if (existing.category === document.category) existing.isCurrent = false;
       }
     }
-    item.documents.push(document);
+    element.documents.push(document);
   }
 
   if (documents.length > 0) {
-    touch(item, actor, now);
+    touch(element, auteur, maintenant);
     history(
-      item,
-      actor.displayName,
+      element,
+      auteur.displayName,
       "DOCUMENTS_ADDED",
       `${documents.length} document${documents.length > 1 ? "s" : ""} ajouté${documents.length > 1 ? "s" : ""}.`,
-      now,
+      maintenant,
     );
   }
-  return { payload, focusCaseId: item.id };
+  return { payload: contenu, focusCaseId: element.id };
 }
 
 export function applyCommercialMutation(
   rawSource: CommercialPayload,
-  input: CommercialMutation,
-  actor: CommercialActor,
-  now: Date = new Date(),
+  saisie: CommercialMutation,
+  auteur: CommercialActor,
+  maintenant: Date = new Date(),
 ): CommercialMutationResult {
   const transitioned = applyCommercialAutomaticTransitions(
     parseCommercialPayload(rawSource),
-    now,
+    maintenant,
   ).payload;
-  const payload = structuredClone(transitioned);
+  const contenu = structuredClone(transitioned);
 
-  if (input.action === "create") {
+  if (saisie.action === "create") {
     if (
-      input.sourceEntryId &&
-      payload.cases.some((item) => item.sourceEntryId === input.sourceEntryId)
+      saisie.sourceEntryId &&
+      contenu.cases.some((element) => element.sourceEntryId === saisie.sourceEntryId)
     ) {
       throw new Error("COMMERCIAL_SOURCE_TASK_ALREADY_LINKED");
     }
 
-    const timestamp = now.toISOString();
-    const item: CommercialCase = {
+    const timestamp = maintenant.toISOString();
+    const element: CommercialCase = {
       id: randomUUID(),
-      sourceEntryId: input.sourceEntryId ?? null,
-      name: input.name,
-      clientName: text(input.clientName),
-      siteLabel: text(input.siteLabel),
-      siteAddressOverride: input.siteAddressOverride ?? null,
+      sourceEntryId: saisie.sourceEntryId ?? null,
+      name: saisie.name,
+      clientName: text(saisie.clientName),
+      siteLabel: text(saisie.siteLabel),
+      siteAddressOverride: saisie.siteAddressOverride ?? null,
       contactName: null,
       contactPhone: null,
       contactEmail: null,
-      description: text(input.description),
-      nextAction: text(input.nextAction),
+      description: text(saisie.description),
+      nextAction: text(saisie.nextAction),
       status: "PISTE",
       quoteOwnerName: null,
       quoteDueDate: null,
-      reviewDate: input.reviewDate,
+      reviewDate: saisie.reviewDate,
       expectedConfirmationDate: null,
       plannedInstallDate: null,
       quoteSentAt: null,
@@ -333,304 +339,313 @@ export function applyCommercialMutation(
       provisionHours: { be: 0, workshop: 0, install: 0 },
       documents: [],
       createdAt: timestamp,
-      createdByName: actor.displayName,
+      createdByName: auteur.displayName,
       updatedAt: timestamp,
-      updatedByName: actor.displayName,
+      updatedByName: auteur.displayName,
       history: [],
     };
     history(
-      item,
-      actor.displayName,
+      element,
+      auteur.displayName,
       "CREATED",
-      input.sourceEntryId
-        ? `Affaire créée depuis une tâche PAPOT en Piste, prochaine revue le ${input.reviewDate}.`
-        : `Affaire créée en Piste, prochaine revue le ${input.reviewDate}.`,
-      now,
+      saisie.sourceEntryId
+        ? `Affaire créée depuis une tâche PAPOT en Piste, prochaine revue le ${saisie.reviewDate}.`
+        : `Affaire créée en Piste, prochaine revue le ${saisie.reviewDate}.`,
+      maintenant,
     );
-    payload.cases.unshift(item);
-    return { payload, focusCaseId: item.id };
+    contenu.cases.unshift(element);
+    return { payload: contenu, focusCaseId: element.id };
   }
 
-  const item = findCase(payload, input.caseId);
+  const element = findCase(contenu, saisie.caseId);
 
-  if (input.action === "updateDetails") {
-    assertOpen(item);
-    item.name = input.name;
-    item.clientName = text(input.clientName);
-    item.siteLabel = text(input.siteLabel);
-    if (input.siteAddressOverride !== undefined) {
-      item.siteAddressOverride = input.siteAddressOverride;
+  if (saisie.action === "updateDetails") {
+    assertOpen(element);
+    element.name = saisie.name;
+    element.clientName = text(saisie.clientName);
+    element.siteLabel = text(saisie.siteLabel);
+    if (saisie.siteAddressOverride !== undefined) {
+      element.siteAddressOverride = saisie.siteAddressOverride;
     }
-    item.contactName = text(input.contactName);
-    item.contactPhone = text(input.contactPhone);
-    item.contactEmail = text(input.contactEmail);
-    item.description = text(input.description);
-    item.nextAction = text(input.nextAction);
-    touch(item, actor, now);
+    element.contactName = text(saisie.contactName);
+    element.contactPhone = text(saisie.contactPhone);
+    element.contactEmail = text(saisie.contactEmail);
+    element.description = text(saisie.description);
+    element.nextAction = text(saisie.nextAction);
+    touch(element, auteur, maintenant);
     history(
-      item,
-      actor.displayName,
+      element,
+      auteur.displayName,
       "DETAILS_UPDATED",
       "Informations commerciales mises à jour.",
-      now,
+      maintenant,
     );
-    return { payload, focusCaseId: item.id };
+    return { payload: contenu, focusCaseId: element.id };
   }
 
-  if (input.action === "setStatus") {
-    assertOpen(item);
-    setActiveStatus(item, input.status, input, actor, now);
-    return { payload, focusCaseId: item.id };
+  if (saisie.action === "setStatus") {
+    assertOpen(element);
+    setActiveStatus(element, saisie.status, saisie, auteur, maintenant);
+    return { payload: contenu, focusCaseId: element.id };
   }
 
-  if (input.action === "linkSourceEntry") {
-    assertOpen(item);
-    const alreadyLinked = payload.cases.find(
-      (candidate) => candidate.id !== item.id && candidate.sourceEntryId === input.sourceEntryId,
+  if (saisie.action === "linkSourceEntry") {
+    assertOpen(element);
+    const alreadyLinked = contenu.cases.find(
+      (candidat) => candidat.id !== element.id && candidat.sourceEntryId === saisie.sourceEntryId,
     );
     if (alreadyLinked) throw new Error("COMMERCIAL_SOURCE_TASK_ALREADY_LINKED");
-    if (item.sourceEntryId && item.sourceEntryId !== input.sourceEntryId) {
+    if (element.sourceEntryId && element.sourceEntryId !== saisie.sourceEntryId) {
       throw new Error("COMMERCIAL_CASE_SOURCE_ALREADY_LINKED");
     }
-    item.sourceEntryId = input.sourceEntryId;
-    touch(item, actor, now);
+    element.sourceEntryId = saisie.sourceEntryId;
+    touch(element, auteur, maintenant);
     history(
-      item,
-      actor.displayName,
+      element,
+      auteur.displayName,
       "SOURCE_ENTRY_LINKED",
       "Entrée PAPOT rattachée à l’affaire.",
-      now,
+      maintenant,
     );
-    return { payload, focusCaseId: item.id };
+    return { payload: contenu, focusCaseId: element.id };
   }
 
-  if (input.action === "retainAdditionalQuote") {
-    if (item.status !== "CONFIRMED") throw new Error("COMMERCIAL_NOT_CONFIRMED");
-    if (item.retainedQuoteIds.includes(input.quoteId)) {
+  if (saisie.action === "retainAdditionalQuote") {
+    if (element.status !== "CONFIRMED") throw new Error("COMMERCIAL_NOT_CONFIRMED");
+    if (element.retainedQuoteIds.includes(saisie.quoteId)) {
       throw new Error("COMMERCIAL_QUOTE_ALREADY_RETAINED");
     }
-    item.retainedQuoteIds.push(input.quoteId);
-    touch(item, actor, now);
+    element.retainedQuoteIds.push(saisie.quoteId);
+    touch(element, auteur, maintenant);
     history(
-      item,
-      actor.displayName,
+      element,
+      auteur.displayName,
       "QUOTES_RETAINED",
-      `Devis complémentaire accepté et ajouté à la base contractuelle (${item.retainedQuoteIds.length} devis retenus).`,
-      now,
+      `Devis complémentaire accepté et ajouté à la base contractuelle (${element.retainedQuoteIds.length} devis retenus).`,
+      maintenant,
     );
-    return { payload, focusCaseId: item.id };
+    return { payload: contenu, focusCaseId: element.id };
   }
 
-  if (input.action === "markQuoteSent") {
-    assertOpen(item);
-    const previous = item.status;
-    item.status = "SENT";
-    item.quoteSentAt = now.toISOString();
-    item.reviewDate = input.followUpDate;
-    item.expectedConfirmationDate = null;
-    touch(item, actor, now);
+  if (saisie.action === "markQuoteSent") {
+    assertOpen(element);
+    const precedent = element.status;
+    element.status = "SENT";
+    element.quoteSentAt = maintenant.toISOString();
+    element.reviewDate = saisie.followUpDate;
+    element.expectedConfirmationDate = null;
+    touch(element, auteur, maintenant);
     history(
-      item,
-      actor.displayName,
+      element,
+      auteur.displayName,
       "QUOTE_SENT",
-      `Devis marqué envoyé. Relance obligatoire prévue le ${input.followUpDate}.`,
-      now,
+      `Devis marqué envoyé. Relance obligatoire prévue le ${saisie.followUpDate}.`,
+      maintenant,
     );
-    if (previous !== "SENT") {
+    if (precedent !== "SENT") {
       history(
-        item,
-        actor.displayName,
+        element,
+        auteur.displayName,
         "STATUS_CHANGED",
-        `Statut : ${COMMERCIAL_STATUS_LABELS[previous]} → Envoyé.`,
-        now,
+        `Statut : ${COMMERCIAL_STATUS_LABELS[precedent]} → Envoyé.`,
+        maintenant,
       );
     }
-    return { payload, focusCaseId: item.id };
+    return { payload: contenu, focusCaseId: element.id };
   }
 
-  if (input.action === "recordFollowUp") {
-    assertOpen(item);
-    history(item, actor.displayName, "FOLLOW_UP", `Relance : ${input.summary}`, now);
+  if (saisie.action === "recordFollowUp") {
+    assertOpen(element);
+    history(element, auteur.displayName, "FOLLOW_UP", `Relance : ${saisie.summary}`, maintenant);
 
-    if (input.nextStatus === "LOST" || input.nextStatus === "ABANDONED") {
-      const previous = item.status;
-      item.status = input.nextStatus;
-      item.closedAt = now.toISOString();
-      item.closingReason = text(input.closingReason ?? "");
-      item.provisionHours = { be: 0, workshop: 0, install: 0 };
-      item.forecastQuoteIds = [];
-      touch(item, actor, now);
+    if (saisie.nextStatus === "LOST" || saisie.nextStatus === "ABANDONED") {
+      const precedent = element.status;
+      element.status = saisie.nextStatus;
+      element.closedAt = maintenant.toISOString();
+      element.closingReason = text(saisie.closingReason ?? "");
+      element.provisionHours = { be: 0, workshop: 0, install: 0 };
+      element.forecastQuoteIds = [];
+      touch(element, auteur, maintenant);
       history(
-        item,
-        actor.displayName,
+        element,
+        auteur.displayName,
         "CLOSED",
-        `${COMMERCIAL_STATUS_LABELS[previous]} → ${COMMERCIAL_STATUS_LABELS[input.nextStatus]}${item.closingReason ? ` · ${item.closingReason}` : ""}.`,
-        now,
+        `${COMMERCIAL_STATUS_LABELS[precedent]} → ${COMMERCIAL_STATUS_LABELS[saisie.nextStatus]}${element.closingReason ? ` · ${element.closingReason}` : ""}.`,
+        maintenant,
       );
-      return { payload, focusCaseId: item.id };
+      return { payload: contenu, focusCaseId: element.id };
     }
 
-    if (input.nextStatus === "LIKELY") {
-      setActiveStatus(item, "LIKELY", { expectedConfirmationDate: input.nextDate }, actor, now);
-    } else if (input.nextStatus === "CHIFFRAGE") {
+    if (saisie.nextStatus === "LIKELY") {
       setActiveStatus(
-        item,
-        "CHIFFRAGE",
-        { quoteDueDate: input.quoteDueDate, quoteOwnerName: input.quoteOwnerName },
-        actor,
-        now,
+        element,
+        "LIKELY",
+        { expectedConfirmationDate: saisie.nextDate },
+        auteur,
+        maintenant,
       );
-    } else if (input.nextStatus === "CONFIRMED") {
+    } else if (saisie.nextStatus === "CHIFFRAGE") {
       setActiveStatus(
-        item,
+        element,
+        "CHIFFRAGE",
+        { quoteDueDate: saisie.quoteDueDate, quoteOwnerName: saisie.quoteOwnerName },
+        auteur,
+        maintenant,
+      );
+    } else if (saisie.nextStatus === "CONFIRMED") {
+      setActiveStatus(
+        element,
         "CONFIRMED",
         {
-          plannedInstallDate: input.plannedInstallDate,
-          retainedQuoteIds: input.retainedQuoteIds,
+          plannedInstallDate: saisie.plannedInstallDate,
+          retainedQuoteIds: saisie.retainedQuoteIds,
         },
-        actor,
-        now,
+        auteur,
+        maintenant,
       );
-    } else if (input.nextStatus === "PISTE") {
-      setActiveStatus(item, "PISTE", { reviewDate: input.nextDate }, actor, now);
-    } else if (input.nextStatus === "SENT") {
-      setActiveStatus(item, "SENT", { reviewDate: input.nextDate }, actor, now);
-    } else if (input.nextStatus === "FOLLOW_UP") {
-      setActiveStatus(item, "FOLLOW_UP", {}, actor, now);
+    } else if (saisie.nextStatus === "PISTE") {
+      setActiveStatus(element, "PISTE", { reviewDate: saisie.nextDate }, auteur, maintenant);
+    } else if (saisie.nextStatus === "SENT") {
+      setActiveStatus(element, "SENT", { reviewDate: saisie.nextDate }, auteur, maintenant);
+    } else if (saisie.nextStatus === "FOLLOW_UP") {
+      setActiveStatus(element, "FOLLOW_UP", {}, auteur, maintenant);
     } else {
-      setActiveStatus(item, "WAITING", { reviewDate: input.nextDate }, actor, now);
+      setActiveStatus(element, "WAITING", { reviewDate: saisie.nextDate }, auteur, maintenant);
     }
-    return { payload, focusCaseId: item.id };
+    return { payload: contenu, focusCaseId: element.id };
   }
 
-  if (input.action === "postponeQuoteDue") {
-    assertOpen(item);
-    if (item.status !== "CHIFFRAGE" || !item.quoteDueDate)
+  if (saisie.action === "postponeQuoteDue") {
+    assertOpen(element);
+    if (element.status !== "CHIFFRAGE" || !element.quoteDueDate)
       throw new Error("COMMERCIAL_NOT_IN_QUOTING");
-    if (input.newDate <= item.quoteDueDate) throw new Error("COMMERCIAL_QUOTE_DATE_NOT_LATER");
-    const oldDate = item.quoteDueDate;
-    item.quoteDueDate = input.newDate;
-    touch(item, actor, now);
+    if (saisie.newDate <= element.quoteDueDate) throw new Error("COMMERCIAL_QUOTE_DATE_NOT_LATER");
+    const oldDate = element.quoteDueDate;
+    element.quoteDueDate = saisie.newDate;
+    touch(element, auteur, maintenant);
     history(
-      item,
-      actor.displayName,
+      element,
+      auteur.displayName,
       "QUOTE_DUE_POSTPONED",
-      `Date prévue du devis repoussée du ${oldDate} au ${input.newDate}. Motif : ${input.reason}`,
-      now,
+      `Date prévue du devis repoussée du ${oldDate} au ${saisie.newDate}. Motif : ${saisie.reason}`,
+      maintenant,
     );
-    return { payload, focusCaseId: item.id };
+    return { payload: contenu, focusCaseId: element.id };
   }
 
-  if (input.action === "updateNotes") {
-    assertOpen(item);
-    item.quoteNotes = input.quoteNotes;
-    touch(item, actor, now);
+  if (saisie.action === "updateNotes") {
+    assertOpen(element);
+    element.quoteNotes = saisie.quoteNotes;
+    touch(element, auteur, maintenant);
     history(
-      item,
-      actor.displayName,
+      element,
+      auteur.displayName,
       "NOTES_UPDATED",
       "Notes internes de chiffrage mises à jour.",
-      now,
+      maintenant,
     );
-    return { payload, focusCaseId: item.id };
+    return { payload: contenu, focusCaseId: element.id };
   }
 
-  if (input.action === "setForecastQuotes") {
-    assertOpen(item);
-    if (item.status === "CONFIRMED") throw new Error("COMMERCIAL_ALREADY_CONFIRMED");
-    if (new Set(input.quoteIds).size !== input.quoteIds.length) {
+  if (saisie.action === "setForecastQuotes") {
+    assertOpen(element);
+    if (element.status === "CONFIRMED") throw new Error("COMMERCIAL_ALREADY_CONFIRMED");
+    if (new Set(saisie.quoteIds).size !== saisie.quoteIds.length) {
       throw new Error("COMMERCIAL_FORECAST_QUOTE_DUPLICATE");
     }
-    item.forecastQuoteIds = [...input.quoteIds];
-    touch(item, actor, now);
+    element.forecastQuoteIds = [...saisie.quoteIds];
+    touch(element, auteur, maintenant);
     history(
-      item,
-      actor.displayName,
+      element,
+      auteur.displayName,
       "FORECAST_QUOTES_UPDATED",
-      `${input.quoteIds.length} devis coché(s) pour les heures prévisionnelles.`,
-      now,
+      `${saisie.quoteIds.length} devis coché(s) pour les heures prévisionnelles.`,
+      maintenant,
     );
-    return { payload, focusCaseId: item.id };
+    return { payload: contenu, focusCaseId: element.id };
   }
 
-  if (input.action === "useManualProvision") {
-    assertOpen(item);
-    if (item.status === "CONFIRMED") throw new Error("COMMERCIAL_ALREADY_CONFIRMED");
-    item.forecastQuoteIds = null;
-    touch(item, actor, now);
+  if (saisie.action === "useManualProvision") {
+    assertOpen(element);
+    if (element.status === "CONFIRMED") throw new Error("COMMERCIAL_ALREADY_CONFIRMED");
+    element.forecastQuoteIds = null;
+    touch(element, auteur, maintenant);
     history(
-      item,
-      actor.displayName,
+      element,
+      auteur.displayName,
       "FORECAST_QUOTES_UPDATED",
       "Retour à la charge manuelle.",
-      now,
+      maintenant,
     );
-    return { payload, focusCaseId: item.id };
+    return { payload: contenu, focusCaseId: element.id };
   }
 
-  if (input.action === "updateProvision") {
-    assertOpen(item);
-    item.provisionHours = { be: input.be, workshop: input.workshop, install: input.install };
-    item.forecastQuoteIds = null;
-    touch(item, actor, now);
+  if (saisie.action === "updateProvision") {
+    assertOpen(element);
+    element.provisionHours = { be: saisie.be, workshop: saisie.workshop, install: saisie.install };
+    element.forecastQuoteIds = null;
+    touch(element, auteur, maintenant);
     history(
-      item,
-      actor.displayName,
+      element,
+      auteur.displayName,
       "PROVISION_UPDATED",
-      `Charge potentielle : BE ${input.be} h · Atelier ${input.workshop} h · Pose ${input.install} h.`,
-      now,
+      `Charge potentielle : BE ${saisie.be} h · Atelier ${saisie.workshop} h · Pose ${saisie.install} h.`,
+      maintenant,
     );
-    return { payload, focusCaseId: item.id };
+    return { payload: contenu, focusCaseId: element.id };
   }
 
-  if (input.action === "close") {
-    assertOpen(item);
-    const previous = item.status;
-    item.status = input.status;
-    item.closedAt = now.toISOString();
-    item.closingReason = text(input.reason);
-    item.provisionHours = { be: 0, workshop: 0, install: 0 };
-    item.reviewDate = null;
-    item.expectedConfirmationDate = null;
-    touch(item, actor, now);
+  if (saisie.action === "close") {
+    assertOpen(element);
+    const precedent = element.status;
+    element.status = saisie.status;
+    element.closedAt = maintenant.toISOString();
+    element.closingReason = text(saisie.reason);
+    element.provisionHours = { be: 0, workshop: 0, install: 0 };
+    element.reviewDate = null;
+    element.expectedConfirmationDate = null;
+    touch(element, auteur, maintenant);
     history(
-      item,
-      actor.displayName,
+      element,
+      auteur.displayName,
       "CLOSED",
-      `${COMMERCIAL_STATUS_LABELS[previous]} → ${COMMERCIAL_STATUS_LABELS[input.status]}${item.closingReason ? ` · ${item.closingReason}` : ""}.`,
-      now,
+      `${COMMERCIAL_STATUS_LABELS[precedent]} → ${COMMERCIAL_STATUS_LABELS[saisie.status]}${element.closingReason ? ` · ${element.closingReason}` : ""}.`,
+      maintenant,
     );
-    return { payload, focusCaseId: item.id };
+    return { payload: contenu, focusCaseId: element.id };
   }
 
-  if (input.action === "reopen") {
-    if (!isCommercialClosed(item)) throw new Error("COMMERCIAL_CASE_NOT_CLOSED");
-    const previous = item.status;
-    item.status = "PISTE";
-    item.reviewDate = input.reviewDate;
-    item.closedAt = null;
-    item.closingReason = null;
-    item.confirmedAt = null;
-    touch(item, actor, now);
+  if (saisie.action === "reopen") {
+    if (!isCommercialClosed(element)) throw new Error("COMMERCIAL_CASE_NOT_CLOSED");
+    const precedent = element.status;
+    element.status = "PISTE";
+    element.reviewDate = saisie.reviewDate;
+    element.closedAt = null;
+    element.closingReason = null;
+    element.confirmedAt = null;
+    touch(element, auteur, maintenant);
     history(
-      item,
-      actor.displayName,
+      element,
+      auteur.displayName,
       "REOPENED",
-      `${COMMERCIAL_STATUS_LABELS[previous]} rouvert en Piste. Prochaine revue le ${input.reviewDate}. La charge potentielle n'est pas restaurée automatiquement.`,
-      now,
+      `${COMMERCIAL_STATUS_LABELS[precedent]} rouvert en Piste. Prochaine revue le ${saisie.reviewDate}. La charge potentielle n'est pas restaurée automatiquement.`,
+      maintenant,
     );
-    return { payload, focusCaseId: item.id };
+    return { payload: contenu, focusCaseId: element.id };
   }
 
   throw new Error("COMMERCIAL_MUTATION_UNSUPPORTED");
 }
 
-export function listCommercialPeople(payload: CommercialPayload, actor: CommercialActor): string[] {
-  const names = new Set<string>(["Nadia", "Lucien", actor.displayName]);
-  for (const item of payload.cases) {
-    if (item.quoteOwnerName) names.add(item.quoteOwnerName);
-    names.add(item.createdByName);
-    names.add(item.updatedByName);
+export function listCommercialPeople(
+  contenu: CommercialPayload,
+  auteur: CommercialActor,
+): string[] {
+  const noms = new Set<string>(["Nadia", "Lucien", auteur.displayName]);
+  for (const element of contenu.cases) {
+    if (element.quoteOwnerName) noms.add(element.quoteOwnerName);
+    noms.add(element.createdByName);
+    noms.add(element.updatedByName);
   }
-  return [...names].filter(Boolean).sort((a, b) => a.localeCompare(b, "fr-FR"));
+  return [...noms].filter(Boolean).sort((a, b) => a.localeCompare(b, "fr-FR"));
 }

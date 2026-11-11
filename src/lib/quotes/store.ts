@@ -23,11 +23,11 @@ export const quoteTaxConfigSchema = z
     defaultRatePercent: vatRatePercentSchema,
     lineOverrides: z.array(quoteLineVatOverrideSchema).max(1000),
   })
-  .superRefine((config, context) => {
+  .superRefine((configuration, contexte) => {
     const lineIds = new Set<string>();
-    for (const override of config.lineOverrides) {
+    for (const override of configuration.lineOverrides) {
       if (lineIds.has(override.lineId)) {
-        context.addIssue({
+        contexte.addIssue({
           code: z.ZodIssueCode.custom,
           path: ["lineOverrides"],
           message: "QUOTE_VAT_LINE_OVERRIDE_DUPLICATE",
@@ -81,31 +81,31 @@ export const nativeQuoteRecordSchema = z
     updatedAt: isoDateTimeSchema,
     updatedByName: z.string().trim().min(1).max(160),
   })
-  .superRefine((record, context) => {
-    if (record.id !== record.model.id) {
-      context.addIssue({
+  .superRefine((enregistrement, contexte) => {
+    if (enregistrement.id !== enregistrement.model.id) {
+      contexte.addIssue({
         code: z.ZodIssueCode.custom,
         path: ["model", "id"],
         message: "QUOTE_RECORD_MODEL_ID_MISMATCH",
       });
     }
-    if (record.finalPdf) {
-      if (record.status === "DRAFT") {
-        context.addIssue({
+    if (enregistrement.finalPdf) {
+      if (enregistrement.status === "DRAFT") {
+        contexte.addIssue({
           code: z.ZodIssueCode.custom,
           path: ["finalPdf"],
           message: "QUOTE_FINAL_PDF_DRAFT_FORBIDDEN",
         });
       }
-      if (record.finalPdf.variantName !== record.variantName) {
-        context.addIssue({
+      if (enregistrement.finalPdf.variantName !== enregistrement.variantName) {
+        contexte.addIssue({
           code: z.ZodIssueCode.custom,
           path: ["finalPdf", "variantName"],
           message: "QUOTE_FINAL_PDF_VARIANT_MISMATCH",
         });
       }
-      if (record.finalPdf.version !== record.version) {
-        context.addIssue({
+      if (enregistrement.finalPdf.version !== enregistrement.version) {
+        contexte.addIssue({
           code: z.ZodIssueCode.custom,
           path: ["finalPdf", "version"],
           message: "QUOTE_FINAL_PDF_VERSION_MISMATCH",
@@ -130,13 +130,13 @@ export function createInitialNativeQuotesPayload(): NativeQuotesPayload {
   return { schemaVersion: 1, quotes: [] };
 }
 
-export function parseNativeQuotesPayload(value: unknown): NativeQuotesPayload {
-  if (value == null) return createInitialNativeQuotesPayload();
-  const parsed = nativeQuotesPayloadSchema.safeParse(value);
-  if (!parsed.success) throw new Error("QUOTES_STORE_INVALID");
+export function parseNativeQuotesPayload(valeur: unknown): NativeQuotesPayload {
+  if (valeur == null) return createInitialNativeQuotesPayload();
+  const analyse = nativeQuotesPayloadSchema.safeParse(valeur);
+  if (!analyse.success) throw new Error("QUOTES_STORE_INVALID");
   return {
-    ...parsed.data,
-    quotes: parsed.data.quotes.map((quote) => ({
+    ...analyse.data,
+    quotes: analyse.data.quotes.map((quote) => ({
       ...quote,
       model: {
         ...quote.model,

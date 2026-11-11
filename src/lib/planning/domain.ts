@@ -131,130 +131,130 @@ export const planningPayloadSchema = z
     hiddenPersonIds: z.array(z.string().uuid()).default([]),
     absences: z.array(planningAbsenceSchema).default([]),
   })
-  .superRefine((value, context) => {
+  .superRefine((valeur, contexte) => {
     const seen = new Set<string>();
-    value.macroAllocations.forEach((allocation, index) => {
-      const key = allocationKey(allocation.chantierId, allocation.activity, allocation.week);
-      if (seen.has(key)) {
-        context.addIssue({
+    valeur.macroAllocations.forEach((allocation, indice) => {
+      const cle = allocationKey(allocation.chantierId, allocation.activity, allocation.week);
+      if (seen.has(cle)) {
+        contexte.addIssue({
           code: z.ZodIssueCode.custom,
-          path: ["macroAllocations", index],
+          path: ["macroAllocations", indice],
           message: "PLANNING_ALLOCATION_DUPLICATE",
         });
       }
-      seen.add(key);
+      seen.add(cle);
     });
 
     const provisionalSeen = new Set<string>();
-    value.provisionalAllocations.forEach((allocation, index) => {
-      const key = provisionalAllocationKey(allocation.caseId, allocation.activity, allocation.week);
-      if (provisionalSeen.has(key)) {
-        context.addIssue({
+    valeur.provisionalAllocations.forEach((allocation, indice) => {
+      const cle = provisionalAllocationKey(allocation.caseId, allocation.activity, allocation.week);
+      if (provisionalSeen.has(cle)) {
+        contexte.addIssue({
           code: z.ZodIssueCode.custom,
-          path: ["provisionalAllocations", index],
+          path: ["provisionalAllocations", indice],
           message: "PLANNING_PROVISIONAL_ALLOCATION_DUPLICATE",
         });
       }
-      provisionalSeen.add(key);
+      provisionalSeen.add(cle);
     });
 
     const actualHoursSeen = new Set<string>();
-    value.actualHours.forEach((entry, index) => {
-      const key = actualHoursKey(entry.chantierId, entry.userId, entry.activity, entry.week);
-      if (actualHoursSeen.has(key)) {
-        context.addIssue({
+    valeur.actualHours.forEach((entree, indice) => {
+      const cle = actualHoursKey(entree.chantierId, entree.userId, entree.activity, entree.week);
+      if (actualHoursSeen.has(cle)) {
+        contexte.addIssue({
           code: z.ZodIssueCode.custom,
-          path: ["actualHours", index],
+          path: ["actualHours", indice],
           message: "PLANNING_ACTUAL_HOURS_DUPLICATE",
         });
       }
-      actualHoursSeen.add(key);
+      actualHoursSeen.add(cle);
     });
 
     const indirectSeen = new Set<string>();
-    value.indirectHours.forEach((entry, index) => {
-      const key = `${entry.userId}:${entry.category}:${entry.week}`;
-      if (indirectSeen.has(key)) {
-        context.addIssue({
+    valeur.indirectHours.forEach((entree, indice) => {
+      const cle = `${entree.userId}:${entree.category}:${entree.week}`;
+      if (indirectSeen.has(cle)) {
+        contexte.addIssue({
           code: z.ZodIssueCode.custom,
-          path: ["indirectHours", index],
+          path: ["indirectHours", indice],
           message: "PLANNING_INDIRECT_HOURS_DUPLICATE",
         });
       }
-      indirectSeen.add(key);
+      indirectSeen.add(cle);
     });
 
     const staffIds = new Set<string>();
     const linkedUsers = new Set<string>();
-    value.staff.forEach((person, index) => {
-      if (staffIds.has(person.id)) {
-        context.addIssue({
+    valeur.staff.forEach((personne, indice) => {
+      if (staffIds.has(personne.id)) {
+        contexte.addIssue({
           code: z.ZodIssueCode.custom,
-          path: ["staff", index, "id"],
+          path: ["staff", indice, "id"],
           message: "PLANNING_STAFF_DUPLICATE",
         });
       }
-      staffIds.add(person.id);
-      if (person.linkedUserId) {
-        if (linkedUsers.has(person.linkedUserId)) {
-          context.addIssue({
+      staffIds.add(personne.id);
+      if (personne.linkedUserId) {
+        if (linkedUsers.has(personne.linkedUserId)) {
+          contexte.addIssue({
             code: z.ZodIssueCode.custom,
-            path: ["staff", index, "linkedUserId"],
+            path: ["staff", indice, "linkedUserId"],
             message: "PLANNING_STAFF_ACCOUNT_ALREADY_LINKED",
           });
         }
-        linkedUsers.add(person.linkedUserId);
+        linkedUsers.add(personne.linkedUserId);
       }
     });
 
     const dailyIds = new Set<string>();
     const legacyDayKeys = new Set<string>();
-    value.dailyAssignments.forEach((assignment, index) => {
+    valeur.dailyAssignments.forEach((assignment, indice) => {
       if (assignment.id) {
         if (dailyIds.has(assignment.id)) {
-          context.addIssue({
+          contexte.addIssue({
             code: z.ZodIssueCode.custom,
-            path: ["dailyAssignments", index, "id"],
+            path: ["dailyAssignments", indice, "id"],
             message: "PLANNING_DAILY_DUPLICATE",
           });
         }
         dailyIds.add(assignment.id);
       } else {
-        const key = `${assignment.userId}:${assignment.date}`;
-        if (legacyDayKeys.has(key)) {
-          context.addIssue({
+        const cle = `${assignment.userId}:${assignment.date}`;
+        if (legacyDayKeys.has(cle)) {
+          contexte.addIssue({
             code: z.ZodIssueCode.custom,
-            path: ["dailyAssignments", index],
+            path: ["dailyAssignments", indice],
             message: "PLANNING_DAILY_DUPLICATE",
           });
         }
-        legacyDayKeys.add(key);
+        legacyDayKeys.add(cle);
       }
     });
 
     const absenceKeys = new Set<string>();
-    value.absences.forEach((absence, index) => {
-      const key = `${absence.userId}:${absence.date}`;
-      if (absenceKeys.has(key)) {
-        context.addIssue({
+    valeur.absences.forEach((absence, indice) => {
+      const cle = `${absence.userId}:${absence.date}`;
+      if (absenceKeys.has(cle)) {
+        contexte.addIssue({
           code: z.ZodIssueCode.custom,
-          path: ["absences", index],
+          path: ["absences", indice],
           message: "PLANNING_ABSENCE_DUPLICATE_DATE",
         });
       }
-      absenceKeys.add(key);
+      absenceKeys.add(cle);
     });
 
-    if (new Set(value.chantierOrder).size !== value.chantierOrder.length) {
-      context.addIssue({
+    if (new Set(valeur.chantierOrder).size !== valeur.chantierOrder.length) {
+      contexte.addIssue({
         code: z.ZodIssueCode.custom,
         path: ["chantierOrder"],
         message: "PLANNING_CHANTIER_ORDER_DUPLICATE",
       });
     }
 
-    if (new Set(value.provisionalOrder).size !== value.provisionalOrder.length) {
-      context.addIssue({
+    if (new Set(valeur.provisionalOrder).size !== valeur.provisionalOrder.length) {
+      contexte.addIssue({
         code: z.ZodIssueCode.custom,
         path: ["provisionalOrder"],
         message: "PLANNING_PROVISIONAL_ORDER_DUPLICATE",
@@ -326,34 +326,34 @@ export function createInitialPlanningPayload(): PlanningPayload {
   };
 }
 
-export function parsePlanningPayload(value: unknown): PlanningPayload {
-  if (value == null) return createInitialPlanningPayload();
-  return planningPayloadSchema.parse(value);
+export function parsePlanningPayload(valeur: unknown): PlanningPayload {
+  if (valeur == null) return createInitialPlanningPayload();
+  return planningPayloadSchema.parse(valeur);
 }
 
 export function allocationKey(
   chantierId: string,
   activity: PlanningActivity,
-  week: string,
+  semaine: string,
 ): string {
-  return `${chantierId}:${activity}:${week}`;
+  return `${chantierId}:${activity}:${semaine}`;
 }
 
 export function provisionalAllocationKey(
-  caseId: string,
+  idAffaire: string,
   activity: PlanningActivity,
-  week: string,
+  semaine: string,
 ): string {
-  return `${caseId}:${activity}:${week}`;
+  return `${idAffaire}:${activity}:${semaine}`;
 }
 
 export function actualHoursKey(
   chantierId: string,
-  userId: string,
+  idUtilisateur: string,
   activity: PlanningActivity,
-  week: string,
+  semaine: string,
 ): string {
-  return `${chantierId}:${userId}:${activity}:${week}`;
+  return `${chantierId}:${idUtilisateur}:${activity}:${semaine}`;
 }
 
 export function plannedHoursForActivity(
@@ -365,37 +365,39 @@ export function plannedHoursForActivity(
   return chantier.plannedHours.install;
 }
 
-export function weeksInIsoYear(year: number): number {
-  const date = new Date(Date.UTC(year, 11, 28));
-  const day = date.getUTCDay() || 7;
-  date.setUTCDate(date.getUTCDate() + 4 - day);
+export function weeksInIsoYear(annee: number): number {
+  const date = new Date(Date.UTC(annee, 11, 28));
+  const jour = date.getUTCDay() || 7;
+  date.setUTCDate(date.getUTCDate() + 4 - jour);
   const yearStart = new Date(Date.UTC(date.getUTCFullYear(), 0, 1));
   return Math.ceil(((date.getTime() - yearStart.getTime()) / 86_400_000 + 1) / 7);
 }
 
-export function isoWeekIdForDate(input: Date): string {
-  const date = new Date(Date.UTC(input.getUTCFullYear(), input.getUTCMonth(), input.getUTCDate()));
-  const day = date.getUTCDay() || 7;
-  date.setUTCDate(date.getUTCDate() + 4 - day);
+export function isoWeekIdForDate(saisie: Date): string {
+  const date = new Date(
+    Date.UTC(saisie.getUTCFullYear(), saisie.getUTCMonth(), saisie.getUTCDate()),
+  );
+  const jour = date.getUTCDay() || 7;
+  date.setUTCDate(date.getUTCDate() + 4 - jour);
   const isoYear = date.getUTCFullYear();
   const yearStart = new Date(Date.UTC(isoYear, 0, 1));
-  const week = Math.ceil(((date.getTime() - yearStart.getTime()) / 86_400_000 + 1) / 7);
-  return `${isoYear}-W${String(week).padStart(2, "0")}`;
+  const semaine = Math.ceil(((date.getTime() - yearStart.getTime()) / 86_400_000 + 1) / 7);
+  return `${isoYear}-W${String(semaine).padStart(2, "0")}`;
 }
 
 export function buildChantierPlanningCloseWarning(
   chantier: Pick<ChantierRecord, "id" | "plannedHours">,
   planningPayload: PlanningPayload,
-  now: Date = new Date(),
+  maintenant: Date = new Date(),
 ): ChantierPlanningCloseWarning {
-  const currentWeek = isoWeekIdForDate(now);
+  const currentWeek = isoWeekIdForDate(maintenant);
   const matching = planningPayload.macroAllocations.filter(
     (allocation) => allocation.chantierId === chantier.id,
   );
 
   const futureAllocatedHours = matching
     .filter((allocation) => allocation.week >= currentWeek)
-    .reduce((sum, allocation) => sum + allocation.hours, 0);
+    .reduce((somme, allocation) => somme + allocation.hours, 0);
 
   const allocatedByActivity = new Map<PlanningActivity, number>();
   for (const allocation of matching) {
@@ -406,10 +408,10 @@ export function buildChantierPlanningCloseWarning(
   }
 
   const activities: PlanningActivity[] = ["BE", "WORKSHOP", "INSTALL"];
-  const remainingToAllocateHours = activities.reduce((sum, activity) => {
+  const remainingToAllocateHours = activities.reduce((somme, activity) => {
     const plannedHours = plannedHoursForActivity(chantier, activity);
     const allocatedHours = allocatedByActivity.get(activity) ?? 0;
-    return sum + Math.max(0, plannedHours - allocatedHours);
+    return somme + Math.max(0, plannedHours - allocatedHours);
   }, 0);
 
   return {
@@ -419,13 +421,13 @@ export function buildChantierPlanningCloseWarning(
   };
 }
 
-export function planningYearWeekIds(year: number): string[] {
-  if (!Number.isInteger(year) || year < 2020 || year > 2100) {
+export function planningYearWeekIds(annee: number): string[] {
+  if (!Number.isInteger(annee) || annee < 2020 || annee > 2100) {
     throw new Error("PLANNING_YEAR_INVALID");
   }
-  return Array.from({ length: weeksInIsoYear(year) }, (_, index) => {
-    const number = String(index + 1).padStart(2, "0");
-    return `${year}-W${number}`;
+  return Array.from({ length: weeksInIsoYear(annee) }, (_, indice) => {
+    const number = String(indice + 1).padStart(2, "0");
+    return `${annee}-W${number}`;
   });
 }
 
@@ -443,16 +445,16 @@ function orderActiveChantiers(
   chantierOrder: string[],
 ): ChantierRecord[] {
   const active = chantiers.filter((chantier) => chantier.status === "ACTIVE");
-  const rank = new Map(chantierOrder.map((id, index) => [id, index]));
+  const rank = new Map(chantierOrder.map((id, indice) => [id, indice]));
   return active
     .map((chantier, inputIndex) => ({ chantier, inputIndex }))
-    .sort((left, right) => {
-      const leftRank = rank.get(left.chantier.id);
-      const rightRank = rank.get(right.chantier.id);
+    .sort((gauche, droite) => {
+      const leftRank = rank.get(gauche.chantier.id);
+      const rightRank = rank.get(droite.chantier.id);
       if (leftRank != null && rightRank != null) return leftRank - rightRank;
       if (leftRank != null) return -1;
       if (rightRank != null) return 1;
-      return left.inputIndex - right.inputIndex;
+      return gauche.inputIndex - droite.inputIndex;
     })
     .map(({ chantier }) => chantier);
 }
@@ -460,10 +462,10 @@ function orderActiveChantiers(
 export function buildFirmGrandPlanningRows(
   chantiersPayload: ChantiersPayload,
   planningPayload: PlanningPayload,
-  year: number,
-  endYear = year,
+  annee: number,
+  endYear = annee,
 ): GrandPlanningChantierRow[] {
-  const weeks = new Set(planningYearWeekIdsRange(year, endYear));
+  const semaines = new Set(planningYearWeekIdsRange(annee, endYear));
   const activities: PlanningActivity[] = ["BE", "WORKSHOP", "INSTALL"];
 
   return orderActiveChantiers(chantiersPayload.chantiers, planningPayload.chantierOrder).map(
@@ -478,29 +480,29 @@ export function buildFirmGrandPlanningRows(
         );
         const weeklyHours = Object.fromEntries(
           matching
-            .filter((allocation) => weeks.has(allocation.week))
+            .filter((allocation) => semaines.has(allocation.week))
             .map((allocation) => [allocation.week, allocation.hours]),
         );
         const actualByWeek = new Map<string, number>();
-        for (const entry of planningPayload.actualHours) {
+        for (const entree of planningPayload.actualHours) {
           if (
-            entry.chantierId === chantier.id &&
-            entry.activity === activity &&
-            weeks.has(entry.week)
+            entree.chantierId === chantier.id &&
+            entree.activity === activity &&
+            semaines.has(entree.week)
           ) {
-            actualByWeek.set(entry.week, (actualByWeek.get(entry.week) ?? 0) + entry.hours);
+            actualByWeek.set(entree.week, (actualByWeek.get(entree.week) ?? 0) + entree.hours);
           }
         }
-        for (const [week, hours] of actualByWeek) weeklyHours[week] = hours;
-        const allocatedHours = matching.reduce((sum, allocation) => sum + allocation.hours, 0);
+        for (const [semaine, heures] of actualByWeek) weeklyHours[semaine] = heures;
+        const allocatedHours = matching.reduce((somme, allocation) => somme + allocation.hours, 0);
         const plannedHours = plannedHoursForActivity(chantier, activity);
         return {
           activity,
           label: PLANNING_ACTIVITY_LABELS[activity],
           plannedHours,
           actualHours: planningPayload.actualHours
-            .filter((entry) => entry.chantierId === chantier.id && entry.activity === activity)
-            .reduce((sum, entry) => sum + entry.hours, 0),
+            .filter((entree) => entree.chantierId === chantier.id && entree.activity === activity)
+            .reduce((somme, entree) => somme + entree.hours, 0),
           allocatedHours,
           remainingHours: plannedHours - allocatedHours,
           weeklyHours,
@@ -522,40 +524,43 @@ function provisionHoursForActivity(
 export function buildCommercialProvisionRows(
   commercialPayload: CommercialPayload,
   planningPayload: PlanningPayload,
-  year: number,
-  endYear = year,
+  annee: number,
+  endYear = annee,
   quotes: readonly NativeQuoteRecord[] = [],
 ): GrandPlanningProvisionRow[] {
-  const weeks = new Set(planningYearWeekIdsRange(year, endYear));
+  const semaines = new Set(planningYearWeekIdsRange(annee, endYear));
   const activities: PlanningActivity[] = ["BE", "WORKSHOP", "INSTALL"];
 
-  const rank = new Map(planningPayload.provisionalOrder.map((id, index) => [id, index]));
+  const rank = new Map(planningPayload.provisionalOrder.map((id, indice) => [id, indice]));
 
   return commercialPayload.cases
     .filter(isCommercialActive)
-    .map((item, inputIndex) => ({
+    .map((element, inputIndex) => ({
       inputIndex,
-      provisionHours: effectiveCommercialForecastHours(item, quotes),
-      item,
+      provisionHours: effectiveCommercialForecastHours(element, quotes),
+      item: element,
     }))
-    .map(({ inputIndex, provisionHours, item }) => ({
+    .map(({ inputIndex, provisionHours, item: element }) => ({
       inputIndex,
       row: {
-        caseId: item.id,
-        name: item.name,
-        status: item.status,
-        statusLabel: COMMERCIAL_STATUS_LABELS[item.status],
-        expectedConfirmationDate: item.expectedConfirmationDate,
+        caseId: element.id,
+        name: element.name,
+        status: element.status,
+        statusLabel: COMMERCIAL_STATUS_LABELS[element.status],
+        expectedConfirmationDate: element.expectedConfirmationDate,
         activities: activities.map((activity) => {
           const matching = planningPayload.provisionalAllocations.filter(
-            (allocation) => allocation.caseId === item.id && allocation.activity === activity,
+            (allocation) => allocation.caseId === element.id && allocation.activity === activity,
           );
           const weeklyHours = Object.fromEntries(
             matching
-              .filter((allocation) => weeks.has(allocation.week))
+              .filter((allocation) => semaines.has(allocation.week))
               .map((allocation) => [allocation.week, allocation.hours]),
           );
-          const allocatedHours = matching.reduce((sum, allocation) => sum + allocation.hours, 0);
+          const allocatedHours = matching.reduce(
+            (somme, allocation) => somme + allocation.hours,
+            0,
+          );
           const activityProvisionHours = provisionHoursForActivity(provisionHours, activity);
           return {
             activity,
@@ -568,18 +573,18 @@ export function buildCommercialProvisionRows(
         }),
       },
     }))
-    .filter(({ row }) =>
-      row.activities.some(
+    .filter(({ row: ligneTableau }) =>
+      ligneTableau.activities.some(
         (activity) => activity.provisionHours !== 0 || activity.allocatedHours !== 0,
       ),
     )
-    .sort((left, right) => {
-      const leftRank = rank.get(left.row.caseId);
-      const rightRank = rank.get(right.row.caseId);
+    .sort((gauche, droite) => {
+      const leftRank = rank.get(gauche.row.caseId);
+      const rightRank = rank.get(droite.row.caseId);
       if (leftRank != null && rightRank != null) return leftRank - rightRank;
       if (leftRank != null) return -1;
       if (rightRank != null) return 1;
-      return left.inputIndex - right.inputIndex;
+      return gauche.inputIndex - droite.inputIndex;
     })
-    .map(({ row }) => row);
+    .map(({ row: ligneTableau }) => ligneTableau);
 }

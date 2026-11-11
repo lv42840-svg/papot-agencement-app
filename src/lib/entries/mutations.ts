@@ -142,78 +142,88 @@ export type EntriesActor = {
 export type EntriesCapabilities = { canQualify: boolean; canManageTags: boolean };
 export type EntriesMutationResult = { payload: EntriesPayload; focusEntryId?: string };
 
-export function entriesCapabilities(actor: EntriesActor): EntriesCapabilities {
+export function entriesCapabilities(auteur: EntriesActor): EntriesCapabilities {
   return {
-    canQualify: actor.canQualify === true,
-    canManageTags: actor.canManageTags === true,
+    canQualify: auteur.canQualify === true,
+    canManageTags: auteur.canManageTags === true,
   };
 }
 
-function requireCapability(value: boolean, code: string): void {
-  if (!value) throw new Error(code);
+function requireCapability(valeur: boolean, code: string): void {
+  if (!valeur) throw new Error(code);
 }
 
-function findEntry(payload: EntriesPayload, entryId: string): EntryRecord {
-  const entry = payload.entries.find((candidate) => candidate.id === entryId);
-  if (!entry) throw new Error("ENTRY_NOT_FOUND");
-  return entry;
+function findEntry(contenu: EntriesPayload, idEntree: string): EntryRecord {
+  const entree = contenu.entries.find((candidat) => candidat.id === idEntree);
+  if (!entree) throw new Error("ENTRY_NOT_FOUND");
+  return entree;
 }
 
-function assertToQualify(entry: EntryRecord): void {
-  if (entry.status !== "TO_QUALIFY") throw new Error("ENTRY_NOT_TO_QUALIFY");
+function assertToQualify(entree: EntryRecord): void {
+  if (entree.status !== "TO_QUALIFY") throw new Error("ENTRY_NOT_TO_QUALIFY");
 }
 
-function assertAssignedToActor(entry: EntryRecord, actor: EntriesActor): void {
-  if (entry.status !== "ASSIGNED") throw new Error("ENTRY_NOT_ASSIGNED");
+function assertAssignedToActor(entree: EntryRecord, auteur: EntriesActor): void {
+  if (entree.status !== "ASSIGNED") throw new Error("ENTRY_NOT_ASSIGNED");
   if (
-    !entry.assigneeName ||
-    normalizePersonName(entry.assigneeName) !== normalizePersonName(actor.displayName)
+    !entree.assigneeName ||
+    normalizePersonName(entree.assigneeName) !== normalizePersonName(auteur.displayName)
   ) {
     throw new Error("ENTRY_NOT_ASSIGNED_TO_ACTOR");
   }
 }
 
-function ensureTagIds(payload: EntriesPayload, tagIds: string[]): void {
-  const known = new Set(payload.tags.map((tag) => tag.id));
+function ensureTagIds(contenu: EntriesPayload, tagIds: string[]): void {
+  const known = new Set(contenu.tags.map((etiquette) => etiquette.id));
   if (tagIds.some((tagId) => !known.has(tagId))) throw new Error("ENTRY_TAG_UNKNOWN");
 }
 
 function history(
-  entry: EntryRecord,
-  actor: EntriesActor,
+  entree: EntryRecord,
+  auteur: EntriesActor,
   type: EntryRecord["history"][number]["type"],
   summary: string,
-  now: string,
+  maintenant: string,
 ): void {
-  entry.history.push({ id: randomUUID(), type, at: now, actorName: actor.displayName, summary });
+  entree.history.push({
+    id: randomUUID(),
+    type,
+    at: maintenant,
+    actorName: auteur.displayName,
+    summary,
+  });
 }
 
 function notify(
-  payload: EntriesPayload,
-  entryId: string,
+  contenu: EntriesPayload,
+  idEntree: string,
   recipientName: string,
   message: string,
-  now: string,
+  maintenant: string,
 ): void {
-  payload.notifications.push({
+  contenu.notifications.push({
     id: randomUUID(),
-    entryId,
+    entryId: idEntree,
     recipientName,
-    createdAt: now,
+    createdAt: maintenant,
     message,
     readAt: null,
   });
 }
 
-function ensureUniqueTagLabel(payload: EntriesPayload, label: string, exceptId?: string): void {
-  const key = normalizePersonName(label);
-  if (payload.tags.some((tag) => tag.id !== exceptId && normalizePersonName(tag.label) === key)) {
+function ensureUniqueTagLabel(contenu: EntriesPayload, libelle: string, exceptId?: string): void {
+  const cle = normalizePersonName(libelle);
+  if (
+    contenu.tags.some(
+      (etiquette) => etiquette.id !== exceptId && normalizePersonName(etiquette.label) === cle,
+    )
+  ) {
     throw new Error("TAG_LABEL_EXISTS");
   }
 }
 
-function slugifyTag(label: string): string {
-  const base = normalizePersonName(label)
+function slugifyTag(libelle: string): string {
+  const base = normalizePersonName(libelle)
     .replace(/[^a-z0-9]+/g, "-")
     .replace(/^-+|-+$/g, "")
     .slice(0, 40);
@@ -222,442 +232,464 @@ function slugifyTag(label: string): string {
 
 export function registerEntryAttachments(
   source: EntriesPayload,
-  entryId: string,
-  attachments: EntryAttachment[],
-  actor: EntriesActor,
+  idEntree: string,
+  piecesJointes: EntryAttachment[],
+  auteur: EntriesActor,
   nowDate: Date = new Date(),
 ): EntriesMutationResult {
-  const payload = structuredClone(source);
-  const entry = findEntry(payload, entryId);
-  const knownIds = new Set(entry.attachments.map((item) => item.id));
-  const knownPaths = new Set(entry.attachments.map((item) => item.storagePath));
-  if (attachments.some((item) => knownIds.has(item.id) || knownPaths.has(item.storagePath))) {
+  const contenu = structuredClone(source);
+  const entree = findEntry(contenu, idEntree);
+  const knownIds = new Set(entree.attachments.map((element) => element.id));
+  const knownPaths = new Set(entree.attachments.map((element) => element.storagePath));
+  if (
+    piecesJointes.some((element) => knownIds.has(element.id) || knownPaths.has(element.storagePath))
+  ) {
     throw new Error("ENTRY_ATTACHMENT_DUPLICATE");
   }
-  entry.attachments.push(...attachments);
-  if (attachments.length > 0) {
-    const names = attachments
+  entree.attachments.push(...piecesJointes);
+  if (piecesJointes.length > 0) {
+    const noms = piecesJointes
       .slice(0, 3)
-      .map((item) => item.fileName)
+      .map((element) => element.fileName)
       .join(", ");
-    const suffix = attachments.length > 3 ? ` +${attachments.length - 3}` : "";
+    const suffix = piecesJointes.length > 3 ? ` +${piecesJointes.length - 3}` : "";
     history(
-      entry,
-      actor,
+      entree,
+      auteur,
       "ATTACHMENTS_ADDED",
-      `${attachments.length} pièce${attachments.length > 1 ? "s" : ""} jointe${attachments.length > 1 ? "s" : ""} ajoutée${attachments.length > 1 ? "s" : ""} : ${names}${suffix}.`,
+      `${piecesJointes.length} pièce${piecesJointes.length > 1 ? "s" : ""} jointe${piecesJointes.length > 1 ? "s" : ""} ajoutée${piecesJointes.length > 1 ? "s" : ""} : ${noms}${suffix}.`,
       nowDate.toISOString(),
     );
   }
-  return { payload, focusEntryId: entry.id };
+  return { payload: contenu, focusEntryId: entree.id };
 }
 
 export function applyEntriesMutation(
   source: EntriesPayload,
-  input: EntriesMutation,
-  actor: EntriesActor,
+  saisie: EntriesMutation,
+  auteur: EntriesActor,
   nowDate: Date = new Date(),
 ): EntriesMutationResult {
-  const payload = structuredClone(source);
-  const capabilities = entriesCapabilities(actor);
-  const now = nowDate.toISOString();
+  const contenu = structuredClone(source);
+  const capabilities = entriesCapabilities(auteur);
+  const maintenant = nowDate.toISOString();
 
-  if (input.action === "create") {
-    const existing = input.entryId
-      ? payload.entries.find((entry) => entry.id === input.entryId)
+  if (saisie.action === "create") {
+    const existing = saisie.entryId
+      ? contenu.entries.find((entree) => entree.id === saisie.entryId)
       : undefined;
     if (existing) {
-      if (existing.rawText !== input.rawText || existing.priority !== input.priority)
+      if (existing.rawText !== saisie.rawText || existing.priority !== saisie.priority)
         throw new Error("CAPTURE_REQUEST_CONFLICT");
-      return { payload, focusEntryId: existing.id };
+      return { payload: contenu, focusEntryId: existing.id };
     }
-    ensureTagIds(payload, input.tagIds);
-    const entry: EntryRecord = {
-      id: input.entryId ?? randomUUID(),
-      rawText: input.rawText,
+    ensureTagIds(contenu, saisie.tagIds);
+    const entree: EntryRecord = {
+      id: saisie.entryId ?? randomUUID(),
+      rawText: saisie.rawText,
       structuredDescription: null,
       nextAction: null,
-      tagIds: [...input.tagIds],
-      priority: input.priority,
+      tagIds: [...saisie.tagIds],
+      priority: saisie.priority,
       status: "TO_QUALIFY",
-      createdAt: now,
-      createdByName: actor.displayName,
+      createdAt: maintenant,
+      createdByName: auteur.displayName,
       assigneeName: null,
       dueDate: null,
       snoozedUntilDate: null,
       result: null,
       completedAt: null,
       parentEntryId: null,
-      clientId: input.clientId ?? null,
-      commercialCaseId: input.commercialCaseId ?? null,
+      clientId: saisie.clientId ?? null,
+      commercialCaseId: saisie.commercialCaseId ?? null,
       derivedEntryIds: [],
       attachments: [],
       history: [],
     };
-    history(entry, actor, "CREATED", "Entrée créée dans À qualifier.", now);
-    payload.entries.unshift(entry);
-    return { payload, focusEntryId: entry.id };
+    history(entree, auteur, "CREATED", "Entrée créée dans À qualifier.", maintenant);
+    contenu.entries.unshift(entree);
+    return { payload: contenu, focusEntryId: entree.id };
   }
 
-  if (input.action === "notificationRead") {
-    const notification = payload.notifications.find((item) => item.id === input.notificationId);
+  if (saisie.action === "notificationRead") {
+    const notification = contenu.notifications.find(
+      (element) => element.id === saisie.notificationId,
+    );
     if (!notification) throw new Error("NOTIFICATION_NOT_FOUND");
     if (
-      normalizePersonName(notification.recipientName) !== normalizePersonName(actor.displayName)
+      normalizePersonName(notification.recipientName) !== normalizePersonName(auteur.displayName)
     ) {
       throw new Error("NOTIFICATION_FORBIDDEN");
     }
-    notification.readAt = now;
-    return { payload, focusEntryId: notification.entryId };
+    notification.readAt = maintenant;
+    return { payload: contenu, focusEntryId: notification.entryId };
   }
 
-  if (input.action === "tagAdd") {
+  if (saisie.action === "tagAdd") {
     requireCapability(capabilities.canManageTags, "TAG_ADMIN_FORBIDDEN");
-    ensureUniqueTagLabel(payload, input.label);
-    payload.tags.push({
-      id: slugifyTag(input.label),
-      label: input.label,
+    ensureUniqueTagLabel(contenu, saisie.label);
+    contenu.tags.push({
+      id: slugifyTag(saisie.label),
+      label: saisie.label,
       active: true,
-      sortOrder: payload.tags.length,
+      sortOrder: contenu.tags.length,
     });
-    return { payload };
+    return { payload: contenu };
   }
 
-  if (input.action === "tagUpdate") {
+  if (saisie.action === "tagUpdate") {
     requireCapability(capabilities.canManageTags, "TAG_ADMIN_FORBIDDEN");
-    const tag = payload.tags.find((item) => item.id === input.tagId);
-    if (!tag) throw new Error("TAG_NOT_FOUND");
-    ensureUniqueTagLabel(payload, input.label, tag.id);
-    tag.label = input.label;
-    tag.active = input.active;
-    return { payload };
+    const etiquette = contenu.tags.find((element) => element.id === saisie.tagId);
+    if (!etiquette) throw new Error("TAG_NOT_FOUND");
+    ensureUniqueTagLabel(contenu, saisie.label, etiquette.id);
+    etiquette.label = saisie.label;
+    etiquette.active = saisie.active;
+    return { payload: contenu };
   }
 
-  if (input.action === "tagMove") {
+  if (saisie.action === "tagMove") {
     requireCapability(capabilities.canManageTags, "TAG_ADMIN_FORBIDDEN");
-    const ordered = [...payload.tags].sort((a, b) => a.sortOrder - b.sortOrder);
-    const index = ordered.findIndex((tag) => tag.id === input.tagId);
-    if (index < 0) throw new Error("TAG_NOT_FOUND");
-    const target = input.direction === "up" ? index - 1 : index + 1;
-    if (target < 0 || target >= ordered.length) return { payload };
-    [ordered[index], ordered[target]] = [ordered[target], ordered[index]];
-    ordered.forEach((tag, position) => {
-      const current = payload.tags.find((candidate) => candidate.id === tag.id);
-      if (current) current.sortOrder = position;
+    const ordered = [...contenu.tags].sort((a, b) => a.sortOrder - b.sortOrder);
+    const indice = ordered.findIndex((etiquette) => etiquette.id === saisie.tagId);
+    if (indice < 0) throw new Error("TAG_NOT_FOUND");
+    const cible = saisie.direction === "up" ? indice - 1 : indice + 1;
+    if (cible < 0 || cible >= ordered.length) return { payload: contenu };
+    [ordered[indice], ordered[cible]] = [ordered[cible], ordered[indice]];
+    ordered.forEach((etiquette, position) => {
+      const courant = contenu.tags.find((candidat) => candidat.id === etiquette.id);
+      if (courant) courant.sortOrder = position;
     });
-    return { payload };
+    return { payload: contenu };
   }
 
-  const entry = findEntry(payload, input.entryId);
+  const entree = findEntry(contenu, saisie.entryId);
 
-  if (input.action === "qualifyDraft") {
+  if (saisie.action === "qualifyDraft") {
     requireCapability(capabilities.canQualify, "QUALIFICATION_FORBIDDEN");
-    assertToQualify(entry);
-    ensureTagIds(payload, input.tagIds);
-    entry.structuredDescription = input.description || null;
-    entry.nextAction = input.nextAction || null;
-    entry.tagIds = [...input.tagIds];
+    assertToQualify(entree);
+    ensureTagIds(contenu, saisie.tagIds);
+    entree.structuredDescription = saisie.description || null;
+    entree.nextAction = saisie.nextAction || null;
+    entree.tagIds = [...saisie.tagIds];
     history(
-      entry,
-      actor,
+      entree,
+      auteur,
       "QUALIFICATION_SAVED",
       "Qualification enregistrée sans sortir de la boîte.",
-      now,
+      maintenant,
     );
-    return { payload, focusEntryId: entry.id };
+    return { payload: contenu, focusEntryId: entree.id };
   }
 
-  if (input.action === "qualifyAssign") {
+  if (saisie.action === "qualifyAssign") {
     requireCapability(capabilities.canQualify, "QUALIFICATION_FORBIDDEN");
-    assertToQualify(entry);
-    ensureTagIds(payload, input.tagIds);
-    entry.structuredDescription = input.description;
-    entry.nextAction = input.nextAction;
-    entry.tagIds = [...input.tagIds];
-    entry.status = "ASSIGNED";
-    entry.assigneeName = input.assigneeName;
-    entry.dueDate = input.dueDate;
-    entry.snoozedUntilDate = null;
+    assertToQualify(entree);
+    ensureTagIds(contenu, saisie.tagIds);
+    entree.structuredDescription = saisie.description;
+    entree.nextAction = saisie.nextAction;
+    entree.tagIds = [...saisie.tagIds];
+    entree.status = "ASSIGNED";
+    entree.assigneeName = saisie.assigneeName;
+    entree.dueDate = saisie.dueDate;
+    entree.snoozedUntilDate = null;
     history(
-      entry,
-      actor,
+      entree,
+      auteur,
       "QUALIFICATION_SAVED",
       "Entrée qualifiée sans ressaisie du texte d'origine.",
-      now,
+      maintenant,
     );
     history(
-      entry,
-      actor,
+      entree,
+      auteur,
       "ASSIGNED",
-      `Affectée à ${input.assigneeName}, échéance ${input.dueDate}.`,
-      now,
+      `Affectée à ${saisie.assigneeName}, échéance ${saisie.dueDate}.`,
+      maintenant,
     );
-    return { payload, focusEntryId: entry.id };
+    return { payload: contenu, focusEntryId: entree.id };
   }
 
-  if (input.action === "qualifyActions") {
+  if (saisie.action === "qualifyActions") {
     requireCapability(capabilities.canQualify, "QUALIFICATION_FORBIDDEN");
-    assertToQualify(entry);
-    ensureTagIds(payload, input.tagIds);
+    assertToQualify(entree);
+    ensureTagIds(contenu, saisie.tagIds);
 
-    entry.structuredDescription = input.description;
-    entry.nextAction = null;
-    entry.tagIds = [...input.tagIds];
-    entry.status = "DONE";
-    entry.result = `${input.actions.length} action${input.actions.length > 1 ? "s" : ""} suivante${input.actions.length > 1 ? "s" : ""} créée${input.actions.length > 1 ? "s" : ""}.`;
-    entry.completedAt = now;
-    entry.snoozedUntilDate = null;
+    entree.structuredDescription = saisie.description;
+    entree.nextAction = null;
+    entree.tagIds = [...saisie.tagIds];
+    entree.status = "DONE";
+    entree.result = `${saisie.actions.length} action${saisie.actions.length > 1 ? "s" : ""} suivante${saisie.actions.length > 1 ? "s" : ""} créée${saisie.actions.length > 1 ? "s" : ""}.`;
+    entree.completedAt = maintenant;
+    entree.snoozedUntilDate = null;
 
-    const createdActions: EntryRecord[] = input.actions.map((action) => {
+    const createdActions: EntryRecord[] = saisie.actions.map((action) => {
       const child: EntryRecord = {
         id: randomUUID(),
         rawText: action.text,
-        structuredDescription: input.description,
+        structuredDescription: saisie.description,
         nextAction: action.text,
-        tagIds: [...input.tagIds],
-        priority: entry.priority,
+        tagIds: [...saisie.tagIds],
+        priority: entree.priority,
         status: "ASSIGNED",
-        createdAt: now,
-        createdByName: actor.displayName,
+        createdAt: maintenant,
+        createdByName: auteur.displayName,
         assigneeName: action.assigneeName,
         dueDate: action.dueDate,
         snoozedUntilDate: null,
         result: null,
         completedAt: null,
-        parentEntryId: entry.id,
-        clientId: entry.clientId ?? null,
-        commercialCaseId: entry.commercialCaseId ?? null,
+        parentEntryId: entree.id,
+        clientId: entree.clientId ?? null,
+        commercialCaseId: entree.commercialCaseId ?? null,
         derivedEntryIds: [],
         attachments: [],
         history: [],
       };
-      history(child, actor, "CREATED", `Action créée depuis « ${entry.rawText} ».`, now);
+      history(child, auteur, "CREATED", `Action créée depuis « ${entree.rawText} ».`, maintenant);
       history(
         child,
-        actor,
+        auteur,
         "ASSIGNED",
         `Affectée à ${action.assigneeName}, échéance ${action.dueDate}.`,
-        now,
+        maintenant,
       );
-      entry.derivedEntryIds.push(child.id);
-      history(entry, actor, "DERIVED_CREATED", `Action liée créée : « ${action.text} ».`, now);
+      entree.derivedEntryIds.push(child.id);
+      history(
+        entree,
+        auteur,
+        "DERIVED_CREATED",
+        `Action liée créée : « ${action.text} ».`,
+        maintenant,
+      );
       return child;
     });
 
     history(
-      entry,
-      actor,
+      entree,
+      auteur,
       "COMPLETED",
       `Note validée avec ${createdActions.length} action${createdActions.length > 1 ? "s" : ""} suivante${createdActions.length > 1 ? "s" : ""}.`,
-      now,
+      maintenant,
     );
 
-    payload.entries.unshift(...createdActions);
-    return { payload, focusEntryId: createdActions[0]?.id ?? entry.id };
+    contenu.entries.unshift(...createdActions);
+    return { payload: contenu, focusEntryId: createdActions[0]?.id ?? entree.id };
   }
 
-  if (input.action === "updateAssigned") {
-    assertAssignedToActor(entry, actor);
-    ensureTagIds(payload, input.tagIds);
-    entry.structuredDescription = input.description;
-    entry.nextAction = input.nextAction;
-    entry.priority = input.priority;
-    entry.tagIds = [...input.tagIds];
+  if (saisie.action === "updateAssigned") {
+    assertAssignedToActor(entree, auteur);
+    ensureTagIds(contenu, saisie.tagIds);
+    entree.structuredDescription = saisie.description;
+    entree.nextAction = saisie.nextAction;
+    entree.priority = saisie.priority;
+    entree.tagIds = [...saisie.tagIds];
     history(
-      entry,
-      actor,
+      entree,
+      auteur,
       "QUALIFICATION_SAVED",
       "Informations de la tâche mises à jour depuis Mes tâches.",
-      now,
+      maintenant,
     );
-    return { payload, focusEntryId: entry.id };
+    return { payload: contenu, focusEntryId: entree.id };
   }
 
-  if (input.action === "assignedActions") {
-    assertAssignedToActor(entry, actor);
+  if (saisie.action === "assignedActions") {
+    assertAssignedToActor(entree, auteur);
 
-    const createdActions: EntryRecord[] = input.actions.map((action) => {
+    const createdActions: EntryRecord[] = saisie.actions.map((action) => {
       const child: EntryRecord = {
         id: randomUUID(),
         rawText: action.text,
-        structuredDescription: entry.structuredDescription,
+        structuredDescription: entree.structuredDescription,
         nextAction: action.text,
-        tagIds: [...entry.tagIds],
-        priority: entry.priority,
+        tagIds: [...entree.tagIds],
+        priority: entree.priority,
         status: "ASSIGNED",
-        createdAt: now,
-        createdByName: actor.displayName,
+        createdAt: maintenant,
+        createdByName: auteur.displayName,
         assigneeName: action.assigneeName,
         dueDate: action.dueDate,
         snoozedUntilDate: null,
         result: null,
         completedAt: null,
-        parentEntryId: entry.id,
-        clientId: entry.clientId ?? null,
-        commercialCaseId: entry.commercialCaseId ?? null,
+        parentEntryId: entree.id,
+        clientId: entree.clientId ?? null,
+        commercialCaseId: entree.commercialCaseId ?? null,
         derivedEntryIds: [],
         attachments: [],
         history: [],
       };
 
-      history(child, actor, "CREATED", `Action créée depuis « ${entry.rawText} ».`, now);
+      history(child, auteur, "CREATED", `Action créée depuis « ${entree.rawText} ».`, maintenant);
       history(
         child,
-        actor,
+        auteur,
         "ASSIGNED",
         `Affectée à ${action.assigneeName}, échéance ${action.dueDate}.`,
-        now,
+        maintenant,
       );
-      entry.derivedEntryIds.push(child.id);
-      history(entry, actor, "DERIVED_CREATED", `Action liée créée : « ${action.text} ».`, now);
+      entree.derivedEntryIds.push(child.id);
+      history(
+        entree,
+        auteur,
+        "DERIVED_CREATED",
+        `Action liée créée : « ${action.text} ».`,
+        maintenant,
+      );
       return child;
     });
 
-    payload.entries.unshift(...createdActions);
-    return { payload, focusEntryId: entry.id };
+    contenu.entries.unshift(...createdActions);
+    return { payload: contenu, focusEntryId: entree.id };
   }
 
-  if (input.action === "qualifyDone") {
+  if (saisie.action === "qualifyDone") {
     requireCapability(capabilities.canQualify, "QUALIFICATION_FORBIDDEN");
-    assertToQualify(entry);
-    ensureTagIds(payload, input.tagIds);
-    entry.tagIds = [...input.tagIds];
-    entry.status = "DONE";
-    entry.result = input.result || null;
-    entry.completedAt = now;
-    entry.snoozedUntilDate = null;
+    assertToQualify(entree);
+    ensureTagIds(contenu, saisie.tagIds);
+    entree.tagIds = [...saisie.tagIds];
+    entree.status = "DONE";
+    entree.result = saisie.result || null;
+    entree.completedAt = maintenant;
+    entree.snoozedUntilDate = null;
     history(
-      entry,
-      actor,
+      entree,
+      auteur,
       "COMPLETED",
-      input.result ? `Traité / terminé : ${input.result}` : "Traité / terminé.",
-      now,
+      saisie.result ? `Traité / terminé : ${saisie.result}` : "Traité / terminé.",
+      maintenant,
     );
-    return { payload, focusEntryId: entry.id };
+    return { payload: contenu, focusEntryId: entree.id };
   }
 
-  if (input.action === "snooze") {
+  if (saisie.action === "snooze") {
     requireCapability(capabilities.canQualify, "QUALIFICATION_FORBIDDEN");
-    assertToQualify(entry);
-    if (input.untilDate < parisDateKey(nowDate)) throw new Error("SNOOZE_DATE_IN_PAST");
-    entry.snoozedUntilDate = input.untilDate;
+    assertToQualify(entree);
+    if (saisie.untilDate < parisDateKey(nowDate)) throw new Error("SNOOZE_DATE_IN_PAST");
+    entree.snoozedUntilDate = saisie.untilDate;
     history(
-      entry,
-      actor,
+      entree,
+      auteur,
       "SNOOZED",
-      `Voir plus tard jusqu'au ${input.untilDate}. Motif : ${input.reason}`,
-      now,
+      `Voir plus tard jusqu'au ${saisie.untilDate}. Motif : ${saisie.reason}`,
+      maintenant,
     );
-    return { payload, focusEntryId: entry.id };
+    return { payload: contenu, focusEntryId: entree.id };
   }
 
-  if (input.action === "postpone") {
-    assertAssignedToActor(entry, actor);
-    if (!entry.dueDate || input.dueDate <= entry.dueDate) {
+  if (saisie.action === "postpone") {
+    assertAssignedToActor(entree, auteur);
+    if (!entree.dueDate || saisie.dueDate <= entree.dueDate) {
       throw new Error("POSTPONE_DATE_NOT_LATER");
     }
-    const oldDate = entry.dueDate;
-    entry.dueDate = input.dueDate;
+    const oldDate = entree.dueDate;
+    entree.dueDate = saisie.dueDate;
     history(
-      entry,
-      actor,
+      entree,
+      auteur,
       "DEADLINE_POSTPONED",
-      `Échéance repoussée du ${oldDate} au ${input.dueDate}. Motif : ${input.reason}`,
-      now,
+      `Échéance repoussée du ${oldDate} au ${saisie.dueDate}. Motif : ${saisie.reason}`,
+      maintenant,
     );
     const recipients = new Set(
-      (actor.notificationRecipients ?? []).filter(
-        (name) => normalizePersonName(name) !== normalizePersonName(actor.displayName),
+      (auteur.notificationRecipients ?? []).filter(
+        (nom) => normalizePersonName(nom) !== normalizePersonName(auteur.displayName),
       ),
     );
     for (const recipientName of recipients) {
       notify(
-        payload,
-        entry.id,
+        contenu,
+        entree.id,
         recipientName,
-        `${actor.displayName} a repoussé « ${entry.rawText} » au ${input.dueDate}. Motif : ${input.reason}`,
-        now,
+        `${auteur.displayName} a repoussé « ${entree.rawText} » au ${saisie.dueDate}. Motif : ${saisie.reason}`,
+        maintenant,
       );
     }
-    return { payload, focusEntryId: entry.id };
+    return { payload: contenu, focusEntryId: entree.id };
   }
 
-  if (input.action === "reassign") {
-    assertAssignedToActor(entry, actor);
-    const oldAssignee = entry.assigneeName ?? actor.displayName;
-    entry.assigneeName = input.assigneeName;
+  if (saisie.action === "reassign") {
+    assertAssignedToActor(entree, auteur);
+    const oldAssignee = entree.assigneeName ?? auteur.displayName;
+    entree.assigneeName = saisie.assigneeName;
     history(
-      entry,
-      actor,
+      entree,
+      auteur,
       "REASSIGNED",
-      `Réaffectée de ${oldAssignee} à ${input.assigneeName}. Motif : ${input.reason}`,
-      now,
+      `Réaffectée de ${oldAssignee} à ${saisie.assigneeName}. Motif : ${saisie.reason}`,
+      maintenant,
     );
     notify(
-      payload,
-      entry.id,
-      input.assigneeName,
-      `${actor.displayName} vous a réaffecté « ${entry.rawText} ». Échéance inchangée : ${entry.dueDate ?? "sans date"}.`,
-      now,
+      contenu,
+      entree.id,
+      saisie.assigneeName,
+      `${auteur.displayName} vous a réaffecté « ${entree.rawText} ». Échéance inchangée : ${entree.dueDate ?? "sans date"}.`,
+      maintenant,
     );
-    return { payload, focusEntryId: entry.id };
+    return { payload: contenu, focusEntryId: entree.id };
   }
 
-  if (input.action === "complete") {
-    assertAssignedToActor(entry, actor);
-    entry.status = "DONE";
-    entry.result = input.result || null;
-    entry.completedAt = now;
+  if (saisie.action === "complete") {
+    assertAssignedToActor(entree, auteur);
+    entree.status = "DONE";
+    entree.result = saisie.result || null;
+    entree.completedAt = maintenant;
     history(
-      entry,
-      actor,
+      entree,
+      auteur,
       "COMPLETED",
-      input.result ? `Terminé : ${input.result}` : "Terminé.",
-      now,
+      saisie.result ? `Terminé : ${saisie.result}` : "Terminé.",
+      maintenant,
     );
-    return { payload, focusEntryId: entry.id };
+    return { payload: contenu, focusEntryId: entree.id };
   }
 
-  if (input.action === "derive") {
+  if (saisie.action === "derive") {
     requireCapability(capabilities.canQualify, "QUALIFICATION_FORBIDDEN");
-    assertToQualify(entry);
+    assertToQualify(entree);
     const derived: EntryRecord = {
       id: randomUUID(),
-      rawText: input.rawText,
+      rawText: saisie.rawText,
       structuredDescription: null,
       nextAction: null,
-      tagIds: [...entry.tagIds],
-      priority: entry.priority,
+      tagIds: [...entree.tagIds],
+      priority: entree.priority,
       status: "TO_QUALIFY",
-      createdAt: now,
-      createdByName: actor.displayName,
+      createdAt: maintenant,
+      createdByName: auteur.displayName,
       assigneeName: null,
       dueDate: null,
       snoozedUntilDate: null,
       result: null,
       completedAt: null,
-      parentEntryId: entry.id,
-      clientId: entry.clientId ?? null,
-      commercialCaseId: entry.commercialCaseId ?? null,
+      parentEntryId: entree.id,
+      clientId: entree.clientId ?? null,
+      commercialCaseId: entree.commercialCaseId ?? null,
       derivedEntryIds: [],
       attachments: [],
       history: [],
     };
-    history(derived, actor, "CREATED", `Entrée dérivée de « ${entry.rawText} ».`, now);
-    history(entry, actor, "DERIVED_CREATED", `Entrée liée créée : « ${input.rawText} ».`, now);
-    entry.derivedEntryIds.push(derived.id);
-    payload.entries.unshift(derived);
-    return { payload, focusEntryId: derived.id };
+    history(derived, auteur, "CREATED", `Entrée dérivée de « ${entree.rawText} ».`, maintenant);
+    history(
+      entree,
+      auteur,
+      "DERIVED_CREATED",
+      `Entrée liée créée : « ${saisie.rawText} ».`,
+      maintenant,
+    );
+    entree.derivedEntryIds.push(derived.id);
+    contenu.entries.unshift(derived);
+    return { payload: contenu, focusEntryId: derived.id };
   }
 
   throw new Error("ENTRY_MUTATION_UNSUPPORTED");
 }
 
-export function listSuggestedAssignees(payload: EntriesPayload, actor: EntriesActor): string[] {
-  const names = new Set<string>([...(actor.assignmentCandidates ?? []), actor.displayName]);
-  for (const entry of payload.entries) {
-    if (entry.assigneeName) names.add(entry.assigneeName);
-    names.add(entry.createdByName);
+export function listSuggestedAssignees(contenu: EntriesPayload, auteur: EntriesActor): string[] {
+  const noms = new Set<string>([...(auteur.assignmentCandidates ?? []), auteur.displayName]);
+  for (const entree of contenu.entries) {
+    if (entree.assigneeName) noms.add(entree.assigneeName);
+    noms.add(entree.createdByName);
   }
-  return [...names].filter(Boolean).sort((a, b) => a.localeCompare(b, "fr-FR"));
+  return [...noms].filter(Boolean).sort((a, b) => a.localeCompare(b, "fr-FR"));
 }

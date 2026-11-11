@@ -38,26 +38,26 @@ function componentActivity(component: QuoteOuvrageComponent): "BE" | "ATELIER" |
   return component.activity ?? component.librarySource?.component.activity ?? null;
 }
 
-function nonPoseLaborHours(line: QuoteLine): { be: number; workshop: number } {
+function nonPoseLaborHours(ligne: QuoteLine): { be: number; workshop: number } {
   let bePerLineUnit = 0;
   let workshopPerLineUnit = 0;
 
-  for (const component of line.components ?? []) {
+  for (const component of ligne.components ?? []) {
     const activity = componentActivity(component);
     if (activity === "BE") bePerLineUnit += component.quantity;
     if (activity === "ATELIER") workshopPerLineUnit += component.quantity;
   }
 
   return {
-    be: line.quantity * bePerLineUnit,
-    workshop: line.quantity * workshopPerLineUnit,
+    be: ligne.quantity * bePerLineUnit,
+    workshop: ligne.quantity * workshopPerLineUnit,
   };
 }
 
-function lineBaseLaborCostCents(line: QuoteLine): number | null {
+function lineBaseLaborCostCents(ligne: QuoteLine): number | null {
   let unitLaborCostCents = 0;
 
-  for (const component of line.components ?? []) {
+  for (const component of ligne.components ?? []) {
     if (componentActivity(component) === null) continue;
     const costRateCents = quoteOuvrageComponentCostPriceCents(component);
     // An unpriced labor hour cannot be treated as free: it would inflate margin.
@@ -65,11 +65,11 @@ function lineBaseLaborCostCents(line: QuoteLine): number | null {
     unitLaborCostCents += Math.round(component.quantity * costRateCents);
   }
 
-  return Math.round(line.quantity * unitLaborCostCents);
+  return Math.round(ligne.quantity * unitLaborCostCents);
 }
 
-function linePoseCostRateCents(line: QuoteLine): number | null {
-  const poseComponents = (line.components ?? []).filter(
+function linePoseCostRateCents(ligne: QuoteLine): number | null {
+  const poseComponents = (ligne.components ?? []).filter(
     (component) => componentActivity(component) === "POSE",
   );
   if (poseComponents.length === 0) return null;
@@ -88,16 +88,16 @@ function linePoseCostRateCents(line: QuoteLine): number | null {
   return costPerLineUnitCents / hoursPerLineUnit;
 }
 
-function roundHours(value: number): number {
-  return Math.round(value * 1_000_000) / 1_000_000;
+function roundHours(valeur: number): number {
+  return Math.round(valeur * 1_000_000) / 1_000_000;
 }
 
 export function calculateCommercialQuoteSummary(quote: NativeQuoteRecord): CommercialQuoteSummary {
   const pricing = calculateQuoteAdjustedPricing(quote.model.items, quote.pricingConfig);
   const linesById = new Map(
     quote.model.items
-      .filter((item): item is QuoteLine => item.kind === "LINE")
-      .map((line) => [line.id, line]),
+      .filter((element): element is QuoteLine => element.kind === "LINE")
+      .map((ligne) => [ligne.id, ligne]),
   );
 
   let laborCostCents = 0;
@@ -111,10 +111,10 @@ export function calculateCommercialQuoteSummary(quote: NativeQuoteRecord): Comme
       return total;
     }
 
-    const line = linesById.get(adjustedLine.lineId);
-    if (!line) return total;
+    const ligne = linesById.get(adjustedLine.lineId);
+    if (!ligne) return total;
 
-    const baseLaborCostCents = lineBaseLaborCostCents(line);
+    const baseLaborCostCents = lineBaseLaborCostCents(ligne);
     if (baseLaborCostCents === null) {
       laborCostComplete = false;
     } else {
@@ -123,7 +123,7 @@ export function calculateCommercialQuoteSummary(quote: NativeQuoteRecord): Comme
 
     const addedPoseHours = adjustedLine.poseHours - adjustedLine.basePoseHours;
     if (addedPoseHours > 0) {
-      const poseCostRateCents = linePoseCostRateCents(line);
+      const poseCostRateCents = linePoseCostRateCents(ligne);
       if (poseCostRateCents === null) {
         laborCostComplete = false;
       } else {
@@ -131,7 +131,7 @@ export function calculateCommercialQuoteSummary(quote: NativeQuoteRecord): Comme
       }
     }
 
-    const nonPoseHours = nonPoseLaborHours(line);
+    const nonPoseHours = nonPoseLaborHours(ligne);
     soldBeHours += nonPoseHours.be;
     soldWorkshopHours += nonPoseHours.workshop;
     soldInstallHours += adjustedLine.poseHours;
@@ -170,7 +170,7 @@ export function calculateCommercialContractSummary(
   retainedQuoteIds: readonly string[],
 ): CommercialContractSummary {
   const retained = new Set(retainedQuoteIds);
-  const selected = quotes.filter((quote) => retained.has(quote.id));
+  const selectionne = quotes.filter((quote) => retained.has(quote.id));
   let totalHtCents = 0;
   let soldHours = 0;
   let soldBeHours = 0;
@@ -185,7 +185,7 @@ export function calculateCommercialContractSummary(
   let totalCostComplete = true;
   let marginComplete = true;
 
-  for (const quote of selected) {
+  for (const quote of selectionne) {
     const summary = calculateCommercialQuoteSummary(quote);
     totalHtCents += summary.totalHtCents;
     soldHours += summary.soldHours;
@@ -215,7 +215,7 @@ export function calculateCommercialContractSummary(
   }
 
   return {
-    quoteCount: selected.length,
+    quoteCount: selectionne.length,
     totalHtCents,
     soldHours: roundHours(soldHours),
     soldHoursByActivity: {

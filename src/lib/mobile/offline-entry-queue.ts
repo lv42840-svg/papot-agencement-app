@@ -16,23 +16,23 @@ const STORE = "entry-queue";
 
 function openDb(): Promise<IDBDatabase> {
   return new Promise((resolve, reject) => {
-    const request = indexedDB.open(DB_NAME, DB_VERSION);
-    request.onupgradeneeded = () => {
-      const db = request.result;
+    const requete = indexedDB.open(DB_NAME, DB_VERSION);
+    requete.onupgradeneeded = () => {
+      const db = requete.result;
       if (!db.objectStoreNames.contains(STORE)) {
         db.createObjectStore(STORE, { keyPath: "id" });
       }
     };
-    request.onsuccess = () => resolve(request.result);
-    request.onerror = () => reject(request.error ?? new Error("OFFLINE_DB_OPEN_FAILED"));
+    requete.onsuccess = () => resolve(requete.result);
+    requete.onerror = () => reject(requete.error ?? new Error("OFFLINE_DB_OPEN_FAILED"));
   });
 }
 
-export async function queueOfflineEntry(draft: OfflineEntryDraft): Promise<void> {
+export async function queueOfflineEntry(brouillon: OfflineEntryDraft): Promise<void> {
   const db = await openDb();
   await new Promise<void>((resolve, reject) => {
     const tx = db.transaction(STORE, "readwrite");
-    tx.objectStore(STORE).put(draft);
+    tx.objectStore(STORE).put(brouillon);
     tx.oncomplete = () => resolve();
     tx.onerror = () => reject(tx.error ?? new Error("OFFLINE_DB_WRITE_FAILED"));
   });
@@ -41,14 +41,14 @@ export async function queueOfflineEntry(draft: OfflineEntryDraft): Promise<void>
 
 export async function listOfflineEntries(ownerUserId: string): Promise<OfflineEntryDraft[]> {
   const db = await openDb();
-  const result = await new Promise<OfflineEntryDraft[]>((resolve, reject) => {
-    const request = db.transaction(STORE, "readonly").objectStore(STORE).getAll();
-    request.onsuccess = () => resolve((request.result ?? []) as OfflineEntryDraft[]);
-    request.onerror = () => reject(request.error ?? new Error("OFFLINE_DB_READ_FAILED"));
+  const resultat = await new Promise<OfflineEntryDraft[]>((resolve, reject) => {
+    const requete = db.transaction(STORE, "readonly").objectStore(STORE).getAll();
+    requete.onsuccess = () => resolve((requete.result ?? []) as OfflineEntryDraft[]);
+    requete.onerror = () => reject(requete.error ?? new Error("OFFLINE_DB_READ_FAILED"));
   });
   db.close();
-  return result
-    .filter((draft) => draft.ownerUserId === ownerUserId)
+  return resultat
+    .filter((brouillon) => brouillon.ownerUserId === ownerUserId)
     .sort((a, b) => a.createdAt.localeCompare(b.createdAt));
 }
 
@@ -57,9 +57,9 @@ export async function removeOfflineEntry(id: string, ownerUserId: string): Promi
   await new Promise<void>((resolve, reject) => {
     const tx = db.transaction(STORE, "readwrite");
     const store = tx.objectStore(STORE);
-    const current = store.get(id);
-    current.onsuccess = () => {
-      if (current.result?.ownerUserId === ownerUserId) store.delete(id);
+    const courant = store.get(id);
+    courant.onsuccess = () => {
+      if (courant.result?.ownerUserId === ownerUserId) store.delete(id);
     };
     tx.oncomplete = () => resolve();
     tx.onerror = () => reject(tx.error ?? new Error("OFFLINE_DB_DELETE_FAILED"));
@@ -92,26 +92,26 @@ function bytesToBase64(bytes: Uint8Array): string {
 }
 
 export async function draftToJsonPayload(
-  draft: OfflineEntryDraft,
+  brouillon: OfflineEntryDraft,
 ): Promise<MobileEntryCapturePayload> {
-  const files = [];
-  for (const file of draft.files) {
-    const bytes = new Uint8Array(await file.arrayBuffer());
-    files.push({
-      name: file.name || "piece-jointe",
-      type: file.type || "application/octet-stream",
+  const fichiers = [];
+  for (const fichier of brouillon.files) {
+    const bytes = new Uint8Array(await fichier.arrayBuffer());
+    fichiers.push({
+      name: fichier.name || "piece-jointe",
+      type: fichier.type || "application/octet-stream",
       base64: bytesToBase64(bytes),
     });
   }
 
   return {
-    requestId: draft.id,
-    ownerUserId: draft.ownerUserId,
-    rawText: draft.rawText,
-    priority: draft.priority,
-    tagIds: draft.tagIds,
-    clientId: draft.clientId || null,
-    commercialCaseId: draft.commercialCaseId || null,
-    files,
+    requestId: brouillon.id,
+    ownerUserId: brouillon.ownerUserId,
+    rawText: brouillon.rawText,
+    priority: brouillon.priority,
+    tagIds: brouillon.tagIds,
+    clientId: brouillon.clientId || null,
+    commercialCaseId: brouillon.commercialCaseId || null,
+    files: fichiers,
   };
 }

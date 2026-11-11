@@ -41,42 +41,42 @@ type SessionRow = {
   expires_at: Date | string;
 };
 
-function isoTimestamp(value: Date | string): string {
-  return value instanceof Date ? value.toISOString() : new Date(value).toISOString();
+function isoTimestamp(valeur: Date | string): string {
+  return valeur instanceof Date ? valeur.toISOString() : new Date(valeur).toISOString();
 }
 
-function rowToUser(row: UserRow): AuthUserRecord {
+function rowToUser(ligneTableau: UserRow): AuthUserRecord {
   return {
-    id: row.id,
-    username: row.username,
-    displayName: row.display_name,
-    email: row.email,
-    passwordHash: row.password_hash,
-    isActive: row.is_active,
-    canManagePermissions: row.can_manage_permissions,
-    mustChangePassword: row.must_change_password,
-    accentKey: row.accent_key,
-    planningPotentialCollapsed: row.planning_potential_collapsed || undefined,
-    modulePermissions: row.module_permissions as AuthUserRecord["modulePermissions"],
-    specialPermissions: row.special_permissions as AuthUserRecord["specialPermissions"],
+    id: ligneTableau.id,
+    username: ligneTableau.username,
+    displayName: ligneTableau.display_name,
+    email: ligneTableau.email,
+    passwordHash: ligneTableau.password_hash,
+    isActive: ligneTableau.is_active,
+    canManagePermissions: ligneTableau.can_manage_permissions,
+    mustChangePassword: ligneTableau.must_change_password,
+    accentKey: ligneTableau.accent_key,
+    planningPotentialCollapsed: ligneTableau.planning_potential_collapsed || undefined,
+    modulePermissions: ligneTableau.module_permissions as AuthUserRecord["modulePermissions"],
+    specialPermissions: ligneTableau.special_permissions as AuthUserRecord["specialPermissions"],
   };
 }
 
-function rowToSession(row: SessionRow): AuthSessionRecord {
+function rowToSession(ligneTableau: SessionRow): AuthSessionRecord {
   return {
-    id: row.id,
-    userId: row.user_id,
-    tokenHash: row.token_hash,
-    deviceId: row.device_id,
-    deviceLabel: row.device_label,
-    createdAt: isoTimestamp(row.created_at),
-    expiresAt: isoTimestamp(row.expires_at),
+    id: ligneTableau.id,
+    userId: ligneTableau.user_id,
+    tokenHash: ligneTableau.token_hash,
+    deviceId: ligneTableau.device_id,
+    deviceLabel: ligneTableau.device_label,
+    createdAt: isoTimestamp(ligneTableau.created_at),
+    expiresAt: isoTimestamp(ligneTableau.expires_at),
   };
 }
 
 async function insertUser(
   client: PoolClient,
-  user: AuthUserRecord,
+  utilisateur: AuthUserRecord,
   version: number,
 ): Promise<void> {
   await client.query(
@@ -99,26 +99,26 @@ async function insertUser(
       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12::jsonb, $13::jsonb)
     `,
     [
-      user.id,
+      utilisateur.id,
       version,
-      user.username,
-      user.displayName,
-      user.email,
-      user.passwordHash,
-      user.isActive,
-      user.canManagePermissions,
-      user.mustChangePassword,
-      user.accentKey,
-      user.planningPotentialCollapsed ?? false,
-      JSON.stringify(user.modulePermissions),
-      JSON.stringify(user.specialPermissions),
+      utilisateur.username,
+      utilisateur.displayName,
+      utilisateur.email,
+      utilisateur.passwordHash,
+      utilisateur.isActive,
+      utilisateur.canManagePermissions,
+      utilisateur.mustChangePassword,
+      utilisateur.accentKey,
+      utilisateur.planningPotentialCollapsed ?? false,
+      JSON.stringify(utilisateur.modulePermissions),
+      JSON.stringify(utilisateur.specialPermissions),
     ],
   );
 }
 
 async function upsertUser(
   client: PoolClient,
-  user: AuthUserRecord,
+  utilisateur: AuthUserRecord,
   version: number,
 ): Promise<void> {
   await client.query(
@@ -154,19 +154,19 @@ async function upsertUser(
         special_permissions = EXCLUDED.special_permissions
     `,
     [
-      user.id,
+      utilisateur.id,
       version,
-      user.username,
-      user.displayName,
-      user.email,
-      user.passwordHash,
-      user.isActive,
-      user.canManagePermissions,
-      user.mustChangePassword,
-      user.accentKey,
-      user.planningPotentialCollapsed ?? false,
-      JSON.stringify(user.modulePermissions),
-      JSON.stringify(user.specialPermissions),
+      utilisateur.username,
+      utilisateur.displayName,
+      utilisateur.email,
+      utilisateur.passwordHash,
+      utilisateur.isActive,
+      utilisateur.canManagePermissions,
+      utilisateur.mustChangePassword,
+      utilisateur.accentKey,
+      utilisateur.planningPotentialCollapsed ?? false,
+      JSON.stringify(utilisateur.modulePermissions),
+      JSON.stringify(utilisateur.specialPermissions),
     ],
   );
 }
@@ -237,14 +237,14 @@ export async function loadAuthPayloadFromQueryable(queryable: AuthQueryable): Pr
 
 export async function replaceAuthSnapshotOnClient(
   client: PoolClient,
-  payload: AuthPayload,
+  contenu: AuthPayload,
 ): Promise<void> {
-  const validated = parseAuthPayload(payload);
+  const validated = parseAuthPayload(contenu);
   await client.query("DELETE FROM papot_auth_sessions");
   await client.query("DELETE FROM papot_auth_users");
 
-  for (const user of validated.users) {
-    await insertUser(client, user, 1);
+  for (const utilisateur of validated.users) {
+    await insertUser(client, utilisateur, 1);
   }
   for (const session of validated.sessions) {
     await insertSession(client, session);
@@ -253,25 +253,27 @@ export async function replaceAuthSnapshotOnClient(
 
 async function replaceMutatedSnapshotOnClient(
   client: PoolClient,
-  payload: AuthPayload,
+  contenu: AuthPayload,
 ): Promise<void> {
-  const validated = parseAuthPayload(payload);
+  const validated = parseAuthPayload(contenu);
   const versionsResult = await client.query<{ id: string; version: number }>(
     "SELECT id, version FROM papot_auth_users",
   );
-  const previousVersions = new Map(versionsResult.rows.map((row) => [row.id, row.version]));
+  const previousVersions = new Map(
+    versionsResult.rows.map((ligneTableau) => [ligneTableau.id, ligneTableau.version]),
+  );
 
   await client.query("DELETE FROM papot_auth_sessions");
 
-  for (const user of validated.users) {
-    await upsertUser(client, user, (previousVersions.get(user.id) ?? 0) + 1);
+  for (const utilisateur of validated.users) {
+    await upsertUser(client, utilisateur, (previousVersions.get(utilisateur.id) ?? 0) + 1);
   }
 
   if (validated.users.length === 0) {
     await client.query("DELETE FROM papot_auth_users");
   } else {
     await client.query("DELETE FROM papot_auth_users WHERE NOT (id = ANY($1::uuid[]))", [
-      validated.users.map((user) => user.id),
+      validated.users.map((utilisateur) => utilisateur.id),
     ]);
   }
 
@@ -282,9 +284,9 @@ async function replaceMutatedSnapshotOnClient(
 
 export type PostgresAuthRepository = {
   load(): Promise<AuthPayload>;
-  replaceSnapshot(payload: AuthPayload): Promise<void>;
+  replaceSnapshot(contenu: AuthPayload): Promise<void>;
   mutate<T>(
-    mutate: (payload: AuthPayload) => T | Promise<T>,
+    mutate: (contenu: AuthPayload) => T | Promise<T>,
   ): Promise<{ payload: AuthPayload; result: T }>;
 };
 
@@ -296,23 +298,23 @@ export function createPostgresAuthRepository(
       return loadAuthPayloadFromQueryable(pool);
     },
 
-    async replaceSnapshot(payload) {
+    async replaceSnapshot(contenu) {
       await withServerDbTransaction(async (client) => {
         await lockAuthMutation(client);
-        await replaceAuthSnapshotOnClient(client, payload);
+        await replaceAuthSnapshotOnClient(client, contenu);
       }, pool);
     },
 
-    async mutate<T>(mutate: (payload: AuthPayload) => T | Promise<T>) {
+    async mutate<T>(mutate: (contenu: AuthPayload) => T | Promise<T>) {
       return withServerDbTransaction(async (client) => {
         await lockAuthMutation(client);
-        const payload = await loadAuthPayloadFromQueryable(client);
-        pruneExpiredSessions(payload);
-        const result = await mutate(payload);
-        await replaceMutatedSnapshotOnClient(client, payload);
+        const contenu = await loadAuthPayloadFromQueryable(client);
+        pruneExpiredSessions(contenu);
+        const resultat = await mutate(contenu);
+        await replaceMutatedSnapshotOnClient(client, contenu);
         return {
           payload: await loadAuthPayloadFromQueryable(client),
-          result,
+          result: resultat,
         };
       }, pool);
     },

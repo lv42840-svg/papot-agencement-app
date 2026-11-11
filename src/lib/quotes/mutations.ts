@@ -166,17 +166,17 @@ export type QuotesMutationResult = {
   focusQuoteId: string;
 };
 
-function sameVariant(left: string, right: string): boolean {
-  return left.localeCompare(right, "fr-FR", { sensitivity: "base" }) === 0;
+function sameVariant(gauche: string, droite: string): boolean {
+  return gauche.localeCompare(droite, "fr-FR", { sensitivity: "base" }) === 0;
 }
 
 function nextVariantVersion(
-  payload: NativeQuotesPayload,
+  contenu: NativeQuotesPayload,
   commercialCaseId: string,
   variantName: string,
 ): number {
   return (
-    payload.quotes.reduce((highest, quote) => {
+    contenu.quotes.reduce((highest, quote) => {
       if (
         quote.commercialCaseId !== commercialCaseId ||
         !sameVariant(quote.variantName, variantName)
@@ -189,61 +189,61 @@ function nextVariantVersion(
 }
 
 function createDraft(
-  payload: NativeQuotesPayload,
-  input: Extract<QuotesMutation, { action: "createDraft" }>,
-  actor: QuotesActor,
-  clientId: string | undefined,
-  now: Date,
+  contenu: NativeQuotesPayload,
+  saisie: Extract<QuotesMutation, { action: "createDraft" }>,
+  auteur: QuotesActor,
+  idClient: string | undefined,
+  maintenant: Date,
 ): QuotesMutationResult {
-  if (!clientId) throw new Error("QUOTE_CLIENT_NOT_FOUND");
+  if (!idClient) throw new Error("QUOTE_CLIENT_NOT_FOUND");
 
-  const quoteId = globalThis.crypto.randomUUID();
-  const timestamp = now.toISOString();
-  const version = nextVariantVersion(payload, input.commercialCaseId, input.variantName);
+  const idDevis = globalThis.crypto.randomUUID();
+  const timestamp = maintenant.toISOString();
+  const version = nextVariantVersion(contenu, saisie.commercialCaseId, saisie.variantName);
   const model = parseQuoteModel({
-    id: quoteId,
-    clientId,
-    subject: input.subject,
-    issueDate: input.issueDate,
+    id: idDevis,
+    clientId: idClient,
+    subject: saisie.subject,
+    issueDate: saisie.issueDate,
     validityDays: QUOTE_DEFAULT_VALIDITY_DAYS,
-    paymentTerms: input.paymentTerms,
+    paymentTerms: saisie.paymentTerms,
     items: [],
   });
 
-  const record = nativeQuoteRecordSchema.parse({
-    id: quoteId,
-    commercialCaseId: input.commercialCaseId,
-    quoteKind: input.quoteKind,
-    variantName: input.variantName,
+  const enregistrement = nativeQuoteRecordSchema.parse({
+    id: idDevis,
+    commercialCaseId: saisie.commercialCaseId,
+    quoteKind: saisie.quoteKind,
+    variantName: saisie.variantName,
     version,
     status: "DRAFT",
     model,
     createdAt: timestamp,
-    createdByName: actor.displayName,
+    createdByName: auteur.displayName,
     updatedAt: timestamp,
-    updatedByName: actor.displayName,
+    updatedByName: auteur.displayName,
   });
 
-  payload.quotes.push(record);
-  return { payload, focusQuoteId: quoteId };
+  contenu.quotes.push(enregistrement);
+  return { payload: contenu, focusQuoteId: idDevis };
 }
 
-function findDraftQuote(payload: NativeQuotesPayload, quoteId: string) {
-  const quoteIndex = payload.quotes.findIndex((quote) => quote.id === quoteId);
+function findDraftQuote(contenu: NativeQuotesPayload, idDevis: string) {
+  const quoteIndex = contenu.quotes.findIndex((quote) => quote.id === idDevis);
   if (quoteIndex < 0) throw new Error("QUOTE_NOT_FOUND");
 
-  const quote = payload.quotes[quoteIndex];
+  const quote = contenu.quotes[quoteIndex];
   if (quote.status !== "DRAFT") throw new Error("QUOTE_NOT_EDITABLE");
   return { quoteIndex, quote };
 }
 
-function findDraftLine(payload: NativeQuotesPayload, quoteId: string, lineId?: string) {
-  const { quoteIndex, quote } = findDraftQuote(payload, quoteId);
+function findDraftLine(contenu: NativeQuotesPayload, idDevis: string, lineId?: string) {
+  const { quoteIndex, quote } = findDraftQuote(contenu, idDevis);
 
   let existingLine: QuoteLine | undefined;
   let existingIndex = -1;
   if (lineId) {
-    existingIndex = quote.model.items.findIndex((item) => item.id === lineId);
+    existingIndex = quote.model.items.findIndex((element) => element.id === lineId);
     if (existingIndex < 0 || quote.model.items[existingIndex].kind !== "LINE") {
       throw new Error("QUOTE_LINE_NOT_FOUND");
     }
@@ -254,38 +254,38 @@ function findDraftLine(payload: NativeQuotesPayload, quoteId: string, lineId?: s
 }
 
 function saveDraftItem(
-  payload: NativeQuotesPayload,
+  contenu: NativeQuotesPayload,
   quoteIndex: number,
-  item: QuoteItem,
+  element: QuoteItem,
   existingIndex: number,
-  actor: QuotesActor,
-  now: Date,
+  auteur: QuotesActor,
+  maintenant: Date,
 ): QuotesMutationResult {
-  const quote = payload.quotes[quoteIndex];
-  const items = [...quote.model.items];
-  if (existingIndex >= 0) items[existingIndex] = item;
-  else items.push(item);
+  const quote = contenu.quotes[quoteIndex];
+  const elements = [...quote.model.items];
+  if (existingIndex >= 0) elements[existingIndex] = element;
+  else elements.push(element);
 
-  const timestamp = now.toISOString();
+  const timestamp = maintenant.toISOString();
   const updated = nativeQuoteRecordSchema.parse({
     ...quote,
-    model: parseQuoteModel({ ...quote.model, items }),
+    model: parseQuoteModel({ ...quote.model, items: elements }),
     updatedAt: timestamp,
-    updatedByName: actor.displayName,
+    updatedByName: auteur.displayName,
   });
-  payload.quotes[quoteIndex] = updated;
-  return { payload, focusQuoteId: updated.id };
+  contenu.quotes[quoteIndex] = updated;
+  return { payload: contenu, focusQuoteId: updated.id };
 }
 
 function saveDraftLine(
-  payload: NativeQuotesPayload,
+  contenu: NativeQuotesPayload,
   quoteIndex: number,
-  line: QuoteLine,
+  ligne: QuoteLine,
   existingIndex: number,
-  actor: QuotesActor,
-  now: Date,
+  auteur: QuotesActor,
+  maintenant: Date,
 ): QuotesMutationResult {
-  return saveDraftItem(payload, quoteIndex, line, existingIndex, actor, now);
+  return saveDraftItem(contenu, quoteIndex, ligne, existingIndex, auteur, maintenant);
 }
 
 function clonePresentationForDuplicate(
@@ -296,15 +296,15 @@ function clonePresentationForDuplicate(
 }
 
 function duplicateDraftLine(
-  payload: NativeQuotesPayload,
-  input: Extract<QuotesMutation, { action: "duplicateLine" }>,
-  actor: QuotesActor,
-  now: Date,
+  contenu: NativeQuotesPayload,
+  saisie: Extract<QuotesMutation, { action: "duplicateLine" }>,
+  auteur: QuotesActor,
+  maintenant: Date,
 ): QuotesMutationResult {
   const { quoteIndex, quote, existingLine, existingIndex } = findDraftLine(
-    payload,
-    input.quoteId,
-    input.lineId,
+    contenu,
+    saisie.quoteId,
+    saisie.lineId,
   );
   if (!existingLine || existingIndex < 0) throw new Error("QUOTE_LINE_NOT_FOUND");
 
@@ -318,144 +318,155 @@ function duplicateDraftLine(
     })),
   };
 
-  const items = [...quote.model.items];
-  items.splice(existingIndex + 1, 0, duplicatedLine);
-  const timestamp = now.toISOString();
+  const elements = [...quote.model.items];
+  elements.splice(existingIndex + 1, 0, duplicatedLine);
+  const timestamp = maintenant.toISOString();
   const updated = nativeQuoteRecordSchema.parse({
     ...quote,
-    model: parseQuoteModel({ ...quote.model, items }),
+    model: parseQuoteModel({ ...quote.model, items: elements }),
     updatedAt: timestamp,
-    updatedByName: actor.displayName,
+    updatedByName: auteur.displayName,
   });
-  payload.quotes[quoteIndex] = updated;
-  return { payload, focusQuoteId: updated.id };
+  contenu.quotes[quoteIndex] = updated;
+  return { payload: contenu, focusQuoteId: updated.id };
 }
 
 function moveDraftLine(
-  payload: NativeQuotesPayload,
-  input: Extract<QuotesMutation, { action: "moveLine" }>,
-  actor: QuotesActor,
-  now: Date,
+  contenu: NativeQuotesPayload,
+  saisie: Extract<QuotesMutation, { action: "moveLine" }>,
+  auteur: QuotesActor,
+  maintenant: Date,
 ): QuotesMutationResult {
   const { quoteIndex, quote, existingLine, existingIndex } = findDraftLine(
-    payload,
-    input.quoteId,
-    input.lineId,
+    contenu,
+    saisie.quoteId,
+    saisie.lineId,
   );
   if (!existingLine || existingIndex < 0) throw new Error("QUOTE_LINE_NOT_FOUND");
 
-  const targetIndex = input.direction === "UP" ? existingIndex - 1 : existingIndex + 1;
-  const target = quote.model.items[targetIndex];
-  if (!target || target.kind !== "LINE" || target.parentId !== existingLine.parentId) {
+  const targetIndex = saisie.direction === "UP" ? existingIndex - 1 : existingIndex + 1;
+  const cible = quote.model.items[targetIndex];
+  if (!cible || cible.kind !== "LINE" || cible.parentId !== existingLine.parentId) {
     throw new Error("QUOTE_LINE_MOVE_BLOCKED");
   }
 
-  const items = [...quote.model.items];
-  [items[existingIndex], items[targetIndex]] = [items[targetIndex], items[existingIndex]];
-  const timestamp = now.toISOString();
+  const elements = [...quote.model.items];
+  [elements[existingIndex], elements[targetIndex]] = [
+    elements[targetIndex],
+    elements[existingIndex],
+  ];
+  const timestamp = maintenant.toISOString();
   const updated = nativeQuoteRecordSchema.parse({
     ...quote,
-    model: parseQuoteModel({ ...quote.model, items }),
+    model: parseQuoteModel({ ...quote.model, items: elements }),
     updatedAt: timestamp,
-    updatedByName: actor.displayName,
+    updatedByName: auteur.displayName,
   });
-  payload.quotes[quoteIndex] = updated;
-  return { payload, focusQuoteId: updated.id };
+  contenu.quotes[quoteIndex] = updated;
+  return { payload: contenu, focusQuoteId: updated.id };
 }
 
 function reorderDraftItem(
-  payload: NativeQuotesPayload,
-  input: Extract<QuotesMutation, { action: "reorderItem" }>,
-  actor: QuotesActor,
-  now: Date,
+  contenu: NativeQuotesPayload,
+  saisie: Extract<QuotesMutation, { action: "reorderItem" }>,
+  auteur: QuotesActor,
+  maintenant: Date,
 ): QuotesMutationResult {
-  const { quoteIndex, quote } = findDraftQuote(payload, input.quoteId);
-  const items = reorderQuoteItems(quote.model.items, input.itemId, input.targetId, input.placement);
-  const timestamp = now.toISOString();
+  const { quoteIndex, quote } = findDraftQuote(contenu, saisie.quoteId);
+  const elements = reorderQuoteItems(
+    quote.model.items,
+    saisie.itemId,
+    saisie.targetId,
+    saisie.placement,
+  );
+  const timestamp = maintenant.toISOString();
   const updated = nativeQuoteRecordSchema.parse({
     ...quote,
-    model: parseQuoteModel({ ...quote.model, items }),
+    model: parseQuoteModel({ ...quote.model, items: elements }),
     updatedAt: timestamp,
-    updatedByName: actor.displayName,
+    updatedByName: auteur.displayName,
   });
-  payload.quotes[quoteIndex] = updated;
-  return { payload, focusQuoteId: updated.id };
+  contenu.quotes[quoteIndex] = updated;
+  return { payload: contenu, focusQuoteId: updated.id };
 }
 
-function headingBlockEnd(items: QuoteItem[], startIndex: number): number {
-  const heading = items[startIndex];
+function headingBlockEnd(elements: QuoteItem[], startIndex: number): number {
+  const heading = elements[startIndex];
   if (!heading || (heading.kind !== "SECTION" && heading.kind !== "SUBSECTION")) {
     return startIndex + 1;
   }
 
-  for (let index = startIndex + 1; index < items.length; index += 1) {
-    const candidate = items[index];
-    if (candidate.kind === "SECTION") return index;
+  for (let indice = startIndex + 1; indice < elements.length; indice += 1) {
+    const candidat = elements[indice];
+    if (candidat.kind === "SECTION") return indice;
     if (
       heading.kind === "SUBSECTION" &&
-      candidate.kind === "SUBSECTION" &&
-      candidate.parentId === heading.parentId
+      candidat.kind === "SUBSECTION" &&
+      candidat.parentId === heading.parentId
     ) {
-      return index;
+      return indice;
     }
   }
-  return items.length;
+  return elements.length;
 }
 
 function deleteDraftItem(
-  payload: NativeQuotesPayload,
-  input: Extract<QuotesMutation, { action: "deleteItem" }>,
-  actor: QuotesActor,
-  now: Date,
+  contenu: NativeQuotesPayload,
+  saisie: Extract<QuotesMutation, { action: "deleteItem" }>,
+  auteur: QuotesActor,
+  maintenant: Date,
 ): QuotesMutationResult {
-  const { quoteIndex, quote } = findDraftQuote(payload, input.quoteId);
-  const itemIndex = quote.model.items.findIndex((item) => item.id === input.itemId);
+  const { quoteIndex, quote } = findDraftQuote(contenu, saisie.quoteId);
+  const itemIndex = quote.model.items.findIndex((element) => element.id === saisie.itemId);
   if (itemIndex < 0) throw new Error("QUOTE_ITEM_NOT_FOUND");
 
-  const item = quote.model.items[itemIndex];
-  if (item.kind === "COMMENT") throw new Error("QUOTE_ITEM_DELETE_UNSUPPORTED");
+  const element = quote.model.items[itemIndex];
+  if (element.kind === "COMMENT") throw new Error("QUOTE_ITEM_DELETE_UNSUPPORTED");
 
   const deleteEnd =
-    item.kind === "SECTION" || item.kind === "SUBSECTION"
+    element.kind === "SECTION" || element.kind === "SUBSECTION"
       ? headingBlockEnd(quote.model.items, itemIndex)
       : itemIndex + 1;
-  const items = [...quote.model.items.slice(0, itemIndex), ...quote.model.items.slice(deleteEnd)];
-  const timestamp = now.toISOString();
+  const elements = [
+    ...quote.model.items.slice(0, itemIndex),
+    ...quote.model.items.slice(deleteEnd),
+  ];
+  const timestamp = maintenant.toISOString();
   const updated = nativeQuoteRecordSchema.parse({
     ...quote,
-    model: parseQuoteModel({ ...quote.model, items }),
+    model: parseQuoteModel({ ...quote.model, items: elements }),
     updatedAt: timestamp,
-    updatedByName: actor.displayName,
+    updatedByName: auteur.displayName,
   });
-  payload.quotes[quoteIndex] = updated;
-  return { payload, focusQuoteId: updated.id };
+  contenu.quotes[quoteIndex] = updated;
+  return { payload: contenu, focusQuoteId: updated.id };
 }
 
 function previousHeadingSiblingIndex(
-  items: QuoteItem[],
+  elements: QuoteItem[],
   currentIndex: number,
   heading: QuoteSection | QuoteSubsection,
 ): number {
-  for (let index = currentIndex - 1; index >= 0; index -= 1) {
-    const candidate = items[index];
+  for (let indice = currentIndex - 1; indice >= 0; indice -= 1) {
+    const candidat = elements[indice];
     if (heading.kind === "SECTION") {
-      if (candidate.kind === "SECTION") return index;
+      if (candidat.kind === "SECTION") return indice;
       continue;
     }
-    if (candidate.kind === "SECTION") return -1;
-    if (candidate.kind === "SUBSECTION" && candidate.parentId === heading.parentId) return index;
+    if (candidat.kind === "SECTION") return -1;
+    if (candidat.kind === "SUBSECTION" && candidat.parentId === heading.parentId) return indice;
   }
   return -1;
 }
 
 function duplicateDraftHeading(
-  payload: NativeQuotesPayload,
-  input: Extract<QuotesMutation, { action: "duplicateHeading" }>,
-  actor: QuotesActor,
-  now: Date,
+  contenu: NativeQuotesPayload,
+  saisie: Extract<QuotesMutation, { action: "duplicateHeading" }>,
+  auteur: QuotesActor,
+  maintenant: Date,
 ): QuotesMutationResult {
-  const { quoteIndex, quote } = findDraftQuote(payload, input.quoteId);
-  const currentIndex = quote.model.items.findIndex((item) => item.id === input.itemId);
+  const { quoteIndex, quote } = findDraftQuote(contenu, saisie.quoteId);
+  const currentIndex = quote.model.items.findIndex((element) => element.id === saisie.itemId);
   if (currentIndex < 0) throw new Error("QUOTE_HEADING_NOT_FOUND");
 
   const heading = quote.model.items[currentIndex];
@@ -465,36 +476,39 @@ function duplicateDraftHeading(
 
   const currentEnd = headingBlockEnd(quote.model.items, currentIndex);
   const sourceBlock = quote.model.items.slice(currentIndex, currentEnd);
-  const newIds = new Map(sourceBlock.map((item) => [item.id, globalThis.crypto.randomUUID()]));
-  const duplicatedBlock: QuoteItem[] = sourceBlock.map((item) => {
-    const id = newIds.get(item.id);
+  const newIds = new Map(
+    sourceBlock.map((element) => [element.id, globalThis.crypto.randomUUID()]),
+  );
+  const duplicatedBlock: QuoteItem[] = sourceBlock.map((element) => {
+    const id = newIds.get(element.id);
     if (!id) throw new Error("QUOTE_HEADING_DUPLICATION_FAILED");
 
-    if (item.kind === "SECTION") {
+    if (element.kind === "SECTION") {
       return {
-        ...structuredClone(item),
+        ...structuredClone(element),
         id,
-        presentation: clonePresentationForDuplicate(item.presentation),
+        presentation: clonePresentationForDuplicate(element.presentation),
       };
     }
 
-    if (item.kind === "SUBSECTION") {
+    if (element.kind === "SUBSECTION") {
       return {
-        ...structuredClone(item),
+        ...structuredClone(element),
         id,
-        parentId: newIds.get(item.parentId) ?? item.parentId,
-        presentation: clonePresentationForDuplicate(item.presentation),
+        parentId: newIds.get(element.parentId) ?? element.parentId,
+        presentation: clonePresentationForDuplicate(element.presentation),
       };
     }
 
-    const parentId = item.parentId === null ? null : (newIds.get(item.parentId) ?? item.parentId);
-    if (item.kind === "LINE") {
+    const parentId =
+      element.parentId === null ? null : (newIds.get(element.parentId) ?? element.parentId);
+    if (element.kind === "LINE") {
       return {
-        ...structuredClone(item),
+        ...structuredClone(element),
         id,
         parentId,
-        presentation: clonePresentationForDuplicate(item.presentation),
-        components: item.components?.map((component) => ({
+        presentation: clonePresentationForDuplicate(element.presentation),
+        components: element.components?.map((component) => ({
           ...structuredClone(component),
           id: globalThis.crypto.randomUUID(),
         })),
@@ -502,37 +516,37 @@ function duplicateDraftHeading(
     }
 
     return {
-      ...structuredClone(item),
+      ...structuredClone(element),
       id,
       parentId,
-      presentation: clonePresentationForDuplicate(item.presentation),
+      presentation: clonePresentationForDuplicate(element.presentation),
     };
   });
 
-  const items = [
+  const elements = [
     ...quote.model.items.slice(0, currentEnd),
     ...duplicatedBlock,
     ...quote.model.items.slice(currentEnd),
   ];
-  const timestamp = now.toISOString();
+  const timestamp = maintenant.toISOString();
   const updated = nativeQuoteRecordSchema.parse({
     ...quote,
-    model: parseQuoteModel({ ...quote.model, items }),
+    model: parseQuoteModel({ ...quote.model, items: elements }),
     updatedAt: timestamp,
-    updatedByName: actor.displayName,
+    updatedByName: auteur.displayName,
   });
-  payload.quotes[quoteIndex] = updated;
-  return { payload, focusQuoteId: updated.id };
+  contenu.quotes[quoteIndex] = updated;
+  return { payload: contenu, focusQuoteId: updated.id };
 }
 
 function moveDraftHeading(
-  payload: NativeQuotesPayload,
-  input: Extract<QuotesMutation, { action: "moveHeading" }>,
-  actor: QuotesActor,
-  now: Date,
+  contenu: NativeQuotesPayload,
+  saisie: Extract<QuotesMutation, { action: "moveHeading" }>,
+  auteur: QuotesActor,
+  maintenant: Date,
 ): QuotesMutationResult {
-  const { quoteIndex, quote } = findDraftQuote(payload, input.quoteId);
-  const currentIndex = quote.model.items.findIndex((item) => item.id === input.itemId);
+  const { quoteIndex, quote } = findDraftQuote(contenu, saisie.quoteId);
+  const currentIndex = quote.model.items.findIndex((element) => element.id === saisie.itemId);
   if (currentIndex < 0) throw new Error("QUOTE_HEADING_NOT_FOUND");
 
   const heading = quote.model.items[currentIndex];
@@ -540,149 +554,149 @@ function moveDraftHeading(
     throw new Error("QUOTE_HEADING_NOT_FOUND");
   }
 
-  const items = [...quote.model.items];
-  const currentEnd = headingBlockEnd(items, currentIndex);
+  const elements = [...quote.model.items];
+  const currentEnd = headingBlockEnd(elements, currentIndex);
   let reordered: QuoteItem[];
 
-  if (input.direction === "UP") {
-    const previousIndex = previousHeadingSiblingIndex(items, currentIndex, heading);
+  if (saisie.direction === "UP") {
+    const previousIndex = previousHeadingSiblingIndex(elements, currentIndex, heading);
     if (previousIndex < 0) throw new Error("QUOTE_HEADING_MOVE_BLOCKED");
     reordered = [
-      ...items.slice(0, previousIndex),
-      ...items.slice(currentIndex, currentEnd),
-      ...items.slice(previousIndex, currentIndex),
-      ...items.slice(currentEnd),
+      ...elements.slice(0, previousIndex),
+      ...elements.slice(currentIndex, currentEnd),
+      ...elements.slice(previousIndex, currentIndex),
+      ...elements.slice(currentEnd),
     ];
   } else {
     const nextIndex = currentEnd;
-    const nextHeading = items[nextIndex];
+    const nextHeading = elements[nextIndex];
     const isSibling =
       heading.kind === "SECTION"
         ? nextHeading?.kind === "SECTION"
         : nextHeading?.kind === "SUBSECTION" && nextHeading.parentId === heading.parentId;
     if (!isSibling || !nextHeading) throw new Error("QUOTE_HEADING_MOVE_BLOCKED");
-    const nextEnd = headingBlockEnd(items, nextIndex);
+    const nextEnd = headingBlockEnd(elements, nextIndex);
     reordered = [
-      ...items.slice(0, currentIndex),
-      ...items.slice(nextIndex, nextEnd),
-      ...items.slice(currentIndex, currentEnd),
-      ...items.slice(nextEnd),
+      ...elements.slice(0, currentIndex),
+      ...elements.slice(nextIndex, nextEnd),
+      ...elements.slice(currentIndex, currentEnd),
+      ...elements.slice(nextEnd),
     ];
   }
 
-  const timestamp = now.toISOString();
+  const timestamp = maintenant.toISOString();
   const updated = nativeQuoteRecordSchema.parse({
     ...quote,
     model: parseQuoteModel({ ...quote.model, items: reordered }),
     updatedAt: timestamp,
-    updatedByName: actor.displayName,
+    updatedByName: auteur.displayName,
   });
-  payload.quotes[quoteIndex] = updated;
-  return { payload, focusQuoteId: updated.id };
+  contenu.quotes[quoteIndex] = updated;
+  return { payload: contenu, focusQuoteId: updated.id };
 }
 
 function updateDraftItemPresentation(
-  payload: NativeQuotesPayload,
-  input: Extract<QuotesMutation, { action: "updateItemPresentation" }>,
-  actor: QuotesActor,
-  now: Date,
+  contenu: NativeQuotesPayload,
+  saisie: Extract<QuotesMutation, { action: "updateItemPresentation" }>,
+  auteur: QuotesActor,
+  maintenant: Date,
 ): QuotesMutationResult {
-  const { quoteIndex, quote } = findDraftQuote(payload, input.quoteId);
-  const itemIndex = quote.model.items.findIndex((item) => item.id === input.itemId);
+  const { quoteIndex, quote } = findDraftQuote(contenu, saisie.quoteId);
+  const itemIndex = quote.model.items.findIndex((element) => element.id === saisie.itemId);
   if (itemIndex < 0) throw new Error("QUOTE_ITEM_NOT_FOUND");
 
-  const item = structuredClone(quote.model.items[itemIndex]);
-  const photos = item.presentation?.photos ?? [];
-  if (input.textStyle === null) {
-    if (photos.length > 0) item.presentation = { photos };
-    else delete item.presentation;
+  const element = structuredClone(quote.model.items[itemIndex]);
+  const photos = element.presentation?.photos ?? [];
+  if (saisie.textStyle === null) {
+    if (photos.length > 0) element.presentation = { photos };
+    else delete element.presentation;
   } else {
-    item.presentation = { textStyle: input.textStyle, photos };
+    element.presentation = { textStyle: saisie.textStyle, photos };
   }
 
-  return saveDraftItem(payload, quoteIndex, item, itemIndex, actor, now);
+  return saveDraftItem(contenu, quoteIndex, element, itemIndex, auteur, maintenant);
 }
 
 function upsertDraftHeading(
-  payload: NativeQuotesPayload,
-  input: Extract<QuotesMutation, { action: "upsertSection" | "upsertSubsection" }>,
-  actor: QuotesActor,
-  now: Date,
+  contenu: NativeQuotesPayload,
+  saisie: Extract<QuotesMutation, { action: "upsertSection" | "upsertSubsection" }>,
+  auteur: QuotesActor,
+  maintenant: Date,
 ): QuotesMutationResult {
-  const { quoteIndex, quote } = findDraftQuote(payload, input.quoteId);
-  const existingIndex = input.itemId
-    ? quote.model.items.findIndex((item) => item.id === input.itemId)
+  const { quoteIndex, quote } = findDraftQuote(contenu, saisie.quoteId);
+  const existingIndex = saisie.itemId
+    ? quote.model.items.findIndex((element) => element.id === saisie.itemId)
     : -1;
 
-  if (input.itemId && existingIndex < 0) throw new Error("QUOTE_HEADING_NOT_FOUND");
+  if (saisie.itemId && existingIndex < 0) throw new Error("QUOTE_HEADING_NOT_FOUND");
   if (existingIndex >= 0) {
     const existing = quote.model.items[existingIndex];
-    const expectedKind = input.action === "upsertSection" ? "SECTION" : "SUBSECTION";
+    const expectedKind = saisie.action === "upsertSection" ? "SECTION" : "SUBSECTION";
     if (existing.kind !== expectedKind) throw new Error("QUOTE_HEADING_NOT_FOUND");
   }
 
   const existingPresentation =
     existingIndex >= 0 ? quote.model.items[existingIndex].presentation : undefined;
 
-  if (input.action === "upsertSection") {
+  if (saisie.action === "upsertSection") {
     return saveDraftItem(
-      payload,
+      contenu,
       quoteIndex,
       {
-        id: input.itemId ?? globalThis.crypto.randomUUID(),
+        id: saisie.itemId ?? globalThis.crypto.randomUUID(),
         kind: "SECTION",
         parentId: null,
-        title: input.title,
+        title: saisie.title,
         ...(existingPresentation ? { presentation: existingPresentation } : {}),
       },
       existingIndex,
-      actor,
-      now,
+      auteur,
+      maintenant,
     );
   }
 
-  const parent = quote.model.items.find((item) => item.id === input.parentId);
+  const parent = quote.model.items.find((element) => element.id === saisie.parentId);
   if (!parent || parent.kind !== "SECTION") throw new Error("QUOTE_SECTION_NOT_FOUND");
 
   return saveDraftItem(
-    payload,
+    contenu,
     quoteIndex,
     {
-      id: input.itemId ?? globalThis.crypto.randomUUID(),
+      id: saisie.itemId ?? globalThis.crypto.randomUUID(),
       kind: "SUBSECTION",
-      parentId: input.parentId,
-      title: input.title,
+      parentId: saisie.parentId,
+      title: saisie.title,
       ...(existingPresentation ? { presentation: existingPresentation } : {}),
     },
     existingIndex,
-    actor,
-    now,
+    auteur,
+    maintenant,
   );
 }
 
 function upsertDraftLine(
-  payload: NativeQuotesPayload,
-  input: Extract<QuotesMutation, { action: "upsertLine" }>,
-  actor: QuotesActor,
-  now: Date,
+  contenu: NativeQuotesPayload,
+  saisie: Extract<QuotesMutation, { action: "upsertLine" }>,
+  auteur: QuotesActor,
+  maintenant: Date,
   librarySource?: QuoteLibraryComponentSource,
 ): QuotesMutationResult {
   const { quoteIndex, existingLine, existingIndex } = findDraftLine(
-    payload,
-    input.quoteId,
-    input.lineId,
+    contenu,
+    saisie.quoteId,
+    saisie.lineId,
   );
-  const parsedQuantity = parseQuoteQuantityInput(input.quantityInput);
+  const parsedQuantity = parseQuoteQuantityInput(saisie.quantityInput);
 
-  const line: QuoteLine = {
-    id: input.lineId ?? globalThis.crypto.randomUUID(),
+  const ligne: QuoteLine = {
+    id: saisie.lineId ?? globalThis.crypto.randomUUID(),
     kind: "LINE",
     parentId: existingLine?.parentId ?? null,
-    description: input.description,
-    unit: input.unit,
+    description: saisie.description,
+    unit: saisie.unit,
     quantity: parsedQuantity.quantity,
     quantityFormula: parsedQuantity.formula,
-    unitPriceCents: input.unitPriceCents,
+    unitPriceCents: saisie.unitPriceCents,
     components: [],
     ...(existingLine?.presentation ? { presentation: existingLine.presentation } : {}),
     ...(librarySource
@@ -692,27 +706,27 @@ function upsertDraftLine(
         : {}),
   };
 
-  return saveDraftLine(payload, quoteIndex, line, existingIndex, actor, now);
+  return saveDraftLine(contenu, quoteIndex, ligne, existingIndex, auteur, maintenant);
 }
 
 function upsertDraftOuvrage(
-  payload: NativeQuotesPayload,
-  input: Extract<QuotesMutation, { action: "upsertOuvrage" }>,
-  actor: QuotesActor,
-  now: Date,
+  contenu: NativeQuotesPayload,
+  saisie: Extract<QuotesMutation, { action: "upsertOuvrage" }>,
+  auteur: QuotesActor,
+  maintenant: Date,
   libraryComponentSources?: ReadonlyMap<string, QuoteLibraryComponentSource>,
 ): QuotesMutationResult {
   const { quoteIndex, existingLine, existingIndex } = findDraftLine(
-    payload,
-    input.quoteId,
-    input.lineId,
+    contenu,
+    saisie.quoteId,
+    saisie.lineId,
   );
-  const parsedQuantity = parseQuoteQuantityInput(input.quantityInput);
+  const parsedQuantity = parseQuoteQuantityInput(saisie.quantityInput);
   const existingComponents = new Map(
     (existingLine?.components ?? []).map((component) => [component.id, component]),
   );
 
-  const components: QuoteOuvrageComponent[] = input.components.map((componentInput) => {
+  const components: QuoteOuvrageComponent[] = saisie.components.map((componentInput) => {
     const parsedComponentQuantity = parseQuoteQuantityInput(componentInput.quantityInput);
     const existingComponent = componentInput.id
       ? existingComponents.get(componentInput.id)
@@ -751,16 +765,16 @@ function upsertDraftOuvrage(
 
   const automaticUnitPriceCents = calculateQuoteOuvrageUnitPriceCents(components);
   const forcedUnitPriceCents =
-    input.forcedUnitPriceCents === undefined
+    saisie.forcedUnitPriceCents === undefined
       ? existingLine?.forcedUnitPriceCents
-      : (input.forcedUnitPriceCents ?? undefined);
+      : (saisie.forcedUnitPriceCents ?? undefined);
 
-  const line: QuoteLine = {
-    id: input.lineId ?? globalThis.crypto.randomUUID(),
+  const ligne: QuoteLine = {
+    id: saisie.lineId ?? globalThis.crypto.randomUUID(),
     kind: "LINE",
-    parentId: input.parentId === undefined ? (existingLine?.parentId ?? null) : input.parentId,
-    description: input.description,
-    unit: input.unit,
+    parentId: saisie.parentId === undefined ? (existingLine?.parentId ?? null) : saisie.parentId,
+    description: saisie.description,
+    unit: saisie.unit,
     quantity: parsedQuantity.quantity,
     quantityFormula: parsedQuantity.formula,
     unitPriceCents: forcedUnitPriceCents ?? automaticUnitPriceCents,
@@ -770,54 +784,54 @@ function upsertDraftOuvrage(
     ...(existingLine?.librarySource ? { librarySource: existingLine.librarySource } : {}),
   };
 
-  return saveDraftLine(payload, quoteIndex, line, existingIndex, actor, now);
+  return saveDraftLine(contenu, quoteIndex, ligne, existingIndex, auteur, maintenant);
 }
 
 export function applyQuotesMutation(
   source: NativeQuotesPayload,
-  input: QuotesMutation,
-  actor: QuotesActor,
-  clientId?: string,
-  now: Date = new Date(),
+  saisie: QuotesMutation,
+  auteur: QuotesActor,
+  idClient?: string,
+  maintenant: Date = new Date(),
   librarySource?: QuoteLibraryComponentSource,
   libraryComponentSources?: ReadonlyMap<string, QuoteLibraryComponentSource>,
 ): QuotesMutationResult {
-  const payload = structuredClone(parseNativeQuotesPayload(source));
-  if (input.action === "createDraft") {
-    return createDraft(payload, input, actor, clientId, now);
+  const contenu = structuredClone(parseNativeQuotesPayload(source));
+  if (saisie.action === "createDraft") {
+    return createDraft(contenu, saisie, auteur, idClient, maintenant);
   }
-  if (input.action === "deleteDraft") {
-    const { quoteIndex } = findDraftQuote(payload, input.quoteId);
-    payload.quotes.splice(quoteIndex, 1);
+  if (saisie.action === "deleteDraft") {
+    const { quoteIndex } = findDraftQuote(contenu, saisie.quoteId);
+    contenu.quotes.splice(quoteIndex, 1);
     // No quote remains selected after deleting a draft, including the last draft.
-    return { payload, focusQuoteId: "" };
+    return { payload: contenu, focusQuoteId: "" };
   }
-  if (input.action === "upsertSection" || input.action === "upsertSubsection") {
-    return upsertDraftHeading(payload, input, actor, now);
+  if (saisie.action === "upsertSection" || saisie.action === "upsertSubsection") {
+    return upsertDraftHeading(contenu, saisie, auteur, maintenant);
   }
-  if (input.action === "duplicateLine") {
-    return duplicateDraftLine(payload, input, actor, now);
+  if (saisie.action === "duplicateLine") {
+    return duplicateDraftLine(contenu, saisie, auteur, maintenant);
   }
-  if (input.action === "moveLine") {
-    return moveDraftLine(payload, input, actor, now);
+  if (saisie.action === "moveLine") {
+    return moveDraftLine(contenu, saisie, auteur, maintenant);
   }
-  if (input.action === "reorderItem") {
-    return reorderDraftItem(payload, input, actor, now);
+  if (saisie.action === "reorderItem") {
+    return reorderDraftItem(contenu, saisie, auteur, maintenant);
   }
-  if (input.action === "moveHeading") {
-    return moveDraftHeading(payload, input, actor, now);
+  if (saisie.action === "moveHeading") {
+    return moveDraftHeading(contenu, saisie, auteur, maintenant);
   }
-  if (input.action === "duplicateHeading") {
-    return duplicateDraftHeading(payload, input, actor, now);
+  if (saisie.action === "duplicateHeading") {
+    return duplicateDraftHeading(contenu, saisie, auteur, maintenant);
   }
-  if (input.action === "deleteItem") {
-    return deleteDraftItem(payload, input, actor, now);
+  if (saisie.action === "deleteItem") {
+    return deleteDraftItem(contenu, saisie, auteur, maintenant);
   }
-  if (input.action === "updateItemPresentation") {
-    return updateDraftItemPresentation(payload, input, actor, now);
+  if (saisie.action === "updateItemPresentation") {
+    return updateDraftItemPresentation(contenu, saisie, auteur, maintenant);
   }
-  if (input.action === "upsertOuvrage") {
-    return upsertDraftOuvrage(payload, input, actor, now, libraryComponentSources);
+  if (saisie.action === "upsertOuvrage") {
+    return upsertDraftOuvrage(contenu, saisie, auteur, maintenant, libraryComponentSources);
   }
-  return upsertDraftLine(payload, input, actor, now, librarySource);
+  return upsertDraftLine(contenu, saisie, auteur, maintenant, librarySource);
 }

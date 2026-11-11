@@ -29,11 +29,11 @@ export type AdminUserSnapshot = {
 };
 
 export async function requirePermissionAdministrator(): Promise<CurrentUser> {
-  const user = await getCurrentUser();
-  if (!user) throw new Error("AUTH_REQUIRED");
-  if (user.mustChangePassword) throw new Error("PASSWORD_CHANGE_REQUIRED");
-  if (!user.canManagePermissions) throw new Error("ADMIN_FORBIDDEN");
-  return user;
+  const utilisateur = await getCurrentUser();
+  if (!utilisateur) throw new Error("AUTH_REQUIRED");
+  if (utilisateur.mustChangePassword) throw new Error("PASSWORD_CHANGE_REQUIRED");
+  if (!utilisateur.canManagePermissions) throw new Error("ADMIN_FORBIDDEN");
+  return utilisateur;
 }
 
 export function userAdminErrorStatus(code: string): number {
@@ -50,54 +50,60 @@ export function userAdminErrorStatus(code: string): number {
 }
 
 function assertEmailAvailable(
-  users: Array<{ id: string; email: string }>,
+  utilisateurs: Array<{ id: string; email: string }>,
   email: string,
   exceptUserId?: string,
 ) {
   const normalized = email.trim().toLowerCase();
   if (
-    users.some((user) => user.id !== exceptUserId && user.email.trim().toLowerCase() === normalized)
+    utilisateurs.some(
+      (utilisateur) =>
+        utilisateur.id !== exceptUserId && utilisateur.email.trim().toLowerCase() === normalized,
+    )
   ) {
     throw new Error("USER_EMAIL_EXISTS");
   }
 }
 
-function normalizeUsername(value: string): string {
-  return value.trim().toLowerCase();
+function normalizeUsername(valeur: string): string {
+  return valeur.trim().toLowerCase();
 }
 
 function assertUsernameAvailable(
-  users: Array<{ id: string; username: string }>,
+  utilisateurs: Array<{ id: string; username: string }>,
   username: string,
   exceptUserId?: string,
 ) {
   const normalized = normalizeUsername(username);
   if (
-    users.some((user) => user.id !== exceptUserId && user.username.toLowerCase() === normalized)
+    utilisateurs.some(
+      (utilisateur) =>
+        utilisateur.id !== exceptUserId && utilisateur.username.toLowerCase() === normalized,
+    )
   ) {
     throw new Error("USERNAME_ALREADY_EXISTS");
   }
 }
 
 export async function listAdminUsers(): Promise<AdminUserSnapshot[]> {
-  const payload = await readAuthPayload();
-  return [...payload.users]
+  const contenu = await readAuthPayload();
+  return [...contenu.users]
     .sort((a, b) => {
       if (a.isActive !== b.isActive) return a.isActive ? -1 : 1;
       return a.displayName.localeCompare(b.displayName, "fr", { sensitivity: "base" });
     })
-    .map((user) => ({
-      id: user.id,
-      username: user.username,
-      displayName: user.displayName,
-      email: user.email,
-      isActive: user.isActive,
-      canManagePermissions: user.canManagePermissions,
-      mustChangePassword: user.mustChangePassword,
-      modulePermissions: { ...user.modulePermissions },
-      specialPermissions: [...user.specialPermissions].sort(),
-      sessions: payload.sessions
-        .filter((session) => session.userId === user.id)
+    .map((utilisateur) => ({
+      id: utilisateur.id,
+      username: utilisateur.username,
+      displayName: utilisateur.displayName,
+      email: utilisateur.email,
+      isActive: utilisateur.isActive,
+      canManagePermissions: utilisateur.canManagePermissions,
+      mustChangePassword: utilisateur.mustChangePassword,
+      modulePermissions: { ...utilisateur.modulePermissions },
+      specialPermissions: [...utilisateur.specialPermissions].sort(),
+      sessions: contenu.sessions
+        .filter((session) => session.userId === utilisateur.id)
         .sort((a, b) => Date.parse(b.createdAt) - Date.parse(a.createdAt))
         .map((session) => ({
           id: session.id,
@@ -109,24 +115,24 @@ export async function listAdminUsers(): Promise<AdminUserSnapshot[]> {
     }));
 }
 
-export async function createManagedUser(input: {
+export async function createManagedUser(saisie: {
   username: string;
   displayName: string;
   email: string;
 }) {
   const id = randomUUID();
-  const username = normalizeUsername(input.username);
-  const email = input.email.trim().toLowerCase();
+  const username = normalizeUsername(saisie.username);
+  const email = saisie.email.trim().toLowerCase();
   const placeholderPasswordHash = await hashPassword(randomBytes(48).toString("base64url"));
-  const actor = await requirePermissionAdministrator();
+  const auteur = await requirePermissionAdministrator();
 
-  await mutateAuthPayload(actor.id, (payload) => {
-    assertUsernameAvailable(payload.users, username);
-    assertEmailAvailable(payload.users, email);
-    payload.users.push({
+  await mutateAuthPayload(auteur.id, (contenu) => {
+    assertUsernameAvailable(contenu.users, username);
+    assertEmailAvailable(contenu.users, email);
+    contenu.users.push({
       id,
       username,
-      displayName: input.displayName.trim(),
+      displayName: saisie.displayName.trim(),
       email,
       passwordHash: placeholderPasswordHash,
       isActive: true,
@@ -143,7 +149,7 @@ export async function createManagedUser(input: {
     userId: id,
     tokenHash: setup.tokenHash,
     purpose: "first_setup",
-    createdByUserId: actor.id,
+    createdByUserId: auteur.id,
     expiresAt: setup.expiresAt,
   });
   return {
@@ -153,72 +159,73 @@ export async function createManagedUser(input: {
   };
 }
 
-export async function updateManagedUserProfile(input: {
+export async function updateManagedUserProfile(saisie: {
   userId: string;
   username: string;
   displayName: string;
   email: string;
 }) {
-  const actor = await requirePermissionAdministrator();
-  const username = normalizeUsername(input.username);
-  const email = input.email.trim().toLowerCase();
-  await mutateAuthPayload(actor.id, (payload) => {
-    assertUsernameAvailable(payload.users, username, input.userId);
-    assertEmailAvailable(payload.users, email, input.userId);
-    const user = payload.users.find((candidate) => candidate.id === input.userId);
-    if (!user) throw new Error("USER_NOT_FOUND");
-    user.username = username;
-    user.displayName = input.displayName.trim();
-    user.email = email;
+  const auteur = await requirePermissionAdministrator();
+  const username = normalizeUsername(saisie.username);
+  const email = saisie.email.trim().toLowerCase();
+  await mutateAuthPayload(auteur.id, (contenu) => {
+    assertUsernameAvailable(contenu.users, username, saisie.userId);
+    assertEmailAvailable(contenu.users, email, saisie.userId);
+    const utilisateur = contenu.users.find((candidat) => candidat.id === saisie.userId);
+    if (!utilisateur) throw new Error("USER_NOT_FOUND");
+    utilisateur.username = username;
+    utilisateur.displayName = saisie.displayName.trim();
+    utilisateur.email = email;
   });
 }
 
-export async function setManagedUserActive(input: {
+export async function setManagedUserActive(saisie: {
   userId: string;
   isActive: boolean;
   actorUserId: string;
 }) {
-  if (!input.isActive && input.userId === input.actorUserId) throw new Error("CANNOT_DISABLE_SELF");
-  await mutateAuthPayload(input.actorUserId, (payload) => {
-    const user = payload.users.find((candidate) => candidate.id === input.userId);
-    if (!user) throw new Error("USER_NOT_FOUND");
-    user.isActive = input.isActive;
-    if (!input.isActive) {
-      payload.sessions = payload.sessions.filter((session) => session.userId !== input.userId);
+  if (!saisie.isActive && saisie.userId === saisie.actorUserId)
+    throw new Error("CANNOT_DISABLE_SELF");
+  await mutateAuthPayload(saisie.actorUserId, (contenu) => {
+    const utilisateur = contenu.users.find((candidat) => candidat.id === saisie.userId);
+    if (!utilisateur) throw new Error("USER_NOT_FOUND");
+    utilisateur.isActive = saisie.isActive;
+    if (!saisie.isActive) {
+      contenu.sessions = contenu.sessions.filter((session) => session.userId !== saisie.userId);
     }
   });
 }
 
-export async function replaceManagedUserPermissions(input: {
+export async function replaceManagedUserPermissions(saisie: {
   userId: string;
   modules: Array<{ moduleKey: string; accessLevel: AccessLevel }>;
   specialPermissions: string[];
 }) {
-  const actor = await requirePermissionAdministrator();
-  await mutateAuthPayload(actor.id, (payload) => {
-    const user = payload.users.find((candidate) => candidate.id === input.userId);
-    if (!user) throw new Error("USER_NOT_FOUND");
-    user.modulePermissions = Object.fromEntries(
-      input.modules.map((permission) => [permission.moduleKey, permission.accessLevel]),
+  const auteur = await requirePermissionAdministrator();
+  await mutateAuthPayload(auteur.id, (contenu) => {
+    const utilisateur = contenu.users.find((candidat) => candidat.id === saisie.userId);
+    if (!utilisateur) throw new Error("USER_NOT_FOUND");
+    utilisateur.modulePermissions = Object.fromEntries(
+      saisie.modules.map((permission) => [permission.moduleKey, permission.accessLevel]),
     );
-    user.specialPermissions = [...new Set(input.specialPermissions)];
+    utilisateur.specialPermissions = [...new Set(saisie.specialPermissions)];
   });
 }
 
-export async function resetManagedUserPassword(input: { userId: string }) {
-  const actor = await requirePermissionAdministrator();
-  const payload = await readAuthPayload();
-  const user = payload.users.find(
-    (candidate) => candidate.id === input.userId && candidate.isActive,
+export async function resetManagedUserPassword(saisie: { userId: string }) {
+  const auteur = await requirePermissionAdministrator();
+  const contenu = await readAuthPayload();
+  const utilisateur = contenu.users.find(
+    (candidat) => candidat.id === saisie.userId && candidat.isActive,
   );
-  if (!user) throw new Error("USER_NOT_FOUND");
+  if (!utilisateur) throw new Error("USER_NOT_FOUND");
 
   const setup = newPasswordSetupToken(60);
   await createPasswordSetupToken({
-    userId: user.id,
+    userId: utilisateur.id,
     tokenHash: setup.tokenHash,
     purpose: "admin_reset",
-    createdByUserId: actor.id,
+    createdByUserId: auteur.id,
     expiresAt: setup.expiresAt,
   });
   return {
@@ -227,14 +234,14 @@ export async function resetManagedUserPassword(input: { userId: string }) {
   };
 }
 
-export async function revokeManagedUserSession(input: { userId: string; sessionId: string }) {
-  const actor = await requirePermissionAdministrator();
-  await mutateAuthPayload(actor.id, (payload) => {
-    if (!payload.users.some((candidate) => candidate.id === input.userId)) {
+export async function revokeManagedUserSession(saisie: { userId: string; sessionId: string }) {
+  const auteur = await requirePermissionAdministrator();
+  await mutateAuthPayload(auteur.id, (contenu) => {
+    if (!contenu.users.some((candidat) => candidat.id === saisie.userId)) {
       throw new Error("USER_NOT_FOUND");
     }
-    payload.sessions = payload.sessions.filter(
-      (session) => !(session.userId === input.userId && session.id === input.sessionId),
+    contenu.sessions = contenu.sessions.filter(
+      (session) => !(session.userId === saisie.userId && session.id === saisie.sessionId),
     );
   });
 }

@@ -6,7 +6,7 @@ import {
 import type { ProductionActivity } from "../production-activity";
 import type { QuoteLibraryComponentSource } from "./model";
 
-export function createLibraryComponentFromQuoteLine(input: {
+export function createLibraryComponentFromQuoteLine(saisie: {
   componentId: string;
   name: string;
   description: string;
@@ -15,20 +15,20 @@ export function createLibraryComponentFromQuoteLine(input: {
   salePriceCents: number;
   activity?: ProductionActivity;
 }): { component: LibraryComponent; source: QuoteLibraryComponentSource } {
-  if (!input.unit.trim()) throw new Error("LIBRARY_COMPONENT_UNIT_REQUIRED");
+  if (!saisie.unit.trim()) throw new Error("LIBRARY_COMPONENT_UNIT_REQUIRED");
 
   const component = parseLibraryComponent({
-    id: input.componentId,
-    name: input.name,
-    description: input.description,
-    unit: input.unit,
-    costPriceCents: input.costPriceCents,
+    id: saisie.componentId,
+    name: saisie.name,
+    description: saisie.description,
+    unit: saisie.unit,
+    costPriceCents: saisie.costPriceCents,
     marginPercent: calculateLibraryComponentMarginPercent(
-      input.costPriceCents,
-      input.salePriceCents,
+      saisie.costPriceCents,
+      saisie.salePriceCents,
     ),
-    salePriceCents: input.salePriceCents,
-    ...(input.activity ? { activity: input.activity } : {}),
+    salePriceCents: saisie.salePriceCents,
+    ...(saisie.activity ? { activity: saisie.activity } : {}),
   });
 
   return {

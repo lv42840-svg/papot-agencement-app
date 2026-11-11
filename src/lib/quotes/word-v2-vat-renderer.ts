@@ -30,8 +30,8 @@ type AnchoredRow = {
   anchorCellIndex: number;
 };
 
-function escapeXmlText(value: string): string {
-  return value
+function escapeXmlText(valeur: string): string {
+  return valeur
     .replaceAll("&", "&amp;")
     .replaceAll("<", "&lt;")
     .replaceAll(">", "&gt;")
@@ -50,19 +50,19 @@ function formatVatRate(ratePercent: number): string {
 function findOpeningTagStart(xml: string, tagName: string, beforeIndex: number): number {
   const pattern = new RegExp(`<${tagName}(?:\\s[^>]*)?>`, "g");
   let lastStart = -1;
-  for (const match of xml.slice(0, beforeIndex + 1).matchAll(pattern)) {
-    if (match.index !== undefined) lastStart = match.index;
+  for (const correspondance of xml.slice(0, beforeIndex + 1).matchAll(pattern)) {
+    if (correspondance.index !== undefined) lastStart = correspondance.index;
   }
   return lastStart;
 }
 
 function containingRange(xml: string, anchorIndex: number, tagName: string): XmlRange | null {
-  const start = findOpeningTagStart(xml, tagName, anchorIndex);
-  if (start < 0) return null;
+  const debut = findOpeningTagStart(xml, tagName, anchorIndex);
+  if (debut < 0) return null;
   const closingTag = `</${tagName}>`;
   const closeStart = xml.indexOf(closingTag, anchorIndex);
   if (closeStart < 0) return null;
-  return { start, end: closeStart + closingTag.length };
+  return { start: debut, end: closeStart + closingTag.length };
 }
 
 function uniqueAnchorIndex(xml: string, token: string): number {
@@ -80,7 +80,10 @@ function anchoredRow(xml: string, token: string): AnchoredRow {
   if (!range) throw new Error(`QUOTE_WORD_V2_VAT_ROW_MISSING:${token}`);
 
   const rowXml = xml.slice(range.start, range.end);
-  const cells = Array.from(rowXml.matchAll(WORD_TABLE_CELL_PATTERN), (match) => match[0]);
+  const cells = Array.from(
+    rowXml.matchAll(WORD_TABLE_CELL_PATTERN),
+    (correspondance) => correspondance[0],
+  );
   if (cells.length === 0) throw new Error(`QUOTE_WORD_V2_VAT_ROW_EMPTY:${token}`);
 
   const anchorCellIndex = cells.findIndex((cell) => cell.includes(token));
@@ -125,10 +128,10 @@ function paragraphWithAlignment(properties: string, alignment?: "left" | "right"
 
 function cellWithText(
   templateCell: string,
-  value: string,
+  valeur: string,
   options: { width?: number; align?: "left" | "right" } = {},
 ): string {
-  const text = escapeXmlText(value);
+  const texte = escapeXmlText(valeur);
   const tcPr =
     options.width === undefined
       ? cellProperties(templateCell)
@@ -140,34 +143,34 @@ function cellWithText(
     `<w:tc>${tcPr}`,
     `<w:p>${pPr}`,
     `<w:r>${rPr}`,
-    `<w:t xml:space="preserve">${text}</w:t>`,
+    `<w:t xml:space="preserve">${texte}</w:t>`,
     "</w:r></w:p></w:tc>",
   ].join("");
 }
 
-function rowWithLabelAndAmount(template: AnchoredRow, label: string, amount: string): string {
+function rowWithLabelAndAmount(template: AnchoredRow, libelle: string, montant: string): string {
   const rowProperties = template.rowXml.match(/<w:trPr>[\s\S]*?<\/w:trPr>/)?.[0] ?? "";
   const lastCellIndex = template.cells.length - 1;
 
   if (template.cells.length === 1 || template.anchorCellIndex === lastCellIndex) {
     const sourceCell = template.cells[template.anchorCellIndex]!;
-    const labelCell = cellWithText(sourceCell, label, {
+    const labelCell = cellWithText(sourceCell, libelle, {
       width: FINANCIAL_TOTALS_WIDTHS[0],
       align: "left",
     });
-    const amountCell = cellWithText(sourceCell, amount, {
+    const amountCell = cellWithText(sourceCell, montant, {
       width: FINANCIAL_TOTALS_WIDTHS[1],
       align: "right",
     });
     return `<w:tr>${rowProperties}${labelCell}${amountCell}</w:tr>`;
   }
 
-  const cells = template.cells.map((cell, index) => {
-    if (index === template.anchorCellIndex) {
-      return cellWithText(cell, label, { align: "left" });
+  const cells = template.cells.map((cell, indice) => {
+    if (indice === template.anchorCellIndex) {
+      return cellWithText(cell, libelle, { align: "left" });
     }
-    if (index === lastCellIndex) {
-      return cellWithText(cell, amount, { align: "right" });
+    if (indice === lastCellIndex) {
+      return cellWithText(cell, montant, { align: "right" });
     }
     return cell;
   });
@@ -189,8 +192,8 @@ function removeAnchoredRow(xml: string, token: string): string {
   return `${xml.slice(0, template.range.start)}${xml.slice(template.range.end)}`;
 }
 
-function taxLineLabel(line: QuoteDocumentTaxLine): string {
-  return `TVA ${formatVatRate(line.ratePercent)} sur ${formatMoney(line.baseHtCents)} HT`;
+function taxLineLabel(ligne: QuoteDocumentTaxLine): string {
+  return `TVA ${formatVatRate(ligne.ratePercent)} sur ${formatMoney(ligne.baseHtCents)} HT`;
 }
 
 export function replaceQuoteVatAnchors(documentXml: string, document: QuoteDocumentData): string {
@@ -198,39 +201,39 @@ export function replaceQuoteVatAnchors(documentXml: string, document: QuoteDocum
   const summaryLabel =
     taxLines.length === 1 ? `TVA ${formatVatRate(taxLines[0]!.ratePercent)}` : "Total TVA";
 
-  let next = replaceAnchoredRow(documentXml, VAT_SUMMARY_ANCHOR, (template) =>
+  let suivant = replaceAnchoredRow(documentXml, VAT_SUMMARY_ANCHOR, (template) =>
     rowWithLabelAndAmount(template, summaryLabel, formatMoney(document.totals.totalVatCents)),
   );
 
   if (taxLines.length <= 1) {
-    next = removeAnchoredRow(next, VAT_LINES_ANCHOR);
-    return next;
+    suivant = removeAnchoredRow(suivant, VAT_LINES_ANCHOR);
+    return suivant;
   }
 
-  next = replaceAnchoredRow(next, VAT_LINES_ANCHOR, (template) =>
+  suivant = replaceAnchoredRow(suivant, VAT_LINES_ANCHOR, (template) =>
     taxLines
-      .map((line) =>
-        rowWithLabelAndAmount(template, taxLineLabel(line), formatMoney(line.vatCents)),
+      .map((ligne) =>
+        rowWithLabelAndAmount(template, taxLineLabel(ligne), formatMoney(ligne.vatCents)),
       )
       .join(""),
   );
 
-  return next;
+  return suivant;
 }
 
 export function renderQuoteWordV2Vat(
   template: Uint8Array,
   document: QuoteDocumentData,
 ): Uint8Array {
-  const entries = readZipArchive(template);
+  const entrees = readZipArchive(template);
   let documentXmlFound = false;
 
-  const renderedEntries = entries.map((entry) => {
-    if (entry.name !== "word/document.xml") return entry;
+  const renderedEntries = entrees.map((entree) => {
+    if (entree.name !== "word/document.xml") return entree;
     documentXmlFound = true;
-    const xml = Buffer.from(entry.data).toString("utf8");
+    const xml = Buffer.from(entree.data).toString("utf8");
     const rendered = replaceQuoteVatAnchors(xml, document);
-    return cloneZipEntryWithData(entry, Buffer.from(rendered, "utf8"));
+    return cloneZipEntryWithData(entree, Buffer.from(rendered, "utf8"));
   });
 
   if (!documentXmlFound) throw new Error("QUOTE_WORD_V2_DOCUMENT_XML_MISSING");

@@ -18,13 +18,13 @@ const FONT_FAMILY_CSS: Record<QuoteItemTextStyle["fontFamily"], string | undefin
   VERDANA: "Verdana, sans-serif",
 };
 
-export function defaultQuoteItemTextStyle(item: QuoteItem): QuoteItemTextStyle {
+export function defaultQuoteItemTextStyle(element: QuoteItem): QuoteItemTextStyle {
   return {
     fontFamily: "DEFAULT",
-    fontSizePx: item.kind === "SECTION" ? 18 : item.kind === "SUBSECTION" ? 15 : 13,
+    fontSizePx: element.kind === "SECTION" ? 18 : element.kind === "SUBSECTION" ? 15 : 13,
     textColor: "#111827",
     highlightColor: null,
-    bold: item.kind !== "COMMENT",
+    bold: element.kind !== "COMMENT",
     italic: false,
   };
 }

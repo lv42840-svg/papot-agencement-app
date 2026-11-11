@@ -7,22 +7,22 @@ import {
 
 export function startQuoteCommercialWorkflow(
   source: CommercialPayload,
-  caseId: string,
+  idAffaire: string,
   quoteOwnerName: string,
   quoteDueDate: string,
-  actor: CommercialActor,
-  now: Date = new Date(),
+  auteur: CommercialActor,
+  maintenant: Date = new Date(),
 ) {
   return applyCommercialMutation(
     source,
     commercialMutationSchema.parse({
       action: "setStatus",
-      caseId,
+      caseId: idAffaire,
       status: "CHIFFRAGE",
       quoteOwnerName,
       quoteDueDate,
     }),
-    actor,
-    now,
+    auteur,
+    maintenant,
   );
 }

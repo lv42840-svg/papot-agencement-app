@@ -74,7 +74,7 @@ export function resolveRetainedChantierQuoteLine(
   idLigneDevis: string,
 ): ChantierQuoteLineReference {
   const reference = retainedChantierQuoteLines(affaire, source).find(
-    (candidate) => candidate.quoteId === idDevis && candidate.quoteLineId === idLigneDevis,
+    (candidat) => candidat.quoteId === idDevis && candidat.quoteLineId === idLigneDevis,
   );
   if (!reference) {
     throw new Error("CHANTIER_QUOTE_LINE_INVALID");

@@ -186,23 +186,23 @@ function formatMoney(cents: number): string {
 }
 
 function formatDateFr(dateKey: string): string {
-  const [year, month, day] = dateKey.split("-");
-  if (!year || !month || !day) throw new Error("QUOTE_DOCUMENT_DATE_INVALID");
-  return `${day}/${month}/${year}`;
+  const [annee, mois, jour] = dateKey.split("-");
+  if (!annee || !mois || !jour) throw new Error("QUOTE_DOCUMENT_DATE_INVALID");
+  return `${jour}/${mois}/${annee}`;
 }
 
-function addDays(dateKey: string, days: number): string {
+function addDays(dateKey: string, jours: number): string {
   const date = new Date(`${dateKey}T00:00:00.000Z`);
   if (Number.isNaN(date.getTime())) throw new Error("QUOTE_DOCUMENT_DATE_INVALID");
-  date.setUTCDate(date.getUTCDate() + days);
+  date.setUTCDate(date.getUTCDate() + jours);
   return date.toISOString().slice(0, 10);
 }
 
 function resolvePrimaryContactName(client: ClientRecord, commercialCase: CommercialCase): string {
-  const selected = commercialCase.primaryContactId
+  const selectionne = commercialCase.primaryContactId
     ? client.contacts.find((contact) => contact.id === commercialCase.primaryContactId)
     : undefined;
-  const primary = selected ?? client.contacts.find((contact) => contact.isPrimary);
+  const primary = selectionne ?? client.contacts.find((contact) => contact.isPrimary);
   if (primary) {
     return [primary.firstName, primary.lastName].filter(Boolean).join(" ").trim();
   }
@@ -213,34 +213,34 @@ function resolvePrimaryContactName(client: ClientRecord, commercialCase: Commerc
   return "";
 }
 
-function itemText(item: NativeQuoteRecord["model"]["items"][number]): string {
-  if (item.kind === "SECTION" || item.kind === "SUBSECTION") return item.title;
-  if (item.kind === "COMMENT") return item.text;
-  return item.description;
+function itemText(element: NativeQuoteRecord["model"]["items"][number]): string {
+  if (element.kind === "SECTION" || element.kind === "SUBSECTION") return element.title;
+  if (element.kind === "COMMENT") return element.text;
+  return element.description;
 }
 
-function itemRichText(item: NativeQuoteRecord["model"]["items"][number]): QuoteRichText | null {
-  return item.presentation?.richText ?? null;
+function itemRichText(element: NativeQuoteRecord["model"]["items"][number]): QuoteRichText | null {
+  return element.presentation?.richText ?? null;
 }
 
-function itemClientPhotos(item: NativeQuoteRecord["model"]["items"][number]): QuoteItemPhoto[] {
-  return (item.presentation?.photos ?? []).filter((photo) => photo.clientVisible);
+function itemClientPhotos(element: NativeQuoteRecord["model"]["items"][number]): QuoteItemPhoto[] {
+  return (element.presentation?.photos ?? []).filter((photo) => photo.clientVisible);
 }
 
-function scopeFromOptionStatus(status: QuoteOptionStatus | null): QuoteDocumentItemScope {
-  if (status === "PENDING") return "PENDING_OPTION";
-  if (status === "RETAINED") return "RETAINED_OPTION";
-  if (status === "REJECTED") return "REJECTED_OPTION";
+function scopeFromOptionStatus(statut: QuoteOptionStatus | null): QuoteDocumentItemScope {
+  if (statut === "PENDING") return "PENDING_OPTION";
+  if (statut === "RETAINED") return "RETAINED_OPTION";
+  if (statut === "REJECTED") return "REJECTED_OPTION";
   return "MAIN";
 }
 
 function resolveHeadingOption(
-  itemId: string,
+  idElement: string,
   parentId: string | null,
   optionByTarget: ReadonlyMap<string, NativeQuoteRecord["pricingConfig"]["options"][number]>,
   itemById: ReadonlyMap<string, NativeQuoteRecord["model"]["items"][number]>,
 ) {
-  const direct = optionByTarget.get(itemId);
+  const direct = optionByTarget.get(idElement);
   if (direct) return direct;
   if (!parentId) return null;
   const parentOption = optionByTarget.get(parentId);
@@ -261,79 +261,82 @@ function vatAmount(baseHtCents: number, ratePercent: number): number {
   return Math.round((baseHtCents * ratePercent) / 100);
 }
 
-function buildTaxLines(lines: QuoteDocumentItem[]): QuoteDocumentTaxLine[] {
+function buildTaxLines(lignes: QuoteDocumentItem[]): QuoteDocumentTaxLine[] {
   const grouped = new Map<number, { baseHtCents: number; vatCents: number }>();
-  for (const line of lines) {
-    if (line.kind !== "LINE" || line.totalHtCents === null || line.vatRatePercent === null)
+  for (const ligne of lignes) {
+    if (ligne.kind !== "LINE" || ligne.totalHtCents === null || ligne.vatRatePercent === null)
       continue;
-    const current = grouped.get(line.vatRatePercent) ?? { baseHtCents: 0, vatCents: 0 };
-    current.baseHtCents += line.totalHtCents;
-    current.vatCents += line.vatCents ?? 0;
-    grouped.set(line.vatRatePercent, current);
+    const courant = grouped.get(ligne.vatRatePercent) ?? { baseHtCents: 0, vatCents: 0 };
+    courant.baseHtCents += ligne.totalHtCents;
+    courant.vatCents += ligne.vatCents ?? 0;
+    grouped.set(ligne.vatRatePercent, courant);
   }
   return Array.from(grouped, ([ratePercent, totals]) => ({ ratePercent, ...totals })).sort(
-    (left, right) => left.ratePercent - right.ratePercent,
+    (gauche, droite) => gauche.ratePercent - droite.ratePercent,
   );
 }
 
-function assertDocumentReady(input: BuildQuoteDocumentDataInput): void {
-  if (input.quote.model.clientId !== input.client.id) {
+function assertDocumentReady(saisie: BuildQuoteDocumentDataInput): void {
+  if (saisie.quote.model.clientId !== saisie.client.id) {
     throw new Error("QUOTE_DOCUMENT_CLIENT_MISMATCH");
   }
-  if (input.quote.commercialCaseId !== input.commercialCase.id) {
+  if (saisie.quote.commercialCaseId !== saisie.commercialCase.id) {
     throw new Error("QUOTE_DOCUMENT_AFFAIR_MISMATCH");
   }
-  if (!input.quoteNumber.trim()) throw new Error("QUOTE_DOCUMENT_NUMBER_REQUIRED");
-  if (!input.company.name.trim()) throw new Error("QUOTE_DOCUMENT_COMPANY_REQUIRED");
-  if (!input.quote.workSchedule.startDate) throw new Error("QUOTE_DOCUMENT_WORK_START_REQUIRED");
-  if (!input.quote.workSchedule.duration.trim()) {
+  if (!saisie.quoteNumber.trim()) throw new Error("QUOTE_DOCUMENT_NUMBER_REQUIRED");
+  if (!saisie.company.name.trim()) throw new Error("QUOTE_DOCUMENT_COMPANY_REQUIRED");
+  if (!saisie.quote.workSchedule.startDate) throw new Error("QUOTE_DOCUMENT_WORK_START_REQUIRED");
+  if (!saisie.quote.workSchedule.duration.trim()) {
     throw new Error("QUOTE_DOCUMENT_WORK_DURATION_REQUIRED");
   }
-  if (!input.quote.workSchedule.endDate) throw new Error("QUOTE_DOCUMENT_WORK_END_REQUIRED");
+  if (!saisie.quote.workSchedule.endDate) throw new Error("QUOTE_DOCUMENT_WORK_END_REQUIRED");
 }
 
-export function buildQuoteDocumentData(input: BuildQuoteDocumentDataInput): QuoteDocumentData {
-  assertDocumentReady(input);
+export function buildQuoteDocumentData(saisie: BuildQuoteDocumentDataInput): QuoteDocumentData {
+  assertDocumentReady(saisie);
 
-  const { quote, client, commercialCase } = input;
+  const { quote, client, commercialCase } = saisie;
   const adjusted = calculateQuoteAdjustedPricing(quote.model.items, quote.pricingConfig);
   if (adjusted.warnings.length > 0) throw new Error("QUOTE_DOCUMENT_PRICING_WARNING");
 
   const numbers = buildQuoteItemNumbers(quote.model.items);
-  const adjustedLineById = new Map(adjusted.lines.map((line) => [line.lineId, line]));
+  const adjustedLineById = new Map(adjusted.lines.map((ligne) => [ligne.lineId, ligne]));
   const optionByTarget = new Map(
     quote.pricingConfig.options.map((option) => [option.targetItemId, option]),
   );
   const optionById = new Map(quote.pricingConfig.options.map((option) => [option.id, option]));
-  const itemById = new Map(quote.model.items.map((item) => [item.id, item]));
+  const itemById = new Map(quote.model.items.map((element) => [element.id, element]));
 
-  let items: QuoteDocumentItem[] = quote.model.items.map((item) => {
-    const adjustedLine = item.kind === "LINE" ? (adjustedLineById.get(item.id) ?? null) : null;
+  let elements: QuoteDocumentItem[] = quote.model.items.map((element) => {
+    const adjustedLine =
+      element.kind === "LINE" ? (adjustedLineById.get(element.id) ?? null) : null;
     const option = adjustedLine
       ? adjustedLine.optionId
         ? (optionById.get(adjustedLine.optionId) ?? null)
         : null
-      : resolveHeadingOption(item.id, item.parentId, optionByTarget, itemById);
+      : resolveHeadingOption(element.id, element.parentId, optionByTarget, itemById);
     const optionStatus = adjustedLine?.optionStatus ?? option?.status ?? null;
     const totalHtCents = adjustedLine?.saleCents ?? null;
-    const ratePercent = item.kind === "LINE" ? resolveVatRate(quote, item.id) : null;
+    const ratePercent = element.kind === "LINE" ? resolveVatRate(quote, element.id) : null;
 
     return {
-      id: item.id,
-      kind: item.kind,
-      number: numbers.get(item.id) ?? "",
-      parentId: item.parentId,
-      text: itemText(item),
-      richText: itemRichText(item),
-      clientPhotos: itemClientPhotos(item),
+      id: element.id,
+      kind: element.kind,
+      number: numbers.get(element.id) ?? "",
+      parentId: element.parentId,
+      text: itemText(element),
+      richText: itemRichText(element),
+      clientPhotos: itemClientPhotos(element),
       scope: scopeFromOptionStatus(optionStatus),
       optionId: option?.id ?? adjustedLine?.optionId ?? null,
       optionLabel: option?.label ?? null,
       optionStatus,
-      quantity: item.kind === "LINE" ? item.quantity : null,
-      unit: item.kind === "LINE" ? item.unit : null,
+      quantity: element.kind === "LINE" ? element.quantity : null,
+      unit: element.kind === "LINE" ? element.unit : null,
       unitPriceHt:
-        item.kind === "LINE" && totalHtCents !== null ? totalHtCents / 100 / item.quantity : null,
+        element.kind === "LINE" && totalHtCents !== null
+          ? totalHtCents / 100 / element.quantity
+          : null,
       totalHtCents,
       vatRatePercent: ratePercent,
       vatCents:
@@ -341,57 +344,63 @@ export function buildQuoteDocumentData(input: BuildQuoteDocumentDataInput): Quot
     };
   });
 
-  const documentItemById = new Map(items.map((item) => [item.id, item]));
+  const documentItemById = new Map(elements.map((element) => [element.id, element]));
   const headingTotals = new Map<string, number>();
 
-  const addHeadingTotal = (headingId: string, line: QuoteDocumentItem) => {
+  const addHeadingTotal = (headingId: string, ligne: QuoteDocumentItem) => {
     const heading = documentItemById.get(headingId);
     if (!heading || (heading.kind !== "SECTION" && heading.kind !== "SUBSECTION")) return;
 
     const sameScope =
       heading.scope === "PENDING_OPTION"
-        ? line.scope === "PENDING_OPTION" && line.optionId === heading.optionId
+        ? ligne.scope === "PENDING_OPTION" && ligne.optionId === heading.optionId
         : heading.scope === "REJECTED_OPTION"
           ? false
           : heading.scope === "RETAINED_OPTION"
-            ? line.scope === "RETAINED_OPTION" && line.optionId === heading.optionId
-            : line.scope === "MAIN" || line.scope === "RETAINED_OPTION";
+            ? ligne.scope === "RETAINED_OPTION" && ligne.optionId === heading.optionId
+            : ligne.scope === "MAIN" || ligne.scope === "RETAINED_OPTION";
 
-    if (!sameScope || line.totalHtCents === null) return;
-    headingTotals.set(headingId, (headingTotals.get(headingId) ?? 0) + line.totalHtCents);
+    if (!sameScope || ligne.totalHtCents === null) return;
+    headingTotals.set(headingId, (headingTotals.get(headingId) ?? 0) + ligne.totalHtCents);
   };
 
-  for (const line of items) {
-    if (line.kind !== "LINE" || !line.parentId) continue;
-    addHeadingTotal(line.parentId, line);
-    const parent = documentItemById.get(line.parentId);
+  for (const ligne of elements) {
+    if (ligne.kind !== "LINE" || !ligne.parentId) continue;
+    addHeadingTotal(ligne.parentId, ligne);
+    const parent = documentItemById.get(ligne.parentId);
     if (parent?.kind === "SUBSECTION" && parent.parentId) {
-      addHeadingTotal(parent.parentId, line);
+      addHeadingTotal(parent.parentId, ligne);
     }
   }
 
-  items = items.map((item) =>
-    item.kind === "SECTION" || item.kind === "SUBSECTION"
-      ? { ...item, totalHtCents: headingTotals.get(item.id) ?? null }
-      : item,
+  elements = elements.map((element) =>
+    element.kind === "SECTION" || element.kind === "SUBSECTION"
+      ? { ...element, totalHtCents: headingTotals.get(element.id) ?? null }
+      : element,
   );
 
-  const mainLines = items.filter(
-    (item) => item.kind === "LINE" && (item.scope === "MAIN" || item.scope === "RETAINED_OPTION"),
+  const mainLines = elements.filter(
+    (element) =>
+      element.kind === "LINE" && (element.scope === "MAIN" || element.scope === "RETAINED_OPTION"),
   );
   const taxLines = buildTaxLines(mainLines);
-  const totalVatCents = taxLines.reduce((sum, line) => sum + line.vatCents, 0);
+  const totalVatCents = taxLines.reduce((somme, ligne) => somme + ligne.vatCents, 0);
 
   const pendingOptions = quote.pricingConfig.options
     .filter((option) => option.status === "PENDING")
     .map((option) => {
-      const optionLines = items.filter(
-        (item) =>
-          item.kind === "LINE" && item.optionId === option.id && item.scope === "PENDING_OPTION",
+      const optionLines = elements.filter(
+        (element) =>
+          element.kind === "LINE" &&
+          element.optionId === option.id &&
+          element.scope === "PENDING_OPTION",
       );
-      const totalHtCents = optionLines.reduce((sum, item) => sum + (item.totalHtCents ?? 0), 0);
+      const totalHtCents = optionLines.reduce(
+        (somme, element) => somme + (element.totalHtCents ?? 0),
+        0,
+      );
       const totalVatCentsForOption = optionLines.reduce(
-        (sum, item) => sum + (item.vatCents ?? 0),
+        (somme, element) => somme + (element.vatCents ?? 0),
         0,
       );
       return {
@@ -409,7 +418,7 @@ export function buildQuoteDocumentData(input: BuildQuoteDocumentDataInput): Quot
   return {
     quote: {
       id: quote.id,
-      number: input.quoteNumber.trim(),
+      number: saisie.quoteNumber.trim(),
       variantName: quote.variantName,
       version: quote.version,
       versionLabel: `${quote.variantName} V${quote.version}`,
@@ -421,7 +430,7 @@ export function buildQuoteDocumentData(input: BuildQuoteDocumentDataInput): Quot
       workDuration: quote.workSchedule.duration,
       workEndDate: quote.workSchedule.endDate ?? "",
     },
-    company: input.company,
+    company: saisie.company,
     client: {
       id: client.id,
       displayName: clientDisplayName(client),
@@ -430,7 +439,7 @@ export function buildQuoteDocumentData(input: BuildQuoteDocumentDataInput): Quot
       addressLine2: client.addressLine2,
       postalCode: client.postalCode,
       city: client.city,
-      country: input.clientCountry?.trim() ?? "",
+      country: saisie.clientCountry?.trim() ?? "",
       identifierLabel: identifier ? "SIRET" : null,
       identifier,
     },
@@ -443,7 +452,7 @@ export function buildQuoteDocumentData(input: BuildQuoteDocumentDataInput): Quot
       sitePostalCode: siteAddress?.postalCode || client.postalCode,
       siteCity: siteAddress?.city || client.city,
     },
-    items,
+    items: elements,
     totals: {
       grossTotalHtCents: adjusted.grossSaleCents,
       customerDiscountCents: adjusted.customerDiscountCents,
