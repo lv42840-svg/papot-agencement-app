@@ -9,22 +9,22 @@ import type { CompanyProfileRepository } from "./repository";
 export function createCompanyProfileRepository(): CompanyProfileRepository {
   if (isLocalStorageMode()) return createLocalCompanyProfileRepository();
 
-  let repositoryPromise: Promise<CompanyProfileRepository> | null = null;
-  const initialize = () => {
-    repositoryPromise ??= (async () => {
+  let promesseDepot: Promise<CompanyProfileRepository> | null = null;
+  const initialiser = () => {
+    promesseDepot ??= (async () => {
       const pool = getServerDbPool();
       await runServerDbMigrations(pool);
       return createPostgresCompanyProfileRepository(pool);
     })();
-    return repositoryPromise;
+    return promesseDepot;
   };
 
   return {
     async load() {
-      return (await initialize()).load();
+      return (await initialiser()).load();
     },
-    async replace(profile) {
-      return (await initialize()).replace(profile);
+    async replace(profil) {
+      return (await initialiser()).replace(profil);
     },
   };
 }

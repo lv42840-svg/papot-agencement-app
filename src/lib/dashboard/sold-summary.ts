@@ -22,71 +22,85 @@ export type DashboardSoldSummary = {
  * Un TS ajouté ultérieurement reste rattaché à la confirmation de l'affaire.
  */
 export function calculateDashboardSoldSummary(
-  cases: readonly CommercialCase[],
-  quotes: readonly NativeQuoteRecord[],
-  now = new Date(),
+  affaires: readonly CommercialCase[],
+  devis: readonly NativeQuoteRecord[],
+  maintenant = new Date(),
 ): DashboardSoldSummary {
-  const parts = new Intl.DateTimeFormat("en-GB", {
+  const parties = new Intl.DateTimeFormat("en-GB", {
     timeZone: "Europe/Paris",
     year: "numeric",
     month: "2-digit",
-  }).formatToParts(now);
-  const year = parts.find((part) => part.type === "year")?.value ?? "";
-  const month = year + "-" + (parts.find((part) => part.type === "month")?.value ?? "");
-  const byId = new Map(quotes.map((quote) => [quote.id, quote]));
-  const parisDate = new Intl.DateTimeFormat("en-CA", {
+  }).formatToParts(maintenant);
+  const annee = parties.find((partie) => partie.type === "year")?.value ?? "";
+  const mois =
+    annee + "-" + (parties.find((partie) => partie.type === "month")?.value ?? "");
+  const devisParId = new Map(devis.map((unDevis) => [unDevis.id, unDevis]));
+  const formatDateParis = new Intl.DateTimeFormat("en-CA", {
     timeZone: "Europe/Paris",
     year: "numeric",
     month: "2-digit",
     day: "2-digit",
   });
 
-  function forPeriod(period: string): SoldPeriodSummary {
-    let soldCents = 0;
-    let plannedMarginCents = 0;
-    let soldComplete = true;
-    let marginComplete = true;
-    let confirmedCases = 0;
-    let incompleteCases = 0;
+  function pourPeriode(periode: string): SoldPeriodSummary {
+    let venduCentimes = 0;
+    let margePrevueCentimes = 0;
+    let venduComplet = true;
+    let margeComplete = true;
+    let affairesConfirmees = 0;
+    let affairesIncompletes = 0;
 
-    for (const item of cases) {
-      if (item.status !== "CONFIRMED" || !item.confirmedAt) continue;
-      const dateParts = parisDate.formatToParts(new Date(item.confirmedAt));
-      const dateValues = Object.fromEntries(dateParts.map((part) => [part.type, part.value]));
-      const date = dateValues.year + "-" + dateValues.month + "-" + dateValues.day;
-      if (!date.startsWith(period)) continue;
-      confirmedCases += 1;
+    for (const affaire of affaires) {
+      if (affaire.status !== "CONFIRMED" || !affaire.confirmedAt) continue;
+      const partiesDate = formatDateParis.formatToParts(new Date(affaire.confirmedAt));
+      const valeursDate = Object.fromEntries(
+        partiesDate.map((partie) => [partie.type, partie.value]),
+      );
+      const date =
+        valeursDate.year + "-" + valeursDate.month + "-" + valeursDate.day;
+      if (!date.startsWith(periode)) continue;
+      affairesConfirmees += 1;
 
-      const retained = item.retainedQuoteIds.map((id) => byId.get(id));
+      const devisRetenus = affaire.retainedQuoteIds.map((id) => devisParId.get(id));
       if (
-        retained.length === 0 ||
-        retained.some((quote) => !quote || quote.commercialCaseId !== item.id)
+        devisRetenus.length === 0 ||
+        devisRetenus.some(
+          (unDevis) => !unDevis || unDevis.commercialCaseId !== affaire.id,
+        )
       ) {
-        soldComplete = false;
-        marginComplete = false;
-        incompleteCases += 1;
+        venduComplet = false;
+        margeComplete = false;
+        affairesIncompletes += 1;
         continue;
       }
 
-      const summary = calculateCommercialContractSummary(
-        retained.filter((quote): quote is NativeQuoteRecord => Boolean(quote)),
-        item.retainedQuoteIds,
+      const resume = calculateCommercialContractSummary(
+        devisRetenus.filter(
+          (unDevis): unDevis is NativeQuoteRecord => Boolean(unDevis),
+        ),
+        affaire.retainedQuoteIds,
       );
-      soldCents += summary.totalHtCents;
-      if (summary.plannedMarginCents === null) {
-        marginComplete = false;
+      venduCentimes += resume.totalHtCents;
+      if (resume.plannedMarginCents === null) {
+        margeComplete = false;
       } else {
-        plannedMarginCents += summary.plannedMarginCents;
+        margePrevueCentimes += resume.plannedMarginCents;
       }
     }
 
     return {
-      soldCents: soldComplete ? soldCents : null,
-      plannedMarginCents: marginComplete && soldComplete ? plannedMarginCents : null,
-      confirmedCases,
-      incompleteCases,
+      soldCents: venduComplet ? venduCentimes : null,
+      plannedMarginCents:
+        margeComplete && venduComplet ? margePrevueCentimes : null,
+      confirmedCases: affairesConfirmees,
+      incompleteCases: affairesIncompletes,
     };
   }
 
-  return { year, month, yearly: forPeriod(year), monthly: forPeriod(month) };
+  return {
+    year: annee,
+    month: mois,
+    yearly: pourPeriode(annee),
+    monthly: pourPeriode(mois),
+  };
 }

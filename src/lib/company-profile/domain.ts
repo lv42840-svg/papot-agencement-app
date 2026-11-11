@@ -34,9 +34,9 @@ export function createEmptyCompanyProfile(): CompanyProfile {
   return companyProfileSchema.parse({});
 }
 
-export function parseCompanyProfile(value: unknown): CompanyProfile {
-  if (value == null) return createEmptyCompanyProfile();
-  const parsed = companyProfileSchema.safeParse(value);
-  if (!parsed.success) throw new Error("COMPANY_PROFILE_INVALID");
-  return parsed.data;
+export function parseCompanyProfile(valeur: unknown): CompanyProfile {
+  if (valeur == null) return createEmptyCompanyProfile();
+  const analyse = companyProfileSchema.safeParse(valeur);
+  if (!analyse.success) throw new Error("COMPANY_PROFILE_INVALID");
+  return analyse.data;
 }
