@@ -43,8 +43,14 @@ export function planningSelectionBounds(
   };
 }
 
-function valueForCell(ligne: PlanningClipboardRow, semaine: string, activite: PlanningActivity) {
-  return ligne.activities.find((element) => element.activity === activite)?.weeklyHours[semaine] ?? 0;
+function valueForCell(
+  ligne: PlanningClipboardRow,
+  semaine: string,
+  activite: PlanningActivity,
+) {
+  return (
+    ligne.activities.find((element) => element.activity === activite)?.weeklyHours[semaine] ?? 0
+  );
 }
 
 function displayHours(valeur: number) {
@@ -63,11 +69,7 @@ export function formatPlanningSelection(
   const lignesTexte: string[] = [];
   for (let indiceLigne = rectangle.top; indiceLigne <= rectangle.bottom; indiceLigne++) {
     const entrees: string[] = [];
-    for (
-      let indiceColonne = rectangle.left;
-      indiceColonne <= rectangle.right;
-      indiceColonne++
-    ) {
+    for (let indiceColonne = rectangle.left; indiceColonne <= rectangle.right; indiceColonne++) {
       const semaine = semaines[Math.floor(indiceColonne / 3)];
       const activite = PLANNING_CLIPBOARD_ACTIVITIES[indiceColonne % 3];
       const element = lignes[indiceLigne];

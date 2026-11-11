@@ -14,7 +14,10 @@ export const EMPTY_QUOTE_RICH_TEXT_STYLE: QuoteRichTextRunStyle = {
   fontSizePx: null,
 };
 
-function sameStyle(gauche: QuoteRichTextRunStyle, droite: QuoteRichTextRunStyle): boolean {
+function sameStyle(
+  gauche: QuoteRichTextRunStyle,
+  droite: QuoteRichTextRunStyle,
+): boolean {
   return (
     gauche.bold === droite.bold &&
     gauche.italic === droite.italic &&
@@ -52,7 +55,9 @@ export function quoteRichTextFromPlainText(
   };
 }
 
-export function normalizeQuoteRichText(texteEnrichi: QuoteRichText): QuoteRichText {
+export function normalizeQuoteRichText(
+  texteEnrichi: QuoteRichText,
+): QuoteRichText {
   const segments: QuoteRichTextRun[] = [];
   for (const candidat of texteEnrichi.runs) {
     if (!candidat.text) continue;
@@ -61,13 +66,18 @@ export function normalizeQuoteRichText(texteEnrichi: QuoteRichText): QuoteRichTe
       style: cloneStyle(candidat.style),
     };
     const precedent = segments.at(-1);
-    if (precedent && sameStyle(precedent.style, segment.style)) precedent.text += segment.text;
-    else segments.push(segment);
+    if (precedent && sameStyle(precedent.style, segment.style)) {
+      precedent.text += segment.text;
+    } else {
+      segments.push(segment);
+    }
   }
   return { runs: segments };
 }
 
-export function quoteRichTextToPlainText(texteEnrichi: QuoteRichText | undefined): string {
+export function quoteRichTextToPlainText(
+  texteEnrichi: QuoteRichText | undefined,
+): string {
   return texteEnrichi?.runs.map((segment) => segment.text).join("") ?? "";
 }
 
@@ -102,8 +112,13 @@ export function applyQuoteRichTextStyle(
 
   const longueurTexte = quoteRichTextToPlainText(texteEnrichi).length;
   const debutSecurise = Math.max(0, Math.min(debut, longueurTexte));
-  const finSecurisee = Math.max(debutSecurise, Math.min(fin, longueurTexte));
-  if (finSecurisee <= debutSecurise) return normalizeQuoteRichText(texteEnrichi);
+  const finSecurisee = Math.max(
+    debutSecurise,
+    Math.min(fin, longueurTexte),
+  );
+  if (finSecurisee <= debutSecurise) {
+    return normalizeQuoteRichText(texteEnrichi);
+  }
 
   const segments: QuoteRichTextRun[] = [];
   let curseur = 0;
@@ -119,7 +134,10 @@ export function applyQuoteRichTextStyle(
     }
 
     const debutLocal = Math.max(0, debutSecurise - debutSegment);
-    const finLocale = Math.min(segment.text.length, finSecurisee - debutSegment);
+    const finLocale = Math.min(
+      segment.text.length,
+      finSecurisee - debutSegment,
+    );
 
     if (debutLocal > 0) {
       segments.push({
@@ -163,11 +181,18 @@ export function quoteRichTextSelectionStyle(
     else {
       if (styleCommun.bold !== segment.style.bold) styleCommun.bold = false;
       if (styleCommun.italic !== segment.style.italic) styleCommun.italic = false;
-      if (styleCommun.underline !== segment.style.underline) styleCommun.underline = false;
-      if (styleCommun.textColor !== segment.style.textColor) styleCommun.textColor = null;
-      if (styleCommun.highlightColor !== segment.style.highlightColor)
+      if (styleCommun.underline !== segment.style.underline) {
+        styleCommun.underline = false;
+      }
+      if (styleCommun.textColor !== segment.style.textColor) {
+        styleCommun.textColor = null;
+      }
+      if (styleCommun.highlightColor !== segment.style.highlightColor) {
         styleCommun.highlightColor = null;
-      if (styleCommun.fontSizePx !== segment.style.fontSizePx) styleCommun.fontSizePx = null;
+      }
+      if (styleCommun.fontSizePx !== segment.style.fontSizePx) {
+        styleCommun.fontSizePx = null;
+      }
     }
   }
 
