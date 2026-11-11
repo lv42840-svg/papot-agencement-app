@@ -16,22 +16,15 @@ type CommercialStateRow = {
   payload: unknown;
 };
 
-type Queryable =
-  | Pick<Pool, "query">
-  | Pick<PoolClient, "query">;
+type Queryable = Pick<Pool, "query"> | Pick<PoolClient, "query">;
 
-async function loadState(
-  sourceRequete: Queryable,
-): Promise<CommercialStateRow> {
-  const resultat =
-    await sourceRequete.query<CommercialStateRow>(
-      "SELECT version, payload FROM papot_commercial_state WHERE scope = 'global'",
-    );
+async function loadState(sourceRequete: Queryable): Promise<CommercialStateRow> {
+  const resultat = await sourceRequete.query<CommercialStateRow>(
+    "SELECT version, payload FROM papot_commercial_state WHERE scope = 'global'",
+  );
   const ligne = resultat.rows[0];
   if (!ligne) {
-    throw new Error(
-      "COMMERCIAL_STORAGE_NOT_INITIALIZED",
-    );
+    throw new Error("COMMERCIAL_STORAGE_NOT_INITIALIZED");
   }
   return ligne;
 }
@@ -45,37 +38,26 @@ export function createPostgresCommercialRepository(
       return parseCommercialPayload(ligne.payload);
     },
 
-    async mutate(
-      transformation: CommercialMutationTransform,
-    ) {
+    async mutate(transformation: CommercialMutationTransform) {
       return withServerDbTransaction(async (client) => {
-        const verrouillage =
-          await client.query<CommercialStateRow>(
-            `
+        const verrouillage = await client.query<CommercialStateRow>(
+          `
             SELECT version, payload
             FROM papot_commercial_state
             WHERE scope = 'global'
             FOR UPDATE
           `,
-          );
+        );
         const ligne = verrouillage.rows[0];
         if (!ligne) {
-          throw new Error(
-            "COMMERCIAL_STORAGE_NOT_INITIALIZED",
-          );
+          throw new Error("COMMERCIAL_STORAGE_NOT_INITIALIZED");
         }
 
-        const mutation = await transformation(
-          parseCommercialPayload(ligne.payload),
-          false,
-        );
+        const mutation = await transformation(parseCommercialPayload(ligne.payload), false);
         if (mutation.shouldPersist === false) {
           return {
-            payload: parseCommercialPayload(
-              mutation.payload,
-            ),
-            focusCaseId:
-              mutation.focusCaseId,
+            payload: parseCommercialPayload(mutation.payload),
+            focusCaseId: mutation.focusCaseId,
           };
         }
 
@@ -93,17 +75,12 @@ export function createPostgresCommercialRepository(
           [mutation.payload, ligne.version],
         );
         if (sauvegarde.rowCount === 0) {
-          throw new CommercialRepositoryError(
-            "COMMERCIAL_VERSION_CONFLICT",
-          );
+          throw new CommercialRepositoryError("COMMERCIAL_VERSION_CONFLICT");
         }
 
         return {
-          payload: parseCommercialPayload(
-            sauvegarde.rows[0]?.payload,
-          ),
-          focusCaseId:
-            mutation.focusCaseId,
+          payload: parseCommercialPayload(sauvegarde.rows[0]?.payload),
+          focusCaseId: mutation.focusCaseId,
         };
       }, pool);
     },

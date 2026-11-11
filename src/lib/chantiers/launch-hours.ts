@@ -2,9 +2,7 @@ import type { ChantierHours } from "./domain";
 import { calculateCommercialContractSummary } from "../quotes/commercial-summary";
 import type { NativeQuotesPayload } from "../quotes/store";
 
-export type ChantierLaunchHoursSource =
-  | "RETAINED_QUOTES"
-  | "COMMERCIAL_PROVISION";
+export type ChantierLaunchHoursSource = "RETAINED_QUOTES" | "COMMERCIAL_PROVISION";
 
 export type ChantierLaunchHours = {
   hours: ChantierHours;
@@ -28,28 +26,16 @@ export function deriveChantierLaunchHours(
     };
   }
 
-  const devisParId = new Map(
-    devis.quotes.map((unDevis) => [unDevis.id, unDevis]),
-  );
-  const devisRetenus = affaire.retainedQuoteIds.map(
-    (idDevis) => {
-      const unDevis = devisParId.get(idDevis);
-      if (
-        !unDevis ||
-        unDevis.commercialCaseId !== affaire.id
-      ) {
-        throw new Error(
-          "CHANTIER_RETAINED_QUOTE_NOT_FOUND",
-        );
-      }
-      return unDevis;
-    },
-  );
+  const devisParId = new Map(devis.quotes.map((unDevis) => [unDevis.id, unDevis]));
+  const devisRetenus = affaire.retainedQuoteIds.map((idDevis) => {
+    const unDevis = devisParId.get(idDevis);
+    if (!unDevis || unDevis.commercialCaseId !== affaire.id) {
+      throw new Error("CHANTIER_RETAINED_QUOTE_NOT_FOUND");
+    }
+    return unDevis;
+  });
 
-  const contrat = calculateCommercialContractSummary(
-    devisRetenus,
-    affaire.retainedQuoteIds,
-  );
+  const contrat = calculateCommercialContractSummary(devisRetenus, affaire.retainedQuoteIds);
   return {
     hours: {
       be: contrat.soldHoursByActivity.be,

@@ -16,22 +16,15 @@ type ChantiersStateRow = {
   payload: unknown;
 };
 
-type Queryable =
-  | Pick<Pool, "query">
-  | Pick<PoolClient, "query">;
+type Queryable = Pick<Pool, "query"> | Pick<PoolClient, "query">;
 
-async function loadState(
-  sourceRequete: Queryable,
-): Promise<ChantiersStateRow> {
-  const resultat =
-    await sourceRequete.query<ChantiersStateRow>(
-      "SELECT version, payload FROM papot_chantiers_state WHERE scope = 'global'",
-    );
+async function loadState(sourceRequete: Queryable): Promise<ChantiersStateRow> {
+  const resultat = await sourceRequete.query<ChantiersStateRow>(
+    "SELECT version, payload FROM papot_chantiers_state WHERE scope = 'global'",
+  );
   const ligne = resultat.rows[0];
   if (!ligne) {
-    throw new Error(
-      "CHANTIERS_STORAGE_NOT_INITIALIZED",
-    );
+    throw new Error("CHANTIERS_STORAGE_NOT_INITIALIZED");
   }
   return ligne;
 }
@@ -45,37 +38,26 @@ export function createPostgresChantiersRepository(
       return parseChantiersPayload(ligne.payload);
     },
 
-    async mutate(
-      transformation: ChantiersMutationTransform,
-    ) {
+    async mutate(transformation: ChantiersMutationTransform) {
       return withServerDbTransaction(async (client) => {
-        const verrouillage =
-          await client.query<ChantiersStateRow>(
-            `
+        const verrouillage = await client.query<ChantiersStateRow>(
+          `
             SELECT version, payload
             FROM papot_chantiers_state
             WHERE scope = 'global'
             FOR UPDATE
           `,
-          );
+        );
         const ligne = verrouillage.rows[0];
         if (!ligne) {
-          throw new Error(
-            "CHANTIERS_STORAGE_NOT_INITIALIZED",
-          );
+          throw new Error("CHANTIERS_STORAGE_NOT_INITIALIZED");
         }
 
-        const mutation = await transformation(
-          parseChantiersPayload(ligne.payload),
-          false,
-        );
+        const mutation = await transformation(parseChantiersPayload(ligne.payload), false);
         if (mutation.shouldPersist === false) {
           return {
-            payload: parseChantiersPayload(
-              mutation.payload,
-            ),
-            focusChantierId:
-              mutation.focusChantierId,
+            payload: parseChantiersPayload(mutation.payload),
+            focusChantierId: mutation.focusChantierId,
           };
         }
 
@@ -93,17 +75,12 @@ export function createPostgresChantiersRepository(
           [mutation.payload, ligne.version],
         );
         if (sauvegarde.rowCount === 0) {
-          throw new ChantiersRepositoryError(
-            "CHANTIERS_VERSION_CONFLICT",
-          );
+          throw new ChantiersRepositoryError("CHANTIERS_VERSION_CONFLICT");
         }
 
         return {
-          payload: parseChantiersPayload(
-            sauvegarde.rows[0]?.payload,
-          ),
-          focusChantierId:
-            mutation.focusChantierId,
+          payload: parseChantiersPayload(sauvegarde.rows[0]?.payload),
+          focusChantierId: mutation.focusChantierId,
         };
       }, pool);
     },

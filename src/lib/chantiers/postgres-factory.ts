@@ -1,13 +1,9 @@
-import {
-  getServerDbPool,
-  runServerDbMigrations,
-} from "@/lib/server-db";
+import { getServerDbPool, runServerDbMigrations } from "@/lib/server-db";
 import { createPostgresChantiersRepository } from "./postgres-repository";
 import type { ChantiersRepository } from "./repository";
 
 export function createPostgresBackedChantiersRepository(): ChantiersRepository {
-  let promesseDepot: Promise<ChantiersRepository> | null =
-    null;
+  let promesseDepot: Promise<ChantiersRepository> | null = null;
 
   const initialiser = () => {
     promesseDepot ??= (async () => {
@@ -23,9 +19,7 @@ export function createPostgresBackedChantiersRepository(): ChantiersRepository {
       return (await initialiser()).load();
     },
     async mutate(transformation) {
-      return (await initialiser()).mutate(
-        transformation,
-      );
+      return (await initialiser()).mutate(transformation);
     },
   };
 }

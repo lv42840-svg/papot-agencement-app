@@ -1,8 +1,5 @@
 import { isLocalStorageMode } from "@/lib/local-db/runtime";
-import {
-  getServerDbPool,
-  runServerDbMigrations,
-} from "@/lib/server-db";
+import { getServerDbPool, runServerDbMigrations } from "@/lib/server-db";
 import { createLocalCommercialRepository } from "./local-repository";
 import { createPostgresCommercialRepository } from "./postgres-repository";
 import type { CommercialRepository } from "./repository";
@@ -12,8 +9,7 @@ export function createCommercialRepository(): CommercialRepository {
     return createLocalCommercialRepository();
   }
 
-  let promesseDepot: Promise<CommercialRepository> | null =
-    null;
+  let promesseDepot: Promise<CommercialRepository> | null = null;
 
   const initialiser = () => {
     promesseDepot ??= (async () => {
@@ -29,9 +25,7 @@ export function createCommercialRepository(): CommercialRepository {
       return (await initialiser()).load();
     },
     async mutate(transformation) {
-      return (await initialiser()).mutate(
-        transformation,
-      );
+      return (await initialiser()).mutate(transformation);
     },
   };
 }

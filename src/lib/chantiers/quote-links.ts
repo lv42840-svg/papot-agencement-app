@@ -25,16 +25,10 @@ export type ChantierRetainedQuote = {
 };
 
 function quoteNumber(devis: NativeQuoteRecord): string {
-  return (
-    devis.finalPdf?.quoteNumber ??
-    `${devis.variantName} · V${devis.version}`
-  );
+  return devis.finalPdf?.quoteNumber ?? `${devis.variantName} · V${devis.version}`;
 }
 
-function lineReference(
-  devis: NativeQuoteRecord,
-  ligne: QuoteLine,
-): ChantierQuoteLineReference {
+function lineReference(devis: NativeQuoteRecord, ligne: QuoteLine): ChantierQuoteLineReference {
   return {
     quoteId: devis.id,
     quoteLineId: ligne.id,
@@ -54,26 +48,15 @@ export function retainedChantierQuotes(
   source: NativeQuotesPayload,
 ): ChantierRetainedQuote[] {
   const donnees = parseNativeQuotesPayload(source);
-  const identifiantsRetenus = new Set(
-    affaire.retainedQuoteIds,
-  );
+  const identifiantsRetenus = new Set(affaire.retainedQuoteIds);
 
   return donnees.quotes
-    .filter(
-      (devis) =>
-        devis.commercialCaseId === affaire.id &&
-        identifiantsRetenus.has(devis.id),
-    )
+    .filter((devis) => devis.commercialCaseId === affaire.id && identifiantsRetenus.has(devis.id))
     .map((devis) => ({
       quote: devis,
       lines: devis.model.items
-        .filter(
-          (element): element is QuoteLine =>
-            element.kind === "LINE",
-        )
-        .map((ligne) =>
-          lineReference(devis, ligne),
-        ),
+        .filter((element): element is QuoteLine => element.kind === "LINE")
+        .map((ligne) => lineReference(devis, ligne)),
     }));
 }
 
@@ -81,10 +64,7 @@ export function retainedChantierQuoteLines(
   affaire: CommercialCase,
   source: NativeQuotesPayload,
 ): ChantierQuoteLineReference[] {
-  return retainedChantierQuotes(
-    affaire,
-    source,
-  ).flatMap((entree) => entree.lines);
+  return retainedChantierQuotes(affaire, source).flatMap((entree) => entree.lines);
 }
 
 export function resolveRetainedChantierQuoteLine(
@@ -93,13 +73,8 @@ export function resolveRetainedChantierQuoteLine(
   idDevis: string,
   idLigneDevis: string,
 ): ChantierQuoteLineReference {
-  const reference = retainedChantierQuoteLines(
-    affaire,
-    source,
-  ).find(
-    (candidate) =>
-      candidate.quoteId === idDevis &&
-      candidate.quoteLineId === idLigneDevis,
+  const reference = retainedChantierQuoteLines(affaire, source).find(
+    (candidate) => candidate.quoteId === idDevis && candidate.quoteLineId === idLigneDevis,
   );
   if (!reference) {
     throw new Error("CHANTIER_QUOTE_LINE_INVALID");
@@ -107,8 +82,6 @@ export function resolveRetainedChantierQuoteLine(
   return reference;
 }
 
-export function chantierQuoteLineDisplay(
-  reference: ChantierQuoteLineReference,
-): string {
+export function chantierQuoteLineDisplay(reference: ChantierQuoteLineReference): string {
   return `${reference.quoteNumber} · ${reference.description}`;
 }
