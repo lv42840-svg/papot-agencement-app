@@ -13,7 +13,7 @@ const personnel = readFileSync(
 describe("new personnel hours and absence suggestions", () => {
   it("saves a separate 38.5 hour schedule only for newly created personnel", () => {
     expect(personnel).toContain("NEW_STAFF_WEEKLY_SCHEDULE");
-    expect(personnel).toContain("payload.peopleCapacity.push");
+    expect(personnel).toContain("contenu.peopleCapacity.push");
     expect(personnel).toContain("countsInMacroCapacity: false");
     expect(personnel).toContain("weeklySchedule: { ...NEW_STAFF_WEEKLY_SCHEDULE }");
   });
