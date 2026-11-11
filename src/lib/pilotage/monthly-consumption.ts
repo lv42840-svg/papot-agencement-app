@@ -28,81 +28,140 @@ export type MonthlyConsumption = {
  * A null payroll input means no access to salary-derived costs, not a free hour.
  */
 export function calculateMonthlyConsumption(
-  month: string,
-  planning: Pick<PlanningPayload, "actualHours" | "indirectHours" | "peopleCapacity">,
-  records: readonly MonthlyLaborCostRecord[] | null,
-  now = new Date(),
+  mois: string,
+  planning: Pick<
+    PlanningPayload,
+    "actualHours" | "indirectHours" | "peopleCapacity"
+  >,
+  enregistrements: readonly MonthlyLaborCostRecord[] | null,
+  maintenant = new Date(),
 ): MonthlyConsumption {
-  financialMonthSchema.parse(month);
-  const schedules = new Map(
-    planning.peopleCapacity.map((person) => [person.userId, person.weeklySchedule]),
+  financialMonthSchema.parse(mois);
+  const horaires = new Map(
+    planning.peopleCapacity.map((personne) => [
+      personne.userId,
+      personne.weeklySchedule,
+    ]),
   );
-  const rates = new Map<string, MonthlyLaborCostRecord>();
-  for (const record of records ?? []) {
-    const key = `${record.personId}:${record.month}`;
-    if (rates.has(key)) throw new Error("MONTHLY_LABOR_COST_DUPLICATE");
-    rates.set(key, record);
+  const couts = new Map<string, MonthlyLaborCostRecord>();
+  for (const enregistrement of enregistrements ?? []) {
+    const cle = `${enregistrement.personId}:${enregistrement.month}`;
+    if (couts.has(cle)) {
+      throw new Error("MONTHLY_LABOR_COST_DUPLICATE");
+    }
+    couts.set(cle, enregistrement);
   }
-  const buckets = {
+  const compartiments = {
     chantier: { hours: 0, cents: 0, unvaluedHours: 0 },
     sav: { hours: 0, cents: 0, unvaluedHours: 0 },
     generalExpenses: { hours: 0, cents: 0, unvaluedHours: 0 },
   };
-  const entries = [
-    ...planning.actualHours.map((row) => ({ ...row, destination: "chantier" as const })),
-    ...planning.indirectHours.map((row) => ({
-      ...row,
-      destination: row.category === "SAV" ? ("sav" as const) : ("generalExpenses" as const),
+  const entrees = [
+    ...planning.actualHours.map((ligne) => ({
+      ...ligne,
+      destination: "chantier" as const,
+    })),
+    ...planning.indirectHours.map((ligne) => ({
+      ...ligne,
+      destination:
+        ligne.category === "SAV"
+          ? ("sav" as const)
+          : ("generalExpenses" as const),
     })),
   ];
-  let provisional = false;
-  let estimatedMonthSplit = false;
-  for (const row of entries) {
-    if (row.hours <= 0) continue;
-    const shares = monthlySharesForWeek(row.week, schedules.get(row.userId));
-    const split = shares.find((item) => item.month === month);
-    if (!split) continue;
-    estimatedMonthSplit ||= shares.length > 1;
-    const bucket = buckets[row.destination];
-    const hours = row.hours * split.fraction;
-    bucket.hours += hours;
-    const resolved =
-      records === null ? null : resolveLaborCostForWorkedMonth(row.userId, month, rates, now);
-    if (!resolved) {
-      bucket.unvaluedHours += hours;
+  let provisoire = false;
+  let repartitionMoisEstimee = false;
+  for (const ligne of entrees) {
+    if (ligne.hours <= 0) continue;
+    const repartitions = monthlySharesForWeek(
+      ligne.week,
+      horaires.get(ligne.userId),
+    );
+    const repartition = repartitions.find(
+      (element) => element.month === mois,
+    );
+    if (!repartition) continue;
+    repartitionMoisEstimee ||= repartitions.length > 1;
+    const compartiment = compartiments[ligne.destination];
+    const heures = ligne.hours * repartition.fraction;
+    compartiment.hours += heures;
+    const coutResolue =
+      enregistrements === null
+        ? null
+        : resolveLaborCostForWorkedMonth(
+            ligne.userId,
+            mois,
+            couts,
+            maintenant,
+          );
+    if (!coutResolue) {
+      compartiment.unvaluedHours += heures;
       continue;
     }
-    provisional ||= resolved.provisional;
-    bucket.cents += (hours * resolved.record.employerCostCents) / resolved.record.workedHours;
+    provisoire ||= coutResolue.provisional;
+    compartiment.cents +=
+      (heures * coutResolue.record.employerCostCents) /
+      coutResolue.record.workedHours;
   }
-  const hours = (value: number) => Math.round(value * 100) / 100;
-  function finish(bucket: typeof buckets.chantier): MonthlyConsumptionBucket {
-    const cents = records !== null && bucket.unvaluedHours === 0 ? Math.round(bucket.cents) : null;
-    if (cents !== null && !Number.isSafeInteger(cents))
+  const arrondirHeures = (valeur: number) =>
+    Math.round(valeur * 100) / 100;
+
+  function finaliser(
+    compartiment: typeof compartiments.chantier,
+  ): MonthlyConsumptionBucket {
+    const centimes =
+      enregistrements !== null &&
+      compartiment.unvaluedHours === 0
+        ? Math.round(compartiment.cents)
+        : null;
+    if (centimes !== null && !Number.isSafeInteger(centimes)) {
       throw new Error("MONTHLY_LABOR_COST_INVALID");
+    }
     return {
-      hours: hours(bucket.hours),
-      valuedCostCents: cents,
-      unvaluedHours: hours(bucket.unvaluedHours),
+      hours: arrondirHeures(compartiment.hours),
+      valuedCostCents: centimes,
+      unvaluedHours: arrondirHeures(
+        compartiment.unvaluedHours,
+      ),
     };
   }
-  const chantier = finish(buckets.chantier);
-  const sav = finish(buckets.sav);
-  const generalExpenses = finish(buckets.generalExpenses);
-  const totals = [chantier, sav, generalExpenses];
+
+  const chantier = finaliser(compartiments.chantier);
+  const sav = finaliser(compartiments.sav);
+  const fraisGeneraux = finaliser(
+    compartiments.generalExpenses,
+  );
+  const totaux = [chantier, sav, fraisGeneraux];
   return {
-    month,
+    month: mois,
     chantier,
     sav,
-    generalExpenses,
+    generalExpenses: fraisGeneraux,
     total: {
-      hours: hours(totals.reduce((sum, bucket) => sum + bucket.hours, 0)),
-      unvaluedHours: hours(totals.reduce((sum, bucket) => sum + bucket.unvaluedHours, 0)),
-      valuedCostCents: totals.some((bucket) => bucket.valuedCostCents === null)
+      hours: arrondirHeures(
+        totaux.reduce(
+          (somme, compartiment) => somme + compartiment.hours,
+          0,
+        ),
+      ),
+      unvaluedHours: arrondirHeures(
+        totaux.reduce(
+          (somme, compartiment) =>
+            somme + compartiment.unvaluedHours,
+          0,
+        ),
+      ),
+      valuedCostCents: totaux.some(
+        (compartiment) => compartiment.valuedCostCents === null,
+      )
         ? null
-        : totals.reduce((sum, bucket) => sum + (bucket.valuedCostCents ?? 0), 0),
+        : totaux.reduce(
+            (somme, compartiment) =>
+              somme + (compartiment.valuedCostCents ?? 0),
+            0,
+          ),
     },
-    provisional,
-    estimatedMonthSplit,
+    provisional: provisoire,
+    estimatedMonthSplit: repartitionMoisEstimee,
   };
 }

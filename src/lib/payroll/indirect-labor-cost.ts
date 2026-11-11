@@ -1,7 +1,10 @@
 import type { PlanningPersonCapacity } from "../planning/capacity";
 import type { PlanningIndirectHours } from "../planning/domain";
 import { monthlySharesForWeek } from "./chantier-labor-cost";
-import { resolveLaborCostForWorkedMonth, type MonthlyLaborCostRecord } from "./monthly-labor-costs";
+import {
+  resolveLaborCostForWorkedMonth,
+  type MonthlyLaborCostRecord,
+} from "./monthly-labor-costs";
 
 export type IndirectLaborCostsPeriod = {
   savHours: number;
@@ -12,10 +15,14 @@ export type IndirectLaborCostsPeriod = {
   provisional: boolean;
 };
 
-type InternalBucket = { hours: number; costCents: number; complete: boolean };
+type InternalBucket = {
+  hours: number;
+  costCents: number;
+  complete: boolean;
+};
 
-function sumHours(hours: number): number {
-  return Math.round(hours * 100) / 100;
+function sumHours(heures: number): number {
+  return Math.round(heures * 100) / 100;
 }
 
 /**
@@ -24,56 +31,82 @@ function sumHours(hours: number): number {
  * Missing payroll values yield null costs, never an underestimated subtotal.
  */
 export function calculateIndirectLaborCostsForPeriod(
-  period: string,
-  entries: readonly PlanningIndirectHours[],
-  records: readonly MonthlyLaborCostRecord[],
-  peopleCapacity: readonly PlanningPersonCapacity[],
-  now = new Date(),
+  periode: string,
+  entrees: readonly PlanningIndirectHours[],
+  enregistrements: readonly MonthlyLaborCostRecord[],
+  capacitesPersonnes: readonly PlanningPersonCapacity[],
+  maintenant = new Date(),
 ): IndirectLaborCostsPeriod {
-  const byPersonMonth = new Map(
-    records.map((record) => [record.personId + ":" + record.month, record]),
+  const parPersonneMois = new Map(
+    enregistrements.map((enregistrement) => [
+      enregistrement.personId + ":" + enregistrement.month,
+      enregistrement,
+    ]),
   );
-  const schedules = new Map(peopleCapacity.map((person) => [person.userId, person.weeklySchedule]));
-  let provisional = false;
-  const buckets: Record<PlanningIndirectHours["category"], InternalBucket> = {
+  const horaires = new Map(
+    capacitesPersonnes.map((personne) => [
+      personne.userId,
+      personne.weeklySchedule,
+    ]),
+  );
+  let provisoire = false;
+  const compartiments: Record<
+    PlanningIndirectHours["category"],
+    InternalBucket
+  > = {
     SAV: { hours: 0, costCents: 0, complete: true },
     GENERAL: { hours: 0, costCents: 0, complete: true },
   };
 
-  for (const entry of entries) {
-    if (entry.hours <= 0) continue;
-    for (const split of monthlySharesForWeek(entry.week, schedules.get(entry.userId))) {
-      if (!split.month.startsWith(period)) continue;
-      const bucket = buckets[entry.category];
-      const hours = entry.hours * split.fraction;
-      bucket.hours += hours;
-      const resolved = resolveLaborCostForWorkedMonth(
-        entry.userId,
-        split.month,
-        byPersonMonth,
-        now,
+  for (const entree of entrees) {
+    if (entree.hours <= 0) continue;
+    for (const repartition of monthlySharesForWeek(
+      entree.week,
+      horaires.get(entree.userId),
+    )) {
+      if (!repartition.month.startsWith(periode)) continue;
+      const compartiment = compartiments[entree.category];
+      const heures = entree.hours * repartition.fraction;
+      compartiment.hours += heures;
+      const coutResolue = resolveLaborCostForWorkedMonth(
+        entree.userId,
+        repartition.month,
+        parPersonneMois,
+        maintenant,
       );
-      if (!resolved) {
-        bucket.complete = false;
+      if (!coutResolue) {
+        compartiment.complete = false;
       } else {
-        provisional ||= resolved.provisional;
-        bucket.costCents +=
-          hours * (resolved.record.employerCostCents / resolved.record.workedHours);
+        provisoire ||= coutResolue.provisional;
+        compartiment.costCents +=
+          heures *
+          (coutResolue.record.employerCostCents /
+            coutResolue.record.workedHours);
       }
     }
   }
 
-  const savCostCents = buckets.SAV.complete ? Math.round(buckets.SAV.costCents) : null;
-  const generalCostCents = buckets.GENERAL.complete ? Math.round(buckets.GENERAL.costCents) : null;
+  const coutSavCentimes = compartiments.SAV.complete
+    ? Math.round(compartiments.SAV.costCents)
+    : null;
+  const coutFraisGenerauxCentimes = compartiments.GENERAL.complete
+    ? Math.round(compartiments.GENERAL.costCents)
+    : null;
 
   return {
-    savHours: sumHours(buckets.SAV.hours),
-    generalHours: sumHours(buckets.GENERAL.hours),
-    savCostCents,
-    generalCostCents,
-    provisional: provisional && savCostCents !== null && generalCostCents !== null,
+    savHours: sumHours(compartiments.SAV.hours),
+    generalHours: sumHours(compartiments.GENERAL.hours),
+    savCostCents: coutSavCentimes,
+    generalCostCents: coutFraisGenerauxCentimes,
+    provisional:
+      provisoire &&
+      coutSavCentimes !== null &&
+      coutFraisGenerauxCentimes !== null,
     totalCostCents:
-      savCostCents === null || generalCostCents === null ? null : savCostCents + generalCostCents,
+      coutSavCentimes === null ||
+      coutFraisGenerauxCentimes === null
+        ? null
+        : coutSavCentimes + coutFraisGenerauxCentimes,
   };
 }
 
@@ -83,10 +116,11 @@ export function calculateIndirectLaborCostsForPeriod(
  * invoices, and other overhead are not included.
  */
 export function calculateIndicativeCompanyMarginCents(
-  plannedMarginCents: number | null,
-  indirectCosts: IndirectLaborCostsPeriod,
+  margePrevueCentimes: number | null,
+  coutsIndirects: IndirectLaborCostsPeriod,
 ): number | null {
-  return plannedMarginCents === null || indirectCosts.totalCostCents === null
+  return margePrevueCentimes === null ||
+    coutsIndirects.totalCostCents === null
     ? null
-    : plannedMarginCents - indirectCosts.totalCostCents;
+    : margePrevueCentimes - coutsIndirects.totalCostCents;
 }
