@@ -1,5 +1,5 @@
-export function commercialAffairHref(caseId: string): string {
-  const normalizedId = caseId.trim();
-  if (!normalizedId) return "/commercial";
-  return `/commercial/${encodeURIComponent(normalizedId)}`;
+export function commercialAffairHref(idAffaire: string): string {
+  const idNormalise = idAffaire.trim();
+  if (!idNormalise) return "/commercial";
+  return `/commercial/${encodeURIComponent(idNormalise)}`;
 }

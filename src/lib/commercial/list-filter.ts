@@ -3,24 +3,26 @@ import { commercialNeedsFollowUp, isCommercialClosed, type CommercialCase } from
 export type CommercialListFilter = "active" | "follow-up" | "confirmed" | "archives";
 
 export function commercialCaseMatchesFilter(
-  item: CommercialCase,
-  filter: CommercialListFilter,
-  now: Date = new Date(),
+  affaire: CommercialCase,
+  filtre: CommercialListFilter,
+  maintenant: Date = new Date(),
 ): boolean {
-  if (filter === "archives") return isCommercialClosed(item);
-  if (filter === "confirmed") return item.status === "CONFIRMED";
-  if (filter === "follow-up") {
+  if (filtre === "archives") return isCommercialClosed(affaire);
+  if (filtre === "confirmed") return affaire.status === "CONFIRMED";
+  if (filtre === "follow-up") {
     return (
-      !isCommercialClosed(item) && item.status !== "CONFIRMED" && commercialNeedsFollowUp(item, now)
+      !isCommercialClosed(affaire) &&
+      affaire.status !== "CONFIRMED" &&
+      commercialNeedsFollowUp(affaire, maintenant)
     );
   }
-  return !isCommercialClosed(item) && item.status !== "CONFIRMED";
+  return !isCommercialClosed(affaire) && affaire.status !== "CONFIRMED";
 }
 
 export function filterCommercialCases(
-  cases: CommercialCase[],
-  filter: CommercialListFilter,
-  now: Date = new Date(),
+  affaires: CommercialCase[],
+  filtre: CommercialListFilter,
+  maintenant: Date = new Date(),
 ): CommercialCase[] {
-  return cases.filter((item) => commercialCaseMatchesFilter(item, filter, now));
+  return affaires.filter((affaire) => commercialCaseMatchesFilter(affaire, filtre, maintenant));
 }

@@ -4,8 +4,8 @@ export type CommercialDocumentFilter = "ALL" | CommercialDocumentCategory;
 
 export function filterCommercialDocuments(
   documents: readonly CommercialDocument[],
-  filter: CommercialDocumentFilter,
+  filtre: CommercialDocumentFilter,
 ): CommercialDocument[] {
-  if (filter === "ALL") return [...documents];
-  return documents.filter((document) => document.category === filter);
+  if (filtre === "ALL") return [...documents];
+  return documents.filter((document) => document.category === filtre);
 }

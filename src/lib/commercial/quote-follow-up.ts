@@ -15,15 +15,15 @@ export const COMMERCIAL_QUOTE_STATUS_LABELS: Record<CommercialQuoteDisplayStatus
 };
 
 export function commercialQuoteDisplayStatus(
-  quoteStatus: QuoteStatus,
-  followUpDate: string | null,
-  now: Date = new Date(),
+  statutDevis: QuoteStatus,
+  dateRelance: string | null,
+  maintenant: Date = new Date(),
 ): CommercialQuoteDisplayStatus {
-  if (quoteStatus !== "SENT") return quoteStatus;
-  if (followUpDate && followUpDate <= commercialParisDateKey(now)) return "FOLLOW_UP";
+  if (statutDevis !== "SENT") return statutDevis;
+  if (dateRelance && dateRelance <= commercialParisDateKey(maintenant)) return "FOLLOW_UP";
   return "SENT";
 }
 
-export function quoteEditorHref(quoteId: string): string {
-  return `/devis/${encodeURIComponent(quoteId)}`;
+export function quoteEditorHref(idDevis: string): string {
+  return `/devis/${encodeURIComponent(idDevis)}`;
 }

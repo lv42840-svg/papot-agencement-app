@@ -8,9 +8,11 @@ export type CommercialAssignableUser = {
 };
 
 export async function listCommercialAssignableUsers(): Promise<CommercialAssignableUser[]> {
-  const payload = await readAuthPayload();
-  return payload.users
-    .filter((user) => user.isActive && Boolean(user.modulePermissions.commercial))
-    .sort((a, b) => a.displayName.localeCompare(b.displayName, "fr", { sensitivity: "base" }))
-    .map((user) => ({ id: user.id, displayName: user.displayName }));
+  const donneesAuthentification = await readAuthPayload();
+  return donneesAuthentification.users
+    .filter((utilisateur) => utilisateur.isActive && Boolean(utilisateur.modulePermissions.commercial))
+    .sort((utilisateurA, utilisateurB) =>
+      utilisateurA.displayName.localeCompare(utilisateurB.displayName, "fr", { sensitivity: "base" }),
+    )
+    .map((utilisateur) => ({ id: utilisateur.id, displayName: utilisateur.displayName }));
 }

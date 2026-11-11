@@ -5,19 +5,19 @@ import type { NativeQuoteRecord } from "../quotes/store";
 export type ForecastActivityHours = { be: number; workshop: number; install: number };
 
 export function effectiveCommercialForecastHours(
-  item: Pick<CommercialCase, "provisionHours" | "forecastQuoteIds" | "id">,
-  quotes: readonly NativeQuoteRecord[],
+  affaire: Pick<CommercialCase, "provisionHours" | "forecastQuoteIds" | "id">,
+  devis: readonly NativeQuoteRecord[],
 ): ForecastActivityHours {
   // null means legacy/manual mode, including all existing commercial cases.
-  if (item.forecastQuoteIds == null) return item.provisionHours;
-  const ids = new Set(item.forecastQuoteIds);
+  if (affaire.forecastQuoteIds == null) return affaire.provisionHours;
+  const identifiantsDevis = new Set(affaire.forecastQuoteIds);
   const total = { be: 0, workshop: 0, install: 0 };
-  for (const quote of quotes) {
-    if (!ids.has(quote.id) || quote.commercialCaseId !== item.id) continue;
-    const hours = calculateCommercialQuoteSummary(quote).soldHoursByActivity;
-    total.be += hours.be;
-    total.workshop += hours.workshop;
-    total.install += hours.install;
+  for (const unDevis of devis) {
+    if (!identifiantsDevis.has(unDevis.id) || unDevis.commercialCaseId !== affaire.id) continue;
+    const heures = calculateCommercialQuoteSummary(unDevis).soldHoursByActivity;
+    total.be += heures.be;
+    total.workshop += heures.workshop;
+    total.install += heures.install;
   }
   return {
     be: Math.round(total.be * 1_000_000) / 1_000_000,
@@ -27,16 +27,16 @@ export function effectiveCommercialForecastHours(
 }
 
 export function assertForecastQuoteSelection(
-  caseId: string,
-  quoteIds: readonly string[],
-  quotes: readonly NativeQuoteRecord[],
+  idAffaire: string,
+  identifiantsDevis: readonly string[],
+  devis: readonly NativeQuoteRecord[],
 ): void {
-  if (new Set(quoteIds).size !== quoteIds.length) {
+  if (new Set(identifiantsDevis).size !== identifiantsDevis.length) {
     throw new Error("COMMERCIAL_FORECAST_QUOTE_DUPLICATE");
   }
-  const byId = new Map(quotes.map((quote) => [quote.id, quote]));
-  for (const id of quoteIds) {
-    if (byId.get(id)?.commercialCaseId !== caseId) {
+  const devisParId = new Map(devis.map((unDevis) => [unDevis.id, unDevis]));
+  for (const idDevis of identifiantsDevis) {
+    if (devisParId.get(idDevis)?.commercialCaseId !== idAffaire) {
       throw new Error("COMMERCIAL_FORECAST_QUOTE_NOT_IN_AFFAIR");
     }
   }
