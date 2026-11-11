@@ -23,17 +23,12 @@ export async function listReadableModules(idUtilisateur: string): Promise<string
   return utilisateur ? Object.keys(utilisateur.modulePermissions) : [];
 }
 
-export async function hasSpecialPermission(
-  idUtilisateur: string,
-  clePermission: string,
-) {
+export async function hasSpecialPermission(idUtilisateur: string, clePermission: string) {
   const utilisateur = await readUserPermissions(idUtilisateur);
   return utilisateur?.specialPermissions.includes(clePermission) === true;
 }
 
-export async function listSpecialPermissions(
-  idUtilisateur: string,
-): Promise<string[]> {
+export async function listSpecialPermissions(idUtilisateur: string): Promise<string[]> {
   const utilisateur = await readUserPermissions(idUtilisateur);
   return utilisateur ? [...utilisateur.specialPermissions].sort() : [];
 }

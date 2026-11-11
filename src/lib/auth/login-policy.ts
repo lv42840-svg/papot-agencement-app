@@ -31,8 +31,7 @@ export function loginBlock(etat: LoginState, maintenant: number) {
 export function failedLogin(etat: LoginState, maintenant: number): LoginState {
   if (loginBlock(etat, maintenant) !== "allowed") return { ...etat };
   const expire =
-    etat.firstFailureAt === null ||
-    maintenant - etat.firstFailureAt >= LOGIN_WINDOW_MS;
+    etat.firstFailureAt === null || maintenant - etat.firstFailureAt >= LOGIN_WINDOW_MS;
   const echecs = expire ? 1 : etat.failures + 1;
   const resultat: LoginState = {
     ...etat,

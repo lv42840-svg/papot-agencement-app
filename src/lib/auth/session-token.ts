@@ -5,9 +5,7 @@ export function newSessionToken() {
     process.env.PAPOT_SESSION_TTL_HOURS ?? process.env.SESSION_TTL_HOURS ?? 12,
   );
   const dureeHeures =
-    Number.isInteger(dureeConfiguree) &&
-    dureeConfiguree >= 1 &&
-    dureeConfiguree <= 168
+    Number.isInteger(dureeConfiguree) && dureeConfiguree >= 1 && dureeConfiguree <= 168
       ? dureeConfiguree
       : 12;
   const jeton = randomBytes(32).toString("base64url");

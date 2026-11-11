@@ -72,10 +72,7 @@ export function summarizeIssuedInvoices(
     });
     const montantHtCentimes = facturesSelectionnees.reduce(
       (somme, facture) =>
-        somme +
-        (facture.type === "CREDIT_NOTE"
-          ? -facture.amountHtCents
-          : facture.amountHtCents),
+        somme + (facture.type === "CREDIT_NOTE" ? -facture.amountHtCents : facture.amountHtCents),
       0,
     );
     if (!Number.isSafeInteger(montantHtCentimes)) {
@@ -83,9 +80,7 @@ export function summarizeIssuedInvoices(
     }
     return {
       amountHtCents: montantHtCentimes,
-      invoiceCount: facturesSelectionnees.filter(
-        (facture) => facture.type === "INVOICE",
-      ).length,
+      invoiceCount: facturesSelectionnees.filter((facture) => facture.type === "INVOICE").length,
     };
   };
   return {

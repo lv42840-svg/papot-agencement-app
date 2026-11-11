@@ -21,9 +21,7 @@ export function quoteContractSelectionState(
     return null;
   }
   if (affaireCommerciale.status !== "CONFIRMED" || !devis.finalPdf) return null;
-  return affaireCommerciale.retainedQuoteIds.includes(devis.id)
-    ? "RETAINED"
-    : "NOT_RETAINED";
+  return affaireCommerciale.retainedQuoteIds.includes(devis.id) ? "RETAINED" : "NOT_RETAINED";
 }
 
 export function quoteContractSelectionLabel(
@@ -34,11 +32,7 @@ export function quoteContractSelectionLabel(
 
 export function quoteCanBeRetained(devis: NativeQuoteRecord): boolean {
   if (!devis.finalPdf) return false;
-  return (
-    devis.status === "SENT" ||
-    devis.status === "ACCEPTED" ||
-    devis.status === "SUPERSEDED"
-  );
+  return devis.status === "SENT" || devis.status === "ACCEPTED" || devis.status === "SUPERSEDED";
 }
 
 export function validateRetainedQuoteSelection(
@@ -48,9 +42,7 @@ export function validateRetainedQuoteSelection(
   confirmerSansDevis: boolean,
 ): NativeQuoteRecord[] {
   const donnees = parseNativeQuotesPayload(source);
-  if (
-    new Set(identifiantsDevisRetenus).size !== identifiantsDevisRetenus.length
-  ) {
+  if (new Set(identifiantsDevisRetenus).size !== identifiantsDevisRetenus.length) {
     throw new Error("COMMERCIAL_RETAINED_QUOTE_DUPLICATE");
   }
 
@@ -58,15 +50,9 @@ export function validateRetainedQuoteSelection(
     (devis) => devis.commercialCaseId === idAffaireCommerciale,
   );
   const devisSelectionnables = devisAffaire.filter(quoteCanBeRetained);
-  const identifiantsSelectionnables = new Set(
-    devisSelectionnables.map((devis) => devis.id),
-  );
+  const identifiantsSelectionnables = new Set(devisSelectionnables.map((devis) => devis.id));
 
-  if (
-    identifiantsDevisRetenus.some(
-      (idDevis) => !identifiantsSelectionnables.has(idDevis),
-    )
-  ) {
+  if (identifiantsDevisRetenus.some((idDevis) => !identifiantsSelectionnables.has(idDevis))) {
     throw new Error("COMMERCIAL_RETAINED_QUOTE_INVALID");
   }
 
@@ -80,8 +66,7 @@ export function validateRetainedQuoteSelection(
   }
 
   return identifiantsDevisRetenus.map(
-    (idDevis) =>
-      devisSelectionnables.find((devis) => devis.id === idDevis)!,
+    (idDevis) => devisSelectionnables.find((devis) => devis.id === idDevis)!,
   );
 }
 
@@ -92,9 +77,7 @@ export function validateAdditionalRetainedQuote(
 ): NativeQuoteRecord {
   const donnees = parseNativeQuotesPayload(source);
   const devis = donnees.quotes.find(
-    (candidat) =>
-      candidat.id === idDevis &&
-      candidat.commercialCaseId === idAffaireCommerciale,
+    (candidat) => candidat.id === idDevis && candidat.commercialCaseId === idAffaireCommerciale,
   );
   if (!devis || !quoteCanBeRetained(devis)) {
     throw new Error("COMMERCIAL_RETAINED_QUOTE_INVALID");

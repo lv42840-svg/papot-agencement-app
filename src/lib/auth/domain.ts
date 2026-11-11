@@ -56,16 +56,12 @@ export function emptyAuthPayload(): AuthPayload {
 
 function normalizedUsernameBase(email: string, id: string): string {
   const partieLocale = email.split("@")[0]?.toLowerCase() ?? "";
-  const nettoye = partieLocale
-    .replace(/[^a-z0-9._-]/g, "")
-    .replace(/^[._-]+|[._-]+$/g, "");
+  const nettoye = partieLocale.replace(/[^a-z0-9._-]/g, "").replace(/^[._-]+|[._-]+$/g, "");
   if (nettoye.length >= 3) return nettoye.slice(0, 70);
   return `user-${id.replace(/-/g, "").slice(0, 8)}`;
 }
 
-function ensureUsernames(
-  utilisateurs: Array<z.infer<typeof storedUserSchema>>,
-): AuthUserRecord[] {
+function ensureUsernames(utilisateurs: Array<z.infer<typeof storedUserSchema>>): AuthUserRecord[] {
   const nomsUtilises = new Set<string>();
   return utilisateurs.map((utilisateur) => {
     const nomDemande = utilisateur.username?.toLowerCase();
@@ -76,10 +72,7 @@ function ensureUsernames(
     let nomUtilisateur = base;
     let suffixe = 2;
     while (nomsUtilises.has(nomUtilisateur.toLowerCase())) {
-      nomUtilisateur = `${base.slice(
-        0,
-        Math.max(3, 78 - String(suffixe).length),
-      )}-${suffixe}`;
+      nomUtilisateur = `${base.slice(0, Math.max(3, 78 - String(suffixe).length))}-${suffixe}`;
       suffixe += 1;
     }
     nomsUtilises.add(nomUtilisateur.toLowerCase());
@@ -114,12 +107,7 @@ export function parseAuthPayload(valeur: unknown): AuthPayload {
   return donnees;
 }
 
-export function pruneExpiredSessions(
-  donnees: AuthPayload,
-  maintenant = new Date(),
-): void {
+export function pruneExpiredSessions(donnees: AuthPayload, maintenant = new Date()): void {
   const limite = maintenant.getTime();
-  donnees.sessions = donnees.sessions.filter(
-    (session) => Date.parse(session.expiresAt) > limite,
-  );
+  donnees.sessions = donnees.sessions.filter((session) => Date.parse(session.expiresAt) > limite);
 }

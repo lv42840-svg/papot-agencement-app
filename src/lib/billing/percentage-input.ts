@@ -6,9 +6,5 @@ export function parseBillingPercentageInput(brut: string): number | null {
   const normalise = brut.trim().replace(",", ".");
   if (!/^\d+(?:\.\d{1,2})?$/.test(normalise)) return null;
   const pourcentage = Number(normalise);
-  return Number.isFinite(pourcentage) &&
-    pourcentage > 0 &&
-    pourcentage <= 100
-    ? pourcentage
-    : null;
+  return Number.isFinite(pourcentage) && pourcentage > 0 && pourcentage <= 100 ? pourcentage : null;
 }

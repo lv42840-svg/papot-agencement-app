@@ -31,8 +31,7 @@ export function billingPreparationFollowup(
     ) {
       throw new Error("BILLING_PREPARATION_EXCEEDS_CONTRACT");
     }
-    const montantRestantHtCentimes =
-      source.contractHtCents - montantPrepareHtCentimes;
+    const montantRestantHtCentimes = source.contractHtCents - montantPrepareHtCentimes;
     return {
       source,
       projectCount: projetsLies.length,

@@ -43,11 +43,7 @@ export function planningSelectionBounds(
   };
 }
 
-function valueForCell(
-  ligne: PlanningClipboardRow,
-  semaine: string,
-  activite: PlanningActivity,
-) {
+function valueForCell(ligne: PlanningClipboardRow, semaine: string, activite: PlanningActivity) {
   return (
     ligne.activities.find((element) => element.activity === activite)?.weeklyHours[semaine] ?? 0
   );

@@ -1,21 +1,11 @@
 import "server-only";
 
-import {
-  isLocalStorageMode,
-  mutateLocalSnapshot,
-  readLocalSnapshot,
-} from "@/lib/local-db/runtime";
-import {
-  getServerDbPool,
-  runServerDbMigrations,
-  withServerDbTransaction,
-} from "@/lib/server-db";
+import { isLocalStorageMode, mutateLocalSnapshot, readLocalSnapshot } from "@/lib/local-db/runtime";
+import { getServerDbPool, runServerDbMigrations, withServerDbTransaction } from "@/lib/server-db";
 import { parseBillingPayload, type BillingPayload } from "./domain";
 
 const RESOURCE_KEY = "billing";
-type BillingTransform = (
-  donnees: BillingPayload,
-) => BillingPayload | Promise<BillingPayload>;
+type BillingTransform = (donnees: BillingPayload) => BillingPayload | Promise<BillingPayload>;
 
 export type BillingRepository = {
   load(): Promise<BillingPayload>;
@@ -62,9 +52,7 @@ export function createBillingRepository(): BillingRepository {
         const resultat = await client.query<{
           payload: unknown;
           version: number;
-        }>(
-          "SELECT payload, version FROM papot_billing_state WHERE scope = 'global' FOR UPDATE",
-        );
+        }>("SELECT payload, version FROM papot_billing_state WHERE scope = 'global' FOR UPDATE");
         const ligne = resultat.rows[0];
         if (!ligne) throw new Error("BILLING_STORAGE_NOT_INITIALIZED");
         const donneesSuivantes = parseBillingPayload(

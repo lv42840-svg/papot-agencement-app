@@ -3,11 +3,7 @@ import "server-only";
 import { createHash, randomUUID } from "node:crypto";
 import { cookies } from "next/headers";
 import { redirect } from "next/navigation";
-import {
-  mutateAuthPayload,
-  readAuthPayload,
-  readSessionIdentity,
-} from "@/lib/auth/store";
+import { mutateAuthPayload, readAuthPayload, readSessionIdentity } from "@/lib/auth/store";
 import { newSessionToken } from "@/lib/auth/session-token";
 
 const cookieName = process.env.SESSION_COOKIE_NAME ?? "papot_session";
@@ -29,9 +25,7 @@ function desktopDeviceIdentity(): {
     };
     return {
       deviceId:
-        typeof donnees.device_id === "string" && donnees.device_id
-          ? donnees.device_id
-          : null,
+        typeof donnees.device_id === "string" && donnees.device_id ? donnees.device_id : null,
       deviceLabel:
         typeof donnees.device_label === "string" && donnees.device_label
           ? donnees.device_label
@@ -93,9 +87,7 @@ export async function destroySession() {
   if (jeton) {
     const empreinte = tokenHash(jeton);
     const donnees = await readAuthPayload();
-    const session = donnees.sessions.find(
-      (candidat) => candidat.tokenHash === empreinte,
-    );
+    const session = donnees.sessions.find((candidat) => candidat.tokenHash === empreinte);
     if (session) {
       await mutateAuthPayload(session.userId, (brouillon) => {
         brouillon.sessions = brouillon.sessions.filter(
@@ -109,9 +101,7 @@ export async function destroySession() {
 
 export async function destroyAllSessionsForUser(idUtilisateur: string) {
   await mutateAuthPayload(idUtilisateur, (donnees) => {
-    donnees.sessions = donnees.sessions.filter(
-      (session) => session.userId !== idUtilisateur,
-    );
+    donnees.sessions = donnees.sessions.filter((session) => session.userId !== idUtilisateur);
   });
 }
 

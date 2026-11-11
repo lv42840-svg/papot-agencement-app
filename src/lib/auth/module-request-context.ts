@@ -20,8 +20,7 @@ export async function requireModuleRequestContext(
   if (utilisateur.mustChangePassword) throw new Error("PASSWORD_CHANGE_REQUIRED");
 
   const peutEcrire = await hasModuleAccess(utilisateur.id, cleModule, "WRITE");
-  const peutLire =
-    peutEcrire || (await hasModuleAccess(utilisateur.id, cleModule, "READ"));
+  const peutLire = peutEcrire || (await hasModuleAccess(utilisateur.id, cleModule, "READ"));
 
   if (niveauRequis === "WRITE" ? !peutEcrire : !peutLire) {
     throw new Error("MODULE_FORBIDDEN");

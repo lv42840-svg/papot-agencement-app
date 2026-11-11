@@ -52,8 +52,7 @@ export function filterBillingProjects(
     .sort((gauche, droite) => {
       if (filtre.sort === "OLDEST") {
         return (
-          gauche.createdAt.localeCompare(droite.createdAt) ||
-          gauche.id.localeCompare(droite.id)
+          gauche.createdAt.localeCompare(droite.createdAt) || gauche.id.localeCompare(droite.id)
         );
       }
       if (filtre.sort === "CLIENT") {
@@ -68,9 +67,6 @@ export function filterBillingProjects(
           droite.createdAt.localeCompare(gauche.createdAt)
         );
       }
-      return (
-        droite.createdAt.localeCompare(gauche.createdAt) ||
-        gauche.id.localeCompare(droite.id)
-      );
+      return droite.createdAt.localeCompare(gauche.createdAt) || gauche.id.localeCompare(droite.id);
     });
 }

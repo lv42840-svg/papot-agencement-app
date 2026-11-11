@@ -43,9 +43,7 @@ export function purchaseChantierNamesForInput(
     if (
       chantier &&
       chantier.status !== "ACTIVE" &&
-      !lignes.some(
-        (ligne) => ligne.chantierId === id && ligne.amountHtCents === montant,
-      )
+      !lignes.some((ligne) => ligne.chantierId === id && ligne.amountHtCents === montant)
     ) {
       throw new Error("PURCHASE_CHANTIER_NOT_ACTIVE");
     }

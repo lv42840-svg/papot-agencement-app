@@ -49,9 +49,7 @@ export const NEW_STAFF_WEEKLY_SCHEDULE = {
   sunday: 0,
 } satisfies z.infer<typeof weekdayHoursSchema>;
 
-export function weeklyScheduleHours(
-  horaire: PlanningPersonCapacity["weeklySchedule"],
-): number {
+export function weeklyScheduleHours(horaire: PlanningPersonCapacity["weeklySchedule"]): number {
   return Object.values(horaire).reduce((somme, heures) => somme + heures, 0);
 }
 
@@ -108,9 +106,7 @@ export function frenchNationalPublicHolidayIds(annee: number): Set<string> {
     [12, 25],
   ] as const;
   const identifiants = new Set(
-    joursFixes.map(([mois, jour]) =>
-      dateId(new Date(Date.UTC(annee, mois - 1, jour))),
-    ),
+    joursFixes.map(([mois, jour]) => dateId(new Date(Date.UTC(annee, mois - 1, jour)))),
   );
   identifiants.add(dateId(addUtcDays(paques, 1)));
   identifiants.add(dateId(addUtcDays(paques, 39)));
@@ -151,9 +147,7 @@ export function isoWeekDates(idSemaine: string): Date[] {
   const quatreJanvier = new Date(Date.UTC(annee, 0, 4));
   const jourQuatreJanvier = quatreJanvier.getUTCDay() || 7;
   const lundi = new Date(quatreJanvier);
-  lundi.setUTCDate(
-    quatreJanvier.getUTCDate() - jourQuatreJanvier + 1 + (semaine - 1) * 7,
-  );
+  lundi.setUTCDate(quatreJanvier.getUTCDate() - jourQuatreJanvier + 1 + (semaine - 1) * 7);
   return Array.from({ length: 7 }, (_, indice) => addUtcDays(lundi, indice));
 }
 
@@ -176,10 +170,7 @@ export function suggestedAbsenceHoursForDate(
 ): number {
   if (!/^\d{4}-\d{2}-\d{2}$/.test(identifiantDate)) return 0;
   const jour = new Date(`${identifiantDate}T12:00:00Z`);
-  if (
-    Number.isNaN(jour.getTime()) ||
-    jour.toISOString().slice(0, 10) !== identifiantDate
-  ) {
+  if (Number.isNaN(jour.getTime()) || jour.toISOString().slice(0, 10) !== identifiantDate) {
     return 0;
   }
   return scheduleHoursForDate(horaire, jour);
@@ -190,10 +181,7 @@ export function weeklyScheduleHoursForWeek(
   idSemaine: string,
 ): number {
   const dates = isoWeekDates(idSemaine);
-  return dates.reduce(
-    (somme, date) => somme + scheduleHoursForDate(horaire, date),
-    0,
-  );
+  return dates.reduce((somme, date) => somme + scheduleHoursForDate(horaire, date), 0);
 }
 
 export function buildWeeklyCapacityIndicators(
@@ -206,9 +194,7 @@ export function buildWeeklyCapacityIndicators(
   absences: PlanningAbsence[] = [],
   chargeProvisionnelleParSemaine: ReadonlyMap<string, number> = new Map(),
 ): PlanningWeekCapacity[] {
-  const personnesComptabilisees = personnes.filter(
-    (personne) => personne.countsInMacroCapacity,
-  );
+  const personnesComptabilisees = personnes.filter((personne) => personne.countsInMacroCapacity);
 
   return semaines.map((semaine) => {
     const dates = isoWeekDates(semaine);
@@ -230,16 +216,13 @@ export function buildWeeklyCapacityIndicators(
           }
           const heuresPrevues = scheduleHoursForDate(personne.weeklySchedule, date);
           const absence = absencesParDate.get(dateId(date));
-          const heuresIndisponibles = absence
-            ? Math.min(absence.hours, heuresPrevues)
-            : 0;
+          const heuresIndisponibles = absence ? Math.min(absence.hours, heuresPrevues) : 0;
           return capacitePersonneSemaine + Math.max(0, heuresPrevues - heuresIndisponibles);
         }, 0)
       );
     }, 0);
     const chargeFermeHeures = chargeFermeParSemaine.get(semaine) ?? 0;
-    const chargeProvisionnelleHeures =
-      chargeProvisionnelleParSemaine.get(semaine) ?? 0;
+    const chargeProvisionnelleHeures = chargeProvisionnelleParSemaine.get(semaine) ?? 0;
     return {
       week: semaine,
       totalCapacityHours: capaciteTotaleHeures,

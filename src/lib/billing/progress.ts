@@ -1,9 +1,4 @@
-import type {
-  BillingDraft,
-  BillingLineProgress,
-  BillingPayload,
-  BillingSource,
-} from "./domain";
+import type { BillingDraft, BillingLineProgress, BillingPayload, BillingSource } from "./domain";
 
 export type LineProgressInput = { lineId: string; percent: number };
 
@@ -50,13 +45,10 @@ export function calculateLineProgress(
   const brouillonsPrecedents = donnees.drafts.filter(
     (brouillon) => brouillon.quoteId === source.quoteId,
   );
-  const historique = brouillonsPrecedents.filter(
-    (brouillon) => brouillon.type === "PROGRESS",
-  );
+  const historique = brouillonsPrecedents.filter((brouillon) => brouillon.type === "PROGRESS");
   if (
     historique.some(
-      (brouillon) =>
-        !brouillon.lineProgress?.length && brouillon.cumulativePercent === null,
+      (brouillon) => !brouillon.lineProgress?.length && brouillon.cumulativePercent === null,
     )
   ) {
     throw new Error("BILLING_PROGRESS_HISTORY_UNDETERMINED");
@@ -68,8 +60,7 @@ export function calculateLineProgress(
       const historiqueLigne = brouillon.lineProgress?.find(
         (ligneHistorique) => ligneHistorique.lineId === ligne.lineId,
       );
-      const pourcentageHistorique =
-        historiqueLigne?.percent ?? brouillon.cumulativePercent ?? 0;
+      const pourcentageHistorique = historiqueLigne?.percent ?? brouillon.cumulativePercent ?? 0;
       return Math.max(maximum, pourcentageHistorique);
     }, 0);
     if (pourcentage < precedent) {
@@ -78,9 +69,7 @@ export function calculateLineProgress(
     return {
       lineId: ligne.lineId,
       percent: pourcentage,
-      cumulativeHtCents: Math.round(
-        (ligne.amountHtCents * pourcentage) / 100,
-      ),
+      cumulativeHtCents: Math.round((ligne.amountHtCents * pourcentage) / 100),
     };
   });
 
@@ -90,10 +79,7 @@ export function calculateLineProgress(
   for (let indice = 0; indice < lignes.length; indice += 1) {
     const ligne = lignes[indice];
     const cible = avancementLignes[indice].cumulativeHtCents;
-    cibleParTaux.set(
-      ligne.vatRatePercent,
-      (cibleParTaux.get(ligne.vatRatePercent) ?? 0) + cible,
-    );
+    cibleParTaux.set(ligne.vatRatePercent, (cibleParTaux.get(ligne.vatRatePercent) ?? 0) + cible);
   }
 
   const precedentParTaux = new Map<number, number>();
@@ -106,25 +92,20 @@ export function calculateLineProgress(
     }
   }
 
-  const groupes: BillingDraft["taxGroups"] = source.contractTaxGroups.map(
-    (contrat) => {
-      const cumul = cibleParTaux.get(contrat.ratePercent) ?? 0;
-      const dejaPrepare = precedentParTaux.get(contrat.ratePercent) ?? 0;
-      const baseHtCentimes = cumul - dejaPrepare;
-      if (baseHtCentimes < 0) {
-        throw new Error("BILLING_PROGRESS_TAX_ALLOCATION_UNAVAILABLE");
-      }
-      return {
-        ratePercent: contrat.ratePercent,
-        baseHtCents: baseHtCentimes,
-        vatCents: Math.round((baseHtCentimes * contrat.ratePercent) / 100),
-      };
-    },
-  );
-  const montantHtCentimes = groupes.reduce(
-    (somme, groupe) => somme + groupe.baseHtCents,
-    0,
-  );
+  const groupes: BillingDraft["taxGroups"] = source.contractTaxGroups.map((contrat) => {
+    const cumul = cibleParTaux.get(contrat.ratePercent) ?? 0;
+    const dejaPrepare = precedentParTaux.get(contrat.ratePercent) ?? 0;
+    const baseHtCentimes = cumul - dejaPrepare;
+    if (baseHtCentimes < 0) {
+      throw new Error("BILLING_PROGRESS_TAX_ALLOCATION_UNAVAILABLE");
+    }
+    return {
+      ratePercent: contrat.ratePercent,
+      baseHtCents: baseHtCentimes,
+      vatCents: Math.round((baseHtCentimes * contrat.ratePercent) / 100),
+    };
+  });
+  const montantHtCentimes = groupes.reduce((somme, groupe) => somme + groupe.baseHtCents, 0);
   const totalPrecedent = brouillonsPrecedents.reduce(
     (somme, brouillon) => somme + brouillon.amountHtCents,
     0,
@@ -135,10 +116,7 @@ export function calculateLineProgress(
   if (montantHtCentimes > restantContrat) {
     throw new Error("BILLING_AMOUNT_EXCEEDS_CONTRACT");
   }
-  const tvaCentimes = groupes.reduce(
-    (somme, groupe) => somme + groupe.vatCents,
-    0,
-  );
+  const tvaCentimes = groupes.reduce((somme, groupe) => somme + groupe.vatCents, 0);
   return {
     amountHtCents: montantHtCentimes,
     tax: {

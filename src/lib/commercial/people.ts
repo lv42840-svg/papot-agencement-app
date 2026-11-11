@@ -11,8 +11,7 @@ export async function listCommercialAssignableUsers(): Promise<CommercialAssigna
   const donneesAuthentification = await readAuthPayload();
   return donneesAuthentification.users
     .filter(
-      (utilisateur) =>
-        utilisateur.isActive && Boolean(utilisateur.modulePermissions.commercial),
+      (utilisateur) => utilisateur.isActive && Boolean(utilisateur.modulePermissions.commercial),
     )
     .sort((utilisateurA, utilisateurB) =>
       utilisateurA.displayName.localeCompare(utilisateurB.displayName, "fr", {

@@ -1,17 +1,10 @@
 import { readSessionIdentityFromDb, readUserPermissionsFromDb } from "./read-model";
 import "server-only";
 
-import {
-  isLocalStorageMode,
-  mutateLocalSnapshot,
-  readLocalSnapshot,
-} from "../local-db/runtime";
+import { isLocalStorageMode, mutateLocalSnapshot, readLocalSnapshot } from "../local-db/runtime";
 import { getServerDbPool, runServerDbMigrations } from "../server-db";
 import { parseAuthPayload, pruneExpiredSessions, type AuthPayload } from "./domain";
-import {
-  createPostgresAuthRepository,
-  type PostgresAuthRepository,
-} from "./postgres-repository";
+import { createPostgresAuthRepository, type PostgresAuthRepository } from "./postgres-repository";
 
 const LOCAL_AUTH_RESOURCE = "auth";
 let repositoryPromise: Promise<PostgresAuthRepository> | undefined;
@@ -82,14 +75,10 @@ export async function readSessionIdentity(empreinte: string) {
   }
   const donnees = await readAuthPayload();
   const session = donnees.sessions.find(
-    (ligne) =>
-      ligne.tokenHash === empreinte && Date.parse(ligne.expiresAt) > Date.now(),
+    (ligne) => ligne.tokenHash === empreinte && Date.parse(ligne.expiresAt) > Date.now(),
   );
   const utilisateur =
-    session &&
-    donnees.users.find(
-      (ligne) => ligne.id === session.userId && ligne.isActive,
-    );
+    session && donnees.users.find((ligne) => ligne.id === session.userId && ligne.isActive);
   if (!utilisateur) return null;
   return {
     id: utilisateur.id,

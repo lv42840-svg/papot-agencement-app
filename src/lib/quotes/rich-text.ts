@@ -14,10 +14,7 @@ export const EMPTY_QUOTE_RICH_TEXT_STYLE: QuoteRichTextRunStyle = {
   fontSizePx: null,
 };
 
-function sameStyle(
-  gauche: QuoteRichTextRunStyle,
-  droite: QuoteRichTextRunStyle,
-): boolean {
+function sameStyle(gauche: QuoteRichTextRunStyle, droite: QuoteRichTextRunStyle): boolean {
   return (
     gauche.bold === droite.bold &&
     gauche.italic === droite.italic &&
@@ -55,9 +52,7 @@ export function quoteRichTextFromPlainText(
   };
 }
 
-export function normalizeQuoteRichText(
-  texteEnrichi: QuoteRichText,
-): QuoteRichText {
+export function normalizeQuoteRichText(texteEnrichi: QuoteRichText): QuoteRichText {
   const segments: QuoteRichTextRun[] = [];
   for (const candidat of texteEnrichi.runs) {
     if (!candidat.text) continue;
@@ -75,9 +70,7 @@ export function normalizeQuoteRichText(
   return { runs: segments };
 }
 
-export function quoteRichTextToPlainText(
-  texteEnrichi: QuoteRichText | undefined,
-): string {
+export function quoteRichTextToPlainText(texteEnrichi: QuoteRichText | undefined): string {
   return texteEnrichi?.runs.map((segment) => segment.text).join("") ?? "";
 }
 
@@ -90,10 +83,7 @@ export function resolveQuoteRichText(
     return normalizeQuoteRichText(texteEnrichi);
   }
 
-  let resultat = quoteRichTextFromPlainText(
-    texte,
-    quoteRichTextStyleFromLegacy(styleHistorique),
-  );
+  let resultat = quoteRichTextFromPlainText(texte, quoteRichTextStyleFromLegacy(styleHistorique));
   for (const marque of styleHistorique?.textColorMarks ?? []) {
     resultat = applyQuoteRichTextStyle(resultat, marque.start, marque.end, {
       textColor: marque.color,
@@ -112,10 +102,7 @@ export function applyQuoteRichTextStyle(
 
   const longueurTexte = quoteRichTextToPlainText(texteEnrichi).length;
   const debutSecurise = Math.max(0, Math.min(debut, longueurTexte));
-  const finSecurisee = Math.max(
-    debutSecurise,
-    Math.min(fin, longueurTexte),
-  );
+  const finSecurisee = Math.max(debutSecurise, Math.min(fin, longueurTexte));
   if (finSecurisee <= debutSecurise) {
     return normalizeQuoteRichText(texteEnrichi);
   }
@@ -134,10 +121,7 @@ export function applyQuoteRichTextStyle(
     }
 
     const debutLocal = Math.max(0, debutSecurise - debutSegment);
-    const finLocale = Math.min(
-      segment.text.length,
-      finSecurisee - debutSegment,
-    );
+    const finLocale = Math.min(segment.text.length, finSecurisee - debutSegment);
 
     if (debutLocal > 0) {
       segments.push({

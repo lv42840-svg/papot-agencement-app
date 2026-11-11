@@ -32,14 +32,8 @@ function weekFor(date: string): string {
   return isoWeekKey(new Date(annee, mois - 1, jour, 12));
 }
 
-function groupedEntry(
-  lignes: DisplayAbsence[],
-  semaine: string,
-  cle: string,
-): AbsenceDisplayEntry {
-  const lignesTriees = [...lignes].sort((gauche, droite) =>
-    gauche.date.localeCompare(droite.date),
-  );
+function groupedEntry(lignes: DisplayAbsence[], semaine: string, cle: string): AbsenceDisplayEntry {
+  const lignesTriees = [...lignes].sort((gauche, droite) => gauche.date.localeCompare(droite.date));
   const premiere = lignesTriees[0];
   return {
     key: cle,
@@ -61,9 +55,7 @@ export function groupPlanningAbsences(
   absences: readonly DisplayAbsence[],
   personnes: readonly Pick<PlanningPersonCapacity, "userId" | "weeklySchedule">[],
 ): AbsenceDisplayEntry[] {
-  const horaires = new Map(
-    personnes.map((personne) => [personne.userId, personne.weeklySchedule]),
-  );
+  const horaires = new Map(personnes.map((personne) => [personne.userId, personne.weeklySchedule]));
   const identifiantsUtilises = new Set<string>();
   const resultats: AbsenceDisplayEntry[] = [];
 
@@ -118,8 +110,7 @@ export function groupPlanningAbsences(
       joursAttendus.length !== lignes.length ||
       !joursAttendus.every((jour) =>
         lignes.some(
-          (ligne) =>
-            ligne.date === jour.date && Math.abs(ligne.hours - jour.hours) < 0.000001,
+          (ligne) => ligne.date === jour.date && Math.abs(ligne.hours - jour.hours) < 0.000001,
         ),
       )
     ) {

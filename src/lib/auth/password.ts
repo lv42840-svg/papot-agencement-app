@@ -10,10 +10,7 @@ export async function hashPassword(motDePasse: string): Promise<string> {
   return `scrypt$${sel}$${derive.toString("hex")}`;
 }
 
-export async function verifyPassword(
-  motDePasse: string,
-  valeurStockee: string,
-): Promise<boolean> {
+export async function verifyPassword(motDePasse: string, valeurStockee: string): Promise<boolean> {
   const [algorithme, sel, valeurEncodee] = valeurStockee.split("$");
   if (algorithme !== "scrypt" || !sel || !valeurEncodee) return false;
 
