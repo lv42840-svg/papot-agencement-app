@@ -1,15 +1,25 @@
 import "server-only";
 
-import { isLocalStorageMode, mutateLocalSnapshot, readLocalSnapshot } from "@/lib/local-db/runtime";
-import { getServerDbPool, runServerDbMigrations, withServerDbTransaction } from "@/lib/server-db";
+import {
+  isLocalStorageMode,
+  mutateLocalSnapshot,
+  readLocalSnapshot,
+} from "@/lib/local-db/runtime";
+import {
+  getServerDbPool,
+  runServerDbMigrations,
+  withServerDbTransaction,
+} from "@/lib/server-db";
 import { parseBillingPayload, type BillingPayload } from "./domain";
 
 const RESOURCE_KEY = "billing";
-type BillingTransform = (payload: BillingPayload) => BillingPayload | Promise<BillingPayload>;
+type BillingTransform = (
+  donnees: BillingPayload,
+) => BillingPayload | Promise<BillingPayload>;
 
 export type BillingRepository = {
   load(): Promise<BillingPayload>;
-  mutate(transform: BillingTransform): Promise<BillingPayload>;
+  mutate(transformation: BillingTransform): Promise<BillingPayload>;
 };
 
 export function createBillingRepository(): BillingRepository {
@@ -18,39 +28,53 @@ export function createBillingRepository(): BillingRepository {
       async load() {
         return readLocalSnapshot(RESOURCE_KEY, parseBillingPayload).payload;
       },
-      mutate(transform) {
-        return mutateLocalSnapshot(RESOURCE_KEY, parseBillingPayload, async ({ payload }) => {
-          const next = parseBillingPayload(await transform(structuredClone(payload)));
-          return { payload: next, result: next };
-        });
+      mutate(transformation) {
+        return mutateLocalSnapshot(
+          RESOURCE_KEY,
+          parseBillingPayload,
+          async ({ payload: donnees }) => {
+            const donneesSuivantes = parseBillingPayload(
+              await transformation(structuredClone(donnees)),
+            );
+            return {
+              payload: donneesSuivantes,
+              result: donneesSuivantes,
+            };
+          },
+        );
       },
     };
   }
 
   const pool = getServerDbPool();
-  const initialize = runServerDbMigrations(pool);
+  const initialisation = runServerDbMigrations(pool);
   return {
     async load() {
-      await initialize;
-      const result = await pool.query<{ payload: unknown }>(
+      await initialisation;
+      const resultat = await pool.query<{ payload: unknown }>(
         "SELECT payload FROM papot_billing_state WHERE scope = 'global'",
       );
-      return parseBillingPayload(result.rows[0]?.payload);
+      return parseBillingPayload(resultat.rows[0]?.payload);
     },
-    async mutate(transform) {
-      await initialize;
+    async mutate(transformation) {
+      await initialisation;
       return withServerDbTransaction(async (client) => {
-        const result = await client.query<{ payload: unknown; version: number }>(
+        const resultat = await client.query<{
+          payload: unknown;
+          version: number;
+        }>(
           "SELECT payload, version FROM papot_billing_state WHERE scope = 'global' FOR UPDATE",
         );
-        const row = result.rows[0];
-        if (!row) throw new Error("BILLING_STORAGE_NOT_INITIALIZED");
-        const next = parseBillingPayload(await transform(parseBillingPayload(row.payload)));
+        const ligne = resultat.rows[0];
+        if (!ligne) throw new Error("BILLING_STORAGE_NOT_INITIALIZED");
+        const donneesSuivantes = parseBillingPayload(
+          await transformation(parseBillingPayload(ligne.payload)),
+        );
         await client.query(
           "UPDATE papot_billing_state SET version = version + 1, payload = $1::jsonb, updated_at = NOW() WHERE scope = 'global'",
-          [JSON.stringify(next)],
+          [JSON.stringify(donneesSuivantes)],
         );
-        return next;
+        return donneesSuivantes;
       }, pool);
     },
   };

@@ -17,21 +17,33 @@ export type BillingPreparationRow = {
  */
 export function billingPreparationFollowup(
   sources: readonly BillingSource[],
-  projects: readonly BillingDraft[],
+  projets: readonly BillingDraft[],
 ): BillingPreparationRow[] {
   return sources.map((source) => {
-    const related = projects.filter((project) => project.quoteId === source.quoteId);
-    const preparedHtCents = related.reduce((sum, item) => sum + item.amountHtCents, 0);
-    if (!Number.isSafeInteger(preparedHtCents) || preparedHtCents > source.contractHtCents) {
+    const projetsLies = projets.filter((projet) => projet.quoteId === source.quoteId);
+    const montantPrepareHtCentimes = projetsLies.reduce(
+      (somme, projet) => somme + projet.amountHtCents,
+      0,
+    );
+    if (
+      !Number.isSafeInteger(montantPrepareHtCentimes) ||
+      montantPrepareHtCentimes > source.contractHtCents
+    ) {
       throw new Error("BILLING_PREPARATION_EXCEEDS_CONTRACT");
     }
-    const remainingToPrepareHtCents = source.contractHtCents - preparedHtCents;
+    const montantRestantHtCentimes =
+      source.contractHtCents - montantPrepareHtCentimes;
     return {
       source,
-      projectCount: related.length,
-      preparedHtCents,
-      remainingToPrepareHtCents,
-      status: preparedHtCents === 0 ? "NONE" : remainingToPrepareHtCents === 0 ? "FULL" : "PARTIAL",
+      projectCount: projetsLies.length,
+      preparedHtCents: montantPrepareHtCentimes,
+      remainingToPrepareHtCents: montantRestantHtCentimes,
+      status:
+        montantPrepareHtCentimes === 0
+          ? "NONE"
+          : montantRestantHtCentimes === 0
+            ? "FULL"
+            : "PARTIAL",
     };
   });
 }
