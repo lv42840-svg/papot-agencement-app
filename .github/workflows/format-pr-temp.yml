@@ -19,16 +19,17 @@ jobs:
           node-version: 22
           cache: npm
       - run: npm ci
+      - run: node scripts/mettre-a-jour-tests-francisation-temp.cjs
       - run: npm run format
-      - name: Commit du formatage si necessaire
+      - name: Commit si necessaire
         shell: bash
         run: |
           if git diff --quiet; then
-            echo "Aucun formatage a appliquer."
+            echo "Aucune mise a jour a appliquer."
             exit 0
           fi
           git config user.name "papot-format-bot"
           git config user.email "actions@users.noreply.github.com"
           git add .
-          git commit -m "Style: appliquer Prettier automatiquement"
+          git commit -m "Tests: aligner les assertions avec les variables francaises"
           git push origin HEAD:${{ github.event.pull_request.head.ref }}
