@@ -26,22 +26,22 @@ export function QuoteInternalNotesEditor({
 }: {
   quote: NativeQuoteRecord;
   canWrite: boolean;
-  onSaved: (payload: NativeQuotesPayload) => void;
+  onSaved: (contenu: NativeQuotesPayload) => void;
 }) {
   const editable = canWrite && quote.status === "DRAFT";
   const [notes, setNotes] = useState(quote.internalNotes);
-  const [saving, setSaving] = useState(false);
-  const [error, setError] = useState("");
+  const [sauvegardeEnCours, setSaving] = useState(false);
+  const [erreur, setError] = useState("");
   const unchanged = notes === quote.internalNotes;
 
-  async function save(event: FormEvent<HTMLFormElement>) {
-    event.preventDefault();
-    if (!editable || saving || unchanged) return;
+  async function save(evenement: FormEvent<HTMLFormElement>) {
+    evenement.preventDefault();
+    if (!editable || sauvegardeEnCours || unchanged) return;
 
     setSaving(true);
     setError("");
     try {
-      const response = await fetch(`/api/desktop/quotes/${quote.id}/notes`, {
+      const reponse = await fetch(`/api/desktop/quotes/${quote.id}/notes`, {
         method: "PATCH",
         headers: {
           "Content-Type": "application/json",
@@ -49,13 +49,13 @@ export function QuoteInternalNotesEditor({
         },
         body: JSON.stringify({ internalNotes: notes }),
       });
-      const data = (await response.json()) as NotesResponse;
-      if (!response.ok || !data.payload) {
-        setError(errorLabel(data.error ?? "QUOTE_INTERNAL_NOTES_UPDATE_FAILED"));
+      const donnees = (await reponse.json()) as NotesResponse;
+      if (!reponse.ok || !donnees.payload) {
+        setError(errorLabel(donnees.error ?? "QUOTE_INTERNAL_NOTES_UPDATE_FAILED"));
         return;
       }
-      onSaved(data.payload);
-      const savedQuote = data.payload.quotes.find((candidate) => candidate.id === quote.id);
+      onSaved(donnees.payload);
+      const savedQuote = donnees.payload.quotes.find((candidat) => candidat.id === quote.id);
       if (savedQuote) setNotes(savedQuote.internalNotes);
     } catch {
       setError("Les notes internes n’ont pas pu être enregistrées.");
@@ -85,20 +85,25 @@ export function QuoteInternalNotesEditor({
         <form onSubmit={save} className="quoteInternalForm">
           <textarea
             value={notes}
-            onChange={(event) => setNotes(event.target.value)}
+            onChange={(evenement) => setNotes(evenement.target.value)}
             rows={4}
             maxLength={20_000}
             placeholder="Ex. Ligne 1.2 : prévoir…"
-            disabled={saving}
+            disabled={sauvegardeEnCours}
             aria-label="Notes internes du devis"
           />
           <div className="quoteInternalActions">
             <span>{notes.length.toLocaleString("fr-FR")} / 20 000</span>
-            <button className="secondaryButton" type="submit" disabled={saving || unchanged}>
-              <Save size={14} aria-hidden="true" /> {saving ? "Enregistrement…" : "Enregistrer"}
+            <button
+              className="secondaryButton"
+              type="submit"
+              disabled={sauvegardeEnCours || unchanged}
+            >
+              <Save size={14} aria-hidden="true" />{" "}
+              {sauvegardeEnCours ? "Enregistrement…" : "Enregistrer"}
             </button>
           </div>
-          {error ? <div className="quoteInternalError">{error}</div> : null}
+          {erreur ? <div className="quoteInternalError">{erreur}</div> : null}
         </form>
       ) : (
         <div className={`quoteInternalRead${quote.internalNotes ? "" : " isEmpty"}`}>

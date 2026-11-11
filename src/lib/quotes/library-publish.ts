@@ -30,14 +30,14 @@ type IdFactory = () => string;
 
 function sameLibraryPricing(
   component: QuoteOuvrageComponent,
-  candidate: LibraryComponent,
+  candidat: LibraryComponent,
   costPriceCents: number,
 ): boolean {
   const sourceId = component.librarySource?.component.sourceComponentId;
-  if (!sourceId || sourceId !== candidate.id) return false;
+  if (!sourceId || sourceId !== candidat.id) return false;
 
   const unit = component.unit.trim();
-  const name = component.description.trim().slice(0, 240);
+  const nom = component.description.trim().slice(0, 240);
   const activity = component.activity ?? component.librarySource?.component.activity;
   let marginPercent: number;
   try {
@@ -50,32 +50,32 @@ function sameLibraryPricing(
   }
 
   return (
-    candidate.name === name &&
-    candidate.unit === unit &&
-    candidate.costPriceCents === costPriceCents &&
-    candidate.marginPercent === marginPercent &&
-    candidate.salePriceCents === component.unitPriceCents &&
-    candidate.activity === activity
+    candidat.name === nom &&
+    candidat.unit === unit &&
+    candidat.costPriceCents === costPriceCents &&
+    candidat.marginPercent === marginPercent &&
+    candidat.salePriceCents === component.unitPriceCents &&
+    candidat.activity === activity
   );
 }
 
 function linkedLibraryComponent(
-  payload: LibraryPayload,
+  contenu: LibraryPayload,
   component: QuoteOuvrageComponent,
 ): LibraryComponent | null {
   const sourceId = component.librarySource?.component.sourceComponentId;
   if (!sourceId) return null;
-  return payload.components.find((item) => item.id === sourceId) ?? null;
+  return contenu.components.find((element) => element.id === sourceId) ?? null;
 }
 
 function reusableLibraryComponent(
-  payload: LibraryPayload,
+  contenu: LibraryPayload,
   component: QuoteOuvrageComponent,
   costPriceCents: number,
 ): LibraryComponent | null {
-  const candidate = linkedLibraryComponent(payload, component);
-  if (!candidate) return null;
-  return sameLibraryPricing(component, candidate, costPriceCents) ? candidate : null;
+  const candidat = linkedLibraryComponent(contenu, component);
+  if (!candidat) return null;
+  return sameLibraryPricing(component, candidat, costPriceCents) ? candidat : null;
 }
 
 function libraryComponentFromQuoteComponent(
@@ -87,8 +87,8 @@ function libraryComponentFromQuoteComponent(
   const unit = component.unit.trim();
   if (!unit) throw new Error("QUOTE_LIBRARY_COMPONENT_UNIT_REQUIRED");
 
-  const name = component.description.trim().slice(0, 240);
-  if (!name) throw new Error("QUOTE_LIBRARY_COMPONENT_NAME_REQUIRED");
+  const nom = component.description.trim().slice(0, 240);
+  if (!nom) throw new Error("QUOTE_LIBRARY_COMPONENT_NAME_REQUIRED");
 
   let marginPercent: number;
   try {
@@ -103,7 +103,7 @@ function libraryComponentFromQuoteComponent(
   const activity = component.activity ?? component.librarySource?.component.activity;
   return {
     id,
-    name,
+    name: nom,
     description:
       preservedDescription ??
       component.librarySource?.component.description ??
@@ -122,51 +122,51 @@ export function publishQuoteComponentToLibrary(
   idFactory: IdFactory = () => globalThis.crypto.randomUUID(),
   mode: QuoteComponentLibraryPublishMode = "CREATE_NEW",
 ): QuoteComponentLibraryPublishResult {
-  let payload = parseLibraryPayload(source);
+  let contenu = parseLibraryPayload(source);
   const costPriceCents = quoteOuvrageComponentCostPriceCents(component);
   if (costPriceCents === null) {
     throw new Error("QUOTE_LIBRARY_COMPONENT_COST_REQUIRED");
   }
 
-  const reusable = reusableLibraryComponent(payload, component, costPriceCents);
+  const reusable = reusableLibraryComponent(contenu, component, costPriceCents);
   if (reusable) {
-    return { payload, componentId: reusable.id, created: false, updated: false };
+    return { payload: contenu, componentId: reusable.id, created: false, updated: false };
   }
 
-  const linked = linkedLibraryComponent(payload, component);
+  const linked = linkedLibraryComponent(contenu, component);
   if (mode === "OVERWRITE_LINKED" && linked) {
-    payload = upsertLibraryComponent(
-      payload,
+    contenu = upsertLibraryComponent(
+      contenu,
       libraryComponentFromQuoteComponent(component, linked.id, costPriceCents, linked.description),
     );
-    return { payload, componentId: linked.id, created: false, updated: true };
+    return { payload: contenu, componentId: linked.id, created: false, updated: true };
   }
 
   const componentId = idFactory();
-  payload = upsertLibraryComponent(
-    payload,
+  contenu = upsertLibraryComponent(
+    contenu,
     libraryComponentFromQuoteComponent(component, componentId, costPriceCents),
   );
-  return { payload, componentId, created: true, updated: false };
+  return { payload: contenu, componentId, created: true, updated: false };
 }
 
 export function publishQuoteOuvrageToLibrary(
   source: LibraryPayload,
-  line: QuoteLine,
+  ligne: QuoteLine,
   idFactory: IdFactory = () => globalThis.crypto.randomUUID(),
 ): QuoteOuvrageLibraryPublishResult {
-  const components = line.components ?? [];
+  const components = ligne.components ?? [];
   if (components.length === 0) {
     throw new Error("QUOTE_LIBRARY_OUVRAGE_COMPONENTS_REQUIRED");
   }
 
-  let payload = parseLibraryPayload(source);
+  let contenu = parseLibraryPayload(source);
   let createdComponentCount = 0;
   const ouvrageComponents: LibraryOuvrage["components"] = [];
 
   for (const component of components) {
-    const publishedComponent = publishQuoteComponentToLibrary(payload, component, idFactory);
-    payload = publishedComponent.payload;
+    const publishedComponent = publishQuoteComponentToLibrary(contenu, component, idFactory);
+    contenu = publishedComponent.payload;
     if (publishedComponent.created) createdComponentCount += 1;
 
     ouvrageComponents.push({
@@ -177,12 +177,12 @@ export function publishQuoteOuvrageToLibrary(
   }
 
   const ouvrageId = idFactory();
-  payload = upsertLibraryOuvrage(payload, {
+  contenu = upsertLibraryOuvrage(contenu, {
     id: ouvrageId,
-    name: line.description.trim().slice(0, 240),
-    description: line.description,
+    name: ligne.description.trim().slice(0, 240),
+    description: ligne.description,
     components: ouvrageComponents,
   });
 
-  return { payload, ouvrageId, createdComponentCount };
+  return { payload: contenu, ouvrageId, createdComponentCount };
 }

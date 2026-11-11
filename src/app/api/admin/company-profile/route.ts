@@ -7,10 +7,10 @@ import { companyProfileSchema } from "@/lib/company-profile/domain";
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
-function noStoreJson(body: unknown, init?: ResponseInit) {
-  const response = NextResponse.json(body, init);
-  response.headers.set("Cache-Control", "no-store");
-  return response;
+function noStoreJson(corps: unknown, init?: ResponseInit) {
+  const reponse = NextResponse.json(corps, init);
+  reponse.headers.set("Cache-Control", "no-store");
+  return reponse;
 }
 
 export async function GET() {
@@ -18,26 +18,26 @@ export async function GET() {
     await requirePermissionAdministrator();
     const profile = await createCompanyProfileRepository().load();
     return noStoreJson({ profile });
-  } catch (error) {
-    const code = error instanceof Error ? error.message : "COMPANY_PROFILE_LOAD_FAILED";
+  } catch (erreur) {
+    const code = erreur instanceof Error ? erreur.message : "COMPANY_PROFILE_LOAD_FAILED";
     return noStoreJson({ error: code }, { status: userAdminErrorStatus(code) });
   }
 }
 
-export async function POST(request: Request) {
+export async function POST(requete: Request) {
   try {
     await requirePermissionAdministrator();
-    const profile = companyProfileSchema.parse(await request.json().catch(() => null));
+    const profile = companyProfileSchema.parse(await requete.json().catch(() => null));
     const saved = await createCompanyProfileRepository().replace(profile);
     return noStoreJson({ profile: saved });
-  } catch (error) {
+  } catch (erreur) {
     const code =
-      error instanceof z.ZodError
+      erreur instanceof z.ZodError
         ? "COMPANY_PROFILE_REQUEST_INVALID"
-        : error instanceof Error
-          ? error.message
+        : erreur instanceof Error
+          ? erreur.message
           : "COMPANY_PROFILE_SAVE_FAILED";
-    const status = code === "COMPANY_PROFILE_REQUEST_INVALID" ? 400 : userAdminErrorStatus(code);
-    return noStoreJson({ error: code }, { status });
+    const statut = code === "COMPANY_PROFILE_REQUEST_INVALID" ? 400 : userAdminErrorStatus(code);
+    return noStoreJson({ error: code }, { status: statut });
   }
 }

@@ -54,12 +54,12 @@ export type PdfVisualComparison = {
 const DEFAULT_TIMEOUT_MS = 60_000;
 const DEFAULT_RENDER_DPI = 150;
 
-function commandNotFound(error: unknown): boolean {
+function commandNotFound(erreur: unknown): boolean {
   return (
-    typeof error === "object" &&
-    error !== null &&
-    "code" in error &&
-    (error as { code?: unknown }).code === "ENOENT"
+    typeof erreur === "object" &&
+    erreur !== null &&
+    "code" in erreur &&
+    (erreur as { code?: unknown }).code === "ENOENT"
   );
 }
 
@@ -98,11 +98,11 @@ export const runPdfCommand: PdfCommandRunner = (command, args, options) =>
     child.stderr?.on("data", (chunk: string) => {
       stderr += chunk;
     });
-    child.once("error", (error) => {
+    child.once("error", (erreur) => {
       if (settled) return;
       settled = true;
       clearTimeout(timer);
-      reject(error);
+      reject(erreur);
     });
     child.once("close", (code) => {
       if (settled) return;
@@ -118,15 +118,15 @@ function libreOfficeCandidates(explicitBinary?: string): string[] {
     return [process.env.PAPOT_LIBREOFFICE_BIN.trim()];
   }
 
-  const candidates: string[] = [];
+  const candidats: string[] = [];
   if (process.platform === "win32") {
-    candidates.push(
+    candidats.push(
       "C:\\Program Files\\LibreOffice\\program\\soffice.exe",
       "C:\\Program Files (x86)\\LibreOffice\\program\\soffice.exe",
     );
   }
-  candidates.push("soffice", "libreoffice");
-  return candidates;
+  candidats.push("soffice", "libreoffice");
+  return candidats;
 }
 
 function microsoftWordPowerShellCandidates(explicitBinary?: string): string[] {
@@ -141,8 +141,8 @@ function microsoftWordPowerShellCandidates(explicitBinary?: string): string[] {
   ];
 }
 
-function isCommandUnavailable(error: unknown): boolean {
-  return error instanceof Error && error.message.startsWith("PDF_COMMAND_NOT_FOUND:");
+function isCommandUnavailable(erreur: unknown): boolean {
+  return erreur instanceof Error && erreur.message.startsWith("PDF_COMMAND_NOT_FOUND:");
 }
 
 const WORD_PDF_EXPORT_SCRIPT = `
@@ -170,31 +170,31 @@ try {
 `;
 
 async function runFirstAvailable(
-  candidates: string[],
+  candidats: string[],
   args: string[],
   options: { cwd: string; timeoutMs: number; commandRunner: PdfCommandRunner },
 ): Promise<{ command: string; result: PdfCommandResult }> {
   let lastNotFound: unknown = null;
-  for (const command of candidates) {
+  for (const command of candidats) {
     try {
-      const result = await options.commandRunner(command, args, {
+      const resultat = await options.commandRunner(command, args, {
         cwd: options.cwd,
         timeoutMs: options.timeoutMs,
       });
-      return { command, result };
-    } catch (error) {
-      if (!commandNotFound(error)) throw error;
-      lastNotFound = error;
+      return { command, result: resultat };
+    } catch (erreur) {
+      if (!commandNotFound(erreur)) throw erreur;
+      lastNotFound = erreur;
     }
   }
 
-  const unavailable = new Error(`PDF_COMMAND_NOT_FOUND:${candidates.join("|")}`);
+  const unavailable = new Error(`PDF_COMMAND_NOT_FOUND:${candidats.join("|")}`);
   if (lastNotFound) (unavailable as Error & { cause?: unknown }).cause = lastNotFound;
   throw unavailable;
 }
 
-function commandMessage(result: PdfCommandResult): string {
-  return result.stderr.trim() || result.stdout.trim() || "NO_COMMAND_OUTPUT";
+function commandMessage(resultat: PdfCommandResult): string {
+  return resultat.stderr.trim() || resultat.stdout.trim() || "NO_COMMAND_OUTPUT";
 }
 
 export async function convertDocxToPdfWithLibreOffice(
@@ -222,7 +222,7 @@ export async function convertDocxToPdfWithLibreOffice(
       outputDir,
       inputPath,
     ];
-    const { command, result } = await runFirstAvailable(
+    const { command, result: resultat } = await runFirstAvailable(
       libreOfficeCandidates(options.binary),
       args,
       {
@@ -232,9 +232,9 @@ export async function convertDocxToPdfWithLibreOffice(
       },
     );
 
-    if (result.exitCode !== 0) {
+    if (resultat.exitCode !== 0) {
       throw new Error(
-        `PDF_CONVERSION_FAILED:${command}:${result.exitCode}:${commandMessage(result)}`,
+        `PDF_CONVERSION_FAILED:${command}:${resultat.exitCode}:${commandMessage(resultat)}`,
       );
     }
 
@@ -244,7 +244,7 @@ export async function convertDocxToPdfWithLibreOffice(
     } catch {
       const outputFiles = await readdir(outputDir).catch(() => [] as string[]);
       throw new Error(
-        `PDF_CONVERSION_OUTPUT_MISSING:${command}:${outputFiles.join("|") || "EMPTY_OUTPUT_DIR"}:${commandMessage(result)}`,
+        `PDF_CONVERSION_OUTPUT_MISSING:${command}:${outputFiles.join("|") || "EMPTY_OUTPUT_DIR"}:${commandMessage(resultat)}`,
       );
     }
     assertPdfBuffer(pdf);
@@ -268,7 +268,7 @@ export async function convertDocxToPdfWithMicrosoftWord(
     await writeFile(inputPath, docx);
     await writeFile(scriptPath, WORD_PDF_EXPORT_SCRIPT, "utf8");
 
-    const { command, result } = await runFirstAvailable(
+    const { command, result: resultat } = await runFirstAvailable(
       microsoftWordPowerShellCandidates(options.binary),
       [
         "-NoProfile",
@@ -287,9 +287,9 @@ export async function convertDocxToPdfWithMicrosoftWord(
       },
     );
 
-    if (result.exitCode !== 0) {
+    if (resultat.exitCode !== 0) {
       throw new Error(
-        `PDF_WORD_CONVERSION_FAILED:${command}:${result.exitCode}:${commandMessage(result)}`,
+        `PDF_WORD_CONVERSION_FAILED:${command}:${resultat.exitCode}:${commandMessage(resultat)}`,
       );
     }
 
@@ -297,7 +297,7 @@ export async function convertDocxToPdfWithMicrosoftWord(
     try {
       pdf = await readFile(outputPath);
     } catch {
-      throw new Error(`PDF_WORD_CONVERSION_OUTPUT_MISSING:${command}:${commandMessage(result)}`);
+      throw new Error(`PDF_WORD_CONVERSION_OUTPUT_MISSING:${command}:${commandMessage(resultat)}`);
     }
     assertPdfBuffer(pdf);
     return pdf;
@@ -353,9 +353,9 @@ function pdfRendererCandidates(explicitBinary?: string): string[] {
 }
 
 function renderedPageNumber(filename: string): number | null {
-  const match = filename.match(/^page-(\d+)\.png$/);
-  if (!match) return null;
-  return Number(match[1]);
+  const correspondance = filename.match(/^page-(\d+)\.png$/);
+  if (!correspondance) return null;
+  return Number(correspondance[1]);
 }
 
 export async function renderPdfToPngPages(
@@ -372,7 +372,7 @@ export async function renderPdfToPngPages(
   try {
     await mkdir(outputDir, { recursive: true });
     await writeFile(inputPath, pdf);
-    const { command, result } = await runFirstAvailable(
+    const { command, result: resultat } = await runFirstAvailable(
       pdfRendererCandidates(options.binary),
       ["-png", "-r", String(options.dpi ?? DEFAULT_RENDER_DPI), inputPath, outputPrefix],
       {
@@ -382,17 +382,19 @@ export async function renderPdfToPngPages(
       },
     );
 
-    if (result.exitCode !== 0) {
-      throw new Error(`PDF_RENDER_FAILED:${command}:${result.exitCode}:${commandMessage(result)}`);
+    if (resultat.exitCode !== 0) {
+      throw new Error(
+        `PDF_RENDER_FAILED:${command}:${resultat.exitCode}:${commandMessage(resultat)}`,
+      );
     }
 
-    const files = (await readdir(outputDir))
+    const fichiers = (await readdir(outputDir))
       .map((filename) => ({ filename, page: renderedPageNumber(filename) }))
-      .filter((entry): entry is { filename: string; page: number } => entry.page !== null)
-      .sort((left, right) => left.page - right.page);
-    if (files.length === 0) throw new Error("PDF_RENDER_NO_PAGES");
+      .filter((entree): entree is { filename: string; page: number } => entree.page !== null)
+      .sort((gauche, droite) => gauche.page - droite.page);
+    if (fichiers.length === 0) throw new Error("PDF_RENDER_NO_PAGES");
 
-    return Promise.all(files.map((entry) => readFile(path.join(outputDir, entry.filename))));
+    return Promise.all(fichiers.map((entree) => readFile(path.join(outputDir, entree.filename))));
   } finally {
     await rm(workDir, { recursive: true, force: true });
   }
@@ -411,8 +413,8 @@ export function compareRenderedPdfPages(
   const maxPages = Math.max(referencePageHashes.length, actualPageHashes.length);
   const changedPages: number[] = [];
 
-  for (let index = 0; index < maxPages; index += 1) {
-    if (referencePageHashes[index] !== actualPageHashes[index]) changedPages.push(index + 1);
+  for (let indice = 0; indice < maxPages; indice += 1) {
+    if (referencePageHashes[indice] !== actualPageHashes[indice]) changedPages.push(indice + 1);
   }
 
   return {

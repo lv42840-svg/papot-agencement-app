@@ -50,63 +50,63 @@ export const dynamic = "force-dynamic";
 type Owner = { userId: string; deviceId: string; displayName: string };
 type RawRequest = Record<string, unknown>;
 
-function noStoreJson(body: unknown, init?: ResponseInit) {
-  const response = NextResponse.json(body, init);
-  response.headers.set("Cache-Control", "no-store");
-  return response;
+function noStoreJson(corps: unknown, init?: ResponseInit) {
+  const reponse = NextResponse.json(corps, init);
+  reponse.headers.set("Cache-Control", "no-store");
+  return reponse;
 }
 
-function rawString(raw: RawRequest, key: string): string | undefined {
-  const value = raw[key];
-  return typeof value === "string" && value.trim() ? value.trim() : undefined;
+function rawString(raw: RawRequest, cle: string): string | undefined {
+  const valeur = raw[cle];
+  return typeof valeur === "string" && valeur.trim() ? valeur.trim() : undefined;
 }
 
-function confirmationRequested(input: CommercialMutation): boolean {
+function confirmationRequested(saisie: CommercialMutation): boolean {
   return (
-    (input.action === "setStatus" && input.status === "CONFIRMED") ||
-    (input.action === "recordFollowUp" && input.nextStatus === "CONFIRMED")
+    (saisie.action === "setStatus" && saisie.status === "CONFIRMED") ||
+    (saisie.action === "recordFollowUp" && saisie.nextStatus === "CONFIRMED")
   );
 }
 
-function caseIdForMutation(input: CommercialMutation): string | null {
-  if (input.action === "create") return null;
-  return "caseId" in input ? input.caseId : null;
+function caseIdForMutation(saisie: CommercialMutation): string | null {
+  if (saisie.action === "create") return null;
+  return "caseId" in saisie ? saisie.caseId : null;
 }
 
-function planningProvisionMustBeCleared(input: CommercialMutation): boolean {
+function planningProvisionMustBeCleared(saisie: CommercialMutation): boolean {
   return (
-    input.action === "close" ||
-    input.action === "reopen" ||
-    (input.action === "recordFollowUp" &&
-      (input.nextStatus === "LOST" || input.nextStatus === "ABANDONED"))
+    saisie.action === "close" ||
+    saisie.action === "reopen" ||
+    (saisie.action === "recordFollowUp" &&
+      (saisie.nextStatus === "LOST" || saisie.nextStatus === "ABANDONED"))
   );
 }
 
-async function validateAdditionalQuoteRetention(input: CommercialMutation): Promise<void> {
-  if (input.action !== "retainAdditionalQuote") return;
+async function validateAdditionalQuoteRetention(saisie: CommercialMutation): Promise<void> {
+  if (saisie.action !== "retainAdditionalQuote") return;
   const quotes = await createQuotesRepository().load();
-  validateAdditionalRetainedQuote(quotes, input.caseId, input.quoteId);
+  validateAdditionalRetainedQuote(quotes, saisie.caseId, saisie.quoteId);
 }
 
-async function validateConfirmationQuoteSelection(input: CommercialMutation): Promise<void> {
-  let caseId: string;
+async function validateConfirmationQuoteSelection(saisie: CommercialMutation): Promise<void> {
+  let idAffaire: string;
   let retainedQuoteIds: string[];
   let confirmWithoutQuote: boolean;
 
-  if (input.action === "setStatus" && input.status === "CONFIRMED") {
-    caseId = input.caseId;
-    retainedQuoteIds = input.retainedQuoteIds ?? [];
-    confirmWithoutQuote = input.confirmWithoutQuote === true;
-  } else if (input.action === "recordFollowUp" && input.nextStatus === "CONFIRMED") {
-    caseId = input.caseId;
-    retainedQuoteIds = input.retainedQuoteIds ?? [];
-    confirmWithoutQuote = input.confirmWithoutQuote === true;
+  if (saisie.action === "setStatus" && saisie.status === "CONFIRMED") {
+    idAffaire = saisie.caseId;
+    retainedQuoteIds = saisie.retainedQuoteIds ?? [];
+    confirmWithoutQuote = saisie.confirmWithoutQuote === true;
+  } else if (saisie.action === "recordFollowUp" && saisie.nextStatus === "CONFIRMED") {
+    idAffaire = saisie.caseId;
+    retainedQuoteIds = saisie.retainedQuoteIds ?? [];
+    confirmWithoutQuote = saisie.confirmWithoutQuote === true;
   } else {
     return;
   }
 
   const quotes = await createQuotesRepository().load();
-  validateRetainedQuoteSelection(quotes, caseId, retainedQuoteIds, confirmWithoutQuote);
+  validateRetainedQuoteSelection(quotes, idAffaire, retainedQuoteIds, confirmWithoutQuote);
 }
 
 function linkResolvedClient(
@@ -115,17 +115,17 @@ function linkResolvedClient(
   actorName: string,
 ): void {
   if (!mutation.focusCaseId) return;
-  const item = mutation.payload.cases.find((candidate) => candidate.id === mutation.focusCaseId);
-  if (!item) throw new Error("COMMERCIAL_CASE_NOT_FOUND");
+  const element = mutation.payload.cases.find((candidat) => candidat.id === mutation.focusCaseId);
+  if (!element) throw new Error("COMMERCIAL_CASE_NOT_FOUND");
 
-  const previousClientId = item.clientId ?? null;
-  const previousName = item.clientName ?? null;
-  item.clientId = resolvedClient.id;
-  item.primaryContactId = null;
-  item.clientName = resolvedClient.displayName;
+  const previousClientId = element.clientId ?? null;
+  const previousName = element.clientName ?? null;
+  element.clientId = resolvedClient.id;
+  element.primaryContactId = null;
+  element.clientName = resolvedClient.displayName;
 
   if (previousClientId !== resolvedClient.id || previousName !== resolvedClient.displayName) {
-    item.history.push({
+    element.history.push({
       id: randomUUID(),
       type: "CLIENT_LINKED",
       at: new Date().toISOString(),
@@ -136,24 +136,24 @@ function linkResolvedClient(
 }
 
 async function snapshot(
-  payload: CommercialPayload,
+  contenu: CommercialPayload,
   owner: Owner,
   canWrite: boolean,
-  user: { id: string },
+  utilisateur: { id: string },
   clients: ClientsRepository,
   focusCaseId?: string,
 ) {
-  const actor = { userId: owner.userId, displayName: owner.displayName };
+  const auteur = { userId: owner.userId, displayName: owner.displayName };
   const [canCreate, canProvision, canConfirm, canonicalClients] = await Promise.all([
-    hasEffectiveSpecialPermission(user, "commercial.create"),
-    hasEffectiveSpecialPermission(user, "commercial.provision"),
-    hasEffectiveSpecialPermission(user, "commercial.confirm_launch"),
+    hasEffectiveSpecialPermission(utilisateur, "commercial.create"),
+    hasEffectiveSpecialPermission(utilisateur, "commercial.provision"),
+    hasEffectiveSpecialPermission(utilisateur, "commercial.confirm_launch"),
     listCanonicalCommercialClients(clients),
   ]);
-  const payloadForUi = hydrateCommercialPayloadWithCanonicalClients(payload, canonicalClients);
+  const payloadForUi = hydrateCommercialPayloadWithCanonicalClients(contenu, canonicalClients);
   return {
     payload: payloadForUi,
-    actor,
+    actor: auteur,
     capabilities: {
       canCreate: canWrite && canCreate,
       canRead: true,
@@ -161,7 +161,7 @@ async function snapshot(
       canProvision: canWrite && canProvision,
       canConfirm: canWrite && canConfirm,
     },
-    suggestedPeople: listCommercialPeople(payloadForUi, actor),
+    suggestedPeople: listCommercialPeople(payloadForUi, auteur),
     focusCaseId,
     serverNow: new Date().toISOString(),
   };
@@ -198,96 +198,98 @@ async function persistAutomaticTransitions(
 
 export async function GET() {
   try {
-    const context = await requireModuleRequestContext("commercial", "READ");
+    const contexte = await requireModuleRequestContext("commercial", "READ");
     const repository = createCommercialRepository();
     const clients = await createClientsRepository();
-    const parsed = await repository.load();
-    const transition = applyCommercialAutomaticTransitions(parsed);
+    const analyse = await repository.load();
+    const transition = applyCommercialAutomaticTransitions(analyse);
 
-    const payload =
-      transition.changed && context.moduleAccess.canWrite
+    const contenu =
+      transition.changed && contexte.moduleAccess.canWrite
         ? await persistAutomaticTransitions(repository)
         : transition.payload;
 
     const owner = {
-      userId: context.user.id,
-      deviceId: context.user.id,
-      displayName: context.user.displayName,
+      userId: contexte.user.id,
+      deviceId: contexte.user.id,
+      displayName: contexte.user.displayName,
     };
     return noStoreJson(
-      await snapshot(payload, owner, context.moduleAccess.canWrite, context.user, clients),
+      await snapshot(contenu, owner, contexte.moduleAccess.canWrite, contexte.user, clients),
     );
-  } catch (error) {
-    const code = error instanceof Error ? error.message : "COMMERCIAL_LOAD_FAILED";
+  } catch (erreur) {
+    const code = erreur instanceof Error ? erreur.message : "COMMERCIAL_LOAD_FAILED";
     return noStoreJson({ error: code }, { status: statusFor(code) });
   }
 }
 
-export async function POST(request: Request) {
+export async function POST(requete: Request) {
   const startedAt = Date.now();
   let stage = "parse-request";
 
   try {
-    const raw = (await request.json()) as RawRequest;
-    const input = commercialMutationSchema.parse(raw);
+    const raw = (await requete.json()) as RawRequest;
+    const saisie = commercialMutationSchema.parse(raw);
     const expectedUpdatedAt =
-      input.action === "create" ? null : rawString(raw, "expectedUpdatedAt");
-    if (input.action !== "create" && !expectedUpdatedAt) {
+      saisie.action === "create" ? null : rawString(raw, "expectedUpdatedAt");
+    if (saisie.action !== "create" && !expectedUpdatedAt) {
       throw new Error("COMMERCIAL_VERSION_REQUIRED");
     }
     stage = "create-runtime";
-    const context = await requireModuleRequestContext("commercial", "WRITE");
-    const requiredSpecialPermission = commercialSpecialPermissionForMutation(input);
+    const contexte = await requireModuleRequestContext("commercial", "WRITE");
+    const requiredSpecialPermission = commercialSpecialPermissionForMutation(saisie);
     if (requiredSpecialPermission) {
-      await requireSpecialPermission(context.user, requiredSpecialPermission);
+      await requireSpecialPermission(contexte.user, requiredSpecialPermission);
     }
 
     const repository = createCommercialRepository();
     const clients = await createClientsRepository();
     const owner = {
-      userId: context.user.id,
-      deviceId: context.user.id,
-      displayName: context.user.displayName,
+      userId: contexte.user.id,
+      deviceId: contexte.user.id,
+      displayName: contexte.user.displayName,
     };
-    const actor = { userId: owner.userId, displayName: owner.displayName };
+    const auteur = { userId: owner.userId, displayName: owner.displayName };
     let resolvedClient: ResolvedCommercialClient | null = null;
 
     const buildMutation = async (
       source: CommercialPayload,
       isRetry: boolean,
     ): Promise<CommercialMutationResult> => {
-      if (input.action !== "create") {
-        const current = source.cases.find((candidate) => candidate.id === input.caseId);
-        if (!current) throw new Error("COMMERCIAL_CASE_NOT_FOUND");
-        assertCommercialRevision(current, expectedUpdatedAt!);
+      if (saisie.action !== "create") {
+        const courant = source.cases.find((candidat) => candidat.id === saisie.caseId);
+        if (!courant) throw new Error("COMMERCIAL_CASE_NOT_FOUND");
+        assertCommercialRevision(courant, expectedUpdatedAt!);
       }
 
-      if (confirmationRequested(input)) {
-        const caseId = caseIdForMutation(input);
-        const item = caseId ? source.cases.find((candidate) => candidate.id === caseId) : null;
-        if (!item) throw new Error("COMMERCIAL_CASE_NOT_FOUND");
-        await validateConfirmationQuoteSelection(input);
+      if (confirmationRequested(saisie)) {
+        const idAffaire = caseIdForMutation(saisie);
+        const element = idAffaire
+          ? source.cases.find((candidat) => candidat.id === idAffaire)
+          : null;
+        if (!element) throw new Error("COMMERCIAL_CASE_NOT_FOUND");
+        await validateConfirmationQuoteSelection(saisie);
       }
-      if (input.action === "retainAdditionalQuote") {
-        const item = source.cases.find((candidate) => candidate.id === input.caseId);
-        if (!item) throw new Error("COMMERCIAL_CASE_NOT_FOUND");
-        if (item.status !== "CONFIRMED") throw new Error("COMMERCIAL_NOT_CONFIRMED");
-        await validateAdditionalQuoteRetention(input);
+      if (saisie.action === "retainAdditionalQuote") {
+        const element = source.cases.find((candidat) => candidat.id === saisie.caseId);
+        if (!element) throw new Error("COMMERCIAL_CASE_NOT_FOUND");
+        if (element.status !== "CONFIRMED") throw new Error("COMMERCIAL_NOT_CONFIRMED");
+        await validateAdditionalQuoteRetention(saisie);
       }
 
-      if (input.action === "setForecastQuotes") {
+      if (saisie.action === "setForecastQuotes") {
         const quotes = await createQuotesRepository().load();
-        assertForecastQuoteSelection(input.caseId, input.quoteIds, quotes.quotes);
+        assertForecastQuoteSelection(saisie.caseId, saisie.quoteIds, quotes.quotes);
       }
 
-      const result = applyCommercialMutation(source, input, actor);
+      const resultat = applyCommercialMutation(source, saisie, auteur);
 
-      if (input.action === "create" || input.action === "updateDetails") {
+      if (saisie.action === "create" || saisie.action === "updateDetails") {
         const currentItem =
-          input.action === "updateDetails"
-            ? source.cases.find((candidate) => candidate.id === input.caseId)
+          saisie.action === "updateDetails"
+            ? source.cases.find((candidat) => candidat.id === saisie.caseId)
             : null;
-        if (input.action === "updateDetails" && !currentItem) {
+        if (saisie.action === "updateDetails" && !currentItem) {
           throw new Error("COMMERCIAL_CASE_NOT_FOUND");
         }
 
@@ -296,64 +298,64 @@ export async function POST(request: Request) {
           stage = "resolve-client";
           resolvedClient = await resolveCommercialClient({
             clients,
-            actor,
+            actor: auteur,
             existingClientId: rawString(raw, "existingClientId"),
-            newClientName: input.clientName,
+            newClientName: saisie.clientName,
             currentClientId: currentItem?.clientId ?? null,
           });
         }
-        linkResolvedClient(result, resolvedClient, actor.displayName);
+        linkResolvedClient(resultat, resolvedClient, auteur.displayName);
       }
 
-      return result;
+      return resultat;
     };
 
     stage = "apply-and-save-mutation";
     const mutation = await repository.mutate(buildMutation);
 
-    if (planningProvisionMustBeCleared(input)) {
-      const caseId = caseIdForMutation(input);
-      if (!caseId) throw new Error("COMMERCIAL_CASE_NOT_FOUND");
+    if (planningProvisionMustBeCleared(saisie)) {
+      const idAffaire = caseIdForMutation(saisie);
+      if (!idAffaire) throw new Error("COMMERCIAL_CASE_NOT_FOUND");
       stage = "clear-planning-provision";
-      await createPlanningRepository().mutate((payload) =>
-        clearPlanningProvisionForCommercialCase(payload, caseId),
+      await createPlanningRepository().mutate((contenu) =>
+        clearPlanningProvisionForCommercialCase(contenu, idAffaire),
       );
     } else if (
-      input.action === "updateProvision" ||
-      input.action === "setForecastQuotes" ||
-      input.action === "useManualProvision"
+      saisie.action === "updateProvision" ||
+      saisie.action === "setForecastQuotes" ||
+      saisie.action === "useManualProvision"
     ) {
-      const item = mutation.payload.cases.find((candidate) => candidate.id === input.caseId);
-      if (!item) throw new Error("COMMERCIAL_CASE_NOT_FOUND");
+      const element = mutation.payload.cases.find((candidat) => candidat.id === saisie.caseId);
+      if (!element) throw new Error("COMMERCIAL_CASE_NOT_FOUND");
       const quotePayload = await createQuotesRepository().load();
-      const hours = effectiveCommercialForecastHours(item, quotePayload.quotes);
-      const hasProvisionReference = hours.be > 0 || hours.workshop > 0 || hours.install > 0;
+      const heures = effectiveCommercialForecastHours(element, quotePayload.quotes);
+      const hasProvisionReference = heures.be > 0 || heures.workshop > 0 || heures.install > 0;
       stage = "sync-planning-potential-order";
-      await createPlanningRepository().mutate((payload) =>
-        syncPlanningPotentialOrderForCommercialCase(payload, input.caseId, hasProvisionReference),
+      await createPlanningRepository().mutate((contenu) =>
+        syncPlanningPotentialOrderForCommercialCase(contenu, saisie.caseId, hasProvisionReference),
       );
     }
 
     console.info("[PAPOT][Commercial] POST saved", { ms: Date.now() - startedAt });
     return noStoreJson(
-      await snapshot(mutation.payload, owner, true, context.user, clients, mutation.focusCaseId),
+      await snapshot(mutation.payload, owner, true, contexte.user, clients, mutation.focusCaseId),
     );
-  } catch (error) {
+  } catch (erreur) {
     const code =
-      error instanceof ZodError
+      erreur instanceof ZodError
         ? "COMMERCIAL_REQUEST_INVALID"
-        : error instanceof Error
-          ? error.message
+        : erreur instanceof Error
+          ? erreur.message
           : "COMMERCIAL_MUTATION_FAILED";
     console.error("[PAPOT][Commercial] POST failed", {
       stage,
       code,
       ms: Date.now() - startedAt,
     });
-    const body =
-      error instanceof CommercialRepositoryError && error.details?.lockedBy
-        ? { error: code, lockedBy: error.details.lockedBy }
+    const corps =
+      erreur instanceof CommercialRepositoryError && erreur.details?.lockedBy
+        ? { error: code, lockedBy: erreur.details.lockedBy }
         : { error: code };
-    return noStoreJson(body, { status: statusFor(code) });
+    return noStoreJson(corps, { status: statusFor(code) });
   }
 }

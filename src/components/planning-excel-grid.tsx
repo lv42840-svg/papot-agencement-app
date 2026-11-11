@@ -41,22 +41,22 @@ type Props = {
   savingKey: string | null;
   potentialCollapsed: boolean;
   potentialPreferenceSaving: boolean;
-  onDraftChange: (key: string, value: string) => void;
-  onDraftClear: (key: string) => void;
+  onDraftChange: (cle: string, valeur: string) => void;
+  onDraftClear: (cle: string) => void;
   onSaveFirm: (
     chantierId: string,
     activity: PlanningActivity,
-    week: string,
-    value: number,
+    semaine: string,
+    valeur: number,
   ) => Promise<void>;
   onSaveProvision: (
-    caseId: string,
+    idAffaire: string,
     activity: PlanningActivity,
-    week: string,
-    value: number,
+    semaine: string,
+    valeur: number,
   ) => Promise<void>;
   onMoveFirm: (chantierId: string, direction: -1 | 1) => Promise<void>;
-  onMoveProvision: (caseId: string, direction: -1 | 1) => Promise<void>;
+  onMoveProvision: (idAffaire: string, direction: -1 | 1) => Promise<void>;
   onTogglePotential: () => Promise<void>;
   onPasteBatch: (updates: PlanningClipboardUpdate[]) => Promise<void>;
   onClipboardError: (message: string) => void;
@@ -65,27 +65,27 @@ type Props = {
 const ACTIVITIES: PlanningActivity[] = ["BE", "WORKSHOP", "INSTALL"];
 const ACTIVITY_LABELS = ["Ét", "Fa", "Po"];
 
-function fmt(value: number): string {
-  return Number.isInteger(value) ? String(value) : String(value).replace(".", ",");
+function fmt(valeur: number): string {
+  return Number.isInteger(valeur) ? String(valeur) : String(valeur).replace(".", ",");
 }
 
-function tripleValues(values: number[]) {
+function tripleValues(valeurs: number[]) {
   return (
     <div className="excelTriple excelTripleValues">
-      {values.map((value, index) => (
-        <span key={ACTIVITIES[index]}>{fmt(value)}</span>
+      {valeurs.map((valeur, indice) => (
+        <span key={ACTIVITIES[indice]}>{fmt(valeur)}</span>
       ))}
     </div>
   );
 }
 
-function availabilityTone(value: number) {
-  return value <= 0 ? "excelUnavailable" : value < 39 ? "excelTight" : "excelAvailable";
+function availabilityTone(valeur: number) {
+  return valeur <= 0 ? "excelUnavailable" : valeur < 39 ? "excelTight" : "excelAvailable";
 }
 
 export function PlanningExcelGrid({
   snapshot,
-  drafts,
+  drafts: brouillons,
   savingKey,
   potentialCollapsed,
   potentialPreferenceSaving,
@@ -99,71 +99,86 @@ export function PlanningExcelGrid({
   onPasteBatch,
   onClipboardError,
 }: Props) {
-  const [selection, setSelection] = useState<{
+  const [selectionCourante, setSelection] = useState<{
     anchor: PlanningClipboardCell;
     end: PlanningClipboardCell;
   } | null>(null);
 
   function rowsForKind(kind: PlanningClipboardKind) {
     if (kind === "firm") {
-      return snapshot.rows.map((row) => ({ id: row.chantierId, activities: row.activities }));
+      return snapshot.rows.map((ligneTableau) => ({
+        id: ligneTableau.chantierId,
+        activities: ligneTableau.activities,
+      }));
     }
-    return snapshot.provisionalRows.map((row) => ({ id: row.caseId, activities: row.activities }));
+    return snapshot.provisionalRows.map((ligneTableau) => ({
+      id: ligneTableau.caseId,
+      activities: ligneTableau.activities,
+    }));
   }
 
   const selectedKeys = new Set<string>();
-  if (selection) {
-    const rows = rowsForKind(selection.anchor.kind);
-    const bounds = planningSelectionBounds(selection.anchor, selection.end, rows, snapshot.weeks);
+  if (selectionCourante) {
+    const lignesTableau = rowsForKind(selectionCourante.anchor.kind);
+    const bounds = planningSelectionBounds(
+      selectionCourante.anchor,
+      selectionCourante.end,
+      lignesTableau,
+      snapshot.weeks,
+    );
     if (bounds) {
       for (let r = bounds.top; r <= bounds.bottom; r++) {
         for (let c = bounds.left; c <= bounds.right; c++) {
-          const week = snapshot.weeks[Math.floor(c / 3)];
+          const semaine = snapshot.weeks[Math.floor(c / 3)];
           const activity = ACTIVITIES[c % 3];
-          selectedKeys.add([selection.anchor.kind, rows[r].id, activity, week].join(":"));
+          selectedKeys.add(
+            [selectionCourante.anchor.kind, lignesTableau[r].id, activity, semaine].join(":"),
+          );
         }
       }
     }
   }
 
-  function handleCopy(event: ClipboardEvent<HTMLTableElement>) {
-    if (!(event.target instanceof HTMLInputElement) || !selection) return;
+  function handleCopy(evenement: ClipboardEvent<HTMLTableElement>) {
+    if (!(evenement.target instanceof HTMLInputElement) || !selectionCourante) return;
     try {
-      const value = formatPlanningSelection(
-        selection.anchor,
-        selection.end,
-        rowsForKind(selection.anchor.kind),
+      const valeur = formatPlanningSelection(
+        selectionCourante.anchor,
+        selectionCourante.end,
+        rowsForKind(selectionCourante.anchor.kind),
         snapshot.weeks,
-        drafts,
+        brouillons,
       );
-      event.clipboardData.setData("text/plain", value);
-      event.preventDefault();
-    } catch (error) {
-      event.preventDefault();
-      onClipboardError(error instanceof Error ? error.message : "Copie impossible.");
+      evenement.clipboardData.setData("text/plain", valeur);
+      evenement.preventDefault();
+    } catch (erreur) {
+      evenement.preventDefault();
+      onClipboardError(erreur instanceof Error ? erreur.message : "Copie impossible.");
     }
   }
 
-  function handlePaste(event: ClipboardEvent<HTMLTableElement>) {
-    if (!(event.target instanceof HTMLInputElement) || !selection) return;
-    event.preventDefault();
+  function handlePaste(evenement: ClipboardEvent<HTMLTableElement>) {
+    if (!(evenement.target instanceof HTMLInputElement) || !selectionCourante) return;
+    evenement.preventDefault();
     if (!snapshot.capabilities.canEditMacro || savingKey !== null) {
       onClipboardError("Le planning est en lecture seule ou en cours d'enregistrement.");
       return;
     }
     try {
-      const pastWeeks = new Set(weekMeta.filter((item) => item.isPast).map((item) => item.week));
+      const pastWeeks = new Set(
+        weekMeta.filter((element) => element.isPast).map((element) => element.week),
+      );
       const updates = planPlanningPaste(
-        event.clipboardData.getData("text/plain"),
-        selection.anchor,
-        selection.end,
-        rowsForKind(selection.anchor.kind),
+        evenement.clipboardData.getData("text/plain"),
+        selectionCourante.anchor,
+        selectionCourante.end,
+        rowsForKind(selectionCourante.anchor.kind),
         snapshot.weeks,
-        (week) => pastWeeks.has(week),
+        (semaine) => pastWeeks.has(semaine),
       );
       void onPasteBatch(updates);
-    } catch (error) {
-      onClipboardError(error instanceof Error ? error.message : "Collage impossible.");
+    } catch (erreur) {
+      onClipboardError(erreur instanceof Error ? erreur.message : "Collage impossible.");
     }
   }
 
@@ -186,21 +201,24 @@ export function PlanningExcelGrid({
     field: "plannedHours" | "actualHours" | "remainingHours",
   ) =>
     snapshot.rows.reduce(
-      (sum, chantier) =>
-        sum + (chantier.activities.find((item) => item.activity === activity)?.[field] ?? 0),
+      (somme, chantier) =>
+        somme +
+        (chantier.activities.find((element) => element.activity === activity)?.[field] ?? 0),
       0,
     );
 
-  const weeklyTotalFor = (activity: PlanningActivity, week: string) =>
+  const weeklyTotalFor = (activity: PlanningActivity, semaine: string) =>
     snapshot.rows.reduce(
-      (sum, chantier) =>
-        sum +
-        (chantier.activities.find((item) => item.activity === activity)?.weeklyHours[week] ?? 0),
+      (somme, chantier) =>
+        somme +
+        (chantier.activities.find((element) => element.activity === activity)?.weeklyHours[
+          semaine
+        ] ?? 0),
       0,
     );
 
-  function weekClass(week: string) {
-    const meta = metaByWeek.get(week);
+  function weekClass(semaine: string) {
+    const meta = metaByWeek.get(semaine);
     return [
       meta?.startsMonth ? "excelMonthStart" : "",
       meta?.isCurrent ? "excelCurrentWeek" : "",
@@ -213,54 +231,57 @@ export function PlanningExcelGrid({
   function hoursInput(
     kind: "firm" | "provisional",
     id: string,
-    name: string,
+    nom: string,
     activity: PlanningActivity,
-    week: string,
+    semaine: string,
     displayedHours: number,
   ) {
-    const key = [kind, id, activity, week].join(":");
+    const cle = [kind, id, activity, semaine].join(":");
     const readOnly =
       !snapshot.capabilities.canEditMacro ||
-      Boolean(metaByWeek.get(week)?.isPast) ||
-      savingKey === key ||
+      Boolean(metaByWeek.get(semaine)?.isPast) ||
+      savingKey === cle ||
       savingKey === "planning-mutation";
     return (
       <input
         key={activity}
-        aria-label={[name, kind === "provisional" ? "provisionnel" : "", activity, week]
+        aria-label={[nom, kind === "provisional" ? "provisionnel" : "", activity, semaine]
           .filter(Boolean)
           .join(" ")}
-        className={[savingKey === key ? "isSaving" : "", selectedKeys.has(key) ? "isSelected" : ""]
+        className={[savingKey === cle ? "isSaving" : "", selectedKeys.has(cle) ? "isSelected" : ""]
           .filter(Boolean)
           .join(" ")}
         readOnly={readOnly}
         onFocus={() =>
           setSelection({
-            anchor: { kind, id, activity, week },
-            end: { kind, id, activity, week },
+            anchor: { kind, id, activity, week: semaine },
+            end: { kind, id, activity, week: semaine },
           })
         }
-        onMouseDown={(event) => {
-          if (!event.shiftKey || !selection || selection.anchor.kind !== kind) return;
-          event.preventDefault();
-          setSelection((current) =>
-            current ? { anchor: current.anchor, end: { kind, id, activity, week } } : current,
+        onMouseDown={(evenement) => {
+          if (!evenement.shiftKey || !selectionCourante || selectionCourante.anchor.kind !== kind)
+            return;
+          evenement.preventDefault();
+          setSelection((courant) =>
+            courant
+              ? { anchor: courant.anchor, end: { kind, id, activity, week: semaine } }
+              : courant,
           );
         }}
         inputMode="decimal"
-        title={[name, activity, week].join(" · ")}
-        value={drafts[key] ?? (displayedHours === 0 ? "" : fmt(displayedHours))}
-        onChange={(event) => onDraftChange(key, event.target.value)}
+        title={[nom, activity, semaine].join(" · ")}
+        value={brouillons[cle] ?? (displayedHours === 0 ? "" : fmt(displayedHours))}
+        onChange={(evenement) => onDraftChange(cle, evenement.target.value)}
         onBlur={() =>
           void (kind === "firm"
-            ? onSaveFirm(id, activity, week, displayedHours)
-            : onSaveProvision(id, activity, week, displayedHours))
+            ? onSaveFirm(id, activity, semaine, displayedHours)
+            : onSaveProvision(id, activity, semaine, displayedHours))
         }
-        onKeyDown={(event) => {
-          if (event.key === "Enter") event.currentTarget.blur();
-          if (event.key === "Escape") {
-            onDraftClear(key);
-            event.currentTarget.blur();
+        onKeyDown={(evenement) => {
+          if (evenement.key === "Enter") evenement.currentTarget.blur();
+          if (evenement.key === "Escape") {
+            onDraftClear(cle);
+            evenement.currentTarget.blur();
           }
         }}
       />
@@ -288,9 +309,9 @@ export function PlanningExcelGrid({
           <th className="excelFixed excelFixedRemaining" rowSpan={2}>
             À répartir <small>Ét · Fa · Po</small>
           </th>
-          {monthGroups.map((month) => (
-            <th key={month.key} colSpan={month.span} className="excelMonthHeading">
-              {month.label} {month.year}
+          {monthGroups.map((mois) => (
+            <th key={mois.key} colSpan={mois.span} className="excelMonthHeading">
+              {mois.label} {mois.year}
             </th>
           ))}
         </tr>
@@ -304,8 +325,8 @@ export function PlanningExcelGrid({
             >
               <strong>{"S" + meta.week.slice(-2)}</strong>
               <div className="excelTriple excelWeekActivityLabels">
-                {ACTIVITY_LABELS.map((label) => (
-                  <span key={label}>{label}</span>
+                {ACTIVITY_LABELS.map((libelle) => (
+                  <span key={libelle}>{libelle}</span>
                 ))}
               </div>
             </th>
@@ -319,19 +340,19 @@ export function PlanningExcelGrid({
               {summary.label}
             </th>
             <td className="excelSummarySpacer" colSpan={3}></td>
-            {snapshot.weeks.map((week) => {
-              const value = capacityByWeek.get(week)?.[summary.field] ?? 0;
+            {snapshot.weeks.map((semaine) => {
+              const valeur = capacityByWeek.get(semaine)?.[summary.field] ?? 0;
               return (
                 <td
-                  key={week}
+                  key={semaine}
                   className={[
                     "excelSummaryCell",
-                    weekClass(week),
-                    summary.tone ? availabilityTone(value) : "",
+                    weekClass(semaine),
+                    summary.tone ? availabilityTone(valeur) : "",
                   ].join(" ")}
-                  title={[summary.label, week, fmt(value) + " h"].join(" · ")}
+                  title={[summary.label, semaine, fmt(valeur) + " h"].join(" · ")}
                 >
-                  {fmt(value)}
+                  {fmt(valeur)}
                 </td>
               );
             })}
@@ -350,12 +371,12 @@ export function PlanningExcelGrid({
           <td className="excelFixed excelFixedRemaining excelMetricCell">
             {tripleValues(ACTIVITIES.map((activity) => totalFor(activity, "remainingHours")))}
           </td>
-          {snapshot.weeks.map((week) => (
+          {snapshot.weeks.map((semaine) => (
             <td
-              key={week}
-              className={["excelWeekCell", "excelActivityTotalCell", weekClass(week)].join(" ")}
+              key={semaine}
+              className={["excelWeekCell", "excelActivityTotalCell", weekClass(semaine)].join(" ")}
             >
-              {tripleValues(ACTIVITIES.map((activity) => weeklyTotalFor(activity, week)))}
+              {tripleValues(ACTIVITIES.map((activity) => weeklyTotalFor(activity, semaine)))}
             </td>
           ))}
         </tr>
@@ -410,8 +431,8 @@ export function PlanningExcelGrid({
             <td className="excelFixed excelFixedRemaining excelMetricCell">
               {tripleValues(chantier.activities.map((activity) => activity.remainingHours))}
             </td>
-            {snapshot.weeks.map((week) => (
-              <td key={week} className={["excelWeekCell", weekClass(week)].join(" ")}>
+            {snapshot.weeks.map((semaine) => (
+              <td key={semaine} className={["excelWeekCell", weekClass(semaine)].join(" ")}>
                 <div className="excelTriple">
                   {chantier.activities.map((activity) =>
                     hoursInput(
@@ -419,8 +440,8 @@ export function PlanningExcelGrid({
                       chantier.chantierId,
                       chantier.name,
                       activity.activity,
-                      week,
-                      activity.weeklyHours[week] ?? 0,
+                      semaine,
+                      activity.weeklyHours[semaine] ?? 0,
                     ),
                   )}
                 </div>
@@ -445,60 +466,60 @@ export function PlanningExcelGrid({
           </tr>
         ) : null}
         {!potentialCollapsed &&
-          snapshot.provisionalRows.map((item, itemIndex) => (
-            <tr key={item.caseId} className="excelProvisionalRow">
+          snapshot.provisionalRows.map((element, itemIndex) => (
+            <tr key={element.caseId} className="excelProvisionalRow">
               <th scope="row" className="excelFixed excelFixedName excelChantierName">
                 <div className="excelChantierTitle">
-                  <strong>{item.name}</strong>
+                  <strong>{element.name}</strong>
                   <span className="excelRowControls">
                     <button
                       type="button"
-                      aria-label={"Monter " + item.name}
+                      aria-label={"Monter " + element.name}
                       disabled={
                         !snapshot.capabilities.canEditMacro ||
                         savingKey === "planning-mutation" ||
                         itemIndex === 0
                       }
-                      onClick={() => void onMoveProvision(item.caseId, -1)}
+                      onClick={() => void onMoveProvision(element.caseId, -1)}
                     >
                       ↑
                     </button>
                     <button
                       type="button"
-                      aria-label={"Descendre " + item.name}
+                      aria-label={"Descendre " + element.name}
                       disabled={
                         !snapshot.capabilities.canEditMacro ||
                         savingKey === "planning-mutation" ||
                         itemIndex === snapshot.provisionalRows.length - 1
                       }
-                      onClick={() => void onMoveProvision(item.caseId, 1)}
+                      onClick={() => void onMoveProvision(element.caseId, 1)}
                     >
                       ↓
                     </button>
                   </span>
                 </div>
-                <small>{item.statusLabel}</small>
+                <small>{element.statusLabel}</small>
               </th>
               <td className="excelFixed excelFixedPlan excelMetricCell">
-                {tripleValues(item.activities.map((activity) => activity.provisionHours))}
+                {tripleValues(element.activities.map((activity) => activity.provisionHours))}
               </td>
               <td className="excelFixed excelFixedActual excelMetricCell">
                 {tripleValues([0, 0, 0])}
               </td>
               <td className="excelFixed excelFixedRemaining excelMetricCell">
-                {tripleValues(item.activities.map((activity) => activity.remainingHours))}
+                {tripleValues(element.activities.map((activity) => activity.remainingHours))}
               </td>
-              {snapshot.weeks.map((week) => (
-                <td key={week} className={["excelWeekCell", weekClass(week)].join(" ")}>
+              {snapshot.weeks.map((semaine) => (
+                <td key={semaine} className={["excelWeekCell", weekClass(semaine)].join(" ")}>
                   <div className="excelTriple">
-                    {item.activities.map((activity) =>
+                    {element.activities.map((activity) =>
                       hoursInput(
                         "provisional",
-                        item.caseId,
-                        item.name,
+                        element.caseId,
+                        element.name,
                         activity.activity,
-                        week,
-                        activity.weeklyHours[week] ?? 0,
+                        semaine,
+                        activity.weeklyHours[semaine] ?? 0,
                       ),
                     )}
                   </div>

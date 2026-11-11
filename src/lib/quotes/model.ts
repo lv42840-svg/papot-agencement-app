@@ -10,9 +10,9 @@ import {
 export const quoteDateSchema = z
   .string()
   .regex(/^\d{4}-\d{2}-\d{2}$/)
-  .refine((value) => {
-    const date = new Date(`${value}T00:00:00.000Z`);
-    return !Number.isNaN(date.getTime()) && date.toISOString().slice(0, 10) === value;
+  .refine((valeur) => {
+    const date = new Date(`${valeur}T00:00:00.000Z`);
+    return !Number.isNaN(date.getTime()) && date.toISOString().slice(0, 10) === valeur;
   }, "QUOTE_DATE_INVALID");
 
 const nullableUuidSchema = z.string().uuid().nullable();
@@ -239,25 +239,25 @@ export type QuoteComment = z.infer<typeof quoteCommentSchema>;
 export type QuoteItem = z.infer<typeof quoteItemSchema>;
 export type QuoteModel = z.infer<typeof quoteModelSchema>;
 
-export function validateQuoteItemHierarchy(items: QuoteItem[]): void {
-  const byId = new Map<string, QuoteItem>();
+export function validateQuoteItemHierarchy(elements: QuoteItem[]): void {
+  const parId = new Map<string, QuoteItem>();
 
-  for (const item of items) {
-    if (byId.has(item.id)) throw new Error("QUOTE_ITEM_ID_DUPLICATE");
-    byId.set(item.id, item);
+  for (const element of elements) {
+    if (parId.has(element.id)) throw new Error("QUOTE_ITEM_ID_DUPLICATE");
+    parId.set(element.id, element);
   }
 
-  for (const item of items) {
-    if (item.kind === "SECTION") continue;
-    if (item.kind === "SUBSECTION") {
-      const parent = byId.get(item.parentId);
+  for (const element of elements) {
+    if (element.kind === "SECTION") continue;
+    if (element.kind === "SUBSECTION") {
+      const parent = parId.get(element.parentId);
       if (!parent) throw new Error("QUOTE_ITEM_PARENT_NOT_FOUND");
       if (parent.kind !== "SECTION") throw new Error("QUOTE_ITEM_PARENT_INVALID");
       continue;
     }
 
-    if (item.parentId === null) continue;
-    const parent = byId.get(item.parentId);
+    if (element.parentId === null) continue;
+    const parent = parId.get(element.parentId);
     if (!parent) throw new Error("QUOTE_ITEM_PARENT_NOT_FOUND");
     if (parent.kind !== "SECTION" && parent.kind !== "SUBSECTION") {
       throw new Error("QUOTE_ITEM_PARENT_INVALID");
@@ -273,37 +273,37 @@ function validateQuantityFormula(
 ): void {
   if (quantityFormula === null) return;
 
-  let parsed;
+  let analyse;
   try {
-    parsed = parseQuoteQuantityInput(quantityFormula);
+    analyse = parseQuoteQuantityInput(quantityFormula);
   } catch {
     throw new Error(invalidCode);
   }
 
-  if (parsed.formula === null) throw new Error(invalidCode);
-  if (Math.abs(parsed.quantity - quantity) > 10 ** -6) {
+  if (analyse.formula === null) throw new Error(invalidCode);
+  if (Math.abs(analyse.quantity - quantity) > 10 ** -6) {
     throw new Error(mismatchCode);
   }
 }
 
-function validateQuoteLineFormula(line: QuoteLine): void {
+function validateQuoteLineFormula(ligne: QuoteLine): void {
   validateQuantityFormula(
-    line.quantity,
-    line.quantityFormula,
+    ligne.quantity,
+    ligne.quantityFormula,
     "QUOTE_LINE_FORMULA_INVALID",
     "QUOTE_LINE_FORMULA_MISMATCH",
   );
 }
 
-function validateQuoteLineLibrarySource(line: QuoteLine): void {
-  if (!line.librarySource) return;
-  if (line.unitPriceCents === undefined) {
+function validateQuoteLineLibrarySource(ligne: QuoteLine): void {
+  if (!ligne.librarySource) return;
+  if (ligne.unitPriceCents === undefined) {
     throw new Error("QUOTE_LINE_LIBRARY_PRICE_MISSING");
   }
 
-  if (line.librarySource.kind === "OUVRAGE") {
+  if (ligne.librarySource.kind === "OUVRAGE") {
     const lineIds = new Set<string>();
-    for (const component of line.librarySource.components) {
+    for (const component of ligne.librarySource.components) {
       if (lineIds.has(component.sourceLineId)) {
         throw new Error("QUOTE_LINE_LIBRARY_SOURCE_INVALID");
       }
@@ -312,20 +312,20 @@ function validateQuoteLineLibrarySource(line: QuoteLine): void {
   }
 }
 
-function addMoneyCents(total: number, amount: number): number {
-  const next = total + amount;
-  if (!Number.isSafeInteger(next) || next < 0) {
+function addMoneyCents(total: number, montant: number): number {
+  const suivant = total + montant;
+  if (!Number.isSafeInteger(suivant) || suivant < 0) {
     throw new Error("QUOTE_OUVRAGE_PRICE_INVALID");
   }
-  return next;
+  return suivant;
 }
 
 function componentAmountCents(quantity: number, unitAmountCents: number): number {
-  const amount = Math.round(quantity * unitAmountCents);
-  if (!Number.isSafeInteger(amount) || amount < 0) {
+  const montant = Math.round(quantity * unitAmountCents);
+  if (!Number.isSafeInteger(montant) || montant < 0) {
     throw new Error("QUOTE_OUVRAGE_PRICE_INVALID");
   }
-  return amount;
+  return montant;
 }
 
 export function calculateQuoteOuvrageUnitPriceCents(components: QuoteOuvrageComponent[]): number {
@@ -369,14 +369,14 @@ export function calculateQuoteOuvrageMarginPercent(
   return ((salePriceCents - costPriceCents) / costPriceCents) * 100;
 }
 
-function validateQuoteOuvrageComponents(line: QuoteLine): void {
-  const components = line.components ?? [];
+function validateQuoteOuvrageComponents(ligne: QuoteLine): void {
+  const components = ligne.components ?? [];
   if (components.length === 0) return;
 
-  const ids = new Set<string>();
+  const identifiants = new Set<string>();
   for (const component of components) {
-    if (ids.has(component.id)) throw new Error("QUOTE_OUVRAGE_COMPONENT_ID_DUPLICATE");
-    ids.add(component.id);
+    if (identifiants.has(component.id)) throw new Error("QUOTE_OUVRAGE_COMPONENT_ID_DUPLICATE");
+    identifiants.add(component.id);
     validateQuantityFormula(
       component.quantity,
       component.quantityFormula,
@@ -385,24 +385,24 @@ function validateQuoteOuvrageComponents(line: QuoteLine): void {
     );
   }
 
-  if (line.unitPriceCents === undefined) throw new Error("QUOTE_OUVRAGE_PRICE_MISSING");
+  if (ligne.unitPriceCents === undefined) throw new Error("QUOTE_OUVRAGE_PRICE_MISSING");
   const automaticPrice = calculateQuoteOuvrageUnitPriceCents(components);
-  const expected = line.forcedUnitPriceCents ?? automaticPrice;
-  if (expected !== line.unitPriceCents) throw new Error("QUOTE_OUVRAGE_PRICE_MISMATCH");
+  const attendu = ligne.forcedUnitPriceCents ?? automaticPrice;
+  if (attendu !== ligne.unitPriceCents) throw new Error("QUOTE_OUVRAGE_PRICE_MISMATCH");
 }
 
-export function parseQuoteModel(value: unknown): QuoteModel {
-  const parsed = quoteModelSchema.safeParse(value);
-  if (!parsed.success) throw new Error("QUOTE_MODEL_INVALID");
+export function parseQuoteModel(valeur: unknown): QuoteModel {
+  const analyse = quoteModelSchema.safeParse(valeur);
+  if (!analyse.success) throw new Error("QUOTE_MODEL_INVALID");
 
-  validateQuoteItemHierarchy(parsed.data.items);
-  for (const item of parsed.data.items) {
-    if (item.kind === "LINE") {
-      validateQuoteLineFormula(item);
-      validateQuoteLineLibrarySource(item);
-      validateQuoteOuvrageComponents(item);
+  validateQuoteItemHierarchy(analyse.data.items);
+  for (const element of analyse.data.items) {
+    if (element.kind === "LINE") {
+      validateQuoteLineFormula(element);
+      validateQuoteLineLibrarySource(element);
+      validateQuoteOuvrageComponents(element);
     }
   }
 
-  return parsed.data;
+  return analyse.data;
 }

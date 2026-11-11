@@ -16,15 +16,15 @@ export type ResolvedCommercialClient = {
 
 type Actor = { userId: string; displayName: string };
 
-function normalizeName(value: string): string {
-  return value.trim().toLocaleLowerCase("fr-FR");
+function normalizeName(valeur: string): string {
+  return valeur.trim().toLocaleLowerCase("fr-FR");
 }
 
 function activeClient(
-  payload: Awaited<ReturnType<ClientsRepository["load"]>>,
-  clientId: string,
+  contenu: Awaited<ReturnType<ClientsRepository["load"]>>,
+  idClient: string,
 ): ClientRecord {
-  const client = payload.clients.find((candidate) => candidate.id === clientId);
+  const client = contenu.clients.find((candidat) => candidat.id === idClient);
   if (!client || client.isArchived) throw new Error("COMMERCIAL_CLIENT_NOT_FOUND");
   return client;
 }
@@ -36,8 +36,8 @@ export async function readCanonicalClients(clients: ClientsRepository) {
 export async function listCanonicalCommercialClients(
   clients: ClientsRepository,
 ): Promise<CommercialClient[]> {
-  const payload = await readCanonicalClients(clients);
-  return payload.clients
+  const contenu = await readCanonicalClients(clients);
+  return contenu.clients
     .filter((client) => !client.isArchived)
     .map((client) => ({
       id: client.id,
@@ -54,31 +54,31 @@ export async function listCanonicalCommercialClients(
 }
 
 export function hydrateCommercialPayloadWithCanonicalClients(
-  payload: CommercialPayload,
+  contenu: CommercialPayload,
   clients: CommercialClient[],
 ): CommercialPayload {
   const clientsById = new Map(clients.map((client) => [client.id, client]));
   return {
-    ...payload,
+    ...contenu,
     clients,
-    cases: payload.cases.map((item) => {
-      if (!item.clientId) return item;
-      const client = clientsById.get(item.clientId);
-      return client ? { ...item, clientName: client.displayName } : item;
+    cases: contenu.cases.map((element) => {
+      if (!element.clientId) return element;
+      const client = clientsById.get(element.clientId);
+      return client ? { ...element, clientName: client.displayName } : element;
     }),
   };
 }
 
 async function createProvisionalClient(
   clients: ClientsRepository,
-  actor: Actor,
+  auteur: Actor,
   displayName: string,
 ): Promise<ResolvedCommercialClient> {
-  const clientId = randomUUID();
+  const idClient = randomUUID();
   const mutation = await clients.mutate(
     {
       action: "create",
-      clientId,
+      clientId: idClient,
       type: "AUTRE",
       companyName: displayName.trim(),
       firstName: "",
@@ -94,54 +94,54 @@ async function createProvisionalClient(
       notes: "",
       contacts: [],
     },
-    actor,
+    auteur,
   );
 
-  const created = activeClient(mutation.payload, clientId);
+  const created = activeClient(mutation.payload, idClient);
   return { id: created.id, displayName: clientDisplayName(created) };
 }
 
-export async function resolveCommercialClient(params: {
+export async function resolveCommercialClient(parametres: {
   clients: ClientsRepository;
   actor: Actor;
   existingClientId?: string;
   newClientName?: string;
   currentClientId?: string | null;
 }): Promise<ResolvedCommercialClient> {
-  const existingClientId = params.existingClientId?.trim();
+  const existingClientId = parametres.existingClientId?.trim();
   if (existingClientId) {
-    const payload = await readCanonicalClients(params.clients);
-    const client = activeClient(payload, existingClientId);
+    const contenu = await readCanonicalClients(parametres.clients);
+    const client = activeClient(contenu, existingClientId);
     return { id: client.id, displayName: clientDisplayName(client) };
   }
 
-  const newClientName = params.newClientName?.trim() ?? "";
+  const newClientName = parametres.newClientName?.trim() ?? "";
   if (!newClientName) throw new Error("COMMERCIAL_CLIENT_REQUIRED");
 
-  if (params.currentClientId) {
-    const payload = await readCanonicalClients(params.clients);
-    const current = payload.clients.find(
-      (candidate) => candidate.id === params.currentClientId && !candidate.isArchived,
+  if (parametres.currentClientId) {
+    const contenu = await readCanonicalClients(parametres.clients);
+    const courant = contenu.clients.find(
+      (candidat) => candidat.id === parametres.currentClientId && !candidat.isArchived,
     );
-    if (current && normalizeName(clientDisplayName(current)) === normalizeName(newClientName)) {
-      return { id: current.id, displayName: clientDisplayName(current) };
+    if (courant && normalizeName(clientDisplayName(courant)) === normalizeName(newClientName)) {
+      return { id: courant.id, displayName: clientDisplayName(courant) };
     }
   }
 
-  return createProvisionalClient(params.clients, params.actor, newClientName);
+  return createProvisionalClient(parametres.clients, parametres.actor, newClientName);
 }
 
 export async function assertCommercialClientReadyForConfirmation(
   clients: ClientsRepository,
-  clientId: string | null | undefined,
+  idClient: string | null | undefined,
 ): Promise<void> {
-  if (!clientId) throw new Error("COMMERCIAL_CLIENT_REQUIRED");
-  const payload = await readCanonicalClients(clients);
-  const client = activeClient(payload, clientId);
+  if (!idClient) throw new Error("COMMERCIAL_CLIENT_REQUIRED");
+  const contenu = await readCanonicalClients(clients);
+  const client = activeClient(contenu, idClient);
   const missing = clientConfirmationMissingFields(client);
   if (missing.length > 0) {
     console.warn("[PAPOT][Commercial] client incomplete for confirmation", {
-      clientId,
+      clientId: idClient,
       missing,
     });
     throw new Error("COMMERCIAL_CLIENT_INCOMPLETE");

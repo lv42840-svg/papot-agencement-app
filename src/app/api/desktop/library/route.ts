@@ -31,45 +31,45 @@ const requestSchema = z.discriminatedUnion("action", [
 
 export async function GET() {
   try {
-    const context = await requireModuleRequestContext("quotes", "READ");
-    return NextResponse.json(await createLibraryRepository(context).load());
-  } catch (error) {
-    const code = error instanceof Error ? error.message : "LIBRARY_REQUEST_FAILED";
+    const contexte = await requireModuleRequestContext("quotes", "READ");
+    return NextResponse.json(await createLibraryRepository(contexte).load());
+  } catch (erreur) {
+    const code = erreur instanceof Error ? erreur.message : "LIBRARY_REQUEST_FAILED";
     const requestStatus = desktopRequestErrorStatus(code);
     return NextResponse.json({ status: "error", error: code }, { status: requestStatus ?? 409 });
   }
 }
 
-export async function POST(request: Request) {
+export async function POST(requete: Request) {
   try {
-    const input = requestSchema.parse(await request.json());
-    const requiredAccess = input.action === "open" ? "READ" : "WRITE";
-    const context = await requireModuleRequestContext("quotes", requiredAccess);
-    const repository = createLibraryRepository(context);
+    const saisie = requestSchema.parse(await requete.json());
+    const requiredAccess = saisie.action === "open" ? "READ" : "WRITE";
+    const contexte = await requireModuleRequestContext("quotes", requiredAccess);
+    const repository = createLibraryRepository(contexte);
 
-    if (input.action === "open") {
-      return NextResponse.json(await repository.open(input.leaseId));
+    if (saisie.action === "open") {
+      return NextResponse.json(await repository.open(saisie.leaseId));
     }
-    if (input.action === "save") {
+    if (saisie.action === "save") {
       return NextResponse.json(
         await repository.save({
-          leaseId: input.leaseId,
-          expectedVersion: input.expectedVersion,
-          payload: input.payload,
+          leaseId: saisie.leaseId,
+          expectedVersion: saisie.expectedVersion,
+          payload: saisie.payload,
         }),
       );
     }
-    if (input.action === "renew") {
-      const lock = await repository.renew(input.leaseId);
+    if (saisie.action === "renew") {
+      const lock = await repository.renew(saisie.leaseId);
       return NextResponse.json({ status: "renewed", lock });
     }
 
     return NextResponse.json({
       status: "released",
-      released: await repository.release(input.leaseId),
+      released: await repository.release(saisie.leaseId),
     });
-  } catch (error) {
-    const code = error instanceof Error ? error.message : "LIBRARY_REQUEST_FAILED";
+  } catch (erreur) {
+    const code = erreur instanceof Error ? erreur.message : "LIBRARY_REQUEST_FAILED";
     const requestStatus = desktopRequestErrorStatus(code);
     return NextResponse.json({ status: "error", error: code }, { status: requestStatus ?? 409 });
   }

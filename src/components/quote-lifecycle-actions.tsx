@@ -35,7 +35,7 @@ export function QuoteLifecycleActions({
   canWrite: boolean;
 }) {
   const [working, setWorking] = useState<LifecycleAction | "deleteDraft" | null>(null);
-  const [error, setError] = useState("");
+  const [erreur, setError] = useState("");
   const isPrevious = quote.status === "SUPERSEDED";
 
   async function run(action: LifecycleAction) {
@@ -43,7 +43,7 @@ export function QuoteLifecycleActions({
     setWorking(action);
     setError("");
     try {
-      const response = await fetch(`/api/desktop/quotes/${quote.id}/lifecycle`, {
+      const reponse = await fetch(`/api/desktop/quotes/${quote.id}/lifecycle`, {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
@@ -51,12 +51,12 @@ export function QuoteLifecycleActions({
         },
         body: JSON.stringify({ action }),
       });
-      const data = (await response.json()) as LifecycleResponse;
-      if (!response.ok || !data.payload || !data.focusQuoteId) {
-        setError(errorLabel(data.error ?? "QUOTE_LIFECYCLE_FAILED"));
+      const donnees = (await reponse.json()) as LifecycleResponse;
+      if (!reponse.ok || !donnees.payload || !donnees.focusQuoteId) {
+        setError(errorLabel(donnees.error ?? "QUOTE_LIFECYCLE_FAILED"));
         return;
       }
-      window.location.assign(quoteHref(data.focusQuoteId));
+      window.location.assign(quoteHref(donnees.focusQuoteId));
     } catch {
       setError("La nouvelle copie du devis n’a pas pu être créée.");
     } finally {
@@ -75,7 +75,7 @@ export function QuoteLifecycleActions({
     setWorking("deleteDraft");
     setError("");
     try {
-      const response = await fetch("/api/desktop/quotes", {
+      const reponse = await fetch("/api/desktop/quotes", {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
@@ -83,13 +83,13 @@ export function QuoteLifecycleActions({
         },
         body: JSON.stringify({ action: "deleteDraft", quoteId: quote.id }),
       });
-      const data = (await response.json()) as LifecycleResponse;
-      if (!response.ok || !data.payload) {
+      const donnees = (await reponse.json()) as LifecycleResponse;
+      if (!reponse.ok || !donnees.payload) {
         setError(
-          data.error === "QUOTE_NOT_EDITABLE"
+          donnees.error === "QUOTE_NOT_EDITABLE"
             ? "Ce devis n’est plus un brouillon et ne peut pas être supprimé."
-            : data.error === "QUOTE_VERSION_CONFLICT" || data.error === "MODULE_FORBIDDEN"
-              ? errorLabel(data.error)
+            : donnees.error === "QUOTE_VERSION_CONFLICT" || donnees.error === "MODULE_FORBIDDEN"
+              ? errorLabel(donnees.error)
               : "Le brouillon n’a pas pu être supprimé. Recharge la page avant de réessayer.",
         );
         return;
@@ -179,7 +179,7 @@ export function QuoteLifecycleActions({
           </button>
         ) : null}
       </div>
-      {error ? <div className="quoteLifecycleError">{error}</div> : null}
+      {erreur ? <div className="quoteLifecycleError">{erreur}</div> : null}
 
       <style jsx>{`
         .quoteLifecycleActions {

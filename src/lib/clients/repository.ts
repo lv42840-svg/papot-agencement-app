@@ -3,7 +3,7 @@ import type { ClientsActor, ClientsMutation, ClientsMutationResult } from "./mut
 
 export interface ClientsRepository {
   load(): Promise<ClientsPayload>;
-  mutate(input: ClientsMutation, actor: ClientsActor): Promise<ClientsMutationResult>;
+  mutate(saisie: ClientsMutation, auteur: ClientsActor): Promise<ClientsMutationResult>;
 }
 
 export type ClientsRepositoryErrorCode = "CLIENTS_LOCKED" | "CLIENTS_VERSION_CONFLICT";

@@ -63,15 +63,15 @@ export function calculateCompanyProfitability(
   actualHoursBySite: ReadonlyMap<string, ChantierHours> = new Map(),
   laborCostsBySite: ReadonlyMap<string, ChantierLaborCostEstimate> = new Map(),
 ): CompanyProfitabilityRow[] {
-  const casesById = new Map(cases.map((item) => [item.id, item]));
+  const casesById = new Map(cases.map((element) => [element.id, element]));
   return chantiers
     .filter((site) => site.status !== "CANCELLED")
     .map((site) => {
       const caseRecord = casesById.get(site.sourceCommercialCaseId) ?? null;
-      const hours = actualHoursBySite.get(site.id);
+      const heures = actualHoursBySite.get(site.id);
       const labor = laborCostsBySite.get(site.id);
       const projection = calculateChantierProfitability(
-        hours ? { ...site, actualHours: hours } : site,
+        heures ? { ...site, actualHours: heures } : site,
         caseRecord,
         quotes,
         { laborCostCents: labor?.costCents ?? null, purchaseCostCents: null },
@@ -110,11 +110,11 @@ export function calculateCompanyProfitability(
 
 /** Never present a partial financial total as a complete enterprise margin. */
 export function companyProfitabilityTotals(
-  rows: readonly CompanyProfitabilityRow[],
+  lignesTableau: readonly CompanyProfitabilityRow[],
 ): CompanyProfitabilityTotals {
-  const incompleteCount = rows.filter((row) => row.missingData).length;
-  const sum = (
-    key:
+  const incompleteCount = lignesTableau.filter((ligneTableau) => ligneTableau.missingData).length;
+  const somme = (
+    cle:
       | "soldCents"
       | "plannedLaborCostCents"
       | "plannedOtherCostCents"
@@ -128,33 +128,44 @@ export function companyProfitabilityTotals(
       | "remainingCostBudgetCents"
       | "remainingLaborBudgetCents",
   ): number | null =>
-    rows.some((row) => row[key] === null)
+    lignesTableau.some((ligneTableau) => ligneTableau[cle] === null)
       ? null
-      : rows.reduce((total, row) => total + (row[key] ?? 0), 0);
+      : lignesTableau.reduce((total, ligneTableau) => total + (ligneTableau[cle] ?? 0), 0);
   return {
-    chantierCount: rows.length,
+    chantierCount: lignesTableau.length,
     incompleteCount,
-    soldCents: sum("soldCents"),
-    plannedLaborCostCents: sum("plannedLaborCostCents"),
-    plannedOtherCostCents: sum("plannedOtherCostCents"),
-    plannedTotalCostCents: sum("plannedTotalCostCents"),
-    plannedMarginCents: sum("plannedMarginCents"),
-    actualLaborCostCents: sum("actualLaborCostCents"),
-    actualPurchaseCostCents: sum("actualPurchaseCostCents"),
-    actualTotalCostCents: sum("actualTotalCostCents"),
-    actualMarginCents: sum("actualMarginCents"),
-    knownCostCommitmentsCents: sum("knownCostCommitmentsCents"),
-    remainingCostBudgetCents: sum("remainingCostBudgetCents"),
-    remainingLaborBudgetCents: sum("remainingLaborBudgetCents"),
-    budgetOverrunCount: rows.filter(
-      (row) => row.remainingCostBudgetCents !== null && row.remainingCostBudgetCents < 0,
+    soldCents: somme("soldCents"),
+    plannedLaborCostCents: somme("plannedLaborCostCents"),
+    plannedOtherCostCents: somme("plannedOtherCostCents"),
+    plannedTotalCostCents: somme("plannedTotalCostCents"),
+    plannedMarginCents: somme("plannedMarginCents"),
+    actualLaborCostCents: somme("actualLaborCostCents"),
+    actualPurchaseCostCents: somme("actualPurchaseCostCents"),
+    actualTotalCostCents: somme("actualTotalCostCents"),
+    actualMarginCents: somme("actualMarginCents"),
+    knownCostCommitmentsCents: somme("knownCostCommitmentsCents"),
+    remainingCostBudgetCents: somme("remainingCostBudgetCents"),
+    remainingLaborBudgetCents: somme("remainingLaborBudgetCents"),
+    budgetOverrunCount: lignesTableau.filter(
+      (ligneTableau) =>
+        ligneTableau.remainingCostBudgetCents !== null && ligneTableau.remainingCostBudgetCents < 0,
     ).length,
-    laborBudgetOverrunCount: rows.filter(
-      (row) => row.remainingLaborBudgetCents !== null && row.remainingLaborBudgetCents < 0,
+    laborBudgetOverrunCount: lignesTableau.filter(
+      (ligneTableau) =>
+        ligneTableau.remainingLaborBudgetCents !== null &&
+        ligneTableau.remainingLaborBudgetCents < 0,
     ).length,
-    provisionalLaborCount: rows.filter((row) => row.actualLaborCostProvisional).length,
-    committedPurchasesCents: rows.reduce((total, row) => total + row.committedPurchasesCents, 0),
-    plannedHours: rows.reduce((total, row) => total + row.plannedHours, 0),
-    actualHours: rows.reduce((total, row) => total + row.actualHours, 0),
+    provisionalLaborCount: lignesTableau.filter(
+      (ligneTableau) => ligneTableau.actualLaborCostProvisional,
+    ).length,
+    committedPurchasesCents: lignesTableau.reduce(
+      (total, ligneTableau) => total + ligneTableau.committedPurchasesCents,
+      0,
+    ),
+    plannedHours: lignesTableau.reduce(
+      (total, ligneTableau) => total + ligneTableau.plannedHours,
+      0,
+    ),
+    actualHours: lignesTableau.reduce((total, ligneTableau) => total + ligneTableau.actualHours, 0),
   };
 }

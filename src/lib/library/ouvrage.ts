@@ -16,15 +16,17 @@ export const libraryOuvrageSchema = z.object({
 export type LibraryOuvrageComponentLine = z.infer<typeof libraryOuvrageComponentLineSchema>;
 export type LibraryOuvrage = z.infer<typeof libraryOuvrageSchema>;
 
-export function parseLibraryOuvrage(value: unknown): LibraryOuvrage {
-  const parsed = libraryOuvrageSchema.safeParse(value);
-  if (!parsed.success) throw new Error("LIBRARY_OUVRAGE_INVALID");
+export function parseLibraryOuvrage(valeur: unknown): LibraryOuvrage {
+  const analyse = libraryOuvrageSchema.safeParse(valeur);
+  if (!analyse.success) throw new Error("LIBRARY_OUVRAGE_INVALID");
 
-  const lineIds = new Set<string>();
-  for (const line of parsed.data.components) {
-    if (lineIds.has(line.id)) throw new Error("LIBRARY_OUVRAGE_LINE_ID_DUPLICATE");
-    lineIds.add(line.id);
+  const identifiantsLignes = new Set<string>();
+  for (const ligne of analyse.data.components) {
+    if (identifiantsLignes.has(ligne.id)) {
+      throw new Error("LIBRARY_OUVRAGE_LINE_ID_DUPLICATE");
+    }
+    identifiantsLignes.add(ligne.id);
   }
 
-  return parsed.data;
+  return analyse.data;
 }

@@ -12,15 +12,15 @@ export function BillingTitlesSettings() {
   useEffect(() => {
     void (async () => {
       try {
-        const response = await fetch("/api/desktop/billing", { cache: "no-store" });
-        const result = (await response.json()) as {
+        const reponse = await fetch("/api/desktop/billing", { cache: "no-store" });
+        const resultat = (await reponse.json()) as {
           payload?: BillingPayload;
           canWrite?: boolean;
           error?: string;
         };
-        if (!response.ok) throw new Error(result.error ?? "Chargement impossible");
-        setTitles(result.payload?.invoiceTitles ?? [...DEFAULT_BILLING_TITLES]);
-        setCanWrite(Boolean(result.canWrite));
+        if (!reponse.ok) throw new Error(resultat.error ?? "Chargement impossible");
+        setTitles(resultat.payload?.invoiceTitles ?? [...DEFAULT_BILLING_TITLES]);
+        setCanWrite(Boolean(resultat.canWrite));
       } catch {
         setMessage("Impossible de charger les intitulés de facturation.");
       }
@@ -28,12 +28,12 @@ export function BillingTitlesSettings() {
   }, []);
 
   async function save() {
-    const clean = titles.map((value) => value.trim());
+    const clean = titles.map((valeur) => valeur.trim());
     if (
       clean.length === 0 ||
       clean.length > 50 ||
-      clean.some((value) => value.length === 0 || value.length > 240) ||
-      new Set(clean.map((value) => value.toLocaleLowerCase("fr-FR"))).size !== clean.length
+      clean.some((valeur) => valeur.length === 0 || valeur.length > 240) ||
+      new Set(clean.map((valeur) => valeur.toLocaleLowerCase("fr-FR"))).size !== clean.length
     ) {
       setMessage("Renseigne 1 à 50 intitulés distincts, sans ligne vide.");
       return;
@@ -41,12 +41,12 @@ export function BillingTitlesSettings() {
     setPending(true);
     setMessage("");
     try {
-      const response = await fetch("/api/desktop/billing", {
+      const reponse = await fetch("/api/desktop/billing", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ action: "SET_TITLES", invoiceTitles: clean }),
       });
-      if (!response.ok) throw new Error("Enregistrement refusé");
+      if (!reponse.ok) throw new Error("Enregistrement refusé");
       setTitles(clean);
       setMessage("Intitulés enregistrés pour les prochains projets de facture.");
     } catch {
@@ -63,17 +63,19 @@ export function BillingTitlesSettings() {
         Ces propositions apparaissent dans la liste déroulante du projet de facture. Modifier la
         liste ne modifie pas les projets existants.
       </p>
-      {titles.map((value, index) => (
-        <div key={index} style={{ display: "flex", gap: 8 }}>
+      {titles.map((valeur, indice) => (
+        <div key={indice} style={{ display: "flex", gap: 8 }}>
           <input
-            aria-label={`Intitulé ${index + 1}`}
+            aria-label={`Intitulé ${indice + 1}`}
             style={{ flex: 1, padding: 9 }}
             disabled={!canWrite || pending}
             maxLength={240}
-            value={value}
+            value={valeur}
             onChange={(e) =>
-              setTitles((current) =>
-                current.map((item, itemIndex) => (itemIndex === index ? e.target.value : item)),
+              setTitles((courant) =>
+                courant.map((element, itemIndex) =>
+                  itemIndex === indice ? e.target.value : element,
+                ),
               )
             }
           />
@@ -82,7 +84,7 @@ export function BillingTitlesSettings() {
             className="secondaryButton"
             disabled={!canWrite || pending || titles.length <= 1}
             onClick={() =>
-              setTitles((current) => current.filter((_, itemIndex) => itemIndex !== index))
+              setTitles((courant) => courant.filter((_, itemIndex) => itemIndex !== indice))
             }
           >
             Supprimer
@@ -94,7 +96,7 @@ export function BillingTitlesSettings() {
           type="button"
           className="secondaryButton"
           disabled={!canWrite || pending || titles.length >= 50}
-          onClick={() => setTitles((current) => [...current, "Nouvel intitulé"])}
+          onClick={() => setTitles((courant) => [...courant, "Nouvel intitulé"])}
         >
           Ajouter un intitulé
         </button>

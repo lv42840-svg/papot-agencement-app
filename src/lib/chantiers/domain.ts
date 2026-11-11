@@ -232,52 +232,54 @@ export function createInitialChantiersPayload(): ChantiersPayload {
   return { schemaVersion: 1, chantiers: [] };
 }
 
-export function parseChantiersPayload(value: unknown): ChantiersPayload {
-  if (value == null) return createInitialChantiersPayload();
-  const payload = chantiersPayloadSchema.parse(value);
+export function parseChantiersPayload(valeur: unknown): ChantiersPayload {
+  if (valeur == null) return createInitialChantiersPayload();
+  const donnees = chantiersPayloadSchema.parse(valeur);
 
-  const byYear = new Map<number, ChantierRecord[]>();
-  for (const chantier of payload.chantiers) {
-    const group = byYear.get(chantier.launchYear) ?? [];
-    group.push(chantier);
-    byYear.set(chantier.launchYear, group);
+  const parAnnee = new Map<number, ChantierRecord[]>();
+  for (const chantier of donnees.chantiers) {
+    const groupe = parAnnee.get(chantier.launchYear) ?? [];
+    groupe.push(chantier);
+    parAnnee.set(chantier.launchYear, groupe);
     if (!chantier.reference) chantier.reference = chantier.name;
   }
 
-  for (const [year, chantiers] of byYear) {
-    const used = new Set(
+  for (const [annee, chantiers] of parAnnee) {
+    const numerosUtilises = new Set(
       chantiers
         .map((chantier) => chantier.number)
-        .filter((number): number is string => Boolean(number))
-        .map((number) => Number(number.split("-").at(-1)))
-        .filter((number) => Number.isInteger(number) && number > 0),
+        .filter((numero): numero is string => Boolean(numero))
+        .map((numero) => Number(numero.split("-").at(-1)))
+        .filter((numero) => Number.isInteger(numero) && numero > 0),
     );
-    let next = 1;
-    for (const chantier of [...chantiers].sort((left, right) =>
-      left.launchedAt.localeCompare(right.launchedAt),
+    let prochainNumero = 1;
+    for (const chantier of [...chantiers].sort((gauche, droite) =>
+      gauche.launchedAt.localeCompare(droite.launchedAt),
     )) {
       if (chantier.number) continue;
-      while (used.has(next)) next += 1;
-      chantier.number = `${year}-${String(next).padStart(3, "0")}`;
-      used.add(next);
-      next += 1;
+      while (numerosUtilises.has(prochainNumero)) prochainNumero += 1;
+      chantier.number = `${annee}-${String(prochainNumero).padStart(3, "0")}`;
+      numerosUtilises.add(prochainNumero);
+      prochainNumero += 1;
     }
   }
 
-  return payload;
+  return donnees;
 }
 
-export function chantierRemainingHours(item: ChantierRecord): ChantierHours {
+export function chantierRemainingHours(chantier: ChantierRecord): ChantierHours {
   return {
-    be: item.plannedHours.be - item.actualHours.be,
-    workshop: item.plannedHours.workshop - item.actualHours.workshop,
-    install: item.plannedHours.install - item.actualHours.install,
+    be: chantier.plannedHours.be - chantier.actualHours.be,
+    workshop: chantier.plannedHours.workshop - chantier.actualHours.workshop,
+    install: chantier.plannedHours.install - chantier.actualHours.install,
   };
 }
 
 export function findChantierByCommercialCase(
-  payload: ChantiersPayload,
-  commercialCaseId: string,
+  donnees: ChantiersPayload,
+  idAffaireCommerciale: string,
 ): ChantierRecord | undefined {
-  return payload.chantiers.find((item) => item.sourceCommercialCaseId === commercialCaseId);
+  return donnees.chantiers.find(
+    (chantier) => chantier.sourceCommercialCaseId === idAffaireCommerciale,
+  );
 }

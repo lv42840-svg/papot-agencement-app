@@ -17,18 +17,22 @@ export function createLocalQuotesRepository(): QuotesRepository {
     },
 
     async mutate(transform) {
-      return mutateLocalSnapshot(RESOURCE_KEY, parseNativeQuotesPayload, async ({ payload }) => {
-        const mutation = await transform(structuredClone(payload));
-        const result = {
-          payload: parseNativeQuotesPayload(mutation.payload),
-          focusQuoteId: mutation.focusQuoteId,
-        };
-        return {
-          payload: result.payload,
-          result,
-          persist: mutation.shouldPersist !== false,
-        };
-      });
+      return mutateLocalSnapshot(
+        RESOURCE_KEY,
+        parseNativeQuotesPayload,
+        async ({ payload: contenu }) => {
+          const mutation = await transform(structuredClone(contenu));
+          const resultat = {
+            payload: parseNativeQuotesPayload(mutation.payload),
+            focusQuoteId: mutation.focusQuoteId,
+          };
+          return {
+            payload: resultat.payload,
+            result: resultat,
+            persist: mutation.shouldPersist !== false,
+          };
+        },
+      );
     },
   };
 }

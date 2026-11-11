@@ -37,12 +37,12 @@ type MutableComponentRow = QuoteComponentCheckRow & {
 
 type QuantityBucket = "plannedQuantity" | "pendingOptionQuantity" | "rejectedOptionQuantity";
 
-function roundQuantity(value: number): number {
-  return Math.round(value * 1_000_000) / 1_000_000;
+function roundQuantity(valeur: number): number {
+  return Math.round(valeur * 1_000_000) / 1_000_000;
 }
 
-function normalizeKeyPart(value: string): string {
-  return value.trim().replace(/\s+/g, " ").toLocaleLowerCase("fr-FR");
+function normalizeKeyPart(valeur: string): string {
+  return valeur.trim().replace(/\s+/g, " ").toLocaleLowerCase("fr-FR");
 }
 
 function componentActivity(component: QuoteOuvrageComponent): ProductionActivity | null {
@@ -62,15 +62,15 @@ function componentName(component: QuoteOuvrageComponent): string {
 }
 
 function optionStatusForLine(
-  line: QuoteLine,
+  ligne: QuoteLine,
   itemsById: ReadonlyMap<string, QuoteItem>,
   optionStatusByTarget: ReadonlyMap<string, QuoteOptionStatus>,
 ): QuoteOptionStatus | null {
-  const direct = optionStatusByTarget.get(line.id);
+  const direct = optionStatusByTarget.get(ligne.id);
   if (direct) return direct;
-  if (!line.parentId) return null;
+  if (!ligne.parentId) return null;
 
-  const parent = itemsById.get(line.parentId);
+  const parent = itemsById.get(ligne.parentId);
   if (!parent) return null;
   const parentStatus = optionStatusByTarget.get(parent.id);
   if (parentStatus) return parentStatus;
@@ -81,9 +81,9 @@ function optionStatusForLine(
   return null;
 }
 
-function bucketForStatus(status: QuoteOptionStatus | null): QuantityBucket {
-  if (status === "PENDING") return "pendingOptionQuantity";
-  if (status === "REJECTED") return "rejectedOptionQuantity";
+function bucketForStatus(statut: QuoteOptionStatus | null): QuantityBucket {
+  if (statut === "PENDING") return "pendingOptionQuantity";
+  if (statut === "REJECTED") return "rejectedOptionQuantity";
   return "plannedQuantity";
 }
 
@@ -91,29 +91,29 @@ function emptyHours(): QuoteHoursCheck {
   return { be: 0, atelier: 0, pose: 0, total: 0 };
 }
 
-function finalizeHours(hours: QuoteHoursCheck): QuoteHoursCheck {
-  const be = roundQuantity(hours.be);
-  const atelier = roundQuantity(hours.atelier);
-  const pose = roundQuantity(hours.pose);
+function finalizeHours(heures: QuoteHoursCheck): QuoteHoursCheck {
+  const be = roundQuantity(heures.be);
+  const atelier = roundQuantity(heures.atelier);
+  const pose = roundQuantity(heures.pose);
   return { be, atelier, pose, total: roundQuantity(be + atelier + pose) };
 }
 
 function hoursBucketForStatus(
-  status: QuoteOptionStatus | null,
+  statut: QuoteOptionStatus | null,
   planned: QuoteHoursCheck,
   pending: QuoteHoursCheck,
   rejected: QuoteHoursCheck,
 ): QuoteHoursCheck {
-  if (status === "PENDING") return pending;
-  if (status === "REJECTED") return rejected;
+  if (statut === "PENDING") return pending;
+  if (statut === "REJECTED") return rejected;
   return planned;
 }
 
 export function calculateQuoteComponentCheck(
-  items: QuoteItem[],
+  elements: QuoteItem[],
   pricingConfig: QuotePricingConfig,
 ): QuoteComponentCheck {
-  const itemsById = new Map(items.map((item) => [item.id, item]));
+  const itemsById = new Map(elements.map((element) => [element.id, element]));
   const optionStatusByTarget = new Map(
     pricingConfig.options.map((option) => [option.targetItemId, option.status]),
   );
@@ -122,22 +122,22 @@ export function calculateQuoteComponentCheck(
   const pendingOptionHours = emptyHours();
   const rejectedOptionHours = emptyHours();
 
-  for (const item of items) {
-    if (item.kind !== "LINE") continue;
-    const status = optionStatusForLine(item, itemsById, optionStatusByTarget);
-    const quantityBucket = bucketForStatus(status);
+  for (const element of elements) {
+    if (element.kind !== "LINE") continue;
+    const statut = optionStatusForLine(element, itemsById, optionStatusByTarget);
+    const quantityBucket = bucketForStatus(statut);
     const hoursBucket = hoursBucketForStatus(
-      status,
+      statut,
       plannedHours,
       pendingOptionHours,
       rejectedOptionHours,
     );
 
-    for (const component of item.components ?? []) {
-      const quantity = roundQuantity(item.quantity * component.quantity);
-      const key = componentKey(component);
-      const current = rowsByKey.get(key) ?? {
-        key,
+    for (const component of element.components ?? []) {
+      const quantity = roundQuantity(element.quantity * component.quantity);
+      const cle = componentKey(component);
+      const courant = rowsByKey.get(cle) ?? {
+        key: cle,
         name: componentName(component),
         unit: component.unit || component.librarySource?.component.unit || "u",
         activity: componentActivity(component),
@@ -148,9 +148,9 @@ export function calculateQuoteComponentCheck(
         ouvrageIds: new Set<string>(),
       };
 
-      current[quantityBucket] = roundQuantity(current[quantityBucket] + quantity);
-      current.ouvrageIds.add(item.id);
-      rowsByKey.set(key, current);
+      courant[quantityBucket] = roundQuantity(courant[quantityBucket] + quantity);
+      courant.ouvrageIds.add(element.id);
+      rowsByKey.set(cle, courant);
 
       const activity = componentActivity(component);
       if (activity === "BE") hoursBucket.be += quantity;
@@ -158,23 +158,25 @@ export function calculateQuoteComponentCheck(
     }
   }
 
-  const adjustedPricing = calculateQuoteAdjustedPricing(items, pricingConfig);
-  for (const line of adjustedPricing.lines) {
+  const adjustedPricing = calculateQuoteAdjustedPricing(elements, pricingConfig);
+  for (const ligne of adjustedPricing.lines) {
     const hoursBucket = hoursBucketForStatus(
-      line.optionStatus,
+      ligne.optionStatus,
       plannedHours,
       pendingOptionHours,
       rejectedOptionHours,
     );
-    hoursBucket.pose += line.poseHours;
+    hoursBucket.pose += ligne.poseHours;
   }
 
-  const rows = Array.from(rowsByKey.values())
-    .map(({ ouvrageIds, ...row }) => ({ ...row, ouvrageCount: ouvrageIds.size }))
-    .sort((left, right) => left.name.localeCompare(right.name, "fr", { sensitivity: "base" }));
+  const lignesTableau = Array.from(rowsByKey.values())
+    .map(({ ouvrageIds, ...ligneTableau }) => ({ ...ligneTableau, ouvrageCount: ouvrageIds.size }))
+    .sort((gauche, droite) =>
+      gauche.name.localeCompare(droite.name, "fr", { sensitivity: "base" }),
+    );
 
   return {
-    rows,
+    rows: lignesTableau,
     plannedHours: finalizeHours(plannedHours),
     pendingOptionHours: finalizeHours(pendingOptionHours),
     rejectedOptionHours: finalizeHours(rejectedOptionHours),

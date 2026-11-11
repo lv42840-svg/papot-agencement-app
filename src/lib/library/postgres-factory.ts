@@ -4,7 +4,7 @@ import { createPostgresLibraryRepository } from "./postgres-repository";
 import type { LibraryRepository } from "./repository";
 
 export function createPostgresBackedLibraryRepository(
-  context: ModuleRequestContext,
+  contexte: ModuleRequestContext,
 ): LibraryRepository {
   let repositoryPromise: Promise<LibraryRepository> | null = null;
 
@@ -13,9 +13,9 @@ export function createPostgresBackedLibraryRepository(
       const pool = getServerDbPool();
       await runServerDbMigrations(pool);
       const owner = {
-        userId: context.user.id,
-        deviceId: context.user.id,
-        displayName: context.user.displayName,
+        userId: contexte.user.id,
+        deviceId: contexte.user.id,
+        displayName: contexte.user.displayName,
       };
       return createPostgresLibraryRepository(owner, pool);
     })();
@@ -29,8 +29,8 @@ export function createPostgresBackedLibraryRepository(
     async open(leaseId) {
       return (await initialize()).open(leaseId);
     },
-    async save(input) {
-      return (await initialize()).save(input);
+    async save(saisie) {
+      return (await initialize()).save(saisie);
     },
     async renew(leaseId) {
       return (await initialize()).renew(leaseId);

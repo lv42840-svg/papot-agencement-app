@@ -12,20 +12,22 @@ export type ServerFileWriteResult = {
   sha256: string;
 };
 
-function errorCode(error: unknown): string | undefined {
-  return typeof error === "object" && error !== null && "code" in error
-    ? String((error as { code?: unknown }).code ?? "")
+function errorCode(erreur: unknown): string | undefined {
+  return typeof erreur === "object" && erreur !== null && "code" in erreur
+    ? String((erreur as { code?: unknown }).code ?? "")
     : undefined;
 }
 
-export function normalizeServerStoragePath(value: string): string {
-  if (typeof value !== "string") throw new Error("SERVER_FILE_PATH_INVALID");
-  const normalized = value.trim().replace(/\\/g, "/");
-  if (!normalized || normalized.startsWith("/") || /^[A-Za-z]:/.test(normalized)) {
+export function normalizeServerStoragePath(valeur: string): string {
+  if (typeof valeur !== "string") {
+    throw new Error("SERVER_FILE_PATH_INVALID");
+  }
+  const normalise = valeur.trim().replace(/\\/g, "/");
+  if (!normalise || normalise.startsWith("/") || /^[A-Za-z]:/.test(normalise)) {
     throw new Error("SERVER_FILE_PATH_INVALID");
   }
 
-  const segments = normalized.split("/");
+  const segments = normalise.split("/");
   if (
     segments.some(
       (segment) =>
@@ -42,29 +44,31 @@ export function normalizeServerStoragePath(value: string): string {
   return segments.join("/");
 }
 
-export function sha256Bytes(bytes: Uint8Array): string {
-  return createHash("sha256").update(bytes).digest("hex");
+export function sha256Bytes(octets: Uint8Array): string {
+  return createHash("sha256").update(octets).digest("hex");
 }
 
 export class ServerFileStore {
   readonly rootPath: string;
 
-  constructor(rootPath: string) {
-    if (typeof rootPath !== "string" || !rootPath.trim()) {
+  constructor(cheminRacine: string) {
+    if (typeof cheminRacine !== "string" || !cheminRacine.trim()) {
       throw new Error("SERVER_FILE_ROOT_REQUIRED");
     }
-    if (!path.isAbsolute(rootPath)) throw new Error("SERVER_FILE_ROOT_INVALID");
-    this.rootPath = path.resolve(rootPath);
+    if (!path.isAbsolute(cheminRacine)) {
+      throw new Error("SERVER_FILE_ROOT_INVALID");
+    }
+    this.rootPath = path.resolve(cheminRacine);
   }
 
-  private resolve(storagePath: string): { logical: string; absolute: string } {
-    const logical = normalizeServerStoragePath(storagePath);
-    const absolute = path.resolve(this.rootPath, ...logical.split("/"));
-    const relative = path.relative(this.rootPath, absolute);
-    if (!relative || relative.startsWith("..") || path.isAbsolute(relative)) {
+  private resolve(cheminStockage: string): { logical: string; absolute: string } {
+    const logique = normalizeServerStoragePath(cheminStockage);
+    const absolu = path.resolve(this.rootPath, ...logique.split("/"));
+    const relatif = path.relative(this.rootPath, absolu);
+    if (!relatif || relatif.startsWith("..") || path.isAbsolute(relatif)) {
       throw new Error("SERVER_FILE_PATH_INVALID");
     }
-    return { logical, absolute };
+    return { logical: logique, absolute: absolu };
   }
 
   async assertReady(): Promise<void> {
@@ -75,60 +79,66 @@ export class ServerFileStore {
     }
   }
 
-  async writeBytes(storagePath: string, bytes: Uint8Array): Promise<ServerFileWriteResult> {
-    const target = this.resolve(storagePath);
-    await fs.mkdir(path.dirname(target.absolute), { recursive: true });
+  async writeBytes(cheminStockage: string, octets: Uint8Array): Promise<ServerFileWriteResult> {
+    const cible = this.resolve(cheminStockage);
+    await fs.mkdir(path.dirname(cible.absolute), {
+      recursive: true,
+    });
 
-    let handle: Awaited<ReturnType<typeof fs.open>> | undefined;
-    let created = false;
+    let fichierOuvert: Awaited<ReturnType<typeof fs.open>> | undefined;
+    let cree = false;
     try {
-      handle = await fs.open(target.absolute, "wx");
-      created = true;
-      await handle.writeFile(bytes);
-      await handle.sync();
-    } catch (error) {
-      if (errorCode(error) === "EEXIST") throw new Error("SERVER_FILE_EXISTS");
-      if (created) {
-        await handle?.close().catch(() => undefined);
-        handle = undefined;
-        await fs.unlink(target.absolute).catch(() => undefined);
+      fichierOuvert = await fs.open(cible.absolute, "wx");
+      cree = true;
+      await fichierOuvert.writeFile(octets);
+      await fichierOuvert.sync();
+    } catch (erreur) {
+      if (errorCode(erreur) === "EEXIST") {
+        throw new Error("SERVER_FILE_EXISTS");
       }
-      throw error;
+      if (cree) {
+        await fichierOuvert?.close().catch(() => undefined);
+        fichierOuvert = undefined;
+        await fs.unlink(cible.absolute).catch(() => undefined);
+      }
+      throw erreur;
     } finally {
-      await handle?.close().catch(() => undefined);
+      await fichierOuvert?.close().catch(() => undefined);
     }
 
     return {
-      storagePath: target.logical,
-      sizeBytes: bytes.byteLength,
-      sha256: sha256Bytes(bytes),
+      storagePath: cible.logical,
+      sizeBytes: octets.byteLength,
+      sha256: sha256Bytes(octets),
     };
   }
 
-  async readBytes(storagePath: string, expectedSha256?: string): Promise<Buffer> {
-    const target = this.resolve(storagePath);
-    let bytes: Buffer;
+  async readBytes(cheminStockage: string, sha256Attendu?: string): Promise<Buffer> {
+    const cible = this.resolve(cheminStockage);
+    let octets: Buffer;
     try {
-      bytes = await fs.readFile(target.absolute);
-    } catch (error) {
-      if (errorCode(error) === "ENOENT") throw new Error("SERVER_FILE_NOT_FOUND");
-      throw error;
+      octets = await fs.readFile(cible.absolute);
+    } catch (erreur) {
+      if (errorCode(erreur) === "ENOENT") {
+        throw new Error("SERVER_FILE_NOT_FOUND");
+      }
+      throw erreur;
     }
 
-    if (expectedSha256 && sha256Bytes(bytes) !== expectedSha256.toLowerCase()) {
+    if (sha256Attendu && sha256Bytes(octets) !== sha256Attendu.toLowerCase()) {
       throw new Error("SERVER_FILE_INTEGRITY_MISMATCH");
     }
-    return bytes;
+    return octets;
   }
 
-  async deleteFile(storagePath: string): Promise<boolean> {
-    const target = this.resolve(storagePath);
+  async deleteFile(cheminStockage: string): Promise<boolean> {
+    const cible = this.resolve(cheminStockage);
     try {
-      await fs.unlink(target.absolute);
+      await fs.unlink(cible.absolute);
       return true;
-    } catch (error) {
-      if (errorCode(error) === "ENOENT") return false;
-      throw error;
+    } catch (erreur) {
+      if (errorCode(erreur) === "ENOENT") return false;
+      throw erreur;
     }
   }
 }

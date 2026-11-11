@@ -30,8 +30,8 @@ type LoadedPhoto = {
 
 type XmlRange = { start: number; end: number };
 
-function escapeXml(value: string): string {
-  return value
+function escapeXml(valeur: string): string {
+  return valeur
     .replaceAll("&", "&amp;")
     .replaceAll("<", "&lt;")
     .replaceAll(">", "&gt;")
@@ -39,42 +39,42 @@ function escapeXml(value: string): string {
     .replaceAll("'", "&apos;");
 }
 
-function escapeRegExp(value: string): string {
-  return value.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+function escapeRegExp(valeur: string): string {
+  return valeur.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
 }
 
 function containingRange(xml: string, anchorIndex: number, tagName: string): XmlRange | null {
   const pattern = new RegExp(`<(/?)${escapeRegExp(tagName)}\\b[^>]*?(\\/?)>`, "g");
   const openStarts: number[] = [];
 
-  for (const match of xml.slice(0, anchorIndex + 1).matchAll(pattern)) {
-    const closing = match[1] === "/";
-    const selfClosing = match[2] === "/";
+  for (const correspondance of xml.slice(0, anchorIndex + 1).matchAll(pattern)) {
+    const closing = correspondance[1] === "/";
+    const selfClosing = correspondance[2] === "/";
     if (closing) {
       openStarts.pop();
-    } else if (!selfClosing && match.index !== undefined) {
-      openStarts.push(match.index);
+    } else if (!selfClosing && correspondance.index !== undefined) {
+      openStarts.push(correspondance.index);
     }
   }
 
-  const start = openStarts.at(-1);
-  if (start === undefined) return null;
+  const debut = openStarts.at(-1);
+  if (debut === undefined) return null;
 
   const matchingPattern = new RegExp(`<(/?)${escapeRegExp(tagName)}\\b[^>]*?(\\/?)>`, "g");
-  matchingPattern.lastIndex = start;
+  matchingPattern.lastIndex = debut;
   let depth = 0;
-  let match: RegExpExecArray | null;
+  let correspondance: RegExpExecArray | null;
 
-  while ((match = matchingPattern.exec(xml)) !== null) {
-    const closing = match[1] === "/";
-    const selfClosing = match[2] === "/";
+  while ((correspondance = matchingPattern.exec(xml)) !== null) {
+    const closing = correspondance[1] === "/";
+    const selfClosing = correspondance[2] === "/";
     if (!closing && !selfClosing) {
       depth += 1;
       continue;
     }
     if (!closing) continue;
     depth -= 1;
-    if (depth === 0) return { start, end: matchingPattern.lastIndex };
+    if (depth === 0) return { start: debut, end: matchingPattern.lastIndex };
   }
 
   return null;
@@ -100,11 +100,11 @@ function assertPhotoBytes(photo: QuoteItemPhoto, bytes: Uint8Array): void {
     buffer.toString("ascii", 0, 4) === "RIFF" &&
     buffer.toString("ascii", 8, 12) === "WEBP";
 
-  const matches =
+  const correspondances =
     (photo.contentType === "image/png" && isPng) ||
     (photo.contentType === "image/jpeg" && isJpeg) ||
     (photo.contentType === "image/webp" && isWebp);
-  if (!matches) throw new Error(`QUOTE_WORD_V2_PHOTO_MIME_MISMATCH:${photo.id}`);
+  if (!correspondances) throw new Error(`QUOTE_WORD_V2_PHOTO_MIME_MISMATCH:${photo.id}`);
 }
 
 function pngDimensions(buffer: Buffer): { width: number; height: number } | null {
@@ -197,21 +197,21 @@ function scaledExtent(width: number, height: number): { cx: number; cy: number }
 
 function imageParagraph(photo: LoadedPhoto, docPrId: number): string {
   const { cx, cy } = scaledExtent(photo.width, photo.height);
-  const name = escapeXml(`Photo devis ${photo.item.number || photo.item.id}`);
-  return `<w:p><w:pPr><w:jc w:val="center"/></w:pPr><w:r><w:drawing><wp:inline distT="0" distB="0" distL="0" distR="0"><wp:extent cx="${cx}" cy="${cy}"/><wp:docPr id="${docPrId}" name="${name}"/><a:graphic xmlns:a="http://schemas.openxmlformats.org/drawingml/2006/main"><a:graphicData uri="http://schemas.openxmlformats.org/drawingml/2006/picture"><pic:pic xmlns:pic="http://schemas.openxmlformats.org/drawingml/2006/picture"><pic:nvPicPr><pic:cNvPr id="0" name="${escapeXml(photo.photo.fileName)}"/><pic:cNvPicPr/></pic:nvPicPr><pic:blipFill><a:blip r:embed="${photo.relationshipId}"/><a:stretch><a:fillRect/></a:stretch></pic:blipFill><pic:spPr><a:xfrm><a:off x="0" y="0"/><a:ext cx="${cx}" cy="${cy}"/></a:xfrm><a:prstGeom prst="rect"><a:avLst/></a:prstGeom></pic:spPr></pic:pic></a:graphicData></a:graphic></wp:inline></w:drawing></w:r></w:p>`;
+  const nom = escapeXml(`Photo devis ${photo.item.number || photo.item.id}`);
+  return `<w:p><w:pPr><w:jc w:val="center"/></w:pPr><w:r><w:drawing><wp:inline distT="0" distB="0" distL="0" distR="0"><wp:extent cx="${cx}" cy="${cy}"/><wp:docPr id="${docPrId}" name="${nom}"/><a:graphic xmlns:a="http://schemas.openxmlformats.org/drawingml/2006/main"><a:graphicData uri="http://schemas.openxmlformats.org/drawingml/2006/picture"><pic:pic xmlns:pic="http://schemas.openxmlformats.org/drawingml/2006/picture"><pic:nvPicPr><pic:cNvPr id="0" name="${escapeXml(photo.photo.fileName)}"/><pic:cNvPicPr/></pic:nvPicPr><pic:blipFill><a:blip r:embed="${photo.relationshipId}"/><a:stretch><a:fillRect/></a:stretch></pic:blipFill><pic:spPr><a:xfrm><a:off x="0" y="0"/><a:ext cx="${cx}" cy="${cy}"/></a:xfrm><a:prstGeom prst="rect"><a:avLst/></a:prstGeom></pic:spPr></pic:pic></a:graphicData></a:graphic></wp:inline></w:drawing></w:r></w:p>`;
 }
 
-function captionParagraph(item: QuoteDocumentItem): string {
-  const label = [item.number, item.text].filter(Boolean).join(" - ");
-  return `<w:p><w:pPr><w:jc w:val="center"/><w:spacing w:after="160"/></w:pPr><w:r><w:rPr><w:i/><w:sz w:val="18"/></w:rPr><w:t xml:space="preserve">${escapeXml(label)}</w:t></w:r></w:p>`;
+function captionParagraph(element: QuoteDocumentItem): string {
+  const libelle = [element.number, element.text].filter(Boolean).join(" - ");
+  return `<w:p><w:pPr><w:jc w:val="center"/><w:spacing w:after="160"/></w:pPr><w:r><w:rPr><w:i/><w:sz w:val="18"/></w:rPr><w:t xml:space="preserve">${escapeXml(libelle)}</w:t></w:r></w:p>`;
 }
 
 function annexXml(photos: LoadedPhoto[]): string {
   const parts = [
     '<w:p><w:pPr><w:keepNext/><w:spacing w:before="200" w:after="120"/></w:pPr><w:r><w:rPr><w:b/><w:sz w:val="24"/></w:rPr><w:t>PHOTOS CLIENT</w:t></w:r></w:p>',
   ];
-  photos.forEach((photo, index) => {
-    parts.push(imageParagraph(photo, 10000 + index), captionParagraph(photo.item));
+  photos.forEach((photo, indice) => {
+    parts.push(imageParagraph(photo, 10000 + indice), captionParagraph(photo.item));
   });
   return parts.join("");
 }
@@ -229,8 +229,8 @@ function replaceAnchorParagraph(documentXml: string, replacement: string): strin
 
 function nextRelationshipId(relsXml: string): number {
   let max = 0;
-  for (const match of relsXml.matchAll(/\bId="rId(\d+)"/g)) {
-    max = Math.max(max, Number(match[1]));
+  for (const correspondance of relsXml.matchAll(/\bId="rId(\d+)"/g)) {
+    max = Math.max(max, Number(correspondance[1]));
   }
   return max + 1;
 }
@@ -250,22 +250,22 @@ function appendRelationships(relsXml: string, photos: LoadedPhoto[]): string {
 function ensureContentTypes(xml: string, photos: LoadedPhoto[]): string {
   const needed = new Map<string, string>();
   for (const photo of photos) needed.set(photo.extension, photo.photo.contentType);
-  let next = xml;
+  let suivant = xml;
   for (const [extension, contentType] of needed) {
-    const exists = new RegExp(`<Default\\b[^>]*\\bExtension="${extension}"`, "i").test(next);
+    const exists = new RegExp(`<Default\\b[^>]*\\bExtension="${extension}"`, "i").test(suivant);
     if (exists) continue;
-    const closeIndex = next.lastIndexOf("</Types>");
+    const closeIndex = suivant.lastIndexOf("</Types>");
     if (closeIndex < 0) throw new Error("QUOTE_WORD_V2_CONTENT_TYPES_INVALID");
-    next = `${next.slice(0, closeIndex)}<Default Extension="${extension}" ContentType="${contentType}"/>${next.slice(closeIndex)}`;
+    suivant = `${suivant.slice(0, closeIndex)}<Default Extension="${extension}" ContentType="${contentType}"/>${suivant.slice(closeIndex)}`;
   }
-  return next;
+  return suivant;
 }
 
-function mediaEntry(template: ZipArchiveEntry, name: string, data: Uint8Array): ZipArchiveEntry {
+function mediaEntry(template: ZipArchiveEntry, nom: string, donnees: Uint8Array): ZipArchiveEntry {
   return {
     ...template,
-    name,
-    data,
+    name: nom,
+    data: donnees,
     compressionMethod: 8,
     internalAttributes: 0,
     externalAttributes: 0,
@@ -276,16 +276,16 @@ function visiblePhotos(
   document: QuoteDocumentData,
 ): Array<{ item: QuoteDocumentItem; photo: QuoteItemPhoto }> {
   const seen = new Set<string>();
-  const result: Array<{ item: QuoteDocumentItem; photo: QuoteItemPhoto }> = [];
-  for (const item of document.items) {
-    if (item.scope === "REJECTED_OPTION") continue;
-    for (const photo of item.clientPhotos) {
+  const resultat: Array<{ item: QuoteDocumentItem; photo: QuoteItemPhoto }> = [];
+  for (const element of document.items) {
+    if (element.scope === "REJECTED_OPTION") continue;
+    for (const photo of element.clientPhotos) {
       if (seen.has(photo.id)) continue;
       seen.add(photo.id);
-      result.push({ item, photo });
+      resultat.push({ item: element, photo });
     }
   }
-  return result;
+  return resultat;
 }
 
 export async function renderQuoteWordV2Photos(
@@ -293,32 +293,32 @@ export async function renderQuoteWordV2Photos(
   document: QuoteDocumentData,
   loader: QuoteWordV2PhotoLoader,
 ): Promise<Uint8Array> {
-  const candidates = visiblePhotos(document);
-  if (candidates.length === 0) throw new Error("QUOTE_WORD_V2_PHOTOS_EMPTY");
+  const candidats = visiblePhotos(document);
+  if (candidats.length === 0) throw new Error("QUOTE_WORD_V2_PHOTOS_EMPTY");
 
-  const entries = readZipArchive(docx);
-  const documentEntry = entries.find((entry) => entry.name === "word/document.xml");
-  const relsEntry = entries.find((entry) => entry.name === "word/_rels/document.xml.rels");
-  const contentTypesEntry = entries.find((entry) => entry.name === "[Content_Types].xml");
+  const entrees = readZipArchive(docx);
+  const documentEntry = entrees.find((entree) => entree.name === "word/document.xml");
+  const relsEntry = entrees.find((entree) => entree.name === "word/_rels/document.xml.rels");
+  const contentTypesEntry = entrees.find((entree) => entree.name === "[Content_Types].xml");
   if (!documentEntry || !relsEntry || !contentTypesEntry) {
     throw new Error("QUOTE_WORD_V2_PHOTO_PACKAGE_PART_MISSING");
   }
 
   let relationshipNumber = nextRelationshipId(Buffer.from(relsEntry.data).toString("utf8"));
   const loaded: LoadedPhoto[] = [];
-  for (let index = 0; index < candidates.length; index += 1) {
-    const candidate = candidates[index];
-    const bytes = await loader(candidate.photo);
-    assertPhotoBytes(candidate.photo, bytes);
-    const dimensions = imageDimensions(candidate.photo, bytes);
-    const extension = extensionFor(candidate.photo);
+  for (let indice = 0; indice < candidats.length; indice += 1) {
+    const candidat = candidats[indice];
+    const bytes = await loader(candidat.photo);
+    assertPhotoBytes(candidat.photo, bytes);
+    const dimensions = imageDimensions(candidat.photo, bytes);
+    const extension = extensionFor(candidat.photo);
     loaded.push({
-      ...candidate,
+      ...candidat,
       bytes,
       ...dimensions,
       extension,
       relationshipId: `rId${relationshipNumber++}`,
-      mediaName: `papot-quote-photo-${index + 1}.${extension}`,
+      mediaName: `papot-quote-photo-${indice + 1}.${extension}`,
     });
   }
 
@@ -332,17 +332,17 @@ export async function renderQuoteWordV2Photos(
     loaded,
   );
 
-  const nextEntries = entries.map((entry) => {
-    if (entry.name === documentEntry.name) {
-      return cloneZipEntryWithData(entry, Buffer.from(nextDocumentXml, "utf8"));
+  const nextEntries = entrees.map((entree) => {
+    if (entree.name === documentEntry.name) {
+      return cloneZipEntryWithData(entree, Buffer.from(nextDocumentXml, "utf8"));
     }
-    if (entry.name === relsEntry.name) {
-      return cloneZipEntryWithData(entry, Buffer.from(nextRelsXml, "utf8"));
+    if (entree.name === relsEntry.name) {
+      return cloneZipEntryWithData(entree, Buffer.from(nextRelsXml, "utf8"));
     }
-    if (entry.name === contentTypesEntry.name) {
-      return cloneZipEntryWithData(entry, Buffer.from(nextContentTypes, "utf8"));
+    if (entree.name === contentTypesEntry.name) {
+      return cloneZipEntryWithData(entree, Buffer.from(nextContentTypes, "utf8"));
     }
-    return entry;
+    return entree;
   });
   nextEntries.push(
     ...loaded.map((photo) =>

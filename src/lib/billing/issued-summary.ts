@@ -24,59 +24,70 @@ export type IssuedInvoiceSummary = {
 };
 
 function parisMonth(date: Date): string {
-  const parts = Object.fromEntries(
+  const parties = Object.fromEntries(
     new Intl.DateTimeFormat("en-GB", {
       timeZone: "Europe/Paris",
       year: "numeric",
       month: "2-digit",
     })
       .formatToParts(date)
-      .map((part) => [part.type, part.value]),
+      .map((partie) => [partie.type, partie.value]),
   );
-  return `${parts.year}-${parts.month}`;
+  return `${parties.year}-${parties.month}`;
 }
 
 /** Pass connected=false while no provider can certify issued invoices. Never return 0 as a substitute. */
 export function summarizeIssuedInvoices(
-  records: readonly IssuedInvoiceRecord[],
-  connected: boolean,
-  now = new Date(),
+  factures: readonly IssuedInvoiceRecord[],
+  connecte: boolean,
+  maintenant = new Date(),
 ): IssuedInvoiceSummary {
-  const month = parisMonth(now);
-  const year = month.slice(0, 4);
-  if (!connected) {
+  const mois = parisMonth(maintenant);
+  const annee = mois.slice(0, 4);
+  if (!connecte) {
     return {
-      year,
-      month,
+      year: annee,
+      month: mois,
       connected: false,
       yearly: { amountHtCents: null, invoiceCount: null },
       monthly: { amountHtCents: null, invoiceCount: null },
     };
   }
-  const ids = new Set<string>();
-  const valid = records.filter((item) => {
-    if (ids.has(item.id)) throw new Error("ISSUED_INVOICE_DUPLICATE");
-    ids.add(item.id);
-    if (!Number.isSafeInteger(item.amountHtCents) || item.amountHtCents < 0) {
+  const identifiants = new Set<string>();
+  const facturesValides = factures.filter((facture) => {
+    if (identifiants.has(facture.id)) throw new Error("ISSUED_INVOICE_DUPLICATE");
+    identifiants.add(facture.id);
+    if (!Number.isSafeInteger(facture.amountHtCents) || facture.amountHtCents < 0) {
       throw new Error("ISSUED_INVOICE_AMOUNT_INVALID");
     }
-    return item.status === "ISSUED";
+    return facture.status === "ISSUED";
   });
-  const forPeriod = (period: string): IssuedInvoicePeriod => {
-    const selected = valid.filter((item) => {
-      const time = new Date(item.issuedAt);
-      if (!Number.isFinite(time.getTime())) throw new Error("ISSUED_INVOICE_DATE_INVALID");
-      return parisMonth(time).startsWith(period);
+  const pourPeriode = (periode: string): IssuedInvoicePeriod => {
+    const facturesSelectionnees = facturesValides.filter((facture) => {
+      const dateEmission = new Date(facture.issuedAt);
+      if (!Number.isFinite(dateEmission.getTime())) {
+        throw new Error("ISSUED_INVOICE_DATE_INVALID");
+      }
+      return parisMonth(dateEmission).startsWith(periode);
     });
-    const amountHtCents = selected.reduce(
-      (sum, item) => sum + (item.type === "CREDIT_NOTE" ? -item.amountHtCents : item.amountHtCents),
+    const montantHtCentimes = facturesSelectionnees.reduce(
+      (somme, facture) =>
+        somme + (facture.type === "CREDIT_NOTE" ? -facture.amountHtCents : facture.amountHtCents),
       0,
     );
-    if (!Number.isSafeInteger(amountHtCents)) throw new Error("ISSUED_INVOICE_SUM_INVALID");
+    if (!Number.isSafeInteger(montantHtCentimes)) {
+      throw new Error("ISSUED_INVOICE_SUM_INVALID");
+    }
     return {
-      amountHtCents,
-      invoiceCount: selected.filter((item) => item.type === "INVOICE").length,
+      amountHtCents: montantHtCentimes,
+      invoiceCount: facturesSelectionnees.filter((facture) => facture.type === "INVOICE").length,
     };
   };
-  return { year, month, connected: true, yearly: forPeriod(year), monthly: forPeriod(month) };
+  return {
+    year: annee,
+    month: mois,
+    connected: true,
+    yearly: pourPeriode(annee),
+    monthly: pourPeriode(mois),
+  };
 }

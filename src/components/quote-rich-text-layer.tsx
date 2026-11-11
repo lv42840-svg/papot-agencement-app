@@ -10,9 +10,9 @@ type Props = {
   quote: NativeQuoteRecord | null;
 };
 
-function itemText(item: QuoteItem): string | null {
-  if (item.kind === "SECTION" || item.kind === "SUBSECTION") return item.title;
-  if (item.kind === "LINE") return item.description;
+function itemText(element: QuoteItem): string | null {
+  if (element.kind === "SECTION" || element.kind === "SUBSECTION") return element.title;
+  if (element.kind === "LINE") return element.description;
   return null;
 }
 
@@ -27,40 +27,40 @@ function styleForRun(run: QuoteRichText["runs"][number]): Partial<CSSStyleDeclar
   };
 }
 
-function paintRichText(target: HTMLElement, item: QuoteItem) {
-  const text = itemText(item);
-  if (text === null) return;
+function paintRichText(cible: HTMLElement, element: QuoteItem) {
+  const texte = itemText(element);
+  if (texte === null) return;
   const richText = resolveQuoteRichText(
-    text,
-    item.presentation?.richText,
-    item.presentation?.textStyle,
+    texte,
+    element.presentation?.richText,
+    element.presentation?.textStyle,
   );
-  Object.assign(target.style, {
+  Object.assign(cible.style, {
     whiteSpace: "pre-wrap",
     overflowWrap: "anywhere",
     overflow: "visible",
     textOverflow: "clip",
   });
-  target.replaceChildren();
+  cible.replaceChildren();
   for (const run of richText.runs) {
-    const span = target.ownerDocument.createElement("span");
+    const span = cible.ownerDocument.createElement("span");
     Object.assign(span.style, styleForRun(run));
     span.textContent = run.text;
-    target.append(span);
+    cible.append(span);
   }
 }
 
 function resolveItemFromTarget(
-  target: HTMLElement,
+  cible: HTMLElement,
   quote: NativeQuoteRecord,
   itemByNumber: ReadonlyMap<string, QuoteItem>,
 ): QuoteItem | null {
-  const row = target.closest<HTMLElement>(".quoteMainRow");
-  const number = row?.querySelector<HTMLElement>(".quoteNumber")?.textContent?.trim();
+  const ligneTableau = cible.closest<HTMLElement>(".quoteMainRow");
+  const number = ligneTableau?.querySelector<HTMLElement>(".quoteNumber")?.textContent?.trim();
   if (!number) return null;
-  const item = itemByNumber.get(number);
-  if (!item || !quote.model.items.some((candidate) => candidate.id === item.id)) return null;
-  return item;
+  const element = itemByNumber.get(number);
+  if (!element || !quote.model.items.some((candidat) => candidat.id === element.id)) return null;
+  return element;
 }
 
 function mutationAddsQuoteRows(mutation: MutationRecord): boolean {
@@ -75,10 +75,10 @@ export function QuoteRichTextLayer({ quote }: Props) {
     const map = new Map<string, QuoteItem>();
     if (!quote) return map;
     const numbers = buildQuoteItemNumbers(quote.model.items);
-    for (const item of quote.model.items) {
-      const text = itemText(item);
-      const number = numbers.get(item.id);
-      if (text !== null && number) map.set(number, item);
+    for (const element of quote.model.items) {
+      const texte = itemText(element);
+      const number = numbers.get(element.id);
+      if (texte !== null && number) map.set(number, element);
     }
     return map;
   }, [quote]);
@@ -90,9 +90,9 @@ export function QuoteRichTextLayer({ quote }: Props) {
       const targets = document.querySelectorAll<HTMLElement>(
         ".quoteHeadingTitle, .quoteLineDescription > strong",
       );
-      for (const target of targets) {
-        const item = resolveItemFromTarget(target, quote, itemByNumber);
-        if (item) paintRichText(target, item);
+      for (const cible of targets) {
+        const element = resolveItemFromTarget(cible, quote, itemByNumber);
+        if (element) paintRichText(cible, element);
       }
     };
 

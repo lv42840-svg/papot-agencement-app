@@ -7,32 +7,32 @@ import type { PlanningPayload } from "../planning/domain";
 
 const monthSchema = z.string().regex(/^(20\d{2}|2100)-(0[1-9]|1[0-2])$/);
 const weekSchema = z.string().regex(/^\d{4}-W\d\d$/);
-const hours = z.number().finite().nonnegative().max(168);
+const heures = z.number().finite().nonnegative().max(168);
 export const overtimeRulesSchema = z
-  .object({ start25: hours, start50: hours })
+  .object({ start25: heures, start50: heures })
   .refine((x) => x.start25 < x.start50, "PAYROLL_OVERTIME_THRESHOLDS_INVALID");
 export type OvertimeRules = z.infer<typeof overtimeRulesSchema>;
 export const DEFAULT_OVERTIME_RULES: OvertimeRules = { start25: 35, start50: 43 };
 
 const weeklyRowSchema = z.object({
   week: weekSchema,
-  hours: hours,
-  baseHours: hours,
-  absenceHours: hours,
+  hours: heures,
+  baseHours: heures,
+  absenceHours: heures,
   source: z.enum(["REAL", "CONTRACT"]),
-  extra25: hours,
-  extra50: hours,
+  extra25: heures,
+  extra50: heures,
 });
 const personRowSchema = z.object({
   personId: z.string().uuid(),
   name: z.string(),
   weeks: z.array(weeklyRowSchema),
-  workedHours: hours.max(1000),
-  overtime25: hours.max(1000),
-  overtime50: hours.max(1000),
+  workedHours: heures.max(1000),
+  overtime25: heures.max(1000),
+  overtime50: heures.max(1000),
   vacationDays: z.number().nonnegative(),
   absences: z.array(
-    z.object({ date: z.string(), type: z.enum(["VACATION", "SICK", "OTHER"]), hours }),
+    z.object({ date: z.string(), type: z.enum(["VACATION", "SICK", "OTHER"]), hours: heures }),
   ),
   contractWeeks: z.array(weekSchema),
   note: z.string().max(3000),
@@ -77,17 +77,14 @@ const prepPayloadSchema = z.object({
   months: z.array(monthStateSchema),
 });
 export type PayrollPreparationPayload = z.infer<typeof prepPayloadSchema>;
-export function parsePayrollPreparation(value: unknown): PayrollPreparationPayload {
-  return prepPayloadSchema.parse(value ?? { schemaVersion: 1, months: [] });
+export function parsePayrollPreparation(valeur: unknown): PayrollPreparationPayload {
+  return prepPayloadSchema.parse(valeur ?? { schemaVersion: 1, months: [] });
 }
-export function getMonthState(
-  payload: PayrollPreparationPayload,
-  month: string,
-): PayrollMonthState {
-  monthSchema.parse(month);
+export function getMonthState(contenu: PayrollPreparationPayload, mois: string): PayrollMonthState {
+  monthSchema.parse(mois);
   return (
-    payload.months.find((row) => row.month === month) ?? {
-      month,
+    contenu.months.find((ligneTableau) => ligneTableau.month === mois) ?? {
+      month: mois,
       status: "PREPARING",
       revision: 0,
       validatedWeeks: [],
@@ -100,100 +97,119 @@ export function getMonthState(
 }
 
 /** All seven days of a week belong to the month of its Sunday, even across New Year. */
-export function payrollWeeks(month: string): string[] {
-  monthSchema.parse(month);
-  const [y, m] = month.split("-").map(Number);
+export function payrollWeeks(mois: string): string[] {
+  monthSchema.parse(mois);
+  const [y, m] = mois.split("-").map(Number);
   const last = new Date(Date.UTC(y, m, 0));
-  const result: string[] = [];
-  for (let day = 1; day <= last.getUTCDate(); day++) {
-    const date = new Date(Date.UTC(y, m - 1, day, 12));
-    if (date.getUTCDay() === 0) result.push(isoWeekKey(date));
+  const resultat: string[] = [];
+  for (let jour = 1; jour <= last.getUTCDate(); jour++) {
+    const date = new Date(Date.UTC(y, m - 1, jour, 12));
+    if (date.getUTCDay() === 0) resultat.push(isoWeekKey(date));
   }
-  return result;
+  return resultat;
 }
 
 export function buildPayrollSummary(
-  month: string,
+  mois: string,
   planning: PlanningPayload,
-  people: readonly PlanningVisiblePerson[],
-  state: PayrollMonthState,
+  personnes: readonly PlanningVisiblePerson[],
+  etat: PayrollMonthState,
   rules: OvertimeRules,
-  now = new Date(),
+  maintenant = new Date(),
 ): PayrollSummary {
-  const weeks = payrollWeeks(month);
-  const rows = people
-    .flatMap((person) => {
-      const personWeeks = weeks.filter((week) =>
-        isoWeekDates(week).some((d) => personPresentOnDate(person, d.toISOString().slice(0, 10))),
+  const semaines = payrollWeeks(mois);
+  const lignesTableau = personnes
+    .flatMap((personne) => {
+      const personWeeks = semaines.filter((semaine) =>
+        isoWeekDates(semaine).some((d) =>
+          personPresentOnDate(personne, d.toISOString().slice(0, 10)),
+        ),
       );
       if (!personWeeks.length) return [];
       const relevantDates = new Set(
-        personWeeks.flatMap((week) => isoWeekDates(week).map((d) => d.toISOString().slice(0, 10))),
+        personWeeks.flatMap((semaine) =>
+          isoWeekDates(semaine).map((d) => d.toISOString().slice(0, 10)),
+        ),
       );
       const absences = planning.absences.filter(
-        (entry) => entry.userId === person.userId && relevantDates.has(entry.date),
+        (entree) => entree.userId === personne.userId && relevantDates.has(entree.date),
       );
-      const weekRows = personWeeks.map((week) => {
-        const dates = isoWeekDates(week);
+      const weekRows = personWeeks.map((semaine) => {
+        const dates = isoWeekDates(semaine);
         const baseHours = dates.reduce((total, date) => {
           const iso = date.toISOString().slice(0, 10);
           return (
             total +
-            (personPresentOnDate(person, iso)
-              ? scheduleHoursForDate(person.weeklySchedule, date)
+            (personPresentOnDate(personne, iso)
+              ? scheduleHoursForDate(personne.weeklySchedule, date)
               : 0)
           );
         }, 0);
         const absenceHours = absences
-          .filter((entry) => dates.some((d) => d.toISOString().slice(0, 10) === entry.date))
-          .reduce((total, row) => total + row.hours, 0);
+          .filter((entree) => dates.some((d) => d.toISOString().slice(0, 10) === entree.date))
+          .reduce((total, ligneTableau) => total + ligneTableau.hours, 0);
         const realHours =
           planning.actualHours
-            .filter((entry) => entry.userId === person.userId && entry.week === week)
-            .reduce((sum, row) => sum + row.hours, 0) +
+            .filter((entree) => entree.userId === personne.userId && entree.week === semaine)
+            .reduce((somme, ligneTableau) => somme + ligneTableau.hours, 0) +
           planning.indirectHours
-            .filter((entry) => entry.userId === person.userId && entry.week === week)
-            .reduce((sum, row) => sum + row.hours, 0);
+            .filter((entree) => entree.userId === personne.userId && entree.week === semaine)
+            .reduce((somme, ligneTableau) => somme + ligneTableau.hours, 0);
         const source =
-          planning.payrollWeekConfirmations?.[person.userId + ":" + week] ===
-            payrollWeekSignature(planning, person.userId, week) ||
+          planning.payrollWeekConfirmations?.[personne.userId + ":" + semaine] ===
+            payrollWeekSignature(planning, personne.userId, semaine) ||
           (!planning.payrollWeekConfirmations &&
-            state.validatedWeeks.includes(person.userId + ":" + week))
+            etat.validatedWeeks.includes(personne.userId + ":" + semaine))
             ? ("REAL" as const)
             : ("CONTRACT" as const);
-        const selected = source === "REAL" ? realHours : Math.max(0, baseHours - absenceHours);
-        const extra25 = Math.max(0, Math.min(selected, rules.start50) - rules.start25);
-        const extra50 = Math.max(0, selected - rules.start50);
-        return { week, source, baseHours, absenceHours, hours: selected, extra25, extra50 };
+        const selectionne = source === "REAL" ? realHours : Math.max(0, baseHours - absenceHours);
+        const extra25 = Math.max(0, Math.min(selectionne, rules.start50) - rules.start25);
+        const extra50 = Math.max(0, selectionne - rules.start50);
+        return {
+          week: semaine,
+          source,
+          baseHours,
+          absenceHours,
+          hours: selectionne,
+          extra25,
+          extra50,
+        };
       });
       const vacationDays = absences
-        .filter((row) => row.type === "VACATION")
-        .reduce((sum, row) => {
-          const date = new Date(`${row.date}T12:00:00Z`);
-          const dailyHours = scheduleHoursForDate(person.weeklySchedule, date);
-          return sum + (dailyHours > 0 ? row.hours / dailyHours : 0);
+        .filter((ligneTableau) => ligneTableau.type === "VACATION")
+        .reduce((somme, ligneTableau) => {
+          const date = new Date(`${ligneTableau.date}T12:00:00Z`);
+          const dailyHours = scheduleHoursForDate(personne.weeklySchedule, date);
+          return somme + (dailyHours > 0 ? ligneTableau.hours / dailyHours : 0);
         }, 0);
       return [
         {
-          personId: person.userId,
-          name: person.displayName,
+          personId: personne.userId,
+          name: personne.displayName,
           weeks: weekRows,
-          workedHours: weekRows.reduce((sum, row) => sum + row.hours, 0),
-          overtime25: weekRows.reduce((sum, row) => sum + row.extra25, 0),
-          overtime50: weekRows.reduce((sum, row) => sum + row.extra50, 0),
+          workedHours: weekRows.reduce((somme, ligneTableau) => somme + ligneTableau.hours, 0),
+          overtime25: weekRows.reduce((somme, ligneTableau) => somme + ligneTableau.extra25, 0),
+          overtime50: weekRows.reduce((somme, ligneTableau) => somme + ligneTableau.extra50, 0),
           vacationDays: Math.round(vacationDays * 100) / 100,
-          absences: absences.map((entry) => ({
-            date: entry.date,
-            type: entry.type,
-            hours: entry.hours,
+          absences: absences.map((entree) => ({
+            date: entree.date,
+            type: entree.type,
+            hours: entree.hours,
           })),
-          contractWeeks: weekRows.filter((row) => row.source === "CONTRACT").map((row) => row.week),
-          note: state.notes[person.userId] ?? "",
+          contractWeeks: weekRows
+            .filter((ligneTableau) => ligneTableau.source === "CONTRACT")
+            .map((ligneTableau) => ligneTableau.week),
+          note: etat.notes[personne.userId] ?? "",
         },
       ];
     })
     .sort((a, b) => a.name.localeCompare(b.name, "fr"));
-  return summarySchema.parse({ month, rules, rows, generatedAt: now.toISOString() });
+  return summarySchema.parse({
+    month: mois,
+    rules,
+    rows: lignesTableau,
+    generatedAt: maintenant.toISOString(),
+  });
 }
 
 const mutationSchema = z.discriminatedUnion("action", [
@@ -247,77 +263,95 @@ export function mutatePayrollPreparation(
   original: PayrollPreparationPayload,
   raw: PayrollPreparationMutation,
   planning: PlanningPayload,
-  people: readonly PlanningVisiblePerson[],
-  actor: string,
-  now = new Date(),
+  personnes: readonly PlanningVisiblePerson[],
+  auteur: string,
+  maintenant = new Date(),
 ): PayrollPreparationPayload {
-  const input = mutationSchema.parse(raw);
-  const result = structuredClone(parsePayrollPreparation(original));
-  const state = getMonthState(result, input.month);
-  if (state.revision !== input.expectedRevision)
+  const saisie = mutationSchema.parse(raw);
+  const resultat = structuredClone(parsePayrollPreparation(original));
+  const etat = getMonthState(resultat, saisie.month);
+  if (etat.revision !== saisie.expectedRevision)
     throw new Error("PAYROLL_PREPARATION_VERSION_CONFLICT");
-  if (state.status === "PREPARED" && input.action !== "reopen")
+  if (etat.status === "PREPARED" && saisie.action !== "reopen")
     throw new Error("PAYROLL_PREPARATION_LOCKED");
-  const action = input.action;
+  const action = saisie.action;
   if (action === "setNote") {
-    if (!people.some((p) => p.userId === input.personId))
+    if (!personnes.some((p) => p.userId === saisie.personId))
       throw new Error("PAYROLL_PERSON_NOT_FOUND");
-    state.notes[input.personId] = input.note;
+    etat.notes[saisie.personId] = saisie.note;
   } else if (action === "setWeekValidated") {
     if (
-      !people.some((p) => p.userId === input.personId) ||
-      !payrollWeeks(input.month).includes(input.week)
+      !personnes.some((p) => p.userId === saisie.personId) ||
+      !payrollWeeks(saisie.month).includes(saisie.week)
     )
       throw new Error("PAYROLL_WEEK_INVALID");
-    const key = input.personId + ":" + input.week;
-    state.validatedWeeks = input.validated
-      ? [...new Set([...state.validatedWeeks, key])]
-      : state.validatedWeeks.filter((x) => x !== key);
+    const cle = saisie.personId + ":" + saisie.week;
+    etat.validatedWeeks = saisie.validated
+      ? [...new Set([...etat.validatedWeeks, cle])]
+      : etat.validatedWeeks.filter((x) => x !== cle);
   } else if (action === "setOvertimeRules") {
-    result.rules = input.rules;
+    resultat.rules = saisie.rules;
   } else if (action === "validate") {
-    const summary = buildPayrollSummary(input.month, planning, people, state, result.rules, now);
-    const previous = state.versions.at(-1)?.summary;
-    if (state.status === "REOPENED" && previous && sameData(previous, summary))
+    const summary = buildPayrollSummary(
+      saisie.month,
+      planning,
+      personnes,
+      etat,
+      resultat.rules,
+      maintenant,
+    );
+    const precedent = etat.versions.at(-1)?.summary;
+    if (etat.status === "REOPENED" && precedent && sameData(precedent, summary))
       throw new Error("PAYROLL_PREPARATION_UNCHANGED");
-    state.versions.push({
-      number: state.versions.length + 1,
-      validatedAt: now.toISOString(),
-      validatedBy: actor,
+    etat.versions.push({
+      number: etat.versions.length + 1,
+      validatedAt: maintenant.toISOString(),
+      validatedBy: auteur,
       summary,
-      reopenReason: state.reopenReason,
+      reopenReason: etat.reopenReason,
     });
-    state.status = "PREPARED";
-    state.reopenReason = null;
+    etat.status = "PREPARED";
+    etat.reopenReason = null;
   } else if (action === "reopen") {
-    if (state.status !== "PREPARED") throw new Error("PAYROLL_PREPARATION_NOT_PREPARED");
-    state.status = "REOPENED";
-    state.reopenReason = input.reason;
+    if (etat.status !== "PREPARED") throw new Error("PAYROLL_PREPARATION_NOT_PREPARED");
+    etat.status = "REOPENED";
+    etat.reopenReason = saisie.reason;
   } else if (action === "restore") {
-    if (state.status !== "REOPENED" || !state.versions.length)
+    if (etat.status !== "REOPENED" || !etat.versions.length)
       throw new Error("PAYROLL_PREPARATION_NOT_REOPENED");
-    const current = buildPayrollSummary(input.month, planning, people, state, result.rules, now);
-    if (!sameData(current, state.versions.at(-1)!.summary))
+    const courant = buildPayrollSummary(
+      saisie.month,
+      planning,
+      personnes,
+      etat,
+      resultat.rules,
+      maintenant,
+    );
+    if (!sameData(courant, etat.versions.at(-1)!.summary))
       throw new Error("PAYROLL_PREPARATION_CHANGED");
-    state.status = "PREPARED";
-    state.reopenReason = null;
+    etat.status = "PREPARED";
+    etat.reopenReason = null;
   }
-  state.eventLog.push({
+  etat.eventLog.push({
     action,
-    at: now.toISOString(),
-    by: actor,
-    reason: action === "reopen" ? input.reason : null,
+    at: maintenant.toISOString(),
+    by: auteur,
+    reason: action === "reopen" ? saisie.reason : null,
   });
-  state.revision++;
-  result.months = [...result.months.filter((item) => item.month !== input.month), state];
-  return prepPayloadSchema.parse(result);
+  etat.revision++;
+  resultat.months = [...resultat.months.filter((element) => element.month !== saisie.month), etat];
+  return prepPayloadSchema.parse(resultat);
 }
 
-export function payrollDifferences(previous: PayrollSummary, current: PayrollSummary) {
-  const oldRows = new Map(previous.rows.map((row) => [row.personId, row]));
-  const newRows = new Map(current.rows.map((row) => [row.personId, row]));
-  const ids = new Set([...oldRows.keys(), ...newRows.keys()]);
-  return [...ids].flatMap((id) => {
+export function payrollDifferences(precedent: PayrollSummary, courant: PayrollSummary) {
+  const oldRows = new Map(
+    precedent.rows.map((ligneTableau) => [ligneTableau.personId, ligneTableau]),
+  );
+  const newRows = new Map(
+    courant.rows.map((ligneTableau) => [ligneTableau.personId, ligneTableau]),
+  );
+  const identifiants = new Set([...oldRows.keys(), ...newRows.keys()]);
+  return [...identifiants].flatMap((id) => {
     const before = oldRows.get(id);
     const after = newRows.get(id);
     const changes: Array<{ field: string; before: unknown; after: unknown }> = [];

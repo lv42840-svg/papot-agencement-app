@@ -4,8 +4,8 @@ import { LoginForm } from "@/components/login-form";
 import { getCurrentUser } from "@/lib/auth/session";
 
 export default async function LoginPage() {
-  const user = await getCurrentUser();
-  if (user) redirect("/");
+  const utilisateur = await getCurrentUser();
+  if (utilisateur) redirect("/");
 
   return (
     <main className="loginPage">

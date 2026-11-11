@@ -51,40 +51,40 @@ const errorMessages: Record<string, string> = {
   POSTPONE_DATE_NOT_LATER: "La nouvelle échéance doit être postérieure à l'échéance actuelle.",
 };
 
-function formatDateOnly(value: string | null): string {
-  if (!value) return "Sans date";
-  const [year, month, day] = value.split("-").map(Number);
+function formatDateOnly(valeur: string | null): string {
+  if (!valeur) return "Sans date";
+  const [annee, mois, jour] = valeur.split("-").map(Number);
   return new Intl.DateTimeFormat("fr-FR", {
     weekday: "short",
     day: "numeric",
     month: "short",
-  }).format(new Date(year, month - 1, day, 12));
+  }).format(new Date(annee, mois - 1, jour, 12));
 }
 
-function addDaysKey(dateKey: string, days: number): string {
-  const [year, month, day] = dateKey.split("-").map(Number);
-  const date = new Date(Date.UTC(year, month - 1, day + days, 12));
+function addDaysKey(dateKey: string, jours: number): string {
+  const [annee, mois, jour] = dateKey.split("-").map(Number);
+  const date = new Date(Date.UTC(annee, mois - 1, jour + jours, 12));
   return `${date.getUTCFullYear().toString().padStart(4, "0")}-${(date.getUTCMonth() + 1)
     .toString()
     .padStart(2, "0")}-${date.getUTCDate().toString().padStart(2, "0")}`;
 }
 
-function endOfWeekKey(today: string): string {
-  const [year, month, day] = today.split("-").map(Number);
-  const weekday = new Date(Date.UTC(year, month - 1, day, 12)).getUTCDay();
+function endOfWeekKey(aujourdhui: string): string {
+  const [annee, mois, jour] = aujourdhui.split("-").map(Number);
+  const weekday = new Date(Date.UTC(annee, mois - 1, jour, 12)).getUTCDay();
   const daysUntilSunday = weekday === 0 ? 0 : 7 - weekday;
-  return addDaysKey(today, daysUntilSunday);
+  return addDaysKey(aujourdhui, daysUntilSunday);
 }
 
-function taskTitle(task: EntryRecord): string {
-  return task.nextAction?.trim() || task.structuredDescription?.trim() || task.rawText;
+function taskTitle(tache: EntryRecord): string {
+  return tache.nextAction?.trim() || tache.structuredDescription?.trim() || tache.rawText;
 }
 
-function taskContext(task: EntryRecord): string | null {
-  const title = taskTitle(task);
-  if (task.rawText.trim() !== title) return task.rawText;
-  const structured = task.structuredDescription?.trim();
-  return structured && structured !== title ? structured : null;
+function taskContext(tache: EntryRecord): string | null {
+  const titre = taskTitle(tache);
+  if (tache.rawText.trim() !== titre) return tache.rawText;
+  const structured = tache.structuredDescription?.trim();
+  return structured && structured !== titre ? structured : null;
 }
 
 function taskSort(a: EntryRecord, b: EntryRecord): number {
@@ -97,20 +97,20 @@ function taskSort(a: EntryRecord, b: EntryRecord): number {
 
 function personalTasks(snapshot: TasksSnapshot | null): EntryRecord[] {
   if (!snapshot) return [];
-  const actor = normalizePersonName(snapshot.actor.displayName);
+  const auteur = normalizePersonName(snapshot.actor.displayName);
   return snapshot.payload.entries
     .filter(
-      (entry) =>
-        entry.status === "ASSIGNED" &&
-        Boolean(entry.assigneeName) &&
-        normalizePersonName(entry.assigneeName ?? "") === actor,
+      (entree) =>
+        entree.status === "ASSIGNED" &&
+        Boolean(entree.assigneeName) &&
+        normalizePersonName(entree.assigneeName ?? "") === auteur,
     )
     .sort(taskSort);
 }
 
-function groupTasks(tasks: EntryRecord[], now: Date): TaskGroup[] {
-  const today = parisDateKey(now);
-  const endOfWeek = endOfWeekKey(today);
+function groupTasks(taches: EntryRecord[], maintenant: Date): TaskGroup[] {
+  const aujourdhui = parisDateKey(maintenant);
+  const endOfWeek = endOfWeekKey(aujourdhui);
   const buckets: Record<TaskGroupKey, EntryRecord[]> = {
     overdue: [],
     today: [],
@@ -119,40 +119,40 @@ function groupTasks(tasks: EntryRecord[], now: Date): TaskGroup[] {
     undated: [],
   };
 
-  for (const task of tasks) {
-    if (!task.dueDate) {
-      buckets.undated.push(task);
-    } else if (task.dueDate < today) {
-      buckets.overdue.push(task);
-    } else if (task.dueDate === today) {
-      buckets.today.push(task);
-    } else if (task.dueDate <= endOfWeek) {
-      buckets.week.push(task);
+  for (const tache of taches) {
+    if (!tache.dueDate) {
+      buckets.undated.push(tache);
+    } else if (tache.dueDate < aujourdhui) {
+      buckets.overdue.push(tache);
+    } else if (tache.dueDate === aujourdhui) {
+      buckets.today.push(tache);
+    } else if (tache.dueDate <= endOfWeek) {
+      buckets.week.push(tache);
     } else {
-      buckets.later.push(task);
+      buckets.later.push(tache);
     }
   }
 
   return (["overdue", "today", "week", "later", "undated"] as TaskGroupKey[])
-    .map((key) => ({ key, label: groupLabels[key], tasks: buckets[key] }))
+    .map((cle) => ({ key: cle, label: groupLabels[cle], tasks: buckets[cle] }))
     .filter((group) => group.tasks.length > 0);
 }
 
 function useTasksData() {
   const [snapshot, setSnapshot] = useState<TasksSnapshot | null>(null);
-  const [loading, setLoading] = useState(true);
+  const [chargement, setLoading] = useState(true);
   const [busy, setBusy] = useState(false);
-  const [error, setError] = useState<string | null>(null);
+  const [erreur, setError] = useState<string | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
 
   const load = useCallback(async () => {
     setLoading(true);
     setError(null);
     try {
-      const response = await fetch("/api/desktop/entries", { cache: "no-store" });
-      const body = (await response.json()) as TasksSnapshot & { error?: string };
-      if (!response.ok) throw new Error(body.error ?? "TASKS_LOAD_FAILED");
-      setSnapshot(body);
+      const reponse = await fetch("/api/desktop/entries", { cache: "no-store" });
+      const corps = (await reponse.json()) as TasksSnapshot & { error?: string };
+      if (!reponse.ok) throw new Error(corps.error ?? "TASKS_LOAD_FAILED");
+      setSnapshot(corps);
     } catch (loadError) {
       const code = loadError instanceof Error ? loadError.message : "TASKS_LOAD_FAILED";
       setError(errorMessages[code] ?? "Impossible de charger les tâches pour le moment.");
@@ -166,24 +166,24 @@ function useTasksData() {
   }, [load]);
 
   const mutate = useCallback(
-    async (body: Record<string, unknown> & { action: string }, successMessage: string) => {
+    async (corps: Record<string, unknown> & { action: string }, successMessage: string) => {
       setBusy(true);
       setError(null);
       setNotice(null);
       try {
-        const response = await fetch("/api/desktop/entries", {
+        const reponse = await fetch("/api/desktop/entries", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify(body),
+          body: JSON.stringify(corps),
         });
-        const result = (await response.json()) as TasksSnapshot & { error?: string };
-        if (!response.ok) {
+        const resultat = (await reponse.json()) as TasksSnapshot & { error?: string };
+        if (!reponse.ok) {
           throw new Error(
-            errorMessages[result.error ?? ""] ??
+            errorMessages[resultat.error ?? ""] ??
               "L'action sur la tâche n'a pas pu être enregistrée.",
           );
         }
-        setSnapshot(result);
+        setSnapshot(resultat);
         setNotice(successMessage);
         return true;
       } catch (mutationError) {
@@ -198,17 +198,20 @@ function useTasksData() {
     [],
   );
 
-  return { snapshot, loading, busy, error, notice, load, mutate };
+  return { snapshot, loading: chargement, busy, error: erreur, notice, load, mutate };
 }
 
 export function DashboardTasksPanel() {
-  const { snapshot, loading, busy, error, load, mutate } = useTasksData();
-  const now = useMemo(() => new Date(snapshot?.serverNow ?? Date.now()), [snapshot?.serverNow]);
-  const tasks = useMemo(() => personalTasks(snapshot), [snapshot]);
-  const groups = useMemo(() => groupTasks(tasks, now), [tasks, now]);
+  const { snapshot, loading: chargement, busy, error: erreur, load, mutate } = useTasksData();
+  const maintenant = useMemo(
+    () => new Date(snapshot?.serverNow ?? Date.now()),
+    [snapshot?.serverNow],
+  );
+  const taches = useMemo(() => personalTasks(snapshot), [snapshot]);
+  const groups = useMemo(() => groupTasks(taches, maintenant), [taches, maintenant]);
   const visibleTasks = groups
     .flatMap((group) =>
-      group.tasks.map((task) => ({ task, group: group.key, groupLabel: group.label })),
+      group.tasks.map((tache) => ({ task: tache, group: group.key, groupLabel: group.label })),
     )
     .slice(0, 6);
 
@@ -218,21 +221,21 @@ export function DashboardTasksPanel() {
         <div>
           <h2 className="dashboardTasksTitle">
             <ListTodo size={16} /> Mes tâches
-            {!loading ? <span className="dashboardTasksCount">{tasks.length}</span> : null}
+            {!chargement ? <span className="dashboardTasksCount">{taches.length}</span> : null}
           </h2>
           <p>Mes actions actives, triées par échéance</p>
         </div>
         <Link href="/tasks">Voir tout</Link>
       </div>
 
-      {loading && !snapshot ? (
+      {chargement && !snapshot ? (
         <div className="dashboardTasksLoading">
           <RefreshCw size={16} className="tasksSpin" /> Chargement…
         </div>
-      ) : error ? (
+      ) : erreur ? (
         <div className="dashboardTasksError">
           <AlertTriangle size={17} />
-          <span>{error}</span>
+          <span>{erreur}</span>
           <button type="button" onClick={() => void load()}>
             Réessayer
           </button>
@@ -245,35 +248,35 @@ export function DashboardTasksPanel() {
         </div>
       ) : (
         <div className="dashboardTasksList">
-          {visibleTasks.map(({ task, group, groupLabel }) => (
+          {visibleTasks.map(({ task: tache, group, groupLabel }) => (
             <div
               className={`dashboardTaskRow${group === "overdue" ? " isOverdue" : ""}`}
-              key={task.id}
+              key={tache.id}
             >
-              <Link href={`/tasks?focus=${task.id}`} className="dashboardTaskMain">
+              <Link href={`/tasks?focus=${tache.id}`} className="dashboardTaskMain">
                 <div className="dashboardTaskTopline">
                   <span className={`dashboardTaskGroup dashboardTaskGroup-${group}`}>
                     {groupLabel}
                   </span>
-                  {task.priority === "URGENT" ? (
+                  {tache.priority === "URGENT" ? (
                     <span className="tasksBadge tasksBadgeUrgent">Urgent</span>
                   ) : null}
                 </div>
-                <strong>{taskTitle(task)}</strong>
-                <span className="dashboardTaskContext">{taskContext(task) ?? "Action PAPOT"}</span>
+                <strong>{taskTitle(tache)}</strong>
+                <span className="dashboardTaskContext">{taskContext(tache) ?? "Action PAPOT"}</span>
                 <small>
-                  <Clock3 size={11} /> {formatDateOnly(task.dueDate)}
+                  <Clock3 size={11} /> {formatDateOnly(tache.dueDate)}
                 </small>
               </Link>
               <button
                 type="button"
                 className="dashboardTaskDone"
                 title="Terminer"
-                aria-label={`Terminer ${taskTitle(task)}`}
+                aria-label={`Terminer ${taskTitle(tache)}`}
                 disabled={busy}
                 onClick={() =>
                   void mutate(
-                    { action: "complete", entryId: task.id, result: "" },
+                    { action: "complete", entryId: tache.id, result: "" },
                     "Tâche terminée.",
                   )
                 }
@@ -282,11 +285,11 @@ export function DashboardTasksPanel() {
               </button>
             </div>
           ))}
-          {tasks.length > visibleTasks.length ? (
+          {taches.length > visibleTasks.length ? (
             <Link href="/tasks" className="dashboardTasksMore">
-              + {tasks.length - visibleTasks.length} autre
-              {tasks.length - visibleTasks.length > 1 ? "s" : ""} tâche
-              {tasks.length - visibleTasks.length > 1 ? "s" : ""}
+              + {taches.length - visibleTasks.length} autre
+              {taches.length - visibleTasks.length > 1 ? "s" : ""} tâche
+              {taches.length - visibleTasks.length > 1 ? "s" : ""}
               <ChevronRight size={13} />
             </Link>
           ) : null}
@@ -301,31 +304,42 @@ export function DashboardTasksPanel() {
 export function TasksWorkspace() {
   const searchParams = useSearchParams();
   const focusId = searchParams.get("focus");
-  const { snapshot, loading, busy, error, notice, load, mutate } = useTasksData();
+  const {
+    snapshot,
+    loading: chargement,
+    busy,
+    error: erreur,
+    notice,
+    load,
+    mutate,
+  } = useTasksData();
   const [postponeId, setPostponeId] = useState<string | null>(null);
   const [postponeDate, setPostponeDate] = useState("");
   const [postponeReason, setPostponeReason] = useState("");
 
-  const now = useMemo(() => new Date(snapshot?.serverNow ?? Date.now()), [snapshot?.serverNow]);
-  const tasks = useMemo(() => personalTasks(snapshot), [snapshot]);
-  const groups = useMemo(() => groupTasks(tasks, now), [tasks, now]);
-  const today = parisDateKey(now);
-  const overdueCount = tasks.filter((task) => isAssignedOverdue(task, now)).length;
-  const todayCount = tasks.filter((task) => task.dueDate === today).length;
-  const urgentCount = tasks.filter((task) => task.priority === "URGENT").length;
+  const maintenant = useMemo(
+    () => new Date(snapshot?.serverNow ?? Date.now()),
+    [snapshot?.serverNow],
+  );
+  const taches = useMemo(() => personalTasks(snapshot), [snapshot]);
+  const groups = useMemo(() => groupTasks(taches, maintenant), [taches, maintenant]);
+  const aujourdhui = parisDateKey(maintenant);
+  const overdueCount = taches.filter((tache) => isAssignedOverdue(tache, maintenant)).length;
+  const todayCount = taches.filter((tache) => tache.dueDate === aujourdhui).length;
+  const urgentCount = taches.filter((tache) => tache.priority === "URGENT").length;
 
   useEffect(() => {
-    if (!focusId || loading) return;
+    if (!focusId || chargement) return;
     const element = document.getElementById(`task-${focusId}`);
     element?.scrollIntoView({ block: "center", behavior: "smooth" });
-  }, [focusId, loading, tasks.length]);
+  }, [focusId, chargement, taches.length]);
 
-  async function submitPostpone(event: FormEvent<HTMLFormElement>, task: EntryRecord) {
-    event.preventDefault();
+  async function submitPostpone(evenement: FormEvent<HTMLFormElement>, tache: EntryRecord) {
+    evenement.preventDefault();
     const ok = await mutate(
       {
         action: "postpone",
-        entryId: task.id,
+        entryId: tache.id,
         dueDate: postponeDate,
         reason: postponeReason,
       },
@@ -355,12 +369,12 @@ export function TasksWorkspace() {
         </button>
       </section>
 
-      {error ? <div className="tasksMessage tasksMessageError">{error}</div> : null}
+      {erreur ? <div className="tasksMessage tasksMessageError">{erreur}</div> : null}
       {notice ? <div className="tasksMessage tasksMessageSuccess">{notice}</div> : null}
 
       <section className="tasksSummary" aria-label="Résumé des tâches">
         <div>
-          <strong>{tasks.length}</strong>
+          <strong>{taches.length}</strong>
           <span>Actives</span>
         </div>
         <div className={overdueCount > 0 ? "isAlert" : ""}>
@@ -377,11 +391,11 @@ export function TasksWorkspace() {
         </div>
       </section>
 
-      {loading && !snapshot ? (
+      {chargement && !snapshot ? (
         <div className="tasksLoading">
           <RefreshCw size={18} className="tasksSpin" /> Chargement des tâches…
         </div>
-      ) : tasks.length === 0 ? (
+      ) : taches.length === 0 ? (
         <div className="tasksAllDone">
           <CheckCircle2 size={34} />
           <strong>Aucune tâche active</strong>
@@ -396,33 +410,33 @@ export function TasksWorkspace() {
                 <span>{group.tasks.length}</span>
               </div>
               <div className="tasksGroupList">
-                {group.tasks.map((task) => {
-                  const focused = task.id === focusId;
-                  const context = taskContext(task);
+                {group.tasks.map((tache) => {
+                  const focused = tache.id === focusId;
+                  const contexte = taskContext(tache);
                   return (
                     <article
-                      id={`task-${task.id}`}
-                      key={task.id}
+                      id={`task-${tache.id}`}
+                      key={tache.id}
                       className={`tasksCard${focused ? " isFocused" : ""}${group.key === "overdue" ? " isOverdue" : ""}`}
                     >
                       <div className="tasksCardMain">
                         <div className="tasksCardBadges">
                           <span className={`tasksBadge tasksBadgeDate tasksBadgeDate-${group.key}`}>
-                            <CalendarClock size={12} /> {formatDateOnly(task.dueDate)}
+                            <CalendarClock size={12} /> {formatDateOnly(tache.dueDate)}
                           </span>
-                          {task.priority === "URGENT" ? (
+                          {tache.priority === "URGENT" ? (
                             <span className="tasksBadge tasksBadgeUrgent">Urgent</span>
                           ) : null}
                           {group.key === "overdue" ? (
                             <span className="tasksBadge tasksBadgeLate">En retard</span>
                           ) : null}
                         </div>
-                        <h3>{taskTitle(task)}</h3>
-                        {context ? <p>{context}</p> : null}
+                        <h3>{taskTitle(tache)}</h3>
+                        {contexte ? <p>{contexte}</p> : null}
                         <div className="tasksCardMeta">
-                          {task.structuredDescription &&
-                          task.structuredDescription !== taskTitle(task) ? (
-                            <span>{task.structuredDescription}</span>
+                          {tache.structuredDescription &&
+                          tache.structuredDescription !== taskTitle(tache) ? (
+                            <span>{tache.structuredDescription}</span>
                           ) : null}
                         </div>
                       </div>
@@ -434,7 +448,7 @@ export function TasksWorkspace() {
                           disabled={busy}
                           onClick={() =>
                             void mutate(
-                              { action: "complete", entryId: task.id, result: "" },
+                              { action: "complete", entryId: tache.id, result: "" },
                               "Tâche terminée.",
                             )
                           }
@@ -446,11 +460,11 @@ export function TasksWorkspace() {
                           className="tasksPostponeButton"
                           disabled={busy}
                           onClick={() => {
-                            if (postponeId === task.id) {
+                            if (postponeId === tache.id) {
                               setPostponeId(null);
                               return;
                             }
-                            setPostponeId(task.id);
+                            setPostponeId(tache.id);
                             setPostponeDate("");
                             setPostponeReason("");
                           }}
@@ -459,18 +473,18 @@ export function TasksWorkspace() {
                         </button>
                       </div>
 
-                      {postponeId === task.id ? (
+                      {postponeId === tache.id ? (
                         <form
                           className="tasksPostponeForm"
-                          onSubmit={(event) => void submitPostpone(event, task)}
+                          onSubmit={(evenement) => void submitPostpone(evenement, tache)}
                         >
                           <label>
                             <span>Nouvelle échéance</span>
                             <input
                               type="date"
-                              min={task.dueDate ? addDaysKey(task.dueDate, 1) : undefined}
+                              min={tache.dueDate ? addDaysKey(tache.dueDate, 1) : undefined}
                               value={postponeDate}
-                              onChange={(event) => setPostponeDate(event.target.value)}
+                              onChange={(evenement) => setPostponeDate(evenement.target.value)}
                               required
                             />
                           </label>
@@ -478,7 +492,7 @@ export function TasksWorkspace() {
                             <span>Motif du report</span>
                             <input
                               value={postponeReason}
-                              onChange={(event) => setPostponeReason(event.target.value)}
+                              onChange={(evenement) => setPostponeReason(evenement.target.value)}
                               placeholder="Pourquoi la date est repoussée ?"
                               required
                             />

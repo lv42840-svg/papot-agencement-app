@@ -4,18 +4,21 @@ import { promisify } from "node:util";
 const scrypt = promisify(scryptCallback);
 const KEY_LENGTH = 64;
 
-export async function hashPassword(password: string): Promise<string> {
-  const salt = randomBytes(16).toString("hex");
-  const derived = (await scrypt(password, salt, KEY_LENGTH)) as Buffer;
-  return `scrypt$${salt}$${derived.toString("hex")}`;
+export async function hashPassword(motDePasse: string): Promise<string> {
+  const sel = randomBytes(16).toString("hex");
+  const derive = (await scrypt(motDePasse, sel, KEY_LENGTH)) as Buffer;
+  return `scrypt$${sel}$${derive.toString("hex")}`;
 }
 
-export async function verifyPassword(password: string, stored: string): Promise<boolean> {
-  const [algorithm, salt, encoded] = stored.split("$");
-  if (algorithm !== "scrypt" || !salt || !encoded) return false;
+export async function verifyPassword(motDePasse: string, valeurStockee: string): Promise<boolean> {
+  const [algorithme, sel, valeurEncodee] = valeurStockee.split("$");
+  if (algorithme !== "scrypt" || !sel || !valeurEncodee) return false;
 
-  const expected = Buffer.from(encoded, "hex");
-  if (expected.length === 0) return false;
-  const actual = (await scrypt(password, salt, expected.length)) as Buffer;
-  return expected.length === actual.length && timingSafeEqual(expected, actual);
+  const valeurAttendue = Buffer.from(valeurEncodee, "hex");
+  if (valeurAttendue.length === 0) return false;
+  const valeurCalculee = (await scrypt(motDePasse, sel, valeurAttendue.length)) as Buffer;
+  return (
+    valeurAttendue.length === valeurCalculee.length &&
+    timingSafeEqual(valeurAttendue, valeurCalculee)
+  );
 }

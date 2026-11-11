@@ -34,32 +34,36 @@ const errorMessages: Record<string, string> = {
   COMMERCIAL_CASE_SOURCE_ALREADY_LINKED: "Cette affaire est déjà rattachée à une autre entrée.",
 };
 
-function defaultCaseName(task: EntryRecord): string {
-  return task.structuredDescription?.trim() || task.rawText.trim();
+function defaultCaseName(tache: EntryRecord): string {
+  return tache.structuredDescription?.trim() || tache.rawText.trim();
 }
 
-export function TaskCommercialBridge({ task, description, nextAction }: TaskCommercialBridgeProps) {
+export function TaskCommercialBridge({
+  task: tache,
+  description,
+  nextAction,
+}: TaskCommercialBridgeProps) {
   const router = useRouter();
   const [cases, setCases] = useState<CommercialCase[]>([]);
   const [clients, setClients] = useState<CommercialClient[]>([]);
-  const [loading, setLoading] = useState(true);
+  const [chargement, setLoading] = useState(true);
   const [busy, setBusy] = useState(false);
-  const [error, setError] = useState<string | null>(null);
+  const [erreur, setError] = useState<string | null>(null);
   const [open, setOpen] = useState(false);
   const [mode, setMode] = useState<Mode>("create");
-  const [name, setName] = useState(() => defaultCaseName(task));
-  const [clientId, setClientId] = useState("");
+  const [nom, setName] = useState(() => defaultCaseName(tache));
+  const [idClient, setClientId] = useState("");
   const [clientName, setClientName] = useState("");
   const [siteLabel, setSiteLabel] = useState("");
-  const [reviewDate, setReviewDate] = useState(task.dueDate ?? "");
+  const [reviewDate, setReviewDate] = useState(tache.dueDate ?? "");
   const [targetCaseId, setTargetCaseId] = useState("");
 
   const linkedCase = useMemo(
-    () => cases.find((item) => item.sourceEntryId === task.id) ?? null,
-    [cases, task.id],
+    () => cases.find((element) => element.sourceEntryId === tache.id) ?? null,
+    [cases, tache.id],
   );
   const linkableCases = useMemo(
-    () => cases.filter((item) => !isCommercialClosed(item) && !item.sourceEntryId),
+    () => cases.filter((element) => !isCommercialClosed(element) && !element.sourceEntryId),
     [cases],
   );
 
@@ -67,11 +71,11 @@ export function TaskCommercialBridge({ task, description, nextAction }: TaskComm
     setLoading(true);
     setError(null);
     try {
-      const response = await fetch("/api/desktop/commercial", { cache: "no-store" });
-      const body = (await response.json()) as CommercialSnapshot;
-      if (!response.ok) throw new Error(body.error ?? "COMMERCIAL_LOAD_FAILED");
-      setCases(body.payload.cases);
-      setClients(body.payload.clients ?? []);
+      const reponse = await fetch("/api/desktop/commercial", { cache: "no-store" });
+      const corps = (await reponse.json()) as CommercialSnapshot;
+      if (!reponse.ok) throw new Error(corps.error ?? "COMMERCIAL_LOAD_FAILED");
+      setCases(corps.payload.cases);
+      setClients(corps.payload.clients ?? []);
     } catch (loadError) {
       const code = loadError instanceof Error ? loadError.message : "COMMERCIAL_LOAD_FAILED";
       setError(errorMessages[code] ?? "Impossible de vérifier le lien avec les affaires.");
@@ -86,45 +90,45 @@ export function TaskCommercialBridge({ task, description, nextAction }: TaskComm
     setOpen(false);
     setMode("create");
     setError(null);
-    setName(defaultCaseName(task));
+    setName(defaultCaseName(tache));
     setClientId("");
     setClientName("");
     setSiteLabel("");
-    setReviewDate(task.dueDate ?? "");
+    setReviewDate(tache.dueDate ?? "");
     setTargetCaseId("");
-  }, [task.id, task.dueDate, task.rawText, task.structuredDescription]);
+  }, [tache.id, tache.dueDate, tache.rawText, tache.structuredDescription]);
 
-  async function post(body: Record<string, unknown>): Promise<CommercialSnapshot> {
-    const response = await fetch("/api/desktop/commercial", {
+  async function post(corps: Record<string, unknown>): Promise<CommercialSnapshot> {
+    const reponse = await fetch("/api/desktop/commercial", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(body),
+      body: JSON.stringify(corps),
     });
-    const result = (await response.json()) as CommercialSnapshot;
-    if (!response.ok) throw new Error(result.error ?? "COMMERCIAL_MUTATION_FAILED");
-    return result;
+    const resultat = (await reponse.json()) as CommercialSnapshot;
+    if (!reponse.ok) throw new Error(resultat.error ?? "COMMERCIAL_MUTATION_FAILED");
+    return resultat;
   }
 
-  async function createAffair(event: FormEvent<HTMLFormElement>) {
-    event.preventDefault();
-    if (!name.trim() || !reviewDate) return;
+  async function createAffair(evenement: FormEvent<HTMLFormElement>) {
+    evenement.preventDefault();
+    if (!nom.trim() || !reviewDate) return;
     setBusy(true);
     setError(null);
     try {
-      const result = await post({
+      const resultat = await post({
         action: "create",
-        sourceEntryId: task.id,
-        name,
-        existingClientId: clientId || undefined,
-        clientName: clientId ? "" : clientName,
+        sourceEntryId: tache.id,
+        name: nom,
+        existingClientId: idClient || undefined,
+        clientName: idClient ? "" : clientName,
         siteLabel,
         reviewDate,
         description,
         nextAction,
       });
-      setCases(result.payload.cases);
-      if (result.focusCaseId)
-        router.push(`/commercial?focus=${encodeURIComponent(result.focusCaseId)}`);
+      setCases(resultat.payload.cases);
+      if (resultat.focusCaseId)
+        router.push(`/commercial?focus=${encodeURIComponent(resultat.focusCaseId)}`);
     } catch (createError) {
       const code = createError instanceof Error ? createError.message : "COMMERCIAL_CREATE_FAILED";
       setError(errorMessages[code] ?? "L’affaire n’a pas pu être créée.");
@@ -138,12 +142,12 @@ export function TaskCommercialBridge({ task, description, nextAction }: TaskComm
     setBusy(true);
     setError(null);
     try {
-      const result = await post({
+      const resultat = await post({
         action: "linkSourceEntry",
         caseId: targetCaseId,
-        sourceEntryId: task.id,
+        sourceEntryId: tache.id,
       });
-      setCases(result.payload.cases);
+      setCases(resultat.payload.cases);
       router.push(`/commercial?focus=${encodeURIComponent(targetCaseId)}`);
     } catch (linkError) {
       const code = linkError instanceof Error ? linkError.message : "COMMERCIAL_LINK_FAILED";
@@ -159,10 +163,10 @@ export function TaskCommercialBridge({ task, description, nextAction }: TaskComm
         <span>
           <BriefcaseBusiness size={15} /> Affaire
         </span>
-        {loading ? <small>Vérification…</small> : null}
+        {chargement ? <small>Vérification…</small> : null}
       </div>
 
-      {error ? <div className="taskCommercialBridgeError">{error}</div> : null}
+      {erreur ? <div className="taskCommercialBridgeError">{erreur}</div> : null}
 
       {linkedCase ? (
         <div className="taskCommercialLinked">
@@ -178,7 +182,7 @@ export function TaskCommercialBridge({ task, description, nextAction }: TaskComm
             <ExternalLink size={14} /> Ouvrir
           </Link>
         </div>
-      ) : !loading ? (
+      ) : !chargement ? (
         <>
           {!open ? (
             <div className="taskCommercialBridgeActions">
@@ -219,13 +223,13 @@ export function TaskCommercialBridge({ task, description, nextAction }: TaskComm
                 <span>Affaire *</span>
                 <select
                   value={targetCaseId}
-                  onChange={(event) => setTargetCaseId(event.target.value)}
+                  onChange={(evenement) => setTargetCaseId(evenement.target.value)}
                 >
                   <option value="">Sélectionner…</option>
-                  {linkableCases.map((item) => (
-                    <option key={item.id} value={item.id}>
-                      {item.name}
-                      {item.clientName ? ` · ${item.clientName}` : ""}
+                  {linkableCases.map((element) => (
+                    <option key={element.id} value={element.id}>
+                      {element.name}
+                      {element.clientName ? ` · ${element.clientName}` : ""}
                     </option>
                   ))}
                 </select>
@@ -240,7 +244,10 @@ export function TaskCommercialBridge({ task, description, nextAction }: TaskComm
               </button>
             </div>
           ) : (
-            <form className="taskCommercialForm" onSubmit={(event) => void createAffair(event)}>
+            <form
+              className="taskCommercialForm"
+              onSubmit={(evenement) => void createAffair(evenement)}
+            >
               <div className="taskCommercialFormHeader">
                 <div>
                   <strong>Créer une affaire</strong>
@@ -252,11 +259,18 @@ export function TaskCommercialBridge({ task, description, nextAction }: TaskComm
               </div>
               <label>
                 <span>Nom affaire *</span>
-                <input value={name} onChange={(event) => setName(event.target.value)} required />
+                <input
+                  value={nom}
+                  onChange={(evenement) => setName(evenement.target.value)}
+                  required
+                />
               </label>
               <label>
                 <span>Client existant</span>
-                <select value={clientId} onChange={(event) => setClientId(event.target.value)}>
+                <select
+                  value={idClient}
+                  onChange={(evenement) => setClientId(evenement.target.value)}
+                >
                   <option value="">Nouveau / à préciser</option>
                   {clients.map((client) => (
                     <option key={client.id} value={client.id}>
@@ -265,32 +279,35 @@ export function TaskCommercialBridge({ task, description, nextAction }: TaskComm
                   ))}
                 </select>
               </label>
-              {!clientId ? (
+              {!idClient ? (
                 <label>
                   <span>Nouveau client</span>
                   <input
                     value={clientName}
-                    onChange={(event) => setClientName(event.target.value)}
+                    onChange={(evenement) => setClientName(evenement.target.value)}
                   />
                 </label>
               ) : null}
               <label>
                 <span>Lieu chantier</span>
-                <input value={siteLabel} onChange={(event) => setSiteLabel(event.target.value)} />
+                <input
+                  value={siteLabel}
+                  onChange={(evenement) => setSiteLabel(evenement.target.value)}
+                />
               </label>
               <label>
                 <span>Prochaine revue *</span>
                 <input
                   type="date"
                   value={reviewDate}
-                  onChange={(event) => setReviewDate(event.target.value)}
+                  onChange={(evenement) => setReviewDate(evenement.target.value)}
                   required
                 />
               </label>
               <button
                 type="submit"
                 className="primaryButton"
-                disabled={busy || !name.trim() || !reviewDate}
+                disabled={busy || !nom.trim() || !reviewDate}
               >
                 <BriefcaseBusiness size={14} /> {busy ? "Création…" : "Créer et ouvrir"}
               </button>

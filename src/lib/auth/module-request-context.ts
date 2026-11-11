@@ -12,22 +12,22 @@ export type ModuleRequestContext = {
 };
 
 export async function requireModuleRequestContext(
-  moduleKey: string,
-  required: AccessLevel,
+  cleModule: string,
+  niveauRequis: AccessLevel,
 ): Promise<ModuleRequestContext> {
-  const user = await getCurrentUser();
-  if (!user) throw new Error("AUTH_REQUIRED");
-  if (user.mustChangePassword) throw new Error("PASSWORD_CHANGE_REQUIRED");
+  const utilisateur = await getCurrentUser();
+  if (!utilisateur) throw new Error("AUTH_REQUIRED");
+  if (utilisateur.mustChangePassword) throw new Error("PASSWORD_CHANGE_REQUIRED");
 
-  const canWrite = await hasModuleAccess(user.id, moduleKey, "WRITE");
-  const canRead = canWrite || (await hasModuleAccess(user.id, moduleKey, "READ"));
+  const peutEcrire = await hasModuleAccess(utilisateur.id, cleModule, "WRITE");
+  const peutLire = peutEcrire || (await hasModuleAccess(utilisateur.id, cleModule, "READ"));
 
-  if (required === "WRITE" ? !canWrite : !canRead) {
+  if (niveauRequis === "WRITE" ? !peutEcrire : !peutLire) {
     throw new Error("MODULE_FORBIDDEN");
   }
 
   return {
-    user,
-    moduleAccess: { canRead, canWrite },
+    user: utilisateur,
+    moduleAccess: { canRead: peutLire, canWrite: peutEcrire },
   };
 }

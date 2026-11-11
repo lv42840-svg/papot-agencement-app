@@ -32,16 +32,16 @@ type ContextPayload = {
   error?: string;
 };
 
-export function MobileEntryCapture({ userId }: { userId: string }) {
-  const [context, setContext] = useState<ContextPayload | null>(null);
+export function MobileEntryCapture({ userId: idUtilisateur }: { userId: string }) {
+  const [contexte, setContext] = useState<ContextPayload | null>(null);
   const [rawText, setRawText] = useState("");
   const [priority, setPriority] = useState<"NORMAL" | "URGENT">("NORMAL");
   const [tagIds, setTagIds] = useState<string[]>([]);
-  const [clientId, setClientId] = useState("");
+  const [idClient, setClientId] = useState("");
   const [commercialCaseId, setCommercialCaseId] = useState("");
-  const [files, setFiles] = useState<File[]>([]);
+  const [fichiers, setFiles] = useState<File[]>([]);
   const [busy, setBusy] = useState(false);
-  const [error, setError] = useState<string | null>(null);
+  const [erreur, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState(false);
   const [online, setOnline] = useState(true);
   const [queuedCount, setQueuedCount] = useState(0);
@@ -50,28 +50,28 @@ export function MobileEntryCapture({ userId }: { userId: string }) {
   const filesRef = useRef<HTMLInputElement>(null);
 
   const refreshQueuedCount = useCallback(async () => {
-    const queued = await listOfflineEntries(userId);
+    const queued = await listOfflineEntries(idUtilisateur);
     setQueuedCount(queued.length);
-  }, [userId]);
+  }, [idUtilisateur]);
 
   const syncQueuedEntries = useCallback(async () => {
     if (!navigator.onLine) return;
     setSyncing(true);
     setError(null);
     try {
-      const queued = await listOfflineEntries(userId);
-      for (const draft of queued) {
-        await queueOfflineEntry(draft);
-        const response = await fetch("/api/mobile/entries/capture", {
+      const queued = await listOfflineEntries(idUtilisateur);
+      for (const brouillon of queued) {
+        await queueOfflineEntry(brouillon);
+        const reponse = await fetch("/api/mobile/entries/capture", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify(await draftToJsonPayload(draft)),
+          body: JSON.stringify(await draftToJsonPayload(brouillon)),
         });
-        if (!response.ok) {
-          const body = (await response.json()) as { error?: string };
-          throw new Error(body.error ?? "Synchronisation impossible");
+        if (!reponse.ok) {
+          const corps = (await reponse.json()) as { error?: string };
+          throw new Error(corps.error ?? "Synchronisation impossible");
         }
-        await removeOfflineEntry(draft.id, userId);
+        await removeOfflineEntry(brouillon.id, idUtilisateur);
       }
       await refreshQueuedCount();
       if (queued.length > 0) setSuccess(true);
@@ -80,7 +80,7 @@ export function MobileEntryCapture({ userId }: { userId: string }) {
     } finally {
       setSyncing(false);
     }
-  }, [refreshQueuedCount, userId]);
+  }, [refreshQueuedCount, idUtilisateur]);
 
   useEffect(() => {
     setOnline(navigator.onLine);
@@ -90,10 +90,10 @@ export function MobileEntryCapture({ userId }: { userId: string }) {
     localStorage.removeItem("papot-mobile-entry-context");
 
     void fetch("/api/mobile/entries/context", { cache: "no-store" })
-      .then(async (response) => {
-        const body = (await response.json()) as ContextPayload;
-        if (!response.ok) throw new Error(body.error ?? "Chargement impossible");
-        setContext(body);
+      .then(async (reponse) => {
+        const corps = (await reponse.json()) as ContextPayload;
+        if (!reponse.ok) throw new Error(corps.error ?? "Chargement impossible");
+        setContext(corps);
       })
       .catch(() => undefined);
 
@@ -112,18 +112,18 @@ export function MobileEntryCapture({ userId }: { userId: string }) {
   }, [refreshQueuedCount, syncQueuedEntries]);
 
   const visibleCases = useMemo(() => {
-    const all = context?.cases ?? [];
-    return clientId ? all.filter((item) => item.clientId === clientId) : all;
-  }, [clientId, context?.cases]);
+    const all = contexte?.cases ?? [];
+    return idClient ? all.filter((element) => element.clientId === idClient) : all;
+  }, [idClient, contexte?.cases]);
 
-  function chooseCase(caseId: string) {
-    setCommercialCaseId(caseId);
-    const selected = context?.cases.find((item) => item.id === caseId);
-    if (selected?.clientId) setClientId(selected.clientId);
+  function chooseCase(idAffaire: string) {
+    setCommercialCaseId(idAffaire);
+    const selectionne = contexte?.cases.find((element) => element.id === idAffaire);
+    if (selectionne?.clientId) setClientId(selectionne.clientId);
   }
 
-  function addFiles(next: File[]) {
-    setFiles((current) => [...current, ...next].slice(0, 12));
+  function addFiles(suivant: File[]) {
+    setFiles((courant) => [...courant, ...suivant].slice(0, 12));
   }
 
   function resetForm() {
@@ -136,24 +136,24 @@ export function MobileEntryCapture({ userId }: { userId: string }) {
   }
 
   async function saveOfflineDraft(): Promise<void> {
-    const draft: OfflineEntryDraft = {
-      ownerUserId: userId,
+    const brouillon: OfflineEntryDraft = {
+      ownerUserId: idUtilisateur,
       id: crypto.randomUUID(),
       createdAt: new Date().toISOString(),
       rawText,
       priority,
       tagIds,
-      clientId,
+      clientId: idClient,
       commercialCaseId,
-      files,
+      files: fichiers,
     };
-    await queueOfflineEntry(draft);
+    await queueOfflineEntry(brouillon);
     await refreshQueuedCount();
     resetForm();
   }
 
-  async function submit(event: FormEvent<HTMLFormElement>) {
-    event.preventDefault();
+  async function submit(evenement: FormEvent<HTMLFormElement>) {
+    evenement.preventDefault();
     if (!rawText.trim()) return;
     setBusy(true);
     setError(null);
@@ -165,26 +165,26 @@ export function MobileEntryCapture({ userId }: { userId: string }) {
         return;
       }
 
-      const draft: OfflineEntryDraft = {
-        ownerUserId: userId,
+      const brouillon: OfflineEntryDraft = {
+        ownerUserId: idUtilisateur,
         id: crypto.randomUUID(),
         createdAt: new Date().toISOString(),
         rawText,
         priority,
         tagIds,
-        clientId,
+        clientId: idClient,
         commercialCaseId,
-        files,
+        files: fichiers,
       };
-      await queueOfflineEntry(draft);
-      const response = await fetch("/api/mobile/entries/capture", {
+      await queueOfflineEntry(brouillon);
+      const reponse = await fetch("/api/mobile/entries/capture", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(await draftToJsonPayload(draft)),
+        body: JSON.stringify(await draftToJsonPayload(brouillon)),
       });
-      const body = (await response.json()) as { error?: string };
-      if (!response.ok) throw new Error(body.error ?? "Envoi impossible");
-      await removeOfflineEntry(draft.id, userId);
+      const corps = (await reponse.json()) as { error?: string };
+      if (!reponse.ok) throw new Error(corps.error ?? "Envoi impossible");
+      await removeOfflineEntry(brouillon.id, idUtilisateur);
       await refreshQueuedCount();
       resetForm();
       setSuccess(true);
@@ -230,7 +230,7 @@ export function MobileEntryCapture({ userId }: { userId: string }) {
           </button>
         </div>
       ) : null}
-      {error ? <div className="mobileCaptureMessage isError">{error}</div> : null}
+      {erreur ? <div className="mobileCaptureMessage isError">{erreur}</div> : null}
       {success ? (
         <div className="mobileCaptureMessage isSuccess">
           <CheckCircle2 size={18} /> Entrée envoyée.
@@ -242,7 +242,7 @@ export function MobileEntryCapture({ userId }: { userId: string }) {
           <span>Qu’est-ce qu’il faut noter ? *</span>
           <textarea
             value={rawText}
-            onChange={(event) => setRawText(event.target.value)}
+            onChange={(evenement) => setRawText(evenement.target.value)}
             rows={5}
             placeholder="Ex. chantier Dupont, prévoir retour SAV porte meuble..."
             required
@@ -252,7 +252,7 @@ export function MobileEntryCapture({ userId }: { userId: string }) {
         <button
           type="button"
           className={`mobileUrgentButton${priority === "URGENT" ? " isActive" : ""}`}
-          onClick={() => setPriority((current) => (current === "URGENT" ? "NORMAL" : "URGENT"))}
+          onClick={() => setPriority((courant) => (courant === "URGENT" ? "NORMAL" : "URGENT"))}
         >
           <AlertTriangle size={16} /> Urgent
         </button>
@@ -260,14 +260,14 @@ export function MobileEntryCapture({ userId }: { userId: string }) {
         <label className="mobileCaptureField">
           <span>Client</span>
           <select
-            value={clientId}
-            onChange={(event) => {
-              setClientId(event.target.value);
+            value={idClient}
+            onChange={(evenement) => {
+              setClientId(evenement.target.value);
               setCommercialCaseId("");
             }}
           >
             <option value="">Aucun / à qualifier plus tard</option>
-            {(context?.clients ?? []).map((client) => (
+            {(contexte?.clients ?? []).map((client) => (
               <option key={client.id} value={client.id}>
                 {client.name}
               </option>
@@ -277,32 +277,35 @@ export function MobileEntryCapture({ userId }: { userId: string }) {
 
         <label className="mobileCaptureField">
           <span>Affaire</span>
-          <select value={commercialCaseId} onChange={(event) => chooseCase(event.target.value)}>
+          <select
+            value={commercialCaseId}
+            onChange={(evenement) => chooseCase(evenement.target.value)}
+          >
             <option value="">Client seulement / aucune affaire</option>
-            {visibleCases.map((item) => (
-              <option key={item.id} value={item.id}>
-                {item.name}
-                {item.clientName ? ` · ${item.clientName}` : ""}
+            {visibleCases.map((element) => (
+              <option key={element.id} value={element.id}>
+                {element.name}
+                {element.clientName ? ` · ${element.clientName}` : ""}
               </option>
             ))}
           </select>
         </label>
 
         <div className="mobileCaptureTags">
-          {(context?.tags ?? []).map((tag) => (
+          {(contexte?.tags ?? []).map((etiquette) => (
             <button
               type="button"
-              key={tag.id}
-              className={tagIds.includes(tag.id) ? "isSelected" : ""}
+              key={etiquette.id}
+              className={tagIds.includes(etiquette.id) ? "isSelected" : ""}
               onClick={() =>
-                setTagIds((current) =>
-                  current.includes(tag.id)
-                    ? current.filter((id) => id !== tag.id)
-                    : [...current, tag.id],
+                setTagIds((courant) =>
+                  courant.includes(etiquette.id)
+                    ? courant.filter((id) => id !== etiquette.id)
+                    : [...courant, etiquette.id],
                 )
               }
             >
-              {tag.label}
+              {etiquette.label}
             </button>
           ))}
         </div>
@@ -314,9 +317,9 @@ export function MobileEntryCapture({ userId }: { userId: string }) {
             type="file"
             accept="image/*"
             capture="environment"
-            onChange={(event) => {
-              addFiles(Array.from(event.target.files ?? []));
-              event.currentTarget.value = "";
+            onChange={(evenement) => {
+              addFiles(Array.from(evenement.target.files ?? []));
+              evenement.currentTarget.value = "";
             }}
           />
           <input
@@ -325,9 +328,9 @@ export function MobileEntryCapture({ userId }: { userId: string }) {
             type="file"
             multiple
             accept="image/*,application/pdf"
-            onChange={(event) => {
-              addFiles(Array.from(event.target.files ?? []));
-              event.currentTarget.value = "";
+            onChange={(evenement) => {
+              addFiles(Array.from(evenement.target.files ?? []));
+              evenement.currentTarget.value = "";
             }}
           />
           <button type="button" onClick={() => cameraRef.current?.click()}>
@@ -338,15 +341,15 @@ export function MobileEntryCapture({ userId }: { userId: string }) {
           </button>
         </div>
 
-        {files.length > 0 ? (
+        {fichiers.length > 0 ? (
           <div className="mobilePendingFiles">
-            {files.map((file, index) => (
+            {fichiers.map((fichier, indice) => (
               <button
                 type="button"
-                key={`${file.name}-${index}`}
-                onClick={() => setFiles((current) => current.filter((_, i) => i !== index))}
+                key={`${fichier.name}-${indice}`}
+                onClick={() => setFiles((courant) => courant.filter((_, i) => i !== indice))}
               >
-                {file.name} ×
+                {fichier.name} ×
               </button>
             ))}
           </div>

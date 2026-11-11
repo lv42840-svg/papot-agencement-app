@@ -5,25 +5,27 @@ import { createPostgresCommercialRepository } from "./postgres-repository";
 import type { CommercialRepository } from "./repository";
 
 export function createCommercialRepository(): CommercialRepository {
-  if (isLocalStorageMode()) return createLocalCommercialRepository();
+  if (isLocalStorageMode()) {
+    return createLocalCommercialRepository();
+  }
 
-  let repositoryPromise: Promise<CommercialRepository> | null = null;
+  let promesseDepot: Promise<CommercialRepository> | null = null;
 
-  const initialize = () => {
-    repositoryPromise ??= (async () => {
+  const initialiser = () => {
+    promesseDepot ??= (async () => {
       const pool = getServerDbPool();
       await runServerDbMigrations(pool);
       return createPostgresCommercialRepository(pool);
     })();
-    return repositoryPromise;
+    return promesseDepot;
   };
 
   return {
     async load() {
-      return (await initialize()).load();
+      return (await initialiser()).load();
     },
-    async mutate(transform) {
-      return (await initialize()).mutate(transform);
+    async mutate(transformation) {
+      return (await initialiser()).mutate(transformation);
     },
   };
 }

@@ -71,65 +71,67 @@ export type QuotePricingMutationResult = {
 };
 
 function nextConfig(
-  config: QuotePricingConfig,
-  items: NativeQuotesPayload["quotes"][number]["model"]["items"],
+  configuration: QuotePricingConfig,
+  elements: NativeQuotesPayload["quotes"][number]["model"]["items"],
   mutation: QuotePricingMutation,
 ): QuotePricingConfig {
   if (mutation.action === "upsertAdjustment") {
-    const adjustments = [...config.adjustments];
-    const index = adjustments.findIndex((item) => item.id === mutation.adjustment.id);
-    if (index >= 0) adjustments[index] = mutation.adjustment;
+    const adjustments = [...configuration.adjustments];
+    const indice = adjustments.findIndex((element) => element.id === mutation.adjustment.id);
+    if (indice >= 0) adjustments[indice] = mutation.adjustment;
     else adjustments.push(mutation.adjustment);
-    return quotePricingConfigSchema.parse({ ...config, adjustments });
+    return quotePricingConfigSchema.parse({ ...configuration, adjustments });
   }
 
   if (mutation.action === "removeAdjustment") {
     return quotePricingConfigSchema.parse({
-      ...config,
-      adjustments: config.adjustments.filter((item) => item.id !== mutation.adjustmentId),
+      ...configuration,
+      adjustments: configuration.adjustments.filter(
+        (element) => element.id !== mutation.adjustmentId,
+      ),
     });
   }
 
   if (mutation.action === "setCustomerDiscount") {
     return quotePricingConfigSchema.parse({
-      ...config,
+      ...configuration,
       customerDiscount: mutation.discount,
     });
   }
 
   if (mutation.action === "clearCustomerDiscount") {
     return quotePricingConfigSchema.parse({
-      ...config,
+      ...configuration,
       customerDiscount: null,
     });
   }
 
   if (mutation.action === "upsertOption") {
-    assertQuoteOptionCanBeUpserted(items, config.options, mutation.option);
-    const options = [...config.options];
-    const index = options.findIndex((item) => item.id === mutation.option.id);
-    if (index >= 0) options[index] = mutation.option;
+    assertQuoteOptionCanBeUpserted(elements, configuration.options, mutation.option);
+    const options = [...configuration.options];
+    const indice = options.findIndex((element) => element.id === mutation.option.id);
+    if (indice >= 0) options[indice] = mutation.option;
     else options.push(mutation.option);
-    return quotePricingConfigSchema.parse({ ...config, options });
+    return quotePricingConfigSchema.parse({ ...configuration, options });
   }
 
   return quotePricingConfigSchema.parse({
-    ...config,
-    options: config.options.filter((item) => item.id !== mutation.optionId),
+    ...configuration,
+    options: configuration.options.filter((element) => element.id !== mutation.optionId),
   });
 }
 
 export function applyQuotePricingMutation(
   source: NativeQuotesPayload,
   mutation: QuotePricingMutation,
-  actor: QuotePricingActor,
-  now: Date = new Date(),
+  auteur: QuotePricingActor,
+  maintenant: Date = new Date(),
 ): QuotePricingMutationResult {
-  const payload = structuredClone(parseNativeQuotesPayload(source));
-  const quoteIndex = payload.quotes.findIndex((quote) => quote.id === mutation.quoteId);
+  const contenu = structuredClone(parseNativeQuotesPayload(source));
+  const quoteIndex = contenu.quotes.findIndex((quote) => quote.id === mutation.quoteId);
   if (quoteIndex < 0) throw new Error("QUOTE_NOT_FOUND");
 
-  const quote = payload.quotes[quoteIndex];
+  const quote = contenu.quotes[quoteIndex];
   if (quote.status !== "DRAFT") throw new Error("QUOTE_NOT_EDITABLE");
 
   const pricingConfig = nextConfig(quote.pricingConfig, quote.model.items, mutation);
@@ -139,9 +141,9 @@ export function applyQuotePricingMutation(
   const updated = nativeQuoteRecordSchema.parse({
     ...quote,
     pricingConfig,
-    updatedAt: now.toISOString(),
-    updatedByName: actor.displayName,
+    updatedAt: maintenant.toISOString(),
+    updatedByName: auteur.displayName,
   });
-  payload.quotes[quoteIndex] = updated;
-  return { payload, focusQuoteId: updated.id };
+  contenu.quotes[quoteIndex] = updated;
+  return { payload: contenu, focusQuoteId: updated.id };
 }

@@ -22,8 +22,8 @@ type SelectionState = {
 };
 
 type HighlightRegistryLike = {
-  set(name: string, highlight: unknown): void;
-  delete(name: string): boolean;
+  set(nom: string, highlight: unknown): void;
+  delete(nom: string): boolean;
 };
 
 type HighlightConstructor = new (...ranges: Range[]) => unknown;
@@ -53,8 +53,8 @@ function textOffset(root: HTMLElement, node: Node, offset: number): number | nul
   }
 }
 
-function domRangeForOffsets(root: HTMLElement, start: number, end: number): Range | null {
-  if (end <= start) return null;
+function domRangeForOffsets(root: HTMLElement, debut: number, fin: number): Range | null {
+  if (fin <= debut) return null;
   const document = root.ownerDocument;
   const walker = document.createTreeWalker(root, 4);
   let cursor = 0;
@@ -62,24 +62,24 @@ function domRangeForOffsets(root: HTMLElement, start: number, end: number): Rang
   let endNode: Node | null = null;
   let startOffset = 0;
   let endOffset = 0;
-  let current = walker.nextNode();
+  let courant = walker.nextNode();
 
-  while (current) {
-    const length = current.textContent?.length ?? 0;
+  while (courant) {
+    const length = courant.textContent?.length ?? 0;
     const nextCursor = cursor + length;
 
-    if (!startNode && start >= cursor && start <= nextCursor) {
-      startNode = current;
-      startOffset = Math.min(start - cursor, length);
+    if (!startNode && debut >= cursor && debut <= nextCursor) {
+      startNode = courant;
+      startOffset = Math.min(debut - cursor, length);
     }
-    if (!endNode && end >= cursor && end <= nextCursor) {
-      endNode = current;
-      endOffset = Math.min(end - cursor, length);
+    if (!endNode && fin >= cursor && fin <= nextCursor) {
+      endNode = courant;
+      endOffset = Math.min(fin - cursor, length);
       break;
     }
 
     cursor = nextCursor;
-    current = walker.nextNode();
+    courant = walker.nextNode();
   }
 
   if (!startNode || !endNode) return null;
@@ -117,26 +117,26 @@ export function QuoteInlineTextColorToolbar({
 }: {
   quote: NativeQuoteRecord;
   canWrite: boolean;
-  onSaved: (payload: NativeQuotesPayload) => void;
+  onSaved: (contenu: NativeQuotesPayload) => void;
 }) {
-  const [selection, setSelection] = useState<SelectionState | null>(null);
-  const [saving, setSaving] = useState(false);
-  const [error, setError] = useState<string | null>(null);
+  const [selectionCourante, setSelection] = useState<SelectionState | null>(null);
+  const [sauvegardeEnCours, setSaving] = useState(false);
+  const [erreur, setError] = useState<string | null>(null);
 
   const numbers = useMemo(() => buildQuoteItemNumbers(quote.model.items), [quote.model.items]);
   const itemByNumber = useMemo(() => {
-    const result = new Map<string, SupportedItem>();
+    const resultat = new Map<string, SupportedItem>();
     for (const item of quote.model.items) {
       if (item.kind !== "SECTION" && item.kind !== "SUBSECTION" && item.kind !== "LINE") continue;
       const number = numbers.get(item.id);
-      if (number) result.set(number, item);
+      if (number) resultat.set(number, item);
     }
-    return result;
+    return resultat;
   }, [numbers, quote.model.items]);
 
   function resolveItem(root: HTMLElement): SupportedItem | null {
-    const row = root.closest(".quoteMainRow");
-    const number = row?.querySelector(".quoteNumber")?.textContent?.trim();
+    const ligneTableau = root.closest(".quoteMainRow");
+    const number = ligneTableau?.querySelector(".quoteNumber")?.textContent?.trim();
     if (!number) return null;
     const item = itemByNumber.get(number) ?? null;
     if (!item) return null;
@@ -149,16 +149,16 @@ export function QuoteInlineTextColorToolbar({
     clearQuoteHighlights(support.registry);
 
     const rangesByColor = new Map<string, Range[]>();
-    const rows = Array.from(
+    const lignesTableau = Array.from(
       document.querySelectorAll<HTMLElement>(".quoteLinesTable .quoteMainRow"),
     );
 
-    for (const row of rows) {
-      const number = row.querySelector(".quoteNumber")?.textContent?.trim();
+    for (const ligneTableau of lignesTableau) {
+      const number = ligneTableau.querySelector(".quoteNumber")?.textContent?.trim();
       if (!number) continue;
       const item = itemByNumber.get(number);
       if (!item) continue;
-      const root = row.querySelector<HTMLElement>(
+      const root = ligneTableau.querySelector<HTMLElement>(
         item.kind === "LINE" ? ".quoteLineDescription > strong" : ".quoteHeadingRow > strong",
       );
       if (!root || root.textContent !== itemText(item)) continue;
@@ -166,9 +166,9 @@ export function QuoteInlineTextColorToolbar({
       for (const mark of item.presentation?.textStyle?.textColorMarks ?? []) {
         const range = domRangeForOffsets(root, mark.start, mark.end);
         if (!range) continue;
-        const current = rangesByColor.get(mark.color) ?? [];
-        current.push(range);
-        rangesByColor.set(mark.color, current);
+        const courant = rangesByColor.get(mark.color) ?? [];
+        courant.push(range);
+        rangesByColor.set(mark.color, courant);
       }
     }
 
@@ -182,9 +182,9 @@ export function QuoteInlineTextColorToolbar({
   useEffect(() => {
     if (!canWrite) return;
 
-    function handleMouseUp(event: MouseEvent) {
-      const target = event.target;
-      if (target instanceof Element && target.closest(".quoteInlineTextToolbar")) return;
+    function handleMouseUp(evenement: MouseEvent) {
+      const cible = evenement.target;
+      if (cible instanceof Element && cible.closest(".quoteInlineTextToolbar")) return;
 
       const browserSelection = window.getSelection();
       if (!browserSelection || browserSelection.rangeCount === 0 || browserSelection.isCollapsed) {
@@ -206,9 +206,9 @@ export function QuoteInlineTextColorToolbar({
         return;
       }
 
-      const start = textOffset(startRoot, range.startContainer, range.startOffset);
-      const end = textOffset(startRoot, range.endContainer, range.endOffset);
-      if (start === null || end === null || end <= start) {
+      const debut = textOffset(startRoot, range.startContainer, range.startOffset);
+      const fin = textOffset(startRoot, range.endContainer, range.endOffset);
+      if (debut === null || fin === null || fin <= debut) {
         setSelection(null);
         return;
       }
@@ -217,21 +217,21 @@ export function QuoteInlineTextColorToolbar({
       setError(null);
       setSelection({
         itemId: item.id,
-        start,
-        end,
+        start: debut,
+        end: fin,
         left: Math.max(16, Math.min(window.innerWidth - 16, rect.left + rect.width / 2)),
         top: Math.max(8, rect.top - 42),
       });
     }
 
-    function handleDragStart(event: DragEvent) {
-      const target = event.target;
-      if (!(target instanceof Node)) return;
-      if (textRootFromNode(target)) event.preventDefault();
+    function handleDragStart(evenement: DragEvent) {
+      const cible = evenement.target;
+      if (!(cible instanceof Node)) return;
+      if (textRootFromNode(cible)) evenement.preventDefault();
     }
 
-    function handleKeyDown(event: KeyboardEvent) {
-      if (event.key === "Escape") setSelection(null);
+    function handleKeyDown(evenement: KeyboardEvent) {
+      if (evenement.key === "Escape") setSelection(null);
     }
 
     document.addEventListener("mouseup", handleMouseUp);
@@ -245,21 +245,21 @@ export function QuoteInlineTextColorToolbar({
   }, [canWrite, itemByNumber]);
 
   async function applyColor(color: string | null) {
-    if (!selection || saving) return;
-    const item = quote.model.items.find((candidate) => candidate.id === selection.itemId);
+    if (!selectionCourante || sauvegardeEnCours) return;
+    const item = quote.model.items.find((candidat) => candidat.id === selectionCourante.itemId);
     if (!item || (item.kind !== "SECTION" && item.kind !== "SUBSECTION" && item.kind !== "LINE")) {
       setSelection(null);
       return;
     }
 
-    const text = itemText(item);
+    const texte = itemText(item);
     const currentStyle: QuoteItemTextStyle =
       item.presentation?.textStyle ?? defaultQuoteItemTextStyle(item);
     const nextMarks = applyQuoteInlineTextColor(
-      text.length,
+      texte.length,
       currentStyle.textColorMarks ?? [],
-      selection.start,
-      selection.end,
+      selectionCourante.start,
+      selectionCourante.end,
       color,
     );
     const nextStyle: QuoteItemTextStyle = {
@@ -270,7 +270,7 @@ export function QuoteInlineTextColorToolbar({
     setSaving(true);
     setError(null);
     try {
-      const response = await fetch("/api/desktop/quotes", {
+      const reponse = await fetch("/api/desktop/quotes", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
@@ -280,9 +280,9 @@ export function QuoteInlineTextColorToolbar({
           textStyle: nextStyle,
         }),
       });
-      const body = (await response.json()) as { payload?: NativeQuotesPayload; error?: string };
-      if (!response.ok || !body.payload) throw new Error(body.error ?? "QUOTES_REQUEST_FAILED");
-      onSaved(body.payload);
+      const corps = (await reponse.json()) as { payload?: NativeQuotesPayload; error?: string };
+      if (!reponse.ok || !corps.payload) throw new Error(corps.error ?? "QUOTES_REQUEST_FAILED");
+      onSaved(corps.payload);
       setSelection(null);
       window.getSelection()?.removeAllRanges();
     } catch {
@@ -292,7 +292,7 @@ export function QuoteInlineTextColorToolbar({
     }
   }
 
-  if (!canWrite || !selection) return null;
+  if (!canWrite || !selectionCourante) return null;
 
   return (
     <>
@@ -300,8 +300,8 @@ export function QuoteInlineTextColorToolbar({
         className="quoteInlineTextToolbar"
         role="toolbar"
         aria-label="Couleur du texte sélectionné"
-        style={{ left: selection.left, top: selection.top }}
-        onMouseDown={(event) => event.preventDefault()}
+        style={{ left: selectionCourante.left, top: selectionCourante.top }}
+        onMouseDown={(evenement) => evenement.preventDefault()}
       >
         {QUOTE_INLINE_TEXT_COLOR_PRESETS.map((preset) => (
           <button
@@ -309,7 +309,7 @@ export function QuoteInlineTextColorToolbar({
             type="button"
             className="quoteInlineTextColorButton"
             onClick={() => void applyColor(preset.value)}
-            disabled={saving}
+            disabled={sauvegardeEnCours}
             aria-label={`Texte ${preset.label.toLowerCase()}`}
             title={preset.label}
           >
@@ -321,13 +321,13 @@ export function QuoteInlineTextColorToolbar({
           type="button"
           className="quoteInlineTextResetButton"
           onClick={() => void applyColor(null)}
-          disabled={saving}
+          disabled={sauvegardeEnCours}
           aria-label="Retirer la couleur de la sélection"
           title="Retirer la couleur"
         >
           <RotateCcw size={13} aria-hidden="true" />
         </button>
-        {error ? <span className="quoteInlineTextError">{error}</span> : null}
+        {erreur ? <span className="quoteInlineTextError">{erreur}</span> : null}
       </div>
 
       <style jsx global>{`

@@ -19,19 +19,19 @@ type QuotesStateRow = {
 type Queryable = Pick<Pool, "query"> | Pick<PoolClient, "query">;
 
 async function loadState(queryable: Queryable): Promise<QuotesStateRow> {
-  const result = await queryable.query<QuotesStateRow>(
+  const resultat = await queryable.query<QuotesStateRow>(
     "SELECT version, payload FROM papot_quotes_state WHERE scope = 'global'",
   );
-  const row = result.rows[0];
-  if (!row) throw new Error("QUOTES_STORAGE_NOT_INITIALIZED");
-  return row;
+  const ligneTableau = resultat.rows[0];
+  if (!ligneTableau) throw new Error("QUOTES_STORAGE_NOT_INITIALIZED");
+  return ligneTableau;
 }
 
 export function createPostgresQuotesRepository(pool: Pool = getServerDbPool()): QuotesRepository {
   return {
     async load() {
-      const row = await loadState(pool);
-      return parseNativeQuotesPayload(row.payload);
+      const ligneTableau = await loadState(pool);
+      return parseNativeQuotesPayload(ligneTableau.payload);
     },
 
     async mutate(transform: QuotesMutationTransform) {
@@ -44,10 +44,10 @@ export function createPostgresQuotesRepository(pool: Pool = getServerDbPool()): 
             FOR UPDATE
           `,
         );
-        const row = locked.rows[0];
-        if (!row) throw new Error("QUOTES_STORAGE_NOT_INITIALIZED");
+        const ligneTableau = locked.rows[0];
+        if (!ligneTableau) throw new Error("QUOTES_STORAGE_NOT_INITIALIZED");
 
-        const mutation = await transform(parseNativeQuotesPayload(row.payload));
+        const mutation = await transform(parseNativeQuotesPayload(ligneTableau.payload));
         if (mutation.shouldPersist === false) {
           return {
             payload: parseNativeQuotesPayload(mutation.payload),
@@ -64,7 +64,7 @@ export function createPostgresQuotesRepository(pool: Pool = getServerDbPool()): 
             WHERE scope = 'global' AND version = $2
             RETURNING payload
           `,
-          [mutation.payload, row.version],
+          [mutation.payload, ligneTableau.version],
         );
         if (saved.rowCount === 0) {
           throw new QuotesRepositoryError("QUOTES_VERSION_CONFLICT");

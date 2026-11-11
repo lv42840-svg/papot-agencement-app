@@ -1,20 +1,22 @@
-export type DroppedItem<TFile> = {
+export type DroppedItem<TFichier> = {
   kind: string;
-  getAsFile: () => TFile | null;
+  getAsFile: () => TFichier | null;
 };
 
-function arrayFromLike<T>(source: ArrayLike<T>): T[] {
-  return Array.from({ length: source.length }, (_, index) => source[index]);
+function arrayFromLike<TElement>(source: ArrayLike<TElement>): TElement[] {
+  return Array.from({ length: source.length }, (_, indice) => source[indice]);
 }
 
-export function collectDroppedFiles<TFile>(
-  items: ArrayLike<DroppedItem<TFile>>,
-  fallbackFiles: ArrayLike<TFile>,
-): TFile[] {
-  const fromItems = arrayFromLike(items)
-    .filter((item) => item.kind === "file")
-    .map((item) => item.getAsFile())
-    .filter((file): file is TFile => file !== null);
+export function collectDroppedFiles<TFichier>(
+  elements: ArrayLike<DroppedItem<TFichier>>,
+  fichiersSecours: ArrayLike<TFichier>,
+): TFichier[] {
+  const fichiersDepuisElements = arrayFromLike(elements)
+    .filter((element) => element.kind === "file")
+    .map((element) => element.getAsFile())
+    .filter((fichier): fichier is TFichier => fichier !== null);
 
-  return fromItems.length > 0 ? fromItems : arrayFromLike(fallbackFiles);
+  return fichiersDepuisElements.length > 0
+    ? fichiersDepuisElements
+    : arrayFromLike(fichiersSecours);
 }

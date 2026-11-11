@@ -53,8 +53,8 @@ type HoursSnapshot = {
   suggestedChantierIds: Record<string, string[]>;
 };
 
-function relativeWeek(week: string, offset: number): string {
-  const monday = isoWeekMonday(week);
+function relativeWeek(semaine: string, offset: number): string {
+  const monday = isoWeekMonday(semaine);
   monday.setUTCDate(monday.getUTCDate() + offset * 7);
   return isoWeekKey(
     new Date(monday.getUTCFullYear(), monday.getUTCMonth(), monday.getUTCDate(), 12),
@@ -65,54 +65,54 @@ function lastCompletedWeek() {
   return relativeWeek(isoWeekKey(new Date()), -1);
 }
 
-const formatHours = (hours: number) =>
+const formatHours = (heures: number) =>
   new Intl.NumberFormat("fr-FR", {
     maximumFractionDigits: 2,
-  }).format(hours);
-const inputHours = (hours: number) => (hours === 0 ? "" : String(hours).replace(".", ","));
-function parseHours(value: string): number | null {
-  const raw = value.trim().replace(",", ".");
+  }).format(heures);
+const inputHours = (heures: number) => (heures === 0 ? "" : String(heures).replace(".", ","));
+function parseHours(valeur: string): number | null {
+  const raw = valeur.trim().replace(",", ".");
   if (!raw) return 0;
   if (!/^(?:\d{1,3})(?:\.\d{1,2})?$/.test(raw)) return null;
-  const parsed = Number(raw);
-  return Number.isFinite(parsed) && parsed >= 0 && parsed <= 168 ? parsed : null;
+  const analyse = Number(raw);
+  return Number.isFinite(analyse) && analyse >= 0 && analyse <= 168 ? analyse : null;
 }
 
 const keyFor = (chantierId: string, activity: Activity) => chantierId + ":" + activity;
 const ACTIVITIES = ["BE", "WORKSHOP", "INSTALL"] as const;
 
 export function ActualHoursWorkspace() {
-  const [week, setWeek] = useState(lastCompletedWeek);
-  const [data, setData] = useState<HoursSnapshot | null>(null);
+  const [semaine, setWeek] = useState(lastCompletedWeek);
+  const [donnees, setData] = useState<HoursSnapshot | null>(null);
   const [personId, setPersonId] = useState("");
   const [extraIds, setExtraIds] = useState<string[]>([]);
   const [extraChoice, setExtraChoice] = useState("");
   const [showAdd, setShowAdd] = useState(false);
-  const [drafts, setDrafts] = useState<Record<string, string>>({});
+  const [brouillons, setDrafts] = useState<Record<string, string>>({});
   const [indirectDrafts, setIndirectDrafts] = useState<Partial<Record<IndirectCategory, string>>>(
     {},
   );
-  const [loading, setLoading] = useState(true);
-  const [saving, setSaving] = useState<string | null>(null);
+  const [chargement, setLoading] = useState(true);
+  const [sauvegardeEnCours, setSaving] = useState<string | null>(null);
   const [message, setMessage] = useState("");
-  const [error, setError] = useState("");
+  const [erreur, setError] = useState("");
 
   const load = useCallback(async () => {
     setLoading(true);
     try {
-      const response = await fetch(
-        `/api/desktop/planning/actual-hours?week=${encodeURIComponent(week)}`,
+      const reponse = await fetch(
+        `/api/desktop/planning/actual-hours?week=${encodeURIComponent(semaine)}`,
         {
           cache: "no-store",
         },
       );
-      const json = (await response.json()) as HoursSnapshot & { error?: string };
-      if (!response.ok) throw new Error(json.error ?? "Impossible de charger les heures.");
+      const json = (await reponse.json()) as HoursSnapshot & { error?: string };
+      if (!reponse.ok) throw new Error(json.error ?? "Impossible de charger les heures.");
       setData(json);
       setDrafts({});
       setIndirectDrafts({});
       setPersonId((old) =>
-        json.people.some((person) => person.id === old) ? old : (json.people[0]?.id ?? ""),
+        json.people.some((personne) => personne.id === old) ? old : (json.people[0]?.id ?? ""),
       );
       setExtraIds([]);
       setExtraChoice("");
@@ -124,46 +124,46 @@ export function ActualHoursWorkspace() {
     } finally {
       setLoading(false);
     }
-  }, [week]);
+  }, [semaine]);
 
   useEffect(() => {
     void load();
   }, [load]);
 
-  const selectedPerson = data?.people.find((person) => person.id === personId);
-  const suggestedIds = data?.suggestedChantierIds?.[personId] ?? [];
+  const selectedPerson = donnees?.people.find((personne) => personne.id === personId);
+  const suggestedIds = donnees?.suggestedChantierIds?.[personId] ?? [];
   const plannedIds = new Set(suggestedIds);
   const recordedIds = useMemo(
     () =>
       new Set(
-        data?.records
-          .filter((entry) => entry.userId === personId)
-          .map((entry) => entry.chantierId) ?? [],
+        donnees?.records
+          .filter((entree) => entree.userId === personId)
+          .map((entree) => entree.chantierId) ?? [],
       ),
-    [data?.records, personId],
+    [donnees?.records, personId],
   );
   const visibleIds = new Set([...suggestedIds, ...recordedIds, ...extraIds]);
   const displayedChantiers =
-    data?.chantiers.filter((chantier) => visibleIds.has(chantier.id)) ?? [];
+    donnees?.chantiers.filter((chantier) => visibleIds.has(chantier.id)) ?? [];
   const availableChantiers =
-    data?.chantiers.filter((chantier) => !visibleIds.has(chantier.id)) ?? [];
+    donnees?.chantiers.filter((chantier) => !visibleIds.has(chantier.id)) ?? [];
   const savedHours = useMemo(() => {
-    const found = new Map<string, number>();
-    for (const entry of data?.records ?? []) {
-      if (entry.userId === personId) {
-        found.set(keyFor(entry.chantierId, entry.activity), entry.hours);
+    const trouve = new Map<string, number>();
+    for (const entree of donnees?.records ?? []) {
+      if (entree.userId === personId) {
+        trouve.set(keyFor(entree.chantierId, entree.activity), entree.hours);
       }
     }
-    return found;
-  }, [data?.records, personId]);
+    return trouve;
+  }, [donnees?.records, personId]);
 
   const savedIndirectHours = useMemo(() => {
-    const found = new Map<IndirectCategory, number>();
-    for (const entry of data?.indirectRecords ?? []) {
-      if (entry.userId === personId) found.set(entry.category, entry.hours);
+    const trouve = new Map<IndirectCategory, number>();
+    for (const entree of donnees?.indirectRecords ?? []) {
+      if (entree.userId === personId) trouve.set(entree.category, entree.hours);
     }
-    return found;
-  }, [data?.indirectRecords, personId]);
+    return trouve;
+  }, [donnees?.indirectRecords, personId]);
 
   function indirectValue(category: IndirectCategory): string {
     return indirectDrafts[category] ?? inputHours(savedIndirectHours.get(category) ?? 0);
@@ -173,21 +173,21 @@ export function ActualHoursWorkspace() {
   }
 
   function cellValue(chantierId: string, activity: Activity): string {
-    const key = keyFor(chantierId, activity);
-    return drafts[key] ?? inputHours(savedHours.get(key) ?? 0);
+    const cle = keyFor(chantierId, activity);
+    return brouillons[cle] ?? inputHours(savedHours.get(cle) ?? 0);
   }
   function cellHours(chantierId: string, activity: Activity): number {
     return parseHours(cellValue(chantierId, activity)) ?? 0;
   }
   function totalForSite(chantierId: string): number {
-    return ACTIVITIES.reduce((sum, activity) => sum + cellHours(chantierId, activity), 0);
+    return ACTIVITIES.reduce((somme, activity) => somme + cellHours(chantierId, activity), 0);
   }
   const totalSiteWeek = displayedChantiers.reduce(
-    (sum, chantier) => sum + totalForSite(chantier.id),
+    (somme, chantier) => somme + totalForSite(chantier.id),
     0,
   );
   const totalIndirectWeek = INDIRECT_CATEGORIES.reduce(
-    (sum, category) => sum + indirectHours(category.code),
+    (somme, category) => somme + indirectHours(category.code),
     0,
   );
   const totalForWeek = totalSiteWeek + totalIndirectWeek;
@@ -204,13 +204,13 @@ export function ActualHoursWorkspace() {
 
   function addChantier() {
     if (!extraChoice || visibleIds.has(extraChoice)) return;
-    setExtraIds((previous) => [...previous, extraChoice]);
+    setExtraIds((precedent) => [...precedent, extraChoice]);
     setExtraChoice("");
     setShowAdd(false);
   }
 
   async function saveChantier(chantierId: string) {
-    if (!data?.editable || !personId || saving) return;
+    if (!donnees?.editable || !personId || sauvegardeEnCours) return;
     const be = parseHours(cellValue(chantierId, "BE"));
     const workshop = parseHours(cellValue(chantierId, "WORKSHOP"));
     const install = parseHours(cellValue(chantierId, "INSTALL"));
@@ -227,13 +227,13 @@ export function ActualHoursWorkspace() {
     setSaving(chantierId);
     setMessage("");
     try {
-      const response = await fetch("/api/desktop/planning/actual-hours", {
+      const reponse = await fetch("/api/desktop/planning/actual-hours", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           action: "saveActualHoursRow",
-          expectedRevision: data.editRevisions?.[`${week}:${personId}:${chantierId}`] ?? 0,
-          week,
+          expectedRevision: donnees.editRevisions?.[`${semaine}:${personId}:${chantierId}`] ?? 0,
+          week: semaine,
           userId: personId,
           chantierId,
           be,
@@ -241,8 +241,8 @@ export function ActualHoursWorkspace() {
           install,
         }),
       });
-      const json = (await response.json()) as HoursSnapshot & { error?: string };
-      if (!response.ok)
+      const json = (await reponse.json()) as HoursSnapshot & { error?: string };
+      if (!reponse.ok)
         throw new Error(
           json.error === "EDIT_VERSION_CONFLICT"
             ? EDIT_CONFLICT_MESSAGE
@@ -254,25 +254,27 @@ export function ActualHoursWorkspace() {
               ...json,
               records: [
                 ...old.records.filter(
-                  (row) => !(row.userId === personId && row.chantierId === chantierId),
+                  (ligneTableau) =>
+                    !(ligneTableau.userId === personId && ligneTableau.chantierId === chantierId),
                 ),
                 ...json.records.filter(
-                  (row) => row.userId === personId && row.chantierId === chantierId,
+                  (ligneTableau) =>
+                    ligneTableau.userId === personId && ligneTableau.chantierId === chantierId,
                 ),
               ],
               indirectRecords: old.indirectRecords,
               editRevisions: {
                 ...old.editRevisions,
-                [`${week}:${personId}:${chantierId}`]:
-                  json.editRevisions[`${week}:${personId}:${chantierId}`],
+                [`${semaine}:${personId}:${chantierId}`]:
+                  json.editRevisions[`${semaine}:${personId}:${chantierId}`],
               },
             }
           : json,
       );
       setDrafts((old) => {
-        const next = { ...old };
-        for (const activity of ACTIVITIES) delete next[keyFor(chantierId, activity)];
-        return next;
+        const suivant = { ...old };
+        for (const activity of ACTIVITIES) delete suivant[keyFor(chantierId, activity)];
+        return suivant;
       });
       setMessage("Heures enregistrées pour ce salarié et ce chantier.");
     } catch (cause) {
@@ -283,29 +285,30 @@ export function ActualHoursWorkspace() {
   }
 
   async function saveIndirect(category: IndirectCategory) {
-    if (!data?.editable || !personId || saving) return;
-    const hours = parseHours(indirectValue(category));
-    if (hours === null) {
+    if (!donnees?.editable || !personId || sauvegardeEnCours) return;
+    const heures = parseHours(indirectValue(category));
+    if (heures === null) {
       setMessage("Heures invalides : utilise un nombre positif avec deux décimales maximum.");
       return;
     }
     setSaving("indirect:" + category);
     setMessage("");
     try {
-      const response = await fetch("/api/desktop/planning/actual-hours", {
+      const reponse = await fetch("/api/desktop/planning/actual-hours", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           action: "saveIndirectHoursRow",
-          expectedRevision: data.editRevisions?.[`${week}:${personId}:indirect:${category}`] ?? 0,
-          week,
+          expectedRevision:
+            donnees.editRevisions?.[`${semaine}:${personId}:indirect:${category}`] ?? 0,
+          week: semaine,
           userId: personId,
           category,
-          hours,
+          hours: heures,
         }),
       });
-      const json = (await response.json()) as HoursSnapshot & { error?: string };
-      if (!response.ok)
+      const json = (await reponse.json()) as HoursSnapshot & { error?: string };
+      if (!reponse.ok)
         throw new Error(
           json.error === "EDIT_VERSION_CONFLICT"
             ? EDIT_CONFLICT_MESSAGE
@@ -318,24 +321,26 @@ export function ActualHoursWorkspace() {
               records: old.records,
               indirectRecords: [
                 ...old.indirectRecords.filter(
-                  (row) => !(row.userId === personId && row.category === category),
+                  (ligneTableau) =>
+                    !(ligneTableau.userId === personId && ligneTableau.category === category),
                 ),
                 ...json.indirectRecords.filter(
-                  (row) => row.userId === personId && row.category === category,
+                  (ligneTableau) =>
+                    ligneTableau.userId === personId && ligneTableau.category === category,
                 ),
               ],
               editRevisions: {
                 ...old.editRevisions,
-                [`${week}:${personId}:indirect:${category}`]:
-                  json.editRevisions[`${week}:${personId}:indirect:${category}`],
+                [`${semaine}:${personId}:indirect:${category}`]:
+                  json.editRevisions[`${semaine}:${personId}:indirect:${category}`],
               },
             }
           : json,
       );
       setIndirectDrafts((old) => {
-        const next = { ...old };
-        delete next[category];
-        return next;
+        const suivant = { ...old };
+        delete suivant[category];
+        return suivant;
       });
       setMessage(
         category === "SAV"
@@ -364,7 +369,7 @@ export function ActualHoursWorkspace() {
           <Link className="secondaryButton" href="/planning">
             Grand planning
           </Link>
-          <Link className="secondaryButton" href={`/planning/${week}`}>
+          <Link className="secondaryButton" href={`/planning/${semaine}`}>
             Petit planning
           </Link>
         </div>
@@ -376,13 +381,13 @@ export function ActualHoursWorkspace() {
           <select
             aria-label="Salarié concerné"
             value={personId}
-            disabled={loading || !data?.people.length || saving !== null}
-            onChange={(event) => choosePerson(event.target.value)}
+            disabled={chargement || !donnees?.people.length || sauvegardeEnCours !== null}
+            onChange={(evenement) => choosePerson(evenement.target.value)}
           >
-            {!data?.people.length ? <option value="">Aucun salarié</option> : null}
-            {data?.people.map((person) => (
-              <option key={person.id} value={person.id}>
-                {person.name}
+            {!donnees?.people.length ? <option value="">Aucun salarié</option> : null}
+            {donnees?.people.map((personne) => (
+              <option key={personne.id} value={personne.id}>
+                {personne.name}
               </option>
             ))}
           </select>
@@ -393,52 +398,54 @@ export function ActualHoursWorkspace() {
             <button
               type="button"
               className="secondaryButton"
-              disabled={saving !== null}
-              onClick={() => setWeek(relativeWeek(week, -1))}
+              disabled={sauvegardeEnCours !== null}
+              onClick={() => setWeek(relativeWeek(semaine, -1))}
             >
               ←
             </button>
             <input
               type="week"
               aria-label="Semaine de saisie"
-              value={week}
-              disabled={saving !== null}
-              onChange={(event) => {
-                if (/^\d{4}-W\d{2}$/.test(event.target.value)) setWeek(event.target.value);
+              value={semaine}
+              disabled={sauvegardeEnCours !== null}
+              onChange={(evenement) => {
+                if (/^\d{4}-W\d{2}$/.test(evenement.target.value)) setWeek(evenement.target.value);
               }}
             />
             <button
               type="button"
               className="secondaryButton"
-              disabled={saving !== null || relativeWeek(week, 1) >= isoWeekKey(new Date())}
-              onClick={() => setWeek(relativeWeek(week, 1))}
+              disabled={
+                sauvegardeEnCours !== null || relativeWeek(semaine, 1) >= isoWeekKey(new Date())
+              }
+              onClick={() => setWeek(relativeWeek(semaine, 1))}
             >
               →
             </button>
           </div>
-          <small>{weekDateRangeLabel(week)}</small>
+          <small>{weekDateRangeLabel(semaine)}</small>
         </label>
       </div>
 
-      {loading ? <p className="actualHoursNotice">Chargement…</p> : null}
-      {error ? (
+      {chargement ? <p className="actualHoursNotice">Chargement…</p> : null}
+      {erreur ? (
         <p className="actualHoursNotice" role="alert">
-          {error}{" "}
+          {erreur}{" "}
           <button type="button" onClick={() => void load()}>
             Réessayer
           </button>
         </p>
       ) : null}
 
-      {data && !loading && selectedPerson ? (
+      {donnees && !chargement && selectedPerson ? (
         <>
-          {!data.weekIsPast ? (
+          {!donnees.weekIsPast ? (
             <p className="actualHoursNotice">
               Cette semaine n&apos;est pas terminée. Choisis une semaine écoulée pour saisir les
               heures réelles.
             </p>
           ) : null}
-          {data.weekIsPast && !data.editable ? (
+          {donnees.weekIsPast && !donnees.editable ? (
             <p className="actualHoursNotice">
               Lecture seule : le droit « Saisir les heures passées » est requis.
             </p>
@@ -478,7 +485,7 @@ export function ActualHoursWorkspace() {
               <tbody>
                 {displayedChantiers.map((chantier) => {
                   const dirty = ACTIVITIES.some(
-                    (activity) => drafts[keyFor(chantier.id, activity)] !== undefined,
+                    (activity) => brouillons[keyFor(chantier.id, activity)] !== undefined,
                   );
                   return (
                     <tr key={chantier.id}>
@@ -501,16 +508,16 @@ export function ActualHoursWorkspace() {
                             aria-label={chantier.name + " " + activity}
                             value={cellValue(chantier.id, activity)}
                             placeholder="0"
-                            disabled={!data.editable || saving !== null}
-                            onChange={(event) =>
-                              setDrafts((current) => ({
-                                ...current,
-                                [keyFor(chantier.id, activity)]: event.target.value,
+                            disabled={!donnees.editable || sauvegardeEnCours !== null}
+                            onChange={(evenement) =>
+                              setDrafts((courant) => ({
+                                ...courant,
+                                [keyFor(chantier.id, activity)]: evenement.target.value,
                               }))
                             }
-                            onKeyDown={(event) => {
-                              if (event.key === "Enter") {
-                                event.preventDefault();
+                            onKeyDown={(evenement) => {
+                              if (evenement.key === "Enter") {
+                                evenement.preventDefault();
                                 void saveChantier(chantier.id);
                               }
                             }}
@@ -524,10 +531,10 @@ export function ActualHoursWorkspace() {
                         <button
                           className="secondaryButton"
                           type="button"
-                          disabled={!data.editable || saving !== null || !dirty}
+                          disabled={!donnees.editable || sauvegardeEnCours !== null || !dirty}
                           onClick={() => void saveChantier(chantier.id)}
                         >
-                          {saving === chantier.id ? "Enregistrement…" : "Enregistrer"}
+                          {sauvegardeEnCours === chantier.id ? "Enregistrement…" : "Enregistrer"}
                         </button>
                       </td>
                     </tr>
@@ -549,7 +556,7 @@ export function ActualHoursWorkspace() {
                     <td key={activity}>
                       {formatHours(
                         displayedChantiers.reduce(
-                          (sum, chantier) => sum + cellHours(chantier.id, activity),
+                          (somme, chantier) => somme + cellHours(chantier.id, activity),
                           0,
                         ),
                       )}{" "}
@@ -568,7 +575,9 @@ export function ActualHoursWorkspace() {
               <button
                 type="button"
                 className="secondaryButton"
-                disabled={!data.editable || saving !== null || availableChantiers.length === 0}
+                disabled={
+                  !donnees.editable || sauvegardeEnCours !== null || availableChantiers.length === 0
+                }
                 onClick={() => setShowAdd(true)}
               >
                 + Ajouter un chantier
@@ -580,7 +589,7 @@ export function ActualHoursWorkspace() {
                   <select
                     aria-label="Chantier à ajouter"
                     value={extraChoice}
-                    onChange={(event) => setExtraChoice(event.target.value)}
+                    onChange={(evenement) => setExtraChoice(evenement.target.value)}
                   >
                     <option value="">Choisir un chantier…</option>
                     {availableChantiers.map((chantier) => (
@@ -616,29 +625,29 @@ export function ActualHoursWorkspace() {
             <h2>Heures hors chantier</h2>
             <p>Saisie simple : aucun SAV ni frais généraux n’est rattaché à un chantier.</p>
             <div className="actualHoursIndirectRows">
-              {INDIRECT_CATEGORIES.map((entry) => {
-                const dirty = indirectDrafts[entry.code] !== undefined;
+              {INDIRECT_CATEGORIES.map((entree) => {
+                const dirty = indirectDrafts[entree.code] !== undefined;
                 return (
-                  <div className="actualHoursIndirectRow" key={entry.code}>
-                    <label htmlFor={"indirect-" + entry.code}>{entry.label}</label>
+                  <div className="actualHoursIndirectRow" key={entree.code}>
+                    <label htmlFor={"indirect-" + entree.code}>{entree.label}</label>
                     <input
-                      id={"indirect-" + entry.code}
-                      aria-label={"Heures " + entry.label}
+                      id={"indirect-" + entree.code}
+                      aria-label={"Heures " + entree.label}
                       type="text"
                       inputMode="decimal"
-                      value={indirectValue(entry.code)}
+                      value={indirectValue(entree.code)}
                       placeholder="0"
-                      disabled={!data.editable || saving !== null}
-                      onChange={(event) =>
+                      disabled={!donnees.editable || sauvegardeEnCours !== null}
+                      onChange={(evenement) =>
                         setIndirectDrafts((old) => ({
                           ...old,
-                          [entry.code]: event.target.value,
+                          [entree.code]: evenement.target.value,
                         }))
                       }
-                      onKeyDown={(event) => {
-                        if (event.key === "Enter") {
-                          event.preventDefault();
-                          void saveIndirect(entry.code);
+                      onKeyDown={(evenement) => {
+                        if (evenement.key === "Enter") {
+                          evenement.preventDefault();
+                          void saveIndirect(entree.code);
                         }
                       }}
                     />
@@ -646,10 +655,12 @@ export function ActualHoursWorkspace() {
                     <button
                       type="button"
                       className="secondaryButton"
-                      disabled={!data.editable || saving !== null || !dirty}
-                      onClick={() => void saveIndirect(entry.code)}
+                      disabled={!donnees.editable || sauvegardeEnCours !== null || !dirty}
+                      onClick={() => void saveIndirect(entree.code)}
                     >
-                      {saving === "indirect:" + entry.code ? "Enregistrement…" : "Enregistrer"}
+                      {sauvegardeEnCours === "indirect:" + entree.code
+                        ? "Enregistrement…"
+                        : "Enregistrer"}
                     </button>
                   </div>
                 );
@@ -682,35 +693,37 @@ export function ActualHoursWorkspace() {
         </p>
       ) : null}
 
-      {data ? <EditHistory events={data.editHistory ?? []} people={data.people} /> : null}
-      {data?.editable && personId ? (
+      {donnees ? <EditHistory events={donnees.editHistory ?? []} people={donnees.people} /> : null}
+      {donnees?.editable && personId ? (
         <button
           type="button"
           className="secondaryButton"
           disabled={
-            !!saving || Object.keys(drafts).length > 0 || Object.keys(indirectDrafts).length > 0
+            !!sauvegardeEnCours ||
+            Object.keys(brouillons).length > 0 ||
+            Object.keys(indirectDrafts).length > 0
           }
           onClick={async () => {
-            const response = await fetch("/api/desktop/planning/actual-hours", {
+            const reponse = await fetch("/api/desktop/planning/actual-hours", {
               method: "POST",
               headers: { "Content-Type": "application/json" },
               body: JSON.stringify({
                 action: "confirmPayrollWeek",
-                week,
+                week: semaine,
                 userId: personId,
-                expectedSignature: data.payrollWeekSignatures[personId],
+                expectedSignature: donnees.payrollWeekSignatures[personId],
               }),
             });
-            const result = await response.json();
-            if (!response.ok) {
+            const resultat = await reponse.json();
+            if (!reponse.ok) {
               setMessage(
-                result.error === "EDIT_VERSION_CONFLICT"
+                resultat.error === "EDIT_VERSION_CONFLICT"
                   ? EDIT_CONFLICT_MESSAGE
                   : "Validation impossible.",
               );
               return;
             }
-            setData(result);
+            setData(resultat);
             setMessage("Semaine validée pour la préparation de paie.");
           }}
         >

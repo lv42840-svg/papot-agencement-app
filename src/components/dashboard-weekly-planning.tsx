@@ -46,17 +46,17 @@ const activityStyles: Record<BoardActivity, string> = {
   INSTALL: "isInstall",
   NOTE: "isNote",
 };
-function cellKey(userId: string, date: string): string {
-  return userId + ":" + date;
+function cellKey(idUtilisateur: string, date: string): string {
+  return idUtilisateur + ":" + date;
 }
 
 export function DashboardWeeklyPlanning({ initialWeek }: { initialWeek: string }) {
-  const [week, setWeek] = useState(initialWeek);
+  const [semaine, setWeek] = useState(initialWeek);
   const [snapshot, setSnapshot] = useState<WeekSnapshot | null>(null);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState("");
+  const [chargement, setLoading] = useState(true);
+  const [erreur, setError] = useState("");
   const [reload, setReload] = useState(0);
-  const data = snapshot?.week === week ? snapshot : null;
+  const donnees = snapshot?.week === semaine ? snapshot : null;
 
   useEffect(() => {
     const controller = new AbortController();
@@ -64,13 +64,13 @@ export function DashboardWeeklyPlanning({ initialWeek }: { initialWeek: string }
     setError("");
     void (async () => {
       try {
-        const response = await fetch(
-          "/api/desktop/planning/weekly-board?week=" + encodeURIComponent(week),
+        const reponse = await fetch(
+          "/api/desktop/planning/weekly-board?week=" + encodeURIComponent(semaine),
           { cache: "no-store", signal: controller.signal },
         );
-        if (response.status === 403) throw new Error("Accès au planning non autorisé.");
-        if (!response.ok) throw new Error("Impossible de charger le planning.");
-        const received = (await response.json()) as WeekSnapshot;
+        if (reponse.status === 403) throw new Error("Accès au planning non autorisé.");
+        if (!reponse.ok) throw new Error("Impossible de charger le planning.");
+        const received = (await reponse.json()) as WeekSnapshot;
         if (!controller.signal.aborted) setSnapshot(received);
       } catch (cause) {
         if (!controller.signal.aborted) {
@@ -82,24 +82,33 @@ export function DashboardWeeklyPlanning({ initialWeek }: { initialWeek: string }
       }
     })();
     return () => controller.abort();
-  }, [week, reload]);
+  }, [semaine, reload]);
 
   const entriesByCell = useMemo(() => {
-    const rows = new Map<string, BoardEntry[]>();
-    for (const entry of data?.assignments ?? []) {
-      const key = cellKey(entry.userId, entry.date);
-      rows.set(key, [...(rows.get(key) ?? []), entry]);
+    const lignesTableau = new Map<string, BoardEntry[]>();
+    for (const entree of donnees?.assignments ?? []) {
+      const cle = cellKey(entree.userId, entree.date);
+      lignesTableau.set(cle, [...(lignesTableau.get(cle) ?? []), entree]);
     }
-    return rows;
-  }, [data]);
+    return lignesTableau;
+  }, [donnees]);
 
   const absencesByCell = useMemo(
-    () => new Map((data?.absences ?? []).map((row) => [cellKey(row.userId, row.date), row])),
-    [data],
+    () =>
+      new Map(
+        (donnees?.absences ?? []).map((ligneTableau) => [
+          cellKey(ligneTableau.userId, ligneTableau.date),
+          ligneTableau,
+        ]),
+      ),
+    [donnees],
   );
   const holidaysByDate = useMemo(
-    () => new Map((data?.holidays ?? []).map((row) => [row.date, row.label])),
-    [data],
+    () =>
+      new Map(
+        (donnees?.holidays ?? []).map((ligneTableau) => [ligneTableau.date, ligneTableau.label]),
+      ),
+    [donnees],
   );
 
   return (
@@ -108,7 +117,7 @@ export function DashboardWeeklyPlanning({ initialWeek }: { initialWeek: string }
         <div>
           <h2>Planning de la semaine</h2>
           <p>
-            S{week.slice(-2)} · Du {weekDateRangeLabel(week)} · affectations réelles de
+            S{semaine.slice(-2)} · Du {weekDateRangeLabel(semaine)} · affectations réelles de
             l&apos;équipe
           </p>
         </div>
@@ -118,11 +127,11 @@ export function DashboardWeeklyPlanning({ initialWeek }: { initialWeek: string }
             className="dashboardWeeklyArrow"
             aria-label="Semaine précédente"
             title="Semaine précédente"
-            onClick={() => setWeek((previous) => shiftDashboardPlanningWeek(previous, -1))}
+            onClick={() => setWeek((precedent) => shiftDashboardPlanningWeek(precedent, -1))}
           >
             <ChevronLeft size={19} />
           </button>
-          {week !== initialWeek ? (
+          {semaine !== initialWeek ? (
             <button
               type="button"
               className="dashboardWeeklyCurrent"
@@ -136,39 +145,39 @@ export function DashboardWeeklyPlanning({ initialWeek }: { initialWeek: string }
             className="dashboardWeeklyArrow"
             aria-label="Semaine suivante"
             title="Semaine suivante"
-            onClick={() => setWeek((previous) => shiftDashboardPlanningWeek(previous, 1))}
+            onClick={() => setWeek((precedent) => shiftDashboardPlanningWeek(precedent, 1))}
           >
             <ChevronRight size={19} />
           </button>
-          <Link className="dashboardWeeklyOpen" href={"/planning/" + week}>
+          <Link className="dashboardWeeklyOpen" href={"/planning/" + semaine}>
             Ouvrir le planning
           </Link>
         </div>
       </div>
 
-      {loading ? (
+      {chargement ? (
         <p className="dashboardWeeklyMessage" role="status">
           Chargement du planning…
         </p>
       ) : null}
-      {error && !loading ? (
+      {erreur && !chargement ? (
         <div className="dashboardWeeklyMessage" role="alert">
-          {error}{" "}
-          <button type="button" onClick={() => setReload((value) => value + 1)}>
+          {erreur}{" "}
+          <button type="button" onClick={() => setReload((valeur) => valeur + 1)}>
             <RotateCcw size={13} /> Réessayer
           </button>
         </div>
       ) : null}
 
-      {data && !loading ? (
+      {donnees && !chargement ? (
         <div className="dashboardWeeklyScroll">
           <table className="dashboardWeeklyTable">
             <thead>
               <tr>
                 <th scope="col">Personnel</th>
-                {data.dates.map((date, index) => (
+                {donnees.dates.map((date, indice) => (
                   <th key={date} scope="col" title={holidaysByDate.get(date) ?? undefined}>
-                    {DAYS[index] ?? "Jour"}
+                    {DAYS[indice] ?? "Jour"}
                     <small>
                       {date.slice(8, 10)}/{date.slice(5, 7)}
                     </small>
@@ -177,18 +186,18 @@ export function DashboardWeeklyPlanning({ initialWeek }: { initialWeek: string }
               </tr>
             </thead>
             <tbody>
-              {data.people.map((person) => (
-                <tr key={person.userId}>
+              {donnees.people.map((personne) => (
+                <tr key={personne.userId}>
                   <th scope="row" className="dashboardWeeklyPerson">
-                    {person.displayName}
+                    {personne.displayName}
                   </th>
-                  {data.dates.map((date) => {
-                    const rows = entriesByCell.get(cellKey(person.userId, date)) ?? [];
-                    const absence = absencesByCell.get(cellKey(person.userId, date));
+                  {donnees.dates.map((date) => {
+                    const lignesTableau = entriesByCell.get(cellKey(personne.userId, date)) ?? [];
+                    const absence = absencesByCell.get(cellKey(personne.userId, date));
                     const holiday = holidaysByDate.get(date);
                     const present =
-                      (!person.endDate || date <= person.endDate) &&
-                      (!person.inactiveSince || date < person.inactiveSince);
+                      (!personne.endDate || date <= personne.endDate) &&
+                      (!personne.inactiveSince || date < personne.inactiveSince);
                     return (
                       <td key={date} className={holiday ? "dashboardWeeklyHoliday" : undefined}>
                         {holiday ? (
@@ -199,19 +208,21 @@ export function DashboardWeeklyPlanning({ initialWeek }: { initialWeek: string }
                             {absence.typeLabel} · {absence.hours.toLocaleString("fr-FR")} h
                           </span>
                         ) : null}
-                        {rows.map((row, index) => (
+                        {lignesTableau.map((ligneTableau, indice) => (
                           <div
-                            key={row.id ?? row.date + ":" + index}
-                            className={"dashboardWeeklyEntry " + activityStyles[row.activity]}
+                            key={ligneTableau.id ?? ligneTableau.date + ":" + indice}
+                            className={
+                              "dashboardWeeklyEntry " + activityStyles[ligneTableau.activity]
+                            }
                           >
-                            <strong title={row.label}>{row.label}</strong>
-                            <small>{activityLabels[row.activity]}</small>
+                            <strong title={ligneTableau.label}>{ligneTableau.label}</strong>
+                            <small>{activityLabels[ligneTableau.activity]}</small>
                           </div>
                         ))}
-                        {!present && rows.length === 0 ? (
+                        {!present && lignesTableau.length === 0 ? (
                           <span className="dashboardWeeklyMuted">Hors présence</span>
                         ) : null}
-                        {present && rows.length === 0 && !absence && !holiday ? (
+                        {present && lignesTableau.length === 0 && !absence && !holiday ? (
                           <span className="dashboardWeeklyMuted">Non planifié</span>
                         ) : null}
                       </td>
@@ -219,9 +230,9 @@ export function DashboardWeeklyPlanning({ initialWeek }: { initialWeek: string }
                   })}
                 </tr>
               ))}
-              {data.people.length === 0 ? (
+              {donnees.people.length === 0 ? (
                 <tr>
-                  <td className="dashboardWeeklyNoPeople" colSpan={data.dates.length + 1}>
+                  <td className="dashboardWeeklyNoPeople" colSpan={donnees.dates.length + 1}>
                     Aucun salarié dans le planning pour cette semaine.
                   </td>
                 </tr>

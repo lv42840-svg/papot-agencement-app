@@ -24,7 +24,7 @@ const fileErrors: Record<string, string> = {
 };
 
 export function CommercialOpenFolderButton({
-  caseId,
+  caseId: idAffaire,
   hasDocuments,
 }: {
   caseId: string;
@@ -46,21 +46,21 @@ export function CommercialOpenFolderButton({
     setFolderBusy(true);
     setFolderError(null);
     try {
-      const response = await fetch(`/api/desktop/commercial/${caseId}/folder`, {
+      const reponse = await fetch(`/api/desktop/commercial/${idAffaire}/folder`, {
         cache: "no-store",
       });
-      const body = (await response.json()) as { storagePath?: string; error?: string };
-      if (!response.ok || !body.storagePath) {
-        throw new Error(body.error ?? "COMMERCIAL_FOLDER_NOT_FOUND");
+      const corps = (await reponse.json()) as { storagePath?: string; error?: string };
+      if (!reponse.ok || !corps.storagePath) {
+        throw new Error(corps.error ?? "COMMERCIAL_FOLDER_NOT_FOUND");
       }
 
-      const result = await bridge.openBusinessFolder({
+      const resultat = await bridge.openBusinessFolder({
         kind: "commercial-case",
-        storagePath: body.storagePath,
+        storagePath: corps.storagePath,
       });
-      if (!result.ok) {
+      if (!resultat.ok) {
         setFolderError(
-          (result.error ? folderErrors[result.error] : undefined) ??
+          (resultat.error ? folderErrors[resultat.error] : undefined) ??
             folderErrors.DESKTOP_BUSINESS_FOLDER_OPEN_FAILED,
         );
       }
@@ -105,7 +105,7 @@ export function CommercialOpenFolderButton({
 }
 
 export function CommercialDocumentActions({
-  caseId,
+  caseId: idAffaire,
   document,
   previewOpen,
   onTogglePreview,
@@ -131,13 +131,13 @@ export function CommercialDocumentActions({
     setFileBusy(true);
     setFileError(null);
     try {
-      const result = await bridge.openBusinessFile({
+      const resultat = await bridge.openBusinessFile({
         kind: "commercial-document",
         storagePath: document.storagePath,
       });
-      if (!result.ok) {
+      if (!resultat.ok) {
         setFileError(
-          (result.error ? fileErrors[result.error] : undefined) ??
+          (resultat.error ? fileErrors[resultat.error] : undefined) ??
             fileErrors.DESKTOP_BUSINESS_FILE_OPEN_FAILED,
         );
       }
@@ -162,7 +162,7 @@ export function CommercialDocumentActions({
         ) : null}
         <a
           className="secondaryButton"
-          href={`/api/desktop/commercial/${caseId}/documents/${document.id}?download=1`}
+          href={`/api/desktop/commercial/${idAffaire}/documents/${document.id}?download=1`}
           download={document.fileName}
           aria-label={`Télécharger ${document.fileName}`}
         >

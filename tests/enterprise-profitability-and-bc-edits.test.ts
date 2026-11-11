@@ -122,9 +122,9 @@ describe("rentabilité entreprise", () => {
     const menu = readFileSync("src/lib/desktop/navigation.ts", "utf8");
     const ui = readFileSync("src/components/enterprise-profitability-workspace.tsx", "utf8");
     expect(route).toContain('requireModuleRequestContext("pilotage", "READ")');
-    expect(route).toContain('requireSpecialPermission(context.user, "dashboard.view_global")');
+    expect(route).toContain('requireSpecialPermission(contexte.user, "dashboard.view_global")');
     expect(route).toContain('requireModuleRequestContext("purchases", "READ")');
-    expect(route).toContain('hasModuleAccess(context.user.id, "payroll", "READ")');
+    expect(route).toContain('hasModuleAccess(contexte.user.id, "payroll", "READ")');
     expect(route).toContain("calculateChantierLaborCostEstimate");
     expect(route).toContain("canReadPayroll ? readMonthlyLaborCosts() : Promise.resolve(null)");
     expect(page).toContain("EnterpriseProfitabilityWorkspace");

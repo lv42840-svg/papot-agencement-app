@@ -23,7 +23,7 @@ export function QuoteModuleNav() {
       </div>
 
       <nav className="quoteModuleTabs" aria-label="Navigation du module Devis">
-        {tabs.map(({ label, href, icon: Icon }) => {
+        {tabs.map(({ label: libelle, href, icon: Icon }) => {
           const active =
             href === "/devis"
               ? pathname === "/devis" ||
@@ -37,7 +37,7 @@ export function QuoteModuleNav() {
               aria-current={active ? "page" : undefined}
             >
               <Icon size={16} aria-hidden="true" />
-              {label}
+              {libelle}
             </Link>
           );
         })}

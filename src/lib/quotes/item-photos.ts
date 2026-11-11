@@ -13,118 +13,118 @@ type QuotePhotoMutationResult = {
 };
 
 function findItem(
-  payload: NativeQuotesPayload,
-  quoteId: string,
-  itemId: string,
+  contenu: NativeQuotesPayload,
+  idDevis: string,
+  idElement: string,
   requireDraft: boolean,
 ) {
-  const quoteIndex = payload.quotes.findIndex((quote) => quote.id === quoteId);
+  const quoteIndex = contenu.quotes.findIndex((quote) => quote.id === idDevis);
   if (quoteIndex < 0) throw new Error("QUOTE_NOT_FOUND");
-  const quote = payload.quotes[quoteIndex];
+  const quote = contenu.quotes[quoteIndex];
   if (requireDraft && quote.status !== "DRAFT") throw new Error("QUOTE_NOT_EDITABLE");
-  const itemIndex = quote.model.items.findIndex((item) => item.id === itemId);
+  const itemIndex = quote.model.items.findIndex((element) => element.id === idElement);
   if (itemIndex < 0) throw new Error("QUOTE_ITEM_NOT_FOUND");
   return { quoteIndex, quote, itemIndex, item: quote.model.items[itemIndex] };
 }
 
 function save(
-  payload: NativeQuotesPayload,
+  contenu: NativeQuotesPayload,
   quoteIndex: number,
   itemIndex: number,
-  item: NativeQuotesPayload["quotes"][number]["model"]["items"][number],
-  actor: QuotePhotoActor,
-  now: Date,
+  element: NativeQuotesPayload["quotes"][number]["model"]["items"][number],
+  auteur: QuotePhotoActor,
+  maintenant: Date,
 ): QuotePhotoMutationResult {
-  const quote = payload.quotes[quoteIndex];
-  const items = [...quote.model.items];
-  items[itemIndex] = item;
+  const quote = contenu.quotes[quoteIndex];
+  const elements = [...quote.model.items];
+  elements[itemIndex] = element;
   const updated = nativeQuoteRecordSchema.parse({
     ...quote,
-    model: parseQuoteModel({ ...quote.model, items }),
-    updatedAt: now.toISOString(),
-    updatedByName: actor.displayName,
+    model: parseQuoteModel({ ...quote.model, items: elements }),
+    updatedAt: maintenant.toISOString(),
+    updatedByName: auteur.displayName,
   });
-  payload.quotes[quoteIndex] = updated;
-  return { payload, focusQuoteId: updated.id };
+  contenu.quotes[quoteIndex] = updated;
+  return { payload: contenu, focusQuoteId: updated.id };
 }
 
 export function getQuoteItemPhoto(
   source: NativeQuotesPayload,
-  quoteId: string,
-  itemId: string,
+  idDevis: string,
+  idElement: string,
   photoId: string,
 ): QuoteItemPhoto {
-  const payload = parseNativeQuotesPayload(source);
-  const { item } = findItem(payload, quoteId, itemId, false);
-  const photo = item.presentation?.photos.find((candidate) => candidate.id === photoId);
+  const contenu = parseNativeQuotesPayload(source);
+  const { item: element } = findItem(contenu, idDevis, idElement, false);
+  const photo = element.presentation?.photos.find((candidat) => candidat.id === photoId);
   if (!photo) throw new Error("QUOTE_ITEM_PHOTO_NOT_FOUND");
   return photo;
 }
 
 export function registerQuoteItemPhotos(
   source: NativeQuotesPayload,
-  quoteId: string,
-  itemId: string,
+  idDevis: string,
+  idElement: string,
   photos: QuoteItemPhoto[],
-  actor: QuotePhotoActor,
-  now: Date = new Date(),
+  auteur: QuotePhotoActor,
+  maintenant: Date = new Date(),
 ): QuotePhotoMutationResult {
-  const payload = structuredClone(parseNativeQuotesPayload(source));
-  const { quoteIndex, itemIndex, item } = findItem(payload, quoteId, itemId, true);
-  const current = item.presentation?.photos ?? [];
-  if (current.length + photos.length > 20) throw new Error("QUOTE_ITEM_PHOTO_LIMIT");
-  const ids = new Set(current.map((photo) => photo.id));
+  const contenu = structuredClone(parseNativeQuotesPayload(source));
+  const { quoteIndex, itemIndex, item: element } = findItem(contenu, idDevis, idElement, true);
+  const courant = element.presentation?.photos ?? [];
+  if (courant.length + photos.length > 20) throw new Error("QUOTE_ITEM_PHOTO_LIMIT");
+  const identifiants = new Set(courant.map((photo) => photo.id));
   for (const photo of photos) {
-    if (ids.has(photo.id)) throw new Error("QUOTE_ITEM_PHOTO_DUPLICATE");
-    ids.add(photo.id);
+    if (identifiants.has(photo.id)) throw new Error("QUOTE_ITEM_PHOTO_DUPLICATE");
+    identifiants.add(photo.id);
   }
-  const updatedItem = structuredClone(item);
+  const updatedItem = structuredClone(element);
   updatedItem.presentation = {
     ...(updatedItem.presentation?.textStyle
       ? { textStyle: updatedItem.presentation.textStyle }
       : {}),
-    photos: [...current, ...photos],
+    photos: [...courant, ...photos],
   };
-  return save(payload, quoteIndex, itemIndex, updatedItem, actor, now);
+  return save(contenu, quoteIndex, itemIndex, updatedItem, auteur, maintenant);
 }
 
 export function setQuoteItemPhotoVisibility(
   source: NativeQuotesPayload,
-  quoteId: string,
-  itemId: string,
+  idDevis: string,
+  idElement: string,
   photoId: string,
   clientVisible: boolean,
-  actor: QuotePhotoActor,
-  now: Date = new Date(),
+  auteur: QuotePhotoActor,
+  maintenant: Date = new Date(),
 ): QuotePhotoMutationResult {
-  const payload = structuredClone(parseNativeQuotesPayload(source));
-  const { quoteIndex, itemIndex, item } = findItem(payload, quoteId, itemId, true);
-  const photos = item.presentation?.photos ?? [];
+  const contenu = structuredClone(parseNativeQuotesPayload(source));
+  const { quoteIndex, itemIndex, item: element } = findItem(contenu, idDevis, idElement, true);
+  const photos = element.presentation?.photos ?? [];
   if (!photos.some((photo) => photo.id === photoId)) throw new Error("QUOTE_ITEM_PHOTO_NOT_FOUND");
-  const updatedItem = structuredClone(item);
+  const updatedItem = structuredClone(element);
   updatedItem.presentation = {
     ...(updatedItem.presentation?.textStyle
       ? { textStyle: updatedItem.presentation.textStyle }
       : {}),
     photos: photos.map((photo) => (photo.id === photoId ? { ...photo, clientVisible } : photo)),
   };
-  return save(payload, quoteIndex, itemIndex, updatedItem, actor, now);
+  return save(contenu, quoteIndex, itemIndex, updatedItem, auteur, maintenant);
 }
 
 export function removeQuoteItemPhoto(
   source: NativeQuotesPayload,
-  quoteId: string,
-  itemId: string,
+  idDevis: string,
+  idElement: string,
   photoId: string,
-  actor: QuotePhotoActor,
-  now: Date = new Date(),
+  auteur: QuotePhotoActor,
+  maintenant: Date = new Date(),
 ): QuotePhotoMutationResult {
-  const payload = structuredClone(parseNativeQuotesPayload(source));
-  const { quoteIndex, itemIndex, item } = findItem(payload, quoteId, itemId, true);
-  const photos = item.presentation?.photos ?? [];
+  const contenu = structuredClone(parseNativeQuotesPayload(source));
+  const { quoteIndex, itemIndex, item: element } = findItem(contenu, idDevis, idElement, true);
+  const photos = element.presentation?.photos ?? [];
   if (!photos.some((photo) => photo.id === photoId)) throw new Error("QUOTE_ITEM_PHOTO_NOT_FOUND");
   const remaining = photos.filter((photo) => photo.id !== photoId);
-  const updatedItem = structuredClone(item);
+  const updatedItem = structuredClone(element);
   if (remaining.length === 0 && !updatedItem.presentation?.textStyle) {
     delete updatedItem.presentation;
   } else {
@@ -135,5 +135,5 @@ export function removeQuoteItemPhoto(
       photos: remaining,
     };
   }
-  return save(payload, quoteIndex, itemIndex, updatedItem, actor, now);
+  return save(contenu, quoteIndex, itemIndex, updatedItem, auteur, maintenant);
 }

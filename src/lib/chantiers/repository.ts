@@ -6,13 +6,13 @@ export type ChantiersRepositoryMutation = ChantierMutationResult & {
 };
 
 export type ChantiersMutationTransform = (
-  payload: ChantiersPayload,
-  isRetry: boolean,
+  donnees: ChantiersPayload,
+  estNouvelleTentative: boolean,
 ) => ChantiersRepositoryMutation | Promise<ChantiersRepositoryMutation>;
 
 export interface ChantiersRepository {
   load(): Promise<ChantiersPayload>;
-  mutate(transform: ChantiersMutationTransform): Promise<ChantierMutationResult>;
+  mutate(transformation: ChantiersMutationTransform): Promise<ChantierMutationResult>;
 }
 
 export type ChantiersRepositoryErrorCode = "CHANTIERS_LOCKED" | "CHANTIERS_VERSION_CONFLICT";

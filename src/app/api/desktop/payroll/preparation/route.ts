@@ -22,12 +22,12 @@ import {
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
-function failure(error: unknown) {
+function failure(erreur: unknown) {
   const code =
-    error instanceof ZodError
+    erreur instanceof ZodError
       ? "PAYROLL_PREPARATION_INVALID"
-      : error instanceof Error
-        ? error.message
+      : erreur instanceof Error
+        ? erreur.message
         : "PAYROLL_PREPARATION_FAILED";
   return NextResponse.json(
     { error: code },
@@ -49,39 +49,53 @@ async function dependencies() {
   return { planning, people: effectivePlanningPeople(planning, auth.users), stored };
 }
 function response(
-  month: string,
-  data: Awaited<ReturnType<typeof dependencies>>,
+  mois: string,
+  donnees: Awaited<ReturnType<typeof dependencies>>,
   canWrite: boolean,
 ) {
-  const state = getMonthState(data.stored, month);
-  const current = buildPayrollSummary(month, data.planning, data.people, state, data.stored.rules);
-  const latest = state.versions.at(-1) ?? null;
-  const diff = latest ? payrollDifferences(latest.summary, current) : [];
+  const etat = getMonthState(donnees.stored, mois);
+  const courant = buildPayrollSummary(
+    mois,
+    donnees.planning,
+    donnees.people,
+    etat,
+    donnees.stored.rules,
+  );
+  const latest = etat.versions.at(-1) ?? null;
+  const diff = latest ? payrollDifferences(latest.summary, courant) : [];
   return NextResponse.json(
-    { month, canWrite, state, current, latest, differences: diff, rules: data.stored.rules },
+    {
+      month: mois,
+      canWrite,
+      state: etat,
+      current: courant,
+      latest,
+      differences: diff,
+      rules: donnees.stored.rules,
+    },
     { headers: { "Cache-Control": "no-store" } },
   );
 }
-export async function GET(request: Request) {
+export async function GET(requete: Request) {
   try {
     const ctx = await requireModuleRequestContext("payroll", "READ");
-    const month = new URL(request.url).searchParams.get("month") ?? "";
-    return response(month, await dependencies(), ctx.moduleAccess.canWrite);
-  } catch (error) {
-    return failure(error);
+    const mois = new URL(requete.url).searchParams.get("month") ?? "";
+    return response(mois, await dependencies(), ctx.moduleAccess.canWrite);
+  } catch (erreur) {
+    return failure(erreur);
   }
 }
-export async function POST(request: Request) {
+export async function POST(requete: Request) {
   try {
     const ctx = await requireModuleRequestContext("payroll", "WRITE");
-    const input = (await request.json()) as Parameters<typeof mutatePayrollPreparation>[1];
-    const { planning, people } = await dependencies();
+    const saisie = (await requete.json()) as Parameters<typeof mutatePayrollPreparation>[1];
+    const { planning, people: personnes } = await dependencies();
     const stored = await updatePayrollPreparation((source) =>
-      mutatePayrollPreparation(source, input, planning, people, ctx.user.displayName),
+      mutatePayrollPreparation(source, saisie, planning, personnes, ctx.user.displayName),
     );
-    const month = (input as { month: string }).month;
-    return response(month, { planning, people, stored }, true);
-  } catch (error) {
-    return failure(error);
+    const mois = (saisie as { month: string }).month;
+    return response(mois, { planning, people: personnes, stored }, true);
+  } catch (erreur) {
+    return failure(erreur);
   }
 }

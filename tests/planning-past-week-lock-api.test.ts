@@ -11,6 +11,6 @@ describe("planning API past-week lock", () => {
     expect(routeSource).toContain(
       'import { assertPlanningWeekEditable, isPlanningWeekPast } from "@/lib/planning/time-markers";',
     );
-    expect(routeSource.split("assertPlanningWeekEditable(input.week);")).toHaveLength(3);
+    expect(routeSource.split("assertPlanningWeekEditable(saisie.week);")).toHaveLength(3);
   });
 });

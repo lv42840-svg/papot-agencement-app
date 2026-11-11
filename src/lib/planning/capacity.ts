@@ -49,8 +49,8 @@ export const NEW_STAFF_WEEKLY_SCHEDULE = {
   sunday: 0,
 } satisfies z.infer<typeof weekdayHoursSchema>;
 
-export function weeklyScheduleHours(schedule: PlanningPersonCapacity["weeklySchedule"]): number {
-  return Object.values(schedule).reduce((sum, hours) => sum + hours, 0);
+export function weeklyScheduleHours(horaire: PlanningPersonCapacity["weeklySchedule"]): number {
+  return Object.values(horaire).reduce((somme, heures) => somme + heures, 0);
 }
 
 type WeekdayKey = keyof PlanningPersonCapacity["weeklySchedule"];
@@ -65,37 +65,37 @@ const WEEKDAY_KEYS: WeekdayKey[] = [
   "sunday",
 ];
 
-function easterSunday(year: number): Date {
-  const a = year % 19;
-  const b = Math.floor(year / 100);
-  const cc = year % 100;
+function easterSunday(annee: number): Date {
+  const a = annee % 19;
+  const b = Math.floor(annee / 100);
+  const c = annee % 100;
   const d = Math.floor(b / 4);
   const e = b % 4;
   const f = Math.floor((b + 8) / 25);
   const g = Math.floor((b - f + 1) / 3);
   const h = (19 * a + b - d - g + 15) % 30;
-  const i = Math.floor(cc / 4);
-  const k = cc % 4;
+  const i = Math.floor(c / 4);
+  const k = c % 4;
   const l = (32 + 2 * e + 2 * i - h - k) % 7;
   const m = Math.floor((a + 11 * h + 22 * l) / 451);
-  const month = Math.floor((h + l - 7 * m + 114) / 31);
-  const day = ((h + l - 7 * m + 114) % 31) + 1;
-  return new Date(Date.UTC(year, month - 1, day));
+  const mois = Math.floor((h + l - 7 * m + 114) / 31);
+  const jour = ((h + l - 7 * m + 114) % 31) + 1;
+  return new Date(Date.UTC(annee, mois - 1, jour));
 }
 
-function addUtcDays(date: Date, days: number): Date {
-  const next = new Date(date);
-  next.setUTCDate(next.getUTCDate() + days);
-  return next;
+function addUtcDays(date: Date, jours: number): Date {
+  const nouvelleDate = new Date(date);
+  nouvelleDate.setUTCDate(nouvelleDate.getUTCDate() + jours);
+  return nouvelleDate;
 }
 
 function dateId(date: Date): string {
   return date.toISOString().slice(0, 10);
 }
 
-export function frenchNationalPublicHolidayIds(year: number): Set<string> {
-  const easter = easterSunday(year);
-  const fixed = [
+export function frenchNationalPublicHolidayIds(annee: number): Set<string> {
+  const paques = easterSunday(annee);
+  const joursFixes = [
     [1, 1],
     [5, 1],
     [5, 8],
@@ -105,19 +105,19 @@ export function frenchNationalPublicHolidayIds(year: number): Set<string> {
     [11, 11],
     [12, 25],
   ] as const;
-  const ids = new Set(
-    fixed.map(([month, day]) => dateId(new Date(Date.UTC(year, month - 1, day)))),
+  const identifiants = new Set(
+    joursFixes.map(([mois, jour]) => dateId(new Date(Date.UTC(annee, mois - 1, jour)))),
   );
-  ids.add(dateId(addUtcDays(easter, 1)));
-  ids.add(dateId(addUtcDays(easter, 39)));
-  ids.add(dateId(addUtcDays(easter, 50)));
-  return ids;
+  identifiants.add(dateId(addUtcDays(paques, 1)));
+  identifiants.add(dateId(addUtcDays(paques, 39)));
+  identifiants.add(dateId(addUtcDays(paques, 50)));
+  return identifiants;
 }
 
 // Labels share the existing holiday calendar used by capacity calculations.
-export function frenchNationalPublicHolidayLabels(year: number): Map<string, string> {
-  const easter = easterSunday(year);
-  const fixed: Array<[number, number, string]> = [
+export function frenchNationalPublicHolidayLabels(annee: number): Map<string, string> {
+  const paques = easterSunday(annee);
+  const joursFixes: Array<[number, number, string]> = [
     [1, 1, "Jour de l'An"],
     [5, 1, "Fête du Travail"],
     [5, 8, "Victoire du 8 mai"],
@@ -127,100 +127,110 @@ export function frenchNationalPublicHolidayLabels(year: number): Map<string, str
     [11, 11, "Armistice"],
     [12, 25, "Noël"],
   ];
-  const holidays = new Map<string, string>(
-    fixed.map(([month, day, label]) => [dateId(new Date(Date.UTC(year, month - 1, day))), label]),
+  const joursFeries = new Map<string, string>(
+    joursFixes.map(([mois, jour, libelle]) => [
+      dateId(new Date(Date.UTC(annee, mois - 1, jour))),
+      libelle,
+    ]),
   );
-  holidays.set(dateId(addUtcDays(easter, 1)), "Lundi de Pâques");
-  holidays.set(dateId(addUtcDays(easter, 39)), "Ascension");
-  holidays.set(dateId(addUtcDays(easter, 50)), "Lundi de Pentecôte");
-  return holidays;
+  joursFeries.set(dateId(addUtcDays(paques, 1)), "Lundi de Pâques");
+  joursFeries.set(dateId(addUtcDays(paques, 39)), "Ascension");
+  joursFeries.set(dateId(addUtcDays(paques, 50)), "Lundi de Pentecôte");
+  return joursFeries;
 }
 
-export function isoWeekDates(weekId: string): Date[] {
-  const match = /^(\d{4})-W(\d{2})$/.exec(weekId);
-  if (!match) throw new Error("PLANNING_WEEK_INVALID");
-  const year = Number(match[1]);
-  const week = Number(match[2]);
-  const jan4 = new Date(Date.UTC(year, 0, 4));
-  const jan4Day = jan4.getUTCDay() || 7;
-  const monday = new Date(jan4);
-  monday.setUTCDate(jan4.getUTCDate() - jan4Day + 1 + (week - 1) * 7);
-  return Array.from({ length: 7 }, (_, index) => addUtcDays(monday, index));
+export function isoWeekDates(idSemaine: string): Date[] {
+  const correspondance = /^(\d{4})-W(\d{2})$/.exec(idSemaine);
+  if (!correspondance) throw new Error("PLANNING_WEEK_INVALID");
+  const annee = Number(correspondance[1]);
+  const semaine = Number(correspondance[2]);
+  const quatreJanvier = new Date(Date.UTC(annee, 0, 4));
+  const jourQuatreJanvier = quatreJanvier.getUTCDay() || 7;
+  const lundi = new Date(quatreJanvier);
+  lundi.setUTCDate(quatreJanvier.getUTCDate() - jourQuatreJanvier + 1 + (semaine - 1) * 7);
+  return Array.from({ length: 7 }, (_, indice) => addUtcDays(lundi, indice));
 }
 
 export function scheduleHoursForDate(
-  schedule: PlanningPersonCapacity["weeklySchedule"],
+  horaire: PlanningPersonCapacity["weeklySchedule"],
   date: Date,
 ): number {
-  const holidays = frenchNationalPublicHolidayIds(date.getUTCFullYear());
-  if (holidays.has(dateId(date))) return 0;
-  const day = date.getUTCDay();
-  const index = day === 0 ? 6 : day - 1;
-  return schedule[WEEKDAY_KEYS[index]];
+  const joursFeries = frenchNationalPublicHolidayIds(date.getUTCFullYear());
+  if (joursFeries.has(dateId(date))) return 0;
+  const jour = date.getUTCDay();
+  const indice = jour === 0 ? 6 : jour - 1;
+  return horaire[WEEKDAY_KEYS[indice]];
 }
 
 // Used to propose absence hours; the user may still enter a partial day.
 // National public holidays already contribute zero capacity.
 export function suggestedAbsenceHoursForDate(
-  schedule: PlanningPersonCapacity["weeklySchedule"],
-  dateId: string,
+  horaire: PlanningPersonCapacity["weeklySchedule"],
+  identifiantDate: string,
 ): number {
-  if (!/^\d{4}-\d{2}-\d{2}$/.test(dateId)) return 0;
-  const day = new Date(`${dateId}T12:00:00Z`);
-  if (Number.isNaN(day.getTime()) || day.toISOString().slice(0, 10) !== dateId) return 0;
-  return scheduleHoursForDate(schedule, day);
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(identifiantDate)) return 0;
+  const jour = new Date(`${identifiantDate}T12:00:00Z`);
+  if (Number.isNaN(jour.getTime()) || jour.toISOString().slice(0, 10) !== identifiantDate) {
+    return 0;
+  }
+  return scheduleHoursForDate(horaire, jour);
 }
 
 export function weeklyScheduleHoursForWeek(
-  schedule: PlanningPersonCapacity["weeklySchedule"],
-  weekId: string,
+  horaire: PlanningPersonCapacity["weeklySchedule"],
+  idSemaine: string,
 ): number {
-  const dates = isoWeekDates(weekId);
-  return dates.reduce((sum, date) => sum + scheduleHoursForDate(schedule, date), 0);
+  const dates = isoWeekDates(idSemaine);
+  return dates.reduce((somme, date) => somme + scheduleHoursForDate(horaire, date), 0);
 }
 
 export function buildWeeklyCapacityIndicators(
-  weeks: string[],
-  people: (PlanningPersonCapacity & { endDate?: string | null; inactiveSince?: string | null })[],
-  firmLoadByWeek: ReadonlyMap<string, number>,
+  semaines: string[],
+  personnes: (PlanningPersonCapacity & {
+    endDate?: string | null;
+    inactiveSince?: string | null;
+  })[],
+  chargeFermeParSemaine: ReadonlyMap<string, number>,
   absences: PlanningAbsence[] = [],
-  provisionalLoadByWeek: ReadonlyMap<string, number> = new Map(),
+  chargeProvisionnelleParSemaine: ReadonlyMap<string, number> = new Map(),
 ): PlanningWeekCapacity[] {
-  const countedPeople = people.filter((person) => person.countsInMacroCapacity);
+  const personnesComptabilisees = personnes.filter((personne) => personne.countsInMacroCapacity);
 
-  return weeks.map((week) => {
-    const dates = isoWeekDates(week);
-    const totalCapacityHours = countedPeople.reduce((sum, person) => {
-      const absencesByDate = new Map(
+  return semaines.map((semaine) => {
+    const dates = isoWeekDates(semaine);
+    const capaciteTotaleHeures = personnesComptabilisees.reduce((somme, personne) => {
+      const absencesParDate = new Map(
         absences
-          .filter((absence) => absence.userId === person.userId)
+          .filter((absence) => absence.userId === personne.userId)
           .map((absence) => [absence.date, absence]),
       );
       return (
-        sum +
-        dates.reduce((personWeek, date) => {
-          const id = dateId(date);
+        somme +
+        dates.reduce((capacitePersonneSemaine, date) => {
+          const identifiantDate = dateId(date);
           if (
-            (person.endDate && id > person.endDate) ||
-            (person.inactiveSince && id >= person.inactiveSince)
-          )
-            return personWeek;
-          const scheduled = scheduleHoursForDate(person.weeklySchedule, date);
-          const absence = absencesByDate.get(dateId(date));
-          const unavailable = absence ? Math.min(absence.hours, scheduled) : 0;
-          return personWeek + Math.max(0, scheduled - unavailable);
+            (personne.endDate && identifiantDate > personne.endDate) ||
+            (personne.inactiveSince && identifiantDate >= personne.inactiveSince)
+          ) {
+            return capacitePersonneSemaine;
+          }
+          const heuresPrevues = scheduleHoursForDate(personne.weeklySchedule, date);
+          const absence = absencesParDate.get(dateId(date));
+          const heuresIndisponibles = absence ? Math.min(absence.hours, heuresPrevues) : 0;
+          return capacitePersonneSemaine + Math.max(0, heuresPrevues - heuresIndisponibles);
         }, 0)
       );
     }, 0);
-    const firmLoadHours = firmLoadByWeek.get(week) ?? 0;
-    const provisionalLoadHours = provisionalLoadByWeek.get(week) ?? 0;
+    const chargeFermeHeures = chargeFermeParSemaine.get(semaine) ?? 0;
+    const chargeProvisionnelleHeures = chargeProvisionnelleParSemaine.get(semaine) ?? 0;
     return {
-      week,
-      totalCapacityHours,
-      firmLoadHours,
-      provisionalLoadHours,
-      firmAvailableHours: totalCapacityHours - firmLoadHours,
-      availableWithProvisionHours: totalCapacityHours - firmLoadHours - provisionalLoadHours,
+      week: semaine,
+      totalCapacityHours: capaciteTotaleHeures,
+      firmLoadHours: chargeFermeHeures,
+      provisionalLoadHours: chargeProvisionnelleHeures,
+      firmAvailableHours: capaciteTotaleHeures - chargeFermeHeures,
+      availableWithProvisionHours:
+        capaciteTotaleHeures - chargeFermeHeures - chargeProvisionnelleHeures,
     };
   });
 }

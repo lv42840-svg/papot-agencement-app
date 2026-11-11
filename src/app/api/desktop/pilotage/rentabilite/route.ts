@@ -19,8 +19,8 @@ export const dynamic = "force-dynamic";
 
 export async function GET() {
   try {
-    const context = await requireModuleRequestContext("pilotage", "READ");
-    await requireSpecialPermission(context.user, "dashboard.view_global");
+    const contexte = await requireModuleRequestContext("pilotage", "READ");
+    await requireSpecialPermission(contexte.user, "dashboard.view_global");
     await Promise.all([
       requireModuleRequestContext("chantiers", "READ"),
       requireModuleRequestContext("commercial", "READ"),
@@ -28,7 +28,7 @@ export async function GET() {
       requireModuleRequestContext("purchases", "READ"),
     ]);
 
-    const canReadPayroll = await hasModuleAccess(context.user.id, "payroll", "READ");
+    const canReadPayroll = await hasModuleAccess(contexte.user.id, "payroll", "READ");
     const [sites, commercial, quotes, purchases, planning, payroll] = await Promise.all([
       createChantiersRepository().load(),
       createCommercialRepository().load(),
@@ -40,11 +40,13 @@ export async function GET() {
     const hoursBySite = new Map(
       sites.chantiers.map((site) => [
         site.id,
-        actualHoursByActivity(planning.actualHours.filter((entry) => entry.chantierId === site.id)),
+        actualHoursByActivity(
+          planning.actualHours.filter((entree) => entree.chantierId === site.id),
+        ),
       ]),
     );
     // Salary-derived hourly costs are never returned without the Paie READ right.
-    const now = new Date();
+    const maintenant = new Date();
     const laborBySite = payroll
       ? new Map(
           sites.chantiers.map((site) => [
@@ -54,12 +56,12 @@ export async function GET() {
               planning.actualHours,
               payroll.records,
               planning.peopleCapacity,
-              now,
+              maintenant,
             ),
           ]),
         )
       : new Map();
-    const rows = calculateCompanyProfitability(
+    const lignesTableau = calculateCompanyProfitability(
       sites.chantiers,
       commercial.cases,
       quotes,
@@ -68,11 +70,11 @@ export async function GET() {
       laborBySite,
     );
     return NextResponse.json(
-      { rows, canReadPayroll },
+      { rows: lignesTableau, canReadPayroll },
       { headers: { "Cache-Control": "private, no-store" } },
     );
-  } catch (error) {
-    const code = error instanceof Error ? error.message : "COMPANY_PROFITABILITY_FAILED";
+  } catch (erreur) {
+    const code = erreur instanceof Error ? erreur.message : "COMPANY_PROFITABILITY_FAILED";
     return NextResponse.json(
       { error: code },
       { status: desktopRequestErrorStatus(code) ?? 400, headers: { "Cache-Control": "no-store" } },

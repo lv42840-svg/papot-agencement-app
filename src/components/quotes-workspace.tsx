@@ -37,8 +37,8 @@ export function QuotesWorkspace({
   );
   const sortedQuotes = useMemo(
     () =>
-      [...initialPayload.quotes].sort((left, right) =>
-        right.updatedAt.localeCompare(left.updatedAt),
+      [...initialPayload.quotes].sort((gauche, droite) =>
+        droite.updatedAt.localeCompare(gauche.updatedAt),
       ),
     [initialPayload.quotes],
   );

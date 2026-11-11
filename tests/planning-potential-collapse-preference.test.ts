@@ -17,7 +17,7 @@ const gridSource = readFileSync(
 
 describe("planning potential collapse preference", () => {
   it("uses the authenticated user's saved preference and defaults legacy users to expanded", () => {
-    expect(pageSource).toContain("user.planningPotentialCollapsed");
+    expect(pageSource).toContain("utilisateur.planningPotentialCollapsed");
     expect(apiSource).toContain("planningPotentialCollapsed");
     expect(workspaceSource).toContain("initialPotentialCollapsed");
   });
@@ -31,7 +31,7 @@ describe("planning potential collapse preference", () => {
 
   it("persists the visual preference through the personal preferences API", () => {
     expect(workspaceSource).toContain('fetch("/api/me/planning-preferences"');
-    expect(workspaceSource).toContain("planningPotentialCollapsed: next");
-    expect(apiSource).toContain("target.planningPotentialCollapsed");
+    expect(workspaceSource).toContain("planningPotentialCollapsed: suivant");
+    expect(apiSource).toContain("cible.planningPotentialCollapsed");
   });
 });

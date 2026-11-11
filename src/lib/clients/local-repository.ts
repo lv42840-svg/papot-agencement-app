@@ -13,9 +13,9 @@ export function createLocalClientsRepository(): ClientsRepository {
       return readLocalSnapshot(RESOURCE_KEY, parseClientsPayload).payload;
     },
 
-    async mutate(input, actor) {
-      return mutateLocalSnapshot(RESOURCE_KEY, parseClientsPayload, ({ payload }) => {
-        const mutation = applyClientsMutation(structuredClone(payload), input, actor);
+    async mutate(saisie, auteur) {
+      return mutateLocalSnapshot(RESOURCE_KEY, parseClientsPayload, ({ payload: donnees }) => {
+        const mutation = applyClientsMutation(structuredClone(donnees), saisie, auteur);
         return {
           payload: mutation.payload,
           result: mutation,

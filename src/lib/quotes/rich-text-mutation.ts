@@ -18,14 +18,14 @@ export type QuoteRichTextUpdate = {
   richText: QuoteRichText;
 };
 
-function itemText(item: QuoteItem): string | null {
-  if (item.kind === "SECTION" || item.kind === "SUBSECTION") return item.title;
-  if (item.kind === "LINE") return item.description;
+function itemText(element: QuoteItem): string | null {
+  if (element.kind === "SECTION" || element.kind === "SUBSECTION") return element.title;
+  if (element.kind === "LINE") return element.description;
   return null;
 }
 
-function normalizeLineEndings(value: string): string {
-  return value.replace(/\r\n?/g, "\n");
+function normalizeLineEndings(valeur: string): string {
+  return valeur.replace(/\r\n?/g, "\n");
 }
 
 function normalizeRichTextLineEndings(richText: QuoteRichText): QuoteRichText {
@@ -37,62 +37,62 @@ function normalizeRichTextLineEndings(richText: QuoteRichText): QuoteRichText {
   };
 }
 
-function withUpdatedText(item: QuoteItem, text: string, richText: QuoteRichText): QuoteItem {
+function withUpdatedText(element: QuoteItem, texte: string, richText: QuoteRichText): QuoteItem {
   const presentation = {
-    ...(item.presentation ?? {}),
+    ...(element.presentation ?? {}),
     richText,
-    photos: item.presentation?.photos ?? [],
+    photos: element.presentation?.photos ?? [],
   };
 
-  if (item.kind === "SECTION" || item.kind === "SUBSECTION") {
-    return { ...item, title: text, presentation };
+  if (element.kind === "SECTION" || element.kind === "SUBSECTION") {
+    return { ...element, title: texte, presentation };
   }
-  if (item.kind === "LINE") {
-    return { ...item, description: text, presentation };
+  if (element.kind === "LINE") {
+    return { ...element, description: texte, presentation };
   }
   throw new Error("QUOTE_RICH_TEXT_ITEM_UNSUPPORTED");
 }
 
 export function applyQuoteRichTextUpdate(
   source: NativeQuotesPayload,
-  input: QuoteRichTextUpdate,
-  actor: QuoteRichTextActor,
-  now: Date = new Date(),
+  saisie: QuoteRichTextUpdate,
+  auteur: QuoteRichTextActor,
+  maintenant: Date = new Date(),
 ): NativeQuotesPayload {
-  const payload = structuredClone(parseNativeQuotesPayload(source));
-  const quoteIndex = payload.quotes.findIndex((quote) => quote.id === input.quoteId);
+  const contenu = structuredClone(parseNativeQuotesPayload(source));
+  const quoteIndex = contenu.quotes.findIndex((quote) => quote.id === saisie.quoteId);
   if (quoteIndex < 0) throw new Error("QUOTE_NOT_FOUND");
 
-  const quote = payload.quotes[quoteIndex];
+  const quote = contenu.quotes[quoteIndex];
   if (quote.status !== "DRAFT") throw new Error("QUOTE_NOT_EDITABLE");
 
-  const itemIndex = quote.model.items.findIndex((item) => item.id === input.itemId);
+  const itemIndex = quote.model.items.findIndex((element) => element.id === saisie.itemId);
   if (itemIndex < 0) throw new Error("QUOTE_ITEM_NOT_FOUND");
-  const item = quote.model.items[itemIndex];
-  if (itemText(item) === null) {
+  const element = quote.model.items[itemIndex];
+  if (itemText(element) === null) {
     throw new Error("QUOTE_RICH_TEXT_ITEM_UNSUPPORTED");
   }
 
-  const text = normalizeLineEndings(input.text).trim();
-  const maxLength = item.kind === "LINE" ? 4000 : 500;
-  if (!text || text.length > maxLength) {
+  const texte = normalizeLineEndings(saisie.text).trim();
+  const maxLength = element.kind === "LINE" ? 4000 : 500;
+  if (!texte || texte.length > maxLength) {
     throw new Error("QUOTE_RICH_TEXT_INVALID");
   }
 
-  const richText = normalizeRichTextLineEndings(quoteRichTextSchema.parse(input.richText));
-  if (quoteRichTextToPlainText(richText).trim() !== text) {
+  const richText = normalizeRichTextLineEndings(quoteRichTextSchema.parse(saisie.richText));
+  if (quoteRichTextToPlainText(richText).trim() !== texte) {
     throw new Error("QUOTE_RICH_TEXT_TEXT_MISMATCH");
   }
 
-  const items = [...quote.model.items];
-  items[itemIndex] = withUpdatedText(item, text, richText);
-  const timestamp = now.toISOString();
-  payload.quotes[quoteIndex] = nativeQuoteRecordSchema.parse({
+  const elements = [...quote.model.items];
+  elements[itemIndex] = withUpdatedText(element, texte, richText);
+  const timestamp = maintenant.toISOString();
+  contenu.quotes[quoteIndex] = nativeQuoteRecordSchema.parse({
     ...quote,
-    model: parseQuoteModel({ ...quote.model, items }),
+    model: parseQuoteModel({ ...quote.model, items: elements }),
     updatedAt: timestamp,
-    updatedByName: actor.displayName,
+    updatedByName: auteur.displayName,
   });
 
-  return parseNativeQuotesPayload(payload);
+  return parseNativeQuotesPayload(contenu);
 }

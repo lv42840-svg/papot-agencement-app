@@ -6,13 +6,13 @@ export type CommercialRepositoryMutation = CommercialMutationResult & {
 };
 
 export type CommercialMutationTransform = (
-  payload: CommercialPayload,
-  isRetry: boolean,
+  donnees: CommercialPayload,
+  estNouvelleTentative: boolean,
 ) => CommercialRepositoryMutation | Promise<CommercialRepositoryMutation>;
 
 export interface CommercialRepository {
   load(): Promise<CommercialPayload>;
-  mutate(transform: CommercialMutationTransform): Promise<CommercialMutationResult>;
+  mutate(transformation: CommercialMutationTransform): Promise<CommercialMutationResult>;
 }
 
 export type CommercialRepositoryErrorCode = "COMMERCIAL_LOCKED" | "COMMERCIAL_VERSION_CONFLICT";

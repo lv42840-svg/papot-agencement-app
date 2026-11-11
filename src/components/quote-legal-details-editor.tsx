@@ -12,13 +12,13 @@ type LegalResponse = {
   error?: string;
 };
 
-function rateInput(value: number): string {
-  return String(value).replace(".", ",");
+function rateInput(valeur: number): string {
+  return String(valeur).replace(".", ",");
 }
 
-function parseRate(value: string): number | null {
-  const parsed = Number(value.trim().replace(",", "."));
-  return Number.isFinite(parsed) && parsed >= 0 && parsed <= 100 ? parsed : null;
+function parseRate(valeur: string): number | null {
+  const analyse = Number(valeur.trim().replace(",", "."));
+  return Number.isFinite(analyse) && analyse >= 0 && analyse <= 100 ? analyse : null;
 }
 
 function errorLabel(code: string): string {
@@ -40,11 +40,11 @@ export function QuoteLegalDetailsEditor({
 }: {
   quote: NativeQuoteRecord;
   canWrite: boolean;
-  onSaved: (payload: NativeQuotesPayload) => void;
+  onSaved: (contenu: NativeQuotesPayload) => void;
 }) {
   const editable = canWrite && quote.status === "DRAFT";
-  const lines = useMemo(
-    () => quote.model.items.filter((item): item is QuoteLine => item.kind === "LINE"),
+  const lignes = useMemo(
+    () => quote.model.items.filter((element): element is QuoteLine => element.kind === "LINE"),
     [quote.model.items],
   );
   const [startDate, setStartDate] = useState(quote.workSchedule.startDate ?? "");
@@ -52,13 +52,13 @@ export function QuoteLegalDetailsEditor({
   const [endDate, setEndDate] = useState(quote.workSchedule.endDate ?? "");
   const [rates, setRates] = useState<Record<string, string>>(() =>
     Object.fromEntries(
-      lines.map((line) => [line.id, rateInput(resolveQuoteLineVatRate(quote, line.id))]),
+      lignes.map((ligne) => [ligne.id, rateInput(resolveQuoteLineVatRate(quote, ligne.id))]),
     ),
   );
   const [savingSchedule, setSavingSchedule] = useState(false);
   const [savingLineId, setSavingLineId] = useState<string | null>(null);
   const [manageLineVat, setManageLineVat] = useState(false);
-  const [error, setError] = useState("");
+  const [erreur, setError] = useState("");
   const [notice, setNotice] = useState("");
 
   useEffect(() => {
@@ -67,28 +67,29 @@ export function QuoteLegalDetailsEditor({
     setEndDate(quote.workSchedule.endDate ?? "");
     setRates(
       Object.fromEntries(
-        lines.map((line) => [line.id, rateInput(resolveQuoteLineVatRate(quote, line.id))]),
+        lignes.map((ligne) => [ligne.id, rateInput(resolveQuoteLineVatRate(quote, ligne.id))]),
       ),
     );
-  }, [lines, quote]);
+  }, [lignes, quote]);
 
   useEffect(() => {
     setManageLineVat(false);
   }, [quote.id]);
 
-  async function patch(body: Record<string, unknown>) {
-    const response = await fetch(`/api/desktop/quotes/${quote.id}/legal`, {
+  async function patch(corps: Record<string, unknown>) {
+    const reponse = await fetch(`/api/desktop/quotes/${quote.id}/legal`, {
       method: "PATCH",
       headers: {
         "Content-Type": "application/json",
         ...quoteRevisionHeaders(quote.updatedAt),
       },
-      body: JSON.stringify(body),
+      body: JSON.stringify(corps),
     });
-    const data = (await response.json()) as LegalResponse;
-    if (!response.ok || !data.payload) throw new Error(data.error ?? "QUOTE_LEGAL_UPDATE_FAILED");
-    onSaved(data.payload);
-    return data.payload;
+    const donnees = (await reponse.json()) as LegalResponse;
+    if (!reponse.ok || !donnees.payload)
+      throw new Error(donnees.error ?? "QUOTE_LEGAL_UPDATE_FAILED");
+    onSaved(donnees.payload);
+    return donnees.payload;
   }
 
   async function saveSchedule() {
@@ -117,10 +118,10 @@ export function QuoteLegalDetailsEditor({
 
   async function saveLineRate(lineId: string, reset = false, nextValue?: string) {
     if (!editable || savingLineId) return;
-    const parsed = reset
+    const analyse = reset
       ? quote.taxConfig.defaultRatePercent
       : parseRate(nextValue ?? rates[lineId] ?? "");
-    if (parsed === null) {
+    if (analyse === null) {
       setError("Le taux de TVA doit être compris entre 0 et 100 %.");
       return;
     }
@@ -128,15 +129,15 @@ export function QuoteLegalDetailsEditor({
     setError("");
     setNotice("");
     try {
-      const payload = await patch({
+      const contenu = await patch({
         action: "setLineVatRate",
         lineId,
-        ratePercent: parsed === quote.taxConfig.defaultRatePercent ? null : parsed,
+        ratePercent: analyse === quote.taxConfig.defaultRatePercent ? null : analyse,
       });
-      const updated = payload.quotes.find((candidate) => candidate.id === quote.id);
+      const updated = contenu.quotes.find((candidat) => candidat.id === quote.id);
       if (updated) {
-        setRates((current) => ({
-          ...current,
+        setRates((courant) => ({
+          ...courant,
           [lineId]: rateInput(resolveQuoteLineVatRate(updated, lineId)),
         }));
       }
@@ -175,7 +176,7 @@ export function QuoteLegalDetailsEditor({
           <input
             type="date"
             value={startDate}
-            onChange={(event) => setStartDate(event.target.value)}
+            onChange={(evenement) => setStartDate(evenement.target.value)}
             disabled={!editable || savingSchedule}
           />
         </label>
@@ -183,7 +184,7 @@ export function QuoteLegalDetailsEditor({
           <span>Durée prévisionnelle</span>
           <input
             value={duration}
-            onChange={(event) => setDuration(event.target.value)}
+            onChange={(evenement) => setDuration(evenement.target.value)}
             placeholder="Ex. 3 semaines"
             maxLength={240}
             disabled={!editable || savingSchedule}
@@ -194,7 +195,7 @@ export function QuoteLegalDetailsEditor({
           <input
             type="date"
             value={endDate}
-            onChange={(event) => setEndDate(event.target.value)}
+            onChange={(evenement) => setEndDate(evenement.target.value)}
             disabled={!editable || savingSchedule}
           />
         </label>
@@ -223,8 +224,8 @@ export function QuoteLegalDetailsEditor({
             <input
               type="checkbox"
               checked={manageLineVat}
-              onChange={(event) => setManageLineVat(event.target.checked)}
-              disabled={lines.length === 0}
+              onChange={(evenement) => setManageLineVat(evenement.target.checked)}
+              disabled={lignes.length === 0}
             />
             <span>TVA différente par ligne</span>
           </label>
@@ -236,37 +237,37 @@ export function QuoteLegalDetailsEditor({
               ? `${quote.taxConfig.lineOverrides.length} taux spécifique${quote.taxConfig.lineOverrides.length > 1 ? "s" : ""} enregistré${quote.taxConfig.lineOverrides.length > 1 ? "s" : ""}.`
               : "Toutes les lignes utilisent le taux client par défaut."}
           </p>
-        ) : lines.length === 0 ? (
+        ) : lignes.length === 0 ? (
           <p className="muted quoteVatEmpty">Ajoute un ouvrage pour régler sa TVA.</p>
         ) : (
           <div className="quoteVatRows">
-            {lines.map((line) => {
+            {lignes.map((ligne) => {
               const overridden = quote.taxConfig.lineOverrides.some(
-                (override) => override.lineId === line.id,
+                (override) => override.lineId === ligne.id,
               );
               return (
-                <div className="quoteVatRow" key={line.id}>
+                <div className="quoteVatRow" key={ligne.id}>
                   <div>
-                    <strong>{line.description}</strong>
+                    <strong>{ligne.description}</strong>
                     <small>{overridden ? "Taux spécifique" : "Taux client par défaut"}</small>
                   </div>
                   <label>
-                    <span className="srOnly">TVA de {line.description}</span>
+                    <span className="srOnly">TVA de {ligne.description}</span>
                     <select
-                      value={rates[line.id] ?? rateInput(quote.taxConfig.defaultRatePercent)}
-                      onChange={(event) => {
-                        const next = event.target.value;
-                        setRates((current) => ({ ...current, [line.id]: next }));
-                        void saveLineRate(line.id, false, next);
+                      value={rates[ligne.id] ?? rateInput(quote.taxConfig.defaultRatePercent)}
+                      onChange={(evenement) => {
+                        const suivant = evenement.target.value;
+                        setRates((courant) => ({ ...courant, [ligne.id]: suivant }));
+                        void saveLineRate(ligne.id, false, suivant);
                       }}
                       disabled={!editable || savingLineId !== null}
-                      aria-label={`TVA de ${line.description}`}
+                      aria-label={`TVA de ${ligne.description}`}
                     >
                       {[0, 2.1, 5.5, 10, 20]
                         .map(rateInput)
                         .filter(
-                          (rate, index, all) =>
-                            all.indexOf(rate) === index || rate === rates[line.id],
+                          (rate, indice, all) =>
+                            all.indexOf(rate) === indice || rate === rates[ligne.id],
                         )
                         .map((rate) => (
                           <option key={rate} value={rate}>
@@ -274,9 +275,9 @@ export function QuoteLegalDetailsEditor({
                           </option>
                         ))}
                       {!["0", "2,1", "5,5", "10", "20"].includes(
-                        rates[line.id] ?? rateInput(quote.taxConfig.defaultRatePercent),
+                        rates[ligne.id] ?? rateInput(quote.taxConfig.defaultRatePercent),
                       ) ? (
-                        <option value={rates[line.id]}>{rates[line.id]} %</option>
+                        <option value={rates[ligne.id]}>{rates[ligne.id]} %</option>
                       ) : null}
                     </select>
                   </label>
@@ -285,7 +286,7 @@ export function QuoteLegalDetailsEditor({
                       <button
                         className="secondaryButton"
                         type="button"
-                        onClick={() => void saveLineRate(line.id, true)}
+                        onClick={() => void saveLineRate(ligne.id, true)}
                         disabled={savingLineId !== null}
                       >
                         Défaut
@@ -299,7 +300,7 @@ export function QuoteLegalDetailsEditor({
         )}
       </div>
 
-      {error ? <div className="quoteLegalMessage isError">{error}</div> : null}
+      {erreur ? <div className="quoteLegalMessage isError">{erreur}</div> : null}
       {notice ? <div className="quoteLegalMessage isSuccess">{notice}</div> : null}
 
       <style jsx>{`

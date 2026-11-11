@@ -39,29 +39,29 @@ function statusFor(code: string): number {
   return 400;
 }
 
-export async function POST(request: Request, context: RouteContext) {
+export async function POST(requete: Request, contexte: RouteContext) {
   try {
-    const { quoteId } = await context.params;
+    const { quoteId: idDevis } = await contexte.params;
     const requestContext = await requireModuleRequestContext("quotes", "WRITE");
-    const input = lifecycleSchema.parse(await request.json());
-    const actor = {
+    const saisie = lifecycleSchema.parse(await requete.json());
+    const auteur = {
       userId: requestContext.user.id,
       displayName: requestContext.user.displayName,
     };
     const repository = createQuotesRepository();
-    const expectedRevision = expectedQuoteRevision(request);
-    const mutation = await repository.mutate((payload) => {
-      assertQuoteRevision(payload, quoteId, expectedRevision);
-      if (input.action === "createVersion") return createQuoteVersion(payload, quoteId, actor);
-      if (input.action === "createVariant") return createQuoteVariant(payload, quoteId, actor);
-      return duplicateQuote(payload, quoteId, actor);
+    const expectedRevision = expectedQuoteRevision(requete);
+    const mutation = await repository.mutate((contenu) => {
+      assertQuoteRevision(contenu, idDevis, expectedRevision);
+      if (saisie.action === "createVersion") return createQuoteVersion(contenu, idDevis, auteur);
+      if (saisie.action === "createVariant") return createQuoteVariant(contenu, idDevis, auteur);
+      return duplicateQuote(contenu, idDevis, auteur);
     });
     return NextResponse.json(
       { payload: mutation.payload, focusQuoteId: mutation.focusQuoteId },
       { headers: { "Cache-Control": "no-store" } },
     );
-  } catch (error) {
-    const code = error instanceof Error ? error.message : "QUOTE_LIFECYCLE_FAILED";
+  } catch (erreur) {
+    const code = erreur instanceof Error ? erreur.message : "QUOTE_LIFECYCLE_FAILED";
     return NextResponse.json({ error: code }, { status: statusFor(code) });
   }
 }

@@ -21,7 +21,7 @@ const api = readFileSync(
 describe("personnel notice, copy and printable weekly board UI", () => {
   it("can add a date of departure to an existing member and hide/deactivate/reactivate/delete safely", () => {
     expect(workspace).toContain('action: "setStaffEndDate"');
-    expect(workspace).toContain("event.target.value || null");
+    expect(workspace).toContain("evenement.target.value || null");
     expect(workspace).toContain('action: "setPersonHidden"');
     expect(workspace).toContain("deactivateStaff");
     expect(workspace).toContain("reactivateStaff");
@@ -34,7 +34,7 @@ describe("personnel notice, copy and printable weekly board UI", () => {
     expect(cell).toContain("Coller jour");
     expect(board).toContain("papot.agencement.weekly-copied-day");
     expect(board).toContain('action: "pasteDailyEntries"');
-    expect(board).toContain("onCopyDay={() => copyDay(assignments.get(key) ?? [])}");
+    expect(board).toContain("onCopyDay={() => copyDay(assignments.get(cle) ?? [])}");
     expect(api).toContain("applyWeeklyBoardPaste");
     expect(api).toContain("PLANNING_DAY_PERSON_ABSENT");
     expect(api).toContain("personPresentOnDate");

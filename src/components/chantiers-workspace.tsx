@@ -51,30 +51,37 @@ const errorMessages: Record<string, string> = {
     "Indique explicitement que tu n'as pas le devis signé.",
 };
 
-function normalize(value: string): string {
-  return value.trim().toLocaleLowerCase("fr-FR");
+function normalize(valeur: string): string {
+  return valeur.trim().toLocaleLowerCase("fr-FR");
 }
 
-function formatDateOnly(value: string): string {
-  const [year, month, day] = value.split("-").map(Number);
+function formatDateOnly(valeur: string): string {
+  const [annee, mois, jour] = valeur.split("-").map(Number);
   return new Intl.DateTimeFormat("fr-FR", {
     day: "numeric",
     month: "short",
     year: "numeric",
-  }).format(new Date(year, month - 1, day, 12));
+  }).format(new Date(annee, mois - 1, jour, 12));
 }
 
-function matches(item: ChantierRecord, query: string): boolean {
-  if (!query) return true;
-  return [item.name, item.number, item.reference, item.clientName, item.companyName, item.siteLabel]
+function matches(element: ChantierRecord, requeteRecherche: string): boolean {
+  if (!requeteRecherche) return true;
+  return [
+    element.name,
+    element.number,
+    element.reference,
+    element.clientName,
+    element.companyName,
+    element.siteLabel,
+  ]
     .filter(Boolean)
-    .some((value) => normalize(String(value)).includes(query));
+    .some((valeur) => normalize(String(valeur)).includes(requeteRecherche));
 }
 
-function statusClass(item: ChantierRecord): string {
-  if (item.status === "DONE") return "done";
-  if (item.status === "CANCELLED") return "cancelled";
-  if (item.status === "ARCHIVED") return "archived";
+function statusClass(element: ChantierRecord): string {
+  if (element.status === "DONE") return "done";
+  if (element.status === "CANCELLED") return "cancelled";
+  if (element.status === "ARCHIVED") return "archived";
   return "active";
 }
 
@@ -82,11 +89,11 @@ export function ChantiersWorkspace() {
   const router = useRouter();
   const [chantiersSnapshot, setChantiersSnapshot] = useState<ChantiersSnapshot | null>(null);
   const [commercialSnapshot, setCommercialSnapshot] = useState<CommercialSnapshot | null>(null);
-  const [loading, setLoading] = useState(true);
+  const [chargement, setLoading] = useState(true);
   const [busy, setBusy] = useState(false);
-  const [error, setError] = useState<string | null>(null);
+  const [erreur, setError] = useState<string | null>(null);
   const [mode, setMode] = useState<ViewMode>("ACTIVE");
-  const [query, setQuery] = useState("");
+  const [requeteRecherche, setQuery] = useState("");
   const [launchCaseId, setLaunchCaseId] = useState<string | null>(null);
 
   const load = useCallback(async () => {
@@ -121,33 +128,33 @@ export function ChantiersWorkspace() {
 
   const chantiers = useMemo(() => chantiersSnapshot?.payload.chantiers ?? [], [chantiersSnapshot]);
   const launchedCommercialIds = useMemo(
-    () => new Set(chantiers.map((item) => item.sourceCommercialCaseId)),
+    () => new Set(chantiers.map((element) => element.sourceCommercialCaseId)),
     [chantiers],
   );
   const launchCandidates = useMemo(
     () =>
       (commercialSnapshot?.payload.cases ?? []).filter(
-        (item) => item.status === "CONFIRMED" && !launchedCommercialIds.has(item.id),
+        (element) => element.status === "CONFIRMED" && !launchedCommercialIds.has(element.id),
       ),
     [commercialSnapshot, launchedCommercialIds],
   );
 
-  const normalizedQuery = normalize(query);
+  const normalizedQuery = normalize(requeteRecherche);
   const visible = useMemo(() => {
-    const filtered = chantiers.filter((item) => matches(item, normalizedQuery));
+    const filtered = chantiers.filter((element) => matches(element, normalizedQuery));
     if (normalizedQuery) return filtered;
-    return filtered.filter((item) => item.status === mode);
+    return filtered.filter((element) => element.status === mode);
   }, [chantiers, normalizedQuery, mode]);
 
-  const selectedLaunch = launchCandidates.find((item) => item.id === launchCaseId) ?? null;
+  const selectedLaunch = launchCandidates.find((element) => element.id === launchCaseId) ?? null;
   const counts = {
-    active: chantiers.filter((item) => item.status === "ACTIVE").length,
-    done: chantiers.filter((item) => item.status === "DONE").length,
-    archived: chantiers.filter((item) => item.status === "ARCHIVED").length,
-    cancelled: chantiers.filter((item) => item.status === "CANCELLED").length,
+    active: chantiers.filter((element) => element.status === "ACTIVE").length,
+    done: chantiers.filter((element) => element.status === "DONE").length,
+    archived: chantiers.filter((element) => element.status === "ARCHIVED").length,
+    cancelled: chantiers.filter((element) => element.status === "CANCELLED").length,
   };
 
-  async function launch(body: {
+  async function launch(corps: {
     commercialCaseId: string;
     quoteMissingDeclared: boolean;
     signedQuoteMissingDeclared: boolean;
@@ -158,16 +165,16 @@ export function ChantiersWorkspace() {
     setBusy(true);
     setError(null);
     try {
-      const response = await fetch("/api/desktop/chantiers/launch", {
+      const reponse = await fetch("/api/desktop/chantiers/launch", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(body),
+        body: JSON.stringify(corps),
       });
-      const result = (await response.json()) as ChantiersSnapshot & { error?: string };
-      if (!response.ok) throw new Error(result.error ?? "CHANTIER_LAUNCH_FAILED");
-      setChantiersSnapshot(result);
+      const resultat = (await reponse.json()) as ChantiersSnapshot & { error?: string };
+      if (!reponse.ok) throw new Error(resultat.error ?? "CHANTIER_LAUNCH_FAILED");
+      setChantiersSnapshot(resultat);
       setLaunchCaseId(null);
-      if (result.focusChantierId) router.push(`/chantiers/${result.focusChantierId}`);
+      if (resultat.focusChantierId) router.push(`/chantiers/${resultat.focusChantierId}`);
     } catch (launchError) {
       const code = launchError instanceof Error ? launchError.message : "CHANTIER_LAUNCH_FAILED";
       setError(errorMessages[code] ?? "Le chantier n'a pas pu être lancé.");
@@ -193,7 +200,7 @@ export function ChantiersWorkspace() {
         </button>
       </section>
 
-      {error ? <div className="chantiersError">{error}</div> : null}
+      {erreur ? <div className="chantiersError">{erreur}</div> : null}
 
       <section className="chantiersSummary">
         <SummaryCard icon={FolderOpen} label="Actifs" value={counts.active} />
@@ -214,26 +221,28 @@ export function ChantiersWorkspace() {
             </div>
           </div>
           <div className="chantiersLaunchList">
-            {launchCandidates.map((item) => (
+            {launchCandidates.map((element) => (
               <button
-                key={item.id}
+                key={element.id}
                 type="button"
-                className={launchCaseId === item.id ? "isSelected" : undefined}
-                onClick={() => setLaunchCaseId((current) => (current === item.id ? null : item.id))}
+                className={launchCaseId === element.id ? "isSelected" : undefined}
+                onClick={() =>
+                  setLaunchCaseId((courant) => (courant === element.id ? null : element.id))
+                }
               >
                 <span>
                   <BriefcaseBusiness size={14} />
                 </span>
                 <div>
-                  <strong>{item.name}</strong>
+                  <strong>{element.name}</strong>
                   <small>
-                    {[item.clientName, item.siteLabel].filter(Boolean).join(" · ") ||
+                    {[element.clientName, element.siteLabel].filter(Boolean).join(" · ") ||
                       "Client / lieu à compléter"}
                   </small>
                 </div>
                 <em>
-                  {item.plannedInstallDate
-                    ? formatDateOnly(item.plannedInstallDate)
+                  {element.plannedInstallDate
+                    ? formatDateOnly(element.plannedInstallDate)
                     : "Pose à compléter"}
                 </em>
               </button>
@@ -284,11 +293,11 @@ export function ChantiersWorkspace() {
         <label className="chantiersSearch">
           <Search size={14} />
           <input
-            value={query}
-            onChange={(event) => setQuery(event.target.value)}
+            value={requeteRecherche}
+            onChange={(evenement) => setQuery(evenement.target.value)}
             placeholder="Nom, numéro, référence, client, société, lieu…"
           />
-          {query ? (
+          {requeteRecherche ? (
             <button type="button" onClick={() => setQuery("")}>
               <X size={13} />
             </button>
@@ -296,7 +305,7 @@ export function ChantiersWorkspace() {
         </label>
       </section>
 
-      {loading && !chantiersSnapshot ? (
+      {chargement && !chantiersSnapshot ? (
         <div className="chantiersEmpty">
           <RefreshCw className="chantiersSpin" size={20} /> Chargement des chantiers…
         </div>
@@ -314,26 +323,26 @@ export function ChantiersWorkspace() {
         </div>
       ) : (
         <div className="chantiersTable">
-          {visible.map((item) => (
-            <Link key={item.id} href={`/chantiers/${item.id}`} className="chantiersRow">
-              <span className={`chantierStatus chantierStatus-${statusClass(item)}`}>
-                {CHANTIER_STATUS_LABELS[item.status]}
+          {visible.map((element) => (
+            <Link key={element.id} href={`/chantiers/${element.id}`} className="chantiersRow">
+              <span className={`chantierStatus chantierStatus-${statusClass(element)}`}>
+                {CHANTIER_STATUS_LABELS[element.status]}
               </span>
               <div className="chantiersRowMain">
-                <strong>{item.name}</strong>
+                <strong>{element.name}</strong>
                 <span>
-                  {[item.clientName, item.companyName, item.siteLabel]
+                  {[element.clientName, element.companyName, element.siteLabel]
                     .filter(Boolean)
                     .join(" · ") || "Client / lieu à compléter"}
                 </span>
               </div>
               <div className="chantiersRowRefs">
-                <span>{item.number || "N° à compléter"}</span>
-                <small>{item.reference || "Référence à compléter"}</small>
+                <span>{element.number || "N° à compléter"}</span>
+                <small>{element.reference || "Référence à compléter"}</small>
               </div>
               <div className="chantiersRowDate">
                 <CalendarClock size={13} />
-                <span>{formatDateOnly(item.plannedInstallDate)}</span>
+                <span>{formatDateOnly(element.plannedInstallDate)}</span>
               </div>
               <FileText size={15} className="chantiersRowArrow" />
             </Link>
@@ -348,8 +357,8 @@ export function ChantiersWorkspace() {
 
 function SummaryCard({
   icon: Icon,
-  label,
-  value,
+  label: libelle,
+  value: valeur,
   accent,
 }: {
   icon: typeof FolderOpen;
@@ -362,14 +371,14 @@ function SummaryCard({
       <span>
         <Icon size={17} />
       </span>
-      <strong>{value}</strong>
-      <small>{label}</small>
+      <strong>{valeur}</strong>
+      <small>{libelle}</small>
     </div>
   );
 }
 
 function LaunchSheet({
-  item,
+  item: element,
   busy,
   onCancel,
   onLaunch,
@@ -377,7 +386,7 @@ function LaunchSheet({
   item: CommercialCase;
   busy: boolean;
   onCancel: () => void;
-  onLaunch: (body: {
+  onLaunch: (corps: {
     commercialCaseId: string;
     quoteMissingDeclared: boolean;
     signedQuoteMissingDeclared: boolean;
@@ -387,9 +396,9 @@ function LaunchSheet({
   }) => Promise<void>;
 }) {
   const quotePresent =
-    item.retainedQuoteIds.length > 0 ||
-    item.documents.some((document) => document.category === "QUOTE");
-  const signedQuotePresent = item.documents.some(
+    element.retainedQuoteIds.length > 0 ||
+    element.documents.some((document) => document.category === "QUOTE");
+  const signedQuotePresent = element.documents.some(
     (document) => document.category === "QUOTE" && document.isSignedQuote,
   );
   const [quoteMissing, setQuoteMissing] = useState(false);
@@ -402,7 +411,7 @@ function LaunchSheet({
     <div className="launchSheet">
       <div className="launchSheetTitle">
         <div>
-          <strong>Feuille de lancement · {item.name}</strong>
+          <strong>Feuille de lancement · {element.name}</strong>
           <span>
             Les informations déjà connues sont reprises. Les absences doivent être déclarées
             explicitement.
@@ -439,7 +448,7 @@ function LaunchSheet({
         disabled={busy || !declarationsOk}
         onClick={() =>
           void onLaunch({
-            commercialCaseId: item.id,
+            commercialCaseId: element.id,
             quoteMissingDeclared: !quotePresent && quoteMissing,
             signedQuoteMissingDeclared: !signedQuotePresent && signedQuoteMissing,
             be: 0,
@@ -455,19 +464,19 @@ function LaunchSheet({
 }
 
 function LaunchDocument({
-  label,
+  label: libelle,
   present,
-  checked,
+  checked: coche,
   onChange,
 }: {
   label: string;
   present: boolean;
   checked: boolean;
-  onChange: (value: boolean) => void;
+  onChange: (valeur: boolean) => void;
 }) {
   return (
     <div className={present ? "isPresent" : "isMissing"}>
-      <strong>{label}</strong>
+      <strong>{libelle}</strong>
       {present ? (
         <span>
           <CheckCircle2 size={13} /> Déjà présent
@@ -476,8 +485,8 @@ function LaunchDocument({
         <label>
           <input
             type="checkbox"
-            checked={checked}
-            onChange={(event) => onChange(event.target.checked)}
+            checked={coche}
+            onChange={(evenement) => onChange(evenement.target.checked)}
           />{" "}
           Je n&apos;ai pas
         </label>

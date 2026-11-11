@@ -3,32 +3,38 @@ type NavigableClient = {
   isArchived: boolean;
 };
 
-export function clientWorkspaceHref(clientId: string): string {
-  return `/clients?focus=${encodeURIComponent(clientId)}`;
+export function clientWorkspaceHref(idClient: string): string {
+  return `/clients?focus=${encodeURIComponent(idClient)}`;
 }
 
 export function resolveClientWorkspaceSelection(
   clients: NavigableClient[],
-  requestedFocusId: string | null,
-  currentSelectedId: string | null,
+  idFocusDemande: string | null,
+  idSelectionCourante: string | null,
 ): { selectedId: string | null; revealArchived: boolean } {
-  const focused = requestedFocusId
-    ? clients.find((client) => client.id === requestedFocusId)
+  const clientFocus = idFocusDemande
+    ? clients.find((client) => client.id === idFocusDemande)
     : undefined;
-  if (focused) {
-    return { selectedId: focused.id, revealArchived: focused.isArchived };
+  if (clientFocus) {
+    return {
+      selectedId: clientFocus.id,
+      revealArchived: clientFocus.isArchived,
+    };
   }
 
-  const current = currentSelectedId
-    ? clients.find((client) => client.id === currentSelectedId)
+  const clientCourant = idSelectionCourante
+    ? clients.find((client) => client.id === idSelectionCourante)
     : undefined;
-  if (current) {
-    return { selectedId: current.id, revealArchived: current.isArchived };
+  if (clientCourant) {
+    return {
+      selectedId: clientCourant.id,
+      revealArchived: clientCourant.isArchived,
+    };
   }
 
-  const fallback = clients.find((client) => !client.isArchived) ?? clients[0] ?? null;
+  const clientSecours = clients.find((client) => !client.isArchived) ?? clients[0] ?? null;
   return {
-    selectedId: fallback?.id ?? null,
-    revealArchived: fallback?.isArchived ?? false,
+    selectedId: clientSecours?.id ?? null,
+    revealArchived: clientSecours?.isArchived ?? false,
   };
 }

@@ -10,8 +10,8 @@ type QuoteDetailsResponse = {
   error?: string;
 };
 
-function formatDate(value: string): string {
-  return new Intl.DateTimeFormat("fr-FR").format(new Date(`${value}T12:00:00`));
+function formatDate(valeur: string): string {
+  return new Intl.DateTimeFormat("fr-FR").format(new Date(`${valeur}T12:00:00`));
 }
 
 function errorLabel(code: string): string {
@@ -36,20 +36,20 @@ export function QuoteGeneralInfoEditor({
   affairName: string;
   paymentTermOptions: string[];
   canWrite: boolean;
-  onSaved: (payload: NativeQuotesPayload) => void;
+  onSaved: (contenu: NativeQuotesPayload) => void;
 }) {
   const editable = canWrite && quote.status === "DRAFT";
   const [editing, setEditing] = useState(false);
   const [subject, setSubject] = useState(quote.model.subject);
   const [issueDate, setIssueDate] = useState(quote.model.issueDate);
   const [paymentTerms, setPaymentTerms] = useState(quote.model.paymentTerms);
-  const [saving, setSaving] = useState(false);
-  const [error, setError] = useState("");
+  const [sauvegardeEnCours, setSaving] = useState(false);
+  const [erreur, setError] = useState("");
   const availablePaymentTerms = Array.from(
     new Set(
       [quote.model.paymentTerms, ...paymentTermOptions]
-        .map((value) => value.trim())
-        .filter((value) => value.length > 0),
+        .map((valeur) => valeur.trim())
+        .filter((valeur) => valeur.length > 0),
     ),
   );
 
@@ -66,14 +66,14 @@ export function QuoteGeneralInfoEditor({
     setEditing(false);
   }
 
-  async function save(event: FormEvent<HTMLFormElement>) {
-    event.preventDefault();
-    if (!editable || saving) return;
+  async function save(evenement: FormEvent<HTMLFormElement>) {
+    evenement.preventDefault();
+    if (!editable || sauvegardeEnCours) return;
 
     setSaving(true);
     setError("");
     try {
-      const response = await fetch(`/api/desktop/quotes/${quote.id}/details`, {
+      const reponse = await fetch(`/api/desktop/quotes/${quote.id}/details`, {
         method: "PATCH",
         headers: {
           "Content-Type": "application/json",
@@ -85,12 +85,12 @@ export function QuoteGeneralInfoEditor({
           paymentTerms,
         }),
       });
-      const data = (await response.json()) as QuoteDetailsResponse;
-      if (!response.ok || !data.payload) {
-        setError(errorLabel(data.error ?? "QUOTE_DETAILS_UPDATE_FAILED"));
+      const donnees = (await reponse.json()) as QuoteDetailsResponse;
+      if (!reponse.ok || !donnees.payload) {
+        setError(errorLabel(donnees.error ?? "QUOTE_DETAILS_UPDATE_FAILED"));
         return;
       }
-      onSaved(data.payload);
+      onSaved(donnees.payload);
       setEditing(false);
     } catch {
       setError("Les informations du devis n’ont pas pu être enregistrées.");
@@ -134,10 +134,10 @@ export function QuoteGeneralInfoEditor({
             <span>Objet</span>
             <input
               value={subject}
-              onChange={(event) => setSubject(event.target.value)}
+              onChange={(evenement) => setSubject(evenement.target.value)}
               maxLength={240}
               required
-              disabled={saving}
+              disabled={sauvegardeEnCours}
             />
           </label>
 
@@ -153,9 +153,9 @@ export function QuoteGeneralInfoEditor({
             <input
               type="date"
               value={issueDate}
-              onChange={(event) => setIssueDate(event.target.value)}
+              onChange={(evenement) => setIssueDate(evenement.target.value)}
               required
-              disabled={saving}
+              disabled={sauvegardeEnCours}
             />
           </label>
 
@@ -163,9 +163,9 @@ export function QuoteGeneralInfoEditor({
             <span>Conditions de règlement</span>
             <select
               value={paymentTerms}
-              onChange={(event) => setPaymentTerms(event.target.value)}
+              onChange={(evenement) => setPaymentTerms(evenement.target.value)}
               required
-              disabled={saving}
+              disabled={sauvegardeEnCours}
             >
               {availablePaymentTerms.map((terms) => (
                 <option key={terms} value={terms}>
@@ -175,17 +175,18 @@ export function QuoteGeneralInfoEditor({
             </select>
           </label>
 
-          {error ? <div className="quoteGeneralError quoteGeneralWide">{error}</div> : null}
+          {erreur ? <div className="quoteGeneralError quoteGeneralWide">{erreur}</div> : null}
 
           <div className="quoteGeneralActions quoteGeneralWide">
-            <button className="primaryButton" type="submit" disabled={saving}>
-              <Check size={14} aria-hidden="true" /> {saving ? "Enregistrement…" : "Enregistrer"}
+            <button className="primaryButton" type="submit" disabled={sauvegardeEnCours}>
+              <Check size={14} aria-hidden="true" />{" "}
+              {sauvegardeEnCours ? "Enregistrement…" : "Enregistrer"}
             </button>
             <button
               className="secondaryButton"
               type="button"
               onClick={closeEditor}
-              disabled={saving}
+              disabled={sauvegardeEnCours}
             >
               <X size={14} aria-hidden="true" /> Annuler
             </button>

@@ -28,8 +28,8 @@ type QuoteLibraryOuvrageInsert = QuoteLibraryInsertBase & {
   ouvrageId: string;
 };
 
-function parseInsertQuantity(value: number | undefined): number {
-  const quantity = value ?? 1;
+function parseInsertQuantity(valeur: number | undefined): number {
+  const quantity = valeur ?? 1;
   if (!Number.isFinite(quantity) || quantity <= 0 || quantity > QUOTE_MAX_QUANTITY) {
     throw new Error("QUOTE_LIBRARY_QUANTITY_INVALID");
   }
@@ -49,13 +49,13 @@ function snapshotComponent(component: LibraryComponent): QuoteLibraryComponentSn
 }
 
 function findComponent(library: LibraryPayload, componentId: string): LibraryComponent {
-  const component = library.components.find((candidate) => candidate.id === componentId);
+  const component = library.components.find((candidat) => candidat.id === componentId);
   if (!component) throw new Error("QUOTE_LIBRARY_COMPONENT_NOT_FOUND");
   return component;
 }
 
 function findOuvrage(library: LibraryPayload, ouvrageId: string): LibraryOuvrage {
-  const ouvrage = library.ouvrages.find((candidate) => candidate.id === ouvrageId);
+  const ouvrage = library.ouvrages.find((candidat) => candidat.id === ouvrageId);
   if (!ouvrage) throw new Error("QUOTE_LIBRARY_OUVRAGE_NOT_FOUND");
   return ouvrage;
 }
@@ -68,12 +68,12 @@ function multiplyMoneyCents(quantity: number, amountCents: number): number {
   return total;
 }
 
-function addMoneyCents(total: number, amount: number): number {
-  const next = total + amount;
-  if (!Number.isSafeInteger(next) || next < 0) {
+function addMoneyCents(total: number, montant: number): number {
+  const suivant = total + montant;
+  if (!Number.isSafeInteger(suivant) || suivant < 0) {
     throw new Error("QUOTE_LIBRARY_PRICE_INVALID");
   }
-  return next;
+  return suivant;
 }
 
 function snapshotOuvrage(
@@ -83,21 +83,21 @@ function snapshotOuvrage(
   let costPriceCents = 0;
   let salePriceCents = 0;
 
-  const components = ouvrage.components.map((line) => {
-    const component = findComponent(library, line.componentId);
+  const components = ouvrage.components.map((ligne) => {
+    const component = findComponent(library, ligne.componentId);
     const componentSnapshot = snapshotComponent(component);
     costPriceCents = addMoneyCents(
       costPriceCents,
-      multiplyMoneyCents(line.quantity, component.costPriceCents),
+      multiplyMoneyCents(ligne.quantity, component.costPriceCents),
     );
     salePriceCents = addMoneyCents(
       salePriceCents,
-      multiplyMoneyCents(line.quantity, component.salePriceCents),
+      multiplyMoneyCents(ligne.quantity, component.salePriceCents),
     );
 
     return {
-      sourceLineId: line.id,
-      quantity: line.quantity,
+      sourceLineId: ligne.id,
+      quantity: ligne.quantity,
       component: componentSnapshot,
     };
   });
@@ -134,25 +134,27 @@ function quoteComponentFromSnapshot(
   };
 }
 
-function appendLibraryLine(quote: QuoteModel, line: QuoteLine): QuoteModel {
+function appendLibraryLine(quote: QuoteModel, ligne: QuoteLine): QuoteModel {
   return parseQuoteModel({
     ...quote,
-    items: [...quote.items, line],
+    items: [...quote.items, ligne],
   });
 }
 
-export function insertLibraryComponentIntoQuote(params: QuoteLibraryComponentInsert): QuoteModel {
-  const quote = parseQuoteModel(params.quote);
-  const component = findComponent(params.library, params.componentId);
+export function insertLibraryComponentIntoQuote(
+  parametres: QuoteLibraryComponentInsert,
+): QuoteModel {
+  const quote = parseQuoteModel(parametres.quote);
+  const component = findComponent(parametres.library, parametres.componentId);
   const componentSnapshot = snapshotComponent(component);
   const components = [
-    quoteComponentFromSnapshot(componentSnapshot, parseInsertQuantity(params.quantity)),
+    quoteComponentFromSnapshot(componentSnapshot, parseInsertQuantity(parametres.quantity)),
   ];
 
   return appendLibraryLine(quote, {
-    id: params.lineId,
+    id: parametres.lineId,
     kind: "LINE",
-    parentId: params.parentId ?? null,
+    parentId: parametres.parentId ?? null,
     description: component.name,
     unit: "u",
     quantity: 1,
@@ -167,21 +169,21 @@ export function insertLibraryComponentIntoQuote(params: QuoteLibraryComponentIns
   });
 }
 
-export function insertLibraryOuvrageIntoQuote(params: QuoteLibraryOuvrageInsert): QuoteModel {
-  const quote = parseQuoteModel(params.quote);
-  const ouvrage = findOuvrage(params.library, params.ouvrageId);
-  const ouvrageSnapshot = snapshotOuvrage(params.library, ouvrage);
-  const components = ouvrageSnapshot.components.map((line) =>
-    quoteComponentFromSnapshot(line.component, line.quantity, line.sourceLineId),
+export function insertLibraryOuvrageIntoQuote(parametres: QuoteLibraryOuvrageInsert): QuoteModel {
+  const quote = parseQuoteModel(parametres.quote);
+  const ouvrage = findOuvrage(parametres.library, parametres.ouvrageId);
+  const ouvrageSnapshot = snapshotOuvrage(parametres.library, ouvrage);
+  const components = ouvrageSnapshot.components.map((ligne) =>
+    quoteComponentFromSnapshot(ligne.component, ligne.quantity, ligne.sourceLineId),
   );
 
   return appendLibraryLine(quote, {
-    id: params.lineId,
+    id: parametres.lineId,
     kind: "LINE",
-    parentId: params.parentId ?? null,
+    parentId: parametres.parentId ?? null,
     description: ouvrage.name,
     unit: "u",
-    quantity: parseInsertQuantity(params.quantity),
+    quantity: parseInsertQuantity(parametres.quantity),
     quantityFormula: null,
     unitPriceCents: calculateQuoteOuvrageUnitPriceCents(components),
     components,

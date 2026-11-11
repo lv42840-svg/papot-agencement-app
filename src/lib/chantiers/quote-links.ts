@@ -24,59 +24,61 @@ export type ChantierRetainedQuote = {
   lines: ChantierQuoteLineReference[];
 };
 
-function quoteNumber(quote: NativeQuoteRecord): string {
-  return quote.finalPdf?.quoteNumber ?? `${quote.variantName} · V${quote.version}`;
+function quoteNumber(devis: NativeQuoteRecord): string {
+  return devis.finalPdf?.quoteNumber ?? `${devis.variantName} · V${devis.version}`;
 }
 
-function lineReference(quote: NativeQuoteRecord, line: QuoteLine): ChantierQuoteLineReference {
+function lineReference(devis: NativeQuoteRecord, ligne: QuoteLine): ChantierQuoteLineReference {
   return {
-    quoteId: quote.id,
-    quoteLineId: line.id,
-    quoteNumber: quoteNumber(quote),
-    quoteKind: quote.quoteKind,
-    variantName: quote.variantName,
-    version: quote.version,
-    subject: quote.model.subject,
-    description: line.description,
-    unit: line.unit,
-    quantity: line.quantity,
+    quoteId: devis.id,
+    quoteLineId: ligne.id,
+    quoteNumber: quoteNumber(devis),
+    quoteKind: devis.quoteKind,
+    variantName: devis.variantName,
+    version: devis.version,
+    subject: devis.model.subject,
+    description: ligne.description,
+    unit: ligne.unit,
+    quantity: ligne.quantity,
   };
 }
 
 export function retainedChantierQuotes(
-  affair: CommercialCase,
+  affaire: CommercialCase,
   source: NativeQuotesPayload,
 ): ChantierRetainedQuote[] {
-  const payload = parseNativeQuotesPayload(source);
-  const retainedIds = new Set(affair.retainedQuoteIds);
+  const donnees = parseNativeQuotesPayload(source);
+  const identifiantsRetenus = new Set(affaire.retainedQuoteIds);
 
-  return payload.quotes
-    .filter((quote) => quote.commercialCaseId === affair.id && retainedIds.has(quote.id))
-    .map((quote) => ({
-      quote,
-      lines: quote.model.items
-        .filter((item): item is QuoteLine => item.kind === "LINE")
-        .map((line) => lineReference(quote, line)),
+  return donnees.quotes
+    .filter((devis) => devis.commercialCaseId === affaire.id && identifiantsRetenus.has(devis.id))
+    .map((devis) => ({
+      quote: devis,
+      lines: devis.model.items
+        .filter((element): element is QuoteLine => element.kind === "LINE")
+        .map((ligne) => lineReference(devis, ligne)),
     }));
 }
 
 export function retainedChantierQuoteLines(
-  affair: CommercialCase,
+  affaire: CommercialCase,
   source: NativeQuotesPayload,
 ): ChantierQuoteLineReference[] {
-  return retainedChantierQuotes(affair, source).flatMap((entry) => entry.lines);
+  return retainedChantierQuotes(affaire, source).flatMap((entree) => entree.lines);
 }
 
 export function resolveRetainedChantierQuoteLine(
-  affair: CommercialCase,
+  affaire: CommercialCase,
   source: NativeQuotesPayload,
-  quoteId: string,
-  quoteLineId: string,
+  idDevis: string,
+  idLigneDevis: string,
 ): ChantierQuoteLineReference {
-  const reference = retainedChantierQuoteLines(affair, source).find(
-    (candidate) => candidate.quoteId === quoteId && candidate.quoteLineId === quoteLineId,
+  const reference = retainedChantierQuoteLines(affaire, source).find(
+    (candidat) => candidat.quoteId === idDevis && candidat.quoteLineId === idLigneDevis,
   );
-  if (!reference) throw new Error("CHANTIER_QUOTE_LINE_INVALID");
+  if (!reference) {
+    throw new Error("CHANTIER_QUOTE_LINE_INVALID");
+  }
   return reference;
 }
 

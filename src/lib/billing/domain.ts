@@ -42,15 +42,15 @@ export const billingDocumentLineSchema = z
     unitPriceCents: centsSchema,
     vatRatePercent: z.number().finite().min(0).max(100),
   })
-  .superRefine((line, ctx) => {
-    if (line.origin === "TITLE") {
-      if (line.quantity !== 0 || line.unitPriceCents !== 0 || line.sourceLineId !== null) {
+  .superRefine((ligne, ctx) => {
+    if (ligne.origin === "TITLE") {
+      if (ligne.quantity !== 0 || ligne.unitPriceCents !== 0 || ligne.sourceLineId !== null) {
         ctx.addIssue({ code: z.ZodIssueCode.custom, message: "BILLING_TITLE_INVALID" });
       }
     } else if (
-      line.quantity <= 0 ||
-      (line.origin === "QUOTE" && !line.sourceLineId) ||
-      (line.origin === "FREE" && line.sourceLineId !== null)
+      ligne.quantity <= 0 ||
+      (ligne.origin === "QUOTE" && !ligne.sourceLineId) ||
+      (ligne.origin === "FREE" && ligne.sourceLineId !== null)
     ) {
       ctx.addIssue({ code: z.ZodIssueCode.custom, message: "BILLING_DOCUMENT_LINE_INVALID" });
     }
@@ -107,7 +107,9 @@ export const billingTitlesSchema = z
   .min(1)
   .max(50)
   .refine(
-    (items) => new Set(items.map((item) => item.toLocaleLowerCase("fr-FR"))).size === items.length,
+    (elements) =>
+      new Set(elements.map((element) => element.toLocaleLowerCase("fr-FR"))).size ===
+      elements.length,
     "BILLING_TITLES_DUPLICATE",
   );
 
@@ -118,39 +120,39 @@ export const billingPayloadSchema = z.object({
 });
 export type BillingPayload = z.infer<typeof billingPayloadSchema>;
 
-export function parseBillingPayload(value: unknown): BillingPayload {
-  if (value === null || value === undefined) return { schemaVersion: 1, drafts: [] };
-  return billingPayloadSchema.parse(value);
+export function parseBillingPayload(valeur: unknown): BillingPayload {
+  if (valeur === null || valeur === undefined) return { schemaVersion: 1, drafts: [] };
+  return billingPayloadSchema.parse(valeur);
 }
 
 export function preparedHtCents(
-  payload: BillingPayload,
-  quoteId: string,
+  contenu: BillingPayload,
+  idDevis: string,
   excludingId?: string,
 ): number {
-  return payload.drafts
-    .filter((draft) => draft.quoteId === quoteId && draft.id !== excludingId)
-    .reduce((sum, draft) => sum + draft.amountHtCents, 0);
+  return contenu.drafts
+    .filter((brouillon) => brouillon.quoteId === idDevis && brouillon.id !== excludingId)
+    .reduce((somme, brouillon) => somme + brouillon.amountHtCents, 0);
 }
 
 function assertSource(source: BillingSource): BillingSource {
   const valid = billingSourceSchema.parse(source);
   if (
-    valid.contractTaxGroups.reduce((sum, group) => sum + group.baseHtCents, 0) !==
+    valid.contractTaxGroups.reduce((somme, group) => somme + group.baseHtCents, 0) !==
     valid.contractHtCents
   ) {
     throw new Error("BILLING_SOURCE_TOTAL_MISMATCH");
   }
   if (valid.lines?.length) {
-    const lineTotal = valid.lines.reduce((sum, line) => sum + line.amountHtCents, 0);
+    const lineTotal = valid.lines.reduce((somme, ligne) => somme + ligne.amountHtCents, 0);
     if (lineTotal !== valid.contractHtCents) throw new Error("BILLING_SOURCE_LINES_MISMATCH");
-    if (new Set(valid.lines.map((line) => line.lineId)).size !== valid.lines.length) {
+    if (new Set(valid.lines.map((ligne) => ligne.lineId)).size !== valid.lines.length) {
       throw new Error("BILLING_SOURCE_LINES_DUPLICATE");
     }
     for (const group of valid.contractTaxGroups) {
       const fromLines = valid.lines
-        .filter((line) => line.vatRatePercent === group.ratePercent)
-        .reduce((sum, line) => sum + line.amountHtCents, 0);
+        .filter((ligne) => ligne.vatRatePercent === group.ratePercent)
+        .reduce((somme, ligne) => somme + ligne.amountHtCents, 0);
       if (fromLines !== group.baseHtCents) throw new Error("BILLING_SOURCE_TAX_MISMATCH");
     }
   }
@@ -164,61 +166,65 @@ export function distributeBillingTax(
   if (!Number.isSafeInteger(amountHtCents) || amountHtCents <= 0) {
     throw new Error("BILLING_AMOUNT_INVALID");
   }
-  const contractHtCents = groups.reduce((sum, group) => sum + group.baseHtCents, 0);
+  const contractHtCents = groups.reduce((somme, group) => somme + group.baseHtCents, 0);
   if (!Number.isSafeInteger(contractHtCents) || amountHtCents > contractHtCents) {
     throw new Error("BILLING_AMOUNT_EXCEEDS_CONTRACT");
   }
   // Largest remainder keeps the total at exactly the requested cent, across VAT rates.
-  const allocations = groups.map((group, index) => {
+  const allocations = groups.map((group, indice) => {
     const raw = (amountHtCents * group.baseHtCents) / contractHtCents;
     return {
-      index,
+      index: indice,
       ratePercent: group.ratePercent,
       baseHtCents: Math.floor(raw),
       fraction: raw % 1,
     };
   });
-  let remaining = amountHtCents - allocations.reduce((sum, row) => sum + row.baseHtCents, 0);
-  for (const row of [...allocations].sort((a, b) => b.fraction - a.fraction || a.index - b.index)) {
+  let remaining =
+    amountHtCents -
+    allocations.reduce((somme, ligneTableau) => somme + ligneTableau.baseHtCents, 0);
+  for (const ligneTableau of [...allocations].sort(
+    (a, b) => b.fraction - a.fraction || a.index - b.index,
+  )) {
     if (remaining <= 0) break;
-    row.baseHtCents += 1;
+    ligneTableau.baseHtCents += 1;
     remaining -= 1;
   }
-  const taxGroups = allocations.map((row) => ({
-    ratePercent: row.ratePercent,
-    baseHtCents: row.baseHtCents,
-    vatCents: Math.round((row.baseHtCents * row.ratePercent) / 100),
+  const taxGroups = allocations.map((ligneTableau) => ({
+    ratePercent: ligneTableau.ratePercent,
+    baseHtCents: ligneTableau.baseHtCents,
+    vatCents: Math.round((ligneTableau.baseHtCents * ligneTableau.ratePercent) / 100),
   }));
-  const vatCents = taxGroups.reduce((sum, group) => sum + group.vatCents, 0);
+  const vatCents = taxGroups.reduce((somme, group) => somme + group.vatCents, 0);
   return { groups: taxGroups, vatCents, ttcCents: amountHtCents + vatCents };
 }
 
-export function resolveBillingAmount(input: {
+export function resolveBillingAmount(saisie: {
   type: BillingType;
   contractHtCents: number;
   alreadyPreparedCents: number;
   amountHtCents?: number;
   cumulativePercent?: number;
 }): number {
-  const { type, contractHtCents, alreadyPreparedCents } = input;
+  const { type, contractHtCents, alreadyPreparedCents } = saisie;
   const remaining = contractHtCents - alreadyPreparedCents;
   if (remaining <= 0) throw new Error("BILLING_CONTRACT_ALREADY_PREPARED");
   let amountHtCents: number;
   if (type === "STANDARD" || type === "FINAL") {
     amountHtCents = remaining;
-  } else if (input.cumulativePercent !== undefined) {
+  } else if (saisie.cumulativePercent !== undefined) {
     if (
-      !Number.isFinite(input.cumulativePercent) ||
-      input.cumulativePercent <= 0 ||
-      input.cumulativePercent > 100
+      !Number.isFinite(saisie.cumulativePercent) ||
+      saisie.cumulativePercent <= 0 ||
+      saisie.cumulativePercent > 100
     )
       throw new Error("BILLING_PERCENT_INVALID");
-    const percentTarget = Math.round((contractHtCents * input.cumulativePercent) / 100);
+    const percentTarget = Math.round((contractHtCents * saisie.cumulativePercent) / 100);
     // Situation = cumulative advancement, from which previous invoices/deposits are deducted.
     // Deposit = percentage of the contract, not cumulative advancement.
     amountHtCents = type === "PROGRESS" ? percentTarget - alreadyPreparedCents : percentTarget;
   } else {
-    amountHtCents = input.amountHtCents ?? 0;
+    amountHtCents = saisie.amountHtCents ?? 0;
   }
   if (!Number.isSafeInteger(amountHtCents) || amountHtCents <= 0) {
     throw new Error("BILLING_AMOUNT_INVALID");
@@ -228,9 +234,9 @@ export function resolveBillingAmount(input: {
 }
 
 export function createBillingDraft(
-  payload: BillingPayload,
+  contenu: BillingPayload,
   source: BillingSource,
-  input: {
+  saisie: {
     requestId: string;
     type: BillingType;
     amountHtCents?: number;
@@ -238,44 +244,44 @@ export function createBillingDraft(
     linePercentages?: Array<{ lineId: string; percent: number }>;
   },
   actorName: string,
-  now = new Date(),
+  maintenant = new Date(),
 ): BillingDraft {
   const validSource = assertSource(source);
-  const alreadyPreparedCents = preparedHtCents(payload, source.quoteId);
+  const alreadyPreparedCents = preparedHtCents(contenu, source.quoteId);
   if (
-    input.linePercentages &&
-    (input.type !== "PROGRESS" ||
-      input.amountHtCents !== undefined ||
-      input.cumulativePercent !== undefined)
+    saisie.linePercentages &&
+    (saisie.type !== "PROGRESS" ||
+      saisie.amountHtCents !== undefined ||
+      saisie.cumulativePercent !== undefined)
   ) {
     throw new Error("BILLING_PROGRESS_INPUT_CONFLICT");
   }
-  const hasLineHistory = payload.drafts.some(
-    (draft) =>
-      draft.quoteId === source.quoteId &&
-      draft.type === "PROGRESS" &&
-      Boolean(draft.lineProgress?.length),
+  const hasLineHistory = contenu.drafts.some(
+    (brouillon) =>
+      brouillon.quoteId === source.quoteId &&
+      brouillon.type === "PROGRESS" &&
+      Boolean(brouillon.lineProgress?.length),
   );
-  if (hasLineHistory && input.type === "PROGRESS" && input.amountHtCents !== undefined) {
+  if (hasLineHistory && saisie.type === "PROGRESS" && saisie.amountHtCents !== undefined) {
     throw new Error("BILLING_PROGRESS_AMOUNT_AFTER_LINES_FORBIDDEN");
   }
   const linePercentages =
-    input.type === "PROGRESS"
-      ? (input.linePercentages ??
-        (input.cumulativePercent !== undefined && validSource.lines?.length
-          ? validSource.lines.map((line) => ({
-              lineId: line.lineId,
-              percent: input.cumulativePercent!,
+    saisie.type === "PROGRESS"
+      ? (saisie.linePercentages ??
+        (saisie.cumulativePercent !== undefined && validSource.lines?.length
+          ? validSource.lines.map((ligne) => ({
+              lineId: ligne.lineId,
+              percent: saisie.cumulativePercent!,
             }))
           : null))
       : null;
   const lineResult = linePercentages
-    ? calculateLineProgress(payload, validSource, linePercentages)
+    ? calculateLineProgress(contenu, validSource, linePercentages)
     : null;
   const amountHtCents =
     lineResult?.amountHtCents ??
     resolveBillingAmount({
-      ...input,
+      ...saisie,
       contractHtCents: validSource.contractHtCents,
       alreadyPreparedCents,
     });
@@ -286,103 +292,104 @@ export function createBillingDraft(
     PROGRESS: "Facture de situation",
     FINAL: "Facture de solde",
   };
-  const draft = billingDraftSchema.parse({
+  const brouillon = billingDraftSchema.parse({
     ...validSource,
     id: globalThis.crypto.randomUUID(),
-    requestId: input.requestId,
+    requestId: saisie.requestId,
     status: "DRAFT",
-    type: input.type,
-    label: typeLabel[input.type],
+    type: saisie.type,
+    label: typeLabel[saisie.type],
     notes: "",
     amountHtCents,
     taxGroups: tax.groups,
     vatCents: tax.vatCents,
     totalTtcCents: tax.ttcCents,
-    cumulativePercent: input.cumulativePercent ?? null,
+    cumulativePercent: saisie.cumulativePercent ?? null,
     ...(lineResult ? { lineProgress: lineResult.lineProgress } : {}),
-    createdAt: now.toISOString(),
+    createdAt: maintenant.toISOString(),
     createdByName: actorName,
-    updatedAt: now.toISOString(),
+    updatedAt: maintenant.toISOString(),
     updatedByName: actorName,
   });
   return billingDraftSchema.parse({
-    ...draft,
-    documentLines: buildInvoiceDocumentLines(draft, payload),
+    ...brouillon,
+    documentLines: buildInvoiceDocumentLines(brouillon, contenu),
   });
 }
 
 export function updateBillingDraft(
-  payload: BillingPayload,
-  draftId: string,
-  input: {
+  contenu: BillingPayload,
+  idBrouillon: string,
+  saisie: {
     expectedUpdatedAt: string;
     label: string;
     notes: string;
     amountHtCents?: number;
   },
   actorName: string,
-  now = new Date(),
+  maintenant = new Date(),
 ): BillingDraft {
-  const draft = payload.drafts.find((item) => item.id === draftId);
-  if (!draft) throw new Error("BILLING_DRAFT_NOT_FOUND");
-  if (draft.status !== "DRAFT") throw new Error("BILLING_DRAFT_LOCKED");
-  if (draft.updatedAt !== input.expectedUpdatedAt) throw new Error("BILLING_VERSION_CONFLICT");
-  const alreadyPreparedCents = preparedHtCents(payload, draft.quoteId, draft.id);
+  const brouillon = contenu.drafts.find((element) => element.id === idBrouillon);
+  if (!brouillon) throw new Error("BILLING_DRAFT_NOT_FOUND");
+  if (brouillon.status !== "DRAFT") throw new Error("BILLING_DRAFT_LOCKED");
+  if (brouillon.updatedAt !== saisie.expectedUpdatedAt) throw new Error("BILLING_VERSION_CONFLICT");
+  const alreadyPreparedCents = preparedHtCents(contenu, brouillon.quoteId, brouillon.id);
   const amountHtCents =
-    draft.type === "STANDARD" || draft.type === "FINAL"
-      ? draft.amountHtCents
-      : (input.amountHtCents ?? draft.amountHtCents);
-  if (amountHtCents + alreadyPreparedCents > draft.contractHtCents) {
+    brouillon.type === "STANDARD" || brouillon.type === "FINAL"
+      ? brouillon.amountHtCents
+      : (saisie.amountHtCents ?? brouillon.amountHtCents);
+  if (amountHtCents + alreadyPreparedCents > brouillon.contractHtCents) {
     throw new Error("BILLING_AMOUNT_EXCEEDS_CONTRACT");
   }
-  if (draft.lineProgress?.length && amountHtCents !== draft.amountHtCents) {
+  if (brouillon.lineProgress?.length && amountHtCents !== brouillon.amountHtCents) {
     throw new Error("BILLING_LINE_PROGRESS_EDIT_FORBIDDEN");
   }
-  if (amountHtCents !== draft.amountHtCents) {
-    const draftIndex = payload.drafts.findIndex((item) => item.id === draftId);
+  if (amountHtCents !== brouillon.amountHtCents) {
+    const draftIndex = contenu.drafts.findIndex((element) => element.id === idBrouillon);
     if (
-      payload.drafts
+      contenu.drafts
         .slice(draftIndex + 1)
-        .some((item) => item.quoteId === draft.quoteId && item.type === "PROGRESS")
+        .some((element) => element.quoteId === brouillon.quoteId && element.type === "PROGRESS")
     ) {
       throw new Error("BILLING_DRAFT_HAS_DEPENDENTS");
     }
   }
-  const tax = distributeBillingTax(draft.contractTaxGroups, amountHtCents);
+  const tax = distributeBillingTax(brouillon.contractTaxGroups, amountHtCents);
   const documentLines =
-    draft.documentLines && amountHtCents !== draft.amountHtCents
+    brouillon.documentLines && amountHtCents !== brouillon.amountHtCents
       ? buildInvoiceDocumentLines(
           {
-            ...draft,
+            ...brouillon,
             amountHtCents,
             taxGroups: tax.groups,
             vatCents: tax.vatCents,
             totalTtcCents: tax.ttcCents,
           },
-          payload,
+          contenu,
         )
-      : draft.documentLines;
+      : brouillon.documentLines;
   return billingDraftSchema.parse({
-    ...draft,
+    ...brouillon,
     ...(documentLines ? { documentLines } : {}),
-    label: input.label,
-    notes: input.notes,
+    label: saisie.label,
+    notes: saisie.notes,
     amountHtCents,
     taxGroups: tax.groups,
     vatCents: tax.vatCents,
     totalTtcCents: tax.ttcCents,
     // Editing the amount explicitly switches the draft away from a cumulative percentage.
-    cumulativePercent: amountHtCents !== draft.amountHtCents ? null : draft.cumulativePercent,
-    updatedAt: now.toISOString(),
+    cumulativePercent:
+      amountHtCents !== brouillon.amountHtCents ? null : brouillon.cumulativePercent,
+    updatedAt: maintenant.toISOString(),
     updatedByName: actorName,
   });
 }
 
 /** Persists an editable invoice document, independently of the signed quote. */
 export function updateBillingDocument(
-  payload: BillingPayload,
-  draftId: string,
-  input: {
+  contenu: BillingPayload,
+  idBrouillon: string,
+  saisie: {
     expectedUpdatedAt: string;
     label: string;
     notes: string;
@@ -390,63 +397,67 @@ export function updateBillingDocument(
     linePercentages?: Array<{ lineId: string; percent: number }>;
   },
   actorName: string,
-  now = new Date(),
+  maintenant = new Date(),
 ): BillingDraft {
-  const index = payload.drafts.findIndex((candidate) => candidate.id === draftId);
-  if (index < 0) throw new Error("BILLING_DRAFT_NOT_FOUND");
-  const draft = payload.drafts[index];
-  if (draft.status !== "DRAFT") throw new Error("BILLING_DRAFT_LOCKED");
-  if (draft.updatedAt !== input.expectedUpdatedAt) throw new Error("BILLING_VERSION_CONFLICT");
+  const indice = contenu.drafts.findIndex((candidat) => candidat.id === idBrouillon);
+  if (indice < 0) throw new Error("BILLING_DRAFT_NOT_FOUND");
+  const brouillon = contenu.drafts[indice];
+  if (brouillon.status !== "DRAFT") throw new Error("BILLING_DRAFT_LOCKED");
+  if (brouillon.updatedAt !== saisie.expectedUpdatedAt) throw new Error("BILLING_VERSION_CONFLICT");
   const documentLines = z
     .array(billingDocumentLineSchema)
     .min(1)
     .max(1000)
-    .parse(input.documentLines);
-  if (new Set(documentLines.map((line) => line.id)).size !== documentLines.length) {
+    .parse(saisie.documentLines);
+  if (new Set(documentLines.map((ligne) => ligne.id)).size !== documentLines.length) {
     throw new Error("BILLING_DOCUMENT_DUPLICATE_LINE");
   }
-  const quoteIds = new Set((draft.lines ?? []).map((line) => line.lineId));
+  const quoteIds = new Set((brouillon.lines ?? []).map((ligne) => ligne.lineId));
   const seenQuoteIds = new Set<string>();
-  const allowedRates = new Set(draft.contractTaxGroups.map((group) => group.ratePercent));
-  for (const line of documentLines) {
-    if (line.origin === "QUOTE") {
+  const allowedRates = new Set(brouillon.contractTaxGroups.map((group) => group.ratePercent));
+  for (const ligne of documentLines) {
+    if (ligne.origin === "QUOTE") {
       if (
-        !line.sourceLineId ||
-        !quoteIds.has(line.sourceLineId) ||
-        seenQuoteIds.has(line.sourceLineId)
+        !ligne.sourceLineId ||
+        !quoteIds.has(ligne.sourceLineId) ||
+        seenQuoteIds.has(ligne.sourceLineId)
       ) {
         throw new Error("BILLING_DOCUMENT_SOURCE_LINE_INVALID");
       }
-      seenQuoteIds.add(line.sourceLineId);
+      seenQuoteIds.add(ligne.sourceLineId);
     }
-    if (line.origin !== "TITLE" && !allowedRates.has(line.vatRatePercent)) {
+    if (ligne.origin !== "TITLE" && !allowedRates.has(ligne.vatRatePercent)) {
       throw new Error("BILLING_DOCUMENT_VAT_OUTSIDE_CONTRACT");
     }
   }
   const totals = calculateInvoiceDocumentTotals(documentLines);
-  const priorDrafts = payload.drafts.slice(0, index);
-  const recalculatedProgress = input.linePercentages
-    ? calculateLineProgress({ schemaVersion: 1, drafts: priorDrafts }, draft, input.linePercentages)
+  const priorDrafts = contenu.drafts.slice(0, indice);
+  const recalculatedProgress = saisie.linePercentages
+    ? calculateLineProgress(
+        { schemaVersion: 1, drafts: priorDrafts },
+        brouillon,
+        saisie.linePercentages,
+      )
     : null;
-  if (recalculatedProgress && draft.type !== "PROGRESS") {
+  if (recalculatedProgress && brouillon.type !== "PROGRESS") {
     throw new Error("BILLING_PROGRESS_INPUT_CONFLICT");
   }
   // A progress correction must not save a document whose amounts disagree
   // with the cumulative progress ledger. This also protects VAT by rate.
   if (recalculatedProgress) {
-    const expected = recalculatedProgress.tax.groups;
-    const actual = totals.taxGroups;
+    const attendu = recalculatedProgress.tax.groups;
+    const reel = totals.taxGroups;
     if (
       totals.amountHtCents !== recalculatedProgress.amountHtCents ||
-      expected.some(
+      attendu.some(
         (group) =>
-          (actual.find((row) => row.ratePercent === group.ratePercent)?.baseHtCents ?? 0) !==
-          group.baseHtCents,
+          (reel.find((ligneTableau) => ligneTableau.ratePercent === group.ratePercent)
+            ?.baseHtCents ?? 0) !== group.baseHtCents,
       ) ||
-      actual.some(
+      reel.some(
         (group) =>
-          (expected.find((row) => row.ratePercent === group.ratePercent)?.baseHtCents ?? 0) !==
-          group.baseHtCents,
+          (attendu.find((ligneTableau) => ligneTableau.ratePercent === group.ratePercent)
+            ?.baseHtCents ?? 0) !== group.baseHtCents,
       )
     ) {
       throw new Error("BILLING_PROGRESS_DOCUMENT_MISMATCH");
@@ -454,31 +465,32 @@ export function updateBillingDocument(
   }
   const progressChanged =
     recalculatedProgress?.lineProgress.some(
-      (row) =>
-        row.percent !==
-        draft.lineProgress?.find((previous) => previous.lineId === row.lineId)?.percent,
+      (ligneTableau) =>
+        ligneTableau.percent !==
+        brouillon.lineProgress?.find((precedent) => precedent.lineId === ligneTableau.lineId)
+          ?.percent,
     ) ?? false;
-  const priorCents = preparedHtCents(payload, draft.quoteId, draft.id);
-  if (totals.amountHtCents + priorCents > draft.contractHtCents) {
+  const priorCents = preparedHtCents(contenu, brouillon.quoteId, brouillon.id);
+  if (totals.amountHtCents + priorCents > brouillon.contractHtCents) {
     throw new Error("BILLING_AMOUNT_EXCEEDS_CONTRACT");
   }
   const financialChange =
-    totals.amountHtCents !== draft.amountHtCents ||
-    draft.taxGroups.some(
+    totals.amountHtCents !== brouillon.amountHtCents ||
+    brouillon.taxGroups.some(
       (group) =>
-        (totals.taxGroups.find((value) => value.ratePercent === group.ratePercent)?.baseHtCents ??
+        (totals.taxGroups.find((valeur) => valeur.ratePercent === group.ratePercent)?.baseHtCents ??
           0) !== group.baseHtCents,
     );
   if (
     (financialChange || progressChanged) &&
-    payload.drafts.slice(index + 1).some((candidate) => candidate.quoteId === draft.quoteId)
+    contenu.drafts.slice(indice + 1).some((candidat) => candidat.quoteId === brouillon.quoteId)
   ) {
     throw new Error("BILLING_DRAFT_HAS_DEPENDENTS");
   }
   return billingDraftSchema.parse({
-    ...draft,
-    label: input.label,
-    notes: input.notes,
+    ...brouillon,
+    label: saisie.label,
+    notes: saisie.notes,
     documentLines,
     ...(recalculatedProgress
       ? { lineProgress: recalculatedProgress.lineProgress, cumulativePercent: null }
@@ -487,43 +499,43 @@ export function updateBillingDocument(
     taxGroups: totals.taxGroups,
     vatCents: totals.vatCents,
     totalTtcCents: totals.totalTtcCents,
-    updatedAt: now.toISOString(),
+    updatedAt: maintenant.toISOString(),
     updatedByName: actorName,
   });
 }
 
 /** Internal approval only: does not allocate a legal invoice number or issue a document. */
 export function approveBillingDraft(
-  payload: BillingPayload,
-  draftId: string,
+  contenu: BillingPayload,
+  idBrouillon: string,
   expectedUpdatedAt: string,
   actorName: string,
-  now = new Date(),
+  maintenant = new Date(),
 ): BillingDraft {
-  const draft = payload.drafts.find((item) => item.id === draftId);
-  if (!draft) throw new Error("BILLING_DRAFT_NOT_FOUND");
-  if (draft.status !== "DRAFT") throw new Error("BILLING_DRAFT_LOCKED");
-  if (draft.updatedAt !== expectedUpdatedAt) throw new Error("BILLING_VERSION_CONFLICT");
-  const lines = draft.documentLines ?? buildInvoiceDocumentLines(draft, payload);
-  const totals = calculateInvoiceDocumentTotals(lines);
+  const brouillon = contenu.drafts.find((element) => element.id === idBrouillon);
+  if (!brouillon) throw new Error("BILLING_DRAFT_NOT_FOUND");
+  if (brouillon.status !== "DRAFT") throw new Error("BILLING_DRAFT_LOCKED");
+  if (brouillon.updatedAt !== expectedUpdatedAt) throw new Error("BILLING_VERSION_CONFLICT");
+  const lignes = brouillon.documentLines ?? buildInvoiceDocumentLines(brouillon, contenu);
+  const totals = calculateInvoiceDocumentTotals(lignes);
   if (
-    totals.amountHtCents !== draft.amountHtCents ||
-    totals.vatCents !== draft.vatCents ||
-    totals.totalTtcCents !== draft.totalTtcCents ||
-    draft.taxGroups.some(
+    totals.amountHtCents !== brouillon.amountHtCents ||
+    totals.vatCents !== brouillon.vatCents ||
+    totals.totalTtcCents !== brouillon.totalTtcCents ||
+    brouillon.taxGroups.some(
       (group) =>
-        (totals.taxGroups.find((row) => row.ratePercent === group.ratePercent)?.baseHtCents ??
-          0) !== group.baseHtCents,
+        (totals.taxGroups.find((ligneTableau) => ligneTableau.ratePercent === group.ratePercent)
+          ?.baseHtCents ?? 0) !== group.baseHtCents,
     )
   )
     throw new Error("BILLING_APPROVAL_TOTALS_MISMATCH");
   return billingDraftSchema.parse({
-    ...draft,
-    documentLines: lines,
+    ...brouillon,
+    documentLines: lignes,
     status: "APPROVED",
-    approvedAt: now.toISOString(),
+    approvedAt: maintenant.toISOString(),
     approvedByName: actorName,
-    updatedAt: now.toISOString(),
+    updatedAt: maintenant.toISOString(),
     updatedByName: actorName,
   });
 }

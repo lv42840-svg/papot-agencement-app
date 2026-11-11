@@ -173,18 +173,18 @@ export function createInitialCommercialPayload(): CommercialPayload {
   return { schemaVersion: 2, clients: [], cases: [] };
 }
 
-export function parseCommercialPayload(value: unknown): CommercialPayload {
-  if (value == null) return createInitialCommercialPayload();
-  const parsed = commercialPayloadSchema.parse(value);
+export function parseCommercialPayload(valeur: unknown): CommercialPayload {
+  if (valeur == null) return createInitialCommercialPayload();
+  const analyse = commercialPayloadSchema.parse(valeur);
   return {
-    ...parsed,
+    ...analyse,
     schemaVersion: 2,
-    clients: parsed.clients ?? [],
-    cases: parsed.cases.map((item) => ({
-      ...item,
-      clientId: item.clientId ?? null,
-      primaryContactId: item.primaryContactId ?? null,
-      documents: item.documents.map((document) => ({
+    clients: analyse.clients ?? [],
+    cases: analyse.cases.map((element) => ({
+      ...element,
+      clientId: element.clientId ?? null,
+      primaryContactId: element.primaryContactId ?? null,
+      documents: element.documents.map((document) => ({
         ...document,
         isSignedQuote: document.isSignedQuote ?? document.legacySignedQuote ?? false,
         legacySignedQuote: document.legacySignedQuote ?? document.isSignedQuote ?? false,
@@ -200,59 +200,62 @@ export function commercialParisDateKey(date: Date = new Date()): string {
     month: "2-digit",
     day: "2-digit",
   }).formatToParts(date);
-  const values = Object.fromEntries(parts.map((part) => [part.type, part.value]));
-  return `${values.year}-${values.month}-${values.day}`;
+  const valeurs = Object.fromEntries(parts.map((part) => [part.type, part.value]));
+  return `${valeurs.year}-${valeurs.month}-${valeurs.day}`;
 }
 
-export function isCommercialClosed(item: CommercialCase): boolean {
-  return item.status === "LOST" || item.status === "ABANDONED";
+export function isCommercialClosed(element: CommercialCase): boolean {
+  return element.status === "LOST" || element.status === "ABANDONED";
 }
 
-export function isCommercialActive(item: CommercialCase): boolean {
-  return !isCommercialClosed(item) && item.status !== "CONFIRMED";
+export function isCommercialActive(element: CommercialCase): boolean {
+  return !isCommercialClosed(element) && element.status !== "CONFIRMED";
 }
 
-export function commercialNeedsFollowUp(item: CommercialCase, now: Date = new Date()): boolean {
-  if (item.status === "FOLLOW_UP") return true;
-  const today = commercialParisDateKey(now);
+export function commercialNeedsFollowUp(
+  element: CommercialCase,
+  maintenant: Date = new Date(),
+): boolean {
+  if (element.status === "FOLLOW_UP") return true;
+  const aujourdhui = commercialParisDateKey(maintenant);
   if (
-    (item.status === "PISTE" ||
-      item.status === "SENT" ||
-      item.status === "WAITING" ||
-      item.status === "CHIFFRAGE") &&
-    item.reviewDate
+    (element.status === "PISTE" ||
+      element.status === "SENT" ||
+      element.status === "WAITING" ||
+      element.status === "CHIFFRAGE") &&
+    element.reviewDate
   ) {
-    return item.reviewDate <= today;
+    return element.reviewDate <= aujourdhui;
   }
-  if (item.status === "LIKELY" && item.expectedConfirmationDate) {
-    return item.expectedConfirmationDate <= today;
+  if (element.status === "LIKELY" && element.expectedConfirmationDate) {
+    return element.expectedConfirmationDate <= aujourdhui;
   }
   return false;
 }
 
-export function nextCommercialDeadline(item: CommercialCase): string | null {
-  if (item.status === "LIKELY") return item.expectedConfirmationDate;
+export function nextCommercialDeadline(element: CommercialCase): string | null {
+  if (element.status === "LIKELY") return element.expectedConfirmationDate;
   if (
-    item.status === "PISTE" ||
-    item.status === "SENT" ||
-    item.status === "WAITING" ||
-    item.status === "CHIFFRAGE"
+    element.status === "PISTE" ||
+    element.status === "SENT" ||
+    element.status === "WAITING" ||
+    element.status === "CHIFFRAGE"
   ) {
-    return item.reviewDate;
+    return element.reviewDate;
   }
   return null;
 }
 
-export function isQuoteOverdue(item: CommercialCase, now: Date = new Date()): boolean {
+export function isQuoteOverdue(element: CommercialCase, maintenant: Date = new Date()): boolean {
   return (
-    item.status === "CHIFFRAGE" &&
-    item.quoteDueDate !== null &&
-    item.quoteDueDate < commercialParisDateKey(now)
+    element.status === "CHIFFRAGE" &&
+    element.quoteDueDate !== null &&
+    element.quoteDueDate < commercialParisDateKey(maintenant)
   );
 }
 
-export function commercialHasSignedQuote(item: CommercialCase): boolean {
-  return item.documents.some(
+export function commercialHasSignedQuote(element: CommercialCase): boolean {
+  return element.documents.some(
     (document) =>
       document.category === "QUOTE" && (document.legacySignedQuote || document.isSignedQuote),
   );
@@ -260,30 +263,30 @@ export function commercialHasSignedQuote(item: CommercialCase): boolean {
 
 export function applyCommercialAutomaticTransitions(
   source: CommercialPayload,
-  now: Date = new Date(),
+  maintenant: Date = new Date(),
 ): { payload: CommercialPayload; changed: boolean } {
-  const payload = structuredClone(parseCommercialPayload(source));
-  const today = commercialParisDateKey(now);
+  const contenu = structuredClone(parseCommercialPayload(source));
+  const aujourdhui = commercialParisDateKey(maintenant);
   let changed = false;
-  for (const item of payload.cases) {
+  for (const element of contenu.cases) {
     if (
-      (item.status === "PISTE" || item.status === "SENT" || item.status === "WAITING") &&
-      item.reviewDate &&
-      item.reviewDate <= today
+      (element.status === "PISTE" || element.status === "SENT" || element.status === "WAITING") &&
+      element.reviewDate &&
+      element.reviewDate <= aujourdhui
     ) {
-      const previous = item.status;
-      item.status = "FOLLOW_UP";
-      item.updatedAt = now.toISOString();
-      item.updatedByName = "PAPOT";
-      item.history.push({
+      const precedent = element.status;
+      element.status = "FOLLOW_UP";
+      element.updatedAt = maintenant.toISOString();
+      element.updatedByName = "PAPOT";
+      element.history.push({
         id: globalThis.crypto.randomUUID(),
         type: "AUTO_DUE",
-        at: now.toISOString(),
+        at: maintenant.toISOString(),
         actorName: "PAPOT",
-        summary: `${COMMERCIAL_STATUS_LABELS[previous]} arrivé à échéance le ${item.reviewDate} : passage automatique en À relancer.`,
+        summary: `${COMMERCIAL_STATUS_LABELS[precedent]} arrivé à échéance le ${element.reviewDate} : passage automatique en À relancer.`,
       });
       changed = true;
     }
   }
-  return { payload, changed };
+  return { payload: contenu, changed };
 }

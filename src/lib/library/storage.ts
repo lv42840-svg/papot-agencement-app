@@ -31,40 +31,44 @@ export function createInitialLibraryPayload(): LibraryPayload {
   };
 }
 
-function ensureUniqueIds(items: Array<{ id: string }>, errorCode: string): void {
-  const ids = new Set<string>();
-  for (const item of items) {
-    if (ids.has(item.id)) throw new Error(errorCode);
-    ids.add(item.id);
+function ensureUniqueIds(elements: Array<{ id: string }>, codeErreur: string): void {
+  const identifiants = new Set<string>();
+  for (const element of elements) {
+    if (identifiants.has(element.id)) throw new Error(codeErreur);
+    identifiants.add(element.id);
   }
 }
 
 function validateComponentReferences(
-  components: LibraryComponent[],
+  composants: LibraryComponent[],
   ouvrages: LibraryOuvrage[],
 ): void {
-  const componentIds = new Set(components.map((component) => component.id));
+  const identifiantsComposants = new Set(composants.map((composant) => composant.id));
   for (const ouvrage of ouvrages) {
-    for (const line of ouvrage.components) {
-      if (!componentIds.has(line.componentId)) {
+    for (const ligne of ouvrage.components) {
+      if (!identifiantsComposants.has(ligne.componentId)) {
         throw new Error("LIBRARY_OUVRAGE_COMPONENT_NOT_FOUND");
       }
     }
   }
 }
 
-export function parseLibraryPayload(value: unknown): LibraryPayload {
-  if (value == null) return createInitialLibraryPayload();
+export function parseLibraryPayload(valeur: unknown): LibraryPayload {
+  if (valeur == null) return createInitialLibraryPayload();
 
-  const parsed = libraryPayloadSchema.safeParse(value);
-  if (!parsed.success) throw new Error("LIBRARY_STORE_INVALID");
+  const analyse = libraryPayloadSchema.safeParse(valeur);
+  if (!analyse.success) throw new Error("LIBRARY_STORE_INVALID");
 
-  for (const component of parsed.data.components) parseLibraryComponent(component);
-  for (const ouvrage of parsed.data.ouvrages) parseLibraryOuvrage(ouvrage);
+  for (const composant of analyse.data.components) {
+    parseLibraryComponent(composant);
+  }
+  for (const ouvrage of analyse.data.ouvrages) {
+    parseLibraryOuvrage(ouvrage);
+  }
 
-  ensureUniqueIds(parsed.data.components, "LIBRARY_COMPONENT_ID_DUPLICATE");
-  ensureUniqueIds(parsed.data.ouvrages, "LIBRARY_OUVRAGE_ID_DUPLICATE");
-  validateComponentReferences(parsed.data.components, parsed.data.ouvrages);
+  ensureUniqueIds(analyse.data.components, "LIBRARY_COMPONENT_ID_DUPLICATE");
+  ensureUniqueIds(analyse.data.ouvrages, "LIBRARY_OUVRAGE_ID_DUPLICATE");
+  validateComponentReferences(analyse.data.components, analyse.data.ouvrages);
 
-  return parsed.data;
+  return analyse.data;
 }

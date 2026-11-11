@@ -4,8 +4,8 @@ export function quoteRevisionHeaders(updatedAt: string): Record<string, string> 
   return { "If-Match": `"${updatedAt}"` };
 }
 
-export function expectedQuoteRevision(request: Request): string {
-  const raw = request.headers.get("if-match")?.trim();
+export function expectedQuoteRevision(requete: Request): string {
+  const raw = requete.headers.get("if-match")?.trim();
   if (!raw) throw new Error("QUOTE_VERSION_REQUIRED");
 
   const revision =
@@ -18,11 +18,11 @@ export function expectedQuoteRevision(request: Request): string {
 }
 
 export function assertQuoteRevision(
-  payload: NativeQuotesPayload,
-  quoteId: string,
+  contenu: NativeQuotesPayload,
+  idDevis: string,
   expectedRevision: string,
 ) {
-  const quote = payload.quotes.find((candidate) => candidate.id === quoteId);
+  const quote = contenu.quotes.find((candidat) => candidat.id === idDevis);
   if (!quote) throw new Error("QUOTE_NOT_FOUND");
   if (quote.updatedAt !== expectedRevision) {
     throw new Error("QUOTE_VERSION_CONFLICT");

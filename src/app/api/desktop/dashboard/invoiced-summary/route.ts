@@ -17,14 +17,14 @@ export const dynamic = "force-dynamic";
  */
 export async function GET() {
   try {
-    const context = await requireModuleRequestContext("pilotage", "READ");
-    await requireSpecialPermission(context.user, "dashboard.view_global");
+    const contexte = await requireModuleRequestContext("pilotage", "READ");
+    await requireSpecialPermission(contexte.user, "dashboard.view_global");
     await requireModuleRequestContext("billing", "READ");
     return NextResponse.json(summarizeIssuedInvoices([], false), {
       headers: { "Cache-Control": "private, no-store" },
     });
-  } catch (error) {
-    const code = error instanceof Error ? error.message : "INVOICED_SUMMARY_UNAVAILABLE";
+  } catch (erreur) {
+    const code = erreur instanceof Error ? erreur.message : "INVOICED_SUMMARY_UNAVAILABLE";
     return NextResponse.json(
       { error: code },
       { status: desktopRequestErrorStatus(code) ?? 400, headers: { "Cache-Control": "no-store" } },

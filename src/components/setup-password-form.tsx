@@ -5,27 +5,27 @@ import { useRouter } from "next/navigation";
 
 export function SetupPasswordForm({ token }: { token: string }) {
   const router = useRouter();
-  const [error, setError] = useState("");
+  const [erreur, setError] = useState("");
   const [busy, setBusy] = useState(false);
 
-  async function submit(event: FormEvent<HTMLFormElement>) {
-    event.preventDefault();
+  async function submit(evenement: FormEvent<HTMLFormElement>) {
+    evenement.preventDefault();
     setError("");
     setBusy(true);
 
-    const data = new FormData(event.currentTarget);
-    const password = String(data.get("password") ?? "");
-    const confirmPassword = String(data.get("confirmPassword") ?? "");
+    const donnees = new FormData(evenement.currentTarget);
+    const password = String(donnees.get("password") ?? "");
+    const confirmPassword = String(donnees.get("confirmPassword") ?? "");
 
-    const response = await fetch("/api/auth/setup-password", {
+    const reponse = await fetch("/api/auth/setup-password", {
       method: "POST",
       headers: { "content-type": "application/json" },
       body: JSON.stringify({ token, password, confirmPassword }),
     });
-    const body = (await response.json().catch(() => null)) as { error?: string } | null;
+    const corps = (await reponse.json().catch(() => null)) as { error?: string } | null;
 
-    if (!response.ok) {
-      setError(body?.error ?? "Impossible de définir le mot de passe.");
+    if (!reponse.ok) {
+      setError(corps?.error ?? "Impossible de définir le mot de passe.");
       setBusy(false);
       return;
     }
@@ -61,9 +61,9 @@ export function SetupPasswordForm({ token }: { token: string }) {
         />
       </label>
       <p className="muted">12 caractères minimum. Le lien est à usage unique.</p>
-      {error ? (
+      {erreur ? (
         <p className="formError" role="alert">
-          {error}
+          {erreur}
         </p>
       ) : null}
       <button className="primaryButton" type="submit" disabled={busy}>

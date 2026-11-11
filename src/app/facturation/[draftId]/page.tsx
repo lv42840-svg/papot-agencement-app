@@ -5,15 +5,15 @@ import { requireModuleRequestContext } from "@/lib/desktop/request-context";
 export const dynamic = "force-dynamic";
 
 export default async function InvoiceDraftPage({
-  params,
+  params: parametres,
 }: {
   params: Promise<{ draftId: string }>;
 }) {
   await requireModuleRequestContext("billing", "READ");
-  const { draftId } = await params;
+  const { draftId: idBrouillon } = await parametres;
   return (
     <DesktopAppShell>
-      <BillingDocumentEditor draftId={draftId} />
+      <BillingDocumentEditor draftId={idBrouillon} />
     </DesktopAppShell>
   );
 }

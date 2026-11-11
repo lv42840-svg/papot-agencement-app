@@ -37,7 +37,7 @@ import { quoteCanBeRetained } from "@/lib/quotes/retention";
 import type { NativeQuotesPayload } from "@/lib/quotes/store";
 
 type MutationBody = Record<string, unknown> & { action: string };
-type Mutate = (body: MutationBody, message: string) => Promise<boolean>;
+type Mutate = (corps: MutationBody, message: string) => Promise<boolean>;
 type SpaceId = (typeof CHANTIER_OPERATIONAL_SPACES)[number]["id"];
 type QuoteGroup = ChantierRetainedQuote;
 
@@ -111,27 +111,28 @@ export function ChantierOperationalWorkspace({
     [commercialCase, quotes],
   );
   const spaceState = chantier.operational.spaces[space];
-  const spaceLabel = CHANTIER_OPERATIONAL_SPACES.find((item) => item.id === space)?.label ?? space;
+  const spaceLabel =
+    CHANTIER_OPERATIONAL_SPACES.find((element) => element.id === space)?.label ?? space;
 
   return (
     <section className="chantierOperationalWorkspace">
       <nav className="chantierOperationalTabs" aria-label="Rubriques du suivi chantier">
-        {CHANTIER_OPERATIONAL_SPACES.map((item) => {
-          const count = countForSpace(chantier, item.id);
-          const state = chantier.operational.spaces[item.id];
+        {CHANTIER_OPERATIONAL_SPACES.map((element) => {
+          const nombre = countForSpace(chantier, element.id);
+          const etat = chantier.operational.spaces[element.id];
           return (
             <button
-              key={item.id}
+              key={element.id}
               type="button"
-              className={space === item.id ? "isActive" : undefined}
-              onClick={() => setSpace(item.id)}
+              className={space === element.id ? "isActive" : undefined}
+              onClick={() => setSpace(element.id)}
             >
-              {spaceIcon(item.id)}
-              <span>{item.label}</span>
-              {state === "NOT_APPLICABLE" ? (
+              {spaceIcon(element.id)}
+              <span>{element.label}</span>
+              {etat === "NOT_APPLICABLE" ? (
                 <small>N/C</small>
-              ) : count !== null ? (
-                <small>{count}</small>
+              ) : nombre !== null ? (
+                <small>{nombre}</small>
               ) : null}
             </button>
           );
@@ -245,12 +246,12 @@ function AdminSpace({
         .filter(
           (quote) => quote.commercialCaseId === commercialCase.id && !retainedIds.has(quote.id),
         )
-        .sort((left, right) => right.updatedAt.localeCompare(left.updatedAt))
+        .sort((gauche, droite) => droite.updatedAt.localeCompare(gauche.updatedAt))
     : [];
   const quoteLineProgress = new Map(
-    chantier.operational.quoteLineProgress.map((item) => [
-      `${item.quoteId}:${item.quoteLineId}`,
-      item.status,
+    chantier.operational.quoteLineProgress.map((element) => [
+      `${element.quoteId}:${element.quoteLineId}`,
+      element.status,
     ]),
   );
 
@@ -278,7 +279,7 @@ function AdminSpace({
           <OperationalEmpty label="Aucun devis natif retenu pour ce chantier." />
         ) : (
           <div className="chantierAdminQuotes">
-            {quoteGroups.map(({ quote, lines }) => (
+            {quoteGroups.map(({ quote, lines: lignes }) => (
               <article key={quote.id}>
                 <div>
                   <strong>{quote.finalPdf?.quoteNumber ?? quote.model.subject}</strong>
@@ -291,23 +292,23 @@ function AdminSpace({
                       : chantier.initialRetainedQuoteIds.includes(quote.id)
                         ? "Contrat initial"
                         : "Complément"}{" "}
-                    · {lines.length} ligne{lines.length > 1 ? "s" : ""} de référence
+                    · {lignes.length} ligne{lignes.length > 1 ? "s" : ""} de référence
                   </small>
                 </div>
-                {lines.length > 0 ? (
+                {lignes.length > 0 ? (
                   <div className="chantierQuoteProgress">
-                    {lines.map((line) => {
+                    {lignes.map((ligne) => {
                       const progress =
-                        quoteLineProgress.get(`${line.quoteId}:${line.quoteLineId}`) ?? "TODO";
+                        quoteLineProgress.get(`${ligne.quoteId}:${ligne.quoteLineId}`) ?? "TODO";
                       return (
                         <div
-                          key={`${line.quoteId}:${line.quoteLineId}`}
+                          key={`${ligne.quoteId}:${ligne.quoteLineId}`}
                           className={`chantierQuoteProgressRow${progress === "DONE" ? " isDone" : ""}`}
                         >
                           <span className="chantierQuoteProgressIdentity">
-                            <strong>{line.description}</strong>
+                            <strong>{ligne.description}</strong>
                             <small>
-                              {line.quantity} {line.unit}
+                              {ligne.quantity} {ligne.unit}
                             </small>
                           </span>
                           <button
@@ -319,10 +320,10 @@ function AdminSpace({
                                 {
                                   action: "setQuoteLineProgress",
                                   chantierId: chantier.id,
-                                  quoteId: line.quoteId,
-                                  quoteLineId: line.quoteLineId,
+                                  quoteId: ligne.quoteId,
+                                  quoteLineId: ligne.quoteLineId,
                                   status: progress === "DONE" ? "TODO" : "DONE",
-                                  quoteLineLabel: chantierQuoteLineDisplay(line),
+                                  quoteLineLabel: chantierQuoteLineDisplay(ligne),
                                 },
                                 progress === "DONE"
                                   ? "Ligne remise à faire."
@@ -416,7 +417,7 @@ type TechnicalSpaceProps = Props & {
 
 function BeSpace({ chantier, busy, canModify, mutate, quoteGroups }: TechnicalSpaceProps) {
   const [creating, setCreating] = useState(false);
-  const items = chantier.operational.beItems;
+  const elements = chantier.operational.beItems;
 
   return (
     <div className="chantierOpSpace">
@@ -426,12 +427,12 @@ function BeSpace({ chantier, busy, canModify, mutate, quoteGroups }: TechnicalSp
           <span>
             <strong>BE</strong>
             <small>
-              {items.length} élément{items.length > 1 ? "s" : ""}
+              {elements.length} élément{elements.length > 1 ? "s" : ""}
             </small>
           </span>
         </div>
         {canModify ? (
-          <button type="button" onClick={() => setCreating((value) => !value)}>
+          <button type="button" onClick={() => setCreating((valeur) => !valeur)}>
             <Plus size={14} /> Nouvel élément BE
           </button>
         ) : null}
@@ -446,24 +447,24 @@ function BeSpace({ chantier, busy, canModify, mutate, quoteGroups }: TechnicalSp
           busy={busy}
           quoteGroups={quoteGroups}
           onCancel={() => setCreating(false)}
-          onCreate={async (value) => {
+          onCreate={async (valeur) => {
             const ok = await mutate(
-              { action: "createBeItem", chantierId: chantier.id, ...value },
+              { action: "createBeItem", chantierId: chantier.id, ...valeur },
               "Élément BE créé.",
             );
             if (ok) setCreating(false);
           }}
         />
       ) : null}
-      {items.length === 0 ? (
+      {elements.length === 0 ? (
         <OperationalEmpty label="Aucun élément BE pour le moment." />
       ) : (
         <div className="chantierOpRows">
-          {items.map((item) => (
+          {elements.map((element) => (
             <BeRow
-              key={item.id}
+              key={element.id}
               chantier={chantier}
-              item={item}
+              item={element}
               busy={busy}
               canModify={canModify}
               mutate={mutate}
@@ -475,47 +476,47 @@ function BeSpace({ chantier, busy, canModify, mutate, quoteGroups }: TechnicalSp
   );
 }
 
-function BeRow({ chantier, item, busy, canModify, mutate }: CoreProps & { item: BeItem }) {
+function BeRow({ chantier, item: element, busy, canModify, mutate }: CoreProps & { item: BeItem }) {
   return (
     <div className="chantierOpRow">
       <div className="chantierOpRowMain">
-        <strong>{item.name}</strong>
+        <strong>{element.name}</strong>
         <span>
-          {originLabel(item.originKind, item.originLabel)}
-          {item.installedByUs ? " · Pose PAPOT" : " · Sans pose PAPOT"}
+          {originLabel(element.originKind, element.originLabel)}
+          {element.installedByUs ? " · Pose PAPOT" : " · Sans pose PAPOT"}
         </span>
       </div>
       <select
-        value={item.status}
+        value={element.status}
         disabled={!canModify || busy}
-        onChange={(event) =>
+        onChange={(evenement) =>
           void mutate(
             {
               action: "setBeStatus",
               chantierId: chantier.id,
-              beItemId: item.id,
-              status: event.target.value as BeItemStatus,
+              beItemId: element.id,
+              status: evenement.target.value as BeItemStatus,
             },
-            event.target.value === "VALIDATED"
+            evenement.target.value === "VALIDATED"
               ? "BE validé, Atelier et Pose alimentés."
               : "Statut BE mis à jour.",
           )
         }
       >
-        {Object.entries(BE_STATUS_LABELS).map(([value, label]) => (
-          <option key={value} value={value}>
-            {label}
+        {Object.entries(BE_STATUS_LABELS).map(([valeur, libelle]) => (
+          <option key={valeur} value={valeur}>
+            {libelle}
           </option>
         ))}
       </select>
-      <StatusPill value={BE_STATUS_LABELS[item.status]} done={item.status === "VALIDATED"} />
+      <StatusPill value={BE_STATUS_LABELS[element.status]} done={element.status === "VALIDATED"} />
     </div>
   );
 }
 
 function WorkshopSpace({ chantier, busy, canModify, mutate, quoteGroups }: TechnicalSpaceProps) {
   const [creating, setCreating] = useState(false);
-  const items = chantier.operational.workshopItems;
+  const elements = chantier.operational.workshopItems;
 
   return (
     <div className="chantierOpSpace">
@@ -525,12 +526,12 @@ function WorkshopSpace({ chantier, busy, canModify, mutate, quoteGroups }: Techn
           <span>
             <strong>Atelier</strong>
             <small>
-              {items.length} élément{items.length > 1 ? "s" : ""}
+              {elements.length} élément{elements.length > 1 ? "s" : ""}
             </small>
           </span>
         </div>
         {canModify ? (
-          <button type="button" onClick={() => setCreating((value) => !value)}>
+          <button type="button" onClick={() => setCreating((valeur) => !valeur)}>
             <Plus size={14} /> Élément direct atelier
           </button>
         ) : null}
@@ -545,24 +546,24 @@ function WorkshopSpace({ chantier, busy, canModify, mutate, quoteGroups }: Techn
           busy={busy}
           quoteGroups={quoteGroups}
           onCancel={() => setCreating(false)}
-          onCreate={async (value) => {
+          onCreate={async (valeur) => {
             const ok = await mutate(
-              { action: "createWorkshopItem", chantierId: chantier.id, ...value },
+              { action: "createWorkshopItem", chantierId: chantier.id, ...valeur },
               "Élément Atelier créé.",
             );
             if (ok) setCreating(false);
           }}
         />
       ) : null}
-      {items.length === 0 ? (
+      {elements.length === 0 ? (
         <OperationalEmpty label="Aucun élément Atelier pour le moment." />
       ) : (
         <div className="chantierOpRows">
-          {items.map((item) => (
+          {elements.map((element) => (
             <WorkshopRow
-              key={item.id}
+              key={element.id}
               chantier={chantier}
-              item={item}
+              item={element}
               busy={busy}
               canModify={canModify}
               mutate={mutate}
@@ -576,7 +577,7 @@ function WorkshopSpace({ chantier, busy, canModify, mutate, quoteGroups }: Techn
 
 function WorkshopRow({
   chantier,
-  item,
+  item: element,
   busy,
   canModify,
   mutate,
@@ -584,41 +585,41 @@ function WorkshopRow({
   return (
     <div className="chantierOpRow">
       <div className="chantierOpRowMain">
-        <strong>{item.name}</strong>
+        <strong>{element.name}</strong>
         <span>
-          {item.sourceBeItemId ? "Issu du BE" : "Créé directement Atelier"} ·{" "}
-          {originLabel(item.originKind, item.originLabel)}
-          {item.installedByUs ? " · Pose PAPOT" : ""}
+          {element.sourceBeItemId ? "Issu du BE" : "Créé directement Atelier"} ·{" "}
+          {originLabel(element.originKind, element.originLabel)}
+          {element.installedByUs ? " · Pose PAPOT" : ""}
         </span>
       </div>
       <select
-        value={item.status}
+        value={element.status}
         disabled={!canModify || busy}
-        onChange={(event) =>
+        onChange={(evenement) =>
           void mutate(
             {
               action: "setWorkshopStatus",
               chantierId: chantier.id,
-              workshopItemId: item.id,
-              status: event.target.value as WorkshopItemStatus,
+              workshopItemId: element.id,
+              status: evenement.target.value as WorkshopItemStatus,
             },
             "Statut Atelier mis à jour.",
           )
         }
       >
-        {Object.entries(WORKSHOP_STATUS_LABELS).map(([value, label]) => (
-          <option key={value} value={value}>
-            {label}
+        {Object.entries(WORKSHOP_STATUS_LABELS).map(([valeur, libelle]) => (
+          <option key={valeur} value={valeur}>
+            {libelle}
           </option>
         ))}
       </select>
-      <StatusPill value={WORKSHOP_STATUS_LABELS[item.status]} done={item.status === "DONE"} />
+      <StatusPill value={WORKSHOP_STATUS_LABELS[element.status]} done={element.status === "DONE"} />
     </div>
   );
 }
 
 function InstallSpace({ chantier, busy, canModify, mutate }: CoreProps) {
-  const items = chantier.operational.installItems;
+  const elements = chantier.operational.installItems;
   return (
     <div className="chantierOpSpace">
       <div className="chantierOpSpaceTitle">
@@ -627,8 +628,8 @@ function InstallSpace({ chantier, busy, canModify, mutate }: CoreProps) {
           <span>
             <strong>Pose</strong>
             <small>
-              {items.length} ouvrage{items.length > 1 ? "s" : ""} / zone
-              {items.length > 1 ? "s" : ""}
+              {elements.length} ouvrage{elements.length > 1 ? "s" : ""} / zone
+              {elements.length > 1 ? "s" : ""}
             </small>
           </span>
         </div>
@@ -637,15 +638,15 @@ function InstallSpace({ chantier, busy, canModify, mutate }: CoreProps) {
         La Pose est indépendante de l&apos;avancement Atelier. Chaque ouvrage ou zone suit
         simplement À faire / En cours / Terminé, avec une note facultative.
       </p>
-      {items.length === 0 ? (
+      {elements.length === 0 ? (
         <OperationalEmpty label="Aucun ouvrage prévu en Pose pour le moment." />
       ) : (
         <div className="chantierInstallRows">
-          {items.map((item) => (
+          {elements.map((element) => (
             <InstallRow
-              key={item.id}
+              key={element.id}
               chantier={chantier}
-              item={item}
+              item={element}
               busy={busy}
               canModify={canModify}
               mutate={mutate}
@@ -659,31 +660,31 @@ function InstallSpace({ chantier, busy, canModify, mutate }: CoreProps) {
 
 function InstallRow({
   chantier,
-  item,
+  item: element,
   busy,
   canModify,
   mutate,
 }: CoreProps & { item: InstallItem }) {
-  const [status, setStatus] = useState<InstallItemStatus>(item.status);
-  const [note, setNote] = useState(item.note ?? "");
+  const [statut, setStatus] = useState<InstallItemStatus>(element.status);
+  const [note, setNote] = useState(element.note ?? "");
 
   return (
     <div className="chantierInstallRow">
       <div className="chantierOpRowMain">
-        <strong>{item.name}</strong>
+        <strong>{element.name}</strong>
         <span>
-          {originLabel(item.originKind, item.originLabel)}
-          {item.sourceBeItemId ? " · Issu du BE" : " · Issu Atelier"}
+          {originLabel(element.originKind, element.originLabel)}
+          {element.sourceBeItemId ? " · Issu du BE" : " · Issu Atelier"}
         </span>
       </div>
       <select
-        value={status}
+        value={statut}
         disabled={!canModify || busy}
-        onChange={(event) => setStatus(event.target.value as InstallItemStatus)}
+        onChange={(evenement) => setStatus(evenement.target.value as InstallItemStatus)}
       >
-        {Object.entries(INSTALL_STATUS_LABELS).map(([value, label]) => (
-          <option key={value} value={value}>
-            {label}
+        {Object.entries(INSTALL_STATUS_LABELS).map(([valeur, libelle]) => (
+          <option key={valeur} value={valeur}>
+            {libelle}
           </option>
         ))}
       </select>
@@ -691,7 +692,7 @@ function InstallRow({
         rows={2}
         value={note}
         disabled={!canModify || busy}
-        onChange={(event) => setNote(event.target.value)}
+        onChange={(evenement) => setNote(evenement.target.value)}
         placeholder="Note terrain facultative"
       />
       {canModify ? (
@@ -703,8 +704,8 @@ function InstallRow({
               {
                 action: "setInstallStatus",
                 chantierId: chantier.id,
-                installItemId: item.id,
-                status,
+                installItemId: element.id,
+                status: statut,
                 note,
               },
               "Suivi Pose enregistré.",
@@ -714,7 +715,7 @@ function InstallRow({
           <Save size={14} /> Enregistrer
         </button>
       ) : null}
-      <StatusPill value={INSTALL_STATUS_LABELS[item.status]} done={item.status === "DONE"} />
+      <StatusPill value={INSTALL_STATUS_LABELS[element.status]} done={element.status === "DONE"} />
     </div>
   );
 }
@@ -730,7 +731,7 @@ function TechnicalCreateForm({
   busy: boolean;
   quoteGroups: QuoteGroup[];
   onCancel: () => void;
-  onCreate: (value: {
+  onCreate: (valeur: {
     name: string;
     originKind: TechnicalOrigin;
     originLabel: string;
@@ -739,7 +740,7 @@ function TechnicalCreateForm({
     sourceQuoteLineId: string;
   }) => Promise<void>;
 }) {
-  const [name, setName] = useState("");
+  const [nom, setName] = useState("");
   const [selectedQuoteLine, setSelectedQuoteLine] = useState("");
   const [quoteSearch, setQuoteSearch] = useState("");
   const [installedByUs, setInstalledByUs] = useState(true);
@@ -747,9 +748,9 @@ function TechnicalCreateForm({
   const quoteOptions = useMemo(
     () =>
       quoteGroups.flatMap((group) =>
-        group.lines.map((line) => ({
-          line,
-          value: `${line.quoteId}:${line.quoteLineId}`,
+        group.lines.map((ligne) => ({
+          line: ligne,
+          value: `${ligne.quoteId}:${ligne.quoteLineId}`,
         })),
       ),
     [quoteGroups],
@@ -761,8 +762,8 @@ function TechnicalCreateForm({
         .map((group) => ({
           ...group,
           lines: normalizedSearch
-            ? group.lines.filter((line) =>
-                `${line.quoteNumber} ${line.description}`
+            ? group.lines.filter((ligne) =>
+                `${ligne.quoteNumber} ${ligne.description}`
                   .toLocaleLowerCase("fr-FR")
                   .includes(normalizedSearch),
               )
@@ -773,10 +774,10 @@ function TechnicalCreateForm({
   );
   const selectedQuote = quoteOptions.find((option) => option.value === selectedQuoteLine)?.line;
 
-  function selectQuoteLine(value: string) {
-    setSelectedQuoteLine(value);
-    const selected = quoteOptions.find((option) => option.value === value)?.line;
-    if (selected && !name.trim()) setName(selected.description);
+  function selectQuoteLine(valeur: string) {
+    setSelectedQuoteLine(valeur);
+    const selectionne = quoteOptions.find((option) => option.value === valeur)?.line;
+    if (selectionne && !nom.trim()) setName(selectionne.description);
   }
 
   return (
@@ -793,8 +794,8 @@ function TechnicalCreateForm({
         <span>Nom *</span>
         <input
           autoFocus
-          value={name}
-          onChange={(event) => setName(event.target.value)}
+          value={nom}
+          onChange={(evenement) => setName(evenement.target.value)}
           placeholder="Ex. Banque accueil, meuble arrière-bar…"
         />
       </label>
@@ -804,7 +805,7 @@ function TechnicalCreateForm({
           <span>Rechercher une ligne</span>
           <input
             value={quoteSearch}
-            onChange={(event) => setQuoteSearch(event.target.value)}
+            onChange={(evenement) => setQuoteSearch(evenement.target.value)}
             placeholder="N° de devis ou texte, ex. banque accueil"
             disabled={quoteGroups.length === 0}
           />
@@ -813,7 +814,7 @@ function TechnicalCreateForm({
           <span>Ligne du devis accepté *</span>
           <select
             value={selectedQuoteLine}
-            onChange={(event) => selectQuoteLine(event.target.value)}
+            onChange={(evenement) => selectQuoteLine(evenement.target.value)}
             disabled={quoteGroups.length === 0}
           >
             <option value="">
@@ -826,12 +827,12 @@ function TechnicalCreateForm({
                 key={group.quote.id}
                 label={`${group.quote.quoteKind === "TS" ? "TS · " : ""}${group.quote.finalPdf?.quoteNumber ?? group.quote.model.subject} · ${group.quote.variantName} · V${group.quote.version}`}
               >
-                {group.lines.map((line) => (
+                {group.lines.map((ligne) => (
                   <option
-                    key={`${line.quoteId}:${line.quoteLineId}`}
-                    value={`${line.quoteId}:${line.quoteLineId}`}
+                    key={`${ligne.quoteId}:${ligne.quoteLineId}`}
+                    value={`${ligne.quoteId}:${ligne.quoteLineId}`}
                   >
-                    {line.description}
+                    {ligne.description}
                   </option>
                 ))}
               </optgroup>
@@ -855,7 +856,7 @@ function TechnicalCreateForm({
         <input
           type="checkbox"
           checked={installedByUs}
-          onChange={(event) => setInstalledByUs(event.target.checked)}
+          onChange={(evenement) => setInstalledByUs(evenement.target.checked)}
         />
         Ouvrage posé par PAPOT
       </label>
@@ -867,11 +868,11 @@ function TechnicalCreateForm({
         <button
           type="button"
           className="isPrimary"
-          disabled={busy || !name.trim() || !selectedQuote}
+          disabled={busy || !nom.trim() || !selectedQuote}
           onClick={() =>
             selectedQuote
               ? void onCreate({
-                  name,
+                  name: nom,
                   originKind: selectedQuote.quoteKind === "TS" ? "TS" : "QUOTE_LINE",
                   originLabel: chantierQuoteLineDisplay(selectedQuote),
                   installedByUs,
@@ -888,21 +889,21 @@ function TechnicalCreateForm({
   );
 }
 
-function StatusPill({ value, done }: { value: string; done: boolean }) {
-  return <span className={`chantierOpStatus${done ? " isDone" : ""}`}>{value}</span>;
+function StatusPill({ value: valeur, done }: { value: string; done: boolean }) {
+  return <span className={`chantierOpStatus${done ? " isDone" : ""}`}>{valeur}</span>;
 }
 
-function OperationalEmpty({ label }: { label: string }) {
+function OperationalEmpty({ label: libelle }: { label: string }) {
   return (
     <div className="chantierOpEmpty">
       <FolderOpen size={24} />
-      <strong>{label}</strong>
+      <strong>{libelle}</strong>
     </div>
   );
 }
 
 function FutureSpace({ id }: { id: Exclude<SpaceId, "be" | "workshop" | "install"> }) {
-  const title = CHANTIER_OPERATIONAL_SPACES.find((item) => item.id === id)?.label ?? id;
+  const titre = CHANTIER_OPERATIONAL_SPACES.find((element) => element.id === id)?.label ?? id;
   return (
     <div className="chantierFutureSpace">
       <span>
@@ -916,7 +917,7 @@ function FutureSpace({ id }: { id: Exclude<SpaceId, "be" | "workshop" | "install
           <BriefcaseBusiness size={21} />
         )}
       </span>
-      <strong>{title}</strong>
+      <strong>{titre}</strong>
       <p>{spaceDescriptions[id]}</p>
       <small>
         Cette rubrique est déjà réservée dans la fiche chantier. Son contenu métier sera raccordé

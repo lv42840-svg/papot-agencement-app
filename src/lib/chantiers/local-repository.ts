@@ -12,19 +12,23 @@ export function createLocalChantiersRepository(): ChantiersRepository {
       return readLocalSnapshot(RESOURCE_KEY, parseChantiersPayload).payload;
     },
 
-    async mutate(transform) {
-      return mutateLocalSnapshot(RESOURCE_KEY, parseChantiersPayload, async ({ payload }) => {
-        const mutation = await transform(structuredClone(payload), false);
-        const result = {
-          payload: parseChantiersPayload(mutation.payload),
-          focusChantierId: mutation.focusChantierId,
-        };
-        return {
-          payload: result.payload,
-          result,
-          persist: mutation.shouldPersist !== false,
-        };
-      });
+    async mutate(transformation) {
+      return mutateLocalSnapshot(
+        RESOURCE_KEY,
+        parseChantiersPayload,
+        async ({ payload: donnees }) => {
+          const mutation = await transformation(structuredClone(donnees), false);
+          const resultat = {
+            payload: parseChantiersPayload(mutation.payload),
+            focusChantierId: mutation.focusChantierId,
+          };
+          return {
+            payload: resultat.payload,
+            result: resultat,
+            persist: mutation.shouldPersist !== false,
+          };
+        },
+      );
     },
   };
 }

@@ -23,17 +23,17 @@ function statusFor(code: string): number {
   return 400;
 }
 
-export async function GET(request: Request, context: RouteContext) {
+export async function GET(requete: Request, contexte: RouteContext) {
   try {
-    const { caseId, documentId } = await context.params;
+    const { caseId: idAffaire, documentId: idDocument } = await contexte.params;
     const requestContext = await requireModuleRequestContext("commercial", "READ");
     const repository = createCommercialRepository();
-    const payload = await repository.load();
-    const item = payload.cases.find((candidate) => candidate.id === caseId);
-    if (!item) {
+    const contenu = await repository.load();
+    const element = contenu.cases.find((candidat) => candidat.id === idAffaire);
+    if (!element) {
       return NextResponse.json({ error: "COMMERCIAL_CASE_NOT_FOUND" }, { status: 404 });
     }
-    const document = item.documents.find((candidate) => candidate.id === documentId);
+    const document = element.documents.find((candidat) => candidat.id === idDocument);
     if (!document) {
       return NextResponse.json({ error: "COMMERCIAL_DOCUMENT_NOT_FOUND" }, { status: 404 });
     }
@@ -42,7 +42,7 @@ export async function GET(request: Request, context: RouteContext) {
       displayName: requestContext.user.displayName,
     });
     const bytes = await readCommercialDocument(transport, document);
-    const download = new URL(request.url).searchParams.get("download") === "1";
+    const download = new URL(requete.url).searchParams.get("download") === "1";
     const previewType = safePreviewType(bytes);
     const canInline = previewType !== null;
 
@@ -56,8 +56,8 @@ export async function GET(request: Request, context: RouteContext) {
         "X-Content-Type-Options": "nosniff",
       },
     });
-  } catch (error) {
-    const code = error instanceof Error ? error.message : "COMMERCIAL_DOCUMENT_READ_FAILED";
+  } catch (erreur) {
+    const code = erreur instanceof Error ? erreur.message : "COMMERCIAL_DOCUMENT_READ_FAILED";
     return NextResponse.json({ error: code }, { status: statusFor(code) });
   }
 }

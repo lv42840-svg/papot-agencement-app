@@ -44,7 +44,7 @@ function quoteErrorLabel(code: string): string {
 export function QuoteCreateWorkspace({
   affairs,
   canWrite,
-  today,
+  today: aujourdhui,
   initialAffairId,
   initialVariantName,
   chantierComplement,
@@ -78,21 +78,21 @@ export function QuoteCreateWorkspace({
   const [quoteKind, setQuoteKind] = useState<"STANDARD" | "TS">(
     chantierComplement ? "TS" : "STANDARD",
   );
-  const [issueDate, setIssueDate] = useState(today);
+  const [issueDate, setIssueDate] = useState(aujourdhui);
   const [paymentTerms, setPaymentTerms] = useState(firstAffair?.paymentTerms ?? "");
   const [quoteOwnerName, setQuoteOwnerName] = useState(
     firstAffair?.quoteOwnerName || defaultOwnerName,
   );
   const [quoteDueDate, setQuoteDueDate] = useState(firstAffair?.quoteDueDate ?? "");
-  const [saving, setSaving] = useState(false);
-  const [error, setError] = useState("");
+  const [sauvegardeEnCours, setSaving] = useState(false);
+  const [erreur, setError] = useState("");
   const availablePaymentTerms = useMemo(
     () =>
       Array.from(
         new Set(
           [affairsById.get(selectedAffairId)?.paymentTerms ?? "", ...paymentTermOptions]
-            .map((value) => value.trim())
-            .filter((value) => value.length > 0),
+            .map((valeur) => valeur.trim())
+            .filter((valeur) => valeur.length > 0),
         ),
       ),
     [affairsById, paymentTermOptions, selectedAffairId],
@@ -102,8 +102,8 @@ export function QuoteCreateWorkspace({
       Array.from(
         new Set(
           [quoteOwnerName, ...quoteOwners.map((owner) => owner.displayName)]
-            .map((value) => value.trim())
-            .filter((value) => value.length > 0),
+            .map((valeur) => valeur.trim())
+            .filter((valeur) => valeur.length > 0),
         ),
       ),
     [quoteOwnerName, quoteOwners],
@@ -118,13 +118,13 @@ export function QuoteCreateWorkspace({
     setQuoteDueDate(affair?.quoteDueDate ?? "");
   }
 
-  async function createDraft(event: FormEvent<HTMLFormElement>) {
-    event.preventDefault();
+  async function createDraft(evenement: FormEvent<HTMLFormElement>) {
+    evenement.preventDefault();
     if (!canWrite || !selectedAffairId || !quoteOwnerName.trim() || !quoteDueDate) return;
     setSaving(true);
     setError("");
     try {
-      const response = await fetch("/api/desktop/quotes", {
+      const reponse = await fetch("/api/desktop/quotes", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
@@ -139,12 +139,12 @@ export function QuoteCreateWorkspace({
           quoteDueDate,
         }),
       });
-      const data = (await response.json()) as QuotesApiResponse;
-      if (!response.ok || !data.payload || !data.focusQuoteId) {
-        setError(quoteErrorLabel(data.error ?? "QUOTES_MUTATION_FAILED"));
+      const donnees = (await reponse.json()) as QuotesApiResponse;
+      if (!reponse.ok || !donnees.payload || !donnees.focusQuoteId) {
+        setError(quoteErrorLabel(donnees.error ?? "QUOTES_MUTATION_FAILED"));
         return;
       }
-      router.replace(quoteHref(data.focusQuoteId));
+      router.replace(quoteHref(donnees.focusQuoteId));
     } catch {
       setError("Le brouillon n’a pas pu être enregistré.");
     } finally {
@@ -195,9 +195,9 @@ export function QuoteCreateWorkspace({
               <span>Affaire</span>
               <select
                 value={selectedAffairId}
-                onChange={(event) => selectAffair(event.target.value)}
+                onChange={(evenement) => selectAffair(evenement.target.value)}
                 required
-                disabled={saving || chantierComplement}
+                disabled={sauvegardeEnCours || chantierComplement}
               >
                 {affairs.map((affair) => (
                   <option key={affair.id} value={affair.id}>
@@ -213,8 +213,10 @@ export function QuoteCreateWorkspace({
                 <span>Nature du devis</span>
                 <select
                   value={quoteKind}
-                  onChange={(event) => setQuoteKind(event.target.value as "STANDARD" | "TS")}
-                  disabled={saving}
+                  onChange={(evenement) =>
+                    setQuoteKind(evenement.target.value as "STANDARD" | "TS")
+                  }
+                  disabled={sauvegardeEnCours}
                 >
                   <option value="TS">Travaux supplémentaires (TS)</option>
                   <option value="STANDARD">Devis complémentaire</option>
@@ -226,10 +228,10 @@ export function QuoteCreateWorkspace({
               <span>Objet</span>
               <input
                 value={subject}
-                onChange={(event) => setSubject(event.target.value)}
+                onChange={(evenement) => setSubject(evenement.target.value)}
                 maxLength={240}
                 required
-                disabled={saving}
+                disabled={sauvegardeEnCours}
               />
             </label>
 
@@ -251,9 +253,9 @@ export function QuoteCreateWorkspace({
               <input
                 type="date"
                 value={issueDate}
-                onChange={(event) => setIssueDate(event.target.value)}
+                onChange={(evenement) => setIssueDate(evenement.target.value)}
                 required
-                disabled={saving}
+                disabled={sauvegardeEnCours}
               />
             </label>
 
@@ -261,9 +263,9 @@ export function QuoteCreateWorkspace({
               <span>Responsable du chiffrage</span>
               <select
                 value={quoteOwnerName}
-                onChange={(event) => setQuoteOwnerName(event.target.value)}
+                onChange={(evenement) => setQuoteOwnerName(evenement.target.value)}
                 required
-                disabled={saving}
+                disabled={sauvegardeEnCours}
               >
                 {availableQuoteOwners.map((ownerName) => (
                   <option key={ownerName} value={ownerName}>
@@ -278,9 +280,9 @@ export function QuoteCreateWorkspace({
               <input
                 type="date"
                 value={quoteDueDate}
-                onChange={(event) => setQuoteDueDate(event.target.value)}
+                onChange={(evenement) => setQuoteDueDate(evenement.target.value)}
                 required
-                disabled={saving}
+                disabled={sauvegardeEnCours}
               />
             </label>
 
@@ -289,9 +291,9 @@ export function QuoteCreateWorkspace({
               {availablePaymentTerms.length > 0 ? (
                 <select
                   value={paymentTerms}
-                  onChange={(event) => setPaymentTerms(event.target.value)}
+                  onChange={(evenement) => setPaymentTerms(evenement.target.value)}
                   required
-                  disabled={saving}
+                  disabled={sauvegardeEnCours}
                 >
                   {!paymentTerms ? <option value="">Choisir…</option> : null}
                   {availablePaymentTerms.map((terms) => (
@@ -303,10 +305,10 @@ export function QuoteCreateWorkspace({
               ) : (
                 <input
                   value={paymentTerms}
-                  onChange={(event) => setPaymentTerms(event.target.value)}
+                  onChange={(evenement) => setPaymentTerms(evenement.target.value)}
                   placeholder="Saisir les conditions de règlement"
                   required
-                  disabled={saving}
+                  disabled={sauvegardeEnCours}
                 />
               )}
             </label>
@@ -318,16 +320,21 @@ export function QuoteCreateWorkspace({
                 : "À la création, l’affaire passe automatiquement en « Chiffrage en cours » avec le responsable et la date prévue ci-dessus."}
             </div>
 
-            {error ? <div className="quoteCreateError quoteFieldWide">{error}</div> : null}
+            {erreur ? <div className="quoteCreateError quoteFieldWide">{erreur}</div> : null}
 
             <div className="quoteCreateActions quoteFieldWide">
               <button
                 className="primaryButton"
                 type="submit"
-                disabled={saving || !paymentTerms.trim() || !quoteOwnerName.trim() || !quoteDueDate}
+                disabled={
+                  sauvegardeEnCours ||
+                  !paymentTerms.trim() ||
+                  !quoteOwnerName.trim() ||
+                  !quoteDueDate
+                }
               >
                 <FilePlus2 size={15} />{" "}
-                {saving ? "Création…" : `Créer et ouvrir ${initialVariantName} V1`}
+                {sauvegardeEnCours ? "Création…" : `Créer et ouvrir ${initialVariantName} V1`}
               </button>
               <Link href={backHref} className="secondaryButton quoteCancelLink">
                 Annuler

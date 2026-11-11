@@ -9,8 +9,8 @@ export type BillingProjectFilter = {
   sort: BillingProjectSort;
 };
 
-function normalize(value: string): string {
-  return value
+function normalize(valeur: string): string {
+  return valeur
     .normalize("NFD")
     .replace(/[\u0300-\u036f]/g, "")
     .toLocaleLowerCase("fr-FR");
@@ -18,39 +18,55 @@ function normalize(value: string): string {
 
 /** Client-side listing only: no mutation or alteration of billing history. */
 export function filterBillingProjects(
-  drafts: readonly BillingDraft[],
-  filter: BillingProjectFilter,
+  brouillons: readonly BillingDraft[],
+  filtre: BillingProjectFilter,
 ): BillingDraft[] {
-  const query = normalize(filter.search.trim());
-  return drafts
-    .filter((draft) => {
-      if (filter.type !== "ALL" && draft.type !== filter.type) return false;
-      if (filter.status !== "ALL" && draft.status !== filter.status) return false;
-      if (filter.chantierId === "NONE" && draft.chantierId !== null) return false;
-      if (
-        filter.chantierId !== "ALL" &&
-        filter.chantierId !== "NONE" &&
-        draft.chantierId !== filter.chantierId
-      )
+  const recherche = normalize(filtre.search.trim());
+  return brouillons
+    .filter((brouillon) => {
+      if (filtre.type !== "ALL" && brouillon.type !== filtre.type) return false;
+      if (filtre.status !== "ALL" && brouillon.status !== filtre.status) {
         return false;
-      if (!query) return true;
-      return normalize(
-        [draft.clientName, draft.affairName, draft.quoteLabel, draft.label, draft.notes].join(" "),
-      ).includes(query);
-    })
-    .sort((a, b) => {
-      if (filter.sort === "OLDEST") {
-        return a.createdAt.localeCompare(b.createdAt) || a.id.localeCompare(b.id);
       }
-      if (filter.sort === "CLIENT") {
+      if (filtre.chantierId === "NONE" && brouillon.chantierId !== null) {
+        return false;
+      }
+      if (
+        filtre.chantierId !== "ALL" &&
+        filtre.chantierId !== "NONE" &&
+        brouillon.chantierId !== filtre.chantierId
+      ) {
+        return false;
+      }
+      if (!recherche) return true;
+      return normalize(
+        [
+          brouillon.clientName,
+          brouillon.affairName,
+          brouillon.quoteLabel,
+          brouillon.label,
+          brouillon.notes,
+        ].join(" "),
+      ).includes(recherche);
+    })
+    .sort((gauche, droite) => {
+      if (filtre.sort === "OLDEST") {
         return (
-          a.clientName.localeCompare(b.clientName, "fr-FR") ||
-          b.createdAt.localeCompare(a.createdAt)
+          gauche.createdAt.localeCompare(droite.createdAt) || gauche.id.localeCompare(droite.id)
         );
       }
-      if (filter.sort === "AMOUNT_DESC") {
-        return b.amountHtCents - a.amountHtCents || b.createdAt.localeCompare(a.createdAt);
+      if (filtre.sort === "CLIENT") {
+        return (
+          gauche.clientName.localeCompare(droite.clientName, "fr-FR") ||
+          droite.createdAt.localeCompare(gauche.createdAt)
+        );
       }
-      return b.createdAt.localeCompare(a.createdAt) || a.id.localeCompare(b.id);
+      if (filtre.sort === "AMOUNT_DESC") {
+        return (
+          droite.amountHtCents - gauche.amountHtCents ||
+          droite.createdAt.localeCompare(gauche.createdAt)
+        );
+      }
+      return droite.createdAt.localeCompare(gauche.createdAt) || gauche.id.localeCompare(droite.id);
     });
 }

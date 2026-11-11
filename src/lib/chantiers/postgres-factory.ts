@@ -3,23 +3,23 @@ import { createPostgresChantiersRepository } from "./postgres-repository";
 import type { ChantiersRepository } from "./repository";
 
 export function createPostgresBackedChantiersRepository(): ChantiersRepository {
-  let repositoryPromise: Promise<ChantiersRepository> | null = null;
+  let promesseDepot: Promise<ChantiersRepository> | null = null;
 
-  const initialize = () => {
-    repositoryPromise ??= (async () => {
+  const initialiser = () => {
+    promesseDepot ??= (async () => {
       const pool = getServerDbPool();
       await runServerDbMigrations(pool);
       return createPostgresChantiersRepository(pool);
     })();
-    return repositoryPromise;
+    return promesseDepot;
   };
 
   return {
     async load() {
-      return (await initialize()).load();
+      return (await initialiser()).load();
     },
-    async mutate(transform) {
-      return (await initialize()).mutate(transform);
+    async mutate(transformation) {
+      return (await initialiser()).mutate(transformation);
     },
   };
 }

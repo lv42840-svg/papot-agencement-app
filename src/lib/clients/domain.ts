@@ -15,9 +15,9 @@ export const clientContactSchema = z
     email: z.union([z.literal(""), z.string().trim().email().max(240)]),
     isPrimary: z.boolean(),
   })
-  .superRefine((contact, context) => {
+  .superRefine((contact, contexte) => {
     if (!contact.firstName && !contact.lastName) {
-      context.addIssue({
+      contexte.addIssue({
         code: z.ZodIssueCode.custom,
         path: ["lastName"],
         message: "CONTACT_NAME_REQUIRED",
@@ -51,17 +51,17 @@ export const clientRecordSchema = z
     updatedAt: isoDateTimeSchema,
     updatedByName: z.string().trim().min(1).max(160),
   })
-  .superRefine((client, context) => {
+  .superRefine((client, contexte) => {
     if (client.type === "PARTICULIER") {
       if (!client.lastName) {
-        context.addIssue({
+        contexte.addIssue({
           code: z.ZodIssueCode.custom,
           path: ["lastName"],
           message: "CLIENT_LAST_NAME_REQUIRED",
         });
       }
     } else if (!client.companyName) {
-      context.addIssue({
+      contexte.addIssue({
         code: z.ZodIssueCode.custom,
         path: ["companyName"],
         message: "CLIENT_COMPANY_NAME_REQUIRED",
@@ -69,7 +69,7 @@ export const clientRecordSchema = z
     }
 
     if (client.contacts.filter((contact) => contact.isPrimary).length > 1) {
-      context.addIssue({
+      contexte.addIssue({
         code: z.ZodIssueCode.custom,
         path: ["contacts"],
         message: "CLIENT_PRIMARY_CONTACT_DUPLICATE",
@@ -108,11 +108,11 @@ export function createInitialClientsPayload(): ClientsPayload {
   return { schemaVersion: 1, clients: [] };
 }
 
-export function parseClientsPayload(value: unknown): ClientsPayload {
-  if (value == null) return createInitialClientsPayload();
-  const parsed = clientsPayloadSchema.safeParse(value);
-  if (!parsed.success) throw new Error("CLIENTS_STORE_INVALID");
-  return parsed.data;
+export function parseClientsPayload(valeur: unknown): ClientsPayload {
+  if (valeur == null) return createInitialClientsPayload();
+  const analyse = clientsPayloadSchema.safeParse(valeur);
+  if (!analyse.success) throw new Error("CLIENTS_STORE_INVALID");
+  return analyse.data;
 }
 
 export function clientDisplayName(client: ClientRecord): string {
@@ -139,8 +139,8 @@ export function isClientReadyForConfirmation(client: ClientRecord): boolean {
   return !client.isArchived && clientConfirmationMissingFields(client).length === 0;
 }
 
-function normalizeSearchValue(value: string): string {
-  return value
+function normalizeSearchValue(valeur: string): string {
+  return valeur
     .normalize("NFD")
     .replace(/[\u0300-\u036f]/g, "")
     .toLocaleLowerCase("fr-FR");
@@ -172,8 +172,8 @@ export function clientSearchText(client: ClientRecord): string {
   );
 }
 
-export function matchesClientSearch(client: ClientRecord, query: string): boolean {
-  const terms = normalizeSearchValue(query)
+export function matchesClientSearch(client: ClientRecord, requeteRecherche: string): boolean {
+  const terms = normalizeSearchValue(requeteRecherche)
     .split(/\s+/)
     .map((term) => term.trim())
     .filter(Boolean);

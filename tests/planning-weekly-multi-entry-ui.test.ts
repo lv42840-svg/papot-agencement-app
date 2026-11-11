@@ -16,8 +16,8 @@ const route = readFileSync(
 
 describe("weekly team board extended UI", () => {
   it("can add, edit and delete multiple categorized assignments within the same day", () => {
-    expect(board).toContain("assignments.get(key) ?? []");
-    expect(cell).toContain("rows.map((row)");
+    expect(board).toContain("assignments.get(cle) ?? []");
+    expect(cell).toContain("lignesTableau.map((ligneTableau)");
     expect(cell).toContain("saveDailyEntry");
     expect(cell).toContain("deleteDailyEntry");
     expect(cell).toContain("weeklyBoardAddEntry");
@@ -31,17 +31,17 @@ describe("weekly team board extended UI", () => {
     expect(board).toContain('className={holiday ? "weeklyBoardDayHead isHoliday"');
     expect(board).toContain("firmChantiers.map");
     expect(board).toContain("provisionalChantiers.map");
-    expect(board).toContain("row.name");
-    expect(board).toContain("row.workshop");
-    expect(board).toContain("row.install");
+    expect(board).toContain("ligneTableau.name");
+    expect(board).toContain("ligneTableau.workshop");
+    expect(board).toContain("ligneTableau.install");
     expect(route).toContain("frenchNationalPublicHolidayLabels");
     expect(route).toContain("weeklyChantierHours");
   });
 
   it("keeps server-side write authorization and read-only totals", () => {
     expect(route).toContain('requireModuleRequestContext("planning", "WRITE")');
-    expect(route).toContain('requireSpecialPermission(context.user, "planning.manage_schedules")');
-    expect(route).toContain("assertPlanningWeekEditable(input.week)");
+    expect(route).toContain('requireSpecialPermission(contexte.user, "planning.manage_schedules")');
+    expect(route).toContain("assertPlanningWeekEditable(saisie.week)");
     expect(route).toContain("applyWeeklyBoardEntry");
     expect(board).toContain("Les affectations ne modifient pas les heures du grand planning.");
   });

@@ -48,14 +48,14 @@ const sendQuoteSchema = z.discriminatedUnion("mode", [
   }),
 ]);
 
-function noStoreJson(body: unknown, init?: ResponseInit) {
-  const response = NextResponse.json(body, init);
-  response.headers.set("Cache-Control", "no-store");
-  return response;
+function noStoreJson(corps: unknown, init?: ResponseInit) {
+  const reponse = NextResponse.json(corps, init);
+  reponse.headers.set("Cache-Control", "no-store");
+  return reponse;
 }
 
-function publicSnapshot(payload: NativeQuotesPayload, canWrite: boolean, focusQuoteId: string) {
-  return { payload, canWrite, focusQuoteId };
+function publicSnapshot(contenu: NativeQuotesPayload, canWrite: boolean, focusQuoteId: string) {
+  return { payload: contenu, canWrite, focusQuoteId };
 }
 
 function errorStatus(code: string): number {
@@ -91,21 +91,24 @@ type PendingArchiveCleanup = {
   deleteFile: (storagePath: string) => Promise<boolean>;
 };
 
-export async function POST(request: Request, { params }: { params: Promise<{ quoteId: string }> }) {
+export async function POST(
+  requete: Request,
+  { params: parametres }: { params: Promise<{ quoteId: string }> },
+) {
   const cleanupState: { archive: PendingArchiveCleanup | null } = { archive: null };
   let committed = false;
 
   try {
-    const { quoteId } = await params;
-    const expectedRevision = expectedQuoteRevision(request);
-    const input = sendQuoteSchema.parse(await request.json());
+    const { quoteId: idDevis } = await parametres;
+    const expectedRevision = expectedQuoteRevision(requete);
+    const saisie = sendQuoteSchema.parse(await requete.json());
     const quoteContext = await requireModuleRequestContext("quotes", "WRITE");
     await requireModuleRequestContext("commercial", "WRITE");
-    const actor = {
+    const auteur = {
       userId: quoteContext.user.id,
       displayName: quoteContext.user.displayName,
     };
-    const now = new Date();
+    const maintenant = new Date();
     const quotesRepository = createQuotesRepository();
     const commercialRepository = createCommercialRepository();
     const clientsRepository = await createClientsRepository();
@@ -121,20 +124,20 @@ export async function POST(request: Request, { params }: { params: Promise<{ quo
       emailSettingsRepository.load(),
     ]);
 
-    const mutation = await quotesRepository.mutate(async (payload) => {
-      assertQuoteRevision(payload, quoteId, expectedRevision);
-      normalizeQuotePricingAfterModelMutation(payload, quoteId);
-      const quote = payload.quotes.find((candidate) => candidate.id === quoteId);
+    const mutation = await quotesRepository.mutate(async (contenu) => {
+      assertQuoteRevision(contenu, idDevis, expectedRevision);
+      normalizeQuotePricingAfterModelMutation(contenu, idDevis);
+      const quote = contenu.quotes.find((candidat) => candidat.id === idDevis);
       if (!quote) throw new Error("QUOTE_NOT_FOUND");
 
       const commercial = await commercialRepository.load();
       const commercialCase = commercial.cases.find(
-        (candidate) => candidate.id === quote.commercialCaseId,
+        (candidat) => candidat.id === quote.commercialCaseId,
       );
       if (!commercialCase) throw new Error("COMMERCIAL_CASE_NOT_FOUND");
 
       if (quote.status === "FROZEN") {
-        if (input.mode !== "SEND") throw new Error("QUOTE_NOT_EDITABLE");
+        if (saisie.mode !== "SEND") throw new Error("QUOTE_NOT_EDITABLE");
         if (!quote.finalPdf) throw new Error("QUOTE_NOT_FROZEN");
         const pdfBytes = await transport.store.readBytes(
           quote.finalPdf.storagePath,
@@ -142,9 +145,9 @@ export async function POST(request: Request, { params }: { params: Promise<{ quo
         );
         await sendQuoteEmail(
           {
-            to: input.email.to,
-            subject: input.email.subject,
-            body: input.email.body,
+            to: saisie.email.to,
+            subject: saisie.email.subject,
+            body: saisie.email.body,
             pdfFileName: quote.finalPdf.fileName,
             pdfBytes,
           },
@@ -154,11 +157,17 @@ export async function POST(request: Request, { params }: { params: Promise<{ quo
             replyToEmail: emailSettings.replyToEmail,
           },
         );
-        const sent = markFrozenNativeQuoteSent(payload, quoteId, input.followUpDate, actor, now);
+        const sent = markFrozenNativeQuoteSent(
+          contenu,
+          idDevis,
+          saisie.followUpDate,
+          auteur,
+          maintenant,
+        );
 
         await commercialRepository.mutate((commercialPayload) => {
           const affair = commercialPayload.cases.find(
-            (candidate) => candidate.id === sent.commercialCaseId,
+            (candidat) => candidat.id === sent.commercialCaseId,
           );
           if (!affair) throw new Error("COMMERCIAL_CASE_NOT_FOUND");
           if (!quoteWorkflowMayChangeCommercialStatus(affair.status)) {
@@ -169,10 +178,10 @@ export async function POST(request: Request, { params }: { params: Promise<{ quo
             {
               action: "markQuoteSent",
               caseId: sent.commercialCaseId,
-              followUpDate: input.followUpDate,
+              followUpDate: saisie.followUpDate,
             },
-            actor,
-            now,
+            auteur,
+            maintenant,
           );
         });
 
@@ -185,10 +194,10 @@ export async function POST(request: Request, { params }: { params: Promise<{ quo
       if (quote.status !== "DRAFT") throw new Error("QUOTE_NOT_EDITABLE");
 
       const issueYear = Number(quote.model.issueDate.slice(0, 4));
-      const quoteNumber = nextFinalQuoteNumber(payload, issueYear);
+      const quoteNumber = nextFinalQuoteNumber(contenu, issueYear);
       const document = buildQuoteDocumentDataFromPayloads(
-        { quoteId, quoteNumber },
-        { quotes: payload, clients, commercial, companyProfile },
+        { quoteId: idDevis, quoteNumber },
+        { quotes: contenu, clients, commercial, companyProfile },
       );
       const generated = await renderQuoteWordV2PdfWithPhotos(template, document, (photo) =>
         transport.store.readBytes(photo.storagePath, photo.sha256),
@@ -202,8 +211,8 @@ export async function POST(request: Request, { params }: { params: Promise<{ quo
           caseName: commercialCase.name,
         },
         pdf: generated.pdf,
-        actorName: actor.displayName,
-        now,
+        actorName: auteur.displayName,
+        now: maintenant,
       });
       if (archive.created) {
         cleanupState.archive = {
@@ -212,12 +221,12 @@ export async function POST(request: Request, { params }: { params: Promise<{ quo
         };
       }
 
-      if (input.mode === "SEND") {
+      if (saisie.mode === "SEND") {
         await sendQuoteEmail(
           {
-            to: input.email.to,
-            subject: input.email.subject,
-            body: input.email.body,
+            to: saisie.email.to,
+            subject: saisie.email.subject,
+            body: saisie.email.body,
             pdfFileName: archive.finalPdf.fileName,
             pdfBytes: generated.pdf,
           },
@@ -230,15 +239,21 @@ export async function POST(request: Request, { params }: { params: Promise<{ quo
       }
 
       const finalized =
-        input.mode === "VALIDATE"
-          ? markNativeQuoteValidatedWithFinalPdf(payload, quoteId, archive.finalPdf, actor, now)
-          : markNativeQuoteSentWithFinalPdf(
-              payload,
-              quoteId,
-              input.followUpDate,
+        saisie.mode === "VALIDATE"
+          ? markNativeQuoteValidatedWithFinalPdf(
+              contenu,
+              idDevis,
               archive.finalPdf,
-              actor,
-              now,
+              auteur,
+              maintenant,
+            )
+          : markNativeQuoteSentWithFinalPdf(
+              contenu,
+              idDevis,
+              saisie.followUpDate,
+              archive.finalPdf,
+              auteur,
+              maintenant,
             );
 
       await commercialRepository.mutate((commercialPayload) => {
@@ -246,13 +261,13 @@ export async function POST(request: Request, { params }: { params: Promise<{ quo
           commercialPayload,
           finalized.commercialCaseId,
           [archive.commercialDocument],
-          actor,
-          now,
+          auteur,
+          maintenant,
         );
-        if (input.mode === "VALIDATE") return registered;
+        if (saisie.mode === "VALIDATE") return registered;
 
         const affair = registered.payload.cases.find(
-          (candidate) => candidate.id === finalized.commercialCaseId,
+          (candidat) => candidat.id === finalized.commercialCaseId,
         );
         if (!affair) throw new Error("COMMERCIAL_CASE_NOT_FOUND");
         if (!quoteWorkflowMayChangeCommercialStatus(affair.status)) return registered;
@@ -261,10 +276,10 @@ export async function POST(request: Request, { params }: { params: Promise<{ quo
           {
             action: "markQuoteSent",
             caseId: finalized.commercialCaseId,
-            followUpDate: input.followUpDate,
+            followUpDate: saisie.followUpDate,
           },
-          actor,
-          now,
+          auteur,
+          maintenant,
         );
       });
 
@@ -278,16 +293,16 @@ export async function POST(request: Request, { params }: { params: Promise<{ quo
     return noStoreJson(
       publicSnapshot(mutation.payload, quoteContext.moduleAccess.canWrite, mutation.focusQuoteId),
     );
-  } catch (error) {
+  } catch (erreur) {
     const pendingArchive = cleanupState.archive;
     if (!committed && pendingArchive) {
       await pendingArchive.deleteFile(pendingArchive.storagePath).catch(() => undefined);
     }
     const code =
-      error instanceof ZodError
+      erreur instanceof ZodError
         ? "QUOTE_SEND_REQUEST_INVALID"
-        : error instanceof Error
-          ? error.message
+        : erreur instanceof Error
+          ? erreur.message
           : "QUOTE_SEND_FAILED";
     return noStoreJson({ error: code }, { status: errorStatus(code) });
   }

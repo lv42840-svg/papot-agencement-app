@@ -38,22 +38,22 @@ type RepositoryOptions = {
   ttlMs?: number;
 };
 
-function envelopeFromRow(row: LibraryStateRow): LibraryEnvelope {
+function envelopeFromRow(ligneTableau: LibraryStateRow): LibraryEnvelope {
   return {
-    version: row.version,
-    payload: parseLibraryPayload(row.payload),
+    version: ligneTableau.version,
+    payload: parseLibraryPayload(ligneTableau.payload),
   };
 }
 
-function snapshotFromRow(row: LibraryStateRow): LibrarySnapshot {
+function snapshotFromRow(ligneTableau: LibraryStateRow): LibrarySnapshot {
   return {
-    version: row.version,
-    payload: parseLibraryPayload(row.payload),
+    version: ligneTableau.version,
+    payload: parseLibraryPayload(ligneTableau.payload),
   };
 }
 
 async function loadState(queryable: Queryable, forUpdate = false): Promise<LibraryStateRow> {
-  const result = await queryable.query<LibraryStateRow>(
+  const resultat = await queryable.query<LibraryStateRow>(
     `
       SELECT version, payload, updated_at, updated_by_user_id, updated_by_device_id
       FROM papot_library_state
@@ -61,13 +61,13 @@ async function loadState(queryable: Queryable, forUpdate = false): Promise<Libra
       ${forUpdate ? "FOR UPDATE" : ""}
     `,
   );
-  const row = result.rows[0];
-  if (!row) throw new Error("LIBRARY_STORAGE_NOT_INITIALIZED");
-  return row;
+  const ligneTableau = resultat.rows[0];
+  if (!ligneTableau) throw new Error("LIBRARY_STORAGE_NOT_INITIALIZED");
+  return ligneTableau;
 }
 
 async function loadLock(client: PoolClient): Promise<LibraryEditLock | null> {
-  const result = await client.query<LibraryLockRow>(
+  const resultat = await client.query<LibraryLockRow>(
     `
       SELECT lock_data
       FROM papot_library_edit_lock
@@ -75,8 +75,8 @@ async function loadLock(client: PoolClient): Promise<LibraryEditLock | null> {
       FOR UPDATE
     `,
   );
-  const row = result.rows[0];
-  return row ? libraryEditLockSchema.parse(row.lock_data) : null;
+  const ligneTableau = resultat.rows[0];
+  return ligneTableau ? libraryEditLockSchema.parse(ligneTableau.lock_data) : null;
 }
 
 async function storeLock(client: PoolClient, lock: LibraryEditLock): Promise<void> {
@@ -104,12 +104,12 @@ export function createPostgresLibraryRepository(
 
     async open(leaseId: string): Promise<OpenLibraryResult> {
       return withServerDbTransaction(async (client) => {
-        const state = await loadState(client, true);
-        const resource = envelopeFromRow(state);
-        const now = clock();
+        const etat = await loadState(client, true);
+        const resource = envelopeFromRow(etat);
+        const maintenant = clock();
         let currentLock = await loadLock(client);
 
-        if (currentLock && isLibraryLockExpired(currentLock, now)) {
+        if (currentLock && isLibraryLockExpired(currentLock, maintenant)) {
           await client.query("DELETE FROM papot_library_edit_lock WHERE scope = 'catalog'");
           currentLock = null;
         }
@@ -119,15 +119,15 @@ export function createPostgresLibraryRepository(
             status: "read-only",
             resource,
             lock: currentLock,
-            baseVersion: state.version,
+            baseVersion: etat.version,
           };
         }
 
         const lock = createLibraryLock({
           leaseId,
           owner,
-          baseVersion: state.version,
-          now,
+          baseVersion: etat.version,
+          now: maintenant,
           ttlMs: options.ttlMs,
         });
         await storeLock(client, lock);
@@ -136,40 +136,40 @@ export function createPostgresLibraryRepository(
           status: "editable",
           resource,
           lock,
-          baseVersion: state.version,
+          baseVersion: etat.version,
         };
       }, pool);
     },
 
-    async save(input): Promise<SaveLibraryEditResult> {
-      if (!Number.isInteger(input.expectedVersion) || input.expectedVersion < 0) {
+    async save(saisie): Promise<SaveLibraryEditResult> {
+      if (!Number.isInteger(saisie.expectedVersion) || saisie.expectedVersion < 0) {
         throw new Error("EXPECTED_VERSION_INVALID");
       }
-      const payload = parseLibraryPayload(input.payload);
+      const contenu = parseLibraryPayload(saisie.payload);
 
       return withServerDbTransaction(async (client) => {
-        const state = await loadState(client, true);
+        const etat = await loadState(client, true);
         const currentLock = await loadLock(client);
         if (!currentLock) throw new Error("LOCK_NOT_FOUND");
 
-        const now = clock();
+        const maintenant = clock();
         const renewed = renewLibraryLock({
           current: currentLock,
-          leaseId: input.leaseId,
+          leaseId: saisie.leaseId,
           owner,
-          now,
+          now: maintenant,
           ttlMs: options.ttlMs,
         });
         await storeLock(client, renewed);
 
-        if (state.version !== input.expectedVersion) {
+        if (etat.version !== saisie.expectedVersion) {
           return {
             status: "conflict",
-            current: envelopeFromRow(state),
+            current: envelopeFromRow(etat),
           };
         }
 
-        const nextVersion = state.version + 1;
+        const nextVersion = etat.version + 1;
         const saved = await client.query<LibraryStateRow>(
           `
             UPDATE papot_library_state
@@ -181,14 +181,14 @@ export function createPostgresLibraryRepository(
             WHERE scope = 'catalog'
             RETURNING version, payload, updated_at, updated_by_user_id, updated_by_device_id
           `,
-          [nextVersion, payload, now.toISOString(), owner.userId, owner.deviceId],
+          [nextVersion, contenu, maintenant.toISOString(), owner.userId, owner.deviceId],
         );
-        const row = saved.rows[0];
-        if (!row) throw new Error("LIBRARY_STORAGE_NOT_INITIALIZED");
+        const ligneTableau = saved.rows[0];
+        if (!ligneTableau) throw new Error("LIBRARY_STORAGE_NOT_INITIALIZED");
 
         return {
           status: "saved",
-          resource: envelopeFromRow(row),
+          resource: envelopeFromRow(ligneTableau),
         };
       }, pool);
     },

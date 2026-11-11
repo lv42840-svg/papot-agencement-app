@@ -15,18 +15,18 @@ export function createPostgresCompanyProfileRepository(
 ): CompanyProfileRepository {
   return {
     async load() {
-      const result = await pool.query<CompanyProfileRow>(
+      const resultat = await pool.query<CompanyProfileRow>(
         "SELECT payload FROM papot_company_profile WHERE scope = 'global'",
       );
-      const row = result.rows[0];
-      if (!row) throw new Error("COMPANY_PROFILE_STORAGE_NOT_INITIALIZED");
-      return parseCompanyProfile(row.payload);
+      const ligne = resultat.rows[0];
+      if (!ligne) throw new Error("COMPANY_PROFILE_STORAGE_NOT_INITIALIZED");
+      return parseCompanyProfile(ligne.payload);
     },
 
-    async replace(profile: CompanyProfile) {
-      const parsed = parseCompanyProfile(profile);
+    async replace(profil: CompanyProfile) {
+      const profilValide = parseCompanyProfile(profil);
       return withServerDbTransaction(async (client) => {
-        const result = await client.query<CompanyProfileRow>(
+        const resultat = await client.query<CompanyProfileRow>(
           `
             UPDATE papot_company_profile
             SET version = version + 1,
@@ -35,11 +35,11 @@ export function createPostgresCompanyProfileRepository(
             WHERE scope = 'global'
             RETURNING payload
           `,
-          [parsed],
+          [profilValide],
         );
-        const row = result.rows[0];
-        if (!row) throw new Error("COMPANY_PROFILE_STORAGE_NOT_INITIALIZED");
-        return parseCompanyProfile(row.payload);
+        const ligne = resultat.rows[0];
+        if (!ligne) throw new Error("COMPANY_PROFILE_STORAGE_NOT_INITIALIZED");
+        return parseCompanyProfile(ligne.payload);
       }, pool);
     },
   };

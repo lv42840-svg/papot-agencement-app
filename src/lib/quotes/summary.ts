@@ -11,64 +11,67 @@ export type QuoteEconomicSummary = {
   marginPercent: number | null;
 };
 
-function lineAmountCents(quantity: number, unitAmountCents: number): number {
-  const amount = Math.round(quantity * unitAmountCents);
-  if (!Number.isSafeInteger(amount) || amount < 0) {
+function lineAmountCents(quantite: number, montantUnitaireCentimes: number): number {
+  const montant = Math.round(quantite * montantUnitaireCentimes);
+  if (!Number.isSafeInteger(montant) || montant < 0) {
     throw new Error("QUOTE_SUMMARY_AMOUNT_INVALID");
   }
-  return amount;
+  return montant;
 }
 
-function addAmount(total: number, amount: number): number {
-  const next = total + amount;
-  if (!Number.isSafeInteger(next) || next < 0) {
+function addAmount(total: number, montant: number): number {
+  const nouveauTotal = total + montant;
+  if (!Number.isSafeInteger(nouveauTotal) || nouveauTotal < 0) {
     throw new Error("QUOTE_SUMMARY_AMOUNT_INVALID");
   }
-  return next;
+  return nouveauTotal;
 }
 
-export function calculateQuoteEconomicSummary(items: QuoteItem[]): QuoteEconomicSummary {
-  let totalSaleCents = 0;
-  let totalCostCents = 0;
-  let costComplete = true;
+export function calculateQuoteEconomicSummary(elements: QuoteItem[]): QuoteEconomicSummary {
+  let totalVenteCentimes = 0;
+  let totalCoutCentimes = 0;
+  let coutComplet = true;
 
-  for (const item of items) {
-    if (item.kind !== "LINE") continue;
+  for (const element of elements) {
+    if (element.kind !== "LINE") continue;
 
-    totalSaleCents = addAmount(
-      totalSaleCents,
-      lineAmountCents(item.quantity, item.unitPriceCents ?? 0),
+    totalVenteCentimes = addAmount(
+      totalVenteCentimes,
+      lineAmountCents(element.quantity, element.unitPriceCents ?? 0),
     );
 
-    const components = item.components ?? [];
-    if (components.length === 0) {
-      costComplete = false;
+    const composants = element.components ?? [];
+    if (composants.length === 0) {
+      coutComplet = false;
       continue;
     }
 
-    const unitCostCents = calculateQuoteOuvrageUnitCostCents(components);
-    if (unitCostCents === null) {
-      costComplete = false;
+    const coutUnitaireCentimes = calculateQuoteOuvrageUnitCostCents(composants);
+    if (coutUnitaireCentimes === null) {
+      coutComplet = false;
       continue;
     }
 
-    totalCostCents = addAmount(totalCostCents, lineAmountCents(item.quantity, unitCostCents));
+    totalCoutCentimes = addAmount(
+      totalCoutCentimes,
+      lineAmountCents(element.quantity, coutUnitaireCentimes),
+    );
   }
 
-  if (!costComplete) {
+  if (!coutComplet) {
     return {
-      totalSaleCents,
+      totalSaleCents: totalVenteCentimes,
       totalCostCents: null,
       marginAmountCents: null,
       marginPercent: null,
     };
   }
 
-  const marginAmountCents = totalSaleCents - totalCostCents;
+  const montantMargeCentimes = totalVenteCentimes - totalCoutCentimes;
   return {
-    totalSaleCents,
-    totalCostCents,
-    marginAmountCents,
-    marginPercent: calculateQuoteOuvrageMarginPercent(totalSaleCents, totalCostCents),
+    totalSaleCents: totalVenteCentimes,
+    totalCostCents: totalCoutCentimes,
+    marginAmountCents: montantMargeCentimes,
+    marginPercent: calculateQuoteOuvrageMarginPercent(totalVenteCentimes, totalCoutCentimes),
   };
 }

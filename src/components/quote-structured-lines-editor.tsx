@@ -126,25 +126,25 @@ function formatMoney(cents: number): string {
   return moneyFormatter.format(cents / 100);
 }
 
-function formatPercent(value: number | null): string {
-  return value === null ? "n/c" : `${percentFormatter.format(value)} %`;
+function formatPercent(valeur: number | null): string {
+  return valeur === null ? "n/c" : `${percentFormatter.format(valeur)} %`;
 }
 
 function centsToInput(cents: number): string {
   return (cents / 100).toFixed(2).replace(".", ",");
 }
 
-function eurosToCents(value: string): number {
-  const euros = Number(value.trim().replace(",", "."));
+function eurosToCents(valeur: string): number {
+  const euros = Number(valeur.trim().replace(",", "."));
   if (!Number.isFinite(euros) || euros < 0) throw new Error("PRICE_INVALID");
   const cents = Math.round(euros * 100);
   if (!Number.isSafeInteger(cents)) throw new Error("PRICE_INVALID");
   return cents;
 }
 
-function optionalEurosToCents(value: string): number | undefined {
-  if (!value.trim()) return undefined;
-  return eurosToCents(value);
+function optionalEurosToCents(valeur: string): number | undefined {
+  if (!valeur.trim()) return undefined;
+  return eurosToCents(valeur);
 }
 
 function newComponentForm(): OuvrageComponentForm {
@@ -175,8 +175,8 @@ function formFromLibraryComponent(component: LibraryComponent): OuvrageComponent
   };
 }
 
-function formsFromLine(line: QuoteLine): OuvrageComponentForm[] {
-  const lineComponents = line.components ?? [];
+function formsFromLine(ligne: QuoteLine): OuvrageComponentForm[] {
+  const lineComponents = ligne.components ?? [];
   if (lineComponents.length > 0) {
     return lineComponents.map((component) => {
       const costPriceCents = quoteOuvrageComponentCostPriceCents(component);
@@ -202,13 +202,13 @@ function formsFromLine(line: QuoteLine): OuvrageComponentForm[] {
 
   return [
     {
-      key: `legacy-${line.id}`,
-      description: line.description,
-      unit: line.unit || "u",
+      key: `legacy-${ligne.id}`,
+      description: ligne.description,
+      unit: ligne.unit || "u",
       quantityInput: "1",
       costPriceEuros: "",
       marginPercentInput: "",
-      unitPriceEuros: centsToInput(line.unitPriceCents ?? 0),
+      unitPriceEuros: centsToInput(ligne.unitPriceCents ?? 0),
       pricingDriver: "SALE_PRICE",
     },
   ];
@@ -335,62 +335,62 @@ function libraryErrorLabel(code: string): string {
   return "La Bibliothèque n’a pas pu être mise à jour.";
 }
 
-function normalizeSearch(value: string): string {
-  return value
+function normalizeSearch(valeur: string): string {
+  return valeur
     .normalize("NFD")
     .replace(/[\u0300-\u036f]/g, "")
     .toLocaleLowerCase("fr-FR")
     .trim();
 }
 
-function latestSection(items: QuoteItem[]): QuoteSection | null {
-  for (let index = items.length - 1; index >= 0; index -= 1) {
-    const item = items[index];
-    if (item.kind === "SECTION") return item;
+function latestSection(elements: QuoteItem[]): QuoteSection | null {
+  for (let indice = elements.length - 1; indice >= 0; indice -= 1) {
+    const element = elements[indice];
+    if (element.kind === "SECTION") return element;
   }
   return null;
 }
 
-function currentInsertionParentId(items: QuoteItem[]): string | null {
-  for (let index = items.length - 1; index >= 0; index -= 1) {
-    const item = items[index];
-    if (item.kind === "SECTION" || item.kind === "SUBSECTION") return item.id;
-    if (item.kind === "LINE" || item.kind === "COMMENT") return item.parentId;
+function currentInsertionParentId(elements: QuoteItem[]): string | null {
+  for (let indice = elements.length - 1; indice >= 0; indice -= 1) {
+    const element = elements[indice];
+    if (element.kind === "SECTION" || element.kind === "SUBSECTION") return element.id;
+    if (element.kind === "LINE" || element.kind === "COMMENT") return element.parentId;
   }
   return null;
 }
 
-async function postLibrary(body: Record<string, unknown>) {
-  const response = await fetch("/api/desktop/library", {
+async function postLibrary(corps: Record<string, unknown>) {
+  const reponse = await fetch("/api/desktop/library", {
     method: "POST",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify(body),
+    body: JSON.stringify(corps),
   });
-  const data = (await response.json()) as LibraryOpenResponse | LibrarySaveResponse;
-  if (!response.ok) {
-    const error = "error" in data ? data.error : "LIBRARY_REQUEST_FAILED";
-    throw new Error(error);
+  const donnees = (await reponse.json()) as LibraryOpenResponse | LibrarySaveResponse;
+  if (!reponse.ok) {
+    const erreur = "error" in donnees ? donnees.error : "LIBRARY_REQUEST_FAILED";
+    throw new Error(erreur);
   }
-  return data;
+  return donnees;
 }
 
 async function postQuotePricing(
-  body: Record<string, unknown>,
+  corps: Record<string, unknown>,
   updatedAt: string,
 ): Promise<NativeQuotesPayload> {
-  const response = await fetch("/api/desktop/quotes/pricing", {
+  const reponse = await fetch("/api/desktop/quotes/pricing", {
     method: "POST",
     headers: {
       "Content-Type": "application/json",
       ...quoteRevisionHeaders(updatedAt),
     },
-    body: JSON.stringify(body),
+    body: JSON.stringify(corps),
   });
-  const data = (await response.json()) as QuotesApiResponse;
-  if (!response.ok || !data.payload) {
-    throw new Error(data.error ?? "QUOTES_PRICING_MUTATION_FAILED");
+  const donnees = (await reponse.json()) as QuotesApiResponse;
+  if (!reponse.ok || !donnees.payload) {
+    throw new Error(donnees.error ?? "QUOTES_PRICING_MUTATION_FAILED");
   }
-  return data.payload;
+  return donnees.payload;
 }
 
 export function QuoteStructuredLinesEditor({
@@ -401,12 +401,12 @@ export function QuoteStructuredLinesEditor({
 }: {
   quote: NativeQuoteRecord | null;
   canWrite: boolean;
-  onSaved: (payload: NativeQuotesPayload) => void;
+  onSaved: (contenu: NativeQuotesPayload) => void;
   headerActions?: ReactNode;
 }) {
-  const postQuotePricingForQuote = (body: Record<string, unknown>) => {
+  const postQuotePricingForQuote = (corps: Record<string, unknown>) => {
     if (!quote) throw new Error("QUOTE_NOT_FOUND");
-    return postQuotePricing(body, quote.updatedAt);
+    return postQuotePricing(corps, quote.updatedAt);
   };
 
   const [formOpen, setFormOpen] = useState(false);
@@ -422,7 +422,7 @@ export function QuoteStructuredLinesEditor({
   const [ouvragePricingDriver, setOuvragePricingDriver] =
     useState<QuotePricingDriver>("SALE_PRICE");
   const [headingEditor, setHeadingEditor] = useState<HeadingEditor>(null);
-  const [saving, setSaving] = useState(false);
+  const [sauvegardeEnCours, setSaving] = useState(false);
   const [duplicatingLineId, setDuplicatingLineId] = useState<string | null>(null);
   const [duplicatingHeadingId, setDuplicatingHeadingId] = useState<string | null>(null);
   const [deletingItemId, setDeletingItemId] = useState<string | null>(null);
@@ -439,7 +439,7 @@ export function QuoteStructuredLinesEditor({
     key: string;
     placement: "BEFORE" | "AFTER";
   } | null>(null);
-  const [error, setError] = useState("");
+  const [erreur, setError] = useState("");
   const [notice, setNotice] = useState("");
   const [libraryPayload, setLibraryPayload] = useState<LibraryPayload | null>(null);
   const [libraryPickerOpen, setLibraryPickerOpen] = useState(false);
@@ -449,17 +449,20 @@ export function QuoteStructuredLinesEditor({
   const [librarySavingComponentId, setLibrarySavingComponentId] = useState<string | null>(null);
   const [publishedLineIds, setPublishedLineIds] = useState<Set<string>>(new Set());
 
-  const items = useMemo(() => quote?.model.items ?? [], [quote]);
-  const lines = useMemo(
-    () => items.filter((item): item is QuoteLine => item.kind === "LINE"),
-    [items],
+  const elements = useMemo(() => quote?.model.items ?? [], [quote]);
+  const lignes = useMemo(
+    () => elements.filter((element): element is QuoteLine => element.kind === "LINE"),
+    [elements],
   );
   const adjustedLinesById = useMemo(() => {
     if (!quote) return new Map();
     const adjusted = calculateQuoteAdjustedPricing(quote.model.items, quote.pricingConfig);
-    return new Map(adjusted.lines.map((line) => [line.lineId, line]));
+    return new Map(adjusted.lines.map((ligne) => [ligne.lineId, ligne]));
   }, [quote]);
-  const itemById = useMemo(() => new Map(items.map((item) => [item.id, item])), [items]);
+  const itemById = useMemo(
+    () => new Map(elements.map((element) => [element.id, element])),
+    [elements],
+  );
   const optionByTargetId = useMemo(
     () =>
       new Map((quote?.pricingConfig.options ?? []).map((option) => [option.targetItemId, option])),
@@ -489,24 +492,24 @@ export function QuoteStructuredLinesEditor({
       return adjusted.optionStatus !== "PENDING" && adjusted.optionStatus !== "REJECTED";
     };
 
-    for (const line of lines) {
-      const adjusted = adjustedLinesById.get(line.id);
-      if (!adjusted || !line.parentId) continue;
-      const amount = adjusted.saleCents;
+    for (const ligne of lignes) {
+      const adjusted = adjustedLinesById.get(ligne.id);
+      if (!adjusted || !ligne.parentId) continue;
+      const montant = adjusted.saleCents;
 
-      if (belongsToHeading(line.parentId, adjusted)) {
-        totals.set(line.parentId, (totals.get(line.parentId) ?? 0) + amount);
+      if (belongsToHeading(ligne.parentId, adjusted)) {
+        totals.set(ligne.parentId, (totals.get(ligne.parentId) ?? 0) + montant);
       }
 
-      const parent = itemById.get(line.parentId);
+      const parent = itemById.get(ligne.parentId);
       if (parent?.kind === "SUBSECTION" && belongsToHeading(parent.parentId, adjusted)) {
-        totals.set(parent.parentId, (totals.get(parent.parentId) ?? 0) + amount);
+        totals.set(parent.parentId, (totals.get(parent.parentId) ?? 0) + montant);
       }
     }
     return totals;
-  }, [adjustedLinesById, itemById, lines, optionByTargetId]);
-  const numbers = useMemo(() => buildQuoteItemNumbers(items), [items]);
-  const lastSection = useMemo(() => latestSection(items), [items]);
+  }, [adjustedLinesById, itemById, lignes, optionByTargetId]);
+  const numbers = useMemo(() => buildQuoteItemNumbers(elements), [elements]);
+  const lastSection = useMemo(() => latestSection(elements), [elements]);
   const editable = canWrite && quote?.status === "DRAFT";
   const calculatedUnitPrice = useMemo(() => ouvrageUnitPriceCents(components), [components]);
   const calculatedUnitCost = useMemo(() => ouvrageUnitCostCents(components), [components]);
@@ -529,7 +532,7 @@ export function QuoteStructuredLinesEditor({
 
   const visibleLibraryComponents = useMemo(() => {
     if (!libraryPayload) return [];
-    const query = normalizeSearch(libraryQuery);
+    const requeteRecherche = normalizeSearch(libraryQuery);
     return libraryPayload.components
       .filter((component) =>
         normalizeSearch(
@@ -539,9 +542,11 @@ export function QuoteStructuredLinesEditor({
             component.unit,
             component.activity ? productionActivityLabel(component.activity) : "",
           ].join(" "),
-        ).includes(query),
+        ).includes(requeteRecherche),
       )
-      .sort((left, right) => left.name.localeCompare(right.name, "fr-FR", { sensitivity: "base" }));
+      .sort((gauche, droite) =>
+        gauche.name.localeCompare(droite.name, "fr-FR", { sensitivity: "base" }),
+      );
   }, [libraryPayload, libraryQuery]);
 
   useEffect(() => {
@@ -573,13 +578,13 @@ export function QuoteStructuredLinesEditor({
   useEffect(() => {
     if (!priceForced || ouvragePricingDriver !== "MARGIN" || calculatedUnitCost === null) return;
     try {
-      const next = centsToInput(
+      const suivant = centsToInput(
         calculateQuoteSalePriceFromMarginCents(
           calculatedUnitCost,
           parseQuoteMarginInput(forcedMarginPercentInput),
         ),
       );
-      setForcedUnitPriceEuros((current) => (current === next ? current : next));
+      setForcedUnitPriceEuros((courant) => (courant === suivant ? courant : suivant));
     } catch {
       // Keep the partial margin input while editing.
     }
@@ -592,10 +597,10 @@ export function QuoteStructuredLinesEditor({
       return;
     }
     try {
-      const next = quoteMarginToInput(
+      const suivant = quoteMarginToInput(
         calculateQuoteMarginFromSalePrice(calculatedUnitCost, eurosToCents(forcedUnitPriceEuros)),
       );
-      setForcedMarginPercentInput((current) => (current === next ? current : next));
+      setForcedMarginPercentInput((courant) => (courant === suivant ? courant : suivant));
     } catch {
       setForcedMarginPercentInput("");
     }
@@ -620,26 +625,26 @@ export function QuoteStructuredLinesEditor({
   function openNewOuvrage() {
     if (!editable || headingEditor) return;
     resetForm();
-    setNewLineParentId(currentInsertionParentId(items));
+    setNewLineParentId(currentInsertionParentId(elements));
     setFormOpen(true);
   }
 
-  function openEditOuvrage(line: QuoteLine) {
+  function openEditOuvrage(ligne: QuoteLine) {
     if (!editable || headingEditor) return;
-    setEditingLineId(line.id);
+    setEditingLineId(ligne.id);
     setNewLineParentId(null);
-    setDescription(line.description);
-    setUnit(line.unit || "u");
-    setQuantityInput(line.quantityFormula ?? String(line.quantity).replace(".", ","));
-    setComponents(formsFromLine(line));
-    setPriceForced(line.forcedUnitPriceCents !== undefined);
-    setForcedUnitPriceEuros(centsToInput(line.forcedUnitPriceCents ?? line.unitPriceCents ?? 0));
-    const lineCost = calculateQuoteOuvrageUnitCostCents(line.components ?? []);
+    setDescription(ligne.description);
+    setUnit(ligne.unit || "u");
+    setQuantityInput(ligne.quantityFormula ?? String(ligne.quantity).replace(".", ","));
+    setComponents(formsFromLine(ligne));
+    setPriceForced(ligne.forcedUnitPriceCents !== undefined);
+    setForcedUnitPriceEuros(centsToInput(ligne.forcedUnitPriceCents ?? ligne.unitPriceCents ?? 0));
+    const lineCost = calculateQuoteOuvrageUnitCostCents(ligne.components ?? []);
     setForcedMarginPercentInput(
       quoteMarginToInput(
         calculateQuoteMarginFromSalePrice(
           lineCost ?? 0,
-          line.forcedUnitPriceCents ?? line.unitPriceCents ?? 0,
+          ligne.forcedUnitPriceCents ?? ligne.unitPriceCents ?? 0,
         ),
       ),
     );
@@ -669,18 +674,18 @@ export function QuoteStructuredLinesEditor({
     });
   }
 
-  function openEditHeading(item: QuoteSection | QuoteSubsection) {
+  function openEditHeading(element: QuoteSection | QuoteSubsection) {
     if (!editable || formOpen) return;
     setError("");
     setHeadingEditor({
-      kind: item.kind,
-      itemId: item.id,
-      parentId: item.kind === "SUBSECTION" ? item.parentId : undefined,
-      title: item.title,
+      kind: element.kind,
+      itemId: element.id,
+      parentId: element.kind === "SUBSECTION" ? element.parentId : undefined,
+      title: element.title,
     });
   }
 
-  async function deleteItem(item: QuoteLine | QuoteSection | QuoteSubsection) {
+  async function deleteItem(element: QuoteLine | QuoteSection | QuoteSubsection) {
     if (
       !quote ||
       !editable ||
@@ -693,19 +698,19 @@ export function QuoteStructuredLinesEditor({
       return;
     }
 
-    const label =
-      item.kind === "LINE"
+    const libelle =
+      element.kind === "LINE"
         ? "cet ouvrage"
-        : item.kind === "SECTION"
+        : element.kind === "SECTION"
           ? "ce titre et tout son contenu"
           : "ce sous-titre et tout son contenu";
-    if (!window.confirm(`Supprimer ${label} ?`)) return;
+    if (!window.confirm(`Supprimer ${libelle} ?`)) return;
 
-    setDeletingItemId(item.id);
+    setDeletingItemId(element.id);
     setError("");
     setNotice("");
     try {
-      const response = await fetch("/api/desktop/quotes", {
+      const reponse = await fetch("/api/desktop/quotes", {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
@@ -714,19 +719,19 @@ export function QuoteStructuredLinesEditor({
         body: JSON.stringify({
           action: "deleteItem",
           quoteId: quote.id,
-          itemId: item.id,
+          itemId: element.id,
         }),
       });
-      const data = (await response.json()) as QuotesApiResponse;
-      if (!response.ok || !data.payload) {
-        setError(lineErrorLabel(data.error ?? "QUOTES_MUTATION_FAILED"));
+      const donnees = (await reponse.json()) as QuotesApiResponse;
+      if (!reponse.ok || !donnees.payload) {
+        setError(lineErrorLabel(donnees.error ?? "QUOTES_MUTATION_FAILED"));
         return;
       }
-      onSaved(data.payload);
+      onSaved(donnees.payload);
       setNotice(
-        item.kind === "LINE"
+        element.kind === "LINE"
           ? "Ouvrage supprimé."
-          : item.kind === "SECTION"
+          : element.kind === "SECTION"
             ? "Titre supprimé avec son contenu."
             : "Sous-titre supprimé avec son contenu.",
       );
@@ -738,37 +743,37 @@ export function QuoteStructuredLinesEditor({
   }
 
   function resolveDropPlacement(
-    event: DragEvent<HTMLElement>,
-    target: QuoteItem,
+    evenement: DragEvent<HTMLElement>,
+    cible: QuoteItem,
   ): QuoteItemPlacement | null {
-    if (!draggingItemId || draggingItemId === target.id) return null;
-    const source = items.find((item) => item.id === draggingItemId);
+    if (!draggingItemId || draggingItemId === cible.id) return null;
+    const source = elements.find((element) => element.id === draggingItemId);
     if (!source || source.kind === "COMMENT") return null;
 
     if (source.kind === "SECTION") {
-      if (target.kind !== "SECTION") return null;
-      const bounds = event.currentTarget.getBoundingClientRect();
-      return event.clientY < bounds.top + bounds.height / 2 ? "BEFORE" : "AFTER";
+      if (cible.kind !== "SECTION") return null;
+      const bounds = evenement.currentTarget.getBoundingClientRect();
+      return evenement.clientY < bounds.top + bounds.height / 2 ? "BEFORE" : "AFTER";
     }
 
     if (source.kind === "SUBSECTION") {
-      if (target.kind === "SECTION") return "INSIDE";
-      if (target.kind !== "SUBSECTION") return null;
-      const bounds = event.currentTarget.getBoundingClientRect();
-      return event.clientY < bounds.top + bounds.height / 2 ? "BEFORE" : "AFTER";
+      if (cible.kind === "SECTION") return "INSIDE";
+      if (cible.kind !== "SUBSECTION") return null;
+      const bounds = evenement.currentTarget.getBoundingClientRect();
+      return evenement.clientY < bounds.top + bounds.height / 2 ? "BEFORE" : "AFTER";
     }
 
-    if (target.kind === "SECTION" || target.kind === "SUBSECTION") return "INSIDE";
-    if (target.kind !== "LINE") return null;
-    const bounds = event.currentTarget.getBoundingClientRect();
-    return event.clientY < bounds.top + bounds.height / 2 ? "BEFORE" : "AFTER";
+    if (cible.kind === "SECTION" || cible.kind === "SUBSECTION") return "INSIDE";
+    if (cible.kind !== "LINE") return null;
+    const bounds = evenement.currentTarget.getBoundingClientRect();
+    return evenement.clientY < bounds.top + bounds.height / 2 ? "BEFORE" : "AFTER";
   }
 
   function startItemDrag(
-    event: DragEvent<HTMLElement>,
-    item: QuoteLine | QuoteSection | QuoteSubsection,
+    evenement: DragEvent<HTMLElement>,
+    element: QuoteLine | QuoteSection | QuoteSubsection,
   ) {
-    const origin = event.target as HTMLElement;
+    const origin = evenement.target as HTMLElement;
     if (
       !editable ||
       formOpen ||
@@ -777,24 +782,24 @@ export function QuoteStructuredLinesEditor({
       reorderingItemId ||
       origin.closest("button, input, textarea, select")
     ) {
-      event.preventDefault();
+      evenement.preventDefault();
       return;
     }
-    setDraggingItemId(item.id);
+    setDraggingItemId(element.id);
     setDropTarget(null);
-    event.dataTransfer.effectAllowed = "move";
-    event.dataTransfer.setData("text/plain", item.id);
+    evenement.dataTransfer.effectAllowed = "move";
+    evenement.dataTransfer.setData("text/plain", element.id);
   }
 
-  function dragItemOver(event: DragEvent<HTMLElement>, target: QuoteItem) {
-    const placement = resolveDropPlacement(event, target);
+  function dragItemOver(evenement: DragEvent<HTMLElement>, cible: QuoteItem) {
+    const placement = resolveDropPlacement(evenement, cible);
     if (!placement) return;
-    event.preventDefault();
-    event.dataTransfer.dropEffect = "move";
-    setDropTarget((current) =>
-      current?.itemId === target.id && current.placement === placement
-        ? current
-        : { itemId: target.id, placement },
+    evenement.preventDefault();
+    evenement.dataTransfer.dropEffect = "move";
+    setDropTarget((courant) =>
+      courant?.itemId === cible.id && courant.placement === placement
+        ? courant
+        : { itemId: cible.id, placement },
     );
   }
 
@@ -803,16 +808,16 @@ export function QuoteStructuredLinesEditor({
     setDropTarget(null);
   }
 
-  async function reorderItem(itemId: string, target: QuoteItem, placement: QuoteItemPlacement) {
-    if (!quote || !editable || reorderingItemId || itemId === target.id) return;
-    const source = items.find((item) => item.id === itemId);
+  async function reorderItem(idElement: string, cible: QuoteItem, placement: QuoteItemPlacement) {
+    if (!quote || !editable || reorderingItemId || idElement === cible.id) return;
+    const source = elements.find((element) => element.id === idElement);
     if (!source || source.kind === "COMMENT") return;
 
-    setReorderingItemId(itemId);
+    setReorderingItemId(idElement);
     setError("");
     setNotice("");
     try {
-      const response = await fetch("/api/desktop/quotes", {
+      const reponse = await fetch("/api/desktop/quotes", {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
@@ -821,17 +826,17 @@ export function QuoteStructuredLinesEditor({
         body: JSON.stringify({
           action: "reorderItem",
           quoteId: quote.id,
-          itemId,
-          targetId: target.id,
+          itemId: idElement,
+          targetId: cible.id,
           placement,
         }),
       });
-      const data = (await response.json()) as QuotesApiResponse;
-      if (!response.ok || !data.payload) {
-        setError(lineErrorLabel(data.error ?? "QUOTES_MUTATION_FAILED"));
+      const donnees = (await reponse.json()) as QuotesApiResponse;
+      if (!reponse.ok || !donnees.payload) {
+        setError(lineErrorLabel(donnees.error ?? "QUOTES_MUTATION_FAILED"));
         return;
       }
-      onSaved(data.payload);
+      onSaved(donnees.payload);
       setNotice(
         source.kind === "LINE"
           ? "Ouvrage déplacé."
@@ -847,18 +852,18 @@ export function QuoteStructuredLinesEditor({
     }
   }
 
-  function dropItem(event: DragEvent<HTMLElement>, target: QuoteItem) {
-    const itemId = draggingItemId;
-    const placement = resolveDropPlacement(event, target);
-    if (!itemId || !placement) return;
-    event.preventDefault();
-    void reorderItem(itemId, target, placement);
+  function dropItem(evenement: DragEvent<HTMLElement>, cible: QuoteItem) {
+    const idElement = draggingItemId;
+    const placement = resolveDropPlacement(evenement, cible);
+    if (!idElement || !placement) return;
+    evenement.preventDefault();
+    void reorderItem(idElement, cible, placement);
   }
 
-  function dropClass(itemId: string): string {
+  function dropClass(idElement: string): string {
     const classes: string[] = [];
-    if (draggingItemId === itemId) classes.push("isDragging");
-    if (dropTarget?.itemId === itemId) {
+    if (draggingItemId === idElement) classes.push("isDragging");
+    if (dropTarget?.itemId === idElement) {
       classes.push(
         dropTarget.placement === "BEFORE"
           ? "quoteDropBefore"
@@ -870,20 +875,20 @@ export function QuoteStructuredLinesEditor({
     return classes.length > 0 ? ` ${classes.join(" ")}` : "";
   }
 
-  function directOptionForItem(itemId: string) {
-    return quote?.pricingConfig.options.find((option) => option.targetItemId === itemId) ?? null;
+  function directOptionForItem(idElement: string) {
+    return quote?.pricingConfig.options.find((option) => option.targetItemId === idElement) ?? null;
   }
 
-  async function toggleItemOption(item: QuoteLine | QuoteSection | QuoteSubsection) {
+  async function toggleItemOption(element: QuoteLine | QuoteSection | QuoteSubsection) {
     if (!quote || !editable || togglingOptionItemId) return;
-    const existing = directOptionForItem(item.id);
-    const label = item.kind === "LINE" ? item.description : item.title;
-    setTogglingOptionItemId(item.id);
+    const existing = directOptionForItem(element.id);
+    const libelle = element.kind === "LINE" ? element.description : element.title;
+    setTogglingOptionItemId(element.id);
     setError("");
     setNotice("");
 
     try {
-      const payload = existing
+      const contenu = existing
         ? await postQuotePricingForQuote({
             action: "removeOption",
             quoteId: quote.id,
@@ -894,13 +899,13 @@ export function QuoteStructuredLinesEditor({
             quoteId: quote.id,
             option: {
               id: globalThis.crypto.randomUUID(),
-              targetItemId: item.id,
-              targetKind: item.kind,
-              label,
+              targetItemId: element.id,
+              targetKind: element.kind,
+              label: libelle,
               status: "PENDING",
             },
           });
-      onSaved(payload);
+      onSaved(contenu);
       setNotice(existing ? "Option retirée du devis." : "Élément placé en option hors total.");
     } catch {
       setError("L’option n’a pas pu être modifiée.");
@@ -909,7 +914,7 @@ export function QuoteStructuredLinesEditor({
     }
   }
 
-  async function duplicateHeading(item: QuoteSection | QuoteSubsection) {
+  async function duplicateHeading(element: QuoteSection | QuoteSubsection) {
     if (
       !quote ||
       !editable ||
@@ -921,11 +926,11 @@ export function QuoteStructuredLinesEditor({
       return;
     }
 
-    setDuplicatingHeadingId(item.id);
+    setDuplicatingHeadingId(element.id);
     setError("");
     setNotice("");
     try {
-      const response = await fetch("/api/desktop/quotes", {
+      const reponse = await fetch("/api/desktop/quotes", {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
@@ -934,17 +939,17 @@ export function QuoteStructuredLinesEditor({
         body: JSON.stringify({
           action: "duplicateHeading",
           quoteId: quote.id,
-          itemId: item.id,
+          itemId: element.id,
         }),
       });
-      const data = (await response.json()) as QuotesApiResponse;
-      if (!response.ok || !data.payload) {
-        setError(lineErrorLabel(data.error ?? "QUOTES_MUTATION_FAILED"));
+      const donnees = (await reponse.json()) as QuotesApiResponse;
+      if (!reponse.ok || !donnees.payload) {
+        setError(lineErrorLabel(donnees.error ?? "QUOTES_MUTATION_FAILED"));
         return;
       }
-      onSaved(data.payload);
+      onSaved(donnees.payload);
       setNotice(
-        item.kind === "SECTION"
+        element.kind === "SECTION"
           ? "Titre dupliqué avec son contenu."
           : "Sous-titre dupliqué avec son contenu.",
       );
@@ -955,13 +960,13 @@ export function QuoteStructuredLinesEditor({
     }
   }
 
-  async function saveHeading(event: FormEvent<HTMLFormElement>) {
-    event.preventDefault();
+  async function saveHeading(evenement: FormEvent<HTMLFormElement>) {
+    evenement.preventDefault();
     if (!quote || !headingEditor) return;
     setSaving(true);
     setError("");
     try {
-      const body =
+      const corps =
         headingEditor.kind === "SECTION"
           ? {
               action: "upsertSection",
@@ -976,20 +981,20 @@ export function QuoteStructuredLinesEditor({
               parentId: headingEditor.parentId,
               title: headingEditor.title,
             };
-      const response = await fetch("/api/desktop/quotes", {
+      const reponse = await fetch("/api/desktop/quotes", {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
           ...quoteRevisionHeaders(quote.updatedAt),
         },
-        body: JSON.stringify(body),
+        body: JSON.stringify(corps),
       });
-      const data = (await response.json()) as QuotesApiResponse;
-      if (!response.ok || !data.payload) {
-        setError(lineErrorLabel(data.error ?? "QUOTES_MUTATION_FAILED"));
+      const donnees = (await reponse.json()) as QuotesApiResponse;
+      if (!reponse.ok || !donnees.payload) {
+        setError(lineErrorLabel(donnees.error ?? "QUOTES_MUTATION_FAILED"));
         return;
       }
-      onSaved(data.payload);
+      onSaved(donnees.payload);
       setNotice(headingEditor.kind === "SECTION" ? "Titre enregistré." : "Sous-titre enregistré.");
       setHeadingEditor(null);
     } catch {
@@ -999,25 +1004,25 @@ export function QuoteStructuredLinesEditor({
     }
   }
 
-  function updateComponent(index: number, patch: Partial<OuvrageComponentForm>) {
-    setComponents((current) =>
-      current.map((component, componentIndex) =>
-        componentIndex === index ? { ...component, ...patch } : component,
+  function updateComponent(indice: number, patch: Partial<OuvrageComponentForm>) {
+    setComponents((courant) =>
+      courant.map((component, componentIndex) =>
+        componentIndex === indice ? { ...component, ...patch } : component,
       ),
     );
   }
 
-  function updateComponentCost(index: number, value: string) {
-    setComponents((current) =>
-      current.map((component, componentIndex) => {
-        if (componentIndex !== index) return component;
-        const next = { ...component, costPriceEuros: value };
+  function updateComponentCost(indice: number, valeur: string) {
+    setComponents((courant) =>
+      courant.map((component, componentIndex) => {
+        if (componentIndex !== indice) return component;
+        const suivant = { ...component, costPriceEuros: valeur };
         try {
-          const costPriceCents = optionalEurosToCents(value);
-          if (costPriceCents === undefined) return { ...next, marginPercentInput: "" };
+          const costPriceCents = optionalEurosToCents(valeur);
+          if (costPriceCents === undefined) return { ...suivant, marginPercentInput: "" };
           if (component.pricingDriver === "MARGIN") {
             return {
-              ...next,
+              ...suivant,
               unitPriceEuros: centsToInput(
                 calculateQuoteSalePriceFromMarginCents(
                   costPriceCents,
@@ -1027,7 +1032,7 @@ export function QuoteStructuredLinesEditor({
             };
           }
           return {
-            ...next,
+            ...suivant,
             marginPercentInput: quoteMarginToInput(
               calculateQuoteMarginFromSalePrice(
                 costPriceCents,
@@ -1036,66 +1041,66 @@ export function QuoteStructuredLinesEditor({
             ),
           };
         } catch {
-          return next;
+          return suivant;
         }
       }),
     );
   }
 
-  function updateComponentMargin(index: number, value: string) {
-    setComponents((current) =>
-      current.map((component, componentIndex) => {
-        if (componentIndex !== index) return component;
-        const next = {
+  function updateComponentMargin(indice: number, valeur: string) {
+    setComponents((courant) =>
+      courant.map((component, componentIndex) => {
+        if (componentIndex !== indice) return component;
+        const suivant = {
           ...component,
-          marginPercentInput: value,
+          marginPercentInput: valeur,
           pricingDriver: "MARGIN" as const,
         };
         try {
           const costPriceCents = optionalEurosToCents(component.costPriceEuros);
-          if (costPriceCents === undefined) return next;
+          if (costPriceCents === undefined) return suivant;
           return {
-            ...next,
+            ...suivant,
             unitPriceEuros: centsToInput(
-              calculateQuoteSalePriceFromMarginCents(costPriceCents, parseQuoteMarginInput(value)),
+              calculateQuoteSalePriceFromMarginCents(costPriceCents, parseQuoteMarginInput(valeur)),
             ),
           };
         } catch {
-          return next;
+          return suivant;
         }
       }),
     );
   }
 
-  function updateComponentSalePrice(index: number, value: string) {
-    setComponents((current) =>
-      current.map((component, componentIndex) => {
-        if (componentIndex !== index) return component;
-        const next = {
+  function updateComponentSalePrice(indice: number, valeur: string) {
+    setComponents((courant) =>
+      courant.map((component, componentIndex) => {
+        if (componentIndex !== indice) return component;
+        const suivant = {
           ...component,
-          unitPriceEuros: value,
+          unitPriceEuros: valeur,
           pricingDriver: "SALE_PRICE" as const,
         };
         try {
           const costPriceCents = optionalEurosToCents(component.costPriceEuros);
-          if (costPriceCents === undefined) return { ...next, marginPercentInput: "" };
+          if (costPriceCents === undefined) return { ...suivant, marginPercentInput: "" };
           return {
-            ...next,
+            ...suivant,
             marginPercentInput: quoteMarginToInput(
-              calculateQuoteMarginFromSalePrice(costPriceCents, eurosToCents(value)),
+              calculateQuoteMarginFromSalePrice(costPriceCents, eurosToCents(valeur)),
             ),
           };
         } catch {
-          return next;
+          return suivant;
         }
       }),
     );
   }
 
-  function updateOuvrageSalePrice(value: string) {
+  function updateOuvrageSalePrice(valeur: string) {
     setPriceForced(true);
     setOuvragePricingDriver("SALE_PRICE");
-    setForcedUnitPriceEuros(value);
+    setForcedUnitPriceEuros(valeur);
     try {
       if (calculatedUnitCost === null) {
         setForcedMarginPercentInput("");
@@ -1103,7 +1108,7 @@ export function QuoteStructuredLinesEditor({
       }
       setForcedMarginPercentInput(
         quoteMarginToInput(
-          calculateQuoteMarginFromSalePrice(calculatedUnitCost, eurosToCents(value)),
+          calculateQuoteMarginFromSalePrice(calculatedUnitCost, eurosToCents(valeur)),
         ),
       );
     } catch {
@@ -1111,15 +1116,15 @@ export function QuoteStructuredLinesEditor({
     }
   }
 
-  function updateOuvrageMargin(value: string) {
+  function updateOuvrageMargin(valeur: string) {
     setPriceForced(true);
     setOuvragePricingDriver("MARGIN");
-    setForcedMarginPercentInput(value);
+    setForcedMarginPercentInput(valeur);
     try {
       if (calculatedUnitCost === null) return;
       setForcedUnitPriceEuros(
         centsToInput(
-          calculateQuoteSalePriceFromMarginCents(calculatedUnitCost, parseQuoteMarginInput(value)),
+          calculateQuoteSalePriceFromMarginCents(calculatedUnitCost, parseQuoteMarginInput(valeur)),
         ),
       );
     } catch {
@@ -1128,30 +1133,30 @@ export function QuoteStructuredLinesEditor({
   }
 
   function addComponent() {
-    setComponents((current) => [...current, newComponentForm()]);
+    setComponents((courant) => [...courant, newComponentForm()]);
     setLibraryPickerOpen(false);
   }
 
-  function startComponentDrag(event: DragEvent<HTMLDivElement>, key: string) {
-    const origin = event.target as HTMLElement;
-    if (saving || origin.closest("button, input, textarea, select")) {
-      event.preventDefault();
+  function startComponentDrag(evenement: DragEvent<HTMLDivElement>, cle: string) {
+    const origin = evenement.target as HTMLElement;
+    if (sauvegardeEnCours || origin.closest("button, input, textarea, select")) {
+      evenement.preventDefault();
       return;
     }
-    setDraggingComponentKey(key);
+    setDraggingComponentKey(cle);
     setComponentDropTarget(null);
-    event.dataTransfer.effectAllowed = "move";
-    event.dataTransfer.setData("text/plain", key);
+    evenement.dataTransfer.effectAllowed = "move";
+    evenement.dataTransfer.setData("text/plain", cle);
   }
 
-  function dragComponentOver(event: DragEvent<HTMLDivElement>, key: string) {
-    if (!draggingComponentKey || draggingComponentKey === key) return;
-    event.preventDefault();
-    const bounds = event.currentTarget.getBoundingClientRect();
-    const placement = event.clientY < bounds.top + bounds.height / 2 ? "BEFORE" : "AFTER";
-    event.dataTransfer.dropEffect = "move";
-    setComponentDropTarget((current) =>
-      current?.key === key && current.placement === placement ? current : { key, placement },
+  function dragComponentOver(evenement: DragEvent<HTMLDivElement>, cle: string) {
+    if (!draggingComponentKey || draggingComponentKey === cle) return;
+    evenement.preventDefault();
+    const bounds = evenement.currentTarget.getBoundingClientRect();
+    const placement = evenement.clientY < bounds.top + bounds.height / 2 ? "BEFORE" : "AFTER";
+    evenement.dataTransfer.dropEffect = "move";
+    setComponentDropTarget((courant) =>
+      courant?.key === cle && courant.placement === placement ? courant : { key: cle, placement },
     );
   }
 
@@ -1160,18 +1165,18 @@ export function QuoteStructuredLinesEditor({
     setComponentDropTarget(null);
   }
 
-  function dropComponent(event: DragEvent<HTMLDivElement>, targetKey: string) {
+  function dropComponent(evenement: DragEvent<HTMLDivElement>, targetKey: string) {
     if (!draggingComponentKey || draggingComponentKey === targetKey) return;
-    event.preventDefault();
+    evenement.preventDefault();
     const placement =
       componentDropTarget?.key === targetKey ? componentDropTarget.placement : "BEFORE";
-    setComponents((current) => {
-      const sourceIndex = current.findIndex((component) => component.key === draggingComponentKey);
-      if (sourceIndex < 0) return current;
-      const sourceComponent = current[sourceIndex];
-      const remaining = current.filter((_, index) => index !== sourceIndex);
+    setComponents((courant) => {
+      const sourceIndex = courant.findIndex((component) => component.key === draggingComponentKey);
+      if (sourceIndex < 0) return courant;
+      const sourceComponent = courant[sourceIndex];
+      const remaining = courant.filter((_, indice) => indice !== sourceIndex);
       const targetIndex = remaining.findIndex((component) => component.key === targetKey);
-      if (targetIndex < 0) return current;
+      if (targetIndex < 0) return courant;
       const insertionIndex = placement === "AFTER" ? targetIndex + 1 : targetIndex;
       return [
         ...remaining.slice(0, insertionIndex),
@@ -1182,10 +1187,10 @@ export function QuoteStructuredLinesEditor({
     finishComponentDrag();
   }
 
-  function componentDropClass(key: string): string {
+  function componentDropClass(cle: string): string {
     const classes: string[] = [];
-    if (draggingComponentKey === key) classes.push("isDragging");
-    if (componentDropTarget?.key === key) {
+    if (draggingComponentKey === cle) classes.push("isDragging");
+    if (componentDropTarget?.key === cle) {
       classes.push(
         componentDropTarget.placement === "BEFORE"
           ? "quoteComponentDropBefore"
@@ -1195,16 +1200,16 @@ export function QuoteStructuredLinesEditor({
     return classes.length > 0 ? ` ${classes.join(" ")}` : "";
   }
 
-  function duplicateComponent(index: number) {
-    setComponents((current) =>
-      duplicateQuoteComponent(current, index, () => globalThis.crypto.randomUUID()),
+  function duplicateComponent(indice: number) {
+    setComponents((courant) =>
+      duplicateQuoteComponent(courant, indice, () => globalThis.crypto.randomUUID()),
     );
   }
 
-  function removeComponent(index: number) {
-    setComponents((current) => {
-      if (current.length <= 1) return current;
-      return current.filter((_, componentIndex) => componentIndex !== index);
+  function removeComponent(indice: number) {
+    setComponents((courant) => {
+      if (courant.length <= 1) return courant;
+      return courant.filter((_, componentIndex) => componentIndex !== indice);
     });
   }
 
@@ -1228,10 +1233,11 @@ export function QuoteStructuredLinesEditor({
 
     setLibraryLoading(true);
     try {
-      const response = await fetch("/api/desktop/library", { cache: "no-store" });
-      const data = (await response.json()) as LibraryGetResponse;
-      if (!response.ok || !data.payload) throw new Error(data.error ?? "LIBRARY_REQUEST_FAILED");
-      setLibraryPayload(ensureRequiredLaborComponents(data.payload));
+      const reponse = await fetch("/api/desktop/library", { cache: "no-store" });
+      const donnees = (await reponse.json()) as LibraryGetResponse;
+      if (!reponse.ok || !donnees.payload)
+        throw new Error(donnees.error ?? "LIBRARY_REQUEST_FAILED");
+      setLibraryPayload(ensureRequiredLaborComponents(donnees.payload));
     } catch {
       setError("Impossible de charger les composants de la Bibliothèque.");
       setLibraryPickerOpen(false);
@@ -1241,28 +1247,28 @@ export function QuoteStructuredLinesEditor({
   }
 
   function chooseLibraryComponent(component: LibraryComponent) {
-    const selected = formFromLibraryComponent(component);
-    setComponents((current) => {
+    const selectionne = formFromLibraryComponent(component);
+    setComponents((courant) => {
       if (
-        current.length === 1 &&
-        !current[0].description.trim() &&
-        !current[0].costPriceEuros.trim()
+        courant.length === 1 &&
+        !courant[0].description.trim() &&
+        !courant[0].costPriceEuros.trim()
       ) {
-        return [selected];
+        return [selectionne];
       }
-      return [...current, selected];
+      return [...courant, selectionne];
     });
     setLibraryPickerOpen(false);
     setLibraryQuery("");
   }
 
-  async function saveOuvrage(event: FormEvent<HTMLFormElement>) {
-    event.preventDefault();
+  async function saveOuvrage(evenement: FormEvent<HTMLFormElement>) {
+    evenement.preventDefault();
     if (!quote) return;
     setSaving(true);
     setError("");
     try {
-      const response = await fetch("/api/desktop/quotes", {
+      const reponse = await fetch("/api/desktop/quotes", {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
@@ -1289,12 +1295,12 @@ export function QuoteStructuredLinesEditor({
           })),
         }),
       });
-      const data = (await response.json()) as QuotesApiResponse;
-      if (!response.ok || !data.payload) {
-        setError(lineErrorLabel(data.error ?? "QUOTES_MUTATION_FAILED"));
+      const donnees = (await reponse.json()) as QuotesApiResponse;
+      if (!reponse.ok || !donnees.payload) {
+        setError(lineErrorLabel(donnees.error ?? "QUOTES_MUTATION_FAILED"));
         return;
       }
-      onSaved(data.payload);
+      onSaved(donnees.payload);
       setNotice(editingLineId ? "Ouvrage modifié." : "Ouvrage ajouté au devis.");
       closeForm();
     } catch {
@@ -1304,14 +1310,14 @@ export function QuoteStructuredLinesEditor({
     }
   }
 
-  async function duplicateOuvrage(line: QuoteLine) {
+  async function duplicateOuvrage(ligne: QuoteLine) {
     if (!quote || !editable || duplicatingLineId || formOpen || headingEditor) return;
-    setDuplicatingLineId(line.id);
+    setDuplicatingLineId(ligne.id);
     setError("");
     setNotice("");
 
     try {
-      const response = await fetch("/api/desktop/quotes", {
+      const reponse = await fetch("/api/desktop/quotes", {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
@@ -1320,15 +1326,15 @@ export function QuoteStructuredLinesEditor({
         body: JSON.stringify({
           action: "duplicateLine",
           quoteId: quote.id,
-          lineId: line.id,
+          lineId: ligne.id,
         }),
       });
-      const data = (await response.json()) as QuotesApiResponse;
-      if (!response.ok || !data.payload) {
-        setError(lineErrorLabel(data.error ?? "QUOTES_MUTATION_FAILED"));
+      const donnees = (await reponse.json()) as QuotesApiResponse;
+      if (!reponse.ok || !donnees.payload) {
+        setError(lineErrorLabel(donnees.error ?? "QUOTES_MUTATION_FAILED"));
         return;
       }
-      onSaved(data.payload);
+      onSaved(donnees.payload);
       setNotice("Ouvrage dupliqué.");
     } catch {
       setError("L’ouvrage n’a pas pu être dupliqué.");
@@ -1337,9 +1343,9 @@ export function QuoteStructuredLinesEditor({
     }
   }
 
-  async function addOuvrageToLibrary(line: QuoteLine) {
+  async function addOuvrageToLibrary(ligne: QuoteLine) {
     if (!editable || librarySavingLineId) return;
-    setLibrarySavingLineId(line.id);
+    setLibrarySavingLineId(ligne.id);
     setError("");
     setNotice("");
     const leaseId = globalThis.crypto.randomUUID();
@@ -1356,7 +1362,7 @@ export function QuoteStructuredLinesEditor({
           ? parseLibraryPayload(opened.resource.payload)
           : createInitialLibraryPayload(),
       );
-      const published = publishQuoteOuvrageToLibrary(basePayload, line);
+      const published = publishQuoteOuvrageToLibrary(basePayload, ligne);
       const saved = (await postLibrary({
         action: "save",
         leaseId,
@@ -1368,7 +1374,7 @@ export function QuoteStructuredLinesEditor({
       if (saved.status === "conflict") throw new Error("LIBRARY_VERSION_CONFLICT");
 
       setLibraryPayload(parseLibraryPayload(saved.resource.payload));
-      setPublishedLineIds((current) => new Set(current).add(line.id));
+      setPublishedLineIds((courant) => new Set(courant).add(ligne.id));
       setNotice("Ouvrage ajouté à la Bibliothèque.");
     } catch (publishError) {
       const code = publishError instanceof Error ? publishError.message : "LIBRARY_REQUEST_FAILED";
@@ -1409,7 +1415,7 @@ export function QuoteStructuredLinesEditor({
       const canOverwriteLinked =
         published.created &&
         linkedComponentId !== undefined &&
-        basePayload.components.some((item) => item.id === linkedComponentId);
+        basePayload.components.some((element) => element.id === linkedComponentId);
 
       if (canOverwriteLinked) {
         const overwrite = window.confirm(
@@ -1515,46 +1521,46 @@ export function QuoteStructuredLinesEditor({
     });
   }
 
-  function renderReadOuvrage(line: QuoteLine) {
-    const lineComponents = line.components ?? [];
-    const salePriceCents = line.unitPriceCents ?? 0;
+  function renderReadOuvrage(ligne: QuoteLine) {
+    const lineComponents = ligne.components ?? [];
+    const salePriceCents = ligne.unitPriceCents ?? 0;
     const costPriceCents = calculateQuoteOuvrageUnitCostCents(lineComponents);
     const marginAmountCents = costPriceCents === null ? null : salePriceCents - costPriceCents;
     const marginPercent = calculateQuoteOuvrageMarginPercent(salePriceCents, costPriceCents);
-    const libraryAlreadyLinked = line.librarySource?.kind === "OUVRAGE";
-    const publishedNow = publishedLineIds.has(line.id);
-    const baseLineTotalCents = Math.round(line.quantity * salePriceCents);
-    const adjustedLine = adjustedLinesById.get(line.id);
+    const libraryAlreadyLinked = ligne.librarySource?.kind === "OUVRAGE";
+    const publishedNow = publishedLineIds.has(ligne.id);
+    const baseLineTotalCents = Math.round(ligne.quantity * salePriceCents);
+    const adjustedLine = adjustedLinesById.get(ligne.id);
     const lineTotalCents = adjustedLine?.saleCents ?? baseLineTotalCents;
     const adjustmentDeltaCents = lineTotalCents - baseLineTotalCents;
-    const directOption = directOptionForItem(line.id);
+    const directOption = directOptionForItem(ligne.id);
 
     return (
       <div
-        className={`quoteOuvrageGroup quoteDraggableItem${dropClass(line.id)}`}
-        key={line.id}
+        className={`quoteOuvrageGroup quoteDraggableItem${dropClass(ligne.id)}`}
+        key={ligne.id}
         draggable={editable && !formOpen && headingEditor === null && reorderingItemId === null}
-        onDragStart={(event) => startItemDrag(event, line)}
-        onDragOver={(event) => dragItemOver(event, line)}
-        onDrop={(event) => dropItem(event, line)}
+        onDragStart={(evenement) => startItemDrag(evenement, ligne)}
+        onDragOver={(evenement) => dragItemOver(evenement, ligne)}
+        onDrop={(evenement) => dropItem(evenement, ligne)}
         onDragEnd={finishItemDrag}
         title={editable ? "Glisser-déposer pour déplacer l’ouvrage" : undefined}
       >
         <div className="quoteMainRow quoteLineRow">
-          <span className="quoteNumber">{numbers.get(line.id) ?? "—"}</span>
+          <span className="quoteNumber">{numbers.get(ligne.id) ?? "—"}</span>
           <div className="quoteLineDescription">
-            <strong style={quoteItemTextStyleToCss(line.presentation?.textStyle)}>
-              {line.description}
+            <strong style={quoteItemTextStyleToCss(ligne.presentation?.textStyle)}>
+              {ligne.description}
             </strong>
             <small>
               {lineComponents.length} composant{lineComponents.length === 1 ? "" : "s"}
             </small>
           </div>
-          <span>{line.quantityFormula ?? line.quantity}</span>
-          <span>{line.unit || "—"}</span>
+          <span>{ligne.quantityFormula ?? ligne.quantity}</span>
+          <span>{ligne.unit || "—"}</span>
           <div className="quotePriceCell">
             <strong>{formatMoney(salePriceCents)}</strong>
-            {line.forcedUnitPriceCents !== undefined ? (
+            {ligne.forcedUnitPriceCents !== undefined ? (
               <small className="quoteForcedBadge">
                 <LockKeyhole size={10} aria-hidden="true" /> Forcé
               </small>
@@ -1587,26 +1593,26 @@ export function QuoteStructuredLinesEditor({
                 <button
                   type="button"
                   className="miniLibraryButton"
-                  onClick={() => void addOuvrageToLibrary(line)}
+                  onClick={() => void addOuvrageToLibrary(ligne)}
                   disabled={librarySavingLineId !== null || libraryAlreadyLinked || publishedNow}
-                  aria-label={`Ajouter ${line.description} à la Bibliothèque`}
+                  aria-label={`Ajouter ${ligne.description} à la Bibliothèque`}
                   title={
                     libraryAlreadyLinked || publishedNow
                       ? "Ouvrage déjà dans la Bibliothèque"
                       : "Ajouter l’ouvrage à la Bibliothèque"
                   }
                 >
-                  {librarySavingLineId === line.id ? "…" : "+B"}
+                  {librarySavingLineId === ligne.id ? "…" : "+B"}
                 </button>
                 <button
                   type="button"
                   className={`miniOptionButton${directOption ? " isActive" : ""}`}
-                  onClick={() => void toggleItemOption(line)}
+                  onClick={() => void toggleItemOption(ligne)}
                   disabled={togglingOptionItemId !== null}
                   aria-label={
                     directOption
-                      ? `Retirer ${line.description} des options`
-                      : `Mettre ${line.description} en option`
+                      ? `Retirer ${ligne.description} des options`
+                      : `Mettre ${ligne.description} en option`
                   }
                   title={directOption ? "Retirer l’option" : "Mettre en option hors total"}
                 >
@@ -1614,35 +1620,35 @@ export function QuoteStructuredLinesEditor({
                 </button>
                 <button
                   type="button"
-                  className={`iconButton${presentationItemId === line.id ? " isActive" : ""}`}
+                  className={`iconButton${presentationItemId === ligne.id ? " isActive" : ""}`}
                   onClick={() =>
-                    setPresentationItemId((current) => (current === line.id ? null : line.id))
+                    setPresentationItemId((courant) => (courant === ligne.id ? null : ligne.id))
                   }
-                  aria-label={`Mise en forme de ${line.description}`}
+                  aria-label={`Mise en forme de ${ligne.description}`}
                   title="Mise en forme client"
                 >
                   <Palette size={14} aria-hidden="true" />
                 </button>
                 <button
                   type="button"
-                  className={`iconButton quotePhotoButton${presentationItemId === line.id ? " isActive" : ""}`}
+                  className={`iconButton quotePhotoButton${presentationItemId === ligne.id ? " isActive" : ""}`}
                   onClick={() =>
-                    setPresentationItemId((current) => (current === line.id ? null : line.id))
+                    setPresentationItemId((courant) => (courant === ligne.id ? null : ligne.id))
                   }
-                  aria-label={`Photos de ${line.description}`}
+                  aria-label={`Photos de ${ligne.description}`}
                   title="Photos de la ligne"
                 >
                   <ImagePlus size={14} aria-hidden="true" />
-                  {(line.presentation?.photos.length ?? 0) > 0 ? (
-                    <span>{line.presentation?.photos.length}</span>
+                  {(ligne.presentation?.photos.length ?? 0) > 0 ? (
+                    <span>{ligne.presentation?.photos.length}</span>
                   ) : null}
                 </button>
                 <button
                   type="button"
                   className="iconButton"
-                  onClick={() => void duplicateOuvrage(line)}
+                  onClick={() => void duplicateOuvrage(ligne)}
                   disabled={formOpen || headingEditor !== null || duplicatingLineId !== null}
-                  aria-label={`Dupliquer ${line.description}`}
+                  aria-label={`Dupliquer ${ligne.description}`}
                   title="Dupliquer l’ouvrage"
                 >
                   <Copy size={14} aria-hidden="true" />
@@ -1650,14 +1656,14 @@ export function QuoteStructuredLinesEditor({
                 <button
                   type="button"
                   className="iconButton"
-                  onClick={() => openEditOuvrage(line)}
+                  onClick={() => openEditOuvrage(ligne)}
                   disabled={
                     formOpen ||
                     headingEditor !== null ||
                     duplicatingLineId !== null ||
                     deletingItemId !== null
                   }
-                  aria-label={`Modifier ${line.description}`}
+                  aria-label={`Modifier ${ligne.description}`}
                   title="Modifier l’ouvrage"
                 >
                   <Pencil size={14} aria-hidden="true" />
@@ -1665,14 +1671,14 @@ export function QuoteStructuredLinesEditor({
                 <button
                   type="button"
                   className="iconButton quoteDeleteItemButton"
-                  onClick={() => void deleteItem(line)}
+                  onClick={() => void deleteItem(ligne)}
                   disabled={
                     formOpen ||
                     headingEditor !== null ||
                     duplicatingLineId !== null ||
                     deletingItemId !== null
                   }
-                  aria-label={`Supprimer ${line.description}`}
+                  aria-label={`Supprimer ${ligne.description}`}
                   title="Supprimer l’ouvrage"
                 >
                   <Trash2 size={14} aria-hidden="true" />
@@ -1681,11 +1687,11 @@ export function QuoteStructuredLinesEditor({
             ) : null}
           </div>
         </div>
-        {presentationItemId === line.id ? (
+        {presentationItemId === ligne.id ? (
           <QuoteItemPresentationPanel
             quoteId={quote!.id}
             quoteUpdatedAt={quote!.updatedAt}
-            item={line}
+            item={ligne}
             editable={editable}
             onSaved={onSaved}
             onClose={() => setPresentationItemId(null)}
@@ -1708,7 +1714,7 @@ export function QuoteStructuredLinesEditor({
     );
   }
 
-  function renderEditingOuvrage(key: string) {
+  function renderEditingOuvrage(cle: string) {
     const retainedPriceInput = priceForced
       ? forcedUnitPriceEuros
       : calculatedUnitPrice === null
@@ -1718,27 +1724,27 @@ export function QuoteStructuredLinesEditor({
     const currentLineTotal = ouvrageTotalCents(quantityInput, effectiveUnitPrice);
 
     return (
-      <form className="quoteOuvrageGroup quoteOuvrageEditing" key={key} onSubmit={saveOuvrage}>
+      <form className="quoteOuvrageGroup quoteOuvrageEditing" key={cle} onSubmit={saveOuvrage}>
         <div className="quoteMainRow quoteLineRow">
           <span className="quoteNumber">{number}</span>
           <input
             className="quoteInlineInput quoteDescriptionInput"
             value={description}
-            onChange={(event) => setDescription(event.target.value)}
+            onChange={(evenement) => setDescription(evenement.target.value)}
             placeholder="Désignation de l’ouvrage"
             required
           />
           <input
             className="quoteInlineInput"
             value={quantityInput}
-            onChange={(event) => setQuantityInput(event.target.value)}
+            onChange={(evenement) => setQuantityInput(evenement.target.value)}
             required
             aria-label="Quantité ouvrage"
           />
           <input
             className="quoteInlineInput"
             value={unit}
-            onChange={(event) => setUnit(event.target.value)}
+            onChange={(evenement) => setUnit(evenement.target.value)}
             aria-label="Unité ouvrage"
           />
           <div className="quoteInlinePrice">
@@ -1746,7 +1752,7 @@ export function QuoteStructuredLinesEditor({
               className="quoteInlineInput"
               inputMode="decimal"
               value={retainedPriceInput}
-              onChange={(event) => updateOuvrageSalePrice(event.target.value)}
+              onChange={(evenement) => updateOuvrageSalePrice(evenement.target.value)}
               aria-label="Prix unitaire HT ouvrage"
             />
             {priceForced ? (
@@ -1766,7 +1772,7 @@ export function QuoteStructuredLinesEditor({
               className="quoteInlineInput"
               inputMode="decimal"
               value={ouvrageMarginInput}
-              onChange={(event) => updateOuvrageMargin(event.target.value)}
+              onChange={(evenement) => updateOuvrageMargin(evenement.target.value)}
               aria-label="Marge pourcentage ouvrage"
               title="Saisir la marge pour calculer le prix de vente"
             />
@@ -1778,7 +1784,7 @@ export function QuoteStructuredLinesEditor({
             <button
               type="submit"
               className="miniActionButton quoteSaveButton"
-              disabled={saving}
+              disabled={sauvegardeEnCours}
               title="Enregistrer"
               aria-label="Enregistrer"
             >
@@ -1788,7 +1794,7 @@ export function QuoteStructuredLinesEditor({
               type="button"
               className="miniActionButton"
               onClick={closeForm}
-              disabled={saving}
+              disabled={sauvegardeEnCours}
               title="Annuler"
               aria-label="Annuler"
             >
@@ -1828,17 +1834,17 @@ export function QuoteStructuredLinesEditor({
             <span>Total HT</span>
             <span />
           </div>
-          {components.map((component, index) => {
+          {components.map((component, indice) => {
             const total = componentTotalCents(component);
             const marginPercent = componentMarginPercent(component);
             return (
               <div
                 className={`quoteComponentRow quoteComponentRowEditing quoteComponentDraggable${componentDropClass(component.key)}`}
                 key={component.key}
-                draggable={!saving}
-                onDragStart={(event) => startComponentDrag(event, component.key)}
-                onDragOver={(event) => dragComponentOver(event, component.key)}
-                onDrop={(event) => dropComponent(event, component.key)}
+                draggable={!sauvegardeEnCours}
+                onDragStart={(evenement) => startComponentDrag(evenement, component.key)}
+                onDragOver={(evenement) => dragComponentOver(evenement, component.key)}
+                onDrop={(evenement) => dropComponent(evenement, component.key)}
                 onDragEnd={finishComponentDrag}
                 title="Glisser-déposer pour déplacer le composant"
               >
@@ -1846,11 +1852,11 @@ export function QuoteStructuredLinesEditor({
                   <input
                     className="quoteInlineInput"
                     value={component.description}
-                    onChange={(event) =>
-                      updateComponent(index, { description: event.target.value })
+                    onChange={(evenement) =>
+                      updateComponent(indice, { description: evenement.target.value })
                     }
                     required
-                    aria-label={`Désignation composant ${index + 1}`}
+                    aria-label={`Désignation composant ${indice + 1}`}
                   />
                   {component.activity ? (
                     <small className="quoteActivityTag">
@@ -1863,25 +1869,27 @@ export function QuoteStructuredLinesEditor({
                 <input
                   className="quoteInlineInput"
                   value={component.quantityInput}
-                  onChange={(event) =>
-                    updateComponent(index, { quantityInput: event.target.value })
+                  onChange={(evenement) =>
+                    updateComponent(indice, { quantityInput: evenement.target.value })
                   }
                   required
-                  aria-label={`Quantité composant ${index + 1}`}
+                  aria-label={`Quantité composant ${indice + 1}`}
                 />
                 <input
                   className="quoteInlineInput"
                   value={component.unit}
-                  onChange={(event) => updateComponent(index, { unit: event.target.value })}
-                  aria-label={`Unité composant ${index + 1}`}
+                  onChange={(evenement) =>
+                    updateComponent(indice, { unit: evenement.target.value })
+                  }
+                  aria-label={`Unité composant ${indice + 1}`}
                 />
                 <input
                   className="quoteInlineInput"
                   inputMode="decimal"
                   value={component.costPriceEuros}
-                  onChange={(event) => updateComponentCost(index, event.target.value)}
+                  onChange={(evenement) => updateComponentCost(indice, evenement.target.value)}
                   placeholder="—"
-                  aria-label={`Coût composant ${index + 1}`}
+                  aria-label={`Coût composant ${indice + 1}`}
                 />
                 <input
                   className={`quoteInlineInput${
@@ -1889,26 +1897,26 @@ export function QuoteStructuredLinesEditor({
                   }`}
                   inputMode="decimal"
                   value={component.marginPercentInput}
-                  onChange={(event) => updateComponentMargin(index, event.target.value)}
+                  onChange={(evenement) => updateComponentMargin(indice, evenement.target.value)}
                   placeholder="n/c"
-                  aria-label={`Marge composant ${index + 1}`}
+                  aria-label={`Marge composant ${indice + 1}`}
                   title="Saisir la marge pour calculer le prix de vente"
                 />
                 <input
                   className="quoteInlineInput"
                   inputMode="decimal"
                   value={component.unitPriceEuros}
-                  onChange={(event) => updateComponentSalePrice(index, event.target.value)}
+                  onChange={(evenement) => updateComponentSalePrice(indice, evenement.target.value)}
                   required
-                  aria-label={`Prix vente composant ${index + 1}`}
+                  aria-label={`Prix vente composant ${indice + 1}`}
                 />
                 <strong>{total === null ? "—" : formatMoney(total)}</strong>
                 <div className="quoteComponentActions">
                   <button
                     type="button"
                     className="miniActionButton"
-                    onClick={() => duplicateComponent(index)}
-                    aria-label={`Dupliquer le composant ${index + 1}`}
+                    onClick={() => duplicateComponent(indice)}
+                    aria-label={`Dupliquer le composant ${indice + 1}`}
                     title="Dupliquer le composant"
                   >
                     <Copy size={13} aria-hidden="true" />
@@ -1916,9 +1924,9 @@ export function QuoteStructuredLinesEditor({
                   <button
                     type="button"
                     className="quoteDeleteComponent"
-                    onClick={() => removeComponent(index)}
+                    onClick={() => removeComponent(indice)}
                     disabled={components.length === 1}
-                    aria-label={`Supprimer le composant ${index + 1}`}
+                    aria-label={`Supprimer le composant ${indice + 1}`}
                     title="Supprimer le composant"
                   >
                     <Trash2 size={13} aria-hidden="true" />
@@ -1934,7 +1942,7 @@ export function QuoteStructuredLinesEditor({
                   <Search size={14} aria-hidden="true" />
                   <input
                     value={libraryQuery}
-                    onChange={(event) => setLibraryQuery(event.target.value)}
+                    onChange={(evenement) => setLibraryQuery(evenement.target.value)}
                     placeholder="Rechercher un composant…"
                     autoFocus
                   />
@@ -1982,30 +1990,30 @@ export function QuoteStructuredLinesEditor({
     );
   }
 
-  function renderHeading(item: QuoteSection | QuoteSubsection) {
-    const editing = headingEditor?.itemId === item.id;
+  function renderHeading(element: QuoteSection | QuoteSubsection) {
+    const editing = headingEditor?.itemId === element.id;
     if (editing && headingEditor)
-      return renderHeadingEditor(headingEditor, numbers.get(item.id) ?? "—");
-    const directOption = directOptionForItem(item.id);
-    const headingTotalCents = headingTotalsById.get(item.id) ?? 0;
+      return renderHeadingEditor(headingEditor, numbers.get(element.id) ?? "—");
+    const directOption = directOptionForItem(element.id);
+    const headingTotalCents = headingTotalsById.get(element.id) ?? 0;
 
     return (
-      <div className="quoteHeadingBlock" key={item.id}>
+      <div className="quoteHeadingBlock" key={element.id}>
         <div
-          className={`quoteMainRow quoteHeadingRow quoteDraggableItem ${item.kind === "SECTION" ? "isSection" : "isSubsection"}${dropClass(item.id)}`}
+          className={`quoteMainRow quoteHeadingRow quoteDraggableItem ${element.kind === "SECTION" ? "isSection" : "isSubsection"}${dropClass(element.id)}`}
           draggable={editable && !formOpen && headingEditor === null && reorderingItemId === null}
-          onDragStart={(event) => startItemDrag(event, item)}
-          onDragOver={(event) => dragItemOver(event, item)}
-          onDrop={(event) => dropItem(event, item)}
+          onDragStart={(evenement) => startItemDrag(evenement, element)}
+          onDragOver={(evenement) => dragItemOver(evenement, element)}
+          onDrop={(evenement) => dropItem(evenement, element)}
           onDragEnd={finishItemDrag}
           title={editable ? "Glisser-déposer pour déplacer ce bloc" : undefined}
         >
-          <span className="quoteNumber">{numbers.get(item.id) ?? "—"}</span>
+          <span className="quoteNumber">{numbers.get(element.id) ?? "—"}</span>
           <strong
             className="quoteHeadingTitle"
-            style={quoteItemTextStyleToCss(item.presentation?.textStyle)}
+            style={quoteItemTextStyleToCss(element.presentation?.textStyle)}
           >
-            {item.title}
+            {element.title}
           </strong>
           <span />
           <span />
@@ -2018,12 +2026,12 @@ export function QuoteStructuredLinesEditor({
                 <button
                   type="button"
                   className={`miniOptionButton${directOption ? " isActive" : ""}`}
-                  onClick={() => void toggleItemOption(item)}
+                  onClick={() => void toggleItemOption(element)}
                   disabled={togglingOptionItemId !== null}
                   aria-label={
                     directOption
-                      ? `Retirer ${item.title} des options`
-                      : `Mettre ${item.title} en option`
+                      ? `Retirer ${element.title} des options`
+                      : `Mettre ${element.title} en option`
                   }
                   title={directOption ? "Retirer l’option" : "Mettre en option hors total"}
                 >
@@ -2031,50 +2039,52 @@ export function QuoteStructuredLinesEditor({
                 </button>
                 <button
                   type="button"
-                  className={`iconButton${presentationItemId === item.id ? " isActive" : ""}`}
+                  className={`iconButton${presentationItemId === element.id ? " isActive" : ""}`}
                   onClick={() =>
-                    setPresentationItemId((current) => (current === item.id ? null : item.id))
+                    setPresentationItemId((courant) => (courant === element.id ? null : element.id))
                   }
-                  aria-label={`Mise en forme de ${item.title}`}
+                  aria-label={`Mise en forme de ${element.title}`}
                   title="Mise en forme client"
                 >
                   <Palette size={14} aria-hidden="true" />
                 </button>
                 <button
                   type="button"
-                  className={`iconButton quotePhotoButton${presentationItemId === item.id ? " isActive" : ""}`}
+                  className={`iconButton quotePhotoButton${presentationItemId === element.id ? " isActive" : ""}`}
                   onClick={() =>
-                    setPresentationItemId((current) => (current === item.id ? null : item.id))
+                    setPresentationItemId((courant) => (courant === element.id ? null : element.id))
                   }
-                  aria-label={`Photos de ${item.title}`}
+                  aria-label={`Photos de ${element.title}`}
                   title="Photos de la ligne"
                 >
                   <ImagePlus size={14} aria-hidden="true" />
-                  {(item.presentation?.photos.length ?? 0) > 0 ? (
-                    <span>{item.presentation?.photos.length}</span>
+                  {(element.presentation?.photos.length ?? 0) > 0 ? (
+                    <span>{element.presentation?.photos.length}</span>
                   ) : null}
                 </button>
                 <button
                   type="button"
                   className="iconButton"
-                  onClick={() => void duplicateHeading(item)}
+                  onClick={() => void duplicateHeading(element)}
                   disabled={
                     formOpen ||
                     headingEditor !== null ||
                     duplicatingHeadingId !== null ||
                     duplicatingLineId !== null
                   }
-                  aria-label={`Dupliquer ${item.title}`}
-                  title={item.kind === "SECTION" ? "Dupliquer le titre" : "Dupliquer le sous-titre"}
+                  aria-label={`Dupliquer ${element.title}`}
+                  title={
+                    element.kind === "SECTION" ? "Dupliquer le titre" : "Dupliquer le sous-titre"
+                  }
                 >
                   <Copy size={14} aria-hidden="true" />
                 </button>
                 <button
                   type="button"
                   className="iconButton"
-                  onClick={() => openEditHeading(item)}
+                  onClick={() => openEditHeading(element)}
                   disabled={formOpen || headingEditor !== null || deletingItemId !== null}
-                  aria-label={`Modifier ${item.title}`}
+                  aria-label={`Modifier ${element.title}`}
                   title="Modifier le titre"
                 >
                   <Pencil size={14} aria-hidden="true" />
@@ -2082,7 +2092,7 @@ export function QuoteStructuredLinesEditor({
                 <button
                   type="button"
                   className="iconButton quoteDeleteItemButton"
-                  onClick={() => void deleteItem(item)}
+                  onClick={() => void deleteItem(element)}
                   disabled={
                     formOpen ||
                     headingEditor !== null ||
@@ -2090,9 +2100,9 @@ export function QuoteStructuredLinesEditor({
                     duplicatingLineId !== null ||
                     deletingItemId !== null
                   }
-                  aria-label={`Supprimer ${item.title}`}
+                  aria-label={`Supprimer ${element.title}`}
                   title={
-                    item.kind === "SECTION"
+                    element.kind === "SECTION"
                       ? "Supprimer le titre et son contenu"
                       : "Supprimer le sous-titre et son contenu"
                   }
@@ -2103,11 +2113,11 @@ export function QuoteStructuredLinesEditor({
             ) : null}
           </div>
         </div>
-        {presentationItemId === item.id ? (
+        {presentationItemId === element.id ? (
           <QuoteItemPresentationPanel
             quoteId={quote!.id}
             quoteUpdatedAt={quote!.updatedAt}
-            item={item}
+            item={element}
             editable={editable}
             onSaved={onSaved}
             onClose={() => setPresentationItemId(null)}
@@ -2128,7 +2138,7 @@ export function QuoteStructuredLinesEditor({
         <input
           className="quoteInlineInput quoteDescriptionInput"
           value={editor.title}
-          onChange={(event) => setHeadingEditor({ ...editor, title: event.target.value })}
+          onChange={(evenement) => setHeadingEditor({ ...editor, title: evenement.target.value })}
           placeholder={editor.kind === "SECTION" ? "Grand titre" : "Sous-titre"}
           autoFocus
           required
@@ -2143,7 +2153,7 @@ export function QuoteStructuredLinesEditor({
           <button
             type="submit"
             className="miniActionButton quoteSaveButton"
-            disabled={saving}
+            disabled={sauvegardeEnCours}
             title="Enregistrer"
             aria-label="Enregistrer"
           >
@@ -2153,7 +2163,7 @@ export function QuoteStructuredLinesEditor({
             type="button"
             className="miniActionButton"
             onClick={() => setHeadingEditor(null)}
-            disabled={saving}
+            disabled={sauvegardeEnCours}
             title="Annuler"
             aria-label="Annuler"
           >
@@ -2176,8 +2186,8 @@ export function QuoteStructuredLinesEditor({
           <p className="eyebrow">Devis</p>
           <h2>{quote.model.subject}</h2>
           <p className="muted">
-            {quote.variantName} · V{quote.version} · {lines.length} ouvrage
-            {lines.length === 1 ? "" : "s"}
+            {quote.variantName} · V{quote.version} · {lignes.length} ouvrage
+            {lignes.length === 1 ? "" : "s"}
           </p>
           {editable ? (
             <p className="quoteDragHint">
@@ -2188,7 +2198,7 @@ export function QuoteStructuredLinesEditor({
         <div className="quoteLinesHeaderActions">{headerActions}</div>
       </div>
 
-      {error ? <div className="quoteLineMessage quoteLineError">{error}</div> : null}
+      {erreur ? <div className="quoteLineMessage quoteLineError">{erreur}</div> : null}
       {notice ? <div className="quoteLineMessage quoteLineNotice">{notice}</div> : null}
 
       <div className="quoteLinesTable">
@@ -2202,16 +2212,17 @@ export function QuoteStructuredLinesEditor({
           <span>Total HT</span>
           <span />
         </div>
-        {items.map((item) => {
-          if (item.kind === "SECTION" || item.kind === "SUBSECTION") return renderHeading(item);
-          if (item.kind === "LINE")
-            return formOpen && editingLineId === item.id
-              ? renderEditingOuvrage(item.id)
-              : renderReadOuvrage(item);
+        {elements.map((element) => {
+          if (element.kind === "SECTION" || element.kind === "SUBSECTION")
+            return renderHeading(element);
+          if (element.kind === "LINE")
+            return formOpen && editingLineId === element.id
+              ? renderEditingOuvrage(element.id)
+              : renderReadOuvrage(element);
           return (
-            <div className="quoteMainRow quoteCommentRow" key={item.id}>
-              <span className="quoteNumber">{numbers.get(item.id) ?? "—"}</span>
-              <span>{item.text}</span>
+            <div className="quoteMainRow quoteCommentRow" key={element.id}>
+              <span className="quoteNumber">{numbers.get(element.id) ?? "—"}</span>
+              <span>{element.text}</span>
               <span />
               <span />
               <span />

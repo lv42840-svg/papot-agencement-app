@@ -11,7 +11,7 @@ import { createQuotesRepository } from "@/lib/quotes/create-repository";
 export const dynamic = "force-dynamic";
 
 export default async function QuotesPage() {
-  const context = await requireModuleRequestContext("quotes", "READ");
+  const contexte = await requireModuleRequestContext("quotes", "READ");
   const commercialRepository = createCommercialRepository();
   const clientsRepository = await createClientsRepository();
   const quotesRepository = createQuotesRepository();
@@ -44,7 +44,7 @@ export default async function QuotesPage() {
       <QuotesWorkspace
         initialPayload={quotes}
         affairs={affairs}
-        canWrite={context.moduleAccess.canWrite}
+        canWrite={contexte.moduleAccess.canWrite}
       />
     </DesktopAppShell>
   );

@@ -40,12 +40,12 @@ function statusFor(code: string): number {
   return 400;
 }
 
-export async function GET(_request: Request, context: RouteContext) {
+export async function GET(_request: Request, contexte: RouteContext) {
   try {
-    const { quoteId, itemId, photoId } = await context.params;
+    const { quoteId: idDevis, itemId: idElement, photoId } = await contexte.params;
     await requireModuleRequestContext("quotes", "READ");
-    const payload = await createQuotesRepository().load();
-    const photo = getQuoteItemPhoto(payload, quoteId, itemId, photoId);
+    const contenu = await createQuotesRepository().load();
+    const photo = getQuoteItemPhoto(contenu, idDevis, idElement, photoId);
     const store = getServerFileStore();
     await store.assertReady();
     const bytes = await store.readBytes(photo.storagePath, photo.sha256);
@@ -57,63 +57,63 @@ export async function GET(_request: Request, context: RouteContext) {
         "Content-Disposition": `inline; filename*=UTF-8''${encodeURIComponent(photo.fileName)}`,
       },
     });
-  } catch (error) {
-    const code = error instanceof Error ? error.message : "QUOTE_ITEM_PHOTO_READ_FAILED";
+  } catch (erreur) {
+    const code = erreur instanceof Error ? erreur.message : "QUOTE_ITEM_PHOTO_READ_FAILED";
     return NextResponse.json({ error: code }, { status: statusFor(code) });
   }
 }
 
-export async function PATCH(request: Request, context: RouteContext) {
+export async function PATCH(requete: Request, contexte: RouteContext) {
   try {
-    const { quoteId, itemId, photoId } = await context.params;
+    const { quoteId: idDevis, itemId: idElement, photoId } = await contexte.params;
     const requestContext = await requireModuleRequestContext("quotes", "WRITE");
-    const input = visibilitySchema.parse(await request.json());
-    const expectedRevision = expectedQuoteRevision(request);
-    const actor = {
+    const saisie = visibilitySchema.parse(await requete.json());
+    const expectedRevision = expectedQuoteRevision(requete);
+    const auteur = {
       userId: requestContext.user.id,
       displayName: requestContext.user.displayName,
     };
-    const mutation = await createQuotesRepository().mutate((payload) => {
-      assertQuoteRevision(payload, quoteId, expectedRevision);
+    const mutation = await createQuotesRepository().mutate((contenu) => {
+      assertQuoteRevision(contenu, idDevis, expectedRevision);
       return setQuoteItemPhotoVisibility(
-        payload,
-        quoteId,
-        itemId,
+        contenu,
+        idDevis,
+        idElement,
         photoId,
-        input.clientVisible,
-        actor,
+        saisie.clientVisible,
+        auteur,
       );
     });
     return NextResponse.json(
       { payload: mutation.payload },
       { headers: { "Cache-Control": "no-store" } },
     );
-  } catch (error) {
-    const code = error instanceof Error ? error.message : "QUOTE_ITEM_PHOTO_UPDATE_FAILED";
+  } catch (erreur) {
+    const code = erreur instanceof Error ? erreur.message : "QUOTE_ITEM_PHOTO_UPDATE_FAILED";
     return NextResponse.json({ error: code }, { status: statusFor(code) });
   }
 }
 
-export async function DELETE(request: Request, context: RouteContext) {
+export async function DELETE(requete: Request, contexte: RouteContext) {
   try {
-    const { quoteId, itemId, photoId } = await context.params;
+    const { quoteId: idDevis, itemId: idElement, photoId } = await contexte.params;
     const requestContext = await requireModuleRequestContext("quotes", "WRITE");
     const repository = createQuotesRepository();
-    const expectedRevision = expectedQuoteRevision(request);
-    const current = await repository.load();
-    assertQuoteRevision(current, quoteId, expectedRevision);
-    const photo = getQuoteItemPhoto(current, quoteId, itemId, photoId);
-    const actor = {
+    const expectedRevision = expectedQuoteRevision(requete);
+    const courant = await repository.load();
+    assertQuoteRevision(courant, idDevis, expectedRevision);
+    const photo = getQuoteItemPhoto(courant, idDevis, idElement, photoId);
+    const auteur = {
       userId: requestContext.user.id,
       displayName: requestContext.user.displayName,
     };
-    const mutation = await repository.mutate((payload) => {
-      assertQuoteRevision(payload, quoteId, expectedRevision);
-      return removeQuoteItemPhoto(payload, quoteId, itemId, photoId, actor);
+    const mutation = await repository.mutate((contenu) => {
+      assertQuoteRevision(contenu, idDevis, expectedRevision);
+      return removeQuoteItemPhoto(contenu, idDevis, idElement, photoId, auteur);
     });
     const stillReferenced = mutation.payload.quotes.some((quote) =>
-      quote.model.items.some((item) =>
-        item.presentation?.photos.some((candidate) => candidate.storagePath === photo.storagePath),
+      quote.model.items.some((element) =>
+        element.presentation?.photos.some((candidat) => candidat.storagePath === photo.storagePath),
       ),
     );
     if (!stillReferenced) {
@@ -124,8 +124,8 @@ export async function DELETE(request: Request, context: RouteContext) {
       { payload: mutation.payload },
       { headers: { "Cache-Control": "no-store" } },
     );
-  } catch (error) {
-    const code = error instanceof Error ? error.message : "QUOTE_ITEM_PHOTO_DELETE_FAILED";
+  } catch (erreur) {
+    const code = erreur instanceof Error ? erreur.message : "QUOTE_ITEM_PHOTO_DELETE_FAILED";
     return NextResponse.json({ error: code }, { status: statusFor(code) });
   }
 }

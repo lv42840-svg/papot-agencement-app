@@ -16,10 +16,10 @@ import {
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
-const moduleKeys = new Set<string>(MODULE_PERMISSIONS.map((item) => item.key));
-const specialKeys = new Set<string>(SPECIAL_PERMISSIONS.map((item) => item.key));
-const moduleKeySchema = z.string().refine((value) => moduleKeys.has(value));
-const specialKeySchema = z.string().refine((value) => specialKeys.has(value));
+const moduleKeys = new Set<string>(MODULE_PERMISSIONS.map((element) => element.key));
+const specialKeys = new Set<string>(SPECIAL_PERMISSIONS.map((element) => element.key));
+const moduleKeySchema = z.string().refine((valeur) => moduleKeys.has(valeur));
+const specialKeySchema = z.string().refine((valeur) => specialKeys.has(valeur));
 
 const mutationSchema = z.discriminatedUnion("action", [
   z.object({
@@ -69,10 +69,10 @@ const mutationSchema = z.discriminatedUnion("action", [
   }),
 ]);
 
-function noStoreJson(body: unknown, init?: ResponseInit) {
-  const response = NextResponse.json(body, init);
-  response.headers.set("Cache-Control", "no-store");
-  return response;
+function noStoreJson(corps: unknown, init?: ResponseInit) {
+  const reponse = NextResponse.json(corps, init);
+  reponse.headers.set("Cache-Control", "no-store");
+  return reponse;
 }
 
 async function snapshot(actorUserId: string) {
@@ -86,50 +86,50 @@ async function snapshot(actorUserId: string) {
 
 export async function GET() {
   try {
-    const actor = await requirePermissionAdministrator();
-    return noStoreJson(await snapshot(actor.id));
-  } catch (error) {
-    const code = error instanceof Error ? error.message : "USER_ADMIN_LOAD_FAILED";
+    const auteur = await requirePermissionAdministrator();
+    return noStoreJson(await snapshot(auteur.id));
+  } catch (erreur) {
+    const code = erreur instanceof Error ? erreur.message : "USER_ADMIN_LOAD_FAILED";
     return noStoreJson({ error: code }, { status: userAdminErrorStatus(code) });
   }
 }
 
-export async function POST(request: Request) {
+export async function POST(requete: Request) {
   try {
-    const actor = await requirePermissionAdministrator();
-    const input = mutationSchema.parse(await request.json().catch(() => null));
+    const auteur = await requirePermissionAdministrator();
+    const saisie = mutationSchema.parse(await requete.json().catch(() => null));
 
     let setup: { setupUrl: string; expiresAt: string } | null = null;
-    switch (input.action) {
+    switch (saisie.action) {
       case "create": {
-        const created = await createManagedUser(input);
+        const created = await createManagedUser(saisie);
         setup = { setupUrl: created.setupUrl, expiresAt: created.expiresAt };
         break;
       }
       case "updateProfile":
-        await updateManagedUserProfile(input);
+        await updateManagedUserProfile(saisie);
         break;
       case "setActive":
-        await setManagedUserActive({ ...input, actorUserId: actor.id });
+        await setManagedUserActive({ ...saisie, actorUserId: auteur.id });
         break;
       case "replacePermissions":
-        await replaceManagedUserPermissions(input);
+        await replaceManagedUserPermissions(saisie);
         break;
       case "resetPassword":
-        setup = await resetManagedUserPassword(input);
+        setup = await resetManagedUserPassword(saisie);
         break;
       case "revokeSession":
-        await revokeManagedUserSession(input);
+        await revokeManagedUserSession(saisie);
         break;
     }
 
-    return noStoreJson({ ...(await snapshot(actor.id)), ...(setup ?? {}) });
-  } catch (error) {
+    return noStoreJson({ ...(await snapshot(auteur.id)), ...(setup ?? {}) });
+  } catch (erreur) {
     const code =
-      error instanceof z.ZodError
+      erreur instanceof z.ZodError
         ? "USER_ADMIN_REQUEST_INVALID"
-        : error instanceof Error
-          ? error.message
+        : erreur instanceof Error
+          ? erreur.message
           : "USER_ADMIN_MUTATION_FAILED";
     return noStoreJson({ error: code }, { status: userAdminErrorStatus(code) });
   }

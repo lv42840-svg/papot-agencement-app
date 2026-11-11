@@ -6,7 +6,7 @@ export type QuotesRepositoryMutation = QuotesMutationResult & {
 };
 
 export type QuotesMutationTransform = (
-  payload: NativeQuotesPayload,
+  donnees: NativeQuotesPayload,
 ) => QuotesRepositoryMutation | Promise<QuotesRepositoryMutation>;
 
 export class QuotesRepositoryError extends Error {
@@ -18,5 +18,5 @@ export class QuotesRepositoryError extends Error {
 
 export interface QuotesRepository {
   load(): Promise<NativeQuotesPayload>;
-  mutate(transform: QuotesMutationTransform): Promise<QuotesMutationResult>;
+  mutate(transformation: QuotesMutationTransform): Promise<QuotesMutationResult>;
 }

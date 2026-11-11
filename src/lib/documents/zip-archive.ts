@@ -30,8 +30,8 @@ function decodeEntryName(bytes: Buffer): string {
   return bytes.toString("utf8");
 }
 
-export function readZipArchive(input: Uint8Array): ZipArchiveEntry[] {
-  const buffer = Buffer.from(input);
+export function readZipArchive(saisie: Uint8Array): ZipArchiveEntry[] {
+  const buffer = Buffer.from(saisie);
   const endOffset = findEndOfCentralDirectory(buffer);
   const entryCount = buffer.readUInt16LE(endOffset + 10);
   const centralDirectoryOffset = buffer.readUInt32LE(endOffset + 16);
@@ -40,10 +40,10 @@ export function readZipArchive(input: Uint8Array): ZipArchiveEntry[] {
     throw new Error("ZIP64_NOT_SUPPORTED");
   }
 
-  const entries: ZipArchiveEntry[] = [];
+  const entrees: ZipArchiveEntry[] = [];
   let cursor = centralDirectoryOffset;
 
-  for (let index = 0; index < entryCount; index += 1) {
+  for (let indice = 0; indice < entryCount; indice += 1) {
     if (buffer.readUInt32LE(cursor) !== CENTRAL_DIRECTORY_SIGNATURE) {
       throw new Error("ZIP_CENTRAL_DIRECTORY_INVALID");
     }
@@ -67,7 +67,7 @@ export function readZipArchive(input: Uint8Array): ZipArchiveEntry[] {
     const externalAttributes = buffer.readUInt32LE(cursor + 38);
     const localHeaderOffset = buffer.readUInt32LE(cursor + 42);
     const nameStart = cursor + 46;
-    const name = decodeEntryName(buffer.subarray(nameStart, nameStart + nameLength));
+    const nom = decodeEntryName(buffer.subarray(nameStart, nameStart + nameLength));
 
     if (buffer.readUInt32LE(localHeaderOffset) !== LOCAL_FILE_HEADER_SIGNATURE) {
       throw new Error("ZIP_LOCAL_HEADER_INVALID");
@@ -76,16 +76,16 @@ export function readZipArchive(input: Uint8Array): ZipArchiveEntry[] {
     const localExtraLength = buffer.readUInt16LE(localHeaderOffset + 28);
     const dataStart = localHeaderOffset + 30 + localNameLength + localExtraLength;
     const compressed = buffer.subarray(dataStart, dataStart + compressedSize);
-    const data =
+    const donnees =
       compressionMethod === METHOD_STORED
         ? Buffer.from(compressed)
         : inflateRawSync(Buffer.from(compressed));
 
-    if (data.length !== uncompressedSize) throw new Error("ZIP_ENTRY_SIZE_MISMATCH");
+    if (donnees.length !== uncompressedSize) throw new Error("ZIP_ENTRY_SIZE_MISMATCH");
 
-    entries.push({
-      name,
-      data,
+    entrees.push({
+      name: nom,
+      data: donnees,
       compressionMethod,
       modifiedTime,
       modifiedDate,
@@ -96,32 +96,32 @@ export function readZipArchive(input: Uint8Array): ZipArchiveEntry[] {
     cursor += 46 + nameLength + extraLength + commentLength;
   }
 
-  return entries;
+  return entrees;
 }
 
 const CRC32_TABLE = (() => {
   const table = new Uint32Array(256);
-  for (let value = 0; value < 256; value += 1) {
-    let crc = value;
+  for (let valeur = 0; valeur < 256; valeur += 1) {
+    let crc = valeur;
     for (let bit = 0; bit < 8; bit += 1) {
       crc = (crc & 1) !== 0 ? 0xedb88320 ^ (crc >>> 1) : crc >>> 1;
     }
-    table[value] = crc >>> 0;
+    table[valeur] = crc >>> 0;
   }
   return table;
 })();
 
-function crc32(input: Uint8Array): number {
+function crc32(saisie: Uint8Array): number {
   let crc = 0xffffffff;
-  for (const byte of input) {
+  for (const byte of saisie) {
     crc = CRC32_TABLE[(crc ^ byte) & 0xff] ^ (crc >>> 8);
   }
   return (crc ^ 0xffffffff) >>> 0;
 }
 
 function makeLocalHeader(
-  entry: ZipArchiveEntry,
-  name: Buffer,
+  entree: ZipArchiveEntry,
+  nom: Buffer,
   compressed: Buffer,
   crc: number,
 ): Buffer {
@@ -129,20 +129,20 @@ function makeLocalHeader(
   header.writeUInt32LE(LOCAL_FILE_HEADER_SIGNATURE, 0);
   header.writeUInt16LE(20, 4);
   header.writeUInt16LE(UTF8_FLAG, 6);
-  header.writeUInt16LE(entry.compressionMethod, 8);
-  header.writeUInt16LE(entry.modifiedTime, 10);
-  header.writeUInt16LE(entry.modifiedDate, 12);
+  header.writeUInt16LE(entree.compressionMethod, 8);
+  header.writeUInt16LE(entree.modifiedTime, 10);
+  header.writeUInt16LE(entree.modifiedDate, 12);
   header.writeUInt32LE(crc, 14);
   header.writeUInt32LE(compressed.length, 18);
-  header.writeUInt32LE(entry.data.length, 22);
-  header.writeUInt16LE(name.length, 26);
+  header.writeUInt32LE(entree.data.length, 22);
+  header.writeUInt16LE(nom.length, 26);
   header.writeUInt16LE(0, 28);
   return header;
 }
 
 function makeCentralHeader(
-  entry: ZipArchiveEntry,
-  name: Buffer,
+  entree: ZipArchiveEntry,
+  nom: Buffer,
   compressed: Buffer,
   crc: number,
   localHeaderOffset: number,
@@ -152,60 +152,63 @@ function makeCentralHeader(
   header.writeUInt16LE(20, 4);
   header.writeUInt16LE(20, 6);
   header.writeUInt16LE(UTF8_FLAG, 8);
-  header.writeUInt16LE(entry.compressionMethod, 10);
-  header.writeUInt16LE(entry.modifiedTime, 12);
-  header.writeUInt16LE(entry.modifiedDate, 14);
+  header.writeUInt16LE(entree.compressionMethod, 10);
+  header.writeUInt16LE(entree.modifiedTime, 12);
+  header.writeUInt16LE(entree.modifiedDate, 14);
   header.writeUInt32LE(crc, 16);
   header.writeUInt32LE(compressed.length, 20);
-  header.writeUInt32LE(entry.data.length, 24);
-  header.writeUInt16LE(name.length, 28);
+  header.writeUInt32LE(entree.data.length, 24);
+  header.writeUInt16LE(nom.length, 28);
   header.writeUInt16LE(0, 30);
   header.writeUInt16LE(0, 32);
   header.writeUInt16LE(0, 34);
-  header.writeUInt16LE(entry.internalAttributes, 36);
-  header.writeUInt32LE(entry.externalAttributes, 38);
+  header.writeUInt16LE(entree.internalAttributes, 36);
+  header.writeUInt32LE(entree.externalAttributes, 38);
   header.writeUInt32LE(localHeaderOffset, 42);
   return header;
 }
 
-export function writeZipArchive(entries: readonly ZipArchiveEntry[]): Uint8Array {
-  if (entries.length > 0xffff) throw new Error("ZIP_ENTRY_COUNT_TOO_LARGE");
+export function writeZipArchive(entrees: readonly ZipArchiveEntry[]): Uint8Array {
+  if (entrees.length > 0xffff) throw new Error("ZIP_ENTRY_COUNT_TOO_LARGE");
 
   const localParts: Buffer[] = [];
   const centralParts: Buffer[] = [];
   let localOffset = 0;
 
-  for (const entry of entries) {
-    const name = Buffer.from(entry.name, "utf8");
-    const data = Buffer.from(entry.data);
+  for (const entree of entrees) {
+    const nom = Buffer.from(entree.name, "utf8");
+    const donnees = Buffer.from(entree.data);
     const compressed =
-      entry.compressionMethod === METHOD_STORED ? data : deflateRawSync(data, { level: 6 });
-    const crc = crc32(data);
-    const localHeader = makeLocalHeader(entry, name, compressed, crc);
-    const centralHeader = makeCentralHeader(entry, name, compressed, crc, localOffset);
+      entree.compressionMethod === METHOD_STORED ? donnees : deflateRawSync(donnees, { level: 6 });
+    const crc = crc32(donnees);
+    const localHeader = makeLocalHeader(entree, nom, compressed, crc);
+    const centralHeader = makeCentralHeader(entree, nom, compressed, crc, localOffset);
 
-    localParts.push(localHeader, name, compressed);
-    centralParts.push(centralHeader, name);
-    localOffset += localHeader.length + name.length + compressed.length;
+    localParts.push(localHeader, nom, compressed);
+    centralParts.push(centralHeader, nom);
+    localOffset += localHeader.length + nom.length + compressed.length;
   }
 
   const centralDirectory = Buffer.concat(centralParts);
-  const end = Buffer.alloc(22);
-  end.writeUInt32LE(END_OF_CENTRAL_DIRECTORY_SIGNATURE, 0);
-  end.writeUInt16LE(0, 4);
-  end.writeUInt16LE(0, 6);
-  end.writeUInt16LE(entries.length, 8);
-  end.writeUInt16LE(entries.length, 10);
-  end.writeUInt32LE(centralDirectory.length, 12);
-  end.writeUInt32LE(localOffset, 16);
-  end.writeUInt16LE(0, 20);
+  const fin = Buffer.alloc(22);
+  fin.writeUInt32LE(END_OF_CENTRAL_DIRECTORY_SIGNATURE, 0);
+  fin.writeUInt16LE(0, 4);
+  fin.writeUInt16LE(0, 6);
+  fin.writeUInt16LE(entrees.length, 8);
+  fin.writeUInt16LE(entrees.length, 10);
+  fin.writeUInt32LE(centralDirectory.length, 12);
+  fin.writeUInt32LE(localOffset, 16);
+  fin.writeUInt16LE(0, 20);
 
-  return Buffer.concat([...localParts, centralDirectory, end]);
+  return Buffer.concat([...localParts, centralDirectory, fin]);
 }
 
-export function cloneZipEntryWithData(entry: ZipArchiveEntry, data: Uint8Array): ZipArchiveEntry {
+export function cloneZipEntryWithData(
+  entree: ZipArchiveEntry,
+  donnees: Uint8Array,
+): ZipArchiveEntry {
   return {
-    ...entry,
-    data,
+    ...entree,
+    data: donnees,
   };
 }

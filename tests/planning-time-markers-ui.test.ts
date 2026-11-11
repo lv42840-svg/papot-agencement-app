@@ -27,7 +27,7 @@ describe("grand planning temporal markers UI", () => {
   });
 
   it("locks editing for past weeks and read-only users", () => {
-    expect(gridSource).toContain("metaByWeek.get(week)?.isPast");
+    expect(gridSource).toContain("metaByWeek.get(semaine)?.isPast");
     expect(gridSource).toContain("!snapshot.capabilities.canEditMacro");
     expect(gridSource).toContain("readOnly={readOnly}");
   });

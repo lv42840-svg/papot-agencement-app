@@ -19,12 +19,12 @@ export type PlanningVisiblePerson = PlanningPersonCapacity & {
 };
 
 export function effectivePlanningPeople(
-  payload: Pick<PlanningPayload, "staff" | "peopleCapacity" | "hiddenPersonIds">,
+  contenu: Pick<PlanningPayload, "staff" | "peopleCapacity" | "hiddenPersonIds">,
   accounts: readonly PlanningAccount[],
 ): PlanningVisiblePerson[] {
-  const saved = new Map(payload.peopleCapacity.map((person) => [person.userId, person]));
-  const linked = new Set(payload.staff.map((person) => person.linkedUserId).filter(Boolean));
-  const hidden = new Set(payload.hiddenPersonIds);
+  const saved = new Map(contenu.peopleCapacity.map((personne) => [personne.userId, personne]));
+  const linked = new Set(contenu.staff.map((personne) => personne.linkedUserId).filter(Boolean));
+  const hidden = new Set(contenu.hiddenPersonIds);
   const legacy: PlanningVisiblePerson[] = accounts
     .filter((account) => account.isActive && !linked.has(account.id))
     .map((account) => ({
@@ -42,31 +42,31 @@ export function effectivePlanningPeople(
       endDate: null,
       inactiveSince: null,
     }));
-  const staff: PlanningVisiblePerson[] = payload.staff.map((person) => ({
-    ...(saved.get(person.id) ?? {
-      userId: person.id,
+  const staff: PlanningVisiblePerson[] = contenu.staff.map((personne) => ({
+    ...(saved.get(personne.id) ?? {
+      userId: personne.id,
       countsInMacroCapacity: false,
       weeklySchedule: DEFAULT_WEEKLY_SCHEDULE,
     }),
-    displayName: `${person.firstName} ${person.lastName}`,
+    displayName: `${personne.firstName} ${personne.lastName}`,
     kind: "staff",
-    firstName: person.firstName,
-    lastName: person.lastName,
-    linkedUserId: person.linkedUserId,
-    hiddenInWeeklyBoard: hidden.has(person.id),
-    endDate: person.endDate,
-    inactiveSince: person.inactiveSince,
+    firstName: personne.firstName,
+    lastName: personne.lastName,
+    linkedUserId: personne.linkedUserId,
+    hiddenInWeeklyBoard: hidden.has(personne.id),
+    endDate: personne.endDate,
+    inactiveSince: personne.inactiveSince,
   }));
   return [...legacy, ...staff];
 }
 
 export function personPresentOnDate(
-  person: Pick<PlanningVisiblePerson, "endDate" | "inactiveSince">,
+  personne: Pick<PlanningVisiblePerson, "endDate" | "inactiveSince">,
   date: string,
 ): boolean {
   return (
-    (!person.endDate || date <= person.endDate) &&
-    (!person.inactiveSince || date < person.inactiveSince)
+    (!personne.endDate || date <= personne.endDate) &&
+    (!personne.inactiveSince || date < personne.inactiveSince)
   );
 }
 
@@ -81,24 +81,24 @@ export type PlanningStaffMutation =
 
 export function applyPlanningStaffMutation(
   source: PlanningPayload,
-  input: PlanningStaffMutation,
+  saisie: PlanningStaffMutation,
   activeAccounts: ReadonlySet<string>,
 ): PlanningPayload {
-  const payload = structuredClone(parsePlanningPayload(source));
-  if (input.action === "saveStaff") {
-    const firstName = input.firstName.trim();
-    const lastName = input.lastName.trim();
+  const contenu = structuredClone(parsePlanningPayload(source));
+  if (saisie.action === "saveStaff") {
+    const firstName = saisie.firstName.trim();
+    const lastName = saisie.lastName.trim();
     if (!firstName || !lastName || firstName.length > 100 || lastName.length > 100) {
       throw new Error("PLANNING_STAFF_NAME_INVALID");
     }
-    if (input.id) {
-      const person = payload.staff.find((candidate) => candidate.id === input.id);
-      if (!person) throw new Error("PLANNING_STAFF_NOT_FOUND");
-      person.firstName = firstName;
-      person.lastName = lastName;
+    if (saisie.id) {
+      const personne = contenu.staff.find((candidat) => candidat.id === saisie.id);
+      if (!personne) throw new Error("PLANNING_STAFF_NOT_FOUND");
+      personne.firstName = firstName;
+      personne.lastName = lastName;
     } else {
       const personId = crypto.randomUUID();
-      payload.staff.push({
+      contenu.staff.push({
         id: personId,
         firstName,
         lastName,
@@ -106,104 +106,109 @@ export function applyPlanningStaffMutation(
         endDate: null,
         inactiveSince: null,
       });
-      payload.peopleCapacity.push({
+      contenu.peopleCapacity.push({
         userId: personId,
         countsInMacroCapacity: false,
         weeklySchedule: { ...NEW_STAFF_WEEKLY_SCHEDULE },
       });
     }
-    return parsePlanningPayload(payload);
+    return parsePlanningPayload(contenu);
   }
 
-  if (input.action === "setPersonHidden") {
-    const visibleIds = new Set([...payload.staff.map((person) => person.id), ...activeAccounts]);
-    if (!visibleIds.has(input.id)) throw new Error("PLANNING_USER_NOT_ACTIVE");
-    payload.hiddenPersonIds = input.hidden
-      ? [...new Set([...payload.hiddenPersonIds, input.id])]
-      : payload.hiddenPersonIds.filter((id) => id !== input.id);
-    return parsePlanningPayload(payload);
+  if (saisie.action === "setPersonHidden") {
+    const visibleIds = new Set([
+      ...contenu.staff.map((personne) => personne.id),
+      ...activeAccounts,
+    ]);
+    if (!visibleIds.has(saisie.id)) throw new Error("PLANNING_USER_NOT_ACTIVE");
+    contenu.hiddenPersonIds = saisie.hidden
+      ? [...new Set([...contenu.hiddenPersonIds, saisie.id])]
+      : contenu.hiddenPersonIds.filter((id) => id !== saisie.id);
+    return parsePlanningPayload(contenu);
   }
 
-  const person = payload.staff.find((candidate) => candidate.id === input.id);
-  if (!person) throw new Error("PLANNING_STAFF_NOT_FOUND");
+  const personne = contenu.staff.find((candidat) => candidat.id === saisie.id);
+  if (!personne) throw new Error("PLANNING_STAFF_NOT_FOUND");
 
-  if (input.action === "setStaffEndDate") {
+  if (saisie.action === "setStaffEndDate") {
     if (
-      input.endDate &&
-      (!/^\d{4}-\d{2}-\d{2}$/.test(input.endDate) ||
-        Number.isNaN(new Date(input.endDate + "T12:00:00Z").getTime()) ||
-        new Date(input.endDate + "T12:00:00Z").toISOString().slice(0, 10) !== input.endDate)
+      saisie.endDate &&
+      (!/^\d{4}-\d{2}-\d{2}$/.test(saisie.endDate) ||
+        Number.isNaN(new Date(saisie.endDate + "T12:00:00Z").getTime()) ||
+        new Date(saisie.endDate + "T12:00:00Z").toISOString().slice(0, 10) !== saisie.endDate)
     )
       throw new Error("PLANNING_END_DATE_INVALID");
-    person.endDate = input.endDate;
-    return parsePlanningPayload(payload);
+    personne.endDate = saisie.endDate;
+    return parsePlanningPayload(contenu);
   }
-  if (input.action === "deactivateStaff") {
-    const today = new Date().toISOString().slice(0, 10);
-    person.inactiveSince = today;
-    return parsePlanningPayload(payload);
+  if (saisie.action === "deactivateStaff") {
+    const aujourdhui = new Date().toISOString().slice(0, 10);
+    personne.inactiveSince = aujourdhui;
+    return parsePlanningPayload(contenu);
   }
-  if (input.action === "reactivateStaff") {
-    person.inactiveSince = null;
-    return parsePlanningPayload(payload);
+  if (saisie.action === "reactivateStaff") {
+    personne.inactiveSince = null;
+    return parsePlanningPayload(contenu);
   }
-  if (input.action === "deleteStaff") {
+  if (saisie.action === "deleteStaff") {
     if (
-      person.linkedUserId ||
-      payload.absences.some((absence) => absence.userId === person.id) ||
-      payload.dailyAssignments.some((entry) => entry.userId === person.id) ||
-      payload.actualHours.some((entry) => entry.userId === person.id) ||
-      payload.indirectHours.some((entry) => entry.userId === person.id)
+      personne.linkedUserId ||
+      contenu.absences.some((absence) => absence.userId === personne.id) ||
+      contenu.dailyAssignments.some((entree) => entree.userId === personne.id) ||
+      contenu.actualHours.some((entree) => entree.userId === personne.id) ||
+      contenu.indirectHours.some((entree) => entree.userId === personne.id)
     )
       throw new Error("PLANNING_STAFF_HAS_HISTORY");
-    payload.staff = payload.staff.filter((candidate) => candidate.id !== person.id);
-    payload.peopleCapacity = payload.peopleCapacity.filter((entry) => entry.userId !== person.id);
-    payload.hiddenPersonIds = payload.hiddenPersonIds.filter((id) => id !== person.id);
-    return parsePlanningPayload(payload);
+    contenu.staff = contenu.staff.filter((candidat) => candidat.id !== personne.id);
+    contenu.peopleCapacity = contenu.peopleCapacity.filter(
+      (entree) => entree.userId !== personne.id,
+    );
+    contenu.hiddenPersonIds = contenu.hiddenPersonIds.filter((id) => id !== personne.id);
+    return parsePlanningPayload(contenu);
   }
 
-  const accountId = input.linkedUserId;
+  const accountId = saisie.linkedUserId;
   if (accountId !== null) {
     if (!activeAccounts.has(accountId)) throw new Error("PLANNING_ACCOUNT_NOT_ACTIVE");
     if (
-      payload.staff.some(
-        (candidate) => candidate.id !== person.id && candidate.linkedUserId === accountId,
+      contenu.staff.some(
+        (candidat) => candidat.id !== personne.id && candidat.linkedUserId === accountId,
       )
     )
       throw new Error("PLANNING_ACCOUNT_ALREADY_LINKED");
 
     // Existing account schedules and absences must never disappear after linking.
-    const legacyCapacity = payload.peopleCapacity.find((entry) => entry.userId === accountId);
-    const staffCapacity = payload.peopleCapacity.find((entry) => entry.userId === person.id);
+    const legacyCapacity = contenu.peopleCapacity.find((entree) => entree.userId === accountId);
+    const staffCapacity = contenu.peopleCapacity.find((entree) => entree.userId === personne.id);
     const untouchedNewStaffSchedule =
       staffCapacity &&
       !staffCapacity.countsInMacroCapacity &&
       Object.entries(NEW_STAFF_WEEKLY_SCHEDULE).every(
-        ([day, hours]) =>
-          staffCapacity.weeklySchedule[day as keyof typeof NEW_STAFF_WEEKLY_SCHEDULE] === hours,
+        ([jour, heures]) =>
+          staffCapacity.weeklySchedule[jour as keyof typeof NEW_STAFF_WEEKLY_SCHEDULE] === heures,
       );
     if (legacyCapacity && staffCapacity && !untouchedNewStaffSchedule) {
       throw new Error("PLANNING_STAFF_CAPACITY_CONFLICT");
     }
     const staffAbsenceDays = new Set(
-      payload.absences
-        .filter((absence) => absence.userId === person.id)
+      contenu.absences
+        .filter((absence) => absence.userId === personne.id)
         .map((absence) => absence.date),
     );
     if (
-      payload.absences.some(
+      contenu.absences.some(
         (absence) => absence.userId === accountId && staffAbsenceDays.has(absence.date),
       )
     )
       throw new Error("PLANNING_STAFF_ABSENCE_CONFLICT");
 
     const staffAssignedDates = new Set(
-      payload.dailyAssignments
-        .filter((assignment) => assignment.userId === person.id)
+      contenu.dailyAssignments
+        .filter((assignment) => assignment.userId === personne.id)
         .map((assignment) => assignment.date),
     );
     if (
-      payload.dailyAssignments.some(
+      contenu.dailyAssignments.some(
         (assignment) => assignment.userId === accountId && staffAssignedDates.has(assignment.date),
       )
     ) {
@@ -215,26 +220,26 @@ export function applyPlanningStaffMutation(
       // an older account: move the existing account schedule to the staff ID.
       staffCapacity.countsInMacroCapacity = legacyCapacity.countsInMacroCapacity;
       staffCapacity.weeklySchedule = { ...legacyCapacity.weeklySchedule };
-      payload.peopleCapacity = payload.peopleCapacity.filter((entry) => entry !== legacyCapacity);
+      contenu.peopleCapacity = contenu.peopleCapacity.filter((entree) => entree !== legacyCapacity);
     } else if (legacyCapacity) {
-      legacyCapacity.userId = person.id;
+      legacyCapacity.userId = personne.id;
     }
-    for (const absence of payload.absences) {
-      if (absence.userId === accountId) absence.userId = person.id;
+    for (const absence of contenu.absences) {
+      if (absence.userId === accountId) absence.userId = personne.id;
     }
-    for (const assignment of payload.dailyAssignments) {
-      if (assignment.userId === accountId) assignment.userId = person.id;
+    for (const assignment of contenu.dailyAssignments) {
+      if (assignment.userId === accountId) assignment.userId = personne.id;
     }
   }
-  if (accountId && payload.hiddenPersonIds.includes(accountId)) {
-    payload.hiddenPersonIds = [
-      ...new Set([...payload.hiddenPersonIds.filter((id) => id !== accountId), person.id]),
+  if (accountId && contenu.hiddenPersonIds.includes(accountId)) {
+    contenu.hiddenPersonIds = [
+      ...new Set([...contenu.hiddenPersonIds.filter((id) => id !== accountId), personne.id]),
     ];
   }
-  person.linkedUserId = accountId;
-  return parsePlanningPayload(payload);
+  personne.linkedUserId = accountId;
+  return parsePlanningPayload(contenu);
 }
 
 export function staffIdentityExists(staff: readonly PlanningStaff[], personId: string): boolean {
-  return staff.some((person) => person.id === personId);
+  return staff.some((personne) => personne.id === personId);
 }

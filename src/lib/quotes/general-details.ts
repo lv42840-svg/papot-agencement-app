@@ -23,20 +23,20 @@ export type QuoteGeneralDetailsActor = {
 
 export function updateDraftQuoteGeneralDetails(
   source: NativeQuotesPayload,
-  quoteId: string,
+  idDevis: string,
   detailsInput: QuoteGeneralDetailsInput,
-  actor: QuoteGeneralDetailsActor,
-  now: Date = new Date(),
+  auteur: QuoteGeneralDetailsActor,
+  maintenant: Date = new Date(),
 ) {
-  const payload = structuredClone(parseNativeQuotesPayload(source));
-  const quoteIndex = payload.quotes.findIndex((quote) => quote.id === quoteId);
+  const contenu = structuredClone(parseNativeQuotesPayload(source));
+  const quoteIndex = contenu.quotes.findIndex((quote) => quote.id === idDevis);
   if (quoteIndex < 0) throw new Error("QUOTE_NOT_FOUND");
 
-  const quote = payload.quotes[quoteIndex];
+  const quote = contenu.quotes[quoteIndex];
   if (quote.status !== "DRAFT") throw new Error("QUOTE_NOT_EDITABLE");
 
   const details = quoteGeneralDetailsSchema.parse(detailsInput);
-  const timestamp = now.toISOString();
+  const timestamp = maintenant.toISOString();
   const updated = nativeQuoteRecordSchema.parse({
     ...quote,
     model: parseQuoteModel({
@@ -47,9 +47,9 @@ export function updateDraftQuoteGeneralDetails(
       paymentTerms: details.paymentTerms,
     }),
     updatedAt: timestamp,
-    updatedByName: actor.displayName,
+    updatedByName: auteur.displayName,
   });
 
-  payload.quotes[quoteIndex] = updated;
-  return { payload, focusQuoteId: updated.id };
+  contenu.quotes[quoteIndex] = updated;
+  return { payload: contenu, focusQuoteId: updated.id };
 }

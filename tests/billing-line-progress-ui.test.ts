@@ -8,7 +8,7 @@ describe("Facturation depuis devis et chantier : avancement par ligne", () => {
     expect(view).toContain("Avancement par ligne (%)");
     expect(view).toContain("Avancement précédent");
     expect(view).toContain("cumulativeLinesCents");
-    expect(view).toContain("linePercentages = rows");
+    expect(view).toContain("linePercentages = lignesTableau");
     expect(view).toContain("Avancement cumulé :");
     const editor = readFileSync("src/components/billing-document-editor.tsx", "utf8");
     expect(editor).toContain("Déjà préparé sur ce devis");

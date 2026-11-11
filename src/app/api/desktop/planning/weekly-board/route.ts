@@ -38,67 +38,76 @@ import { assertPlanningWeekEditable, isPlanningWeekPast } from "@/lib/planning/t
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
-function noStoreJson(value: unknown, init?: ResponseInit) {
-  const response = NextResponse.json(value, init);
-  response.headers.set("Cache-Control", "no-store");
-  return response;
+function noStoreJson(valeur: unknown, init?: ResponseInit) {
+  const reponse = NextResponse.json(valeur, init);
+  reponse.headers.set("Cache-Control", "no-store");
+  return reponse;
 }
 
-function sendError(error: unknown) {
+function sendError(erreur: unknown) {
   const code =
-    error instanceof ZodError
+    erreur instanceof ZodError
       ? "PLANNING_WEEK_REQUEST_INVALID"
-      : error instanceof Error
-        ? error.message
+      : erreur instanceof Error
+        ? erreur.message
         : "PLANNING_WEEK_FAILED";
-  const status =
+  const statut =
     desktopRequestErrorStatus(code) ??
     (code.includes("NOT_ACTIVE") || code.includes("CONFLICT") ? 409 : 400);
-  return noStoreJson({ error: code }, { status });
+  return noStoreJson({ error: code }, { status: statut });
 }
 
 async function weeklySnapshot(
-  week: string,
-  context: Awaited<ReturnType<typeof requireModuleRequestContext>>,
+  semaine: string,
+  contexte: Awaited<ReturnType<typeof requireModuleRequestContext>>,
 ) {
   const [planning, chantiers, commercial, quotes, auth, canManage] = await Promise.all([
     createPlanningRepository().load(),
-    createChantiersRepository(context).load(),
+    createChantiersRepository(contexte).load(),
     createCommercialRepository().load(),
     createQuotesRepository().load(),
     readAuthPayload(),
-    hasEffectiveSpecialPermission(context.user, "planning.manage_schedules"),
+    hasEffectiveSpecialPermission(contexte.user, "planning.manage_schedules"),
   ]);
-  const year = Number(week.slice(0, 4));
-  const firmRows = buildFirmGrandPlanningRows(chantiers, planning, year);
+  const annee = Number(semaine.slice(0, 4));
+  const firmRows = buildFirmGrandPlanningRows(chantiers, planning, annee);
   const potentialRows = buildCommercialProvisionRows(
     commercial,
     planning,
-    year,
-    year,
+    annee,
+    annee,
     quotes.quotes,
   );
   // The small board must display the exact totals used in the grand planning.
-  const firm = weekActivityHours(firmRows, week);
-  const firmChantiers = weeklyChantierHours(firmRows, week, "firm", (index) => ({
-    id: firmRows[index].chantierId,
-    name: firmRows[index].name,
+  const firm = weekActivityHours(firmRows, semaine);
+  const firmChantiers = weeklyChantierHours(firmRows, semaine, "firm", (indice) => ({
+    id: firmRows[indice].chantierId,
+    name: firmRows[indice].name,
   }));
-  const provisional = weekActivityHours(potentialRows, week);
-  const provisionalChantiers = weeklyChantierHours(potentialRows, week, "provisional", (index) => ({
-    id: potentialRows[index].caseId,
-    name: potentialRows[index].name,
-  }));
+  const provisional = weekActivityHours(potentialRows, semaine);
+  const provisionalChantiers = weeklyChantierHours(
+    potentialRows,
+    semaine,
+    "provisional",
+    (indice) => ({
+      id: potentialRows[indice].caseId,
+      name: potentialRows[indice].name,
+    }),
+  );
   const allPeople = effectivePlanningPeople(planning, auth.users);
-  const dates = workingDaysOfWeek(week);
-  const people = allPeople.filter(
-    (person) =>
-      !person.hiddenInWeeklyBoard &&
-      (dates.some((date) => personPresentOnDate(person, date)) ||
+  const dates = workingDaysOfWeek(semaine);
+  const personnes = allPeople.filter(
+    (personne) =>
+      !personne.hiddenInWeeklyBoard &&
+      (dates.some((date) => personPresentOnDate(personne, date)) ||
         planning.dailyAssignments.some(
-          (row) => row.userId === person.userId && dates.includes(row.date),
+          (ligneTableau) =>
+            ligneTableau.userId === personne.userId && dates.includes(ligneTableau.date),
         ) ||
-        planning.absences.some((row) => row.userId === person.userId && dates.includes(row.date))),
+        planning.absences.some(
+          (ligneTableau) =>
+            ligneTableau.userId === personne.userId && dates.includes(ligneTableau.date),
+        )),
   );
   const holidays = dates.map((date) => ({
     date,
@@ -107,35 +116,39 @@ async function weeklySnapshot(
   const allSiteNames = new Map(chantiers.chantiers.map((site) => [site.id, site.name]));
   const assignments = planning.dailyAssignments
     .filter(
-      (row) => dates.includes(row.date) && people.some((person) => person.userId === row.userId),
+      (ligneTableau) =>
+        dates.includes(ligneTableau.date) &&
+        personnes.some((personne) => personne.userId === ligneTableau.userId),
     )
-    .map((row) => ({
-      ...row,
-      label: row.chantierId ? (allSiteNames.get(row.chantierId) ?? row.label) : row.label,
+    .map((ligneTableau) => ({
+      ...ligneTableau,
+      label: ligneTableau.chantierId
+        ? (allSiteNames.get(ligneTableau.chantierId) ?? ligneTableau.label)
+        : ligneTableau.label,
     }));
   const absences = planning.absences
-    .filter((row) => dates.includes(row.date))
-    .map((row) => ({
-      ...row,
-      typeLabel: PLANNING_ABSENCE_TYPE_LABELS[row.type],
+    .filter((ligneTableau) => dates.includes(ligneTableau.date))
+    .map((ligneTableau) => ({
+      ...ligneTableau,
+      typeLabel: PLANNING_ABSENCE_TYPE_LABELS[ligneTableau.type],
     }));
   const capacity = buildWeeklyCapacityIndicators(
-    [week],
+    [semaine],
     allPeople,
-    new Map([[week, firm.total]]),
+    new Map([[semaine, firm.total]]),
     planning.absences,
-    new Map([[week, provisional.total]]),
+    new Map([[semaine, provisional.total]]),
   )[0];
   return {
-    week,
+    week: semaine,
     dates,
-    people: people.map((person) => ({
-      userId: person.userId,
-      displayName: person.displayName,
-      countsInMacroCapacity: person.countsInMacroCapacity,
-      weeklySchedule: person.weeklySchedule,
-      endDate: person.endDate,
-      inactiveSince: person.inactiveSince,
+    people: personnes.map((personne) => ({
+      userId: personne.userId,
+      displayName: personne.displayName,
+      countsInMacroCapacity: personne.countsInMacroCapacity,
+      weeklySchedule: personne.weeklySchedule,
+      endDate: personne.endDate,
+      inactiveSince: personne.inactiveSince,
     })),
     sites: chantiers.chantiers
       .filter((site) => site.status === "ACTIVE")
@@ -149,90 +162,92 @@ async function weeklySnapshot(
     firm,
     provisional,
     capacity,
-    editable: context.moduleAccess.canWrite && canManage && !isPlanningWeekPast(week),
+    editable: contexte.moduleAccess.canWrite && canManage && !isPlanningWeekPast(semaine),
   };
 }
 
-export async function GET(request: Request) {
+export async function GET(requete: Request) {
   try {
-    const context = await requireModuleRequestContext("planning", "READ");
-    const week = weeklyBoardWeekSchema.parse(new URL(request.url).searchParams.get("week"));
-    return noStoreJson(await weeklySnapshot(week, context));
-  } catch (error) {
-    return sendError(error);
+    const contexte = await requireModuleRequestContext("planning", "READ");
+    const semaine = weeklyBoardWeekSchema.parse(new URL(requete.url).searchParams.get("week"));
+    return noStoreJson(await weeklySnapshot(semaine, contexte));
+  } catch (erreur) {
+    return sendError(erreur);
   }
 }
 
-export async function POST(request: Request) {
+export async function POST(requete: Request) {
   try {
-    const context = await requireModuleRequestContext("planning", "WRITE");
-    await requireSpecialPermission(context.user, "planning.manage_schedules");
-    const input = z
+    const contexte = await requireModuleRequestContext("planning", "WRITE");
+    await requireSpecialPermission(contexte.user, "planning.manage_schedules");
+    const saisie = z
       .union([weeklyBoardAssignmentSchema, weeklyBoardEntrySchema, weeklyBoardPasteSchema])
-      .parse(await request.json());
-    assertPlanningWeekEditable(input.week);
+      .parse(await requete.json());
+    assertPlanningWeekEditable(saisie.week);
     const [auth, chantiers] = await Promise.all([
       readAuthPayload(),
-      createChantiersRepository(context).load(),
+      createChantiersRepository(contexte).load(),
     ]);
     const activeSites = chantiers.chantiers
       .filter((site) => site.status === "ACTIVE")
       .map((site) => ({ id: site.id, name: site.name }));
-    await createPlanningRepository().mutate((payload) => {
-      const people = effectivePlanningPeople(payload, auth.users);
-      const selectedPerson = people.find((person) => person.userId === input.userId);
+    await createPlanningRepository().mutate((contenu) => {
+      const personnes = effectivePlanningPeople(contenu, auth.users);
+      const selectedPerson = personnes.find((personne) => personne.userId === saisie.userId);
       if (!selectedPerson) throw new Error("PLANNING_USER_NOT_ACTIVE");
-      if (input.action !== "deleteDailyEntry" && !personPresentOnDate(selectedPerson, input.date))
+      if (saisie.action !== "deleteDailyEntry" && !personPresentOnDate(selectedPerson, saisie.date))
         throw new Error("PLANNING_PERSON_NOT_PRESENT");
-      if (input.action === "pasteDailyEntries") {
+      if (saisie.action === "pasteDailyEntries") {
         const scheduled = scheduleHoursForDate(
           selectedPerson.weeklySchedule,
-          new Date(input.date + "T12:00:00Z"),
+          new Date(saisie.date + "T12:00:00Z"),
         );
-        const absence = payload.absences.find(
-          (row) => row.userId === input.userId && row.date === input.date,
+        const absence = contenu.absences.find(
+          (ligneTableau) =>
+            ligneTableau.userId === saisie.userId && ligneTableau.date === saisie.date,
         );
         if (absence && scheduled > 0 && absence.hours >= scheduled) {
           throw new Error("PLANNING_DAY_PERSON_ABSENT");
         }
         return applyWeeklyBoardPaste(
-          payload,
-          input,
-          new Set(people.map((person) => person.userId)),
+          contenu,
+          saisie,
+          new Set(personnes.map((personne) => personne.userId)),
           activeSites,
         );
       }
-      if (input.action !== "setDailyAssignment") {
+      if (saisie.action !== "setDailyAssignment") {
         // The full-day absence rule is enforced server-side, not only by hiding the UI.
-        const person = people.find((person) => person.userId === input.userId);
-        const absence = payload.absences.find(
-          (row) => row.userId === input.userId && row.date === input.date,
+        const personne = personnes.find((personne) => personne.userId === saisie.userId);
+        const absence = contenu.absences.find(
+          (ligneTableau) =>
+            ligneTableau.userId === saisie.userId && ligneTableau.date === saisie.date,
         );
         if (
-          input.action === "saveDailyEntry" &&
-          person &&
+          saisie.action === "saveDailyEntry" &&
+          personne &&
           absence &&
           absence.hours >=
-            scheduleHoursForDate(person.weeklySchedule, new Date(input.date + "T12:00:00Z")) &&
-          scheduleHoursForDate(person.weeklySchedule, new Date(input.date + "T12:00:00Z")) > 0
+            scheduleHoursForDate(personne.weeklySchedule, new Date(saisie.date + "T12:00:00Z")) &&
+          scheduleHoursForDate(personne.weeklySchedule, new Date(saisie.date + "T12:00:00Z")) > 0
         )
           throw new Error("PLANNING_DAY_PERSON_ABSENT");
         return applyWeeklyBoardEntry(
-          payload,
-          input,
-          new Set(people.map((person) => person.userId)),
+          contenu,
+          saisie,
+          new Set(personnes.map((personne) => personne.userId)),
           activeSites,
         );
       }
       return applyDailyAssignment(
-        payload,
-        input,
-        new Set(people.map((person) => person.userId)),
+        contenu,
+        saisie,
+        new Set(personnes.map((personne) => personne.userId)),
         activeSites,
       );
     });
-    return noStoreJson(await weeklySnapshot(input.week, context));
-  } catch (error) {
-    return sendError(error);
+    return noStoreJson(await weeklySnapshot(saisie.week, contexte));
+  } catch (erreur) {
+    return sendError(erreur);
   }
 }

@@ -78,8 +78,8 @@ const paymentTermsOptions = [
   "60 jours fin de mois",
 ] as const;
 
-function isPresetPaymentTerm(value: string): boolean {
-  return paymentTermsOptions.includes(value as (typeof paymentTermsOptions)[number]);
+function isPresetPaymentTerm(valeur: string): boolean {
+  return paymentTermsOptions.includes(valeur as (typeof paymentTermsOptions)[number]);
 }
 
 const errorMessages: Record<string, string> = {
@@ -159,32 +159,32 @@ export function ClientsWorkspace() {
   const searchParams = useSearchParams();
   const requestedFocusId = searchParams.get("focus");
   const [snapshot, setSnapshot] = useState<ClientsSnapshot | null>(null);
-  const [loading, setLoading] = useState(true);
+  const [chargement, setLoading] = useState(true);
   const [busy, setBusy] = useState(false);
-  const [error, setError] = useState<string | null>(null);
+  const [erreur, setError] = useState<string | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
-  const [query, setQuery] = useState("");
+  const [requeteRecherche, setQuery] = useState("");
   const [showArchived, setShowArchived] = useState(false);
   const [selectedId, setSelectedId] = useState<string | null>(requestedFocusId);
   const [mode, setMode] = useState<EditMode>("view");
-  const [draft, setDraft] = useState<ClientDraft>(emptyDraft);
+  const [brouillon, setDraft] = useState<ClientDraft>(emptyDraft);
 
   const load = useCallback(async () => {
     setLoading(true);
     setError(null);
     try {
-      const response = await fetch("/api/desktop/clients", { cache: "no-store" });
-      const body = (await response.json()) as ClientsSnapshot & { error?: string };
-      if (!response.ok) throw new Error(body.error ?? "CLIENTS_LOAD_FAILED");
-      setSnapshot(body);
-      setSelectedId((current) => {
-        const selection = resolveClientWorkspaceSelection(
-          body.payload.clients,
+      const reponse = await fetch("/api/desktop/clients", { cache: "no-store" });
+      const corps = (await reponse.json()) as ClientsSnapshot & { error?: string };
+      if (!reponse.ok) throw new Error(corps.error ?? "CLIENTS_LOAD_FAILED");
+      setSnapshot(corps);
+      setSelectedId((courant) => {
+        const selectionCourante = resolveClientWorkspaceSelection(
+          corps.payload.clients,
           requestedFocusId,
-          current,
+          courant,
         );
-        if (selection.revealArchived) setShowArchived(true);
-        return selection.selectedId;
+        if (selectionCourante.revealArchived) setShowArchived(true);
+        return selectionCourante.selectedId;
       });
     } catch (loadError) {
       const code = loadError instanceof Error ? loadError.message : "CLIENTS_LOAD_FAILED";
@@ -212,43 +212,47 @@ export function ClientsWorkspace() {
     const clients = snapshot?.payload.clients ?? [];
     return clients
       .filter((client) => showArchived || !client.isArchived)
-      .filter((client) => matchesClientSearch(client, query))
+      .filter((client) => matchesClientSearch(client, requeteRecherche))
       .sort((a, b) => {
         if (a.isArchived !== b.isArchived) return a.isArchived ? 1 : -1;
         return clientDisplayName(a).localeCompare(clientDisplayName(b), "fr-FR", {
           sensitivity: "base",
         });
       });
-  }, [query, showArchived, snapshot?.payload.clients]);
+  }, [requeteRecherche, showArchived, snapshot?.payload.clients]);
 
-  async function mutate(body: Record<string, unknown>, successMessage: string) {
+  async function mutate(corps: Record<string, unknown>, successMessage: string) {
     setBusy(true);
     setError(null);
     setNotice(null);
     try {
-      const response = await fetch("/api/desktop/clients", {
+      const reponse = await fetch("/api/desktop/clients", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(body),
+        body: JSON.stringify(corps),
       });
-      const result = (await response.json()) as ClientsSnapshot & {
+      const resultat = (await reponse.json()) as ClientsSnapshot & {
         error?: string;
         lockedBy?: string;
       };
-      if (!response.ok) {
+      if (!reponse.ok) {
         const base =
-          errorMessages[result.error ?? ""] ?? "La fiche client n’a pas pu être enregistrée.";
-        throw new Error(result.lockedBy ? `${base} Poste en cours : ${result.lockedBy}.` : base);
+          errorMessages[resultat.error ?? ""] ?? "La fiche client n’a pas pu être enregistrée.";
+        throw new Error(
+          resultat.lockedBy ? `${base} Poste en cours : ${resultat.lockedBy}.` : base,
+        );
       }
-      setSnapshot(result);
-      if (result.focusClientId) {
-        setSelectedId(result.focusClientId);
-        const client = result.payload.clients.find((item) => item.id === result.focusClientId);
+      setSnapshot(resultat);
+      if (resultat.focusClientId) {
+        setSelectedId(resultat.focusClientId);
+        const client = resultat.payload.clients.find(
+          (element) => element.id === resultat.focusClientId,
+        );
         if (client) setDraft(clientToDraft(client));
       }
       setMode("view");
       setNotice(successMessage);
-      return result;
+      return resultat;
     } catch (mutationError) {
       const message =
         mutationError instanceof Error
@@ -288,13 +292,13 @@ export function ClientsWorkspace() {
     setDraft(emptyDraft());
   }
 
-  function updateDraft<K extends keyof ClientDraft>(key: K, value: ClientDraft[K]) {
-    setDraft((current) => ({ ...current, [key]: value }));
+  function updateDraft<K extends keyof ClientDraft>(cle: K, valeur: ClientDraft[K]) {
+    setDraft((courant) => ({ ...courant, [cle]: valeur }));
   }
 
   function addContact() {
     updateDraft("contacts", [
-      ...draft.contacts,
+      ...brouillon.contacts,
       {
         id: crypto.randomUUID(),
         firstName: "",
@@ -302,16 +306,16 @@ export function ClientsWorkspace() {
         role: "",
         phone: "",
         email: "",
-        isPrimary: draft.contacts.length === 0,
+        isPrimary: brouillon.contacts.length === 0,
       },
     ]);
   }
 
-  function updateContact(index: number, patch: Partial<DraftContact>) {
-    setDraft((current) => ({
-      ...current,
-      contacts: current.contacts.map((contact, contactIndex) => {
-        if (contactIndex !== index) {
+  function updateContact(indice: number, patch: Partial<DraftContact>) {
+    setDraft((courant) => ({
+      ...courant,
+      contacts: courant.contacts.map((contact, contactIndex) => {
+        if (contactIndex !== indice) {
           return patch.isPrimary ? { ...contact, isPrimary: false } : contact;
         }
         return { ...contact, ...patch };
@@ -319,17 +323,19 @@ export function ClientsWorkspace() {
     }));
   }
 
-  function removeContact(index: number) {
+  function removeContact(indice: number) {
     updateDraft(
       "contacts",
-      draft.contacts.filter((_, contactIndex) => contactIndex !== index),
+      brouillon.contacts.filter((_, contactIndex) => contactIndex !== indice),
     );
   }
 
-  async function submit(event: FormEvent<HTMLFormElement>) {
-    event.preventDefault();
-    const contacts = draft.contacts.filter(hasContactContent).map((contact) => ({ ...contact }));
-    const defaultVatRatePercent = Number(draft.defaultVatRatePercent.trim().replace(",", "."));
+  async function submit(evenement: FormEvent<HTMLFormElement>) {
+    evenement.preventDefault();
+    const contacts = brouillon.contacts
+      .filter(hasContactContent)
+      .map((contact) => ({ ...contact }));
+    const defaultVatRatePercent = Number(brouillon.defaultVatRatePercent.trim().replace(",", "."));
     if (
       !Number.isFinite(defaultVatRatePercent) ||
       defaultVatRatePercent < 0 ||
@@ -338,7 +344,7 @@ export function ClientsWorkspace() {
       setError("La TVA par défaut doit être comprise entre 0 et 100 %.");
       return;
     }
-    const fields = { ...draft, contacts, defaultVatRatePercent };
+    const fields = { ...brouillon, contacts, defaultVatRatePercent };
 
     if (mode === "new") {
       await mutate({ action: "create", ...fields }, "Client créé.");
@@ -354,11 +360,11 @@ export function ClientsWorkspace() {
 
   async function archiveSelected() {
     if (!selectedClient) return;
-    const result = await mutate(
+    const resultat = await mutate(
       { action: "archive", clientId: selectedClient.id },
       "Client archivé.",
     );
-    if (result) setShowArchived(true);
+    if (resultat) setShowArchived(true);
   }
 
   async function reactivateSelected() {
@@ -387,7 +393,7 @@ export function ClientsWorkspace() {
         ) : null}
       </header>
 
-      {error ? <div className="clientsAlert clientsAlertError">{error}</div> : null}
+      {erreur ? <div className="clientsAlert clientsAlertError">{erreur}</div> : null}
       {notice ? <div className="clientsAlert clientsAlertSuccess">{notice}</div> : null}
 
       <div className="clientsLayout">
@@ -395,8 +401,8 @@ export function ClientsWorkspace() {
           <div className="clientsSearch">
             <Search size={16} aria-hidden="true" />
             <input
-              value={query}
-              onChange={(event) => setQuery(event.target.value)}
+              value={requeteRecherche}
+              onChange={(evenement) => setQuery(evenement.target.value)}
               placeholder="Rechercher nom, téléphone, e-mail, SIRET, TVA…"
               aria-label="Rechercher un client"
             />
@@ -405,14 +411,14 @@ export function ClientsWorkspace() {
             <input
               type="checkbox"
               checked={showArchived}
-              onChange={(event) => setShowArchived(event.target.checked)}
+              onChange={(evenement) => setShowArchived(evenement.target.checked)}
             />
             Afficher les archivés
           </label>
 
           <div className="clientsList">
-            {loading ? <p className="muted">Chargement…</p> : null}
-            {!loading && visibleClients.length === 0 ? (
+            {chargement ? <p className="muted">Chargement…</p> : null}
+            {!chargement && visibleClients.length === 0 ? (
               <div className="clientsEmpty">
                 <Building2 size={24} aria-hidden="true" />
                 <span>Aucun client correspondant.</span>
@@ -524,25 +530,27 @@ export function ClientsWorkspace() {
                   <label className="clientsField">
                     Type de client
                     <select
-                      value={draft.type}
-                      onChange={(event) => updateDraft("type", event.target.value as ClientType)}
+                      value={brouillon.type}
+                      onChange={(evenement) =>
+                        updateDraft("type", evenement.target.value as ClientType)
+                      }
                       disabled={!editable}
                     >
-                      {Object.entries(typeLabels).map(([value, label]) => (
-                        <option key={value} value={value}>
-                          {label}
+                      {Object.entries(typeLabels).map(([valeur, libelle]) => (
+                        <option key={valeur} value={valeur}>
+                          {libelle}
                         </option>
                       ))}
                     </select>
                   </label>
 
-                  {draft.type === "PARTICULIER" ? (
+                  {brouillon.type === "PARTICULIER" ? (
                     <>
                       <label className="clientsField">
                         Nom
                         <input
-                          value={draft.lastName}
-                          onChange={(event) => updateDraft("lastName", event.target.value)}
+                          value={brouillon.lastName}
+                          onChange={(evenement) => updateDraft("lastName", evenement.target.value)}
                           disabled={!editable}
                           required
                         />
@@ -550,8 +558,8 @@ export function ClientsWorkspace() {
                       <label className="clientsField">
                         Prénom
                         <input
-                          value={draft.firstName}
-                          onChange={(event) => updateDraft("firstName", event.target.value)}
+                          value={brouillon.firstName}
+                          onChange={(evenement) => updateDraft("firstName", evenement.target.value)}
                           disabled={!editable}
                         />
                       </label>
@@ -561,8 +569,10 @@ export function ClientsWorkspace() {
                       <label className="clientsField clientsFieldWide">
                         Nom / raison sociale
                         <input
-                          value={draft.companyName}
-                          onChange={(event) => updateDraft("companyName", event.target.value)}
+                          value={brouillon.companyName}
+                          onChange={(evenement) =>
+                            updateDraft("companyName", evenement.target.value)
+                          }
                           disabled={!editable}
                           required
                         />
@@ -570,8 +580,8 @@ export function ClientsWorkspace() {
                       <label className="clientsField">
                         SIRET
                         <input
-                          value={draft.siret}
-                          onChange={(event) => updateDraft("siret", event.target.value)}
+                          value={brouillon.siret}
+                          onChange={(evenement) => updateDraft("siret", evenement.target.value)}
                           disabled={!editable}
                           inputMode="numeric"
                           placeholder="14 chiffres"
@@ -580,8 +590,8 @@ export function ClientsWorkspace() {
                       <label className="clientsField">
                         N° TVA intracommunautaire
                         <input
-                          value={draft.vatNumber}
-                          onChange={(event) => updateDraft("vatNumber", event.target.value)}
+                          value={brouillon.vatNumber}
+                          onChange={(evenement) => updateDraft("vatNumber", evenement.target.value)}
                           disabled={!editable}
                           placeholder="FR..."
                           autoCapitalize="characters"
@@ -598,40 +608,40 @@ export function ClientsWorkspace() {
                   <label className="clientsField clientsFieldWide">
                     Adresse
                     <input
-                      value={draft.addressLine1}
-                      onChange={(event) => updateDraft("addressLine1", event.target.value)}
+                      value={brouillon.addressLine1}
+                      onChange={(evenement) => updateDraft("addressLine1", evenement.target.value)}
                       disabled={!editable}
                     />
                   </label>
                   <label className="clientsField clientsFieldWide">
                     Complément d’adresse
                     <input
-                      value={draft.addressLine2}
-                      onChange={(event) => updateDraft("addressLine2", event.target.value)}
+                      value={brouillon.addressLine2}
+                      onChange={(evenement) => updateDraft("addressLine2", evenement.target.value)}
                       disabled={!editable}
                     />
                   </label>
                   <label className="clientsField">
                     Code postal
                     <input
-                      value={draft.postalCode}
-                      onChange={(event) => updateDraft("postalCode", event.target.value)}
+                      value={brouillon.postalCode}
+                      onChange={(evenement) => updateDraft("postalCode", evenement.target.value)}
                       disabled={!editable}
                     />
                   </label>
                   <label className="clientsField">
                     Ville
                     <input
-                      value={draft.city}
-                      onChange={(event) => updateDraft("city", event.target.value)}
+                      value={brouillon.city}
+                      onChange={(evenement) => updateDraft("city", evenement.target.value)}
                       disabled={!editable}
                     />
                   </label>
                   <label className="clientsField">
                     Téléphone
                     <input
-                      value={draft.phone}
-                      onChange={(event) => updateDraft("phone", event.target.value)}
+                      value={brouillon.phone}
+                      onChange={(evenement) => updateDraft("phone", evenement.target.value)}
                       disabled={!editable}
                       type="tel"
                     />
@@ -639,8 +649,8 @@ export function ClientsWorkspace() {
                   <label className="clientsField">
                     E-mail
                     <input
-                      value={draft.email}
-                      onChange={(event) => updateDraft("email", event.target.value)}
+                      value={brouillon.email}
+                      onChange={(evenement) => updateDraft("email", evenement.target.value)}
                       disabled={!editable}
                       type="email"
                     />
@@ -657,8 +667,8 @@ export function ClientsWorkspace() {
                   <label className="clientsField">
                     Conditions applicables à ce client
                     <select
-                      value={draft.paymentTerms}
-                      onChange={(event) => updateDraft("paymentTerms", event.target.value)}
+                      value={brouillon.paymentTerms}
+                      onChange={(evenement) => updateDraft("paymentTerms", evenement.target.value)}
                       disabled={!editable}
                     >
                       <option value="">À définir</option>
@@ -667,8 +677,8 @@ export function ClientsWorkspace() {
                           {option}
                         </option>
                       ))}
-                      {draft.paymentTerms && !isPresetPaymentTerm(draft.paymentTerms) ? (
-                        <option value={draft.paymentTerms}>{draft.paymentTerms}</option>
+                      {brouillon.paymentTerms && !isPresetPaymentTerm(brouillon.paymentTerms) ? (
+                        <option value={brouillon.paymentTerms}>{brouillon.paymentTerms}</option>
                       ) : null}
                     </select>
                   </label>
@@ -676,9 +686,9 @@ export function ClientsWorkspace() {
                     TVA par défaut
                     <span className="clientsVatInput">
                       <input
-                        value={draft.defaultVatRatePercent}
-                        onChange={(event) =>
-                          updateDraft("defaultVatRatePercent", event.target.value)
+                        value={brouillon.defaultVatRatePercent}
+                        onChange={(evenement) =>
+                          updateDraft("defaultVatRatePercent", evenement.target.value)
                         }
                         disabled={!editable}
                         inputMode="decimal"
@@ -706,18 +716,18 @@ export function ClientsWorkspace() {
                   ) : null}
                 </div>
 
-                {draft.contacts.length === 0 ? (
+                {brouillon.contacts.length === 0 ? (
                   <p className="muted clientsNoContacts">Aucun contact secondaire renseigné.</p>
                 ) : (
                   <div className="clientsContacts">
-                    {draft.contacts.map((contact, index) => (
+                    {brouillon.contacts.map((contact, indice) => (
                       <div className="clientsContactRow" key={contact.id}>
                         <label className="clientsField">
                           Prénom
                           <input
                             value={contact.firstName}
-                            onChange={(event) =>
-                              updateContact(index, { firstName: event.target.value })
+                            onChange={(evenement) =>
+                              updateContact(indice, { firstName: evenement.target.value })
                             }
                             disabled={!editable}
                           />
@@ -726,8 +736,8 @@ export function ClientsWorkspace() {
                           Nom
                           <input
                             value={contact.lastName}
-                            onChange={(event) =>
-                              updateContact(index, { lastName: event.target.value })
+                            onChange={(evenement) =>
+                              updateContact(indice, { lastName: evenement.target.value })
                             }
                             disabled={!editable}
                           />
@@ -736,7 +746,9 @@ export function ClientsWorkspace() {
                           Fonction
                           <input
                             value={contact.role}
-                            onChange={(event) => updateContact(index, { role: event.target.value })}
+                            onChange={(evenement) =>
+                              updateContact(indice, { role: evenement.target.value })
+                            }
                             disabled={!editable}
                           />
                         </label>
@@ -744,8 +756,8 @@ export function ClientsWorkspace() {
                           Téléphone
                           <input
                             value={contact.phone}
-                            onChange={(event) =>
-                              updateContact(index, { phone: event.target.value })
+                            onChange={(evenement) =>
+                              updateContact(indice, { phone: evenement.target.value })
                             }
                             disabled={!editable}
                             type="tel"
@@ -755,8 +767,8 @@ export function ClientsWorkspace() {
                           E-mail
                           <input
                             value={contact.email}
-                            onChange={(event) =>
-                              updateContact(index, { email: event.target.value })
+                            onChange={(evenement) =>
+                              updateContact(indice, { email: evenement.target.value })
                             }
                             disabled={!editable}
                             type="email"
@@ -766,8 +778,8 @@ export function ClientsWorkspace() {
                           <input
                             type="checkbox"
                             checked={contact.isPrimary}
-                            onChange={(event) =>
-                              updateContact(index, { isPrimary: event.target.checked })
+                            onChange={(evenement) =>
+                              updateContact(indice, { isPrimary: evenement.target.checked })
                             }
                             disabled={!editable}
                           />
@@ -777,7 +789,7 @@ export function ClientsWorkspace() {
                           <button
                             className="iconButton clientsRemoveContact"
                             type="button"
-                            onClick={() => removeContact(index)}
+                            onClick={() => removeContact(indice)}
                             aria-label="Supprimer ce contact"
                             title="Supprimer ce contact"
                           >
@@ -795,8 +807,8 @@ export function ClientsWorkspace() {
                 <label className="clientsField">
                   Informations internes
                   <textarea
-                    value={draft.notes}
-                    onChange={(event) => updateDraft("notes", event.target.value)}
+                    value={brouillon.notes}
+                    onChange={(evenement) => updateDraft("notes", evenement.target.value)}
                     disabled={!editable}
                     rows={4}
                   />

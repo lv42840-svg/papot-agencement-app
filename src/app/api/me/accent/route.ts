@@ -3,19 +3,19 @@ import { getCurrentUser } from "@/lib/auth/session";
 import { mutateAuthPayload } from "@/lib/auth/store";
 import { isAccentKey } from "@/lib/theme/palette";
 
-export async function PATCH(request: Request) {
-  const user = await getCurrentUser();
-  if (!user) return NextResponse.json({ error: "Non authentifié." }, { status: 401 });
-  const body = (await request.json().catch(() => null)) as { accentKey?: string } | null;
-  if (!body?.accentKey || !isAccentKey(body.accentKey)) {
+export async function PATCH(requete: Request) {
+  const utilisateur = await getCurrentUser();
+  if (!utilisateur) return NextResponse.json({ error: "Non authentifié." }, { status: 401 });
+  const corps = (await requete.json().catch(() => null)) as { accentKey?: string } | null;
+  if (!corps?.accentKey || !isAccentKey(corps.accentKey)) {
     return NextResponse.json({ error: "Couleur non autorisée." }, { status: 400 });
   }
-  await mutateAuthPayload(user.id, (payload) => {
-    const target = payload.users.find(
-      (candidate) => candidate.id === user.id && candidate.isActive,
+  await mutateAuthPayload(utilisateur.id, (contenu) => {
+    const cible = contenu.users.find(
+      (candidat) => candidat.id === utilisateur.id && candidat.isActive,
     );
-    if (!target) throw new Error("AUTH_USER_NOT_FOUND");
-    target.accentKey = body.accentKey!;
+    if (!cible) throw new Error("AUTH_USER_NOT_FOUND");
+    cible.accentKey = corps.accentKey!;
   });
   return NextResponse.json({ ok: true });
 }

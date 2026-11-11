@@ -20,12 +20,12 @@ export function DashboardCommercialStats() {
   useEffect(() => {
     let active = true;
     void fetch("/api/desktop/commercial", { cache: "no-store" })
-      .then(async (response) => {
-        if (!response.ok) return null;
-        return (await response.json()) as CommercialDashboardSnapshot;
+      .then(async (reponse) => {
+        if (!reponse.ok) return null;
+        return (await reponse.json()) as CommercialDashboardSnapshot;
       })
-      .then((result) => {
-        if (active && result) setSnapshot(result);
+      .then((resultat) => {
+        if (active && resultat) setSnapshot(resultat);
       })
       .catch(() => undefined);
     return () => {
@@ -35,12 +35,13 @@ export function DashboardCommercialStats() {
 
   const stats = useMemo(() => {
     const cases = snapshot?.payload.cases ?? [];
-    const now = new Date(snapshot?.serverNow ?? Date.now());
+    const maintenant = new Date(snapshot?.serverNow ?? Date.now());
     return {
-      active: cases.filter((item) => !isCommercialClosed(item) && item.status !== "CONFIRMED")
-        .length,
+      active: cases.filter(
+        (element) => !isCommercialClosed(element) && element.status !== "CONFIRMED",
+      ).length,
       actions: cases.filter(
-        (item) => !isCommercialClosed(item) && commercialNeedsFollowUp(item, now),
+        (element) => !isCommercialClosed(element) && commercialNeedsFollowUp(element, maintenant),
       ).length,
     };
   }, [snapshot]);

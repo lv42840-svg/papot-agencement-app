@@ -4,7 +4,7 @@ import { useState, type ReactNode } from "react";
 import { MonthlyLaborCostsWorkspace } from "@/components/monthly-labor-costs-workspace";
 import { PayrollPreparationWorkspace } from "@/components/payroll-preparation-workspace";
 
-export function HeuresTabs({ hours }: { hours: ReactNode }) {
+export function HeuresTabs({ hours: heures }: { hours: ReactNode }) {
   const [tab, setTab] = useState<"actual" | "monthly" | "preparation">("actual");
 
   return (
@@ -35,7 +35,7 @@ export function HeuresTabs({ hours }: { hours: ReactNode }) {
         </button>
       </nav>
       {tab === "actual" ? (
-        hours
+        heures
       ) : tab === "monthly" ? (
         <MonthlyLaborCostsWorkspace />
       ) : (

@@ -47,11 +47,12 @@ export function DesktopSidebar({
   canManagePermissions: boolean;
 }) {
   const pathname = usePathname();
-  const [collapsed, setCollapsed] = useState(false);
+  const [replie, setCollapsed] = useState(false);
   const allowed = new Set(allowedModules);
   const visibleNavigation = desktopNavigation.filter(
-    (item) =>
-      (!item.moduleKey || allowed.has(item.moduleKey)) && (!item.adminOnly || canManagePermissions),
+    (element) =>
+      (!element.moduleKey || allowed.has(element.moduleKey)) &&
+      (!element.adminOnly || canManagePermissions),
   );
 
   useEffect(() => {
@@ -74,16 +75,16 @@ export function DesktopSidebar({
   }, []);
 
   function toggleSidebar() {
-    setCollapsed((current) => {
-      const next = !current;
-      window.localStorage.setItem(STORAGE_KEY, next ? "1" : "0");
-      return next;
+    setCollapsed((courant) => {
+      const suivant = !courant;
+      window.localStorage.setItem(STORAGE_KEY, suivant ? "1" : "0");
+      return suivant;
     });
   }
 
   return (
     <>
-      <aside className={`desktopSidebarV2${collapsed ? " isCollapsed" : ""}`}>
+      <aside className={`desktopSidebarV2${replie ? " isCollapsed" : ""}`}>
         <div className="desktopBrandV2">
           <img
             className="desktopBrandLogoV2"
@@ -98,10 +99,10 @@ export function DesktopSidebar({
           type="button"
           className="desktopSidebarToggle"
           onClick={toggleSidebar}
-          aria-label={collapsed ? "Déployer le menu" : "Réduire le menu"}
-          title={collapsed ? "Déployer le menu" : "Réduire le menu"}
+          aria-label={replie ? "Déployer le menu" : "Réduire le menu"}
+          title={replie ? "Déployer le menu" : "Réduire le menu"}
         >
-          {collapsed ? (
+          {replie ? (
             <PanelLeftOpen size={15} aria-hidden="true" />
           ) : (
             <PanelLeftClose size={15} aria-hidden="true" />
@@ -109,9 +110,9 @@ export function DesktopSidebar({
         </button>
 
         <nav className="desktopNavV2" aria-label="Navigation principale">
-          {visibleNavigation.map((item) => {
-            const { label, href } = item;
-            const Icon = navigationIcons[item.icon];
+          {visibleNavigation.map((element) => {
+            const { label: libelle, href } = element;
+            const Icon = navigationIcons[element.icon];
             const active =
               href === "/desktop-ready"
                 ? pathname === href
@@ -120,23 +121,23 @@ export function DesktopSidebar({
             return href ? (
               <Link
                 href={href}
-                key={label}
+                key={libelle}
                 className={active ? "desktopNavActive" : undefined}
                 aria-current={active ? "page" : undefined}
-                title={collapsed ? label : undefined}
+                title={replie ? libelle : undefined}
               >
                 <Icon size={18} aria-hidden="true" />
-                <span className="desktopNavLabel">{label}</span>
+                <span className="desktopNavLabel">{libelle}</span>
               </Link>
             ) : (
               <span
                 className="desktopNavDisabled"
-                key={label}
+                key={libelle}
                 aria-disabled="true"
-                title={collapsed ? `${label} · À venir` : undefined}
+                title={replie ? `${libelle} · À venir` : undefined}
               >
                 <Icon size={18} aria-hidden="true" />
-                <span className="desktopNavLabel">{label}</span>
+                <span className="desktopNavLabel">{libelle}</span>
                 <small>À venir</small>
               </span>
             );

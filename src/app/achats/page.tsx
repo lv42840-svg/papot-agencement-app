@@ -10,10 +10,10 @@ export default async function PurchasesPage({
   searchParams: Promise<{ chantierId?: string }>;
 }) {
   await requireModuleRequestContext("purchases", "READ");
-  const params = await searchParams;
+  const parametres = await searchParams;
   return (
     <DesktopAppShell>
-      <PurchaseOrdersWorkspace chantierId={params.chantierId} />
+      <PurchaseOrdersWorkspace chantierId={parametres.chantierId} />
     </DesktopAppShell>
   );
 }

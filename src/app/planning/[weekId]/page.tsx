@@ -6,16 +6,16 @@ import { weeklyBoardWeekSchema } from "@/lib/planning/weekly-board";
 import { isoWeekKey } from "@/lib/planning/time-markers";
 
 export default async function PlanningWeekPage({
-  params,
+  params: parametres,
 }: {
   params: Promise<{ weekId: string }>;
 }) {
-  const [{ weekId }] = await Promise.all([params, requireUser()]);
-  const parsed = weeklyBoardWeekSchema.safeParse(weekId);
-  if (!parsed.success) redirect(`/planning/${isoWeekKey(new Date())}`);
+  const [{ weekId }] = await Promise.all([parametres, requireUser()]);
+  const analyse = weeklyBoardWeekSchema.safeParse(weekId);
+  if (!analyse.success) redirect(`/planning/${isoWeekKey(new Date())}`);
   return (
     <DesktopAppShell>
-      <WeeklyTeamBoard week={parsed.data} />
+      <WeeklyTeamBoard week={analyse.data} />
     </DesktopAppShell>
   );
 }

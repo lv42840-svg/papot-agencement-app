@@ -3,12 +3,12 @@ import type { LibrarySnapshot } from "./storage";
 
 export interface LibraryRepository {
   load(): Promise<LibrarySnapshot>;
-  open(leaseId: string): Promise<OpenLibraryResult>;
-  save(params: {
+  open(idBail: string): Promise<OpenLibraryResult>;
+  save(parametres: {
     leaseId: string;
     expectedVersion: number;
     payload: unknown;
   }): Promise<SaveLibraryEditResult>;
-  renew(leaseId: string): Promise<LibraryEditLock>;
-  release(leaseId: string): Promise<boolean>;
+  renew(idBail: string): Promise<LibraryEditLock>;
+  release(idBail: string): Promise<boolean>;
 }

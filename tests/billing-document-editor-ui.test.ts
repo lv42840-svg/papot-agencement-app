@@ -13,7 +13,7 @@ describe("facturation: éditeur identique au parcours devis", () => {
     const siteBilling = readFileSync("src/components/chantier-billing-tab.tsx", "utf8");
     expect(site).toContain("ChantierBillingTab");
     expect(siteBilling).toContain("/facturation?chantierId=");
-    expect(page).toContain("<BillingDocumentEditor draftId={draftId} />");
+    expect(page).toContain("<BillingDocumentEditor draftId={idBrouillon} />");
   });
 
   it("propose directement le pourcentage global pour un acompte et par ligne pour une situation", () => {
@@ -22,19 +22,19 @@ describe("facturation: éditeur identique au parcours devis", () => {
     expect(ui).toContain('useState<"AMOUNT" | "PERCENT" | "LINES">("PERCENT")');
     expect(ui).toContain('setMode(e.target.value === "PROGRESS" ? "LINES" : "PERCENT")');
     expect(ui).toContain("Avancement par ligne (%)");
-    expect(ui).toContain("parseBillingPercentageInput(value)");
+    expect(ui).toContain("parseBillingPercentageInput(valeur)");
     expect(ui).toContain("Ex. 30 (à saisir)");
-    expect(ui).not.toContain('Number(value.replace(",", "."))');
+    expect(ui).not.toContain('Number(valeur.replace(",", "."))');
     expect(ui).toContain("router.push(`/facturation/");
   });
 
   it("signale avant envoi une situation inférieure aux acomptes déjà préparés", () => {
     const ui = readFileSync("src/components/billing-workspace.tsx", "utf8");
-    expect(ui).toContain("calculateLineProgress(data.payload, active, enteredLineRows)");
+    expect(ui).toContain("calculateLineProgress(donnees.payload, active, enteredLineRows)");
     expect(ui).toContain("BILLING_PROGRESS_TAX_ALLOCATION_UNAVAILABLE");
     expect(ui).toContain("Avancement cumulé insuffisant");
     expect(ui).toContain("Boolean(progressPreviewError)");
-    expect(ui).toContain("const rows = enteredLineRows;");
+    expect(ui).toContain("const lignesTableau = enteredLineRows;");
   });
 
   it("crée depuis le chantier et présente les projets en tableau filtrable", () => {
@@ -47,7 +47,7 @@ describe("facturation: éditeur identique au parcours devis", () => {
     expect(ui).toContain("Nouvelle facture depuis chantier");
     expect(ui).toContain("Projets de factures");
     expect(ui).toContain('aria-label="Choisir un chantier à facturer"');
-    expect(ui).toContain("filterBillingProjects(drafts");
+    expect(ui).toContain("filterBillingProjects(brouillons");
     expect(ui).toContain('aria-label="Filtrer par statut"');
     expect(ui).toContain('aria-label="Filtrer par chantier"');
     expect(ui).toContain('aria-label="Trier les projets de factures"');

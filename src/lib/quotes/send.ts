@@ -22,32 +22,32 @@ type PreparedQuote = {
   quote: NativeQuoteRecord;
 };
 
-function prepareDraftQuote(source: NativeQuotesPayload, quoteId: string): PreparedQuote {
-  const payload = structuredClone(parseNativeQuotesPayload(source));
-  normalizeQuotePricingAfterModelMutation(payload, quoteId);
+function prepareDraftQuote(source: NativeQuotesPayload, idDevis: string): PreparedQuote {
+  const contenu = structuredClone(parseNativeQuotesPayload(source));
+  normalizeQuotePricingAfterModelMutation(contenu, idDevis);
 
-  const quoteIndex = payload.quotes.findIndex((quote) => quote.id === quoteId);
+  const quoteIndex = contenu.quotes.findIndex((quote) => quote.id === idDevis);
   if (quoteIndex < 0) throw new Error("QUOTE_NOT_FOUND");
 
-  const quote = payload.quotes[quoteIndex];
+  const quote = contenu.quotes[quoteIndex];
   if (quote.status !== "DRAFT") throw new Error("QUOTE_NOT_EDITABLE");
 
   assertQuotePricingIntegrity(quote.model.items, quote.pricingConfig);
   const pricing = calculateQuoteAdjustedPricing(quote.model.items, quote.pricingConfig);
   if (pricing.warnings.length > 0) throw new Error("QUOTE_PRICING_REVIEW_REQUIRED");
 
-  return { payload, quoteIndex, quote };
+  return { payload: contenu, quoteIndex, quote };
 }
 
-function prepareFrozenQuote(source: NativeQuotesPayload, quoteId: string): PreparedQuote {
-  const payload = structuredClone(parseNativeQuotesPayload(source));
-  const quoteIndex = payload.quotes.findIndex((quote) => quote.id === quoteId);
+function prepareFrozenQuote(source: NativeQuotesPayload, idDevis: string): PreparedQuote {
+  const contenu = structuredClone(parseNativeQuotesPayload(source));
+  const quoteIndex = contenu.quotes.findIndex((quote) => quote.id === idDevis);
   if (quoteIndex < 0) throw new Error("QUOTE_NOT_FOUND");
-  const quote = payload.quotes[quoteIndex];
+  const quote = contenu.quotes[quoteIndex];
   if (quote.status !== "FROZEN" || !quote.finalPdf) {
     throw new Error("QUOTE_NOT_FROZEN");
   }
-  return { payload, quoteIndex, quote };
+  return { payload: contenu, quoteIndex, quote };
 }
 
 function assertFollowUpDate(followUpDate: string) {
@@ -76,14 +76,14 @@ function result(prepared: PreparedQuote, updated: NativeQuoteRecord) {
 
 export function markNativeQuoteValidatedWithFinalPdf(
   source: NativeQuotesPayload,
-  quoteId: string,
+  idDevis: string,
   finalPdf: QuoteFinalPdf,
-  actor: QuoteSendActor,
-  now: Date = new Date(),
+  auteur: QuoteSendActor,
+  maintenant: Date = new Date(),
 ): { payload: NativeQuotesPayload; focusQuoteId: string; commercialCaseId: string } {
-  const prepared = prepareDraftQuote(source, quoteId);
+  const prepared = prepareDraftQuote(source, idDevis);
   assertFinalPdfMatchesQuote(prepared.quote, finalPdf);
-  const timestamp = now.toISOString();
+  const timestamp = maintenant.toISOString();
   const updated = nativeQuoteRecordSchema.parse({
     ...prepared.quote,
     status: "FROZEN",
@@ -91,21 +91,21 @@ export function markNativeQuoteValidatedWithFinalPdf(
     followUpDate: null,
     finalPdf,
     updatedAt: timestamp,
-    updatedByName: actor.displayName,
+    updatedByName: auteur.displayName,
   });
   return result(prepared, updated);
 }
 
 export function markNativeQuoteSent(
   source: NativeQuotesPayload,
-  quoteId: string,
+  idDevis: string,
   followUpDate: string,
-  actor: QuoteSendActor,
-  now: Date = new Date(),
+  auteur: QuoteSendActor,
+  maintenant: Date = new Date(),
 ): { payload: NativeQuotesPayload; focusQuoteId: string; commercialCaseId: string } {
   assertFollowUpDate(followUpDate);
-  const prepared = prepareDraftQuote(source, quoteId);
-  const timestamp = now.toISOString();
+  const prepared = prepareDraftQuote(source, idDevis);
+  const timestamp = maintenant.toISOString();
   const updated = nativeQuoteRecordSchema.parse({
     ...prepared.quote,
     status: "SENT",
@@ -113,23 +113,23 @@ export function markNativeQuoteSent(
     followUpDate,
     finalPdf: null,
     updatedAt: timestamp,
-    updatedByName: actor.displayName,
+    updatedByName: auteur.displayName,
   });
   return result(prepared, updated);
 }
 
 export function markNativeQuoteSentWithFinalPdf(
   source: NativeQuotesPayload,
-  quoteId: string,
+  idDevis: string,
   followUpDate: string,
   finalPdf: QuoteFinalPdf,
-  actor: QuoteSendActor,
-  now: Date = new Date(),
+  auteur: QuoteSendActor,
+  maintenant: Date = new Date(),
 ): { payload: NativeQuotesPayload; focusQuoteId: string; commercialCaseId: string } {
   assertFollowUpDate(followUpDate);
-  const prepared = prepareDraftQuote(source, quoteId);
+  const prepared = prepareDraftQuote(source, idDevis);
   assertFinalPdfMatchesQuote(prepared.quote, finalPdf);
-  const timestamp = now.toISOString();
+  const timestamp = maintenant.toISOString();
   const updated = nativeQuoteRecordSchema.parse({
     ...prepared.quote,
     status: "SENT",
@@ -137,28 +137,28 @@ export function markNativeQuoteSentWithFinalPdf(
     followUpDate,
     finalPdf,
     updatedAt: timestamp,
-    updatedByName: actor.displayName,
+    updatedByName: auteur.displayName,
   });
   return result(prepared, updated);
 }
 
 export function markFrozenNativeQuoteSent(
   source: NativeQuotesPayload,
-  quoteId: string,
+  idDevis: string,
   followUpDate: string,
-  actor: QuoteSendActor,
-  now: Date = new Date(),
+  auteur: QuoteSendActor,
+  maintenant: Date = new Date(),
 ): { payload: NativeQuotesPayload; focusQuoteId: string; commercialCaseId: string } {
   assertFollowUpDate(followUpDate);
-  const prepared = prepareFrozenQuote(source, quoteId);
-  const timestamp = now.toISOString();
+  const prepared = prepareFrozenQuote(source, idDevis);
+  const timestamp = maintenant.toISOString();
   const updated = nativeQuoteRecordSchema.parse({
     ...prepared.quote,
     status: "SENT",
     sentAt: timestamp,
     followUpDate,
     updatedAt: timestamp,
-    updatedByName: actor.displayName,
+    updatedByName: auteur.displayName,
   });
   return result(prepared, updated);
 }

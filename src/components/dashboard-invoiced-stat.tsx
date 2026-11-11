@@ -10,26 +10,26 @@ const euros = new Intl.NumberFormat("fr-FR", {
   currency: "EUR",
   maximumFractionDigits: 0,
 });
-const amount = (value: number | null) =>
-  value === null ? "Non disponible" : euros.format(value / 100);
+const montant = (valeur: number | null) =>
+  valeur === null ? "Non disponible" : euros.format(valeur / 100);
 
 export function DashboardInvoicedStat() {
   const [summary, setSummary] = useState<IssuedInvoiceSummary | null>(null);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState("");
+  const [chargement, setLoading] = useState(true);
+  const [erreur, setError] = useState("");
 
   useEffect(() => {
     const controller = new AbortController();
     void (async () => {
       try {
-        const response = await fetch("/api/desktop/dashboard/invoiced-summary", {
+        const reponse = await fetch("/api/desktop/dashboard/invoiced-summary", {
           cache: "no-store",
           signal: controller.signal,
         });
-        if (response.status === 403) throw new Error("Accès Pilotage et Facturation requis.");
-        if (!response.ok) throw new Error("Chiffre d'affaires indisponible.");
-        const result = (await response.json()) as IssuedInvoiceSummary;
-        if (!controller.signal.aborted) setSummary(result);
+        if (reponse.status === 403) throw new Error("Accès Pilotage et Facturation requis.");
+        if (!reponse.ok) throw new Error("Chiffre d'affaires indisponible.");
+        const resultat = (await reponse.json()) as IssuedInvoiceSummary;
+        if (!controller.signal.aborted) setSummary(resultat);
       } catch (cause) {
         if (!controller.signal.aborted) {
           setError(cause instanceof Error ? cause.message : "Facturation indisponible.");
@@ -48,17 +48,17 @@ export function DashboardInvoicedStat() {
       </span>
       <div className="dashboardInvoicedBody">
         <strong className="dashboardInvoicedTitle">Chiffre d&apos;affaires facturé HT</strong>
-        {loading ? <small>Chargement…</small> : null}
-        {error ? <small role="status">{error}</small> : null}
+        {chargement ? <small>Chargement…</small> : null}
+        {erreur ? <small role="status">{erreur}</small> : null}
         {summary ? (
           <>
             <div className="dashboardInvoicedLine">
               <span>Mois {summary.month}</span>
-              <strong>{amount(summary.monthly.amountHtCents)}</strong>
+              <strong>{montant(summary.monthly.amountHtCents)}</strong>
             </div>
             <div className="dashboardInvoicedLine">
               <span>Année {summary.year}</span>
-              <strong>{amount(summary.yearly.amountHtCents)}</strong>
+              <strong>{montant(summary.yearly.amountHtCents)}</strong>
             </div>
             <div className="dashboardInvoicedLine">
               <span>Marge réelle du mois</span>

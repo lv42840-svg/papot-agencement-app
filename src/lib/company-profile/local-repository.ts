@@ -12,9 +12,9 @@ export function createLocalCompanyProfileRepository(): CompanyProfileRepository 
       return readLocalSnapshot(RESOURCE_KEY, parseCompanyProfile).payload;
     },
 
-    async replace(profile: CompanyProfile) {
-      const saved = await replaceLocalSnapshot(RESOURCE_KEY, parseCompanyProfile, profile);
-      return saved.payload;
+    async replace(profil: CompanyProfile) {
+      const sauvegarde = await replaceLocalSnapshot(RESOURCE_KEY, parseCompanyProfile, profil);
+      return sauvegarde.payload;
     },
   };
 }

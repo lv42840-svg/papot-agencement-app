@@ -10,13 +10,13 @@ type EntryAttachmentRuntimeContext = {
 };
 
 export async function createEntryAttachmentTransport(
-  context: EntryAttachmentRuntimeContext,
+  contexte: EntryAttachmentRuntimeContext,
 ): Promise<EntryAttachmentTransport> {
-  const store = getServerFileStore();
-  await store.assertReady();
+  const stockage = getServerFileStore();
+  await stockage.assertReady();
 
   return {
-    store,
-    displayName: context.owner.displayName,
+    store: stockage,
+    displayName: contexte.owner.displayName,
   };
 }

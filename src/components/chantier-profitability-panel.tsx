@@ -20,21 +20,21 @@ const numberFormatter = new Intl.NumberFormat("fr-FR", {
   maximumFractionDigits: 2,
 });
 
-function money(value: number | null): string {
-  return value === null ? "Non disponible" : moneyFormatter.format(value / 100);
+function money(valeur: number | null): string {
+  return valeur === null ? "Non disponible" : moneyFormatter.format(valeur / 100);
 }
 
-function percent(value: number | null): string {
-  return value === null ? "" : numberFormatter.format(value) + " %";
+function percent(valeur: number | null): string {
+  return valeur === null ? "" : numberFormatter.format(valeur) + " %";
 }
 
-function hours(value: number): string {
-  return numberFormatter.format(value) + " h";
+function hours(valeur: number): string {
+  return numberFormatter.format(valeur) + " h";
 }
 
-function tone(value: number | null): string {
-  if (value === null) return "isNeutral";
-  return value < 0 ? "isNegative" : "isPositive";
+function tone(valeur: number | null): string {
+  if (valeur === null) return "isNeutral";
+  return valeur < 0 ? "isNegative" : "isPositive";
 }
 
 export function ChantierProfitabilityPanel({
@@ -52,7 +52,7 @@ export function ChantierProfitabilityPanel({
   actualLaborCostProvisional?: boolean;
   committedPurchasesCents?: number | null;
 }) {
-  const result = calculateChantierProfitability(
+  const resultat = calculateChantierProfitability(
     chantier,
     commercialCase,
     quotes,
@@ -70,7 +70,7 @@ export function ChantierProfitabilityPanel({
         </div>
       </header>
 
-      {result.missingRetainedQuoteIds.length > 0 ? (
+      {resultat.missingRetainedQuoteIds.length > 0 ? (
         <div className="chantierProfitabilityWarning">
           <AlertTriangle size={15} />
           Un devis retenu n&apos;est plus résolu. Les montants globaux sont masqués pour éviter un
@@ -82,45 +82,45 @@ export function ChantierProfitabilityPanel({
       <div className="chantierProfitabilityCards">
         <Metric
           label="Vendu prévu HT"
-          value={money(result.soldCents)}
+          value={money(resultat.soldCents)}
           detail={
-            result.soldCents === null
+            resultat.soldCents === null
               ? "Aucun devis natif retenu exploitable"
-              : result.retainedQuotes.length + " devis / TS retenu(s)"
+              : resultat.retainedQuotes.length + " devis / TS retenu(s)"
           }
         />
         <Metric
           label="Achats et frais prévus (hors heures)"
-          value={money(result.plannedDisbursementCents)}
+          value={money(resultat.plannedDisbursementCents)}
           detail={
-            result.plannedDisbursementCents === null
+            resultat.plannedDisbursementCents === null
               ? "Coûts prévus incomplets, aucune estimation inventée"
               : "Calculé depuis les devis retenus"
           }
         />
         <Metric
           label="Coût des heures prévues"
-          value={money(result.plannedLaborCostCents)}
+          value={money(resultat.plannedLaborCostCents)}
           detail={
-            result.plannedLaborCostCents === null
+            resultat.plannedLaborCostCents === null
               ? "Taux horaire manquant ou nul dans un devis : coût à compléter"
               : "BE, atelier et pose valorisés au taux du devis"
           }
         />
         <Metric
           label="Coût total prévu"
-          value={money(result.plannedTotalCostCents)}
+          value={money(resultat.plannedTotalCostCents)}
           detail="Achats, frais et heures du devis"
         />
         <Metric
           label="Marge prévue"
-          value={money(result.plannedMarginCents)}
+          value={money(resultat.plannedMarginCents)}
           detail={
-            result.plannedMarginCents === null
+            resultat.plannedMarginCents === null
               ? "Non calculable avec les données actuelles"
-              : percent(result.plannedMarginPercent) + " · heures déjà déduites"
+              : percent(resultat.plannedMarginPercent) + " · heures déjà déduites"
           }
-          className={tone(result.plannedMarginCents)}
+          className={tone(resultat.plannedMarginCents)}
         />
       </div>
 
@@ -128,16 +128,16 @@ export function ChantierProfitabilityPanel({
       <div className="chantierProfitabilityCards">
         <Metric
           label="Facturé client HT"
-          value={money(result.actualRevenueCents)}
+          value={money(resultat.actualRevenueCents)}
           detail={
-            result.actualRevenueCents === null
+            resultat.actualRevenueCents === null
               ? "Factures clients à raccorder à la comptabilité"
               : "Factures émises nettes des avoirs"
           }
         />
         <Metric
           label="Achats et frais réels HT"
-          value={money(result.actualPurchaseCostCents)}
+          value={money(resultat.actualPurchaseCostCents)}
           detail="En attente du rapprochement Pennylane : factures fournisseurs validées"
         />
         <Metric
@@ -146,9 +146,9 @@ export function ChantierProfitabilityPanel({
               ? "Coût des heures réalisées · estimé"
               : "Coût des heures réalisées"
           }
-          value={money(result.actualLaborCostCents)}
+          value={money(resultat.actualLaborCostCents)}
           detail={
-            result.actualLaborCostCents === null
+            resultat.actualLaborCostCents === null
               ? "Coût employeur manquant pour un mois clos ou son mois précédent, ou accès Paie requis"
               : actualLaborCostProvisional
                 ? "Mois en cours valorisé au taux du mois précédent"
@@ -157,14 +157,14 @@ export function ChantierProfitabilityPanel({
         />
         <Metric
           label="Coût total réel"
-          value={money(result.actualTotalCostCents)}
+          value={money(resultat.actualTotalCostCents)}
           detail="Disponible après validation des achats facturés"
         />
         <Metric
           label="Marge réelle"
-          value={money(result.actualMarginCents)}
+          value={money(resultat.actualMarginCents)}
           detail="Non disponible avant rapprochement des factures"
-          className={tone(result.actualMarginCents) + " isStrong"}
+          className={tone(resultat.actualMarginCents) + " isStrong"}
         />
       </div>
       <p className="chantierProfitabilityNote">
@@ -177,33 +177,33 @@ export function ChantierProfitabilityPanel({
       <div className="chantierProfitabilityCards">
         <Metric
           label="Heures réalisées + BC engagés"
-          value={money(result.knownCostCommitmentsCents)}
+          value={money(resultat.knownCostCommitmentsCents)}
           detail="Heures au coût employeur et BC HT, sans les assimiler à des factures"
         />
         <Metric
           label="Budget total restant à couvrir"
-          value={money(result.remainingCostBudgetCents)}
+          value={money(resultat.remainingCostBudgetCents)}
           detail="Budget total du devis moins heures réalisées et BC engagés ; reste à produire non inclus"
-          className={tone(result.remainingCostBudgetCents)}
+          className={tone(resultat.remainingCostBudgetCents)}
         />
         <Metric
           label="Budget heures restant"
-          value={money(result.remainingLaborBudgetCents)}
+          value={money(resultat.remainingLaborBudgetCents)}
           detail="Coût des heures prévu moins coût des heures effectivement saisies"
-          className={tone(result.remainingLaborBudgetCents)}
+          className={tone(resultat.remainingLaborBudgetCents)}
         />
       </div>
-      {result.remainingCostBudgetCents !== null && result.remainingCostBudgetCents < 0 ? (
+      {resultat.remainingCostBudgetCents !== null && resultat.remainingCostBudgetCents < 0 ? (
         <div className="chantierProfitabilityWarning" role="alert">
           <AlertTriangle size={15} />
-          Dépassement du budget total de coûts de {money(-result.remainingCostBudgetCents)}
+          Dépassement du budget total de coûts de {money(-resultat.remainingCostBudgetCents)}
           avant même les travaux et achats restant à réaliser.
         </div>
       ) : null}
-      {result.remainingLaborBudgetCents !== null && result.remainingLaborBudgetCents < 0 ? (
+      {resultat.remainingLaborBudgetCents !== null && resultat.remainingLaborBudgetCents < 0 ? (
         <div className="chantierProfitabilityWarning" role="alert">
           <AlertTriangle size={15} />
-          Dépassement du budget main-d&apos;œuvre de {money(-result.remainingLaborBudgetCents)}.
+          Dépassement du budget main-d&apos;œuvre de {money(-resultat.remainingLaborBudgetCents)}.
         </div>
       ) : null}
       <p className="chantierProfitabilityNote">
@@ -227,21 +227,25 @@ export function ChantierProfitabilityPanel({
             subtitle="BE, atelier et pose des devis / TS retenus, comparés au temps réellement saisi."
           />
           <div className="chantierProfitabilityRows">
-            <HoursRow label="BE" planned={result.plannedHours.be} actual={result.actualHours.be} />
+            <HoursRow
+              label="BE"
+              planned={resultat.plannedHours.be}
+              actual={resultat.actualHours.be}
+            />
             <HoursRow
               label="Atelier"
-              planned={result.plannedHours.workshop}
-              actual={result.actualHours.workshop}
+              planned={resultat.plannedHours.workshop}
+              actual={resultat.actualHours.workshop}
             />
             <HoursRow
               label="Pose"
-              planned={result.plannedHours.install}
-              actual={result.actualHours.install}
+              planned={resultat.plannedHours.install}
+              actual={resultat.actualHours.install}
             />
             <HoursRow
               label="Total"
-              planned={result.plannedHours.total}
-              actual={result.actualHours.total}
+              planned={resultat.plannedHours.total}
+              actual={resultat.actualHours.total}
               total
             />
           </div>
@@ -256,29 +260,30 @@ export function ChantierProfitabilityPanel({
           <div className="chantierProfitabilityRows">
             <CostRow
               label="Budget d'achats identifiés HT"
-              value={result.plannedPurchasesCents}
+              value={resultat.plannedPurchasesCents}
               missing="Budget incomplet : vérifier les composants non chiffrés ou non classés"
               total
             />
             <CostRow
               label="Achats engagés (BC) HT"
-              value={result.committedPurchasesCents}
+              value={resultat.committedPurchasesCents}
               missing="Accès au module Achats requis"
             />
             <CostRow
               label="Écart engagé - prévu HT"
-              value={result.purchaseBudgetOverrunCents}
+              value={resultat.purchaseBudgetOverrunCents}
               missing="Écart indisponible si le devis ou les BC sont incomplets"
             />
-            {result.purchaseBudgetOverrunCents !== null && result.purchaseBudgetOverrunCents > 0 ? (
+            {resultat.purchaseBudgetOverrunCents !== null &&
+            resultat.purchaseBudgetOverrunCents > 0 ? (
               <div className="chantierProfitabilityWarning">
                 <AlertTriangle size={15} />
-                Dépassement du budget achats : {money(result.purchaseBudgetOverrunCents)} HT
+                Dépassement du budget achats : {money(resultat.purchaseBudgetOverrunCents)} HT
               </div>
             ) : null}
           </div>
           <div style={{ maxHeight: 340, overflow: "auto" }}>
-            {result.plannedPurchaseLines.length === 0 ? (
+            {resultat.plannedPurchaseLines.length === 0 ? (
               <p className="chantierProfitabilityNote">
                 Aucun composant d&apos;achat identifié dans les devis retenus.
               </p>
@@ -293,24 +298,24 @@ export function ChantierProfitabilityPanel({
                   </tr>
                 </thead>
                 <tbody>
-                  {result.plannedPurchaseLines.map((item) => (
-                    <tr key={`${item.quoteId}:${item.quoteLineId}:${item.componentId}`}>
+                  {resultat.plannedPurchaseLines.map((element) => (
+                    <tr key={`${element.quoteId}:${element.quoteLineId}:${element.componentId}`}>
                       <td style={{ padding: 6, borderBottom: "1px solid #eee" }}>
-                        <strong>{item.quoteReference}</strong>
-                        <div>{item.quoteLineDescription}</div>
+                        <strong>{element.quoteReference}</strong>
+                        <div>{element.quoteLineDescription}</div>
                       </td>
                       <td style={{ padding: 6, borderBottom: "1px solid #eee" }}>
-                        {item.description}
+                        {element.description}
                       </td>
                       <td
                         style={{ padding: 6, borderBottom: "1px solid #eee", textAlign: "right" }}
                       >
-                        {numberFormatter.format(item.quantity)} {item.unit}
+                        {numberFormatter.format(element.quantity)} {element.unit}
                       </td>
                       <td
                         style={{ padding: 6, borderBottom: "1px solid #eee", textAlign: "right" }}
                       >
-                        {money(item.totalCostCents)}
+                        {money(element.totalCostCents)}
                       </td>
                     </tr>
                   ))}
@@ -318,12 +323,12 @@ export function ChantierProfitabilityPanel({
               </table>
             )}
           </div>
-          {result.purchaseClassificationWarnings.length > 0 ? (
+          {resultat.purchaseClassificationWarnings.length > 0 ? (
             <div className="chantierProfitabilityWarning">
               <AlertTriangle size={15} />
               <span>
-                {result.purchaseClassificationWarnings.length} élément(s) à classer ou chiffrer :{" "}
-                {result.purchaseClassificationWarnings
+                {resultat.purchaseClassificationWarnings.length} élément(s) à classer ou chiffrer :{" "}
+                {resultat.purchaseClassificationWarnings
                   .map((warning) => `${warning.quoteReference} · ${warning.description}`)
                   .join(" ; ")}
               </span>
@@ -342,11 +347,11 @@ export function ChantierProfitabilityPanel({
           title="Composition du vendu"
           subtitle="Contrôle par devis retenu, sans ventilation de marge par ligne."
         />
-        {result.retainedQuotes.length === 0 ? (
+        {resultat.retainedQuotes.length === 0 ? (
           <div className="chantierProfitabilityEmpty">Aucun devis natif retenu à afficher.</div>
         ) : (
           <div className="chantierProfitabilityQuotes">
-            {result.retainedQuotes.map((quote) => (
+            {resultat.retainedQuotes.map((quote) => (
               <article key={quote.quoteId}>
                 <div>
                   <strong>
@@ -527,8 +532,8 @@ export function ChantierProfitabilityPanel({
 }
 
 function Metric({
-  label,
-  value,
+  label: libelle,
+  value: valeur,
   detail,
   className = "",
 }: {
@@ -539,8 +544,8 @@ function Metric({
 }) {
   return (
     <div className={"chantierProfitabilityMetric " + className}>
-      <span>{label}</span>
-      <strong>{value}</strong>
+      <span>{libelle}</span>
+      <strong>{valeur}</strong>
       <small>{detail}</small>
       <style jsx>{`
         .chantierProfitabilityMetric {
@@ -589,7 +594,7 @@ function Metric({
 
 function BlockTitle({
   icon,
-  title,
+  title: titre,
   subtitle,
 }: {
   icon: React.ReactNode;
@@ -600,7 +605,7 @@ function BlockTitle({
     <div className="chantierProfitabilityBlockTitle">
       {icon}
       <span>
-        <strong>{title}</strong>
+        <strong>{titre}</strong>
         <small>{subtitle}</small>
       </span>
       <style jsx>{`
@@ -628,9 +633,9 @@ function BlockTitle({
 }
 
 function HoursRow({
-  label,
+  label: libelle,
   planned,
-  actual,
+  actual: reel,
   total = false,
 }: {
   label: string;
@@ -640,12 +645,12 @@ function HoursRow({
 }) {
   return (
     <div className={"chantierProfitabilityHoursRow" + (total ? " isTotal" : "")}>
-      <strong>{label}</strong>
+      <strong>{libelle}</strong>
       <span>
         Vendu <b>{hours(planned)}</b>
       </span>
       <span>
-        Réel <b>{hours(actual)}</b>
+        Réel <b>{hours(reel)}</b>
       </span>
       <style jsx>{`
         .chantierProfitabilityHoursRow {
@@ -675,8 +680,8 @@ function HoursRow({
 }
 
 function CostRow({
-  label,
-  value,
+  label: libelle,
+  value: valeur,
   missing,
   total = false,
 }: {
@@ -687,9 +692,9 @@ function CostRow({
 }) {
   return (
     <div className={"chantierProfitabilityCostRow" + (total ? " isTotal" : "")}>
-      <strong>{label}</strong>
-      <span className={value === null ? "isMissing" : undefined}>
-        {value === null ? missing : money(value)}
+      <strong>{libelle}</strong>
+      <span className={valeur === null ? "isMissing" : undefined}>
+        {valeur === null ? missing : money(valeur)}
       </span>
       <style jsx>{`
         .chantierProfitabilityCostRow {

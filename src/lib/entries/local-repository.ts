@@ -12,11 +12,11 @@ import type { EntriesRepository } from "./repository";
 const RESOURCE_KEY = "entries";
 
 export function createLocalEntriesRepository(): EntriesRepository {
-  const persist = (
-    transform: (payload: EntriesPayload) => EntriesMutationResult,
+  const enregistrer = (
+    transformation: (donnees: EntriesPayload) => EntriesMutationResult,
   ): Promise<EntriesMutationResult> =>
-    mutateLocalSnapshot(RESOURCE_KEY, parseEntriesPayload, ({ payload }) => {
-      const mutation = transform(structuredClone(payload));
+    mutateLocalSnapshot(RESOURCE_KEY, parseEntriesPayload, ({ payload: donnees }) => {
+      const mutation = transformation(structuredClone(donnees));
       return { payload: mutation.payload, result: mutation };
     });
 
@@ -24,11 +24,13 @@ export function createLocalEntriesRepository(): EntriesRepository {
     async load() {
       return readLocalSnapshot(RESOURCE_KEY, parseEntriesPayload).payload;
     },
-    async mutate(input, actor) {
-      return persist((payload) => applyEntriesMutation(payload, input, actor));
+    async mutate(saisie, auteur) {
+      return enregistrer((donnees) => applyEntriesMutation(donnees, saisie, auteur));
     },
-    async registerAttachments(entryId, attachments, actor) {
-      return persist((payload) => registerEntryAttachments(payload, entryId, attachments, actor));
+    async registerAttachments(idEntree, piecesJointes, auteur) {
+      return enregistrer((donnees) =>
+        registerEntryAttachments(donnees, idEntree, piecesJointes, auteur),
+      );
     },
   };
 }

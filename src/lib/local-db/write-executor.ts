@@ -2,9 +2,9 @@ import { AsyncLocalStorage } from "node:async_hooks";
 
 type WriteTransaction<TTarget> = {
   getTarget: () => TTarget;
-  begin: (target: TTarget) => void;
-  commit: (target: TTarget) => void;
-  rollback: (target: TTarget) => void;
+  begin: (cible: TTarget) => void;
+  commit: (cible: TTarget) => void;
+  rollback: (cible: TTarget) => void;
 };
 
 export function createSerializedReentrantWriteExecutor<TTarget>(
@@ -13,30 +13,30 @@ export function createSerializedReentrantWriteExecutor<TTarget>(
   let writeQueue: Promise<void> = Promise.resolve();
   const activeTarget = new AsyncLocalStorage<TTarget>();
 
-  return function executeWrite<T>(work: (target: TTarget) => T | Promise<T>): Promise<T> {
+  return function executeWrite<T>(work: (cible: TTarget) => T | Promise<T>): Promise<T> {
     const currentTarget = activeTarget.getStore();
     if (currentTarget) {
       return Promise.resolve().then(() => work(currentTarget));
     }
 
     const run = async () => {
-      const target = transaction.getTarget();
-      transaction.begin(target);
+      const cible = transaction.getTarget();
+      transaction.begin(cible);
       try {
-        const result = await activeTarget.run(target, () => work(target));
-        transaction.commit(target);
-        return result;
-      } catch (error) {
-        transaction.rollback(target);
-        throw error;
+        const resultat = await activeTarget.run(cible, () => work(cible));
+        transaction.commit(cible);
+        return resultat;
+      } catch (erreur) {
+        transaction.rollback(cible);
+        throw erreur;
       }
     };
 
-    const result = writeQueue.then(run, run);
-    writeQueue = result.then(
+    const resultat = writeQueue.then(run, run);
+    writeQueue = resultat.then(
       () => undefined,
       () => undefined,
     );
-    return result;
+    return resultat;
   };
 }

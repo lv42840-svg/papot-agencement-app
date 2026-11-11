@@ -38,30 +38,30 @@ function moneyLabel(cents: number): string {
   return moneyFormatter.format(cents / 100);
 }
 
-function hoursLabel(hours: number): string {
-  return `${hoursFormatter.format(hours)} h`;
+function hoursLabel(heures: number): string {
+  return `${hoursFormatter.format(heures)} h`;
 }
 
-function dateLabel(value: string | null): string {
-  if (!value) return "";
-  const [year, month, day] = value.split("-").map(Number);
+function dateLabel(valeur: string | null): string {
+  if (!valeur) return "";
+  const [annee, mois, jour] = valeur.split("-").map(Number);
   return new Intl.DateTimeFormat("fr-FR", {
     day: "numeric",
     month: "short",
     year: "numeric",
-  }).format(new Date(year, month - 1, day, 12));
+  }).format(new Date(annee, mois - 1, jour, 12));
 }
 
-function statusTone(status: CommercialQuoteDisplayStatus): string {
-  if (status === "FOLLOW_UP") return "follow";
-  if (status === "SENT") return "sent";
-  if (status === "ACCEPTED") return "accepted";
-  if (status === "REJECTED" || status === "CANCELLED") return "closed";
+function statusTone(statut: CommercialQuoteDisplayStatus): string {
+  if (statut === "FOLLOW_UP") return "follow";
+  if (statut === "SENT") return "sent";
+  if (statut === "ACCEPTED") return "accepted";
+  if (statut === "REJECTED" || statut === "CANCELLED") return "closed";
   return "draft";
 }
 
 export function CommercialAffairQuotes({
-  item,
+  item: element,
   busy,
   canProvision,
   mutate,
@@ -69,11 +69,14 @@ export function CommercialAffairQuotes({
   item: CommercialCase;
   busy: boolean;
   canProvision: boolean;
-  mutate: (body: Record<string, unknown> & { action: string }, success: string) => Promise<unknown>;
+  mutate: (
+    corps: Record<string, unknown> & { action: string },
+    success: string,
+  ) => Promise<unknown>;
 }) {
-  const [payload, setPayload] = useState<NativeQuotesPayload | null>(null);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState("");
+  const [contenu, setPayload] = useState<NativeQuotesPayload | null>(null);
+  const [chargement, setLoading] = useState(true);
+  const [erreur, setError] = useState("");
 
   useEffect(() => {
     let cancelled = false;
@@ -81,12 +84,12 @@ export function CommercialAffairQuotes({
     setError("");
 
     void fetch("/api/desktop/quotes", { cache: "no-store" })
-      .then(async (response) => {
-        const body = (await response.json()) as QuotesApiResponse;
-        if (!response.ok || !body.payload) {
-          throw new Error(body.error ?? "QUOTES_LOAD_FAILED");
+      .then(async (reponse) => {
+        const corps = (await reponse.json()) as QuotesApiResponse;
+        if (!reponse.ok || !corps.payload) {
+          throw new Error(corps.error ?? "QUOTES_LOAD_FAILED");
         }
-        if (!cancelled) setPayload(body.payload);
+        if (!cancelled) setPayload(corps.payload);
       })
       .catch((loadError) => {
         if (cancelled) return;
@@ -104,14 +107,14 @@ export function CommercialAffairQuotes({
     return () => {
       cancelled = true;
     };
-  }, [item.id]);
+  }, [element.id]);
 
   const quotes = useMemo(
     () =>
-      (payload?.quotes ?? [])
-        .filter((quote) => quote.commercialCaseId === item.id)
-        .sort((left, right) => right.updatedAt.localeCompare(left.updatedAt)),
-    [item.id, payload?.quotes],
+      (contenu?.quotes ?? [])
+        .filter((quote) => quote.commercialCaseId === element.id)
+        .sort((gauche, droite) => droite.updatedAt.localeCompare(gauche.updatedAt)),
+    [element.id, contenu?.quotes],
   );
 
   const currentQuoteCount = useMemo(
@@ -122,29 +125,32 @@ export function CommercialAffairQuotes({
     () => new Set(quotes.map((quote) => quote.variantName.trim().toLocaleLowerCase("fr-FR"))).size,
     [quotes],
   );
-  const retainedIds = useMemo(() => new Set(item.retainedQuoteIds), [item.retainedQuoteIds]);
-  const forecastIds = useMemo(() => new Set(item.forecastQuoteIds ?? []), [item.forecastQuoteIds]);
+  const retainedIds = useMemo(() => new Set(element.retainedQuoteIds), [element.retainedQuoteIds]);
+  const forecastIds = useMemo(
+    () => new Set(element.forecastQuoteIds ?? []),
+    [element.forecastQuoteIds],
+  );
   const forecastHours = useMemo(
-    () => effectiveCommercialForecastHours(item, quotes),
-    [item, quotes],
+    () => effectiveCommercialForecastHours(element, quotes),
+    [element, quotes],
   );
   const forecastLocked =
-    !canProvision || busy || isCommercialClosed(item) || item.status === "CONFIRMED";
+    !canProvision || busy || isCommercialClosed(element) || element.status === "CONFIRMED";
 
-  async function toggleForecastQuote(quoteId: string, checked: boolean) {
+  async function toggleForecastQuote(idDevis: string, coche: boolean) {
     if (forecastLocked) return;
-    const ids = new Set(item.forecastQuoteIds ?? []);
-    if (checked) ids.add(quoteId);
-    else ids.delete(quoteId);
+    const identifiants = new Set(element.forecastQuoteIds ?? []);
+    if (coche) identifiants.add(idDevis);
+    else identifiants.delete(idDevis);
     await mutate(
-      { action: "setForecastQuotes", caseId: item.id, quoteIds: [...ids] },
+      { action: "setForecastQuotes", caseId: element.id, quoteIds: [...identifiants] },
       "Sélection des devis prévisionnels enregistrée.",
     );
   }
 
   const contract = useMemo(
-    () => calculateCommercialContractSummary(quotes, item.retainedQuoteIds),
-    [item.retainedQuoteIds, quotes],
+    () => calculateCommercialContractSummary(quotes, element.retainedQuoteIds),
+    [element.retainedQuoteIds, quotes],
   );
 
   return (
@@ -157,27 +163,27 @@ export function CommercialAffairQuotes({
           <span>{quotes.length}</span>
           <Link
             className="commercialAffairQuoteCreate"
-            href={`/devis/nouveau?affaire=${encodeURIComponent(item.id)}`}
+            href={`/devis/nouveau?affaire=${encodeURIComponent(element.id)}`}
           >
             <FilePlus2 size={13} /> Créer un devis
           </Link>
         </div>
       </div>
 
-      {loading ? (
+      {chargement ? (
         <div className="commercialAffairQuotesState">
           <RefreshCw size={14} /> Chargement des devis…
         </div>
-      ) : error ? (
-        <div className="commercialAffairQuotesState error">{error}</div>
+      ) : erreur ? (
+        <div className="commercialAffairQuotesState error">{erreur}</div>
       ) : quotes.length === 0 ? (
         <div className="commercialAffairQuotesState">
           Aucun devis créé pour cette affaire. Le premier sera automatiquement Base V1.
         </div>
       ) : (
         <>
-          {item.status === "CONFIRMED" ? (
-            item.retainedQuoteIds.length > 0 ? (
+          {element.status === "CONFIRMED" ? (
+            element.retainedQuoteIds.length > 0 ? (
               <div
                 className="commercialAffairContractOverview"
                 aria-label="Cumul contractuel des devis retenus"
@@ -245,7 +251,7 @@ export function CommercialAffairQuotes({
             </div>
           )}
 
-          {item.status !== "CONFIRMED" && !isCommercialClosed(item) ? (
+          {element.status !== "CONFIRMED" && !isCommercialClosed(element) ? (
             <div
               className="commercialAffairForecastOverview"
               aria-label="Heures du planning prévisionnel"
@@ -253,7 +259,7 @@ export function CommercialAffairQuotes({
               <div>
                 <strong>Devis comptés dans le prévisionnel</strong>
                 <span>
-                  {item.forecastQuoteIds == null
+                  {element.forecastQuoteIds == null
                     ? "Charge manuelle actuelle : coche un devis pour utiliser ses heures."
                     : `${forecastIds.size} devis coché(s) · les autres sont exclus.`}
                 </span>
@@ -262,14 +268,14 @@ export function CommercialAffairQuotes({
                 BE {hoursLabel(forecastHours.be)} · Atelier {hoursLabel(forecastHours.workshop)} ·
                 Pose {hoursLabel(forecastHours.install)}
               </strong>
-              {item.forecastQuoteIds != null && canProvision ? (
+              {element.forecastQuoteIds != null && canProvision ? (
                 <button
                   type="button"
                   className="commercialForecastManualButton"
                   disabled={busy}
                   onClick={() =>
                     void mutate(
-                      { action: "useManualProvision", caseId: item.id },
+                      { action: "useManualProvision", caseId: element.id },
                       "Retour à la charge prévisionnelle manuelle.",
                     )
                   }
@@ -286,15 +292,15 @@ export function CommercialAffairQuotes({
               const summary = calculateCommercialQuoteSummary(quote);
               return (
                 <div key={quote.id} className="commercialAffairQuoteEntry">
-                  {item.status !== "CONFIRMED" && !isCommercialClosed(item) ? (
+                  {element.status !== "CONFIRMED" && !isCommercialClosed(element) ? (
                     <label className="commercialForecastToggle">
                       <input
                         type="checkbox"
                         aria-label={`Compter le devis ${quote.variantName} V${quote.version} dans le prévisionnel`}
                         checked={forecastIds.has(quote.id)}
                         disabled={forecastLocked}
-                        onChange={(event) =>
-                          void toggleForecastQuote(quote.id, event.target.checked)
+                        onChange={(evenement) =>
+                          void toggleForecastQuote(quote.id, evenement.target.checked)
                         }
                       />
                       <span>Prévisionnel</span>
@@ -304,8 +310,9 @@ export function CommercialAffairQuotes({
                     type="button"
                     className="commercialAffairQuoteRow"
                     onDoubleClick={() => window.location.assign(quoteEditorHref(quote.id))}
-                    onKeyDown={(event) => {
-                      if (event.key === "Enter") window.location.assign(quoteEditorHref(quote.id));
+                    onKeyDown={(evenement) => {
+                      if (evenement.key === "Enter")
+                        window.location.assign(quoteEditorHref(quote.id));
                     }}
                     title="Double-clique pour ouvrir ce devis dans le module Devis"
                   >
@@ -343,7 +350,7 @@ export function CommercialAffairQuotes({
                     </div>
 
                     <div className="commercialAffairQuoteMeta">
-                      {item.status === "CONFIRMED" ? (
+                      {element.status === "CONFIRMED" ? (
                         <span
                           className={`commercialAffairQuoteRetention ${
                             retainedIds.has(quote.id) ? "retained" : "notRetained"

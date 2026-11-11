@@ -5,23 +5,23 @@ import type {
   BillingSourceLine,
 } from "./domain";
 
-export function lineHtCents(line: BillingDocumentLine): number {
-  if (line.origin === "TITLE") return 0;
-  const result = Math.round(line.quantity * line.unitPriceCents);
-  if (!Number.isSafeInteger(result) || result < 0) {
+export function lineHtCents(ligne: BillingDocumentLine): number {
+  if (ligne.origin === "TITLE") return 0;
+  const resultat = Math.round(ligne.quantity * ligne.unitPriceCents);
+  if (!Number.isSafeInteger(resultat) || resultat < 0) {
     throw new Error("BILLING_DOCUMENT_AMOUNT_INVALID");
   }
-  return result;
+  return resultat;
 }
 
-export function calculateInvoiceDocumentTotals(lines: BillingDocumentLine[]) {
+export function calculateInvoiceDocumentTotals(lignes: BillingDocumentLine[]) {
   const byRate = new Map<number, number>();
-  const amountHtCents = lines.reduce((sum, line) => {
-    const value = lineHtCents(line);
-    if (line.origin !== "TITLE") {
-      byRate.set(line.vatRatePercent, (byRate.get(line.vatRatePercent) ?? 0) + value);
+  const amountHtCents = lignes.reduce((somme, ligne) => {
+    const valeur = lineHtCents(ligne);
+    if (ligne.origin !== "TITLE") {
+      byRate.set(ligne.vatRatePercent, (byRate.get(ligne.vatRatePercent) ?? 0) + valeur);
     }
-    return sum + value;
+    return somme + valeur;
   }, 0);
   if (!Number.isSafeInteger(amountHtCents) || amountHtCents <= 0) {
     throw new Error("BILLING_DOCUMENT_EMPTY");
@@ -33,27 +33,27 @@ export function calculateInvoiceDocumentTotals(lines: BillingDocumentLine[]) {
       vatCents: Math.round((baseHtCents * ratePercent) / 100),
     }))
     .sort((a, b) => a.ratePercent - b.ratePercent);
-  const vatCents = taxGroups.reduce((sum, group) => sum + group.vatCents, 0);
+  const vatCents = taxGroups.reduce((somme, group) => somme + group.vatCents, 0);
   return { amountHtCents, taxGroups, vatCents, totalTtcCents: amountHtCents + vatCents };
 }
 
 function distributeAmounts(
-  lines: BillingSourceLine[],
+  lignes: BillingSourceLine[],
   amountHtCents: number,
   weights: number[],
 ): number[] {
-  if (!lines.length) return [];
-  let weightsUsed = weights.map((value) => Math.max(0, value));
-  if (weightsUsed.reduce((sum, value) => sum + value, 0) <= 0) {
-    weightsUsed = lines.map((line) => line.amountHtCents);
+  if (!lignes.length) return [];
+  let weightsUsed = weights.map((valeur) => Math.max(0, valeur));
+  if (weightsUsed.reduce((somme, valeur) => somme + valeur, 0) <= 0) {
+    weightsUsed = lignes.map((ligne) => ligne.amountHtCents);
   }
-  const totalWeights = weightsUsed.reduce((sum, value) => sum + value, 0);
-  if (totalWeights <= 0) return lines.map((_, i) => (i === 0 ? amountHtCents : 0));
-  const parts = lines.map((_, index) => {
-    const raw = (amountHtCents * weightsUsed[index]) / totalWeights;
-    return { index, amount: Math.floor(raw), fraction: raw % 1 };
+  const totalWeights = weightsUsed.reduce((somme, valeur) => somme + valeur, 0);
+  if (totalWeights <= 0) return lignes.map((_, i) => (i === 0 ? amountHtCents : 0));
+  const parts = lignes.map((_, indice) => {
+    const raw = (amountHtCents * weightsUsed[indice]) / totalWeights;
+    return { index: indice, amount: Math.floor(raw), fraction: raw % 1 };
   });
-  let remaining = amountHtCents - parts.reduce((sum, part) => sum + part.amount, 0);
+  let remaining = amountHtCents - parts.reduce((somme, part) => somme + part.amount, 0);
   for (const part of [...parts].sort((a, b) => b.fraction - a.fraction || a.index - b.index)) {
     if (remaining <= 0) break;
     part.amount++;
@@ -64,24 +64,24 @@ function distributeAmounts(
 
 /** Generates an independent editable snapshot; the retained quote is never changed. */
 export function buildInvoiceDocumentLines(
-  draft: BillingDraft,
-  payload: BillingPayload,
+  brouillon: BillingDraft,
+  contenu: BillingPayload,
 ): BillingDocumentLine[] {
-  const draftIndex = payload.drafts.findIndex((item) => item.id === draft.id);
-  const prior = payload.drafts
-    .slice(0, draftIndex < 0 ? payload.drafts.length : draftIndex)
-    .filter((item) => item.quoteId === draft.quoteId);
-  const sourceLines = draft.lines ?? [];
-  const output: BillingDocumentLine[] = [];
+  const draftIndex = contenu.drafts.findIndex((element) => element.id === brouillon.id);
+  const prior = contenu.drafts
+    .slice(0, draftIndex < 0 ? contenu.drafts.length : draftIndex)
+    .filter((element) => element.quoteId === brouillon.quoteId);
+  const sourceLines = brouillon.lines ?? [];
+  const sortie: BillingDocumentLine[] = [];
 
-  for (const group of draft.taxGroups) {
-    const matching = sourceLines.filter((line) => line.vatRatePercent === group.ratePercent);
+  for (const group of brouillon.taxGroups) {
+    const matching = sourceLines.filter((ligne) => ligne.vatRatePercent === group.ratePercent);
     if (!matching.length) {
-      output.push({
+      sortie.push({
         id: globalThis.crypto.randomUUID(),
         origin: "FREE",
         sourceLineId: null,
-        description: `Prestation selon devis ${draft.quoteLabel}`,
+        description: `Prestation selon devis ${brouillon.quoteLabel}`,
         quantity: 1,
         unit: "forfait",
         unitPriceCents: group.baseHtCents,
@@ -90,33 +90,33 @@ export function buildInvoiceDocumentLines(
       continue;
     }
 
-    const previousSituations = prior.filter((item) => item.type === "PROGRESS");
-    const weights = matching.map((line) => {
-      const target = draft.lineProgress?.find(
-        (row) => row.lineId === line.lineId,
+    const previousSituations = prior.filter((element) => element.type === "PROGRESS");
+    const weights = matching.map((ligne) => {
+      const cible = brouillon.lineProgress?.find(
+        (ligneTableau) => ligneTableau.lineId === ligne.lineId,
       )?.cumulativeHtCents;
-      if (target === undefined) return line.amountHtCents;
-      const previousTarget = previousSituations.reduce((maximum, item) => {
-        const row = item.lineProgress?.find((entry) => entry.lineId === line.lineId);
-        const amount =
-          row?.cumulativeHtCents ??
-          (item.cumulativePercent === null
+      if (cible === undefined) return ligne.amountHtCents;
+      const previousTarget = previousSituations.reduce((maximum, element) => {
+        const ligneTableau = element.lineProgress?.find((entree) => entree.lineId === ligne.lineId);
+        const montant =
+          ligneTableau?.cumulativeHtCents ??
+          (element.cumulativePercent === null
             ? 0
-            : Math.round((line.amountHtCents * item.cumulativePercent) / 100));
-        return Math.max(maximum, amount);
+            : Math.round((ligne.amountHtCents * element.cumulativePercent) / 100));
+        return Math.max(maximum, montant);
       }, 0);
-      return Math.max(0, target - previousTarget);
+      return Math.max(0, cible - previousTarget);
     });
     const allocated = distributeAmounts(matching, group.baseHtCents, weights);
-    matching.forEach((source, index) => {
-      const amount = allocated[index];
+    matching.forEach((source, indice) => {
+      const montant = allocated[indice];
       const quantity = source.quantity ?? 1;
-      const roundedUnit = Math.round(amount / quantity);
+      const roundedUnit = Math.round(montant / quantity);
       const exact =
-        amount > 0 &&
+        montant > 0 &&
         Number.isSafeInteger(roundedUnit) &&
-        Math.round(quantity * roundedUnit) === amount;
-      output.push({
+        Math.round(quantity * roundedUnit) === montant;
+      sortie.push({
         id: globalThis.crypto.randomUUID(),
         origin: "QUOTE",
         sourceLineId: source.lineId,
@@ -124,13 +124,13 @@ export function buildInvoiceDocumentLines(
         // source link, but give the editable invoice row a valid description.
         description: source.description.trim()
           ? source.description
-          : `Prestation du devis ${draft.quoteLabel}`,
+          : `Prestation du devis ${brouillon.quoteLabel}`,
         quantity: exact ? quantity : 1,
         unit: exact ? (source.unit ?? "u") : "forfait",
-        unitPriceCents: exact ? roundedUnit : amount,
+        unitPriceCents: exact ? roundedUnit : montant,
         vatRatePercent: source.vatRatePercent,
       });
     });
   }
-  return output;
+  return sortie;
 }

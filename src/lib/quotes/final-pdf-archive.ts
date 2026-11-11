@@ -23,18 +23,18 @@ export type QuoteFinalPdfArchiveResult = {
   created: boolean;
 };
 
-function existingSequence(quoteNumber: string, year: number): number | null {
-  const match = quoteNumber.match(FINAL_QUOTE_NUMBER_PATTERN);
-  if (!match || Number(match[1]) !== year) return null;
-  return Number(match[2]);
+function existingSequence(quoteNumber: string, annee: number): number | null {
+  const correspondance = quoteNumber.match(FINAL_QUOTE_NUMBER_PATTERN);
+  if (!correspondance || Number(correspondance[1]) !== annee) return null;
+  return Number(correspondance[2]);
 }
 
-export function nextFinalQuoteNumber(payload: NativeQuotesPayload, year: number): string {
-  const highest = payload.quotes.reduce((current, quote) => {
-    const sequence = quote.finalPdf ? existingSequence(quote.finalPdf.quoteNumber, year) : null;
-    return sequence === null ? current : Math.max(current, sequence);
+export function nextFinalQuoteNumber(contenu: NativeQuotesPayload, annee: number): string {
+  const highest = contenu.quotes.reduce((courant, quote) => {
+    const sequence = quote.finalPdf ? existingSequence(quote.finalPdf.quoteNumber, annee) : null;
+    return sequence === null ? courant : Math.max(courant, sequence);
   }, 0);
-  return formatQuoteNumber(year, highest + 1);
+  return formatQuoteNumber(annee, highest + 1);
 }
 
 export function quoteFinalPdfFileName(
@@ -47,26 +47,26 @@ export function quoteFinalPdfFileName(
 }
 
 export function quoteFinalPdfStoragePath(
-  context: QuoteFinalPdfArchiveContext,
+  contexte: QuoteFinalPdfArchiveContext,
   quote: Pick<NativeQuoteRecord, "variantName" | "version">,
   quoteNumber: string,
 ): string {
   return commercialDocumentStoragePath({
-    creationYear: context.creationYear,
-    clientName: context.clientName,
-    caseName: context.caseName,
+    creationYear: contexte.creationYear,
+    clientName: contexte.clientName,
+    caseName: contexte.caseName,
     category: "QUOTE",
     fileName: quoteFinalPdfFileName(quote, quoteNumber),
   });
 }
 
-function isExistingFileError(error: unknown): boolean {
-  return error instanceof Error && error.message === "SERVER_FILE_EXISTS";
+function isExistingFileError(erreur: unknown): boolean {
+  return erreur instanceof Error && erreur.message === "SERVER_FILE_EXISTS";
 }
 
 export async function archiveFinalQuotePdf(
   store: ServerFileStore,
-  input: {
+  saisie: {
     quote: Pick<NativeQuoteRecord, "variantName" | "version">;
     quoteNumber: string;
     context: QuoteFinalPdfArchiveContext;
@@ -75,23 +75,23 @@ export async function archiveFinalQuotePdf(
     now?: Date;
   },
 ): Promise<QuoteFinalPdfArchiveResult> {
-  assertPdfBuffer(input.pdf);
-  const now = input.now ?? new Date();
-  const fileName = quoteFinalPdfFileName(input.quote, input.quoteNumber);
-  const storagePath = quoteFinalPdfStoragePath(input.context, input.quote, input.quoteNumber);
-  const expectedSha256 = sha256Bytes(input.pdf);
+  assertPdfBuffer(saisie.pdf);
+  const maintenant = saisie.now ?? new Date();
+  const fileName = quoteFinalPdfFileName(saisie.quote, saisie.quoteNumber);
+  const storagePath = quoteFinalPdfStoragePath(saisie.context, saisie.quote, saisie.quoteNumber);
+  const expectedSha256 = sha256Bytes(saisie.pdf);
   let created = true;
-  let sizeBytes = input.pdf.byteLength;
+  let sizeBytes = saisie.pdf.byteLength;
   let sha256 = expectedSha256;
 
   try {
-    const written = await store.writeBytes(storagePath, input.pdf);
+    const written = await store.writeBytes(storagePath, saisie.pdf);
     sizeBytes = written.sizeBytes;
     sha256 = written.sha256;
-  } catch (error) {
-    if (!isExistingFileError(error)) throw error;
+  } catch (erreur) {
+    if (!isExistingFileError(erreur)) throw erreur;
     const existing = await store.readBytes(storagePath);
-    if (existing.byteLength !== input.pdf.byteLength || sha256Bytes(existing) !== expectedSha256) {
+    if (existing.byteLength !== saisie.pdf.byteLength || sha256Bytes(existing) !== expectedSha256) {
       throw new Error("QUOTE_FINAL_PDF_ARCHIVE_CONFLICT");
     }
     assertPdfBuffer(existing);
@@ -101,18 +101,18 @@ export async function archiveFinalQuotePdf(
   }
 
   const commercialDocumentId = randomUUID();
-  const archivedAt = now.toISOString();
+  const archivedAt = maintenant.toISOString();
   const finalPdf: QuoteFinalPdf = {
-    quoteNumber: input.quoteNumber,
-    variantName: input.quote.variantName,
-    version: input.quote.version,
+    quoteNumber: saisie.quoteNumber,
+    variantName: saisie.quote.variantName,
+    version: saisie.quote.version,
     commercialDocumentId,
     fileName,
     storagePath,
     sizeBytes,
     sha256,
     archivedAt,
-    archivedByName: input.actorName,
+    archivedByName: saisie.actorName,
   };
   const commercialDocument: CommercialDocument = {
     id: commercialDocumentId,
@@ -122,12 +122,12 @@ export async function archiveFinalQuotePdf(
     sha256,
     storagePath,
     category: "QUOTE",
-    versionLabel: `V${input.quote.version}`,
-    variantLabel: input.quote.variantName,
+    versionLabel: `V${saisie.quote.version}`,
+    variantLabel: saisie.quote.variantName,
     isCurrent: true,
     isSignedQuote: false,
     uploadedAt: archivedAt,
-    uploadedByName: input.actorName,
+    uploadedByName: saisie.actorName,
   };
 
   return { finalPdf, commercialDocument, created };

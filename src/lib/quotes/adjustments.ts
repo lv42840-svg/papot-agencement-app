@@ -68,11 +68,11 @@ export const quotePricingConfigSchema = z
     options: z.array(quoteOptionSchema).max(500),
     customerDiscount: quoteCustomerDiscountSchema.optional(),
   })
-  .superRefine((config, context) => {
+  .superRefine((configuration, contexte) => {
     const adjustmentIds = new Set<string>();
-    for (const adjustment of config.adjustments) {
+    for (const adjustment of configuration.adjustments) {
       if (adjustmentIds.has(adjustment.id)) {
-        context.addIssue({
+        contexte.addIssue({
           code: z.ZodIssueCode.custom,
           path: ["adjustments"],
           message: "QUOTE_ADJUSTMENT_ID_DUPLICATE",
@@ -83,16 +83,16 @@ export const quotePricingConfigSchema = z
 
     const optionIds = new Set<string>();
     const optionTargets = new Set<string>();
-    for (const option of config.options) {
+    for (const option of configuration.options) {
       if (optionIds.has(option.id)) {
-        context.addIssue({
+        contexte.addIssue({
           code: z.ZodIssueCode.custom,
           path: ["options"],
           message: "QUOTE_OPTION_ID_DUPLICATE",
         });
       }
       if (optionTargets.has(option.targetItemId)) {
-        context.addIssue({
+        contexte.addIssue({
           code: z.ZodIssueCode.custom,
           path: ["options"],
           message: "QUOTE_OPTION_TARGET_DUPLICATE",
@@ -159,35 +159,35 @@ type MutableLine = QuoteAdjustedLine & {
   poseSaleRateCents: number | null;
 };
 
-function assertSafeMoney(value: number): number {
-  if (!Number.isSafeInteger(value) || value < 0) {
+function assertSafeMoney(valeur: number): number {
+  if (!Number.isSafeInteger(valeur) || valeur < 0) {
     throw new Error("QUOTE_ADJUSTED_PRICING_MONEY_INVALID");
   }
-  return value;
+  return valeur;
 }
 
 function lineAmountCents(quantity: number, unitAmountCents: number): number {
   return assertSafeMoney(Math.round(quantity * unitAmountCents));
 }
 
-function addMoney(left: number, right: number): number {
-  return assertSafeMoney(left + right);
+function addMoney(gauche: number, droite: number): number {
+  return assertSafeMoney(gauche + droite);
 }
 
-function subtractMoney(left: number, right: number): number {
-  return assertSafeMoney(left - right);
+function subtractMoney(gauche: number, droite: number): number {
+  return assertSafeMoney(gauche - droite);
 }
 
 function componentActivity(component: QuoteOuvrageComponent): "BE" | "ATELIER" | "POSE" | null {
   return component.activity ?? component.librarySource?.component.activity ?? null;
 }
 
-function linePoseProfile(line: QuoteLine): {
+function linePoseProfile(ligne: QuoteLine): {
   hours: number;
   costRateCents: number | null;
   saleRateCents: number | null;
 } {
-  const poseComponents = (line.components ?? []).filter(
+  const poseComponents = (ligne.components ?? []).filter(
     (component) => componentActivity(component) === "POSE",
   );
   if (poseComponents.length === 0) {
@@ -215,22 +215,22 @@ function linePoseProfile(line: QuoteLine): {
   }
 
   return {
-    hours: Math.round(line.quantity * hoursPerLineUnit * 1_000_000) / 1_000_000,
+    hours: Math.round(ligne.quantity * hoursPerLineUnit * 1_000_000) / 1_000_000,
     saleRateCents: saleAmountPerLineUnit / hoursPerLineUnit,
     costRateCents: costComplete ? costAmountPerLineUnit / hoursPerLineUnit : null,
   };
 }
 
 function optionForLine(
-  line: QuoteLine,
+  ligne: QuoteLine,
   itemById: ReadonlyMap<string, QuoteItem>,
   optionByTarget: ReadonlyMap<string, QuoteOption>,
 ): QuoteOption | null {
-  const direct = optionByTarget.get(line.id);
+  const direct = optionByTarget.get(ligne.id);
   if (direct) return direct;
-  if (!line.parentId) return null;
+  if (!ligne.parentId) return null;
 
-  const parent = itemById.get(line.parentId);
+  const parent = itemById.get(ligne.parentId);
   if (!parent) return null;
   const parentOption = optionByTarget.get(parent.id);
   if (parentOption) return parentOption;
@@ -243,99 +243,99 @@ function optionForLine(
 
 function integerDistribution(
   total: number,
-  entries: Array<{ lineId: string; weight: number }>,
+  entrees: Array<{ lineId: string; weight: number }>,
 ): Map<string, number> {
-  const result = new Map<string, number>();
-  if (entries.length === 0 || total === 0) {
-    for (const entry of entries) result.set(entry.lineId, 0);
-    return result;
+  const resultat = new Map<string, number>();
+  if (entrees.length === 0 || total === 0) {
+    for (const entree of entrees) resultat.set(entree.lineId, 0);
+    return resultat;
   }
 
-  const safeWeights = entries.map((entry) => ({
-    ...entry,
-    weight: Number.isFinite(entry.weight) && entry.weight > 0 ? entry.weight : 0,
+  const safeWeights = entrees.map((entree) => ({
+    ...entree,
+    weight: Number.isFinite(entree.weight) && entree.weight > 0 ? entree.weight : 0,
   }));
-  const weightTotal = safeWeights.reduce((sum, entry) => sum + entry.weight, 0);
+  const weightTotal = safeWeights.reduce((somme, entree) => somme + entree.weight, 0);
   const denominator = weightTotal > 0 ? weightTotal : safeWeights.length;
   const remainders: Array<{ lineId: string; remainder: number; index: number }> = [];
   let allocated = 0;
 
-  safeWeights.forEach((entry, index) => {
-    const weight = weightTotal > 0 ? entry.weight : 1;
+  safeWeights.forEach((entree, indice) => {
+    const weight = weightTotal > 0 ? entree.weight : 1;
     const exact = (total * weight) / denominator;
     const floor = Math.floor(exact);
-    result.set(entry.lineId, floor);
+    resultat.set(entree.lineId, floor);
     allocated += floor;
-    remainders.push({ lineId: entry.lineId, remainder: exact - floor, index });
+    remainders.push({ lineId: entree.lineId, remainder: exact - floor, index: indice });
   });
 
-  remainders.sort((left, right) => {
-    if (right.remainder !== left.remainder) return right.remainder - left.remainder;
-    return left.index - right.index;
+  remainders.sort((gauche, droite) => {
+    if (droite.remainder !== gauche.remainder) return droite.remainder - gauche.remainder;
+    return gauche.index - droite.index;
   });
 
   let remaining = total - allocated;
   let cursor = 0;
   while (remaining > 0) {
-    const target = remainders[cursor % remainders.length];
-    result.set(target.lineId, (result.get(target.lineId) ?? 0) + 1);
+    const cible = remainders[cursor % remainders.length];
+    resultat.set(cible.lineId, (resultat.get(cible.lineId) ?? 0) + 1);
     remaining -= 1;
     cursor += 1;
   }
 
-  return result;
+  return resultat;
 }
 
 function moneyDistribution(
   totalCents: number,
-  lines: MutableLine[],
-  weight: (line: MutableLine) => number,
+  lignes: MutableLine[],
+  weight: (ligne: MutableLine) => number,
 ): Map<string, number> {
   return integerDistribution(
     totalCents,
-    lines.map((line) => ({ lineId: line.lineId, weight: weight(line) })),
+    lignes.map((ligne) => ({ lineId: ligne.lineId, weight: weight(ligne) })),
   );
 }
 
-function hoursDistribution(totalHours: number, lines: MutableLine[]): Map<string, number> {
+function hoursDistribution(totalHours: number, lignes: MutableLine[]): Map<string, number> {
   const factor = 1_000_000;
   const totalUnits = Math.round(totalHours * factor);
   const units = integerDistribution(
     totalUnits,
-    lines.map((line) => ({ lineId: line.lineId, weight: line.basePoseHours })),
+    lignes.map((ligne) => ({ lineId: ligne.lineId, weight: ligne.basePoseHours })),
   );
-  return new Map(Array.from(units, ([lineId, value]) => [lineId, value / factor]));
+  return new Map(Array.from(units, ([lineId, valeur]) => [lineId, valeur / factor]));
 }
 
 function applyMoneyToLines(
-  lines: MutableLine[],
+  lignes: MutableLine[],
   totalSaleIncrementCents: number,
   totalCostIncrementCents: number,
-  weights: (line: MutableLine) => number,
+  weights: (ligne: MutableLine) => number,
 ) {
-  const saleDistribution = moneyDistribution(totalSaleIncrementCents, lines, weights);
-  const costDistribution = moneyDistribution(totalCostIncrementCents, lines, weights);
+  const saleDistribution = moneyDistribution(totalSaleIncrementCents, lignes, weights);
+  const costDistribution = moneyDistribution(totalCostIncrementCents, lignes, weights);
 
-  for (const line of lines) {
-    line.saleCents = addMoney(line.saleCents, saleDistribution.get(line.lineId) ?? 0);
-    if (line.costCents !== null) {
-      line.costCents = addMoney(line.costCents, costDistribution.get(line.lineId) ?? 0);
+  for (const ligne of lignes) {
+    ligne.saleCents = addMoney(ligne.saleCents, saleDistribution.get(ligne.lineId) ?? 0);
+    if (ligne.costCents !== null) {
+      ligne.costCents = addMoney(ligne.costCents, costDistribution.get(ligne.lineId) ?? 0);
     }
   }
 }
 
-function scopeSale(lines: MutableLine[]): number {
-  return lines.reduce((total, line) => addMoney(total, line.saleCents), 0);
+function scopeSale(lignes: MutableLine[]): number {
+  return lignes.reduce((total, ligne) => addMoney(total, ligne.saleCents), 0);
 }
 
 function applyPoseHoursAdjustment(
-  lines: MutableLine[],
+  lignes: MutableLine[],
   adjustment: QuotePoseHoursAdjustment,
   warnings: string[],
   scopeLabel: string,
 ) {
-  const eligible = lines.filter(
-    (line) => line.basePoseHours > 0 && line.poseSaleRateCents !== null,
+  const eligible = lignes.filter(
+    (ligne) => ligne.basePoseHours > 0 && ligne.poseSaleRateCents !== null,
   );
   if (eligible.length === 0) {
     warnings.push(`QUOTE_POSE_HOURS_NO_BASE:${adjustment.id}:${scopeLabel}`);
@@ -345,29 +345,29 @@ function applyPoseHoursAdjustment(
   const distributedHours = hoursDistribution(adjustment.hours, eligible);
   let zeroRateDetected = false;
 
-  for (const line of eligible) {
-    const addedHours = distributedHours.get(line.lineId) ?? 0;
-    line.poseHours = Math.round((line.poseHours + addedHours) * 1_000_000) / 1_000_000;
+  for (const ligne of eligible) {
+    const addedHours = distributedHours.get(ligne.lineId) ?? 0;
+    ligne.poseHours = Math.round((ligne.poseHours + addedHours) * 1_000_000) / 1_000_000;
 
-    const costRate = line.poseCostRateCents;
+    const costRate = ligne.poseCostRateCents;
     const costIncrement = costRate === null ? null : Math.round(addedHours * costRate);
-    if (line.costCents !== null) {
+    if (ligne.costCents !== null) {
       if (costIncrement === null) {
-        line.costCents = null;
+        ligne.costCents = null;
       } else {
-        line.costCents = addMoney(line.costCents, assertSafeMoney(costIncrement));
+        ligne.costCents = addMoney(ligne.costCents, assertSafeMoney(costIncrement));
       }
     }
 
     const saleRate =
-      adjustment.marginTreatment === "PASS_THROUGH" ? costRate : line.poseSaleRateCents;
+      adjustment.marginTreatment === "PASS_THROUGH" ? costRate : ligne.poseSaleRateCents;
     if (saleRate === null) {
-      warnings.push(`QUOTE_POSE_HOURS_COST_MISSING:${adjustment.id}:${line.lineId}`);
+      warnings.push(`QUOTE_POSE_HOURS_COST_MISSING:${adjustment.id}:${ligne.lineId}`);
       continue;
     }
     if (saleRate === 0) zeroRateDetected = true;
     const saleIncrement = assertSafeMoney(Math.round(addedHours * saleRate));
-    line.saleCents = addMoney(line.saleCents, saleIncrement);
+    ligne.saleCents = addMoney(ligne.saleCents, saleIncrement);
   }
 
   if (zeroRateDetected) {
@@ -376,49 +376,49 @@ function applyPoseHoursAdjustment(
 }
 
 function applyHotelAdjustment(
-  lines: MutableLine[],
+  lignes: MutableLine[],
   adjustment: QuoteHotelAdjustment,
   warnings: string[],
   scopeLabel: string,
 ) {
-  const eligible = lines.filter((line) => line.poseHours > 0);
+  const eligible = lignes.filter((ligne) => ligne.poseHours > 0);
   if (eligible.length === 0) {
     warnings.push(`QUOTE_HOTEL_NO_POSE_HOURS:${adjustment.id}:${scopeLabel}`);
     return;
   }
 
   const hotelCostCents = assertSafeMoney(adjustment.nights * adjustment.pricePerNightCents);
-  const costDistribution = moneyDistribution(hotelCostCents, eligible, (line) => line.poseHours);
+  const costDistribution = moneyDistribution(hotelCostCents, eligible, (ligne) => ligne.poseHours);
 
-  for (const line of eligible) {
-    const costIncrement = costDistribution.get(line.lineId) ?? 0;
-    if (line.costCents !== null) {
-      line.costCents = addMoney(line.costCents, costIncrement);
+  for (const ligne of eligible) {
+    const costIncrement = costDistribution.get(ligne.lineId) ?? 0;
+    if (ligne.costCents !== null) {
+      ligne.costCents = addMoney(ligne.costCents, costIncrement);
     }
 
     let saleIncrement = costIncrement;
     if (adjustment.marginTreatment === "MARGED") {
-      const costRate = line.poseCostRateCents;
-      const saleRate = line.poseSaleRateCents;
+      const costRate = ligne.poseCostRateCents;
+      const saleRate = ligne.poseSaleRateCents;
       if (costRate === null || saleRate === null || costRate <= 0 || saleRate <= 0) {
-        warnings.push(`QUOTE_HOTEL_MARGIN_RATE_MISSING:${adjustment.id}:${line.lineId}`);
+        warnings.push(`QUOTE_HOTEL_MARGIN_RATE_MISSING:${adjustment.id}:${ligne.lineId}`);
       } else {
         saleIncrement = assertSafeMoney(Math.round((costIncrement * saleRate) / costRate));
       }
     }
 
-    line.saleCents = addMoney(line.saleCents, saleIncrement);
+    ligne.saleCents = addMoney(ligne.saleCents, saleIncrement);
   }
 }
 
 function applyScopeAdjustments(
-  lines: MutableLine[],
+  lignes: MutableLine[],
   adjustments: QuotePricingAdjustment[],
   isOption: boolean,
   warnings: string[],
   scopeLabel: string,
 ) {
-  if (lines.length === 0) return;
+  if (lignes.length === 0) return;
   const applicable = adjustments.filter(
     (adjustment) => adjustment.active && (!isOption || adjustment.applyToOptions),
   );
@@ -427,49 +427,51 @@ function applyScopeAdjustments(
   // 3) marge supplémentaire PAPOT, 4) commissions et autres pourcentages sans marge.
   for (const adjustment of applicable) {
     if (adjustment.kind !== "POSE_HOURS") continue;
-    applyPoseHoursAdjustment(lines, adjustment, warnings, scopeLabel);
+    applyPoseHoursAdjustment(lignes, adjustment, warnings, scopeLabel);
   }
 
   for (const adjustment of applicable) {
     if (adjustment.kind !== "HOTEL") continue;
-    applyHotelAdjustment(lines, adjustment, warnings, scopeLabel);
+    applyHotelAdjustment(lignes, adjustment, warnings, scopeLabel);
   }
 
-  const margedPercent = applicable.reduce((sum, adjustment) => {
+  const margedPercent = applicable.reduce((somme, adjustment) => {
     if (adjustment.kind !== "PERCENTAGE" || adjustment.marginTreatment !== "MARGED") {
-      return sum;
+      return somme;
     }
-    return sum + adjustment.percent;
+    return somme + adjustment.percent;
   }, 0);
 
   if (margedPercent > 0) {
-    const currentSaleCents = scopeSale(lines);
+    const currentSaleCents = scopeSale(lignes);
     const incrementCents = assertSafeMoney(Math.round((currentSaleCents * margedPercent) / 100));
-    applyMoneyToLines(lines, incrementCents, 0, (line) => line.saleCents);
+    applyMoneyToLines(lignes, incrementCents, 0, (ligne) => ligne.saleCents);
   }
 
-  const passThroughPercent = applicable.reduce((sum, adjustment) => {
+  const passThroughPercent = applicable.reduce((somme, adjustment) => {
     if (adjustment.kind !== "PERCENTAGE" || adjustment.marginTreatment !== "PASS_THROUGH") {
-      return sum;
+      return somme;
     }
-    return sum + adjustment.percent;
+    return somme + adjustment.percent;
   }, 0);
 
   if (passThroughPercent >= 100) {
     throw new Error("QUOTE_PASS_THROUGH_PERCENT_INVALID");
   }
   if (passThroughPercent > 0) {
-    const currentSaleCents = scopeSale(lines);
+    const currentSaleCents = scopeSale(lignes);
     const targetSaleCents = assertSafeMoney(
       Math.round(currentSaleCents / (1 - passThroughPercent / 100)),
     );
     const incrementCents = targetSaleCents - currentSaleCents;
-    applyMoneyToLines(lines, incrementCents, incrementCents, (line) => line.saleCents);
+    applyMoneyToLines(lignes, incrementCents, incrementCents, (ligne) => ligne.saleCents);
   }
 }
 
-function sumPoseHours(lines: MutableLine[]): number {
-  return Math.round(lines.reduce((sum, line) => sum + line.poseHours, 0) * 1_000_000) / 1_000_000;
+function sumPoseHours(lignes: MutableLine[]): number {
+  return (
+    Math.round(lignes.reduce((somme, ligne) => somme + ligne.poseHours, 0) * 1_000_000) / 1_000_000
+  );
 }
 
 function marginPercent(saleCents: number, costCents: number): number | null {
@@ -478,30 +480,30 @@ function marginPercent(saleCents: number, costCents: number): number | null {
 }
 
 export function calculateQuoteAdjustedPricing(
-  items: QuoteItem[],
-  config: QuotePricingConfig = createEmptyQuotePricingConfig(),
+  elements: QuoteItem[],
+  configuration: QuotePricingConfig = createEmptyQuotePricingConfig(),
 ): QuoteAdjustedPricing {
-  const parsedConfig = quotePricingConfigSchema.parse(config);
-  const itemById = new Map(items.map((item) => [item.id, item]));
+  const parsedConfig = quotePricingConfigSchema.parse(configuration);
+  const itemById = new Map(elements.map((element) => [element.id, element]));
   const optionByTarget = new Map(
     parsedConfig.options.map((option) => [option.targetItemId, option]),
   );
 
-  const lines: MutableLine[] = items
-    .filter((item): item is QuoteLine => item.kind === "LINE")
-    .map((line) => {
-      const baseSaleCents = lineAmountCents(line.quantity, line.unitPriceCents ?? 0);
-      const components = line.components ?? [];
+  const lignes: MutableLine[] = elements
+    .filter((element): element is QuoteLine => element.kind === "LINE")
+    .map((ligne) => {
+      const baseSaleCents = lineAmountCents(ligne.quantity, ligne.unitPriceCents ?? 0);
+      const components = ligne.components ?? [];
       const unitCostCents =
         components.length > 0 ? calculateQuoteOuvrageUnitCostCents(components) : null;
       const baseCostCents =
-        unitCostCents === null ? null : lineAmountCents(line.quantity, unitCostCents);
-      const resolvedOption = optionForLine(line, itemById, optionByTarget);
-      const poseProfile = linePoseProfile(line);
+        unitCostCents === null ? null : lineAmountCents(ligne.quantity, unitCostCents);
+      const resolvedOption = optionForLine(ligne, itemById, optionByTarget);
+      const poseProfile = linePoseProfile(ligne);
       return {
-        line,
-        lineId: line.id,
-        description: line.description,
+        line: ligne,
+        lineId: ligne.id,
+        description: ligne.description,
         resolvedOption,
         optionId: resolvedOption?.id ?? null,
         optionStatus: resolvedOption?.status ?? null,
@@ -517,11 +519,11 @@ export function calculateQuoteAdjustedPricing(
     });
 
   const warnings: string[] = [];
-  const mainBaseLines = lines.filter((line) => !line.resolvedOption);
+  const mainBaseLines = lignes.filter((ligne) => !ligne.resolvedOption);
   applyScopeAdjustments(mainBaseLines, parsedConfig.adjustments, false, warnings, "MAIN");
 
   for (const option of parsedConfig.options) {
-    const optionLines = lines.filter((line) => line.resolvedOption?.id === option.id);
+    const optionLines = lignes.filter((ligne) => ligne.resolvedOption?.id === option.id);
     applyScopeAdjustments(optionLines, parsedConfig.adjustments, true, warnings, option.id);
   }
 
@@ -530,8 +532,8 @@ export function calculateQuoteAdjustedPricing(
       .filter((option) => option.status === "RETAINED")
       .map((option) => option.id),
   );
-  const mainLines = lines.filter(
-    (line) => !line.resolvedOption || retainedOptionIds.has(line.resolvedOption.id),
+  const mainLines = lignes.filter(
+    (ligne) => !ligne.resolvedOption || retainedOptionIds.has(ligne.resolvedOption.id),
   );
 
   const grossSaleCents = scopeSale(mainLines);
@@ -548,27 +550,27 @@ export function calculateQuoteAdjustedPricing(
     const discountDistribution = moneyDistribution(
       customerDiscountCents,
       mainLines,
-      (line) => line.saleCents,
+      (ligne) => ligne.saleCents,
     );
-    for (const line of mainLines) {
-      line.saleCents = subtractMoney(line.saleCents, discountDistribution.get(line.lineId) ?? 0);
+    for (const ligne of mainLines) {
+      ligne.saleCents = subtractMoney(ligne.saleCents, discountDistribution.get(ligne.lineId) ?? 0);
     }
   }
 
   const totalSaleCents = scopeSale(mainLines);
-  const costComplete = mainLines.every((line) => line.costCents !== null);
+  const costComplete = mainLines.every((ligne) => ligne.costCents !== null);
   const totalCostCents = costComplete
-    ? mainLines.reduce((total, line) => addMoney(total, line.costCents ?? 0), 0)
+    ? mainLines.reduce((total, ligne) => addMoney(total, ligne.costCents ?? 0), 0)
     : null;
   const marginAmountCents = totalCostCents === null ? null : totalSaleCents - totalCostCents;
 
   const optionSummaries = parsedConfig.options.map((option) => {
-    const optionLines = lines.filter((line) => line.resolvedOption?.id === option.id);
+    const optionLines = lignes.filter((ligne) => ligne.resolvedOption?.id === option.id);
     return {
       id: option.id,
       label: option.label,
       status: option.status,
-      saleCents: optionLines.reduce((total, line) => addMoney(total, line.saleCents), 0),
+      saleCents: optionLines.reduce((total, ligne) => addMoney(total, ligne.saleCents), 0),
       poseHours: sumPoseHours(optionLines),
     };
   });
@@ -579,14 +581,14 @@ export function calculateQuoteAdjustedPricing(
   return {
     grossSaleCents,
     customerDiscountCents,
-    lines: lines.map(
+    lines: lignes.map(
       ({
         line: _line,
         resolvedOption: _resolvedOption,
         poseCostRateCents: _poseCostRateCents,
         poseSaleRateCents: _poseSaleRateCents,
-        ...line
-      }) => line,
+        ...ligne
+      }) => ligne,
     ),
     totalSaleCents,
     totalCostCents,

@@ -21,44 +21,50 @@ type EditableRow = BillingDocumentLine & { quantityInput: string; priceInput: st
 
 const currency = (cents: number) =>
   (cents / 100).toLocaleString("fr-FR", { style: "currency", currency: "EUR" });
-const decimal = (value: number) => String(value).replace(".", ",");
-const euros = (value: number) => (value / 100).toFixed(2).replace(".", ",");
-function centsFromEuros(value: string): number {
-  const text = value.replace(/\s/g, "").replace(",", ".");
-  if (!/^\d+(\.\d{1,2})?$/.test(text)) return NaN;
-  return Math.round(Number(text) * 100);
+const decimal = (valeur: number) => String(valeur).replace(".", ",");
+const euros = (valeur: number) => (valeur / 100).toFixed(2).replace(".", ",");
+function centsFromEuros(valeur: string): number {
+  const texte = valeur.replace(/\s/g, "").replace(",", ".");
+  if (!/^\d+(\.\d{1,2})?$/.test(texte)) return NaN;
+  return Math.round(Number(texte) * 100);
 }
-function quantityFromText(value: string): number {
-  const text = value.replace(/\s/g, "").replace(",", ".");
-  return /^\d+(\.\d{1,4})?$/.test(text) ? Number(text) : NaN;
+function quantityFromText(valeur: string): number {
+  const texte = valeur.replace(/\s/g, "").replace(",", ".");
+  return /^\d+(\.\d{1,4})?$/.test(texte) ? Number(texte) : NaN;
 }
-function editable(row: BillingDocumentLine): EditableRow {
-  return { ...row, quantityInput: decimal(row.quantity), priceInput: euros(row.unitPriceCents) };
+function editable(ligneTableau: BillingDocumentLine): EditableRow {
+  return {
+    ...ligneTableau,
+    quantityInput: decimal(ligneTableau.quantity),
+    priceInput: euros(ligneTableau.unitPriceCents),
+  };
 }
-function serialize(row: EditableRow): BillingDocumentLine | null {
-  if (!row.description.trim()) return null;
-  const quantity = row.origin === "TITLE" ? 0 : quantityFromText(row.quantityInput);
-  const unitPriceCents = row.origin === "TITLE" ? 0 : centsFromEuros(row.priceInput);
+function serialize(ligneTableau: EditableRow): BillingDocumentLine | null {
+  if (!ligneTableau.description.trim()) return null;
+  const quantity =
+    ligneTableau.origin === "TITLE" ? 0 : quantityFromText(ligneTableau.quantityInput);
+  const unitPriceCents =
+    ligneTableau.origin === "TITLE" ? 0 : centsFromEuros(ligneTableau.priceInput);
   if (
     !Number.isFinite(quantity) ||
     !Number.isSafeInteger(unitPriceCents) ||
     quantity < 0 ||
     unitPriceCents < 0 ||
-    (row.origin !== "TITLE" && quantity <= 0)
+    (ligneTableau.origin !== "TITLE" && quantity <= 0)
   )
     return null;
   return {
-    id: row.id,
-    origin: row.origin,
-    sourceLineId: row.sourceLineId,
-    description: row.description,
+    id: ligneTableau.id,
+    origin: ligneTableau.origin,
+    sourceLineId: ligneTableau.sourceLineId,
+    description: ligneTableau.description,
     quantity,
-    unit: row.unit,
+    unit: ligneTableau.unit,
     unitPriceCents,
-    vatRatePercent: row.vatRatePercent,
+    vatRatePercent: ligneTableau.vatRatePercent,
   };
 }
-const labels: Record<BillingDraft["type"], string> = {
+const libelles: Record<BillingDraft["type"], string> = {
   STANDARD: "Facture classique",
   DEPOSIT: "Acompte",
   PROGRESS: "Situation",
@@ -87,49 +93,50 @@ const serverErrors: Record<string, string> = {
     "La TVA est incompatible avec les acomptes déjà préparés.",
 };
 
-export function BillingDocumentEditor({ draftId }: { draftId: string }) {
+export function BillingDocumentEditor({ draftId: idBrouillon }: { draftId: string }) {
   const router = useRouter();
-  const [draft, setDraft] = useState<BillingDraft | null>(null);
+  const [brouillon, setDraft] = useState<BillingDraft | null>(null);
   const [canWrite, setCanWrite] = useState(false);
-  const [rows, setRows] = useState<EditableRow[]>([]);
+  const [lignesTableau, setRows] = useState<EditableRow[]>([]);
   const [initialRows, setInitialRows] = useState<EditableRow[]>([]);
-  const [payload, setPayload] = useState<BillingPayload | null>(null);
+  const [contenu, setPayload] = useState<BillingPayload | null>(null);
   const [progressValues, setProgressValues] = useState<Record<string, string>>({});
   const [pendingPercentages, setPendingPercentages] = useState<LineProgressInput[] | null>(null);
-  const [label, setLabel] = useState("");
+  const [libelle, setLabel] = useState("");
   const [notes, setNotes] = useState("");
   const [busy, setBusy] = useState(false);
-  const [loading, setLoading] = useState(true);
+  const [chargement, setLoading] = useState(true);
   const [dirty, setDirty] = useState(false);
-  const [error, setError] = useState("");
+  const [erreur, setError] = useState("");
   const [notice, setNotice] = useState("");
 
   async function reload() {
-    const response = await fetch("/api/desktop/billing", { cache: "no-store" });
-    const json = (await response.json()) as ApiSnapshot;
-    if (!response.ok) throw new Error(json.error ?? "Impossible de charger la facture");
-    const selected = json.payload.drafts.find((item) => item.id === draftId);
-    if (!selected) throw new Error("Projet de facture introuvable");
-    setDraft(selected);
+    const reponse = await fetch("/api/desktop/billing", { cache: "no-store" });
+    const json = (await reponse.json()) as ApiSnapshot;
+    if (!reponse.ok) throw new Error(json.error ?? "Impossible de charger la facture");
+    const selectionne = json.payload.drafts.find((element) => element.id === idBrouillon);
+    if (!selectionne) throw new Error("Projet de facture introuvable");
+    setDraft(selectionne);
     setPayload(json.payload);
-    setCanWrite(json.canWrite && selected.status === "DRAFT");
+    setCanWrite(json.canWrite && selectionne.status === "DRAFT");
     setProgressValues(
       Object.fromEntries(
-        (selected.lines ?? []).map((line) => [
-          line.lineId,
+        (selectionne.lines ?? []).map((ligne) => [
+          ligne.lineId,
           decimal(
-            selected.lineProgress?.find((row) => row.lineId === line.lineId)?.percent ??
-              selected.cumulativePercent ??
+            selectionne.lineProgress?.find((ligneTableau) => ligneTableau.lineId === ligne.lineId)
+              ?.percent ??
+              selectionne.cumulativePercent ??
               0,
           ),
         ]),
       ),
     );
     setPendingPercentages(null);
-    setLabel(selected.label);
-    setNotes(selected.notes);
+    setLabel(selectionne.label);
+    setNotes(selectionne.notes);
     const original = (
-      selected.documentLines ?? buildInvoiceDocumentLines(selected, json.payload)
+      selectionne.documentLines ?? buildInvoiceDocumentLines(selectionne, json.payload)
     ).map(editable);
     setRows(original);
     setInitialRows(original);
@@ -143,19 +150,19 @@ export function BillingDocumentEditor({ draftId }: { draftId: string }) {
       .finally(() => setLoading(false));
     // The draft ID is stable for this route.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [draftId]);
+  }, [idBrouillon]);
   useEffect(() => {
     if (!dirty) return;
-    const warn = (event: BeforeUnloadEvent) => {
-      event.preventDefault();
+    const warn = (evenement: BeforeUnloadEvent) => {
+      evenement.preventDefault();
     };
     window.addEventListener("beforeunload", warn);
     return () => window.removeEventListener("beforeunload", warn);
   }, [dirty]);
 
-  const parsedRows = useMemo(() => rows.map(serialize), [rows]);
-  const invalid = parsedRows.some((row) => row === null);
-  const preview = useMemo(() => {
+  const parsedRows = useMemo(() => lignesTableau.map(serialize), [lignesTableau]);
+  const invalid = parsedRows.some((ligneTableau) => ligneTableau === null);
+  const apercu = useMemo(() => {
     if (invalid || parsedRows.length === 0) return null;
     try {
       return calculateInvoiceDocumentTotals(parsedRows as BillingDocumentLine[]);
@@ -163,40 +170,46 @@ export function BillingDocumentEditor({ draftId }: { draftId: string }) {
       return null;
     }
   }, [parsedRows, invalid]);
-  const rates = [...new Set(draft?.contractTaxGroups.map((rate) => rate.ratePercent) ?? [20])].sort(
-    (a, b) => a - b,
-  );
-  const titleChoices = payload?.invoiceTitles ?? [...DEFAULT_BILLING_TITLES];
-  const availableTitles = titleChoices.includes(label) ? titleChoices : [label, ...titleChoices];
+  const rates = [
+    ...new Set(brouillon?.contractTaxGroups.map((rate) => rate.ratePercent) ?? [20]),
+  ].sort((a, b) => a - b);
+  const titleChoices = contenu?.invoiceTitles ?? [...DEFAULT_BILLING_TITLES];
+  const availableTitles = titleChoices.includes(libelle)
+    ? titleChoices
+    : [libelle, ...titleChoices];
   const priorProjects =
-    draft && payload
-      ? payload.drafts
+    brouillon && contenu
+      ? contenu.drafts
           .slice(
             0,
-            payload.drafts.findIndex((item) => item.id === draft.id),
+            contenu.drafts.findIndex((element) => element.id === brouillon.id),
           )
-          .filter((item) => item.quoteId === draft.quoteId)
+          .filter((element) => element.quoteId === brouillon.quoteId)
       : [];
-  const priorHt = priorProjects.reduce((sum, item) => sum + item.amountHtCents, 0);
+  const priorHt = priorProjects.reduce((somme, element) => somme + element.amountHtCents, 0);
 
   function alter(id: string, patch: Partial<EditableRow>) {
-    setRows((old) => old.map((row) => (row.id === id ? { ...row, ...patch } : row)));
+    setRows((old) =>
+      old.map((ligneTableau) =>
+        ligneTableau.id === id ? { ...ligneTableau, ...patch } : ligneTableau,
+      ),
+    );
     setDirty(true);
     setNotice("");
   }
-  function reorder(index: number, direction: number) {
-    const other = index + direction;
-    if (other < 0 || other >= rows.length) return;
+  function reorder(indice: number, direction: number) {
+    const other = indice + direction;
+    if (other < 0 || other >= lignesTableau.length) return;
     setRows((old) => {
-      const result = [...old];
-      [result[index], result[other]] = [result[other], result[index]];
-      return result;
+      const resultat = [...old];
+      [resultat[indice], resultat[other]] = [resultat[other], resultat[indice]];
+      return resultat;
     });
     setDirty(true);
     setNotice("");
   }
   function addLine(kind: "FREE" | "TITLE") {
-    const row: BillingDocumentLine = {
+    const ligneTableau: BillingDocumentLine = {
       id: crypto.randomUUID(),
       origin: kind,
       sourceLineId: null,
@@ -206,37 +219,40 @@ export function BillingDocumentEditor({ draftId }: { draftId: string }) {
       unitPriceCents: 0,
       vatRatePercent: kind === "TITLE" ? 0 : (rates[0] ?? 20),
     };
-    setRows((old) => [...old, editable(row)]);
+    setRows((old) => [...old, editable(ligneTableau)]);
     setDirty(true);
     setNotice("");
   }
-  function duplicate(row: EditableRow, index: number) {
-    if (row.origin === "TITLE") return;
+  function duplicate(ligneTableau: EditableRow, indice: number) {
+    if (ligneTableau.origin === "TITLE") return;
     const copy: EditableRow = {
-      ...row,
+      ...ligneTableau,
       id: crypto.randomUUID(),
       origin: "FREE",
       sourceLineId: null,
-      description: `${row.description} (copie)`,
+      description: `${ligneTableau.description} (copie)`,
     };
-    setRows((old) => [...old.slice(0, index + 1), copy, ...old.slice(index + 1)]);
+    setRows((old) => [...old.slice(0, indice + 1), copy, ...old.slice(indice + 1)]);
     setDirty(true);
     setNotice("");
   }
   function remove(id: string) {
-    setRows((old) => old.filter((row) => row.id !== id));
+    setRows((old) => old.filter((ligneTableau) => ligneTableau.id !== id));
     setDirty(true);
     setNotice("");
   }
   function applyProgress() {
-    if (!draft || !payload || draft.type !== "PROGRESS" || !draft.lines?.length) return;
-    const percentages = draft.lines.map((line) => ({
-      lineId: line.lineId,
-      percent: Number((progressValues[line.lineId] ?? "").replace(",", ".")),
+    if (!brouillon || !contenu || brouillon.type !== "PROGRESS" || !brouillon.lines?.length) return;
+    const percentages = brouillon.lines.map((ligne) => ({
+      lineId: ligne.lineId,
+      percent: Number((progressValues[ligne.lineId] ?? "").replace(",", ".")),
     }));
     if (
       percentages.some(
-        (row) => !Number.isFinite(row.percent) || row.percent < 0 || row.percent > 100,
+        (ligneTableau) =>
+          !Number.isFinite(ligneTableau.percent) ||
+          ligneTableau.percent < 0 ||
+          ligneTableau.percent > 100,
       )
     ) {
       setError("L'avancement de chaque ligne doit être compris entre 0 et 100 %.");
@@ -250,20 +266,20 @@ export function BillingDocumentEditor({ draftId }: { draftId: string }) {
     )
       return;
     try {
-      const index = payload.drafts.findIndex((row) => row.id === draft.id);
-      const previous = { schemaVersion: 1 as const, drafts: payload.drafts.slice(0, index) };
-      const result = calculateLineProgress(previous, draft, percentages);
+      const indice = contenu.drafts.findIndex((ligneTableau) => ligneTableau.id === brouillon.id);
+      const precedent = { schemaVersion: 1 as const, drafts: contenu.drafts.slice(0, indice) };
+      const resultat = calculateLineProgress(precedent, brouillon, percentages);
       const recalculated: BillingDraft = {
-        ...draft,
-        lineProgress: result.lineProgress,
+        ...brouillon,
+        lineProgress: resultat.lineProgress,
         cumulativePercent: null,
-        amountHtCents: result.amountHtCents,
-        taxGroups: result.tax.groups,
-        vatCents: result.tax.vatCents,
-        totalTtcCents: result.tax.ttcCents,
+        amountHtCents: resultat.amountHtCents,
+        taxGroups: resultat.tax.groups,
+        vatCents: resultat.tax.vatCents,
+        totalTtcCents: resultat.tax.ttcCents,
       };
-      const custom = rows.filter((row) => row.origin !== "QUOTE");
-      setRows([...buildInvoiceDocumentLines(recalculated, previous).map(editable), ...custom]);
+      const custom = lignesTableau.filter((ligneTableau) => ligneTableau.origin !== "QUOTE");
+      setRows([...buildInvoiceDocumentLines(recalculated, precedent).map(editable), ...custom]);
       setPendingPercentages(percentages);
       setDirty(true);
       setError("");
@@ -276,53 +292,54 @@ export function BillingDocumentEditor({ draftId }: { draftId: string }) {
   function goBack() {
     if (dirty && !window.confirm("Des modifications ne sont pas enregistrées. Quitter ?")) return;
     router.push(
-      draft?.chantierId
-        ? `/facturation?chantierId=${encodeURIComponent(draft.chantierId)}`
-        : `/facturation?quoteId=${encodeURIComponent(draft?.quoteId ?? "")}`,
+      brouillon?.chantierId
+        ? `/facturation?chantierId=${encodeURIComponent(brouillon.chantierId)}`
+        : `/facturation?quoteId=${encodeURIComponent(brouillon?.quoteId ?? "")}`,
     );
   }
   async function save() {
-    if (!draft || !canWrite || busy) return;
+    if (!brouillon || !canWrite || busy) return;
     setError("");
     setNotice("");
-    if (!label.trim() || invalid || !preview || !parsedRows.length) {
+    if (!libelle.trim() || invalid || !apercu || !parsedRows.length) {
       setError("Renseigne les désignations, quantités et prix de chaque ligne.");
       return;
     }
-    const previous = draft.amountHtCents;
-    const exceeds = preview.amountHtCents > draft.contractHtCents;
+    const precedent = brouillon.amountHtCents;
+    const exceeds = apercu.amountHtCents > brouillon.contractHtCents;
     if (exceeds) {
       setError("Ce projet dépasse le devis retenu. Crée un devis complémentaire validé.");
       return;
     }
     setBusy(true);
     try {
-      const response = await fetch("/api/desktop/billing", {
+      const reponse = await fetch("/api/desktop/billing", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           action: "UPDATE_DOCUMENT",
-          draftId: draft.id,
-          expectedUpdatedAt: draft.updatedAt,
-          label: label.trim(),
+          draftId: brouillon.id,
+          expectedUpdatedAt: brouillon.updatedAt,
+          label: libelle.trim(),
           notes,
           documentLines: parsedRows,
           ...(pendingPercentages ? { linePercentages: pendingPercentages } : {}),
         }),
       });
-      const json = (await response.json()) as ApiSnapshot;
-      if (!response.ok) throw new Error(json.error ?? "Enregistrement impossible");
-      const saved = json.payload.drafts.find((item) => item.id === draft.id);
+      const json = (await reponse.json()) as ApiSnapshot;
+      if (!reponse.ok) throw new Error(json.error ?? "Enregistrement impossible");
+      const saved = json.payload.drafts.find((element) => element.id === brouillon.id);
       if (!saved) throw new Error("Projet introuvable après enregistrement");
       setDraft(saved);
       setPayload(json.payload);
       setPendingPercentages(null);
       setProgressValues(
         Object.fromEntries(
-          (saved.lines ?? []).map((line) => [
-            line.lineId,
+          (saved.lines ?? []).map((ligne) => [
+            ligne.lineId,
             decimal(
-              saved.lineProgress?.find((row) => row.lineId === line.lineId)?.percent ??
+              saved.lineProgress?.find((ligneTableau) => ligneTableau.lineId === ligne.lineId)
+                ?.percent ??
                 saved.cumulativePercent ??
                 0,
             ),
@@ -334,7 +351,7 @@ export function BillingDocumentEditor({ draftId }: { draftId: string }) {
       setInitialRows(original);
       setDirty(false);
       setNotice(
-        preview.amountHtCents !== previous
+        apercu.amountHtCents !== precedent
           ? "Projet enregistré et totaux recalculés. Aucune facture officielle émise."
           : "Modifications enregistrées. Aucune facture officielle émise.",
       );
@@ -347,7 +364,7 @@ export function BillingDocumentEditor({ draftId }: { draftId: string }) {
   }
 
   async function approve() {
-    if (!draft || !canWrite || busy || dirty) return;
+    if (!brouillon || !canWrite || busy || dirty) return;
     if (
       !window.confirm(
         "Valider et verrouiller ce projet en interne ? Il ne pourra plus être modifié. Aucun numéro légal ni facture officielle ne sera émis.",
@@ -357,17 +374,17 @@ export function BillingDocumentEditor({ draftId }: { draftId: string }) {
     setBusy(true);
     setError("");
     try {
-      const response = await fetch("/api/desktop/billing", {
+      const reponse = await fetch("/api/desktop/billing", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           action: "APPROVE",
-          draftId: draft.id,
-          expectedUpdatedAt: draft.updatedAt,
+          draftId: brouillon.id,
+          expectedUpdatedAt: brouillon.updatedAt,
         }),
       });
-      const result = (await response.json()) as ApiSnapshot;
-      if (!response.ok) throw new Error(result.error ?? "Validation impossible");
+      const resultat = (await reponse.json()) as ApiSnapshot;
+      if (!reponse.ok) throw new Error(resultat.error ?? "Validation impossible");
       await reload();
       setNotice("Projet approuvé et verrouillé en interne. Aucune facture officielle émise.");
     } catch (caught) {
@@ -378,11 +395,11 @@ export function BillingDocumentEditor({ draftId }: { draftId: string }) {
     }
   }
 
-  if (loading) return <main className="invoiceLoading">Chargement du projet de facture…</main>;
-  if (!draft)
+  if (chargement) return <main className="invoiceLoading">Chargement du projet de facture…</main>;
+  if (!brouillon)
     return (
       <main className="invoiceLoading" role="alert">
-        {error || "Facture introuvable."}
+        {erreur || "Facture introuvable."}
       </main>
     );
 
@@ -394,18 +411,18 @@ export function BillingDocumentEditor({ draftId }: { draftId: string }) {
             <ArrowLeft size={15} /> Retour aux projets
           </button>
           <span className="invoiceTag">
-            {draft.status === "APPROVED" ? "VALIDÉ EN INTERNE · NON ÉMIS" : "PROJET · NON ÉMIS"}
+            {brouillon.status === "APPROVED" ? "VALIDÉ EN INTERNE · NON ÉMIS" : "PROJET · NON ÉMIS"}
           </span>
           <h1>
-            <FileText size={25} /> {labels[draft.type]}
+            <FileText size={25} /> {libelles[brouillon.type]}
           </h1>
           <p>
-            {draft.affairName} · {draft.clientName}
+            {brouillon.affairName} · {brouillon.clientName}
           </p>
           <div className="invoiceReferences">
-            <Link href={`/devis/${draft.quoteId}`}>Devis source : {draft.quoteLabel}</Link>
-            {draft.chantierId && (
-              <Link href={`/chantiers/${draft.chantierId}`}>Ouvrir le chantier</Link>
+            <Link href={`/devis/${brouillon.quoteId}`}>Devis source : {brouillon.quoteLabel}</Link>
+            {brouillon.chantierId && (
+              <Link href={`/chantiers/${brouillon.chantierId}`}>Ouvrir le chantier</Link>
             )}
           </div>
         </div>
@@ -427,9 +444,9 @@ export function BillingDocumentEditor({ draftId }: { draftId: string }) {
         Le devis signé reste inchangé. Ce projet n&apos;a ni numéro officiel, ni PDF émis, ni envoi
         Pennylane.
       </aside>
-      {error && (
+      {erreur && (
         <p className="invoiceError" role="alert">
-          {error}
+          {erreur}
         </p>
       )}
       {notice && (
@@ -439,7 +456,7 @@ export function BillingDocumentEditor({ draftId }: { draftId: string }) {
       )}
       {!canWrite && (
         <p className="invoiceDraftNotice">
-          {draft.status === "APPROVED"
+          {brouillon.status === "APPROVED"
             ? "Projet verrouillé après validation interne."
             : "Lecture seule : droit Facturation en écriture requis."}
         </p>
@@ -451,16 +468,16 @@ export function BillingDocumentEditor({ draftId }: { draftId: string }) {
           <label>
             Intitulé de la facture
             <select
-              value={label}
+              value={libelle}
               disabled={!canWrite}
               onChange={(e) => {
                 setLabel(e.target.value);
                 setDirty(true);
               }}
             >
-              {availableTitles.map((item) => (
-                <option key={item} value={item}>
-                  {item}
+              {availableTitles.map((element) => (
+                <option key={element} value={element}>
+                  {element}
                 </option>
               ))}
             </select>
@@ -506,20 +523,20 @@ export function BillingDocumentEditor({ draftId }: { draftId: string }) {
                 </tr>
               </thead>
               <tbody>
-                {priorProjects.map((item) => (
-                  <tr key={item.id}>
+                {priorProjects.map((element) => (
+                  <tr key={element.id}>
                     <td>
-                      <Link href={`/facturation/${item.id}`}>
-                        {labels[item.type]} · {item.label}
+                      <Link href={`/facturation/${element.id}`}>
+                        {libelles[element.type]} · {element.label}
                       </Link>
                     </td>
-                    <td>{new Date(item.createdAt).toLocaleDateString("fr-FR")}</td>
+                    <td>{new Date(element.createdAt).toLocaleDateString("fr-FR")}</td>
                     <td>
-                      {item.status === "APPROVED" ? "Validé en interne" : "Projet non validé"}
+                      {element.status === "APPROVED" ? "Validé en interne" : "Projet non validé"}
                     </td>
-                    <td>{currency(item.amountHtCents)}</td>
-                    <td>{currency(item.vatCents)}</td>
-                    <td>{currency(item.totalTtcCents)}</td>
+                    <td>{currency(element.amountHtCents)}</td>
+                    <td>{currency(element.vatCents)}</td>
+                    <td>{currency(element.totalTtcCents)}</td>
                   </tr>
                 ))}
               </tbody>
@@ -528,9 +545,9 @@ export function BillingDocumentEditor({ draftId }: { draftId: string }) {
         )}
         <p>
           <strong>Déjà préparé : {currency(priorHt)} HT</strong> · Projet actuel :{" "}
-          {currency(preview?.amountHtCents ?? draft.amountHtCents)} HT · Cumul après ce projet :{" "}
-          {currency(priorHt + (preview?.amountHtCents ?? draft.amountHtCents))} HT sur{" "}
-          {currency(draft.contractHtCents)} HT.
+          {currency(apercu?.amountHtCents ?? brouillon.amountHtCents)} HT · Cumul après ce projet :{" "}
+          {currency(priorHt + (apercu?.amountHtCents ?? brouillon.amountHtCents))} HT sur{" "}
+          {currency(brouillon.contractHtCents)} HT.
         </p>
       </section>
 
@@ -552,7 +569,7 @@ export function BillingDocumentEditor({ draftId }: { draftId: string }) {
             <button
               className="primaryButton"
               type="button"
-              disabled={!canWrite || busy || rows.length >= 1000}
+              disabled={!canWrite || busy || lignesTableau.length >= 1000}
               onClick={() => addLine("FREE")}
             >
               <Plus size={15} /> Ajouter une ligne
@@ -574,30 +591,33 @@ export function BillingDocumentEditor({ draftId }: { draftId: string }) {
               </tr>
             </thead>
             <tbody>
-              {rows.map((row, index) => {
-                const current = parsedRows[index];
-                const amount = current
-                  ? Math.round(current.quantity * current.unitPriceCents)
+              {lignesTableau.map((ligneTableau, indice) => {
+                const courant = parsedRows[indice];
+                const montant = courant
+                  ? Math.round(courant.quantity * courant.unitPriceCents)
                   : NaN;
                 return (
-                  <tr key={row.id} className={row.origin === "TITLE" ? "invoiceTitleRow" : ""}>
-                    <td className="invoiceIndex">{index + 1}</td>
+                  <tr
+                    key={ligneTableau.id}
+                    className={ligneTableau.origin === "TITLE" ? "invoiceTitleRow" : ""}
+                  >
+                    <td className="invoiceIndex">{indice + 1}</td>
                     <td className="invoiceDescription">
                       <input
-                        aria-label={`Désignation ligne ${index + 1}`}
+                        aria-label={`Désignation ligne ${indice + 1}`}
                         disabled={!canWrite}
-                        value={row.description}
-                        onChange={(e) => alter(row.id, { description: e.target.value })}
+                        value={ligneTableau.description}
+                        onChange={(e) => alter(ligneTableau.id, { description: e.target.value })}
                       />
-                      {row.origin !== "TITLE" && (
+                      {ligneTableau.origin !== "TITLE" && (
                         <small>
-                          {row.origin === "QUOTE"
+                          {ligneTableau.origin === "QUOTE"
                             ? "Issu du devis"
                             : "Ligne ajoutée à cette facture"}
                         </small>
                       )}
                     </td>
-                    {row.origin === "TITLE" ? (
+                    {ligneTableau.origin === "TITLE" ? (
                       <td colSpan={5} className="invoiceTitleHint">
                         Titre libre, sans montant facturé
                       </td>
@@ -605,38 +625,40 @@ export function BillingDocumentEditor({ draftId }: { draftId: string }) {
                       <>
                         <td>
                           <input
-                            aria-label={`Quantité ligne ${index + 1}`}
+                            aria-label={`Quantité ligne ${indice + 1}`}
                             inputMode="decimal"
                             disabled={!canWrite}
-                            value={row.quantityInput}
-                            onChange={(e) => alter(row.id, { quantityInput: e.target.value })}
+                            value={ligneTableau.quantityInput}
+                            onChange={(e) =>
+                              alter(ligneTableau.id, { quantityInput: e.target.value })
+                            }
                           />
                         </td>
                         <td>
                           <input
-                            aria-label={`Unité ligne ${index + 1}`}
+                            aria-label={`Unité ligne ${indice + 1}`}
                             disabled={!canWrite}
                             maxLength={40}
-                            value={row.unit}
-                            onChange={(e) => alter(row.id, { unit: e.target.value })}
+                            value={ligneTableau.unit}
+                            onChange={(e) => alter(ligneTableau.id, { unit: e.target.value })}
                           />
                         </td>
                         <td>
                           <input
-                            aria-label={`Prix unitaire HT ligne ${index + 1}`}
+                            aria-label={`Prix unitaire HT ligne ${indice + 1}`}
                             inputMode="decimal"
                             disabled={!canWrite}
-                            value={row.priceInput}
-                            onChange={(e) => alter(row.id, { priceInput: e.target.value })}
+                            value={ligneTableau.priceInput}
+                            onChange={(e) => alter(ligneTableau.id, { priceInput: e.target.value })}
                           />
                         </td>
                         <td>
                           <select
-                            aria-label={`TVA ligne ${index + 1}`}
+                            aria-label={`TVA ligne ${indice + 1}`}
                             disabled={!canWrite}
-                            value={row.vatRatePercent}
+                            value={ligneTableau.vatRatePercent}
                             onChange={(e) =>
-                              alter(row.id, { vatRatePercent: Number(e.target.value) })
+                              alter(ligneTableau.id, { vatRatePercent: Number(e.target.value) })
                             }
                           >
                             {rates.map((rate) => (
@@ -647,7 +669,7 @@ export function BillingDocumentEditor({ draftId }: { draftId: string }) {
                           </select>
                         </td>
                         <td className="invoiceLineSum">
-                          {Number.isSafeInteger(amount) ? currency(amount) : "À vérifier"}
+                          {Number.isSafeInteger(montant) ? currency(montant) : "À vérifier"}
                         </td>
                       </>
                     )}
@@ -656,33 +678,33 @@ export function BillingDocumentEditor({ draftId }: { draftId: string }) {
                         <>
                           <button
                             title="Monter"
-                            aria-label={`Monter ligne ${index + 1}`}
-                            disabled={index === 0}
-                            onClick={() => reorder(index, -1)}
+                            aria-label={`Monter ligne ${indice + 1}`}
+                            disabled={indice === 0}
+                            onClick={() => reorder(indice, -1)}
                           >
                             <ArrowUp size={14} />
                           </button>
                           <button
                             title="Descendre"
-                            aria-label={`Descendre ligne ${index + 1}`}
-                            disabled={index === rows.length - 1}
-                            onClick={() => reorder(index, 1)}
+                            aria-label={`Descendre ligne ${indice + 1}`}
+                            disabled={indice === lignesTableau.length - 1}
+                            onClick={() => reorder(indice, 1)}
                           >
                             <ArrowDown size={14} />
                           </button>
-                          {row.origin !== "TITLE" && (
+                          {ligneTableau.origin !== "TITLE" && (
                             <button
                               title="Dupliquer"
-                              aria-label={`Dupliquer ligne ${index + 1}`}
-                              onClick={() => duplicate(row, index)}
+                              aria-label={`Dupliquer ligne ${indice + 1}`}
+                              onClick={() => duplicate(ligneTableau, indice)}
                             >
                               <Copy size={14} />
                             </button>
                           )}
                           <button
                             title="Supprimer"
-                            aria-label={`Supprimer ligne ${index + 1}`}
-                            onClick={() => remove(row.id)}
+                            aria-label={`Supprimer ligne ${indice + 1}`}
+                            onClick={() => remove(ligneTableau.id)}
                           >
                             <Trash2 size={14} />
                           </button>
@@ -695,7 +717,7 @@ export function BillingDocumentEditor({ draftId }: { draftId: string }) {
             </tbody>
           </table>
         </div>
-        {draft.type === "PROGRESS" && draft.lines?.length ? (
+        {brouillon.type === "PROGRESS" && brouillon.lines?.length ? (
           <details className="invoiceProgress" open>
             <summary>Avancement cumulé par ligne du devis</summary>
             <p>
@@ -711,19 +733,19 @@ export function BillingDocumentEditor({ draftId }: { draftId: string }) {
                   </tr>
                 </thead>
                 <tbody>
-                  {draft.lines.map((line) => (
-                    <tr key={line.lineId}>
-                      <td>{line.description}</td>
+                  {brouillon.lines.map((ligne) => (
+                    <tr key={ligne.lineId}>
+                      <td>{ligne.description}</td>
                       <td>
                         <input
-                          aria-label={`Avancement cumulé de ${line.description}`}
+                          aria-label={`Avancement cumulé de ${ligne.description}`}
                           inputMode="decimal"
                           disabled={!canWrite || busy}
-                          value={progressValues[line.lineId] ?? "0"}
-                          onChange={(event) =>
+                          value={progressValues[ligne.lineId] ?? "0"}
+                          onChange={(evenement) =>
                             setProgressValues((old) => ({
                               ...old,
-                              [line.lineId]: event.target.value,
+                              [ligne.lineId]: evenement.target.value,
                             }))
                           }
                         />
@@ -755,33 +777,33 @@ export function BillingDocumentEditor({ draftId }: { draftId: string }) {
         <div className="invoiceTotals">
           <div>
             <span>Montant HT</span>
-            <strong>{preview ? currency(preview.amountHtCents) : "À vérifier"}</strong>
+            <strong>{apercu ? currency(apercu.amountHtCents) : "À vérifier"}</strong>
           </div>
           <div>
             <span>TVA</span>
-            <strong>{preview ? currency(preview.vatCents) : "À vérifier"}</strong>
+            <strong>{apercu ? currency(apercu.vatCents) : "À vérifier"}</strong>
           </div>
           <div className="invoiceTtc">
             <span>Total TTC</span>
-            <strong>{preview ? currency(preview.totalTtcCents) : "À vérifier"}</strong>
+            <strong>{apercu ? currency(apercu.totalTtcCents) : "À vérifier"}</strong>
           </div>
         </div>
         <div className="invoiceTotals invoiceComparison">
           <div>
             <span>Contrat retenu HT</span>
-            <strong>{currency(draft.contractHtCents)}</strong>
+            <strong>{currency(brouillon.contractHtCents)}</strong>
           </div>
           <div>
             <span>Montant initial du projet HT</span>
-            <strong>{currency(draft.amountHtCents)}</strong>
+            <strong>{currency(brouillon.amountHtCents)}</strong>
           </div>
         </div>
         <div className="invoiceFooterActions">
-          {draft.status === "DRAFT" && (
+          {brouillon.status === "DRAFT" && (
             <button
               className="secondaryButton"
               type="button"
-              disabled={!canWrite || busy || dirty || !preview}
+              disabled={!canWrite || busy || dirty || !apercu}
               onClick={() => void approve()}
             >
               Valider en interne et verrouiller
@@ -793,16 +815,18 @@ export function BillingDocumentEditor({ draftId }: { draftId: string }) {
             onClick={() => {
               if (dirty && !window.confirm("Abandonner les modifications non enregistrées ?"))
                 return;
-              setRows(initialRows.map((row) => ({ ...row })));
-              setLabel(draft.label);
-              setNotes(draft.notes);
+              setRows(initialRows.map((ligneTableau) => ({ ...ligneTableau })));
+              setLabel(brouillon.label);
+              setNotes(brouillon.notes);
               setProgressValues(
                 Object.fromEntries(
-                  (draft.lines ?? []).map((line) => [
-                    line.lineId,
+                  (brouillon.lines ?? []).map((ligne) => [
+                    ligne.lineId,
                     decimal(
-                      draft.lineProgress?.find((row) => row.lineId === line.lineId)?.percent ??
-                        draft.cumulativePercent ??
+                      brouillon.lineProgress?.find(
+                        (ligneTableau) => ligneTableau.lineId === ligne.lineId,
+                      )?.percent ??
+                        brouillon.cumulativePercent ??
                         0,
                     ),
                   ]),
@@ -818,7 +842,7 @@ export function BillingDocumentEditor({ draftId }: { draftId: string }) {
           <button
             className="primaryButton"
             type="button"
-            disabled={!canWrite || busy || !dirty || !preview}
+            disabled={!canWrite || busy || !dirty || !apercu}
             onClick={() => void save()}
           >
             <Save size={16} /> Enregistrer le projet

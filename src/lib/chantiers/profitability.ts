@@ -58,8 +58,8 @@ export type ChantierProfitability = {
   missingRetainedQuoteIds: string[];
 };
 
-function totalHours(hours: ChantierHours): ChantierHours & { total: number } {
-  return { ...hours, total: hours.be + hours.workshop + hours.install };
+function totalHours(heures: ChantierHours): ChantierHours & { total: number } {
+  return { ...heures, total: heures.be + heures.workshop + heures.install };
 }
 
 function marginPercent(saleCents: number, costCents: number): number | null {
@@ -67,16 +67,16 @@ function marginPercent(saleCents: number, costCents: number): number | null {
   return ((saleCents - costCents) / costCents) * 100;
 }
 
-function addSafeMoney(left: number, right: number): number {
-  const total = left + right;
+function addSafeMoney(gauche: number, droite: number): number {
+  const total = gauche + droite;
   if (!Number.isSafeInteger(total) || total < 0)
     throw new Error("CHANTIER_PROFITABILITY_MONEY_INVALID");
   return total;
 }
 
-function signedMoney(value: number): number {
-  if (!Number.isSafeInteger(value)) throw new Error("CHANTIER_PROFITABILITY_MONEY_INVALID");
-  return value;
+function signedMoney(valeur: number): number {
+  if (!Number.isSafeInteger(valeur)) throw new Error("CHANTIER_PROFITABILITY_MONEY_INVALID");
+  return valeur;
 }
 
 function retainedQuotes(
@@ -85,17 +85,17 @@ function retainedQuotes(
 ): { records: NativeQuoteRecord[]; missingIds: string[] } {
   if (!commercialCase) return { records: [], missingIds: [] };
   const quotesById = new Map(quotes.quotes.map((quote) => [quote.id, quote]));
-  const records: NativeQuoteRecord[] = [];
+  const enregistrements: NativeQuoteRecord[] = [];
   const missingIds: string[] = [];
-  for (const quoteId of commercialCase.retainedQuoteIds) {
-    const quote = quotesById.get(quoteId);
+  for (const idDevis of commercialCase.retainedQuoteIds) {
+    const quote = quotesById.get(idDevis);
     if (!quote || quote.commercialCaseId !== commercialCase.id) {
-      missingIds.push(quoteId);
+      missingIds.push(idDevis);
       continue;
     }
-    records.push(quote);
+    enregistrements.push(quote);
   }
-  return { records, missingIds };
+  return { records: enregistrements, missingIds };
 }
 
 export function calculateChantierProfitability(
@@ -107,7 +107,7 @@ export function calculateChantierProfitability(
 ): ChantierProfitability {
   const retained = retainedQuotes(commercialCase, quotes);
   const purchaseExtracts = retained.records.map((quote) => extractPlannedPurchases(quote));
-  const summaries = retained.records.map((quote, index) => {
+  const summaries = retained.records.map((quote, indice) => {
     const summary = calculateCommercialQuoteSummary(quote);
     return {
       quoteId: quote.id,
@@ -121,7 +121,7 @@ export function calculateChantierProfitability(
       plannedDisbursementCents: summary.plannedDisbursementCents,
       plannedLaborCostCents: summary.plannedLaborCostCents,
       plannedMarginCents: summary.plannedMarginCents,
-      plannedPurchasesCents: purchaseExtracts[index].totalCents,
+      plannedPurchasesCents: purchaseExtracts[indice].totalCents,
     } satisfies ChantierProfitabilityQuote;
   });
   const soldComplete =
@@ -142,7 +142,7 @@ export function calculateChantierProfitability(
   const plannedLaborComplete =
     soldComplete && summaries.every((quote) => quote.plannedLaborCostCents !== null);
   const plannedLaborCostCents = plannedLaborComplete
-    ? summaries.reduce((sum, quote) => addSafeMoney(sum, quote.plannedLaborCostCents ?? 0), 0)
+    ? summaries.reduce((somme, quote) => addSafeMoney(somme, quote.plannedLaborCostCents ?? 0), 0)
     : null;
   const plannedTotalCostCents =
     plannedDisbursementCents === null || plannedLaborCostCents === null
@@ -151,12 +151,12 @@ export function calculateChantierProfitability(
   const plannedPurchasesComplete =
     soldComplete && purchaseExtracts.every((quote) => quote.totalCents !== null);
   const plannedPurchasesCents = plannedPurchasesComplete
-    ? purchaseExtracts.reduce((sum, item) => addSafeMoney(sum, item.totalCents ?? 0), 0)
+    ? purchaseExtracts.reduce((somme, element) => addSafeMoney(somme, element.totalCents ?? 0), 0)
     : null;
-  const plannedPurchaseLines = purchaseExtracts.flatMap((item) => item.lines);
-  const purchaseClassificationWarnings = purchaseExtracts.flatMap((item, index) =>
-    item.unclassified.map((warning) => ({
-      quoteReference: summaries[index].quoteNumber ?? summaries[index].subject,
+  const plannedPurchaseLines = purchaseExtracts.flatMap((element) => element.lines);
+  const purchaseClassificationWarnings = purchaseExtracts.flatMap((element, indice) =>
+    element.unclassified.map((warning) => ({
+      quoteReference: summaries[indice].quoteNumber ?? summaries[indice].subject,
       ...warning,
     })),
   );

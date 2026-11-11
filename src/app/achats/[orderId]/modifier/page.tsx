@@ -5,15 +5,15 @@ import { requireModuleRequestContext } from "@/lib/desktop/request-context";
 export const dynamic = "force-dynamic";
 
 export default async function EditPurchaseOrderPage({
-  params,
+  params: parametres,
 }: {
   params: Promise<{ orderId: string }>;
 }) {
   await requireModuleRequestContext("purchases", "READ");
-  const { orderId } = await params;
+  const { orderId: idCommande } = await parametres;
   return (
     <DesktopAppShell>
-      <PurchaseOrderEditWorkspace orderId={orderId} />
+      <PurchaseOrderEditWorkspace orderId={idCommande} />
     </DesktopAppShell>
   );
 }

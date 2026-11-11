@@ -33,7 +33,7 @@ describe("quote lifecycle UI", () => {
 
   it("ne supprime le fichier photo que s'il n'est plus reference par une autre version", () => {
     expect(photoRoute).toContain("stillReferenced");
-    expect(photoRoute).toContain("candidate.storagePath === photo.storagePath");
+    expect(photoRoute).toContain("candidat.storagePath === photo.storagePath");
     expect(photoRoute).toContain("if (!stillReferenced)");
   });
 });

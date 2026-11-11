@@ -20,7 +20,7 @@ describe("raccordement BC et clôture chantier", () => {
     expect(ui).toContain('purchaseDecision === "REMOVE"');
     expect(ui).toContain("removeConfirmed");
     expect(ui).toContain("purchaseWarning.token");
-    expect(api).toContain('input.action === "markDone"');
+    expect(api).toContain('saisie.action === "markDone"');
     expect(api).toContain("CHANTIER_PURCHASE_REVIEW_REQUIRED");
     expect(api).toContain("CHANTIER_PURCHASE_REVIEW_CONFLICT");
     expect(api).toContain("removeChantierPurchaseCommitments");

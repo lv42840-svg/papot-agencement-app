@@ -10,26 +10,26 @@ import { resolveLaborCostForWorkedMonth, type MonthlyLaborCostRecord } from "./m
  * This is an estimate: no daily distribution is invented or written back to planning.
  */
 export function monthlySharesForWeek(
-  week: string,
-  schedule: PlanningPersonCapacity["weeklySchedule"] = DEFAULT_WEEKLY_SCHEDULE,
+  semaine: string,
+  horaire: PlanningPersonCapacity["weeklySchedule"] = DEFAULT_WEEKLY_SCHEDULE,
 ): Array<{ month: string; fraction: number }> {
-  const dates = isoWeekDates(week);
-  let weights = dates.map((date) => scheduleHoursForDate(schedule, date));
-  if (weights.every((value) => value === 0)) {
-    weights = dates.map((date) => {
-      const day = date.getUTCDay();
-      return day > 0 && day < 6 ? 1 : 0;
+  const dates = isoWeekDates(semaine);
+  let poids = dates.map((date) => scheduleHoursForDate(horaire, date));
+  if (poids.every((valeur) => valeur === 0)) {
+    poids = dates.map((date) => {
+      const jour = date.getUTCDay();
+      return jour > 0 && jour < 6 ? 1 : 0;
     });
   }
-  const weightSum = weights.reduce((sum, value) => sum + value, 0);
-  const byMonth = new Map<string, number>();
-  dates.forEach((date, index) => {
-    const month = date.toISOString().slice(0, 7);
-    byMonth.set(month, (byMonth.get(month) ?? 0) + weights[index] / weightSum);
+  const sommePoids = poids.reduce((somme, valeur) => somme + valeur, 0);
+  const parMois = new Map<string, number>();
+  dates.forEach((date, indice) => {
+    const mois = date.toISOString().slice(0, 7);
+    parMois.set(mois, (parMois.get(mois) ?? 0) + poids[indice] / sommePoids);
   });
-  return [...byMonth]
+  return [...parMois]
     .filter(([, fraction]) => fraction > 0)
-    .map(([month, fraction]) => ({ month, fraction }));
+    .map(([mois, fraction]) => ({ month: mois, fraction }));
 }
 
 /**
@@ -43,51 +43,71 @@ export type ChantierLaborCostEstimate = {
 };
 
 export function calculateChantierLaborCostEstimate(
-  chantierId: string,
-  actualHours: readonly PlanningActualHours[],
-  records: readonly MonthlyLaborCostRecord[],
-  personCapacities: readonly PlanningPersonCapacity[],
-  now = new Date(),
+  idChantier: string,
+  heuresReelles: readonly PlanningActualHours[],
+  enregistrements: readonly MonthlyLaborCostRecord[],
+  capacitesPersonnes: readonly PlanningPersonCapacity[],
+  maintenant = new Date(),
 ): ChantierLaborCostEstimate {
-  const entries = actualHours.filter((row) => row.chantierId === chantierId && row.hours > 0);
-  if (entries.length === 0) return { costCents: 0, provisional: false };
-
-  const byPersonMonth = new Map(
-    records.map((record) => [record.personId + ":" + record.month, record]),
+  const entrees = heuresReelles.filter(
+    (ligne) => ligne.chantierId === idChantier && ligne.hours > 0,
   );
-  const byPerson = new Map(
-    personCapacities.map((person) => [person.userId, person.weeklySchedule]),
-  );
-  let totalCents = 0;
-  let provisional = false;
+  if (entrees.length === 0) {
+    return { costCents: 0, provisional: false };
+  }
 
-  for (const entry of entries) {
-    for (const split of monthlySharesForWeek(entry.week, byPerson.get(entry.userId))) {
-      const resolved = resolveLaborCostForWorkedMonth(
-        entry.userId,
-        split.month,
-        byPersonMonth,
-        now,
+  const parPersonneMois = new Map(
+    enregistrements.map((enregistrement) => [
+      enregistrement.personId + ":" + enregistrement.month,
+      enregistrement,
+    ]),
+  );
+  const horairesParPersonne = new Map(
+    capacitesPersonnes.map((personne) => [personne.userId, personne.weeklySchedule]),
+  );
+  let totalCentimes = 0;
+  let provisoire = false;
+
+  for (const entree of entrees) {
+    for (const repartition of monthlySharesForWeek(
+      entree.week,
+      horairesParPersonne.get(entree.userId),
+    )) {
+      const coutResolue = resolveLaborCostForWorkedMonth(
+        entree.userId,
+        repartition.month,
+        parPersonneMois,
+        maintenant,
       );
-      if (!resolved) return { costCents: null, provisional: false };
-      provisional ||= resolved.provisional;
-      totalCents +=
-        entry.hours *
-        split.fraction *
-        (resolved.record.employerCostCents / resolved.record.workedHours);
+      if (!coutResolue) {
+        return { costCents: null, provisional: false };
+      }
+      provisoire ||= coutResolue.provisional;
+      totalCentimes +=
+        entree.hours *
+        repartition.fraction *
+        (coutResolue.record.employerCostCents / coutResolue.record.workedHours);
     }
   }
-  return { costCents: Math.round(totalCents), provisional };
+  return {
+    costCents: Math.round(totalCentimes),
+    provisional: provisoire,
+  };
 }
 
 /** Compatibility helper for callers that only require the monetary total. */
 export function calculateChantierLaborCostCents(
-  chantierId: string,
-  actualHours: readonly PlanningActualHours[],
-  records: readonly MonthlyLaborCostRecord[],
-  personCapacities: readonly PlanningPersonCapacity[],
-  now = new Date(),
+  idChantier: string,
+  heuresReelles: readonly PlanningActualHours[],
+  enregistrements: readonly MonthlyLaborCostRecord[],
+  capacitesPersonnes: readonly PlanningPersonCapacity[],
+  maintenant = new Date(),
 ): number | null {
-  return calculateChantierLaborCostEstimate(chantierId, actualHours, records, personCapacities, now)
-    .costCents;
+  return calculateChantierLaborCostEstimate(
+    idChantier,
+    heuresReelles,
+    enregistrements,
+    capacitesPersonnes,
+    maintenant,
+  ).costCents;
 }

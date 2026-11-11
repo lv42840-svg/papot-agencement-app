@@ -28,7 +28,7 @@ describe("actual hours interface and chantier bridge", () => {
   it("chooses the employee first and shows weekly chantiers with 3-hour fields", () => {
     expect(workspace).toContain("1 · Salarié");
     expect(workspace).toContain("2 · Semaine écoulée");
-    expect(workspace).toContain("data?.people.map((person)");
+    expect(workspace).toContain("donnees?.people.map((personne)");
     expect(workspace).toContain("suggestedChantierIds");
     expect(workspace).toContain("Prévu au petit planning");
     expect(workspace).toContain("Heures déjà enregistrées");
@@ -42,11 +42,11 @@ describe("actual hours interface and chantier bridge", () => {
   it("requires the individual actual-hours permission on past weeks only", () => {
     expect(route).toContain('requireModuleRequestContext("planning", "WRITE")');
     expect(route).toContain(
-      'requireSpecialPermission(context.user, "planning.enter_actual_hours")',
+      'requireSpecialPermission(contexte.user, "planning.enter_actual_hours")',
     );
-    expect(route).toContain("if (!isPlanningWeekPast(input.week))");
+    expect(route).toContain("if (!isPlanningWeekPast(saisie.week))");
     expect(route).toContain("applyActualHoursRow");
-    expect(route).toContain("effectivePlanningPeople(payload, auth.users)");
+    expect(route).toContain("effectivePlanningPeople(contenu, auth.users)");
     expect(route).toContain("Cache-Control");
   });
 

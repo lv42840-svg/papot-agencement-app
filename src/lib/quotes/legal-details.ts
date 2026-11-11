@@ -14,9 +14,9 @@ export const quoteWorkScheduleInputSchema = z
     duration: z.string().trim().min(1).max(240),
     endDate: quoteDateSchema,
   })
-  .superRefine((schedule, context) => {
+  .superRefine((schedule, contexte) => {
     if (schedule.endDate < schedule.startDate) {
-      context.addIssue({
+      contexte.addIssue({
         code: z.ZodIssueCode.custom,
         path: ["endDate"],
         message: "QUOTE_WORK_END_BEFORE_START",
@@ -39,39 +39,39 @@ export const quoteLegalDetailsMutationSchema = z.discriminatedUnion("action", [
 export type QuoteLegalDetailsMutation = z.infer<typeof quoteLegalDetailsMutationSchema>;
 export type QuoteLegalDetailsActor = { displayName: string };
 
-function findDraftQuote(payload: NativeQuotesPayload, quoteId: string) {
-  const quoteIndex = payload.quotes.findIndex((quote) => quote.id === quoteId);
+function findDraftQuote(contenu: NativeQuotesPayload, idDevis: string) {
+  const quoteIndex = contenu.quotes.findIndex((quote) => quote.id === idDevis);
   if (quoteIndex < 0) throw new Error("QUOTE_NOT_FOUND");
-  const quote = payload.quotes[quoteIndex];
+  const quote = contenu.quotes[quoteIndex];
   if (quote.status !== "DRAFT") throw new Error("QUOTE_NOT_EDITABLE");
   return { quoteIndex, quote };
 }
 
 function saveQuote(
-  payload: NativeQuotesPayload,
+  contenu: NativeQuotesPayload,
   quoteIndex: number,
   quote: NativeQuoteRecord,
-  actor: QuoteLegalDetailsActor,
-  now: Date,
+  auteur: QuoteLegalDetailsActor,
+  maintenant: Date,
 ) {
   const updated = nativeQuoteRecordSchema.parse({
     ...quote,
-    updatedAt: now.toISOString(),
-    updatedByName: actor.displayName,
+    updatedAt: maintenant.toISOString(),
+    updatedByName: auteur.displayName,
   });
-  payload.quotes[quoteIndex] = updated;
-  return { payload, focusQuoteId: updated.id };
+  contenu.quotes[quoteIndex] = updated;
+  return { payload: contenu, focusQuoteId: updated.id };
 }
 
 export function initializeQuoteVatFromClient(
   source: NativeQuotesPayload,
-  quoteId: string,
+  idDevis: string,
   defaultRatePercent: number,
-  actor: QuoteLegalDetailsActor,
-  now: Date = new Date(),
+  auteur: QuoteLegalDetailsActor,
+  maintenant: Date = new Date(),
 ) {
-  const payload = structuredClone(parseNativeQuotesPayload(source));
-  const { quoteIndex, quote } = findDraftQuote(payload, quoteId);
+  const contenu = structuredClone(parseNativeQuotesPayload(source));
+  const { quoteIndex, quote } = findDraftQuote(contenu, idDevis);
   const updated: NativeQuoteRecord = {
     ...quote,
     taxConfig: {
@@ -79,7 +79,7 @@ export function initializeQuoteVatFromClient(
       lineOverrides: [],
     },
   };
-  return saveQuote(payload, quoteIndex, updated, actor, now);
+  return saveQuote(contenu, quoteIndex, updated, auteur, maintenant);
 }
 
 export function resolveQuoteLineVatRate(quote: NativeQuoteRecord, lineId: string): number {
@@ -99,32 +99,34 @@ export function quoteHasCompleteWorkSchedule(quote: NativeQuoteRecord): boolean 
 
 export function applyQuoteLegalDetailsMutation(
   source: NativeQuotesPayload,
-  quoteId: string,
+  idDevis: string,
   rawInput: QuoteLegalDetailsMutation,
-  actor: QuoteLegalDetailsActor,
-  now: Date = new Date(),
+  auteur: QuoteLegalDetailsActor,
+  maintenant: Date = new Date(),
 ) {
-  const payload = structuredClone(parseNativeQuotesPayload(source));
-  const { quoteIndex, quote } = findDraftQuote(payload, quoteId);
-  const input = quoteLegalDetailsMutationSchema.parse(rawInput);
+  const contenu = structuredClone(parseNativeQuotesPayload(source));
+  const { quoteIndex, quote } = findDraftQuote(contenu, idDevis);
+  const saisie = quoteLegalDetailsMutationSchema.parse(rawInput);
 
-  if (input.action === "updateWorkSchedule") {
-    const schedule = quoteWorkScheduleInputSchema.parse(input.schedule);
-    return saveQuote(payload, quoteIndex, { ...quote, workSchedule: schedule }, actor, now);
+  if (saisie.action === "updateWorkSchedule") {
+    const schedule = quoteWorkScheduleInputSchema.parse(saisie.schedule);
+    return saveQuote(contenu, quoteIndex, { ...quote, workSchedule: schedule }, auteur, maintenant);
   }
 
-  const line = quote.model.items.find((item) => item.kind === "LINE" && item.id === input.lineId);
-  if (!line) throw new Error("QUOTE_LINE_NOT_FOUND");
+  const ligne = quote.model.items.find(
+    (element) => element.kind === "LINE" && element.id === saisie.lineId,
+  );
+  if (!ligne) throw new Error("QUOTE_LINE_NOT_FOUND");
 
   const lineOverrides = quote.taxConfig.lineOverrides.filter(
-    (override) => override.lineId !== input.lineId,
+    (override) => override.lineId !== saisie.lineId,
   );
-  if (input.ratePercent !== null && input.ratePercent !== quote.taxConfig.defaultRatePercent) {
-    lineOverrides.push({ lineId: input.lineId, ratePercent: input.ratePercent });
+  if (saisie.ratePercent !== null && saisie.ratePercent !== quote.taxConfig.defaultRatePercent) {
+    lineOverrides.push({ lineId: saisie.lineId, ratePercent: saisie.ratePercent });
   }
 
   return saveQuote(
-    payload,
+    contenu,
     quoteIndex,
     {
       ...quote,
@@ -133,7 +135,7 @@ export function applyQuoteLegalDetailsMutation(
         lineOverrides,
       },
     },
-    actor,
-    now,
+    auteur,
+    maintenant,
   );
 }

@@ -84,13 +84,13 @@ function sendErrorLabel(code?: string): string {
 }
 
 async function postFinalize(
-  quoteId: string,
+  idDevis: string,
   mode: FinalizeMode,
   followUpDate: string,
   updatedAt: string,
   email?: EmailDraft,
 ): Promise<NativeQuotesPayload> {
-  const response = await fetch(`/api/desktop/quotes/${quoteId}/send`, {
+  const reponse = await fetch(`/api/desktop/quotes/${idDevis}/send`, {
     method: "POST",
     headers: {
       "Content-Type": "application/json",
@@ -98,12 +98,12 @@ async function postFinalize(
     },
     body: JSON.stringify(mode === "SEND" ? { mode, followUpDate, email } : { mode }),
   });
-  const data = (await response.json()) as ApiResponse;
-  if (!response.ok || !data.payload) throw new Error(data.error ?? "QUOTE_SEND_FAILED");
-  return data.payload;
+  const donnees = (await reponse.json()) as ApiResponse;
+  if (!reponse.ok || !donnees.payload) throw new Error(donnees.error ?? "QUOTE_SEND_FAILED");
+  return donnees.payload;
 }
 
-function buildEmailDraft(params: {
+function buildEmailDraft(parametres: {
   quote: NativeQuoteRecord;
   settings: QuoteEmailSettings;
   recipientEmail: string;
@@ -111,23 +111,23 @@ function buildEmailDraft(params: {
   clientName: string;
   affairName: string;
 }): EmailDraft {
-  const quoteNumber = params.quote.finalPdf?.quoteNumber ?? "";
-  const greeting = params.recipientName.trim()
-    ? `Bonjour ${params.recipientName.trim()},`
+  const quoteNumber = parametres.quote.finalPdf?.quoteNumber ?? "";
+  const greeting = parametres.recipientName.trim()
+    ? `Bonjour ${parametres.recipientName.trim()},`
     : "Bonjour,";
-  const values = {
-    AFFAIRE: params.affairName,
+  const valeurs = {
+    AFFAIRE: parametres.affairName,
     BONJOUR: greeting,
-    CLIENT: params.clientName,
-    CONTACT: params.recipientName,
+    CLIENT: parametres.clientName,
+    CONTACT: parametres.recipientName,
     NUM_DEVIS: quoteNumber,
-    OBJET_DEVIS: params.quote.model.subject,
+    OBJET_DEVIS: parametres.quote.model.subject,
   };
 
   return {
-    to: params.recipientEmail,
-    subject: renderQuoteEmailTemplate(params.settings.subjectTemplate, values),
-    body: renderQuoteEmailTemplate(params.settings.bodyTemplate, values),
+    to: parametres.recipientEmail,
+    subject: renderQuoteEmailTemplate(parametres.settings.subjectTemplate, valeurs),
+    body: renderQuoteEmailTemplate(parametres.settings.bodyTemplate, valeurs),
   };
 }
 
@@ -148,12 +148,12 @@ export function QuoteSendAction({
   recipientEmail: string;
   recipientName: string;
   emailSettings: QuoteEmailSettings;
-  onSaved: (payload: NativeQuotesPayload) => void;
+  onSaved: (contenu: NativeQuotesPayload) => void;
 }) {
   const [mode, setMode] = useState<FinalizeMode | null>(null);
   const [followUpDate, setFollowUpDate] = useState("");
-  const [saving, setSaving] = useState(false);
-  const [error, setError] = useState("");
+  const [sauvegardeEnCours, setSaving] = useState(false);
+  const [erreur, setError] = useState("");
   const [emailDraft, setEmailDraft] = useState<EmailDraft | null>(null);
 
   const defaultFrozenDraft = useMemo(
@@ -183,24 +183,24 @@ export function QuoteSendAction({
     setEmailDraft(null);
   }
 
-  async function submit(event: FormEvent<HTMLFormElement>) {
-    event.preventDefault();
+  async function submit(evenement: FormEvent<HTMLFormElement>) {
+    evenement.preventDefault();
     if (!mode) return;
 
     setSaving(true);
     setError("");
     try {
       if (mode === "VALIDATE") {
-        const payload = await postFinalize(quote.id, "VALIDATE", "", quote.updatedAt);
-        onSaved(payload);
+        const contenu = await postFinalize(quote.id, "VALIDATE", "", quote.updatedAt);
+        onSaved(contenu);
         setMode(null);
         return;
       }
 
       if (!emailDraft) {
-        const payload = await postFinalize(quote.id, "VALIDATE", "", quote.updatedAt);
-        onSaved(payload);
-        const frozen = payload.quotes.find((candidate) => candidate.id === quote.id);
+        const contenu = await postFinalize(quote.id, "VALIDATE", "", quote.updatedAt);
+        onSaved(contenu);
+        const frozen = contenu.quotes.find((candidat) => candidat.id === quote.id);
         if (!frozen) throw new Error("QUOTE_NOT_FOUND");
         setEmailDraft(
           buildEmailDraft({
@@ -228,14 +228,14 @@ export function QuoteSendAction({
         return;
       }
 
-      const payload = await postFinalize(
+      const contenu = await postFinalize(
         quote.id,
         "SEND",
         followUpDate,
         quote.updatedAt,
         emailDraft,
       );
-      onSaved(payload);
+      onSaved(contenu);
       setMode(null);
       setEmailDraft(null);
     } catch (caught) {
@@ -303,9 +303,9 @@ export function QuoteSendAction({
             <input
               type="email"
               value={emailDraft.to}
-              onChange={(event) =>
-                setEmailDraft((current) =>
-                  current ? { ...current, to: event.target.value } : current,
+              onChange={(evenement) =>
+                setEmailDraft((courant) =>
+                  courant ? { ...courant, to: evenement.target.value } : courant,
                 )
               }
               required
@@ -315,9 +315,9 @@ export function QuoteSendAction({
             <span>Objet</span>
             <input
               value={emailDraft.subject}
-              onChange={(event) =>
-                setEmailDraft((current) =>
-                  current ? { ...current, subject: event.target.value } : current,
+              onChange={(evenement) =>
+                setEmailDraft((courant) =>
+                  courant ? { ...courant, subject: evenement.target.value } : courant,
                 )
               }
               required
@@ -328,9 +328,9 @@ export function QuoteSendAction({
             <textarea
               rows={9}
               value={emailDraft.body}
-              onChange={(event) =>
-                setEmailDraft((current) =>
-                  current ? { ...current, body: event.target.value } : current,
+              onChange={(evenement) =>
+                setEmailDraft((courant) =>
+                  courant ? { ...courant, body: evenement.target.value } : courant,
                 )
               }
               required
@@ -341,7 +341,7 @@ export function QuoteSendAction({
             <input
               type="date"
               value={followUpDate}
-              onChange={(event) => setFollowUpDate(event.target.value)}
+              onChange={(evenement) => setFollowUpDate(evenement.target.value)}
               required
             />
           </label>
@@ -352,14 +352,14 @@ export function QuoteSendAction({
         </>
       ) : null}
 
-      {error ? <div className="quoteFormError">{error}</div> : null}
+      {erreur ? <div className="quoteFormError">{erreur}</div> : null}
 
       <div className="quoteDraftActions">
         <button type="button" className="secondaryButton" onClick={cancel}>
           Annuler
         </button>
-        <button type="submit" className="primaryButton" disabled={saving}>
-          {saving
+        <button type="submit" className="primaryButton" disabled={sauvegardeEnCours}>
+          {sauvegardeEnCours
             ? mode === "VALIDATE"
               ? "Validation du PDF…"
               : emailDraft

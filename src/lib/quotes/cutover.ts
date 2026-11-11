@@ -16,16 +16,16 @@ type CutoverMarkerRow = {
   record_count: number;
 };
 
-export function quotesPayloadHash(payload: NativeQuotesPayload): string {
+export function quotesPayloadHash(contenu: NativeQuotesPayload): string {
   return createHash("sha256")
-    .update(JSON.stringify(parseNativeQuotesPayload(payload)))
+    .update(JSON.stringify(parseNativeQuotesPayload(contenu)))
     .digest("hex");
 }
 
 async function findCutoverMarker(
   queryable: Pick<Pool, "query"> | Pick<PoolClient, "query">,
 ): Promise<CutoverMarkerRow | null> {
-  const result = await queryable.query<CutoverMarkerRow>(
+  const resultat = await queryable.query<CutoverMarkerRow>(
     `
       SELECT source_hash, record_count
       FROM papot_domain_cutovers
@@ -33,14 +33,14 @@ async function findCutoverMarker(
     `,
     [QUOTES_CUTOVER_DOMAIN],
   );
-  return result.rows[0] ?? null;
+  return resultat.rows[0] ?? null;
 }
 
 async function validateImportedSnapshot(client: PoolClient, expectedHash: string): Promise<void> {
-  const result = await client.query<{ payload: unknown }>(
+  const resultat = await client.query<{ payload: unknown }>(
     "SELECT payload FROM papot_quotes_state WHERE scope = 'global'",
   );
-  const imported = parseNativeQuotesPayload(result.rows[0]?.payload);
+  const imported = parseNativeQuotesPayload(resultat.rows[0]?.payload);
   if (quotesPayloadHash(imported) !== expectedHash) {
     throw new Error("QUOTES_CUTOVER_VALIDATION_FAILED");
   }
@@ -81,18 +81,18 @@ async function importSnapshot(
   );
 }
 
-export async function ensureQuotesPostgresCutover(params: {
+export async function ensureQuotesPostgresCutover(parametres: {
   pool?: Pool;
   acquireSource(): Promise<NativeQuotesPayload>;
 }): Promise<void> {
-  const pool = params.pool ?? getServerDbPool();
+  const pool = parametres.pool ?? getServerDbPool();
   if (await findCutoverMarker(pool)) return;
 
   await withServerDbTransaction(async (client) => {
     await client.query("SELECT pg_advisory_xact_lock($1)", [QUOTES_CUTOVER_LOCK_ID]);
     if (await findCutoverMarker(client)) return;
 
-    const source = parseNativeQuotesPayload(await params.acquireSource());
+    const source = parseNativeQuotesPayload(await parametres.acquireSource());
     const sourceHash = quotesPayloadHash(source);
     await importSnapshot(client, source, sourceHash);
   }, pool);

@@ -12,32 +12,34 @@ export type EntryAttachmentTransport = {
   displayName: string;
 };
 
-function safeFileName(value: string): string {
-  const cleaned = value
+function safeFileName(valeur: string): string {
+  const nettoye = valeur
     .trim()
     .replace(/[<>:"/\\|?*\x00-\x1F]/g, "-")
     .replace(/[. ]+$/g, "");
-  return (cleaned || "piece-jointe").slice(0, 180);
+  return (nettoye || "piece-jointe").slice(0, 180);
 }
 
-function validateFiles(files: File[]): void {
-  if (files.length > MAX_ENTRY_ATTACHMENTS_PER_UPLOAD) {
+function validateFiles(fichiers: File[]): void {
+  if (fichiers.length > MAX_ENTRY_ATTACHMENTS_PER_UPLOAD) {
     throw new Error("ENTRY_ATTACHMENTS_TOO_MANY");
   }
-  for (const file of files) {
-    if (file.size > MAX_ENTRY_ATTACHMENT_BYTES) {
+  for (const fichier of fichiers) {
+    if (fichier.size > MAX_ENTRY_ATTACHMENT_BYTES) {
       throw new Error("ENTRY_ATTACHMENT_TOO_LARGE");
     }
-    if (!file.name.trim()) throw new Error("ENTRY_ATTACHMENT_NAME_REQUIRED");
+    if (!fichier.name.trim()) {
+      throw new Error("ENTRY_ATTACHMENT_NAME_REQUIRED");
+    }
   }
 }
 
-function validateAttachmentPath(attachment: EntryAttachment): string[] {
-  const allowedPrefixes = ["documents/entries/", "documents/captures/"];
-  if (!allowedPrefixes.some((prefix) => attachment.storagePath.startsWith(prefix))) {
+function validateAttachmentPath(pieceJointe: EntryAttachment): string[] {
+  const prefixesAutorises = ["documents/entries/", "documents/captures/"];
+  if (!prefixesAutorises.some((prefixe) => pieceJointe.storagePath.startsWith(prefixe))) {
     throw new Error("ENTRY_ATTACHMENT_PATH_INVALID");
   }
-  const segments = attachment.storagePath.split("/").filter(Boolean);
+  const segments = pieceJointe.storagePath.split("/").filter(Boolean);
   if (segments.some((segment) => segment === "." || segment === "..")) {
     throw new Error("ENTRY_ATTACHMENT_PATH_INVALID");
   }
@@ -46,59 +48,59 @@ function validateAttachmentPath(attachment: EntryAttachment): string[] {
 
 export async function uploadEntryAttachments(
   transport: EntryAttachmentTransport,
-  entryId: string,
-  files: File[],
-  now = new Date(),
+  idEntree: string,
+  fichiers: File[],
+  maintenant = new Date(),
 ): Promise<EntryAttachment[]> {
-  validateFiles(files);
-  const uploaded: EntryAttachment[] = [];
+  validateFiles(fichiers);
+  const piecesJointesEnvoyees: EntryAttachment[] = [];
 
   try {
-    for (const file of files) {
+    for (const fichier of fichiers) {
       const id = randomUUID();
-      const objectName = safeFileName(file.name);
-      const storagePath = `documents/entries/${entryId}/${id}/${objectName}`;
-      const bytes = Buffer.from(await file.arrayBuffer());
-      const written = await transport.store.writeBytes(storagePath, bytes);
+      const nomObjet = safeFileName(fichier.name);
+      const cheminStockage = `documents/entries/${idEntree}/${id}/${nomObjet}`;
+      const octets = Buffer.from(await fichier.arrayBuffer());
+      const ecriture = await transport.store.writeBytes(cheminStockage, octets);
 
-      uploaded.push({
+      piecesJointesEnvoyees.push({
         id,
-        fileName: file.name,
-        contentType: file.type || "application/octet-stream",
-        sizeBytes: written.sizeBytes,
-        sha256: written.sha256,
-        storagePath: written.storagePath,
-        uploadedAt: now.toISOString(),
+        fileName: fichier.name,
+        contentType: fichier.type || "application/octet-stream",
+        sizeBytes: ecriture.sizeBytes,
+        sha256: ecriture.sha256,
+        storagePath: ecriture.storagePath,
+        uploadedAt: maintenant.toISOString(),
         uploadedByName: transport.displayName,
       });
     }
 
-    return uploaded;
-  } catch (error) {
-    await cleanupEntryAttachments(transport, uploaded);
-    throw error;
+    return piecesJointesEnvoyees;
+  } catch (erreur) {
+    await cleanupEntryAttachments(transport, piecesJointesEnvoyees);
+    throw erreur;
   }
 }
 
 export async function readEntryAttachment(
   transport: Pick<EntryAttachmentTransport, "store">,
-  attachment: EntryAttachment,
+  pieceJointe: EntryAttachment,
 ): Promise<Buffer> {
-  validateAttachmentPath(attachment);
-  const bytes = await transport.store.readBytes(attachment.storagePath, attachment.sha256);
-  if (bytes.length !== attachment.sizeBytes) {
+  validateAttachmentPath(pieceJointe);
+  const octets = await transport.store.readBytes(pieceJointe.storagePath, pieceJointe.sha256);
+  if (octets.length !== pieceJointe.sizeBytes) {
     throw new Error("ENTRY_ATTACHMENT_INTEGRITY_MISMATCH");
   }
-  return bytes;
+  return octets;
 }
 
 export async function cleanupEntryAttachments(
   transport: Pick<EntryAttachmentTransport, "store">,
-  attachments: EntryAttachment[],
+  piecesJointes: EntryAttachment[],
 ): Promise<void> {
   await Promise.all(
-    attachments.map((attachment) =>
-      transport.store.deleteFile(attachment.storagePath).catch(() => undefined),
+    piecesJointes.map((pieceJointe) =>
+      transport.store.deleteFile(pieceJointe.storagePath).catch(() => undefined),
     ),
   );
 }

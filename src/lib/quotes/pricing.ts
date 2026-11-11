@@ -1,47 +1,47 @@
 export type QuotePricingDriver = "MARGIN" | "SALE_PRICE";
 
-function assertMoneyCents(value: number): number {
-  if (!Number.isSafeInteger(value) || value < 0) {
+function assertMoneyCents(valeur: number): number {
+  if (!Number.isSafeInteger(valeur) || valeur < 0) {
     throw new Error("QUOTE_PRICING_MONEY_INVALID");
   }
-  return value;
+  return valeur;
 }
 
-function assertMarginPercent(value: number): number {
-  if (!Number.isFinite(value) || value < -100) {
+function assertMarginPercent(valeur: number): number {
+  if (!Number.isFinite(valeur) || valeur < -100) {
     throw new Error("QUOTE_PRICING_MARGIN_INVALID");
   }
-  return value;
+  return valeur;
 }
 
-export function parseQuoteMarginInput(value: string): number {
-  const normalized = value.trim().replace(",", ".");
-  if (!normalized) throw new Error("QUOTE_PRICING_MARGIN_INVALID");
-  return assertMarginPercent(Number(normalized));
+export function parseQuoteMarginInput(valeur: string): number {
+  const valeurNormalisee = valeur.trim().replace(",", ".");
+  if (!valeurNormalisee) throw new Error("QUOTE_PRICING_MARGIN_INVALID");
+  return assertMarginPercent(Number(valeurNormalisee));
 }
 
-export function quoteMarginToInput(value: number | null): string {
-  if (value === null || !Number.isFinite(value)) return "";
-  const rounded = Math.round(value * 100) / 100;
-  return String(rounded).replace(".", ",");
+export function quoteMarginToInput(valeur: number | null): string {
+  if (valeur === null || !Number.isFinite(valeur)) return "";
+  const valeurArrondie = Math.round(valeur * 100) / 100;
+  return String(valeurArrondie).replace(".", ",");
 }
 
 export function calculateQuoteSalePriceFromMarginCents(
-  costPriceCents: number,
-  marginPercent: number,
+  coutCentimes: number,
+  margePourcent: number,
 ): number {
-  const cost = assertMoneyCents(costPriceCents);
-  const margin = assertMarginPercent(marginPercent);
-  const salePriceCents = Math.round(cost * (1 + margin / 100));
-  return assertMoneyCents(salePriceCents);
+  const cout = assertMoneyCents(coutCentimes);
+  const marge = assertMarginPercent(margePourcent);
+  const prixVenteCentimes = Math.round(cout * (1 + marge / 100));
+  return assertMoneyCents(prixVenteCentimes);
 }
 
 export function calculateQuoteMarginFromSalePrice(
-  costPriceCents: number,
-  salePriceCents: number,
+  coutCentimes: number,
+  prixVenteCentimes: number,
 ): number | null {
-  const cost = assertMoneyCents(costPriceCents);
-  const sale = assertMoneyCents(salePriceCents);
-  if (cost === 0) return sale === 0 ? 0 : null;
-  return ((sale - cost) / cost) * 100;
+  const cout = assertMoneyCents(coutCentimes);
+  const vente = assertMoneyCents(prixVenteCentimes);
+  if (cout === 0) return vente === 0 ? 0 : null;
+  return ((vente - cout) / cout) * 100;
 }

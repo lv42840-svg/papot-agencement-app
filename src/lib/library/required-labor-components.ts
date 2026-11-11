@@ -42,32 +42,40 @@ const REQUIRED_LABOR_COMPONENTS: LibraryComponent[] = [
 ];
 
 export function requiredLaborComponents(): LibraryComponent[] {
-  return REQUIRED_LABOR_COMPONENTS.map((component) => ({ ...component }));
+  return REQUIRED_LABOR_COMPONENTS.map((composant) => ({
+    ...composant,
+  }));
 }
 
-export function isRequiredLaborComponentId(componentId: string): boolean {
+export function isRequiredLaborComponentId(idComposant: string): boolean {
   return Object.values(REQUIRED_LABOR_COMPONENT_IDS).includes(
-    componentId as (typeof REQUIRED_LABOR_COMPONENT_IDS)[ProductionActivity],
+    idComposant as (typeof REQUIRED_LABOR_COMPONENT_IDS)[ProductionActivity],
   );
 }
 
-export function ensureRequiredLaborComponents(payload: LibraryPayload): LibraryPayload {
-  const components = [...payload.components];
+export function ensureRequiredLaborComponents(donnees: LibraryPayload): LibraryPayload {
+  const composants = [...donnees.components];
 
-  for (const required of REQUIRED_LABOR_COMPONENTS) {
-    const existingForActivity = components.find(
-      (component) => component.activity === required.activity,
+  for (const composantRequis of REQUIRED_LABOR_COMPONENTS) {
+    const existantPourActivite = composants.find(
+      (composant) => composant.activity === composantRequis.activity,
     );
-    if (existingForActivity) continue;
+    if (existantPourActivite) continue;
 
-    const fixedIdIndex = components.findIndex((component) => component.id === required.id);
-    if (fixedIdIndex >= 0) {
-      components[fixedIdIndex] = { ...components[fixedIdIndex], activity: required.activity };
+    const indiceIdFixe = composants.findIndex((composant) => composant.id === composantRequis.id);
+    if (indiceIdFixe >= 0) {
+      composants[indiceIdFixe] = {
+        ...composants[indiceIdFixe],
+        activity: composantRequis.activity,
+      };
       continue;
     }
 
-    components.push({ ...required });
+    composants.push({ ...composantRequis });
   }
 
-  return parseLibraryPayload({ ...payload, components });
+  return parseLibraryPayload({
+    ...donnees,
+    components: composants,
+  });
 }

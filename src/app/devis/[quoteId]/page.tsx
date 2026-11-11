@@ -11,23 +11,27 @@ import { quoteContractSelectionState } from "@/lib/quotes/retention";
 
 export const dynamic = "force-dynamic";
 
-export default async function QuotePage({ params }: { params: Promise<{ quoteId: string }> }) {
-  const { quoteId } = await params;
-  const context = await requireModuleRequestContext("quotes", "READ");
+export default async function QuotePage({
+  params: parametres,
+}: {
+  params: Promise<{ quoteId: string }>;
+}) {
+  const { quoteId: idDevis } = await parametres;
+  const contexte = await requireModuleRequestContext("quotes", "READ");
   const commercialRepository = createCommercialRepository();
   const clientsRepository = await createClientsRepository();
-  const [payload, commercial, clients, emailSettings] = await Promise.all([
+  const [contenu, commercial, clients, emailSettings] = await Promise.all([
     createQuotesRepository().load(),
     commercialRepository.load(),
     clientsRepository.load(),
     createQuoteEmailSettingsRepository().load(),
   ]);
 
-  const quote = payload.quotes.find((candidate) => candidate.id === quoteId);
+  const quote = contenu.quotes.find((candidat) => candidat.id === idDevis);
   if (!quote) notFound();
 
-  const affair = commercial.cases.find((candidate) => candidate.id === quote.commercialCaseId);
-  const client = clients.clients.find((candidate) => candidate.id === quote.model.clientId);
+  const affair = commercial.cases.find((candidat) => candidat.id === quote.commercialCaseId);
+  const client = clients.clients.find((candidat) => candidat.id === quote.model.clientId);
   const affairName = affair
     ? `${affair.name}${affair.siteLabel ? ` · ${affair.siteLabel}` : ""}`
     : "Affaire introuvable";
@@ -44,18 +48,18 @@ export default async function QuotePage({ params }: { params: Promise<{ quoteId:
   const contractState = quoteContractSelectionState(quote, affair);
   const paymentTermOptions = Array.from(
     new Set(
-      [quote.model.paymentTerms, ...clients.clients.map((candidate) => candidate.paymentTerms)]
-        .map((value) => value.trim())
-        .filter((value) => value.length > 0),
+      [quote.model.paymentTerms, ...clients.clients.map((candidat) => candidat.paymentTerms)]
+        .map((valeur) => valeur.trim())
+        .filter((valeur) => valeur.length > 0),
     ),
   );
 
   return (
     <DesktopAppShell>
       <QuoteDirectEditor
-        initialPayload={payload}
-        quoteId={quoteId}
-        canWrite={context.moduleAccess.canWrite}
+        initialPayload={contenu}
+        quoteId={idDevis}
+        canWrite={contexte.moduleAccess.canWrite}
         clientName={clientName}
         affairName={affairName}
         recipientEmail={recipientEmail}

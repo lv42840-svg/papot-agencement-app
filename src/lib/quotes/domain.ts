@@ -31,8 +31,8 @@ export const QUOTE_DOCUMENT_STATUS_LABELS: Record<QuoteStatus, string> = {
   SUPERSEDED: "Version précédente",
 };
 
-export function quoteDocumentStatusLabel(status: QuoteStatus): string {
-  return QUOTE_DOCUMENT_STATUS_LABELS[status];
+export function quoteDocumentStatusLabel(statut: QuoteStatus): string {
+  return QUOTE_DOCUMENT_STATUS_LABELS[statut];
 }
 
 export type QuoteQuantity = {
@@ -64,61 +64,61 @@ const quantityError = () => new Error("QUOTE_QUANTITY_EXPRESSION_INVALID");
 class QuantityExpressionParser {
   private index = 0;
 
-  constructor(private readonly input: string) {}
+  constructor(private readonly saisie: string) {}
 
   parse(): number {
-    const value = this.parseExpression();
+    const valeur = this.parseExpression();
     this.skipWhitespace();
-    if (this.index !== this.input.length) throw quantityError();
-    return value;
+    if (this.index !== this.saisie.length) throw quantityError();
+    return valeur;
   }
 
   private parseExpression(): number {
-    let value = this.parseTerm();
+    let valeur = this.parseTerm();
 
     while (true) {
       this.skipWhitespace();
-      const operator = this.input[this.index];
-      if (operator !== "+" && operator !== "-") return value;
+      const operator = this.saisie[this.index];
+      if (operator !== "+" && operator !== "-") return valeur;
       this.index += 1;
-      const right = this.parseTerm();
-      value = operator === "+" ? value + right : value - right;
+      const droite = this.parseTerm();
+      valeur = operator === "+" ? valeur + droite : valeur - droite;
     }
   }
 
   private parseTerm(): number {
-    let value = this.parseFactor();
+    let valeur = this.parseFactor();
 
     while (true) {
       this.skipWhitespace();
-      const operator = this.input[this.index];
-      if (operator !== "*" && operator !== "/") return value;
+      const operator = this.saisie[this.index];
+      if (operator !== "*" && operator !== "/") return valeur;
       this.index += 1;
-      const right = this.parseFactor();
-      if (operator === "/" && right === 0) {
+      const droite = this.parseFactor();
+      if (operator === "/" && droite === 0) {
         throw new Error("QUOTE_QUANTITY_DIVISION_BY_ZERO");
       }
-      value = operator === "*" ? value * right : value / right;
+      valeur = operator === "*" ? valeur * droite : valeur / droite;
     }
   }
 
   private parseFactor(): number {
     this.skipWhitespace();
 
-    const unary = this.input[this.index];
+    const unary = this.saisie[this.index];
     if (unary === "+" || unary === "-") {
       this.index += 1;
-      const value = this.parseFactor();
-      return unary === "-" ? -value : value;
+      const valeur = this.parseFactor();
+      return unary === "-" ? -valeur : valeur;
     }
 
-    if (this.input[this.index] === "(") {
+    if (this.saisie[this.index] === "(") {
       this.index += 1;
-      const value = this.parseExpression();
+      const valeur = this.parseExpression();
       this.skipWhitespace();
-      if (this.input[this.index] !== ")") throw quantityError();
+      if (this.saisie[this.index] !== ")") throw quantityError();
       this.index += 1;
-      return value;
+      return valeur;
     }
 
     return this.parseNumber();
@@ -126,12 +126,12 @@ class QuantityExpressionParser {
 
   private parseNumber(): number {
     this.skipWhitespace();
-    const start = this.index;
+    const debut = this.index;
     let hasDigit = false;
     let hasDecimalSeparator = false;
 
-    while (this.index < this.input.length) {
-      const character = this.input[this.index];
+    while (this.index < this.saisie.length) {
+      const character = this.saisie[this.index];
       if (character >= "0" && character <= "9") {
         hasDigit = true;
         this.index += 1;
@@ -146,41 +146,41 @@ class QuantityExpressionParser {
     }
 
     if (!hasDigit) throw quantityError();
-    const value = Number(this.input.slice(start, this.index));
-    if (!Number.isFinite(value)) throw quantityError();
-    return value;
+    const valeur = Number(this.saisie.slice(debut, this.index));
+    if (!Number.isFinite(valeur)) throw quantityError();
+    return valeur;
   }
 
   private skipWhitespace() {
-    while (/\s/.test(this.input[this.index] ?? "")) this.index += 1;
+    while (/\s/.test(this.saisie[this.index] ?? "")) this.index += 1;
   }
 }
 
-function roundQuantity(value: number): number {
+function roundQuantity(valeur: number): number {
   const factor = 10 ** QUOTE_QUANTITY_PRECISION;
-  return Math.round((value + Number.EPSILON) * factor) / factor;
+  return Math.round((valeur + Number.EPSILON) * factor) / factor;
 }
 
-function assertMoneyCents(value: number) {
-  if (!Number.isSafeInteger(value) || value < 0) {
+function assertMoneyCents(valeur: number) {
+  if (!Number.isSafeInteger(valeur) || valeur < 0) {
     throw new Error("QUOTE_MONEY_INVALID");
   }
 }
 
-function assertPercent(value: number) {
-  if (!Number.isFinite(value) || value < 0 || value > 100) {
+function assertPercent(valeur: number) {
+  if (!Number.isFinite(valeur) || valeur < 0 || valeur > 100) {
     throw new Error("QUOTE_PERCENT_INVALID");
   }
 }
 
-function assertQuantity(value: number) {
-  if (!Number.isFinite(value) || value <= 0 || value > QUOTE_MAX_QUANTITY) {
+function assertQuantity(valeur: number) {
+  if (!Number.isFinite(valeur) || valeur <= 0 || valeur > QUOTE_MAX_QUANTITY) {
     throw new Error("QUOTE_QUANTITY_INVALID");
   }
 }
 
-export function parseQuoteQuantityInput(input: string): QuoteQuantity {
-  const formula = input.trim();
+export function parseQuoteQuantityInput(saisie: string): QuoteQuantity {
+  const formula = saisie.trim();
   if (!formula || formula.length > QUOTE_MAX_QUANTITY_EXPRESSION_LENGTH) {
     throw quantityError();
   }
@@ -188,8 +188,8 @@ export function parseQuoteQuantityInput(input: string): QuoteQuantity {
   const normalized = formula.replace(/,/g, ".");
   if (!/^[0-9+\-*/().\s]+$/.test(normalized)) throw quantityError();
 
-  const parsed = new QuantityExpressionParser(normalized).parse();
-  const quantity = roundQuantity(parsed);
+  const analyse = new QuantityExpressionParser(normalized).parse();
+  const quantity = roundQuantity(analyse);
   assertQuantity(quantity);
 
   const simpleNumber = /^(?:\d+(?:[.,]\d*)?|[.,]\d+)$/.test(formula);
@@ -199,18 +199,18 @@ export function parseQuoteQuantityInput(input: string): QuoteQuantity {
   };
 }
 
-export function formatQuoteNumber(year: number, sequence: number): string {
-  if (!Number.isInteger(year) || year < 2000 || year > 9999) {
+export function formatQuoteNumber(annee: number, sequence: number): string {
+  if (!Number.isInteger(annee) || annee < 2000 || annee > 9999) {
     throw new Error("QUOTE_YEAR_INVALID");
   }
   if (!Number.isInteger(sequence) || sequence < 1 || sequence > 9999) {
     throw new Error("QUOTE_SEQUENCE_INVALID");
   }
-  return `D-${year}-${String(sequence).padStart(4, "0")}`;
+  return `D-${annee}-${String(sequence).padStart(4, "0")}`;
 }
 
-export function quoteValidityDate(issueDate: string, days = QUOTE_DEFAULT_VALIDITY_DAYS): string {
-  if (!/^\d{4}-\d{2}-\d{2}$/.test(issueDate) || !Number.isInteger(days) || days < 1) {
+export function quoteValidityDate(issueDate: string, jours = QUOTE_DEFAULT_VALIDITY_DAYS): string {
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(issueDate) || !Number.isInteger(jours) || jours < 1) {
     throw new Error("QUOTE_VALIDITY_INVALID");
   }
 
@@ -219,7 +219,7 @@ export function quoteValidityDate(issueDate: string, days = QUOTE_DEFAULT_VALIDI
     throw new Error("QUOTE_VALIDITY_INVALID");
   }
 
-  date.setUTCDate(date.getUTCDate() + days);
+  date.setUTCDate(date.getUTCDate() + jours);
   return date.toISOString().slice(0, 10);
 }
 
@@ -250,30 +250,30 @@ export function applySequentialQuoteDiscounts(
   return { finalCents: remainingCents, steps };
 }
 
-export function calculateQuoteLine(input: {
+export function calculateQuoteLine(saisie: {
   quantity: number;
   unitPriceCents: number;
   discountPercent?: number;
   vatRatePercent: number;
 }): QuoteLineCalculation {
-  assertQuantity(input.quantity);
-  assertMoneyCents(input.unitPriceCents);
-  const discountPercent = input.discountPercent ?? 0;
+  assertQuantity(saisie.quantity);
+  assertMoneyCents(saisie.unitPriceCents);
+  const discountPercent = saisie.discountPercent ?? 0;
   assertPercent(discountPercent);
-  assertPercent(input.vatRatePercent);
+  assertPercent(saisie.vatRatePercent);
 
-  const grossHtCents = Math.round(input.quantity * input.unitPriceCents);
+  const grossHtCents = Math.round(saisie.quantity * saisie.unitPriceCents);
   assertMoneyCents(grossHtCents);
   const discountAmountCents = percentageAmountCents(grossHtCents, discountPercent);
   const netHtCents = grossHtCents - discountAmountCents;
-  const vatAmountCents = percentageAmountCents(netHtCents, input.vatRatePercent);
+  const vatAmountCents = percentageAmountCents(netHtCents, saisie.vatRatePercent);
 
   return {
     grossHtCents,
     discountPercent,
     discountAmountCents,
     netHtCents,
-    vatRatePercent: input.vatRatePercent,
+    vatRatePercent: saisie.vatRatePercent,
     vatAmountCents,
     ttcCents: netHtCents + vatAmountCents,
   };

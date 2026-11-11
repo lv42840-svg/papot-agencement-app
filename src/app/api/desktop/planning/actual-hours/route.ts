@@ -25,10 +25,10 @@ import { isPlanningWeekPast } from "@/lib/planning/time-markers";
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
-function noStoreJson(payload: unknown, init?: ResponseInit) {
-  const response = NextResponse.json(payload, init);
-  response.headers.set("Cache-Control", "no-store");
-  return response;
+function noStoreJson(contenu: unknown, init?: ResponseInit) {
+  const reponse = NextResponse.json(contenu, init);
+  reponse.headers.set("Cache-Control", "no-store");
+  return reponse;
 }
 
 function statusFor(code: string) {
@@ -44,65 +44,66 @@ function statusFor(code: string) {
   );
 }
 
-function reportError(error: unknown) {
+function reportError(erreur: unknown) {
   const code =
-    error instanceof ZodError
+    erreur instanceof ZodError
       ? "PLANNING_ACTUAL_HOURS_INVALID"
-      : error instanceof Error
-        ? error.message
+      : erreur instanceof Error
+        ? erreur.message
         : "PLANNING_ACTUAL_HOURS_FAILED";
   return noStoreJson({ error: code }, { status: statusFor(code) });
 }
 
 async function snapshot(
-  week: string,
-  context: Awaited<ReturnType<typeof requireModuleRequestContext>>,
+  semaine: string,
+  contexte: Awaited<ReturnType<typeof requireModuleRequestContext>>,
 ) {
   const [planning, chantiers, auth, canEnter] = await Promise.all([
     createPlanningRepository().load(),
-    createChantiersRepository(context).load(),
+    createChantiersRepository(contexte).load(),
     readAuthPayload(),
-    hasEffectiveSpecialPermission(context.user, "planning.enter_actual_hours"),
+    hasEffectiveSpecialPermission(contexte.user, "planning.enter_actual_hours"),
   ]);
 
-  const people = effectivePlanningPeople(planning, auth.users);
-  const byId = new Map(people.map((person) => [person.userId, person.displayName]));
+  const personnes = effectivePlanningPeople(planning, auth.users);
+  const parId = new Map(personnes.map((personne) => [personne.userId, personne.displayName]));
   // Existing hours must remain readable after a legacy account is deactivated.
   for (const account of auth.users) {
-    if (!byId.has(account.id)) byId.set(account.id, account.displayName);
+    if (!parId.has(account.id)) parId.set(account.id, account.displayName);
   }
   const storedPeople = new Set([
-    ...planning.actualHours.map((entry) => entry.userId),
-    ...planning.indirectHours.map((entry) => entry.userId),
+    ...planning.actualHours.map((entree) => entree.userId),
+    ...planning.indirectHours.map((entree) => entree.userId),
   ]);
   const personnel = [
-    ...people.map((person) => ({
-      id: person.userId,
-      name: person.displayName,
-      endDate: person.endDate,
-      inactiveSince: person.inactiveSince,
+    ...personnes.map((personne) => ({
+      id: personne.userId,
+      name: personne.displayName,
+      endDate: personne.endDate,
+      inactiveSince: personne.inactiveSince,
     })),
     ...auth.users
       .filter(
-        (person) =>
-          storedPeople.has(person.id) && !people.some((active) => active.userId === person.id),
+        (personne) =>
+          storedPeople.has(personne.id) &&
+          !personnes.some((active) => active.userId === personne.id),
       )
-      .map((person) => ({
-        id: person.id,
-        name: person.displayName,
+      .map((personne) => ({
+        id: personne.id,
+        name: personne.displayName,
         endDate: null,
         inactiveSince: null,
       })),
   ].sort((a, b) => a.name.localeCompare(b.name, "fr"));
 
-  const recorded = planning.actualHours.filter((entry) => entry.week === week);
+  const recorded = planning.actualHours.filter((entree) => entree.week === semaine);
   const chantierRows = chantiers.chantiers
     .filter((chantier) => chantier.status !== "CANCELLED")
     .map((chantier) => {
-      const matching = planning.actualHours.filter((entry) => entry.chantierId === chantier.id);
-      const actual = actualHoursByActivity(matching);
+      const matching = planning.actualHours.filter((entree) => entree.chantierId === chantier.id);
+      const reel = actualHoursByActivity(matching);
       const weekActual = actualHoursByActivity(
-        recorded.filter((entry) => entry.chantierId === chantier.id),
+        recorded.filter((entree) => entree.chantierId === chantier.id),
       );
       return {
         id: chantier.id,
@@ -110,12 +111,12 @@ async function snapshot(
         reference: chantier.reference,
         status: chantier.status,
         plannedHours: chantier.plannedHours,
-        actualHours: actual,
+        actualHours: reel,
         weekHours: weekActual,
         remainingHours: {
-          be: chantier.plannedHours.be - actual.be,
-          workshop: chantier.plannedHours.workshop - actual.workshop,
-          install: chantier.plannedHours.install - actual.install,
+          be: chantier.plannedHours.be - reel.be,
+          workshop: chantier.plannedHours.workshop - reel.workshop,
+          install: chantier.plannedHours.install - reel.install,
         },
       };
     })
@@ -123,74 +124,77 @@ async function snapshot(
   const chantierIds = new Set(chantierRows.map((chantier) => chantier.id));
   const suggestedChantierIds = scheduledChantiersByPerson(
     planning.dailyAssignments,
-    week,
+    semaine,
     chantierRows,
   );
   return {
-    week,
+    week: semaine,
     payrollWeekSignatures: Object.fromEntries(
-      personnel.map((person) => [person.id, payrollWeekSignature(planning, person.id, week)]),
+      personnel.map((personne) => [
+        personne.id,
+        payrollWeekSignature(planning, personne.id, semaine),
+      ]),
     ),
     editRevisions: planning.editRevisions ?? {},
-    editHistory: (planning.editHistory ?? []).filter((entry) => entry.key.includes(week)),
-    editable: context.moduleAccess.canWrite && canEnter && isPlanningWeekPast(week),
-    weekIsPast: isPlanningWeekPast(week),
+    editHistory: (planning.editHistory ?? []).filter((entree) => entree.key.includes(semaine)),
+    editable: contexte.moduleAccess.canWrite && canEnter && isPlanningWeekPast(semaine),
+    weekIsPast: isPlanningWeekPast(semaine),
     people: personnel,
     chantiers: chantierRows,
     suggestedChantierIds,
     records: recorded
-      .filter((entry) => chantierIds.has(entry.chantierId))
-      .map((entry) => ({ ...entry, personName: byId.get(entry.userId) ?? "Personnel" })),
-    indirectRecords: planning.indirectHours.filter((entry) => entry.week === week),
+      .filter((entree) => chantierIds.has(entree.chantierId))
+      .map((entree) => ({ ...entree, personName: parId.get(entree.userId) ?? "Personnel" })),
+    indirectRecords: planning.indirectHours.filter((entree) => entree.week === semaine),
   };
 }
 
-export async function GET(request: Request) {
+export async function GET(requete: Request) {
   try {
-    const context = await requireModuleRequestContext("planning", "READ");
-    const week = actualHoursWeekSchema.parse(new URL(request.url).searchParams.get("week"));
-    return noStoreJson(await snapshot(week, context));
-  } catch (error) {
-    return reportError(error);
+    const contexte = await requireModuleRequestContext("planning", "READ");
+    const semaine = actualHoursWeekSchema.parse(new URL(requete.url).searchParams.get("week"));
+    return noStoreJson(await snapshot(semaine, contexte));
+  } catch (erreur) {
+    return reportError(erreur);
   }
 }
 
-export async function POST(request: Request) {
+export async function POST(requete: Request) {
   try {
-    const context = await requireModuleRequestContext("planning", "WRITE");
-    await requireSpecialPermission(context.user, "planning.enter_actual_hours");
-    const raw = await request.json();
+    const contexte = await requireModuleRequestContext("planning", "WRITE");
+    await requireSpecialPermission(contexte.user, "planning.enter_actual_hours");
+    const raw = await requete.json();
     if (raw.action === "confirmPayrollWeek") {
-      const input = z
+      const saisie = z
         .object({
           userId: z.string().uuid(),
           week: actualHoursWeekSchema,
           expectedSignature: z.string().max(1000000),
         })
         .parse(raw);
-      if (!isPlanningWeekPast(input.week)) throw new Error("PLANNING_ACTUAL_HOURS_WEEK_NOT_PAST");
-      await createPlanningRepository().mutate((payload) => {
-        const signature = payrollWeekSignature(payload, input.userId, input.week);
-        if (signature !== input.expectedSignature) throw new Error("EDIT_VERSION_CONFLICT");
+      if (!isPlanningWeekPast(saisie.week)) throw new Error("PLANNING_ACTUAL_HOURS_WEEK_NOT_PAST");
+      await createPlanningRepository().mutate((contenu) => {
+        const signature = payrollWeekSignature(contenu, saisie.userId, saisie.week);
+        if (signature !== saisie.expectedSignature) throw new Error("EDIT_VERSION_CONFLICT");
         return {
-          ...payload,
+          ...contenu,
           payrollWeekConfirmations: {
-            ...payload.payrollWeekConfirmations,
-            [input.userId + ":" + input.week]: signature,
+            ...contenu.payrollWeekConfirmations,
+            [saisie.userId + ":" + saisie.week]: signature,
           },
         };
       });
-      return noStoreJson(await snapshot(input.week, context));
+      return noStoreJson(await snapshot(saisie.week, contexte));
     }
 
-    const input =
+    const saisie =
       raw?.action === "saveIndirectHoursRow"
         ? indirectHoursRowSchema.parse(raw)
         : actualHoursRowSchema.parse(raw);
-    if (!isPlanningWeekPast(input.week)) throw new Error("PLANNING_ACTUAL_HOURS_WEEK_NOT_PAST");
+    if (!isPlanningWeekPast(saisie.week)) throw new Error("PLANNING_ACTUAL_HOURS_WEEK_NOT_PAST");
 
     const [chantiers, auth] = await Promise.all([
-      createChantiersRepository(context).load(),
+      createChantiersRepository(contexte).load(),
       readAuthPayload(),
     ]);
     const chantierIds = new Set(
@@ -198,63 +202,67 @@ export async function POST(request: Request) {
         .filter((chantier) => chantier.status !== "CANCELLED")
         .map((chantier) => chantier.id),
     );
-    await createPlanningRepository().mutate((payload) => {
-      const people = effectivePlanningPeople(payload, auth.users);
-      const ids = new Set(people.map((person) => person.userId));
+    await createPlanningRepository().mutate((contenu) => {
+      const personnes = effectivePlanningPeople(contenu, auth.users);
+      const identifiants = new Set(personnes.map((personne) => personne.userId));
       // Allow correcting historical entries of employees whose old login was disabled.
       const recordedIds = new Set(
-        input.action === "saveActualHoursRow"
-          ? payload.actualHours
-              .filter((entry) => entry.chantierId === input.chantierId && entry.week === input.week)
-              .map((entry) => entry.userId)
-          : payload.indirectHours
-              .filter((entry) => entry.category === input.category && entry.week === input.week)
-              .map((entry) => entry.userId),
+        saisie.action === "saveActualHoursRow"
+          ? contenu.actualHours
+              .filter(
+                (entree) => entree.chantierId === saisie.chantierId && entree.week === saisie.week,
+              )
+              .map((entree) => entree.userId)
+          : contenu.indirectHours
+              .filter(
+                (entree) => entree.category === saisie.category && entree.week === saisie.week,
+              )
+              .map((entree) => entree.userId),
       );
-      for (const user of auth.users) {
-        if (recordedIds.has(user.id)) ids.add(user.id);
+      for (const utilisateur of auth.users) {
+        if (recordedIds.has(utilisateur.id)) identifiants.add(utilisateur.id);
       }
-      const key =
-        input.action === "saveIndirectHoursRow"
-          ? `${input.week}:${input.userId}:indirect:${input.category}`
-          : `${input.week}:${input.userId}:${input.chantierId}`;
-      const revision = payload.editRevisions?.[key] ?? 0;
+      const cle =
+        saisie.action === "saveIndirectHoursRow"
+          ? `${saisie.week}:${saisie.userId}:indirect:${saisie.category}`
+          : `${saisie.week}:${saisie.userId}:${saisie.chantierId}`;
+      const revision = contenu.editRevisions?.[cle] ?? 0;
       assertEditRevision(raw.expectedRevision, revision);
       const before =
-        input.action === "saveIndirectHoursRow"
-          ? payload.indirectHours.filter(
-              (entry) =>
-                entry.week === input.week &&
-                entry.userId === input.userId &&
-                entry.category === input.category,
+        saisie.action === "saveIndirectHoursRow"
+          ? contenu.indirectHours.filter(
+              (entree) =>
+                entree.week === saisie.week &&
+                entree.userId === saisie.userId &&
+                entree.category === saisie.category,
             )
-          : payload.actualHours.filter(
-              (entry) =>
-                entry.week === input.week &&
-                entry.userId === input.userId &&
-                entry.chantierId === input.chantierId,
+          : contenu.actualHours.filter(
+              (entree) =>
+                entree.week === saisie.week &&
+                entree.userId === saisie.userId &&
+                entree.chantierId === saisie.chantierId,
             );
-      const next =
-        input.action === "saveIndirectHoursRow"
-          ? applyIndirectHoursRow(payload, input, ids)
-          : applyActualHoursRow(payload, input, chantierIds, ids);
-      next.editRevisions = { ...payload.editRevisions, [key]: revision + 1 };
-      next.editHistory = [
-        ...(payload.editHistory ?? []),
+      const suivant =
+        saisie.action === "saveIndirectHoursRow"
+          ? applyIndirectHoursRow(contenu, saisie, identifiants)
+          : applyActualHoursRow(contenu, saisie, chantierIds, identifiants);
+      suivant.editRevisions = { ...contenu.editRevisions, [cle]: revision + 1 };
+      suivant.editHistory = [
+        ...(contenu.editHistory ?? []),
         {
-          key,
+          key: cle,
           revision: revision + 1,
           at: new Date().toISOString(),
-          actorId: context.user.id,
-          actorName: context.user.displayName,
+          actorId: contexte.user.id,
+          actorName: contexte.user.displayName,
           before,
-          after: input,
+          after: saisie,
         },
       ];
-      return next;
+      return suivant;
     });
-    return noStoreJson(await snapshot(input.week, context));
-  } catch (error) {
-    return reportError(error);
+    return noStoreJson(await snapshot(saisie.week, contexte));
+  } catch (erreur) {
+    return reportError(erreur);
   }
 }

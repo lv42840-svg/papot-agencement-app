@@ -36,10 +36,10 @@ const activityClasses: Record<BoardActivity, string> = {
 };
 
 export function WeeklyBoardDayCell({
-  userId,
+  userId: idUtilisateur,
   date,
-  name,
-  rows,
+  name: nom,
+  rows: lignesTableau,
   holiday,
   absence,
   isAbsent,
@@ -64,44 +64,44 @@ export function WeeklyBoardDayCell({
   onCopyDay: () => void;
   onPasteDay: () => void;
   busy: boolean;
-  onChange: (input: BoardEntryMutation) => Promise<boolean>;
+  onChange: (saisie: BoardEntryMutation) => Promise<boolean>;
 }) {
   const [editing, setEditing] = useState<string | null>(null);
   const [draftLabel, setDraftLabel] = useState("");
   const [draftActivity, setDraftActivity] = useState<BoardActivity>("NOTE");
 
-  function edit(row?: BoardEntry) {
-    setEditing(row ? (row.id ?? "legacy") : "new");
-    setDraftLabel(row?.label ?? "");
-    setDraftActivity(row?.activity ?? "NOTE");
+  function edit(ligneTableau?: BoardEntry) {
+    setEditing(ligneTableau ? (ligneTableau.id ?? "legacy") : "new");
+    setDraftLabel(ligneTableau?.label ?? "");
+    setDraftActivity(ligneTableau?.activity ?? "NOTE");
   }
 
-  async function submit(event: FormEvent<HTMLFormElement>) {
-    event.preventDefault();
+  async function submit(evenement: FormEvent<HTMLFormElement>) {
+    evenement.preventDefault();
     if (busy || !draftLabel.trim()) return;
-    const row = rows.find((candidate) => (candidate.id ?? "legacy") === editing);
+    const ligneTableau = lignesTableau.find((candidat) => (candidat.id ?? "legacy") === editing);
     const ok = await onChange({
       action: "saveDailyEntry",
-      userId,
+      userId: idUtilisateur,
       date,
-      id: row?.id,
-      legacy: !!row && !row.id,
+      id: ligneTableau?.id,
+      legacy: !!ligneTableau && !ligneTableau.id,
       label: draftLabel.trim(),
       activity: draftActivity,
     });
     if (ok) setEditing(null);
   }
 
-  async function remove(row: BoardEntry) {
+  async function remove(ligneTableau: BoardEntry) {
     if (busy) return;
     await onChange({
       action: "deleteDailyEntry",
-      userId,
+      userId: idUtilisateur,
       date,
-      id: row.id,
-      legacy: !row.id,
+      id: ligneTableau.id,
+      legacy: !ligneTableau.id,
     });
-    if (editing === (row.id ?? "legacy")) setEditing(null);
+    if (editing === (ligneTableau.id ?? "legacy")) setEditing(null);
   }
 
   return (
@@ -116,42 +116,45 @@ export function WeeklyBoardDayCell({
           {absence.typeLabel} · {absence.hours.toLocaleString("fr-FR")} h
         </span>
       ) : null}
-      {rows.map((row) => {
-        const key = row.id ?? "legacy";
-        const isEditing = editing === key;
+      {lignesTableau.map((ligneTableau) => {
+        const cle = ligneTableau.id ?? "legacy";
+        const isEditing = editing === cle;
         return (
-          <div key={key} className={`weeklyBoardEntry ${activityClasses[row.activity]}`}>
+          <div key={cle} className={`weeklyBoardEntry ${activityClasses[ligneTableau.activity]}`}>
             <div className="weeklyBoardEntryInfo">
-              <strong>{row.label}</strong>
-              <small>{activityLabels[row.activity]}</small>
+              <strong>{ligneTableau.label}</strong>
+              <small>{activityLabels[ligneTableau.activity]}</small>
             </div>
             {editable && !isAbsent && isPresent ? (
               <div className="weeklyBoardEntryActions">
                 <button
                   type="button"
                   disabled={busy}
-                  aria-label={`Modifier ${row.label}`}
-                  onClick={() => edit(row)}
+                  aria-label={`Modifier ${ligneTableau.label}`}
+                  onClick={() => edit(ligneTableau)}
                 >
                   ✎
                 </button>
                 <button
                   type="button"
                   disabled={busy}
-                  aria-label={`Supprimer ${row.label}`}
-                  onClick={() => void remove(row)}
+                  aria-label={`Supprimer ${ligneTableau.label}`}
+                  onClick={() => void remove(ligneTableau)}
                 >
                   ×
                 </button>
               </div>
             ) : null}
             {isEditing ? (
-              <form className="weeklyBoardEditForm" onSubmit={(event) => void submit(event)}>
+              <form
+                className="weeklyBoardEditForm"
+                onSubmit={(evenement) => void submit(evenement)}
+              >
                 <input
-                  aria-label={`Intitulé pour ${name}, ${date}`}
+                  aria-label={`Intitulé pour ${nom}, ${date}`}
                   value={draftLabel}
                   list="weekly-board-site-suggestions"
-                  onChange={(event) => setDraftLabel(event.target.value)}
+                  onChange={(evenement) => setDraftLabel(evenement.target.value)}
                   maxLength={160}
                   required
                   autoFocus
@@ -159,11 +162,13 @@ export function WeeklyBoardDayCell({
                 <select
                   aria-label="Activité"
                   value={draftActivity}
-                  onChange={(event) => setDraftActivity(event.target.value as BoardActivity)}
+                  onChange={(evenement) =>
+                    setDraftActivity(evenement.target.value as BoardActivity)
+                  }
                 >
-                  {Object.entries(activityLabels).map(([value, label]) => (
-                    <option key={value} value={value}>
-                      {label}
+                  {Object.entries(activityLabels).map(([valeur, libelle]) => (
+                    <option key={valeur} value={valeur}>
+                      {libelle}
                     </option>
                   ))}
                 </select>
@@ -181,7 +186,7 @@ export function WeeklyBoardDayCell({
         );
       })}
       <div className="weeklyBoardDayClipboard">
-        {rows.length > 0 ? (
+        {lignesTableau.length > 0 ? (
           <button
             type="button"
             onClick={onCopyDay}
@@ -202,13 +207,13 @@ export function WeeklyBoardDayCell({
         ) : null}
       </div>
       {editing === "new" ? (
-        <form className="weeklyBoardEditForm" onSubmit={(event) => void submit(event)}>
+        <form className="weeklyBoardEditForm" onSubmit={(evenement) => void submit(evenement)}>
           <input
-            aria-label={`Nouvelle affectation pour ${name}, ${date}`}
+            aria-label={`Nouvelle affectation pour ${nom}, ${date}`}
             value={draftLabel}
             list="weekly-board-site-suggestions"
             placeholder="Chantier ou texte libre"
-            onChange={(event) => setDraftLabel(event.target.value)}
+            onChange={(evenement) => setDraftLabel(evenement.target.value)}
             maxLength={160}
             required
             autoFocus
@@ -216,11 +221,11 @@ export function WeeklyBoardDayCell({
           <select
             aria-label="Type d'activité"
             value={draftActivity}
-            onChange={(event) => setDraftActivity(event.target.value as BoardActivity)}
+            onChange={(evenement) => setDraftActivity(evenement.target.value as BoardActivity)}
           >
-            {Object.entries(activityLabels).map(([value, label]) => (
-              <option key={value} value={value}>
-                {label}
+            {Object.entries(activityLabels).map(([valeur, libelle]) => (
+              <option key={valeur} value={valeur}>
+                {libelle}
               </option>
             ))}
           </select>
@@ -238,7 +243,7 @@ export function WeeklyBoardDayCell({
         <span className="weeklyBoardDayOff">Hors période de présence</span>
       ) : isAbsent ? (
         <span className="weeklyBoardDayOff">Indisponible</span>
-      ) : editable && editing !== "new" && rows.length < 20 ? (
+      ) : editable && editing !== "new" && lignesTableau.length < 20 ? (
         <button
           className="weeklyBoardAddEntry"
           type="button"

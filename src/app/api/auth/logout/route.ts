@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { destroySession } from "@/lib/auth/session";
 
-export async function POST(request: Request) {
+export async function POST(requete: Request) {
   await destroySession();
-  return NextResponse.redirect(new URL("/login", request.url), 303);
+  return NextResponse.redirect(new URL("/login", requete.url), 303);
 }

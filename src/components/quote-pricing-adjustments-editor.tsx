@@ -24,22 +24,22 @@ function formatMoney(cents: number): string {
   return moneyFormatter.format(cents / 100);
 }
 
-function parseNumber(value: string, allowZero = false): number {
-  const parsed = Number(value.trim().replace(",", "."));
-  if (!Number.isFinite(parsed) || parsed < 0 || (!allowZero && parsed === 0)) {
+function parseNumber(valeur: string, allowZero = false): number {
+  const analyse = Number(valeur.trim().replace(",", "."));
+  if (!Number.isFinite(analyse) || analyse < 0 || (!allowZero && analyse === 0)) {
     throw new Error("NUMBER_INVALID");
   }
-  return parsed;
+  return analyse;
 }
 
-function parsePositiveInteger(value: string): number {
-  const parsed = parseNumber(value);
-  if (!Number.isInteger(parsed)) throw new Error("NUMBER_INVALID");
-  return parsed;
+function parsePositiveInteger(valeur: string): number {
+  const analyse = parseNumber(valeur);
+  if (!Number.isInteger(analyse)) throw new Error("NUMBER_INVALID");
+  return analyse;
 }
 
-function parseMoneyCents(value: string): number {
-  return Math.round(parseNumber(value) * 100);
+function parseMoneyCents(valeur: string): number {
+  return Math.round(parseNumber(valeur) * 100);
 }
 
 function adjustmentValueLabel(adjustment: QuotePricingAdjustment): string {
@@ -89,22 +89,22 @@ function pricingWarningLabel(code: string): string {
 }
 
 async function postPricing(
-  body: Record<string, unknown>,
+  corps: Record<string, unknown>,
   updatedAt: string,
 ): Promise<NativeQuotesPayload> {
-  const response = await fetch("/api/desktop/quotes/pricing", {
+  const reponse = await fetch("/api/desktop/quotes/pricing", {
     method: "POST",
     headers: {
       "Content-Type": "application/json",
       ...quoteRevisionHeaders(updatedAt),
     },
-    body: JSON.stringify(body),
+    body: JSON.stringify(corps),
   });
-  const data = (await response.json()) as PricingApiResponse;
-  if (!response.ok || !data.payload) {
-    throw new Error(data.error ?? "QUOTES_PRICING_MUTATION_FAILED");
+  const donnees = (await reponse.json()) as PricingApiResponse;
+  if (!reponse.ok || !donnees.payload) {
+    throw new Error(donnees.error ?? "QUOTES_PRICING_MUTATION_FAILED");
   }
-  return data.payload;
+  return donnees.payload;
 }
 
 export function QuotePricingAdjustmentsEditor({
@@ -114,13 +114,14 @@ export function QuotePricingAdjustmentsEditor({
 }: {
   quote: NativeQuoteRecord;
   canWrite: boolean;
-  onSaved: (payload: NativeQuotesPayload) => void;
+  onSaved: (contenu: NativeQuotesPayload) => void;
 }) {
   const editable = canWrite && quote.status === "DRAFT";
-  const postPricingForQuote = (body: Record<string, unknown>) => postPricing(body, quote.updatedAt);
+  const postPricingForQuote = (corps: Record<string, unknown>) =>
+    postPricing(corps, quote.updatedAt);
   const [kind, setKind] = useState<"PERCENTAGE" | "POSE_HOURS" | "HOTEL">("PERCENTAGE");
-  const [label, setLabel] = useState("Commission architecte");
-  const [value, setValue] = useState("5");
+  const [libelle, setLabel] = useState("Commission architecte");
+  const [valeur, setValue] = useState("5");
   const [hotelNights, setHotelNights] = useState("1");
   const [hotelPricePerNight, setHotelPricePerNight] = useState("120");
   const [marginTreatment, setMarginTreatment] = useState<"MARGED" | "PASS_THROUGH">("PASS_THROUGH");
@@ -136,15 +137,15 @@ export function QuotePricingAdjustmentsEditor({
       : String(discount.amountCents / 100).replace(".", ",");
   });
   const [savingDiscount, setSavingDiscount] = useState(false);
-  const [saving, setSaving] = useState(false);
-  const [error, setError] = useState("");
+  const [sauvegardeEnCours, setSaving] = useState(false);
+  const [erreur, setError] = useState("");
 
   const pricing = useMemo(
     () => calculateQuoteAdjustedPricing(quote.model.items, quote.pricingConfig),
     [quote.model.items, quote.pricingConfig],
   );
   const poseLines = useMemo(
-    () => pricing.lines.filter((line) => line.basePoseHours > 0),
+    () => pricing.lines.filter((ligne) => ligne.basePoseHours > 0),
     [pricing.lines],
   );
   const warningLabels = useMemo(
@@ -198,12 +199,12 @@ export function QuotePricingAdjustmentsEditor({
   }
 
   async function addAdjustment() {
-    if (!editable || saving || !label.trim()) return;
+    if (!editable || sauvegardeEnCours || !libelle.trim()) return;
     setError("");
     setSaving(true);
     try {
       const id = globalThis.crypto.randomUUID();
-      const cleanLabel = label.trim();
+      const cleanLabel = libelle.trim();
       if (kind === "HOTEL") {
         await saveAdjustment({
           id,
@@ -226,9 +227,9 @@ export function QuotePricingAdjustmentsEditor({
         marginTreatment,
       } as const;
       if (kind === "PERCENTAGE") {
-        await saveAdjustment({ ...common, kind, percent: parseNumber(value) });
+        await saveAdjustment({ ...common, kind, percent: parseNumber(valeur) });
       } else {
-        await saveAdjustment({ ...common, kind, hours: parseNumber(value) });
+        await saveAdjustment({ ...common, kind, hours: parseNumber(valeur) });
       }
     } catch (caught) {
       setError(pricingErrorLabel(caught instanceof Error ? caught.message : ""));
@@ -324,7 +325,7 @@ export function QuotePricingAdjustmentsEditor({
         </div>
       </header>
 
-      {error ? <div className="error">{error}</div> : null}
+      {erreur ? <div className="error">{erreur}</div> : null}
 
       <div className="customerDiscount">
         <div>
@@ -339,7 +340,9 @@ export function QuotePricingAdjustmentsEditor({
           <select
             value={discountKind}
             disabled={!editable || savingDiscount}
-            onChange={(event) => setDiscountKind(event.target.value as "PERCENTAGE" | "AMOUNT")}
+            onChange={(evenement) =>
+              setDiscountKind(evenement.target.value as "PERCENTAGE" | "AMOUNT")
+            }
             aria-label="Type de remise client"
           >
             <option value="PERCENTAGE">%</option>
@@ -348,7 +351,7 @@ export function QuotePricingAdjustmentsEditor({
           <input
             value={discountValue}
             disabled={!editable || savingDiscount}
-            onChange={(event) => setDiscountValue(event.target.value)}
+            onChange={(evenement) => setDiscountValue(evenement.target.value)}
             inputMode="decimal"
             placeholder={discountKind === "PERCENTAGE" ? "Ex. 5" : "Ex. 100"}
             aria-label="Valeur de la remise client"
@@ -384,7 +387,7 @@ export function QuotePricingAdjustmentsEditor({
             <select
               disabled={!editable}
               value={kind}
-              onChange={(event) => changeKind(event.target.value as typeof kind)}
+              onChange={(evenement) => changeKind(evenement.target.value as typeof kind)}
             >
               <option value="PERCENTAGE">Pourcentage</option>
               <option value="POSE_HOURS">Heures de pose / trajet</option>
@@ -393,8 +396,8 @@ export function QuotePricingAdjustmentsEditor({
             <input
               disabled={!editable}
               placeholder="Libellé interne"
-              value={label}
-              onChange={(event) => setLabel(event.target.value)}
+              value={libelle}
+              onChange={(evenement) => setLabel(evenement.target.value)}
             />
             {kind === "HOTEL" ? (
               <>
@@ -403,14 +406,14 @@ export function QuotePricingAdjustmentsEditor({
                   inputMode="numeric"
                   placeholder="Nuits"
                   value={hotelNights}
-                  onChange={(event) => setHotelNights(event.target.value)}
+                  onChange={(evenement) => setHotelNights(evenement.target.value)}
                 />
                 <input
                   disabled={!editable}
                   inputMode="decimal"
                   placeholder="€/nuit"
                   value={hotelPricePerNight}
-                  onChange={(event) => setHotelPricePerNight(event.target.value)}
+                  onChange={(evenement) => setHotelPricePerNight(evenement.target.value)}
                 />
               </>
             ) : (
@@ -418,14 +421,16 @@ export function QuotePricingAdjustmentsEditor({
                 disabled={!editable}
                 inputMode="decimal"
                 placeholder={kind === "PERCENTAGE" ? "%" : "Heures"}
-                value={value}
-                onChange={(event) => setValue(event.target.value)}
+                value={valeur}
+                onChange={(evenement) => setValue(evenement.target.value)}
               />
             )}
             <select
               disabled={!editable}
               value={marginTreatment}
-              onChange={(event) => setMarginTreatment(event.target.value as typeof marginTreatment)}
+              onChange={(evenement) =>
+                setMarginTreatment(evenement.target.value as typeof marginTreatment)
+              }
             >
               <option value="PASS_THROUGH">Répercuté sans marge</option>
               <option value="MARGED">Margé</option>
@@ -438,14 +443,14 @@ export function QuotePricingAdjustmentsEditor({
                   checked={applyToOptions}
                   disabled={!editable}
                   type="checkbox"
-                  onChange={(event) => setApplyToOptions(event.target.checked)}
+                  onChange={(evenement) => setApplyToOptions(evenement.target.checked)}
                 />
                 Appliquer aux options
               </label>
             )}
             <button
               className="primaryButton compact"
-              disabled={!editable || saving || !label.trim()}
+              disabled={!editable || sauvegardeEnCours || !libelle.trim()}
               type="button"
               onClick={() => void addAdjustment()}
             >
@@ -506,10 +511,10 @@ export function QuotePricingAdjustmentsEditor({
             {poseLines.length === 0 ? (
               <p className="empty">Aucune heure de pose dans les ouvrages pour le moment.</p>
             ) : null}
-            {poseLines.map((line) => (
-              <div className="poseRow" key={line.lineId}>
-                <span title={line.description}>{line.description}</span>
-                <strong>{line.basePoseHours.toLocaleString("fr-FR")} h</strong>
+            {poseLines.map((ligne) => (
+              <div className="poseRow" key={ligne.lineId}>
+                <span title={ligne.description}>{ligne.description}</span>
+                <strong>{ligne.basePoseHours.toLocaleString("fr-FR")} h</strong>
               </div>
             ))}
           </div>

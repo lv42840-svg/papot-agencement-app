@@ -6,9 +6,9 @@ import { getCurrentUser } from "@/lib/auth/session";
 export const dynamic = "force-dynamic";
 
 export default async function ChangePasswordPage() {
-  const user = await getCurrentUser();
-  if (!user) redirect("/login");
-  if (!user.mustChangePassword) redirect("/");
+  const utilisateur = await getCurrentUser();
+  if (!utilisateur) redirect("/login");
+  if (!utilisateur.mustChangePassword) redirect("/");
 
   return (
     <main className="loginPage">

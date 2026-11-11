@@ -28,12 +28,12 @@ export type QuoteEmailPolicy = {
   replyToEmail: string;
 };
 
-function isEmail(value: string): boolean {
-  return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(value);
+function isEmail(valeur: string): boolean {
+  return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(valeur);
 }
 
-function readAddress(value: string | undefined, fallback: string): string {
-  const normalized = value?.trim() || fallback;
+function readAddress(valeur: string | undefined, fallback: string): string {
+  const normalized = valeur?.trim() || fallback;
   if (!isEmail(normalized)) throw new Error("QUOTE_EMAIL_NOT_CONFIGURED");
   return normalized;
 }
@@ -63,24 +63,24 @@ function smtpConfigFromEnv(env: QuoteEmailEnv = process.env): SmtpConfig {
   return { host, port, secure, username, password };
 }
 
-function headerValue(value: string): string {
-  if (/\r|\n/.test(value)) throw new Error("QUOTE_EMAIL_SEND_FAILED");
-  return value.trim();
+function headerValue(valeur: string): string {
+  if (/\r|\n/.test(valeur)) throw new Error("QUOTE_EMAIL_SEND_FAILED");
+  return valeur.trim();
 }
 
-function encodeHeader(value: string): string {
-  return `=?UTF-8?B?${Buffer.from(headerValue(value), "utf8").toString("base64")}?=`;
+function encodeHeader(valeur: string): string {
+  return `=?UTF-8?B?${Buffer.from(headerValue(valeur), "utf8").toString("base64")}?=`;
 }
 
-function base64Lines(value: Uint8Array | string): string {
+function base64Lines(valeur: Uint8Array | string): string {
   const encoded = Buffer.from(
-    value instanceof Uint8Array ? value : Buffer.from(value, "utf8"),
+    valeur instanceof Uint8Array ? valeur : Buffer.from(valeur, "utf8"),
   ).toString("base64");
   return encoded.match(/.{1,76}/g)?.join("\r\n") ?? "";
 }
 
-function asciiFileName(value: string): string {
-  const normalized = value
+function asciiFileName(valeur: string): string {
+  const normalized = valeur
     .normalize("NFKD")
     .replace(/[\u0300-\u036f]/g, "")
     .replace(/[^A-Za-z0-9._-]+/g, "_")
@@ -89,7 +89,7 @@ function asciiFileName(value: string): string {
 }
 
 export function buildQuoteEmailMessage(
-  input: QuoteEmailInput,
+  saisie: QuoteEmailInput,
   policy: QuoteEmailPolicy,
 ): {
   envelopeFrom: string;
@@ -98,17 +98,17 @@ export function buildQuoteEmailMessage(
   subject: string;
   body: string;
 } {
-  const to = input.to.trim();
+  const to = saisie.to.trim();
   if (!isEmail(to)) throw new Error("QUOTE_RECIPIENT_EMAIL_REQUIRED");
-  if (input.pdfBytes.byteLength === 0) throw new Error("QUOTE_EMAIL_SEND_FAILED");
+  if (saisie.pdfBytes.byteLength === 0) throw new Error("QUOTE_EMAIL_SEND_FAILED");
 
-  const subject = headerValue(input.subject);
-  const body = input.body.trim();
-  if (!subject || !body) throw new Error("QUOTE_EMAIL_CONTENT_REQUIRED");
+  const subject = headerValue(saisie.subject);
+  const corps = saisie.body.trim();
+  if (!subject || !corps) throw new Error("QUOTE_EMAIL_CONTENT_REQUIRED");
 
   const boundary = `papot-${randomUUID()}`;
   const domain = policy.fromEmail.split("@")[1] || "papot.app";
-  const fileName = headerValue(input.pdfFileName);
+  const fileName = headerValue(saisie.pdfFileName);
   const fallbackFileName = asciiFileName(fileName);
 
   const raw = [
@@ -126,7 +126,7 @@ export function buildQuoteEmailMessage(
     'Content-Type: text/plain; charset="utf-8"',
     "Content-Transfer-Encoding: base64",
     "",
-    base64Lines(body),
+    base64Lines(corps),
     "",
     `--${boundary}`,
     `Content-Type: application/pdf; name="${fallbackFileName}"`,
@@ -135,7 +135,7 @@ export function buildQuoteEmailMessage(
       fileName,
     )}`,
     "",
-    base64Lines(input.pdfBytes),
+    base64Lines(saisie.pdfBytes),
     "",
     `--${boundary}--`,
     "",
@@ -146,7 +146,7 @@ export function buildQuoteEmailMessage(
     recipients: Array.from(new Set([to, policy.ccEmail])),
     raw,
     subject,
-    body,
+    body: corps,
   };
 }
 
@@ -160,17 +160,17 @@ function readResponse(socket: net.Socket): Promise<string> {
 
     const onData = (chunk: Buffer) => {
       buffer += chunk.toString("utf8");
-      const lines = buffer.split("\r\n").filter(Boolean);
-      const last = lines[lines.length - 1] ?? "";
+      const lignes = buffer.split("\r\n").filter(Boolean);
+      const last = lignes[lignes.length - 1] ?? "";
       if (/^\d{3} /.test(last)) {
         cleanup();
         resolve(buffer);
       }
     };
 
-    const onError = (error: Error) => {
+    const onError = (erreur: Error) => {
       cleanup();
-      reject(error);
+      reject(erreur);
     };
 
     const cleanup = () => {
@@ -183,22 +183,22 @@ function readResponse(socket: net.Socket): Promise<string> {
   });
 }
 
-async function command(socket: net.Socket, line: string, expected: number[]): Promise<string> {
-  socket.write(line + "\r\n");
-  const response = await readResponse(socket);
-  const code = Number(response.slice(0, 3));
-  if (!expected.includes(code)) throw new Error(`SMTP_${code}_${response.trim()}`);
-  return response;
+async function command(socket: net.Socket, ligne: string, attendu: number[]): Promise<string> {
+  socket.write(ligne + "\r\n");
+  const reponse = await readResponse(socket);
+  const code = Number(reponse.slice(0, 3));
+  if (!attendu.includes(code)) throw new Error(`SMTP_${code}_${reponse.trim()}`);
+  return reponse;
 }
 
-async function connectSocket(config: SmtpConfig): Promise<net.Socket> {
-  if (config.secure) {
+async function connectSocket(configuration: SmtpConfig): Promise<net.Socket> {
+  if (configuration.secure) {
     return await new Promise((resolve, reject) => {
       const socket = tls.connect(
         {
-          host: config.host,
-          port: config.port,
-          servername: config.host,
+          host: configuration.host,
+          port: configuration.port,
+          servername: configuration.host,
           rejectUnauthorized: true,
         },
         () => resolve(socket),
@@ -210,7 +210,9 @@ async function connectSocket(config: SmtpConfig): Promise<net.Socket> {
   }
 
   const plain = await new Promise<net.Socket>((resolve, reject) => {
-    const socket = net.connect({ host: config.host, port: config.port }, () => resolve(socket));
+    const socket = net.connect({ host: configuration.host, port: configuration.port }, () =>
+      resolve(socket),
+    );
     socket.setTimeout(20_000);
     socket.once("error", reject);
     socket.once("timeout", () => socket.destroy(new Error("SMTP_TIMEOUT")));
@@ -224,7 +226,7 @@ async function connectSocket(config: SmtpConfig): Promise<net.Socket> {
     const secure = tls.connect(
       {
         socket: plain,
-        servername: config.host,
+        servername: configuration.host,
         rejectUnauthorized: true,
       },
       () => resolve(secure),
@@ -235,29 +237,33 @@ async function connectSocket(config: SmtpConfig): Promise<net.Socket> {
   });
 }
 
-async function sendSmtpMessage(params: {
+async function sendSmtpMessage(parametres: {
   config: SmtpConfig;
   envelopeFrom: string;
   recipients: string[];
   raw: string;
 }) {
-  const socket = await connectSocket(params.config);
+  const socket = await connectSocket(parametres.config);
 
   try {
-    if (params.config.secure) await readResponse(socket);
+    if (parametres.config.secure) await readResponse(socket);
 
     await command(socket, "EHLO papot.app", [250]);
     await command(socket, "AUTH LOGIN", [334]);
-    await command(socket, Buffer.from(params.config.username, "utf8").toString("base64"), [334]);
-    await command(socket, Buffer.from(params.config.password, "utf8").toString("base64"), [235]);
-    await command(socket, `MAIL FROM:<${params.envelopeFrom}>`, [250]);
+    await command(socket, Buffer.from(parametres.config.username, "utf8").toString("base64"), [
+      334,
+    ]);
+    await command(socket, Buffer.from(parametres.config.password, "utf8").toString("base64"), [
+      235,
+    ]);
+    await command(socket, `MAIL FROM:<${parametres.envelopeFrom}>`, [250]);
 
-    for (const recipient of params.recipients) {
+    for (const recipient of parametres.recipients) {
       await command(socket, `RCPT TO:<${recipient}>`, [250, 251]);
     }
 
     await command(socket, "DATA", [354]);
-    socket.write(dotStuff(params.raw) + "\r\n.\r\n");
+    socket.write(dotStuff(parametres.raw) + "\r\n.\r\n");
     const sent = await readResponse(socket);
     const code = Number(sent.slice(0, 3));
     if (code !== 250) throw new Error(`SMTP_${code}_${sent.trim()}`);
@@ -269,22 +275,22 @@ async function sendSmtpMessage(params: {
 }
 
 export async function sendQuoteEmail(
-  input: QuoteEmailInput,
+  saisie: QuoteEmailInput,
   policy: QuoteEmailPolicy,
   env: QuoteEmailEnv = process.env,
 ): Promise<void> {
-  const message = buildQuoteEmailMessage(input, policy);
-  const config = smtpConfigFromEnv(env);
+  const message = buildQuoteEmailMessage(saisie, policy);
+  const configuration = smtpConfigFromEnv(env);
 
   try {
     await sendSmtpMessage({
-      config,
+      config: configuration,
       envelopeFrom: message.envelopeFrom,
       recipients: message.recipients,
       raw: message.raw,
     });
-  } catch (error) {
-    if (error instanceof Error && error.message === "QUOTE_EMAIL_NOT_CONFIGURED") throw error;
+  } catch (erreur) {
+    if (erreur instanceof Error && erreur.message === "QUOTE_EMAIL_NOT_CONFIGURED") throw erreur;
     throw new Error("QUOTE_EMAIL_SEND_FAILED");
   }
 }

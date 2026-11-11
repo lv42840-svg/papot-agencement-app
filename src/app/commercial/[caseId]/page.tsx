@@ -4,15 +4,15 @@ import { DesktopAppShell } from "@/components/desktop-app-shell";
 export const dynamic = "force-dynamic";
 
 export default async function CommercialAffairPage({
-  params,
+  params: parametres,
 }: {
   params: Promise<{ caseId: string }>;
 }) {
-  const { caseId } = await params;
+  const { caseId: idAffaire } = await parametres;
 
   return (
     <DesktopAppShell>
-      <CommercialWorkspaceV2 affairId={caseId} />
+      <CommercialWorkspaceV2 affairId={idAffaire} />
     </DesktopAppShell>
   );
 }

@@ -157,70 +157,80 @@ export function chantierCapabilities(_actor: ChantierActor): ChantierCapabilitie
   };
 }
 
-function text(value: string): string | null {
-  const trimmed = value.trim();
+function text(valeur: string): string | null {
+  const trimmed = valeur.trim();
   return trimmed ? trimmed : null;
 }
 
-function findChantier(payload: ChantiersPayload, chantierId: string): ChantierRecord {
-  const item = payload.chantiers.find((candidate) => candidate.id === chantierId);
-  if (!item) throw new Error("CHANTIER_NOT_FOUND");
-  return item;
+function findChantier(contenu: ChantiersPayload, chantierId: string): ChantierRecord {
+  const element = contenu.chantiers.find((candidat) => candidat.id === chantierId);
+  if (!element) throw new Error("CHANTIER_NOT_FOUND");
+  return element;
 }
 
-export function assertChantierRevision(item: ChantierRecord, expectedUpdatedAt: string): void {
-  if (item.updatedAt !== expectedUpdatedAt) {
+export function assertChantierRevision(element: ChantierRecord, expectedUpdatedAt: string): void {
+  if (element.updatedAt !== expectedUpdatedAt) {
     throw new Error("CHANTIERS_VERSION_CONFLICT");
   }
 }
 
 function history(
-  item: ChantierRecord,
+  element: ChantierRecord,
   actorName: string,
   type: ChantierRecord["history"][number]["type"],
   summary: string,
-  now: Date,
+  maintenant: Date,
 ): void {
-  item.history.push({ id: randomUUID(), type, at: now.toISOString(), actorName, summary });
+  element.history.push({
+    id: randomUUID(),
+    type,
+    at: maintenant.toISOString(),
+    actorName,
+    summary,
+  });
 }
 
-function touch(item: ChantierRecord, actor: ChantierActor, now: Date): void {
-  item.updatedAt = now.toISOString();
-  item.updatedByName = actor.displayName;
+function touch(element: ChantierRecord, auteur: ChantierActor, maintenant: Date): void {
+  element.updatedAt = maintenant.toISOString();
+  element.updatedByName = auteur.displayName;
 }
 
-function hasDocument(item: CommercialCase, category: "QUOTE" | "COSTING"): boolean {
-  return item.documents.some((document) => document.category === category);
+function hasDocument(element: CommercialCase, category: "QUOTE" | "COSTING"): boolean {
+  return element.documents.some((document) => document.category === category);
 }
 
-function ensureOperationalEditable(item: ChantierRecord): void {
-  if (item.status === "ARCHIVED") throw new Error("CHANTIER_ARCHIVED_READ_ONLY");
+function ensureOperationalEditable(element: ChantierRecord): void {
+  if (element.status === "ARCHIVED") throw new Error("CHANTIER_ARCHIVED_READ_ONLY");
 }
 
-function findBeItem(item: ChantierRecord, id: string): BeItem {
-  const result = item.operational.beItems.find((candidate) => candidate.id === id);
-  if (!result) throw new Error("CHANTIER_BE_ITEM_NOT_FOUND");
-  return result;
+function findBeItem(element: ChantierRecord, id: string): BeItem {
+  const resultat = element.operational.beItems.find((candidat) => candidat.id === id);
+  if (!resultat) throw new Error("CHANTIER_BE_ITEM_NOT_FOUND");
+  return resultat;
 }
 
-function findWorkshopItem(item: ChantierRecord, id: string): WorkshopItem {
-  const result = item.operational.workshopItems.find((candidate) => candidate.id === id);
-  if (!result) throw new Error("CHANTIER_WORKSHOP_ITEM_NOT_FOUND");
-  return result;
+function findWorkshopItem(element: ChantierRecord, id: string): WorkshopItem {
+  const resultat = element.operational.workshopItems.find((candidat) => candidat.id === id);
+  if (!resultat) throw new Error("CHANTIER_WORKSHOP_ITEM_NOT_FOUND");
+  return resultat;
 }
 
-function findInstallItem(item: ChantierRecord, id: string): InstallItem {
-  const result = item.operational.installItems.find((candidate) => candidate.id === id);
-  if (!result) throw new Error("CHANTIER_INSTALL_ITEM_NOT_FOUND");
-  return result;
+function findInstallItem(element: ChantierRecord, id: string): InstallItem {
+  const resultat = element.operational.installItems.find((candidat) => candidat.id === id);
+  if (!resultat) throw new Error("CHANTIER_INSTALL_ITEM_NOT_FOUND");
+  return resultat;
 }
 
-function createWorkshopFromBe(item: ChantierRecord, beItem: BeItem, now: Date): WorkshopItem {
-  const existing = item.operational.workshopItems.find(
-    (candidate) => candidate.sourceBeItemId === beItem.id,
+function createWorkshopFromBe(
+  element: ChantierRecord,
+  beItem: BeItem,
+  maintenant: Date,
+): WorkshopItem {
+  const existing = element.operational.workshopItems.find(
+    (candidat) => candidat.sourceBeItemId === beItem.id,
   );
   if (existing) return existing;
-  const timestamp = now.toISOString();
+  const timestamp = maintenant.toISOString();
   const created: WorkshopItem = {
     id: randomUUID(),
     sourceBeItemId: beItem.id,
@@ -234,12 +244,12 @@ function createWorkshopFromBe(item: ChantierRecord, beItem: BeItem, now: Date): 
     createdAt: timestamp,
     updatedAt: timestamp,
   };
-  item.operational.workshopItems.push(created);
+  element.operational.workshopItems.push(created);
   return created;
 }
 
 function createInstallFromTechnical(
-  item: ChantierRecord,
+  element: ChantierRecord,
   source: {
     sourceBeItemId: string | null;
     sourceWorkshopItemId: string | null;
@@ -249,16 +259,16 @@ function createInstallFromTechnical(
     sourceQuoteId: string | null;
     sourceQuoteLineId: string | null;
   },
-  now: Date,
+  maintenant: Date,
 ): InstallItem {
-  const existing = item.operational.installItems.find(
-    (candidate) =>
-      (source.sourceBeItemId && candidate.sourceBeItemId === source.sourceBeItemId) ||
+  const existing = element.operational.installItems.find(
+    (candidat) =>
+      (source.sourceBeItemId && candidat.sourceBeItemId === source.sourceBeItemId) ||
       (source.sourceWorkshopItemId &&
-        candidate.sourceWorkshopItemId === source.sourceWorkshopItemId),
+        candidat.sourceWorkshopItemId === source.sourceWorkshopItemId),
   );
   if (existing) return existing;
-  const timestamp = now.toISOString();
+  const timestamp = maintenant.toISOString();
   const created: InstallItem = {
     id: randomUUID(),
     sourceBeItemId: source.sourceBeItemId,
@@ -273,25 +283,25 @@ function createInstallFromTechnical(
     createdAt: timestamp,
     updatedAt: timestamp,
   };
-  item.operational.installItems.push(created);
+  element.operational.installItems.push(created);
   return created;
 }
 
 export function launchChantierFromCommercial(
   rawSource: ChantiersPayload,
   commercialCase: CommercialCase,
-  input: LaunchChantierInput,
-  actor: ChantierActor,
-  now: Date = new Date(),
+  saisie: LaunchChantierInput,
+  auteur: ChantierActor,
+  maintenant: Date = new Date(),
 ): ChantierMutationResult {
   const source = parseChantiersPayload(rawSource);
-  const payload = structuredClone(source);
+  const contenu = structuredClone(source);
 
-  if (commercialCase.id !== input.commercialCaseId)
+  if (commercialCase.id !== saisie.commercialCaseId)
     throw new Error("CHANTIER_COMMERCIAL_CASE_MISMATCH");
   if (commercialCase.status !== "CONFIRMED") throw new Error("CHANTIER_COMMERCIAL_NOT_CONFIRMED");
   if (!commercialCase.plannedInstallDate) throw new Error("CHANTIER_INSTALL_DATE_REQUIRED");
-  if (payload.chantiers.some((item) => item.sourceCommercialCaseId === commercialCase.id)) {
+  if (contenu.chantiers.some((element) => element.sourceCommercialCaseId === commercialCase.id)) {
     throw new Error("CHANTIER_ALREADY_LAUNCHED");
   }
 
@@ -300,16 +310,16 @@ export function launchChantierFromCommercial(
   const signedQuotePresent = commercialHasSignedQuote(commercialCase);
   const costingPresent = hasDocument(commercialCase, "COSTING");
 
-  if (!quotePresent && !input.quoteMissingDeclared)
+  if (!quotePresent && !saisie.quoteMissingDeclared)
     throw new Error("CHANTIER_QUOTE_DECLARATION_REQUIRED");
-  if (!signedQuotePresent && !input.signedQuoteMissingDeclared) {
+  if (!signedQuotePresent && !saisie.signedQuoteMissingDeclared) {
     throw new Error("CHANTIER_SIGNED_QUOTE_DECLARATION_REQUIRED");
   }
-  if (!costingPresent && !input.costingMissingDeclared)
+  if (!costingPresent && !saisie.costingMissingDeclared)
     throw new Error("CHANTIER_COSTING_DECLARATION_REQUIRED");
 
-  const timestamp = now.toISOString();
-  const item: ChantierRecord = {
+  const timestamp = maintenant.toISOString();
+  const element: ChantierRecord = {
     id: commercialCase.id,
     sourceCommercialCaseId: commercialCase.id,
     sourceEntryId: commercialCase.sourceEntryId,
@@ -327,14 +337,14 @@ export function launchChantierFromCommercial(
     nextAction: commercialCase.nextAction,
     status: "ACTIVE",
     plannedInstallDate: commercialCase.plannedInstallDate,
-    launchYear: now.getFullYear(),
+    launchYear: maintenant.getFullYear(),
     launchDocuments: {
       quote: quotePresent ? "PRESENT" : "MISSING_DECLARED",
       signedQuote: signedQuotePresent ? "PRESENT" : "MISSING_DECLARED",
       costing: costingPresent ? "PRESENT" : "MISSING_DECLARED",
     },
     signedQuoteReminder: quotePresent && !signedQuotePresent,
-    plannedHours: { be: input.be, workshop: input.workshop, install: input.install },
+    plannedHours: { be: saisie.be, workshop: saisie.workshop, install: saisie.install },
     actualHours: { be: 0, workshop: 0, install: 0 },
     operational: {
       spaces: {
@@ -352,12 +362,12 @@ export function launchChantierFromCommercial(
       quoteLineProgress: [],
     },
     launchedAt: timestamp,
-    launchedByName: actor.displayName,
+    launchedByName: auteur.displayName,
     completedAt: null,
     archivedAt: null,
     createdAt: timestamp,
     updatedAt: timestamp,
-    updatedByName: actor.displayName,
+    updatedByName: auteur.displayName,
     history: [],
   };
 
@@ -367,116 +377,120 @@ export function launchChantierFromCommercial(
     !costingPresent ? "déboursé" : null,
   ].filter(Boolean);
   history(
-    item,
-    actor.displayName,
+    element,
+    auteur.displayName,
     "LAUNCHED",
-    `Chantier lancé depuis l'affaire commerciale. Charge initiale : BE ${input.be} h · Atelier ${input.workshop} h · Pose ${input.install} h${absent.length ? ` · Éléments déclarés absents : ${absent.join(", ")}` : ""}.`,
-    now,
+    `Chantier lancé depuis l'affaire commerciale. Charge initiale : BE ${saisie.be} h · Atelier ${saisie.workshop} h · Pose ${saisie.install} h${absent.length ? ` · Éléments déclarés absents : ${absent.join(", ")}` : ""}.`,
+    maintenant,
   );
 
-  payload.chantiers.unshift(item);
-  return { payload, focusChantierId: item.id };
+  contenu.chantiers.unshift(element);
+  return { payload: contenu, focusChantierId: element.id };
 }
 
 export function applyChantierMutation(
   rawSource: ChantiersPayload,
-  input: ChantierMutation,
-  actor: ChantierActor,
-  now: Date = new Date(),
+  saisie: ChantierMutation,
+  auteur: ChantierActor,
+  maintenant: Date = new Date(),
 ): ChantierMutationResult {
-  const payload = structuredClone(parseChantiersPayload(rawSource));
-  const item = findChantier(payload, input.chantierId);
+  const contenu = structuredClone(parseChantiersPayload(rawSource));
+  const element = findChantier(contenu, saisie.chantierId);
 
   // Cancellation preserves the dossier but stops operational changes until reopening.
-  if (item.status === "CANCELLED" && input.action !== "reactivate" && input.action !== "archive") {
+  if (
+    element.status === "CANCELLED" &&
+    saisie.action !== "reactivate" &&
+    saisie.action !== "archive"
+  ) {
     throw new Error("CHANTIER_CANCELLED_READ_ONLY");
   }
 
-  if (input.action === "updateDetails") {
-    if (item.status === "ARCHIVED") throw new Error("CHANTIER_ARCHIVED_READ_ONLY");
-    item.number = text(input.number);
-    item.reference = text(input.reference);
-    item.name = input.name;
-    item.clientName = text(input.clientName);
-    item.companyName = text(input.companyName);
-    item.siteLabel = text(input.siteLabel);
-    item.contactName = text(input.contactName);
-    item.contactPhone = text(input.contactPhone);
-    item.contactEmail = text(input.contactEmail);
-    item.description = text(input.description);
-    item.nextAction = text(input.nextAction);
-    touch(item, actor, now);
+  if (saisie.action === "updateDetails") {
+    if (element.status === "ARCHIVED") throw new Error("CHANTIER_ARCHIVED_READ_ONLY");
+    element.number = text(saisie.number);
+    element.reference = text(saisie.reference);
+    element.name = saisie.name;
+    element.clientName = text(saisie.clientName);
+    element.companyName = text(saisie.companyName);
+    element.siteLabel = text(saisie.siteLabel);
+    element.contactName = text(saisie.contactName);
+    element.contactPhone = text(saisie.contactPhone);
+    element.contactEmail = text(saisie.contactEmail);
+    element.description = text(saisie.description);
+    element.nextAction = text(saisie.nextAction);
+    touch(element, auteur, maintenant);
     history(
-      item,
-      actor.displayName,
+      element,
+      auteur.displayName,
       "DETAILS_UPDATED",
       "Informations du chantier mises à jour.",
-      now,
+      maintenant,
     );
-    return { payload, focusChantierId: item.id };
+    return { payload: contenu, focusChantierId: element.id };
   }
 
-  if (input.action === "updatePlannedHours") {
-    if (item.status === "ARCHIVED") throw new Error("CHANTIER_ARCHIVED_READ_ONLY");
-    const previous = item.plannedHours;
-    const next = { be: input.be, workshop: input.workshop, install: input.install };
+  if (saisie.action === "updatePlannedHours") {
+    if (element.status === "ARCHIVED") throw new Error("CHANTIER_ARCHIVED_READ_ONLY");
+    const precedent = element.plannedHours;
+    const suivant = { be: saisie.be, workshop: saisie.workshop, install: saisie.install };
     if (
-      previous.be === next.be &&
-      previous.workshop === next.workshop &&
-      previous.install === next.install
+      precedent.be === suivant.be &&
+      precedent.workshop === suivant.workshop &&
+      precedent.install === suivant.install
     ) {
       throw new Error("CHANTIER_HOURS_UNCHANGED");
     }
-    item.plannedHours = next;
-    touch(item, actor, now);
+    element.plannedHours = suivant;
+    touch(element, auteur, maintenant);
     history(
-      item,
-      actor.displayName,
+      element,
+      auteur.displayName,
       "PLANNED_HOURS_UPDATED",
-      `Prévision modifiée : BE ${previous.be} → ${next.be} h · Atelier ${previous.workshop} → ${next.workshop} h · Pose ${previous.install} → ${next.install} h. Motif : ${input.reason}`,
-      now,
+      `Prévision modifiée : BE ${precedent.be} → ${suivant.be} h · Atelier ${precedent.workshop} → ${suivant.workshop} h · Pose ${precedent.install} → ${suivant.install} h. Motif : ${saisie.reason}`,
+      maintenant,
     );
-    return { payload, focusChantierId: item.id };
+    return { payload: contenu, focusChantierId: element.id };
   }
 
-  if (input.action === "createBeItem") {
-    ensureOperationalEditable(item);
-    const timestamp = now.toISOString();
+  if (saisie.action === "createBeItem") {
+    ensureOperationalEditable(element);
+    const timestamp = maintenant.toISOString();
     const created: BeItem = {
       id: randomUUID(),
-      name: input.name,
-      originKind: input.originKind,
-      originLabel: text(input.originLabel),
-      installedByUs: input.installedByUs,
-      sourceQuoteId: input.sourceQuoteId ?? null,
-      sourceQuoteLineId: input.sourceQuoteLineId ?? null,
+      name: saisie.name,
+      originKind: saisie.originKind,
+      originLabel: text(saisie.originLabel),
+      installedByUs: saisie.installedByUs,
+      sourceQuoteId: saisie.sourceQuoteId ?? null,
+      sourceQuoteLineId: saisie.sourceQuoteLineId ?? null,
       status: "TODO",
       createdAt: timestamp,
       updatedAt: timestamp,
     };
-    item.operational.beItems.push(created);
-    touch(item, actor, now);
+    element.operational.beItems.push(created);
+    touch(element, auteur, maintenant);
     history(
-      item,
-      actor.displayName,
+      element,
+      auteur.displayName,
       "OPERATIONAL_ITEM_CREATED",
       `BE : ${created.name} créé (${created.originKind === "TS" ? "TS" : "ligne devis"}${created.installedByUs ? " · posé par PAPOT" : ""}).`,
-      now,
+      maintenant,
     );
-    return { payload, focusChantierId: item.id };
+    return { payload: contenu, focusChantierId: element.id };
   }
 
-  if (input.action === "setBeStatus") {
-    ensureOperationalEditable(item);
-    const beItem = findBeItem(item, input.beItemId);
-    const previous = beItem.status;
-    beItem.status = input.status;
-    beItem.updatedAt = now.toISOString();
-    if (input.status === "VALIDATED") {
-      const workshop = createWorkshopFromBe(item, beItem, now);
+  if (saisie.action === "setBeStatus") {
+    ensureOperationalEditable(element);
+    const beItem = findBeItem(element, saisie.beItemId);
+    const precedent = beItem.status;
+    beItem.status = saisie.status;
+    beItem.updatedAt = maintenant.toISOString();
+    if (saisie.status === "VALIDATED") {
+      const workshop = createWorkshopFromBe(element, beItem, maintenant);
       if (beItem.installedByUs) {
         createInstallFromTechnical(
-          item,
+          element,
           {
             sourceBeItemId: beItem.id,
             sourceWorkshopItemId: workshop.id,
@@ -486,41 +500,41 @@ export function applyChantierMutation(
             sourceQuoteId: beItem.sourceQuoteId,
             sourceQuoteLineId: beItem.sourceQuoteLineId,
           },
-          now,
+          maintenant,
         );
       }
     }
-    touch(item, actor, now);
+    touch(element, auteur, maintenant);
     history(
-      item,
-      actor.displayName,
+      element,
+      auteur.displayName,
       "OPERATIONAL_STATUS_UPDATED",
-      `BE · ${beItem.name} : ${BE_STATUS_LABELS[previous]} → ${BE_STATUS_LABELS[input.status]}.`,
-      now,
+      `BE · ${beItem.name} : ${BE_STATUS_LABELS[precedent]} → ${BE_STATUS_LABELS[saisie.status]}.`,
+      maintenant,
     );
-    return { payload, focusChantierId: item.id };
+    return { payload: contenu, focusChantierId: element.id };
   }
 
-  if (input.action === "createWorkshopItem") {
-    ensureOperationalEditable(item);
-    const timestamp = now.toISOString();
+  if (saisie.action === "createWorkshopItem") {
+    ensureOperationalEditable(element);
+    const timestamp = maintenant.toISOString();
     const created: WorkshopItem = {
       id: randomUUID(),
       sourceBeItemId: null,
-      name: input.name,
-      originKind: input.originKind,
-      originLabel: text(input.originLabel),
-      installedByUs: input.installedByUs,
-      sourceQuoteId: input.sourceQuoteId ?? null,
-      sourceQuoteLineId: input.sourceQuoteLineId ?? null,
+      name: saisie.name,
+      originKind: saisie.originKind,
+      originLabel: text(saisie.originLabel),
+      installedByUs: saisie.installedByUs,
+      sourceQuoteId: saisie.sourceQuoteId ?? null,
+      sourceQuoteLineId: saisie.sourceQuoteLineId ?? null,
       status: "PREPARE",
       createdAt: timestamp,
       updatedAt: timestamp,
     };
-    item.operational.workshopItems.push(created);
+    element.operational.workshopItems.push(created);
     if (created.installedByUs) {
       createInstallFromTechnical(
-        item,
+        element,
         {
           sourceBeItemId: null,
           sourceWorkshopItemId: created.id,
@@ -530,198 +544,206 @@ export function applyChantierMutation(
           sourceQuoteId: created.sourceQuoteId,
           sourceQuoteLineId: created.sourceQuoteLineId,
         },
-        now,
+        maintenant,
       );
     }
-    touch(item, actor, now);
+    touch(element, auteur, maintenant);
     history(
-      item,
-      actor.displayName,
+      element,
+      auteur.displayName,
       "OPERATIONAL_ITEM_CREATED",
       `Atelier : ${created.name} créé directement (${created.originKind === "TS" ? "TS" : "ligne devis"}${created.installedByUs ? " · posé par PAPOT" : ""}).`,
-      now,
+      maintenant,
     );
-    return { payload, focusChantierId: item.id };
+    return { payload: contenu, focusChantierId: element.id };
   }
 
-  if (input.action === "setWorkshopStatus") {
-    ensureOperationalEditable(item);
-    const workshopItem = findWorkshopItem(item, input.workshopItemId);
-    const previous = workshopItem.status;
-    workshopItem.status = input.status;
-    workshopItem.updatedAt = now.toISOString();
-    touch(item, actor, now);
+  if (saisie.action === "setWorkshopStatus") {
+    ensureOperationalEditable(element);
+    const workshopItem = findWorkshopItem(element, saisie.workshopItemId);
+    const precedent = workshopItem.status;
+    workshopItem.status = saisie.status;
+    workshopItem.updatedAt = maintenant.toISOString();
+    touch(element, auteur, maintenant);
     history(
-      item,
-      actor.displayName,
+      element,
+      auteur.displayName,
       "OPERATIONAL_STATUS_UPDATED",
-      `Atelier · ${workshopItem.name} : ${WORKSHOP_STATUS_LABELS[previous]} → ${WORKSHOP_STATUS_LABELS[input.status]}.`,
-      now,
+      `Atelier · ${workshopItem.name} : ${WORKSHOP_STATUS_LABELS[precedent]} → ${WORKSHOP_STATUS_LABELS[saisie.status]}.`,
+      maintenant,
     );
-    return { payload, focusChantierId: item.id };
+    return { payload: contenu, focusChantierId: element.id };
   }
 
-  if (input.action === "setInstallStatus") {
-    ensureOperationalEditable(item);
-    const installItem = findInstallItem(item, input.installItemId);
-    const previous = installItem.status;
-    installItem.status = input.status;
-    installItem.note = text(input.note);
-    installItem.updatedAt = now.toISOString();
-    touch(item, actor, now);
+  if (saisie.action === "setInstallStatus") {
+    ensureOperationalEditable(element);
+    const installItem = findInstallItem(element, saisie.installItemId);
+    const precedent = installItem.status;
+    installItem.status = saisie.status;
+    installItem.note = text(saisie.note);
+    installItem.updatedAt = maintenant.toISOString();
+    touch(element, auteur, maintenant);
     history(
-      item,
-      actor.displayName,
+      element,
+      auteur.displayName,
       "OPERATIONAL_STATUS_UPDATED",
-      `Pose · ${installItem.name} : ${INSTALL_STATUS_LABELS[previous]} → ${INSTALL_STATUS_LABELS[input.status]}${installItem.note ? ` · ${installItem.note}` : ""}.`,
-      now,
+      `Pose · ${installItem.name} : ${INSTALL_STATUS_LABELS[precedent]} → ${INSTALL_STATUS_LABELS[saisie.status]}${installItem.note ? ` · ${installItem.note}` : ""}.`,
+      maintenant,
     );
-    return { payload, focusChantierId: item.id };
+    return { payload: contenu, focusChantierId: element.id };
   }
 
-  if (input.action === "setQuoteLineProgress") {
-    ensureOperationalEditable(item);
-    const previous = item.operational.quoteLineProgress.find(
-      (candidate) =>
-        candidate.quoteId === input.quoteId && candidate.quoteLineId === input.quoteLineId,
+  if (saisie.action === "setQuoteLineProgress") {
+    ensureOperationalEditable(element);
+    const precedent = element.operational.quoteLineProgress.find(
+      (candidat) =>
+        candidat.quoteId === saisie.quoteId && candidat.quoteLineId === saisie.quoteLineId,
     );
-    const previousStatus = previous?.status ?? "TODO";
-    if (previousStatus === input.status) {
+    const previousStatus = precedent?.status ?? "TODO";
+    if (previousStatus === saisie.status) {
       throw new Error("CHANTIER_QUOTE_LINE_PROGRESS_UNCHANGED");
     }
 
-    if (previous) {
-      previous.status = input.status;
-      previous.updatedAt = now.toISOString();
-      previous.updatedByName = actor.displayName;
+    if (precedent) {
+      precedent.status = saisie.status;
+      precedent.updatedAt = maintenant.toISOString();
+      precedent.updatedByName = auteur.displayName;
     } else {
-      item.operational.quoteLineProgress.push({
-        quoteId: input.quoteId,
-        quoteLineId: input.quoteLineId,
-        status: input.status,
-        updatedAt: now.toISOString(),
-        updatedByName: actor.displayName,
+      element.operational.quoteLineProgress.push({
+        quoteId: saisie.quoteId,
+        quoteLineId: saisie.quoteLineId,
+        status: saisie.status,
+        updatedAt: maintenant.toISOString(),
+        updatedByName: auteur.displayName,
       });
     }
 
-    touch(item, actor, now);
+    touch(element, auteur, maintenant);
     history(
-      item,
-      actor.displayName,
+      element,
+      auteur.displayName,
       "OPERATIONAL_STATUS_UPDATED",
-      `Ligne devis · ${text(input.quoteLineLabel) ?? input.quoteLineId} : ${previousStatus === "DONE" ? "Réalisée" : "À faire"} → ${input.status === "DONE" ? "Réalisée" : "À faire"}.`,
-      now,
+      `Ligne devis · ${text(saisie.quoteLineLabel) ?? saisie.quoteLineId} : ${previousStatus === "DONE" ? "Réalisée" : "À faire"} → ${saisie.status === "DONE" ? "Réalisée" : "À faire"}.`,
+      maintenant,
     );
-    return { payload, focusChantierId: item.id };
+    return { payload: contenu, focusChantierId: element.id };
   }
 
-  if (input.action === "setOperationalSpaceState") {
-    ensureOperationalEditable(item);
-    const previous = item.operational.spaces[input.spaceId];
-    if (previous === input.state) throw new Error("CHANTIER_OPERATIONAL_SPACE_UNCHANGED");
-    item.operational.spaces[input.spaceId] = input.state;
-    touch(item, actor, now);
-    const label =
-      input.spaceId === "workshop"
+  if (saisie.action === "setOperationalSpaceState") {
+    ensureOperationalEditable(element);
+    const precedent = element.operational.spaces[saisie.spaceId];
+    if (precedent === saisie.state) throw new Error("CHANTIER_OPERATIONAL_SPACE_UNCHANGED");
+    element.operational.spaces[saisie.spaceId] = saisie.state;
+    touch(element, auteur, maintenant);
+    const libelle =
+      saisie.spaceId === "workshop"
         ? "Atelier"
-        : input.spaceId === "install"
+        : saisie.spaceId === "install"
           ? "Pose"
-          : input.spaceId === "meeting"
+          : saisie.spaceId === "meeting"
             ? "Réunion de chantier"
-            : input.spaceId === "reception"
+            : saisie.spaceId === "reception"
               ? "Réception"
-              : input.spaceId === "admin"
+              : saisie.spaceId === "admin"
                 ? "Admin"
-                : input.spaceId.toUpperCase();
+                : saisie.spaceId.toUpperCase();
     history(
-      item,
-      actor.displayName,
+      element,
+      auteur.displayName,
       "OPERATIONAL_SPACE_STATE_UPDATED",
-      `${label} : ${input.state === "NOT_APPLICABLE" ? "déclaré Non concerné" : "réactivé"}.`,
-      now,
+      `${libelle} : ${saisie.state === "NOT_APPLICABLE" ? "déclaré Non concerné" : "réactivé"}.`,
+      maintenant,
     );
-    return { payload, focusChantierId: item.id };
+    return { payload: contenu, focusChantierId: element.id };
   }
 
-  if (input.action === "markDone") {
-    if (item.status !== "ACTIVE") throw new Error("CHANTIER_NOT_ACTIVE");
-    item.status = "DONE";
-    item.completedAt = now.toISOString();
-    touch(item, actor, now);
+  if (saisie.action === "markDone") {
+    if (element.status !== "ACTIVE") throw new Error("CHANTIER_NOT_ACTIVE");
+    element.status = "DONE";
+    element.completedAt = maintenant.toISOString();
+    touch(element, auteur, maintenant);
     history(
-      item,
-      actor.displayName,
+      element,
+      auteur.displayName,
       "MARKED_DONE",
-      `Chantier passé à Terminé. Motif : ${input.reason}. Revue des BC : ${
-        input.purchaseReview?.decision === "REMOVE"
+      `Chantier passé à Terminé. Motif : ${saisie.reason}. Revue des BC : ${
+        saisie.purchaseReview?.decision === "REMOVE"
           ? "engagements non rapprochés retirés"
-          : input.purchaseReview?.decision === "KEEP"
+          : saisie.purchaseReview?.decision === "KEEP"
             ? "engagements non rapprochés conservés"
             : "aucun engagement à revoir"
       }.`,
-      now,
+      maintenant,
     );
-    return { payload, focusChantierId: item.id };
+    return { payload: contenu, focusChantierId: element.id };
   }
 
-  if (input.action === "cancel") {
-    if (item.status !== "ACTIVE") throw new Error("CHANTIER_NOT_ACTIVE");
-    if (input.confirmed !== true) throw new Error("CHANTIER_CANCELLATION_CONFIRMATION_REQUIRED");
-    const reason = input.reason.trim();
+  if (saisie.action === "cancel") {
+    if (element.status !== "ACTIVE") throw new Error("CHANTIER_NOT_ACTIVE");
+    if (saisie.confirmed !== true) throw new Error("CHANTIER_CANCELLATION_CONFIRMATION_REQUIRED");
+    const reason = saisie.reason.trim();
     if (!reason || reason.length > 1000) throw new Error("CHANTIER_CANCELLATION_REASON_REQUIRED");
-    item.status = "CANCELLED";
+    element.status = "CANCELLED";
     // Do not mark unfinished work as completed and do not erase hours or quote links.
-    item.completedAt = null;
-    touch(item, actor, now);
-    history(item, actor.displayName, "CANCELLED", `Chantier annulé. Motif : ${reason}`, now);
-    return { payload, focusChantierId: item.id };
-  }
-
-  if (input.action === "reactivate") {
-    if (item.status !== "DONE" && item.status !== "CANCELLED") throw new Error("CHANTIER_NOT_DONE");
-    item.status = "ACTIVE";
-    item.completedAt = null;
-    touch(item, actor, now);
+    element.completedAt = null;
+    touch(element, auteur, maintenant);
     history(
-      item,
-      actor.displayName,
-      "REACTIVATED",
-      `Chantier remis en Actif. Motif : ${input.reason}`,
-      now,
+      element,
+      auteur.displayName,
+      "CANCELLED",
+      `Chantier annulé. Motif : ${reason}`,
+      maintenant,
     );
-    return { payload, focusChantierId: item.id };
+    return { payload: contenu, focusChantierId: element.id };
   }
 
-  if (input.action === "archive") {
-    if (item.status !== "DONE" && item.status !== "CANCELLED") throw new Error("CHANTIER_NOT_DONE");
-    item.status = "ARCHIVED";
-    item.archivedAt = now.toISOString();
-    touch(item, actor, now);
+  if (saisie.action === "reactivate") {
+    if (element.status !== "DONE" && element.status !== "CANCELLED")
+      throw new Error("CHANTIER_NOT_DONE");
+    element.status = "ACTIVE";
+    element.completedAt = null;
+    touch(element, auteur, maintenant);
     history(
-      item,
-      actor.displayName,
+      element,
+      auteur.displayName,
+      "REACTIVATED",
+      `Chantier remis en Actif. Motif : ${saisie.reason}`,
+      maintenant,
+    );
+    return { payload: contenu, focusChantierId: element.id };
+  }
+
+  if (saisie.action === "archive") {
+    if (element.status !== "DONE" && element.status !== "CANCELLED")
+      throw new Error("CHANTIER_NOT_DONE");
+    element.status = "ARCHIVED";
+    element.archivedAt = maintenant.toISOString();
+    touch(element, auteur, maintenant);
+    history(
+      element,
+      auteur.displayName,
       "ARCHIVED",
       "Chantier archivé après revue des éléments encore ouverts.",
-      now,
+      maintenant,
     );
-    return { payload, focusChantierId: item.id };
+    return { payload: contenu, focusChantierId: element.id };
   }
 
-  if (input.action === "unarchive") {
-    if (item.status !== "ARCHIVED") throw new Error("CHANTIER_NOT_ARCHIVED");
-    item.status = "ACTIVE";
-    item.archivedAt = null;
-    item.completedAt = null;
-    touch(item, actor, now);
+  if (saisie.action === "unarchive") {
+    if (element.status !== "ARCHIVED") throw new Error("CHANTIER_NOT_ARCHIVED");
+    element.status = "ACTIVE";
+    element.archivedAt = null;
+    element.completedAt = null;
+    touch(element, auteur, maintenant);
     history(
-      item,
-      actor.displayName,
+      element,
+      auteur.displayName,
       "UNARCHIVED",
-      `Chantier réactivé depuis les archives. Motif : ${input.reason}`,
-      now,
+      `Chantier réactivé depuis les archives. Motif : ${saisie.reason}`,
+      maintenant,
     );
-    return { payload, focusChantierId: item.id };
+    return { payload: contenu, focusChantierId: element.id };
   }
 
-  throw new Error(`CHANTIER_MUTATION_UNSUPPORTED_${CHANTIER_STATUS_LABELS[item.status]}`);
+  throw new Error(`CHANTIER_MUTATION_UNSUPPORTED_${CHANTIER_STATUS_LABELS[element.status]}`);
 }

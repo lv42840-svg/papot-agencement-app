@@ -12,15 +12,21 @@ export function createLocalPlanningRepository(): PlanningRepository {
       return readLocalSnapshot(RESOURCE_KEY, parsePlanningPayload).payload;
     },
 
-    async mutate(transform) {
-      return mutateLocalSnapshot(RESOURCE_KEY, parsePlanningPayload, async ({ payload }) => {
-        const next = parsePlanningPayload(await transform(structuredClone(payload)));
-        return {
-          payload: next,
-          result: next,
-          persist: true,
-        };
-      });
+    async mutate(transformation) {
+      return mutateLocalSnapshot(
+        RESOURCE_KEY,
+        parsePlanningPayload,
+        async ({ payload: donnees }) => {
+          const donneesSuivantes = parsePlanningPayload(
+            await transformation(structuredClone(donnees)),
+          );
+          return {
+            payload: donneesSuivantes,
+            result: donneesSuivantes,
+            persist: true,
+          };
+        },
+      );
     },
   };
 }

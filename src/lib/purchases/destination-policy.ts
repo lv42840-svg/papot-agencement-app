@@ -7,38 +7,46 @@ import {
 
 /** Keep historical amounts on closed sites, but do not create or change their commitments. */
 export function purchaseChantierNamesForInput(
-  input: PurchaseOrderInput,
-  sites: readonly { id: string; name: string; status: string }[],
-  previous?: PurchaseOrder,
+  saisie: PurchaseOrderInput,
+  chantiers: readonly { id: string; name: string; status: string }[],
+  precedente?: PurchaseOrder,
 ): ReadonlyMap<string, string> {
-  const byId = new Map(sites.map((site) => [site.id, site]));
-  const before = new Map(
-    (previous ? purchaseOrderAllocations(previous) : [])
-      .filter((row) => row.chantierId !== null)
-      .map((row) => [row.chantierId, row.amountHtCents]),
+  const chantiersParId = new Map(chantiers.map((chantier) => [chantier.id, chantier]));
+  const affectationsPrecedentes = new Map(
+    (precedente ? purchaseOrderAllocations(precedente) : [])
+      .filter((ligne) => ligne.chantierId !== null)
+      .map((ligne) => [ligne.chantierId, ligne.amountHtCents]),
   );
-  const rows =
-    input.mode === "QUICK"
-      ? input.allocations
-      : [{ chantierId: input.chantierId, amountHtCents: purchaseOrderAmount(input) }];
-  for (const row of rows) {
-    if (row.chantierId === null) continue;
-    const site = byId.get(row.chantierId);
-    if (!site) throw new Error("PURCHASE_CHANTIER_NOT_FOUND");
-    if (site.status !== "ACTIVE" && before.get(site.id) !== row.amountHtCents) {
-      throw new Error("PURCHASE_CHANTIER_NOT_ACTIVE");
-    }
-  }
-  // Removing a closed site's allocation is a deliberate close-review action, not a silent edit.
-  for (const [id, amount] of before) {
-    const site = id ? byId.get(id) : undefined;
+  const lignes =
+    saisie.mode === "QUICK"
+      ? saisie.allocations
+      : [
+          {
+            chantierId: saisie.chantierId,
+            amountHtCents: purchaseOrderAmount(saisie),
+          },
+        ];
+  for (const ligne of lignes) {
+    if (ligne.chantierId === null) continue;
+    const chantier = chantiersParId.get(ligne.chantierId);
+    if (!chantier) throw new Error("PURCHASE_CHANTIER_NOT_FOUND");
     if (
-      site &&
-      site.status !== "ACTIVE" &&
-      !rows.some((row) => row.chantierId === id && row.amountHtCents === amount)
+      chantier.status !== "ACTIVE" &&
+      affectationsPrecedentes.get(chantier.id) !== ligne.amountHtCents
     ) {
       throw new Error("PURCHASE_CHANTIER_NOT_ACTIVE");
     }
   }
-  return new Map(sites.map((site) => [site.id, site.name]));
+  // Removing a closed site's allocation is a deliberate close-review action, not a silent edit.
+  for (const [id, montant] of affectationsPrecedentes) {
+    const chantier = id ? chantiersParId.get(id) : undefined;
+    if (
+      chantier &&
+      chantier.status !== "ACTIVE" &&
+      !lignes.some((ligne) => ligne.chantierId === id && ligne.amountHtCents === montant)
+    ) {
+      throw new Error("PURCHASE_CHANTIER_NOT_ACTIVE");
+    }
+  }
+  return new Map(chantiers.map((chantier) => [chantier.id, chantier.name]));
 }

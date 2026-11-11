@@ -38,14 +38,14 @@ const quoteCommercialWorkflowSchema = z.object({
   quoteDueDate: z.string().regex(/^\d{4}-\d{2}-\d{2}$/),
 });
 
-function noStoreJson(body: unknown, init?: ResponseInit) {
-  const response = NextResponse.json(body, init);
-  response.headers.set("Cache-Control", "no-store");
-  return response;
+function noStoreJson(corps: unknown, init?: ResponseInit) {
+  const reponse = NextResponse.json(corps, init);
+  reponse.headers.set("Cache-Control", "no-store");
+  return reponse;
 }
 
-function publicSnapshot(payload: NativeQuotesPayload, canWrite: boolean, focusQuoteId?: string) {
-  return { payload, canWrite, focusQuoteId };
+function publicSnapshot(contenu: NativeQuotesPayload, canWrite: boolean, focusQuoteId?: string) {
+  return { payload: contenu, canWrite, focusQuoteId };
 }
 
 function errorStatus(code: string): number {
@@ -78,16 +78,16 @@ function errorStatus(code: string): number {
 
 export async function GET() {
   try {
-    const context = await requireModuleRequestContext("quotes", "READ");
-    const payload = await createQuotesRepository().load();
-    return noStoreJson(publicSnapshot(payload, context.moduleAccess.canWrite));
-  } catch (error) {
-    const code = error instanceof Error ? error.message : "QUOTES_LOAD_FAILED";
+    const contexte = await requireModuleRequestContext("quotes", "READ");
+    const contenu = await createQuotesRepository().load();
+    return noStoreJson(publicSnapshot(contenu, contexte.moduleAccess.canWrite));
+  } catch (erreur) {
+    const code = erreur instanceof Error ? erreur.message : "QUOTES_LOAD_FAILED";
     return noStoreJson({ error: code }, { status: errorStatus(code) });
   }
 }
 
-export async function POST(request: Request) {
+export async function POST(requete: Request) {
   let librarySession:
     | {
         repository: ReturnType<typeof createLibraryRepository>;
@@ -99,13 +99,14 @@ export async function POST(request: Request) {
     | undefined;
 
   try {
-    const rawInput = await request.json();
-    const input = quotesMutationSchema.parse(rawInput);
-    const expectedRevision = input.action === "createDraft" ? null : expectedQuoteRevision(request);
-    const context = await requireModuleRequestContext("quotes", "WRITE");
-    const actor = { userId: context.user.id, displayName: context.user.displayName };
+    const rawInput = await requete.json();
+    const saisie = quotesMutationSchema.parse(rawInput);
+    const expectedRevision =
+      saisie.action === "createDraft" ? null : expectedQuoteRevision(requete);
+    const contexte = await requireModuleRequestContext("quotes", "WRITE");
+    const auteur = { userId: contexte.user.id, displayName: contexte.user.displayName };
 
-    if (input.action === "createDraft") {
+    if (saisie.action === "createDraft") {
       const workflow = quoteCommercialWorkflowSchema.parse(rawInput);
       await requireModuleRequestContext("commercial", "WRITE");
       const commercialRepository = createCommercialRepository();
@@ -115,51 +116,51 @@ export async function POST(request: Request) {
         clientsRepository.load(),
       ]);
 
-      const affair = commercial.cases.find((item) => item.id === input.commercialCaseId);
+      const affair = commercial.cases.find((element) => element.id === saisie.commercialCaseId);
       if (!affair) throw new Error("QUOTE_AFFAIR_NOT_FOUND");
       if (isCommercialClosed(affair)) throw new Error("QUOTE_AFFAIR_CLOSED");
       if (!affair.clientId) throw new Error("QUOTE_CLIENT_NOT_FOUND");
 
-      const client = clients.clients.find((item) => item.id === affair.clientId);
+      const client = clients.clients.find((element) => element.id === affair.clientId);
       if (!client) throw new Error("QUOTE_CLIENT_NOT_FOUND");
       if (client.isArchived) throw new Error("QUOTE_CLIENT_ARCHIVED");
 
-      const now = new Date();
+      const maintenant = new Date();
       if (quoteWorkflowMayChangeCommercialStatus(affair.status)) {
-        await commercialRepository.mutate((payload) =>
+        await commercialRepository.mutate((contenu) =>
           startQuoteCommercialWorkflow(
-            payload,
+            contenu,
             affair.id,
             workflow.quoteOwnerName,
             workflow.quoteDueDate,
-            actor,
-            now,
+            auteur,
+            maintenant,
           ),
         );
       }
 
       const repository = createQuotesRepository();
-      const mutation = await repository.mutate((payload) => {
-        const created = applyQuotesMutation(payload, input, actor, client.id, now);
+      const mutation = await repository.mutate((contenu) => {
+        const created = applyQuotesMutation(contenu, saisie, auteur, client.id, maintenant);
         return initializeQuoteVatFromClient(
           created.payload,
           created.focusQuoteId,
           client.defaultVatRatePercent,
-          actor,
-          now,
+          auteur,
+          maintenant,
         );
       });
       return noStoreJson(
-        publicSnapshot(mutation.payload, context.moduleAccess.canWrite, mutation.focusQuoteId),
+        publicSnapshot(mutation.payload, contexte.moduleAccess.canWrite, mutation.focusQuoteId),
       );
     }
 
-    if (input.action === "upsertLine" && input.saveToLibrary) {
-      if (input.libraryCostPriceCents === undefined || !input.libraryName) {
+    if (saisie.action === "upsertLine" && saisie.saveToLibrary) {
+      if (saisie.libraryCostPriceCents === undefined || !saisie.libraryName) {
         throw new Error("QUOTES_REQUEST_INVALID");
       }
 
-      const libraryRepository = createLibraryRepository(context);
+      const libraryRepository = createLibraryRepository(contexte);
       const leaseId = globalThis.crypto.randomUUID();
       const opened = await libraryRepository.open(leaseId);
       if (opened.status !== "editable") throw new Error("LIBRARY_LOCKED");
@@ -169,11 +170,11 @@ export async function POST(request: Request) {
         : createInitialLibraryPayload();
       const { component, source } = createLibraryComponentFromQuoteLine({
         componentId: globalThis.crypto.randomUUID(),
-        name: input.libraryName,
-        description: input.description,
-        unit: input.unit,
-        costPriceCents: input.libraryCostPriceCents,
-        salePriceCents: input.unitPriceCents,
+        name: saisie.libraryName,
+        description: saisie.description,
+        unit: saisie.unit,
+        costPriceCents: saisie.libraryCostPriceCents,
+        salePriceCents: saisie.unitPriceCents,
       });
 
       librarySession = {
@@ -186,22 +187,22 @@ export async function POST(request: Request) {
     }
 
     let libraryComponentSources: ReadonlyMap<string, QuoteLibraryComponentSource> | undefined;
-    if (input.action === "upsertOuvrage") {
+    if (saisie.action === "upsertOuvrage") {
       const requestedComponentIds = Array.from(
         new Set(
-          input.components
+          saisie.components
             .map((component) => component.libraryComponentId)
             .filter((componentId): componentId is string => Boolean(componentId)),
         ),
       );
 
       if (requestedComponentIds.length > 0) {
-        const library = await createLibraryRepository(context).load();
+        const library = await createLibraryRepository(contexte).load();
         const libraryPayload = ensureRequiredLaborComponents(library.payload);
         const sources = new Map<string, QuoteLibraryComponentSource>();
 
         for (const componentId of requestedComponentIds) {
-          const component = libraryPayload.components.find((item) => item.id === componentId);
+          const component = libraryPayload.components.find((element) => element.id === componentId);
           if (!component) throw new Error("QUOTE_LIBRARY_COMPONENT_NOT_FOUND");
           sources.set(
             componentId,
@@ -222,12 +223,12 @@ export async function POST(request: Request) {
     }
 
     const repository = createQuotesRepository();
-    const mutation = await repository.mutate(async (payload) => {
-      assertQuoteRevision(payload, input.quoteId, expectedRevision!);
-      const result = applyQuotesMutation(
-        payload,
-        input,
-        actor,
+    const mutation = await repository.mutate(async (contenu) => {
+      assertQuoteRevision(contenu, saisie.quoteId, expectedRevision!);
+      const resultat = applyQuotesMutation(
+        contenu,
+        saisie,
+        auteur,
         undefined,
         new Date(),
         librarySession?.source,
@@ -243,18 +244,18 @@ export async function POST(request: Request) {
         if (saved.status !== "saved") throw new Error("LIBRARY_VERSION_CONFLICT");
       }
 
-      return result;
+      return resultat;
     });
 
     return noStoreJson(
-      publicSnapshot(mutation.payload, context.moduleAccess.canWrite, mutation.focusQuoteId),
+      publicSnapshot(mutation.payload, contexte.moduleAccess.canWrite, mutation.focusQuoteId),
     );
-  } catch (error) {
+  } catch (erreur) {
     const code =
-      error instanceof ZodError
+      erreur instanceof ZodError
         ? "QUOTES_REQUEST_INVALID"
-        : error instanceof Error
-          ? error.message
+        : erreur instanceof Error
+          ? erreur.message
           : "QUOTES_MUTATION_FAILED";
     return noStoreJson({ error: code }, { status: errorStatus(code) });
   } finally {

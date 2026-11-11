@@ -18,7 +18,7 @@ describe("grand planning commercial provision bridge", () => {
   it("loads provisional cases and retains firm versus provisional fields", () => {
     expect(apiSource).toContain("createCommercialRepository().load()");
     expect(apiSource).toMatch(
-      /buildCommercialProvisionRows\(\s*commercial,\s*planning,\s*year,\s*endYear,\s*quotes\.quotes,?\s*\)/,
+      /buildCommercialProvisionRows\(\s*commercial,\s*planning,\s*annee,\s*endYear,\s*quotes\.quotes,?\s*\)/,
     );
     expect(apiSource).toContain("provisionalRows");
   });
@@ -44,14 +44,14 @@ describe("grand planning commercial provision bridge", () => {
   });
 
   it("allows authorized reordering of provisioned cases", () => {
-    expect(apiSource).toContain('input.action === "setPotentialOrder"');
+    expect(apiSource).toContain('saisie.action === "setPotentialOrder"');
     expect(workspaceSource).toContain('action: "setPotentialOrder"');
-    expect(gridSource).toContain("onMoveProvision(item.caseId, -1)");
-    expect(gridSource).toContain("onMoveProvision(item.caseId, 1)");
+    expect(gridSource).toContain("onMoveProvision(element.caseId, -1)");
+    expect(gridSource).toContain("onMoveProvision(element.caseId, 1)");
   });
 
   it("edits provisional hours in the same Excel grid with a lighter visual treatment", () => {
-    expect(apiSource).toContain('input.action === "setProvisionHours"');
+    expect(apiSource).toContain('saisie.action === "setProvisionHours"');
     expect(workspaceSource).toContain('action: "setProvisionHours"');
     expect(gridSource).toMatch(/hoursInput\(\s*"provisional"/);
     expect(workspaceSource).toContain(".excelProvisionalRow .excelWeekCell");

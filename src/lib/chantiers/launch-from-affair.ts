@@ -16,23 +16,23 @@ export const launchChantierFromAffairSchema = z.object({
 export type LaunchChantierFromAffairInput = z.infer<typeof launchChantierFromAffairSchema>;
 export type ChantierLaunchActor = { userId: string; displayName: string };
 
-function hasHistoricalDocument(item: CommercialCase, category: "QUOTE" | "COSTING"): boolean {
-  return item.documents.some((document) => document.category === category);
+function hasHistoricalDocument(element: CommercialCase, category: "QUOTE" | "COSTING"): boolean {
+  return element.documents.some((document) => document.category === category);
 }
 
 export function launchChantierFromAffair(
   rawSource: ChantiersPayload,
   affair: CommercialCase,
-  input: LaunchChantierFromAffairInput,
-  actor: ChantierLaunchActor,
-  now: Date = new Date(),
+  saisie: LaunchChantierFromAffairInput,
+  auteur: ChantierLaunchActor,
+  maintenant: Date = new Date(),
 ): { payload: ChantiersPayload; focusChantierId: string } {
-  const payload = structuredClone(parseChantiersPayload(rawSource));
+  const contenu = structuredClone(parseChantiersPayload(rawSource));
 
-  if (affair.id !== input.commercialCaseId) throw new Error("CHANTIER_COMMERCIAL_CASE_MISMATCH");
+  if (affair.id !== saisie.commercialCaseId) throw new Error("CHANTIER_COMMERCIAL_CASE_MISMATCH");
   if (affair.status !== "CONFIRMED") throw new Error("CHANTIER_COMMERCIAL_NOT_CONFIRMED");
   if (!affair.plannedInstallDate) throw new Error("CHANTIER_INSTALL_DATE_REQUIRED");
-  if (payload.chantiers.some((item) => item.sourceCommercialCaseId === affair.id)) {
+  if (contenu.chantiers.some((element) => element.sourceCommercialCaseId === affair.id)) {
     throw new Error("CHANTIER_ALREADY_LAUNCHED");
   }
 
@@ -42,18 +42,18 @@ export function launchChantierFromAffair(
   const historicalQuote = hasHistoricalDocument(affair, "QUOTE");
   const nativeQuote = affair.retainedQuoteIds.length > 0;
   const historicalCosting = hasHistoricalDocument(affair, "COSTING");
-  const timestamp = now.toISOString();
-  const launchYear = now.getFullYear();
-  const existingNumbers = payload.chantiers
-    .filter((candidate) => candidate.launchYear === launchYear)
-    .map((candidate) => candidate.number)
-    .filter((value): value is string => Boolean(value))
-    .map((value) => Number(value.split("-").at(-1)))
-    .filter((value) => Number.isInteger(value) && value > 0);
+  const timestamp = maintenant.toISOString();
+  const launchYear = maintenant.getFullYear();
+  const existingNumbers = contenu.chantiers
+    .filter((candidat) => candidat.launchYear === launchYear)
+    .map((candidat) => candidat.number)
+    .filter((valeur): valeur is string => Boolean(valeur))
+    .map((valeur) => Number(valeur.split("-").at(-1)))
+    .filter((valeur) => Number.isInteger(valeur) && valeur > 0);
   const nextSequence = existingNumbers.length > 0 ? Math.max(...existingNumbers) + 1 : 1;
   const chantierNumber = `${launchYear}-${String(nextSequence).padStart(3, "0")}`;
 
-  const item: ChantierRecord = {
+  const element: ChantierRecord = {
     id: affair.id,
     sourceCommercialCaseId: affair.id,
     sourceEntryId: affair.sourceEntryId,
@@ -78,7 +78,7 @@ export function launchChantierFromAffair(
       costing: historicalCosting ? "PRESENT" : "MISSING_DECLARED",
     },
     signedQuoteReminder: false,
-    plannedHours: { be: input.be, workshop: input.workshop, install: input.install },
+    plannedHours: { be: saisie.be, workshop: saisie.workshop, install: saisie.install },
     actualHours: { be: 0, workshop: 0, install: 0 },
     operational: {
       spaces: {
@@ -96,23 +96,23 @@ export function launchChantierFromAffair(
       quoteLineProgress: [],
     },
     launchedAt: timestamp,
-    launchedByName: actor.displayName,
+    launchedByName: auteur.displayName,
     completedAt: null,
     archivedAt: null,
     createdAt: timestamp,
     updatedAt: timestamp,
-    updatedByName: actor.displayName,
+    updatedByName: auteur.displayName,
     history: [
       {
         id: randomUUID(),
         type: "LAUNCHED",
         at: timestamp,
-        actorName: actor.displayName,
-        summary: `Chantier lancé depuis l’affaire. Charge initiale : BE ${input.be} h · Atelier ${input.workshop} h · Pose ${input.install} h. ${affair.retainedQuoteIds.length} devis natif${affair.retainedQuoteIds.length > 1 ? "s" : ""} retenu${affair.retainedQuoteIds.length > 1 ? "s" : ""} lié${affair.retainedQuoteIds.length > 1 ? "s" : ""} au chantier.`,
+        actorName: auteur.displayName,
+        summary: `Chantier lancé depuis l’affaire. Charge initiale : BE ${saisie.be} h · Atelier ${saisie.workshop} h · Pose ${saisie.install} h. ${affair.retainedQuoteIds.length} devis natif${affair.retainedQuoteIds.length > 1 ? "s" : ""} retenu${affair.retainedQuoteIds.length > 1 ? "s" : ""} lié${affair.retainedQuoteIds.length > 1 ? "s" : ""} au chantier.`,
       },
     ],
   };
 
-  payload.chantiers.unshift(item);
-  return { payload, focusChantierId: item.id };
+  contenu.chantiers.unshift(element);
+  return { payload: contenu, focusChantierId: element.id };
 }

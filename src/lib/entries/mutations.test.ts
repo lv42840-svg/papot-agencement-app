@@ -3,7 +3,7 @@ import { describe, expect, it } from "vitest";
 import { createInitialEntriesPayload } from "./domain";
 import { applyEntriesMutation, type EntriesActor } from "./mutations";
 
-const actor: EntriesActor = {
+const auteur: EntriesActor = {
   userId: "11111111-1111-4111-8111-111111111111",
   displayName: "Lucien",
   canQualify: true,
@@ -21,7 +21,7 @@ describe("entries assigned actions and reassignment", () => {
         priority: "NORMAL",
         tagIds: [],
       },
-      actor,
+      auteur,
       new Date("2026-10-03T18:00:00.000Z"),
     );
 
@@ -36,11 +36,11 @@ describe("entries assigned actions and reassignment", () => {
         dueDate: "2026-10-06",
         tagIds: [],
       },
-      actor,
+      auteur,
       new Date("2026-10-03T18:05:00.000Z"),
     );
 
-    const result = applyEntriesMutation(
+    const resultat = applyEntriesMutation(
       assigned.payload,
       {
         action: "assignedActions",
@@ -58,21 +58,23 @@ describe("entries assigned actions and reassignment", () => {
           },
         ],
       },
-      actor,
+      auteur,
       new Date("2026-10-03T18:10:00.000Z"),
     );
 
-    const parent = result.payload.entries.find(
-      (entry) => entry.id === "22222222-2222-4222-8222-222222222222",
+    const parent = resultat.payload.entries.find(
+      (entree) => entree.id === "22222222-2222-4222-8222-222222222222",
     );
 
     expect(parent?.status).toBe("ASSIGNED");
     expect(parent?.completedAt).toBeNull();
     expect(parent?.derivedEntryIds).toHaveLength(2);
 
-    const children = result.payload.entries.filter((entry) => entry.parentEntryId === parent?.id);
+    const children = resultat.payload.entries.filter(
+      (entree) => entree.parentEntryId === parent?.id,
+    );
     expect(children).toHaveLength(2);
-    expect(children.map((entry) => entry.rawText)).toEqual(
+    expect(children.map((entree) => entree.rawText)).toEqual(
       expect.arrayContaining(["Appeler le client", "Préparer le devis"]),
     );
   });
@@ -87,7 +89,7 @@ describe("entries assigned actions and reassignment", () => {
         priority: "NORMAL",
         tagIds: [],
       },
-      actor,
+      auteur,
       new Date("2026-10-03T18:00:00.000Z"),
     );
 
@@ -102,11 +104,11 @@ describe("entries assigned actions and reassignment", () => {
         dueDate: "2026-10-06",
         tagIds: [],
       },
-      actor,
+      auteur,
       new Date("2026-10-03T18:05:00.000Z"),
     );
 
-    const result = applyEntriesMutation(
+    const resultat = applyEntriesMutation(
       assigned.payload,
       {
         action: "reassign",
@@ -114,16 +116,16 @@ describe("entries assigned actions and reassignment", () => {
         assigneeName: "Nadia",
         reason: "Nadia reprend le suivi client",
       },
-      actor,
+      auteur,
       new Date("2026-10-03T18:10:00.000Z"),
     );
 
-    const entry = result.payload.entries.find(
-      (item) => item.id === "33333333-3333-4333-8333-333333333333",
+    const entree = resultat.payload.entries.find(
+      (element) => element.id === "33333333-3333-4333-8333-333333333333",
     );
-    const event = entry?.history.find((item) => item.type === "REASSIGNED");
+    const evenement = entree?.history.find((element) => element.type === "REASSIGNED");
 
-    expect(entry?.assigneeName).toBe("Nadia");
-    expect(event?.summary).toContain("Motif : Nadia reprend le suivi client");
+    expect(entree?.assigneeName).toBe("Nadia");
+    expect(evenement?.summary).toContain("Motif : Nadia reprend le suivi client");
   });
 });

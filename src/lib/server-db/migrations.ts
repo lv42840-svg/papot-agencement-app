@@ -70,25 +70,25 @@ async function ensureFreshWebBootstrap(client: PoolClient): Promise<void> {
       (SELECT COUNT(*)::text FROM papot_domain_cutovers) AS cutovers
   `);
 
-  const row = counts.rows[0];
-  if (!row) throw new Error("PAPOT_FRESH_BOOTSTRAP_STATE_UNAVAILABLE");
+  const ligneTableau = counts.rows[0];
+  if (!ligneTableau) throw new Error("PAPOT_FRESH_BOOTSTRAP_STATE_UNAVAILABLE");
 
   const businessCounts = [
-    row.clients,
-    row.auth_users,
-    row.auth_sessions,
-    row.entries,
-    row.commercial,
-    row.chantiers,
-    row.library,
-    row.quotes,
+    ligneTableau.clients,
+    ligneTableau.auth_users,
+    ligneTableau.auth_sessions,
+    ligneTableau.entries,
+    ligneTableau.commercial,
+    ligneTableau.chantiers,
+    ligneTableau.library,
+    ligneTableau.quotes,
   ];
 
-  const allBusinessEmpty = businessCounts.every((count) => count === "0");
-  const alreadyBootstrapped = row.cutovers === "9";
+  const allBusinessEmpty = businessCounts.every((nombre) => nombre === "0");
+  const alreadyBootstrapped = ligneTableau.cutovers === "9";
 
   if (alreadyBootstrapped) return;
-  if (!allBusinessEmpty || row.cutovers !== "0") {
+  if (!allBusinessEmpty || ligneTableau.cutovers !== "0") {
     throw new Error("PAPOT_FRESH_BOOTSTRAP_REQUIRES_EMPTY_DATABASE");
   }
 
@@ -293,14 +293,14 @@ async function ensureAuthConceptSecurity(client: PoolClient): Promise<void> {
   `);
   const used = new Set(
     existing.rows
-      .map((row) => row.username?.trim().toLowerCase())
-      .filter((value): value is string => Boolean(value)),
+      .map((ligneTableau) => ligneTableau.username?.trim().toLowerCase())
+      .filter((valeur): valeur is string => Boolean(valeur)),
   );
-  for (const row of existing.rows) {
-    if (row.username?.trim()) continue;
-    const local = row.email.split("@")[0]?.toLowerCase() ?? "";
+  for (const ligneTableau of existing.rows) {
+    if (ligneTableau.username?.trim()) continue;
+    const local = ligneTableau.email.split("@")[0]?.toLowerCase() ?? "";
     const cleaned = local.replace(/[^a-z0-9._-]/g, "").replace(/^[._-]+|[._-]+$/g, "");
-    const fallback = `user-${row.id.replace(/-/g, "").slice(0, 8)}`;
+    const fallback = `user-${ligneTableau.id.replace(/-/g, "").slice(0, 8)}`;
     const base = (cleaned.length >= 3 ? cleaned : fallback).slice(0, 70);
     let username = base;
     let suffix = 2;
@@ -310,7 +310,7 @@ async function ensureAuthConceptSecurity(client: PoolClient): Promise<void> {
     }
     used.add(username.toLowerCase());
     await client.query("UPDATE papot_auth_users SET username = $2 WHERE id = $1", [
-      row.id,
+      ligneTableau.id,
       username,
     ]);
   }
@@ -742,13 +742,13 @@ export async function runServerDbMigrations(
     }
 
     await client.query("COMMIT");
-  } catch (error) {
+  } catch (erreur) {
     try {
       await client.query("ROLLBACK");
     } catch {
       // Preserve the migration error that triggered the rollback.
     }
-    throw error;
+    throw erreur;
   } finally {
     client.release();
   }

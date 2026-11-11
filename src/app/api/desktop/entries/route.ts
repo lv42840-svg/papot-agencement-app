@@ -15,18 +15,18 @@ import {
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
-function noStoreJson(body: unknown, init?: ResponseInit) {
-  const response = NextResponse.json(body, init);
-  response.headers.set("Cache-Control", "no-store");
-  return response;
+function noStoreJson(corps: unknown, init?: ResponseInit) {
+  const reponse = NextResponse.json(corps, init);
+  reponse.headers.set("Cache-Control", "no-store");
+  return reponse;
 }
 
-function publicSnapshot(payload: EntriesPayload, actor: EntriesActor, focusEntryId?: string) {
+function publicSnapshot(contenu: EntriesPayload, auteur: EntriesActor, focusEntryId?: string) {
   return {
-    payload,
-    actor: { userId: actor.userId, displayName: actor.displayName },
-    capabilities: entriesCapabilities(actor),
-    suggestedAssignees: listSuggestedAssignees(payload, actor),
+    payload: contenu,
+    actor: { userId: auteur.userId, displayName: auteur.displayName },
+    capabilities: entriesCapabilities(auteur),
+    suggestedAssignees: listSuggestedAssignees(contenu, auteur),
     focusEntryId,
     serverNow: new Date().toISOString(),
   };
@@ -44,39 +44,39 @@ function errorStatus(code: string): number {
 
 export async function GET() {
   try {
-    const context = await requireModuleRequestContext("capture", "READ");
-    const actor = await buildEntriesActor(context);
+    const contexte = await requireModuleRequestContext("capture", "READ");
+    const auteur = await buildEntriesActor(contexte);
     const repository = await createEntriesRepository();
-    const payload = await repository.load();
-    return noStoreJson(publicSnapshot(payload, actor));
-  } catch (error) {
-    const code = error instanceof Error ? error.message : "ENTRIES_LOAD_FAILED";
+    const contenu = await repository.load();
+    return noStoreJson(publicSnapshot(contenu, auteur));
+  } catch (erreur) {
+    const code = erreur instanceof Error ? erreur.message : "ENTRIES_LOAD_FAILED";
     return noStoreJson({ status: "error", error: code }, { status: errorStatus(code) });
   }
 }
 
-export async function POST(request: Request) {
+export async function POST(requete: Request) {
   const startedAt = Date.now();
   let stage = "parse-request";
 
   try {
-    const input = entriesMutationSchema.parse(await request.json());
+    const saisie = entriesMutationSchema.parse(await requete.json());
     stage = "create-context";
-    const context = await requireModuleRequestContext("capture", "WRITE");
-    const actor = await buildEntriesActor(context);
+    const contexte = await requireModuleRequestContext("capture", "WRITE");
+    const auteur = await buildEntriesActor(contexte);
     const repository = await createEntriesRepository();
 
     stage = "mutate-repository";
-    const mutation = await repository.mutate(input, actor);
+    const mutation = await repository.mutate(saisie, auteur);
 
     console.info("[PAPOT][Entries] POST saved", { ms: Date.now() - startedAt });
-    return noStoreJson(publicSnapshot(mutation.payload, actor, mutation.focusEntryId));
-  } catch (error) {
+    return noStoreJson(publicSnapshot(mutation.payload, auteur, mutation.focusEntryId));
+  } catch (erreur) {
     const code =
-      error instanceof ZodError
+      erreur instanceof ZodError
         ? "ENTRIES_REQUEST_INVALID"
-        : error instanceof Error
-          ? error.message
+        : erreur instanceof Error
+          ? erreur.message
           : "ENTRIES_MUTATION_FAILED";
     console.error("[PAPOT][Entries] POST failed", {
       stage,

@@ -16,7 +16,7 @@ const gridSource = readFileSync(
 
 describe("grand planning firm chantier order", () => {
   it("exposes a protected shared chantier order mutation", () => {
-    expect(apiSource).toContain('input.action === "setChantierOrder"');
+    expect(apiSource).toContain('saisie.action === "setChantierOrder"');
     expect(apiSource).toContain("applyPlanningChantierOrderMutation");
     expect(apiSource).toContain('"planning.edit_macro"');
   });

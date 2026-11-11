@@ -12,8 +12,8 @@ function normalizedRepository(repository: QuotesRepository): QuotesRepository {
   return {
     load: () => repository.load(),
     mutate: (transform) =>
-      repository.mutate(async (payload) => {
-        const mutation = await transform(payload);
+      repository.mutate(async (contenu) => {
+        const mutation = await transform(contenu);
         return {
           ...mutation,
           payload: mutation.focusQuoteId

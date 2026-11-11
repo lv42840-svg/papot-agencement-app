@@ -45,15 +45,15 @@ const newLine = (): EditableLine => ({
   unitPrice: "",
 });
 function moneyCents(raw: string): number | null {
-  const value = raw.trim().replace(",", ".");
-  if (!/^\d+(?:\.\d{1,2})?$/.test(value)) return null;
-  const cents = Math.round(Number(value) * 100);
+  const valeur = raw.trim().replace(",", ".");
+  if (!/^\d+(?:\.\d{1,2})?$/.test(valeur)) return null;
+  const cents = Math.round(Number(valeur) * 100);
   return Number.isSafeInteger(cents) && cents >= 0 && cents <= 100_000_000_000 ? cents : null;
 }
 function positiveQuantity(raw: string): number | null {
-  const value = raw.trim().replace(",", ".");
-  if (!/^\d+(?:\.\d{1,6})?$/.test(value)) return null;
-  const n = Number(value);
+  const valeur = raw.trim().replace(",", ".");
+  if (!/^\d+(?:\.\d{1,6})?$/.test(valeur)) return null;
+  const n = Number(valeur);
   return Number.isFinite(n) && n > 0 && n <= 1_000_000 ? n : null;
 }
 const messageFor = (code: string) => {
@@ -72,7 +72,7 @@ export function PurchaseOrdersWorkspace({ chantierId }: { chantierId?: string })
   const [snapshot, setSnapshot] = useState<Snapshot | null>(null);
   const [busy, setBusy] = useState(false);
   const [notice, setNotice] = useState("");
-  const [error, setError] = useState("");
+  const [erreur, setError] = useState("");
   const [siteId, setSiteId] = useState(chantierId ?? "");
   const [supplierName, setSupplierName] = useState("");
   const [mode, setMode] = useState<"QUICK" | "DETAILED">("QUICK");
@@ -80,15 +80,15 @@ export function PurchaseOrdersWorkspace({ chantierId }: { chantierId?: string })
   const [allocations, setAllocations] = useState<QuickAllocation[]>([
     newAllocation(chantierId ?? ""),
   ]);
-  const [lines, setLines] = useState<EditableLine[]>([newLine()]);
-  const [search, setSearch] = useState("");
+  const [lignes, setLines] = useState<EditableLine[]>([newLine()]);
+  const [recherche, setSearch] = useState("");
   const [siteFilter, setSiteFilter] = useState(chantierId ?? "ALL");
   const requestId = useRef<string>(crypto.randomUUID());
 
   async function reload() {
-    const response = await fetch("/api/desktop/purchases", { cache: "no-store" });
-    const json = (await response.json()) as Snapshot;
-    if (!response.ok) throw new Error(json.error ?? "PURCHASE_ORDER_LOAD_FAILED");
+    const reponse = await fetch("/api/desktop/purchases", { cache: "no-store" });
+    const json = (await reponse.json()) as Snapshot;
+    if (!reponse.ok) throw new Error(json.error ?? "PURCHASE_ORDER_LOAD_FAILED");
     setSnapshot(json);
     return json;
   }
@@ -103,61 +103,61 @@ export function PurchaseOrdersWorkspace({ chantierId }: { chantierId?: string })
     { id: "SAV", label: "SAV (hors chantier)" },
     { id: "GENERAL_EXPENSES", label: "Frais généraux (hors chantier)" },
   ];
-  const selected =
+  const selectionne =
     sites.find((site) => site.id === siteId)?.id ??
     sites.find((site) => site.id === chantierId)?.id ??
     sites[0]?.id ??
     "";
   const suppliers = useMemo(
     () =>
-      [...new Set((snapshot?.payload.orders ?? []).map((order) => order.supplierName))].sort(
+      [...new Set((snapshot?.payload.orders ?? []).map((commande) => commande.supplierName))].sort(
         (a, b) => a.localeCompare(b, "fr-FR"),
       ),
     [snapshot],
   );
   const commitmentTotals = snapshot ? committedPurchasesByDestination(snapshot.payload) : null;
-  const linePreview = lines.map((line) => {
-    const qty = positiveQuantity(line.quantity);
-    const price = moneyCents(line.unitPrice);
-    return qty !== null && price !== null ? Math.round(qty * price) : null;
+  const linePreview = lignes.map((ligne) => {
+    const qty = positiveQuantity(ligne.quantity);
+    const prix = moneyCents(ligne.unitPrice);
+    return qty !== null && prix !== null ? Math.round(qty * prix) : null;
   });
-  const detailedTotal = linePreview.every((sum) => sum !== null)
-    ? linePreview.reduce<number>((sum, cost) => sum + (cost ?? 0), 0)
+  const detailedTotal = linePreview.every((somme) => somme !== null)
+    ? linePreview.reduce<number>((somme, cout) => somme + (cout ?? 0), 0)
     : null;
-  const quickAmounts = allocations.map((entry) => moneyCents(entry.amount));
+  const quickAmounts = allocations.map((entree) => moneyCents(entree.amount));
   const quickTotal =
-    quickAmounts.every((value) => value !== null) && allocations.length > 0
-      ? quickAmounts.reduce<number>((sum, value) => sum + (value ?? 0), 0)
+    quickAmounts.every((valeur) => valeur !== null) && allocations.length > 0
+      ? quickAmounts.reduce<number>((somme, valeur) => somme + (valeur ?? 0), 0)
       : null;
-  const preview = mode === "QUICK" ? quickTotal : detailedTotal;
+  const apercu = mode === "QUICK" ? quickTotal : detailedTotal;
   const all = snapshot?.payload.orders ?? [];
   const visible = all
     .filter(
-      (order) =>
+      (commande) =>
         siteFilter === "ALL" ||
-        (order.allocations?.some(
+        (commande.allocations?.some(
           (allocation) => purchaseDestinationKey(allocation) === siteFilter,
         ) ??
-          order.chantierId === siteFilter),
+          commande.chantierId === siteFilter),
     )
-    .filter((order) =>
+    .filter((commande) =>
       [
-        order.reference,
-        order.supplierName,
-        order.chantierName,
-        ...(order.allocations?.map((a) => a.chantierName) ?? []),
-        order.description,
+        commande.reference,
+        commande.supplierName,
+        commande.chantierName,
+        ...(commande.allocations?.map((a) => a.chantierName) ?? []),
+        commande.description,
       ]
         .join(" ")
         .toLocaleLowerCase("fr-FR")
-        .includes(search.trim().toLocaleLowerCase("fr-FR")),
+        .includes(recherche.trim().toLocaleLowerCase("fr-FR")),
     )
     .sort((a, b) => b.createdAt.localeCompare(a.createdAt));
-  const committed = snapshot ? committedPurchaseTotal(snapshot.payload, selected) : 0;
+  const committed = snapshot ? committedPurchaseTotal(snapshot.payload, selectionne) : 0;
 
-  function patchLine(id: string, key: keyof EditableLine, value: string) {
-    setLines((current) =>
-      current.map((line) => (line.id === id ? { ...line, [key]: value } : line)),
+  function patchLine(id: string, cle: keyof EditableLine, valeur: string) {
+    setLines((courant) =>
+      courant.map((ligne) => (ligne.id === id ? { ...ligne, [cle]: valeur } : ligne)),
     );
     setError("");
   }
@@ -168,53 +168,57 @@ export function PurchaseOrdersWorkspace({ chantierId }: { chantierId?: string })
       setError("Renseigne le nom du fournisseur.");
       return;
     }
-    let order: PurchaseOrderInput;
+    let commande: PurchaseOrderInput;
     if (mode === "QUICK") {
-      const entries = allocations.map((row) => ({
-        chantierId: row.chantierId || selected,
-        amountHtCents: moneyCents(row.amount),
+      const entrees = allocations.map((ligneTableau) => ({
+        chantierId: ligneTableau.chantierId || selectionne,
+        amountHtCents: moneyCents(ligneTableau.amount),
       }));
       if (
-        entries.some((row) => !destinations.some((item) => item.id === row.chantierId)) ||
-        entries.some((row) => row.amountHtCents === null || row.amountHtCents <= 0) ||
-        new Set(entries.map((row) => row.chantierId)).size !== entries.length ||
-        preview === null ||
-        preview <= 0
+        entrees.some(
+          (ligneTableau) => !destinations.some((element) => element.id === ligneTableau.chantierId),
+        ) ||
+        entrees.some(
+          (ligneTableau) => ligneTableau.amountHtCents === null || ligneTableau.amountHtCents <= 0,
+        ) ||
+        new Set(entrees.map((ligneTableau) => ligneTableau.chantierId)).size !== entrees.length ||
+        apercu === null ||
+        apercu <= 0
       ) {
         setError("Indique une destination distincte et un montant HT positif sur chaque ligne.");
         return;
       }
-      order = {
+      commande = {
         mode: "QUICK",
-        allocations: entries.map((row) =>
-          purchaseAllocationFromSelection(row.chantierId, row.amountHtCents!),
+        allocations: entrees.map((ligneTableau) =>
+          purchaseAllocationFromSelection(ligneTableau.chantierId, ligneTableau.amountHtCents!),
         ),
         supplierName: supplierName.trim(),
         description: description.trim(),
       };
     } else {
-      if (!selected) {
+      if (!selectionne) {
         setError("Choisis un chantier actif pour le BC détaillé.");
         return;
       }
-      const parsed: PurchaseOrderLine[] = [];
-      for (const line of lines) {
-        const quantity = positiveQuantity(line.quantity);
-        const unitPriceHtCents = moneyCents(line.unitPrice);
+      const analyse: PurchaseOrderLine[] = [];
+      for (const ligne of lignes) {
+        const quantity = positiveQuantity(ligne.quantity);
+        const unitPriceHtCents = moneyCents(ligne.unitPrice);
         if (
-          !line.description.trim() ||
-          !line.unit.trim() ||
+          !ligne.description.trim() ||
+          !ligne.unit.trim() ||
           quantity === null ||
           unitPriceHtCents === null
         ) {
           setError("Chaque ligne doit avoir une désignation, quantité, unité et prix HT valides.");
           return;
         }
-        parsed.push({
-          id: line.id,
-          description: line.description.trim(),
+        analyse.push({
+          id: ligne.id,
+          description: ligne.description.trim(),
           quantity,
-          unit: line.unit.trim(),
+          unit: ligne.unit.trim(),
           unitPriceHtCents,
         });
       }
@@ -222,30 +226,34 @@ export function PurchaseOrdersWorkspace({ chantierId }: { chantierId?: string })
         setError("Vérifie les prix : le total HT doit être positif.");
         return;
       }
-      order = {
+      commande = {
         mode: "DETAILED",
-        chantierId: selected,
+        chantierId: selectionne,
         supplierName: supplierName.trim(),
         description: description.trim(),
-        lines: parsed,
+        lines: analyse,
       };
     }
     setBusy(true);
     try {
-      const response = await fetch("/api/desktop/purchases", {
+      const reponse = await fetch("/api/desktop/purchases", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ action: "CREATE", requestId: requestId.current, order }),
+        body: JSON.stringify({ action: "CREATE", requestId: requestId.current, order: commande }),
       });
-      const result = (await response.json()) as Snapshot;
-      if (!response.ok) throw new Error(result.error ?? "PURCHASE_ORDER_CREATE_FAILED");
-      setSnapshot((current) => (current ? { ...current, payload: result.payload } : current));
-      const saved = result.payload.orders.find((item) => item.requestId === requestId.current);
+      const resultat = (await reponse.json()) as Snapshot;
+      if (!reponse.ok) throw new Error(resultat.error ?? "PURCHASE_ORDER_CREATE_FAILED");
+      setSnapshot((courant) => (courant ? { ...courant, payload: resultat.payload } : courant));
+      const saved = resultat.payload.orders.find(
+        (element) => element.requestId === requestId.current,
+      );
       setNotice(
         `${saved?.reference ?? "BC"} enregistré comme coût engagé, sans envoi au fournisseur.`,
       );
       requestId.current = crypto.randomUUID();
-      setAllocations((rows) => rows.map((row) => ({ ...row, amount: "" })));
+      setAllocations((lignesTableau) =>
+        lignesTableau.map((ligneTableau) => ({ ...ligneTableau, amount: "" })),
+      );
       setDescription("");
       setLines([newLine()]);
     } catch (e) {
@@ -264,14 +272,14 @@ export function PurchaseOrdersWorkspace({ chantierId }: { chantierId?: string })
     setBusy(true);
     setError("");
     try {
-      const response = await fetch("/api/desktop/purchases", {
+      const reponse = await fetch("/api/desktop/purchases", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ action: "CANCEL", orderId: id, expectedUpdatedAt }),
       });
-      const result = (await response.json()) as Snapshot;
-      if (!response.ok) throw new Error(result.error ?? "PURCHASE_ORDER_CANCEL_FAILED");
-      setSnapshot((current) => (current ? { ...current, payload: result.payload } : current));
+      const resultat = (await reponse.json()) as Snapshot;
+      if (!reponse.ok) throw new Error(resultat.error ?? "PURCHASE_ORDER_CANCEL_FAILED");
+      setSnapshot((courant) => (courant ? { ...courant, payload: resultat.payload } : courant));
       setNotice("BC annulé. Il n'est plus comptabilisé parmi les engagements.");
     } catch (e) {
       setError(messageFor(e instanceof Error ? e.message : "PURCHASE_ORDER_CANCEL_FAILED"));
@@ -289,9 +297,9 @@ export function PurchaseOrdersWorkspace({ chantierId }: { chantierId?: string })
           fournisseur, ni coût réel validé, ni envoi automatique. Rapprochement Pennylane à venir.
         </p>
       </div>
-      {error ? (
+      {erreur ? (
         <p role="alert" style={{ color: "#b33138" }}>
-          {error}
+          {erreur}
         </p>
       ) : null}
       {notice ? (
@@ -332,7 +340,7 @@ export function PurchaseOrdersWorkspace({ chantierId }: { chantierId?: string })
                 <label style={{ display: "grid", gap: 5 }}>
                   Chantier *
                   <select
-                    value={selected}
+                    value={selectionne}
                     disabled={busy || !snapshot.canWrite}
                     onChange={(e) => {
                       setSiteId(e.target.value);
@@ -417,21 +425,21 @@ export function PurchaseOrdersWorkspace({ chantierId }: { chantierId?: string })
                       </tr>
                     </thead>
                     <tbody>
-                      {allocations.map((row, i) => {
-                        const selectedDestination = row.chantierId || selected;
+                      {allocations.map((ligneTableau, i) => {
+                        const selectedDestination = ligneTableau.chantierId || selectionne;
                         return (
-                          <tr key={row.id}>
+                          <tr key={ligneTableau.id}>
                             <td>
                               <select
                                 aria-label={`Destination du BC rapide ligne ${i + 1}`}
                                 value={selectedDestination}
                                 disabled={busy || !snapshot.canWrite}
                                 onChange={(e) => {
-                                  setAllocations((current) =>
-                                    current.map((item) =>
-                                      item.id === row.id
-                                        ? { ...item, chantierId: e.target.value }
-                                        : item,
+                                  setAllocations((courant) =>
+                                    courant.map((element) =>
+                                      element.id === ligneTableau.id
+                                        ? { ...element, chantierId: e.target.value }
+                                        : element,
                                     ),
                                   );
                                   setError("");
@@ -439,15 +447,16 @@ export function PurchaseOrdersWorkspace({ chantierId }: { chantierId?: string })
                                 style={{ width: "100%", minWidth: 210 }}
                               >
                                 <option value="">Choisir une destination</option>
-                                {!destinations.some((item) => item.id === selectedDestination) &&
-                                selectedDestination ? (
+                                {!destinations.some(
+                                  (element) => element.id === selectedDestination,
+                                ) && selectedDestination ? (
                                   <option value={selectedDestination} disabled>
                                     Chantier indisponible : choisir une destination
                                   </option>
                                 ) : null}
-                                {destinations.map((item) => (
-                                  <option key={item.id} value={item.id}>
-                                    {item.label}
+                                {destinations.map((element) => (
+                                  <option key={element.id} value={element.id}>
+                                    {element.label}
                                   </option>
                                 ))}
                               </select>
@@ -457,14 +466,14 @@ export function PurchaseOrdersWorkspace({ chantierId }: { chantierId?: string })
                                 aria-label={`Montant HT ligne chantier, SAV ou frais généraux ${i + 1}`}
                                 inputMode="decimal"
                                 placeholder="Ex. 250,00"
-                                value={row.amount}
+                                value={ligneTableau.amount}
                                 disabled={busy || !snapshot.canWrite}
                                 onChange={(e) => {
-                                  setAllocations((current) =>
-                                    current.map((item) =>
-                                      item.id === row.id
-                                        ? { ...item, amount: e.target.value }
-                                        : item,
+                                  setAllocations((courant) =>
+                                    courant.map((element) =>
+                                      element.id === ligneTableau.id
+                                        ? { ...element, amount: e.target.value }
+                                        : element,
                                     ),
                                   );
                                   setError("");
@@ -486,8 +495,8 @@ export function PurchaseOrdersWorkspace({ chantierId }: { chantierId?: string })
                                 className="secondaryButton"
                                 disabled={allocations.length === 1 || busy || !snapshot.canWrite}
                                 onClick={() =>
-                                  setAllocations((current) =>
-                                    current.filter((item) => item.id !== row.id),
+                                  setAllocations((courant) =>
+                                    courant.filter((element) => element.id !== ligneTableau.id),
                                   )
                                 }
                               >
@@ -506,10 +515,11 @@ export function PurchaseOrdersWorkspace({ chantierId }: { chantierId?: string })
                   disabled={busy || !snapshot.canWrite || allocations.length >= 100}
                   onClick={() => {
                     const firstUnused = destinations.find(
-                      (item) => !allocations.some((a) => (a.chantierId || selected) === item.id),
+                      (element) =>
+                        !allocations.some((a) => (a.chantierId || selectionne) === element.id),
                     );
                     if (firstUnused)
-                      setAllocations((current) => [...current, newAllocation(firstUnused.id)]);
+                      setAllocations((courant) => [...courant, newAllocation(firstUnused.id)]);
                     else setError("Toutes les destinations disponibles sont déjà sélectionnées.");
                   }}
                 >
@@ -530,14 +540,14 @@ export function PurchaseOrdersWorkspace({ chantierId }: { chantierId?: string })
                     </tr>
                   </thead>
                   <tbody>
-                    {lines.map((line, i) => (
-                      <tr key={line.id}>
+                    {lignes.map((ligne, i) => (
+                      <tr key={ligne.id}>
                         <td>
                           <input
                             aria-label={`Désignation ligne ${i + 1}`}
-                            value={line.description}
+                            value={ligne.description}
                             disabled={busy || !snapshot.canWrite}
-                            onChange={(e) => patchLine(line.id, "description", e.target.value)}
+                            onChange={(e) => patchLine(ligne.id, "description", e.target.value)}
                             style={{ width: "100%", minWidth: 230 }}
                           />
                         </td>
@@ -545,18 +555,18 @@ export function PurchaseOrdersWorkspace({ chantierId }: { chantierId?: string })
                           <input
                             aria-label={`Quantité ligne ${i + 1}`}
                             inputMode="decimal"
-                            value={line.quantity}
+                            value={ligne.quantity}
                             disabled={busy || !snapshot.canWrite}
-                            onChange={(e) => patchLine(line.id, "quantity", e.target.value)}
+                            onChange={(e) => patchLine(ligne.id, "quantity", e.target.value)}
                             style={{ width: 80 }}
                           />
                         </td>
                         <td>
                           <input
                             aria-label={`Unité ligne ${i + 1}`}
-                            value={line.unit}
+                            value={ligne.unit}
                             disabled={busy || !snapshot.canWrite}
-                            onChange={(e) => patchLine(line.id, "unit", e.target.value)}
+                            onChange={(e) => patchLine(ligne.id, "unit", e.target.value)}
                             style={{ width: 75 }}
                           />
                         </td>
@@ -564,9 +574,9 @@ export function PurchaseOrdersWorkspace({ chantierId }: { chantierId?: string })
                           <input
                             aria-label={`Prix unitaire ligne ${i + 1}`}
                             inputMode="decimal"
-                            value={line.unitPrice}
+                            value={ligne.unitPrice}
                             disabled={busy || !snapshot.canWrite}
-                            onChange={(e) => patchLine(line.id, "unitPrice", e.target.value)}
+                            onChange={(e) => patchLine(ligne.id, "unitPrice", e.target.value)}
                             style={{ width: 110 }}
                           />
                         </td>
@@ -577,9 +587,9 @@ export function PurchaseOrdersWorkspace({ chantierId }: { chantierId?: string })
                           <button
                             type="button"
                             className="secondaryButton"
-                            disabled={lines.length === 1 || busy || !snapshot.canWrite}
+                            disabled={lignes.length === 1 || busy || !snapshot.canWrite}
                             onClick={() =>
-                              setLines((current) => current.filter((x) => x.id !== line.id))
+                              setLines((courant) => courant.filter((x) => x.id !== ligne.id))
                             }
                           >
                             Retirer
@@ -592,8 +602,8 @@ export function PurchaseOrdersWorkspace({ chantierId }: { chantierId?: string })
                 <button
                   type="button"
                   className="secondaryButton"
-                  disabled={busy || !snapshot.canWrite || lines.length >= 200}
-                  onClick={() => setLines((current) => [...current, newLine()])}
+                  disabled={busy || !snapshot.canWrite || lignes.length >= 200}
+                  onClick={() => setLines((courant) => [...courant, newLine()])}
                 >
                   Ajouter une ligne
                 </button>
@@ -609,7 +619,7 @@ export function PurchaseOrdersWorkspace({ chantierId }: { chantierId?: string })
               }}
             >
               <div>
-                <strong>Total du BC : {preview === null ? "À renseigner" : euro(preview)}</strong>
+                <strong>Total du BC : {apercu === null ? "À renseigner" : euro(apercu)}</strong>
                 {mode === "DETAILED" ? (
                   <div>Déjà engagé sur ce chantier : {euro(committed)}</div>
                 ) : (
@@ -634,7 +644,7 @@ export function PurchaseOrdersWorkspace({ chantierId }: { chantierId?: string })
               <input
                 aria-label="Rechercher un BC"
                 placeholder="Référence, fournisseur, chantier, SAV…"
-                value={search}
+                value={recherche}
                 onChange={(e) => setSearch(e.target.value)}
                 style={{ minWidth: 230, flex: 2 }}
               />
@@ -676,78 +686,80 @@ export function PurchaseOrdersWorkspace({ chantierId }: { chantierId?: string })
                   </tr>
                 </thead>
                 <tbody>
-                  {visible.map((order) => (
-                    <tr key={order.id} style={{ borderBottom: "1px solid #ece8f0" }}>
-                      <td style={{ padding: 8 }}>{order.reference}</td>
+                  {visible.map((commande) => (
+                    <tr key={commande.id} style={{ borderBottom: "1px solid #ece8f0" }}>
+                      <td style={{ padding: 8 }}>{commande.reference}</td>
                       <td style={{ padding: 8 }}>
-                        {new Date(order.createdAt).toLocaleDateString("fr-FR")}
+                        {new Date(commande.createdAt).toLocaleDateString("fr-FR")}
                       </td>
-                      <td style={{ padding: 8 }}>{order.supplierName}</td>
+                      <td style={{ padding: 8 }}>{commande.supplierName}</td>
                       <td style={{ padding: 8 }}>
-                        {order.allocations?.length ? (
+                        {commande.allocations?.length ? (
                           <details>
-                            <summary>{order.allocations.length} destination(s)</summary>
-                            {order.allocations.map((a) => (
+                            <summary>{commande.allocations.length} destination(s)</summary>
+                            {commande.allocations.map((a) => (
                               <div key={purchaseDestinationKey(a)}>
                                 {a.chantierName} : {euro(a.amountHtCents)}
                               </div>
                             ))}
                           </details>
                         ) : (
-                          order.chantierName
+                          commande.chantierName
                         )}
                       </td>
                       <td style={{ padding: 8 }}>
-                        {order.mode === "QUICK" ? "Rapide" : `Détaillé (${order.lines.length})`}
+                        {commande.mode === "QUICK"
+                          ? "Rapide"
+                          : `Détaillé (${commande.lines.length})`}
                       </td>
                       <td style={{ padding: 8 }}>
-                        {order.status === "CANCELLED" ? "Annulé" : "Engagé · Non envoyé"}
+                        {commande.status === "CANCELLED" ? "Annulé" : "Engagé · Non envoyé"}
                       </td>
                       <td style={{ padding: 8, textAlign: "right", whiteSpace: "nowrap" }}>
-                        {euro(order.amountHtCents)}
+                        {euro(commande.amountHtCents)}
                       </td>
                       <td style={{ padding: 8 }}>
-                        {order.status === "COMMITTED" &&
+                        {commande.status === "COMMITTED" &&
                         snapshot.canWrite &&
-                        !order.removedAllocations?.length ? (
+                        !commande.removedAllocations?.length ? (
                           <Link
                             className="secondaryButton"
-                            href={`/achats/${encodeURIComponent(order.id)}/modifier`}
+                            href={`/achats/${encodeURIComponent(commande.id)}/modifier`}
                           >
                             Modifier
                           </Link>
                         ) : null}
-                        {order.status === "COMMITTED" && snapshot.canWrite ? (
+                        {commande.status === "COMMITTED" && snapshot.canWrite ? (
                           <button
                             type="button"
                             className="secondaryButton"
                             disabled={busy}
-                            onClick={() => void cancel(order.id, order.updatedAt)}
+                            onClick={() => void cancel(commande.id, commande.updatedAt)}
                           >
                             Annuler
                           </button>
                         ) : null}
-                        {order.mode === "DETAILED" ? (
+                        {commande.mode === "DETAILED" ? (
                           <>
                             <a
                               className="secondaryButton"
-                              href={`/api/desktop/purchases/${encodeURIComponent(order.id)}/pdf`}
-                              aria-label={`Télécharger le PDF du ${order.reference}`}
+                              href={`/api/desktop/purchases/${encodeURIComponent(commande.id)}/pdf`}
+                              aria-label={`Télécharger le PDF du ${commande.reference}`}
                             >
                               PDF
                             </a>
                             <details>
                               <summary>Lignes</summary>
-                              {order.lines.map((line) => (
-                                <div key={line.id}>
-                                  {line.description} · {line.quantity} {line.unit} ×{" "}
-                                  {euro(line.unitPriceHtCents)}
+                              {commande.lines.map((ligne) => (
+                                <div key={ligne.id}>
+                                  {ligne.description} · {ligne.quantity} {ligne.unit} ×{" "}
+                                  {euro(ligne.unitPriceHtCents)}
                                 </div>
                               ))}
                             </details>
                           </>
-                        ) : order.description ? (
-                          <small>{order.description}</small>
+                        ) : commande.description ? (
+                          <small>{commande.description}</small>
                         ) : null}
                       </td>
                     </tr>

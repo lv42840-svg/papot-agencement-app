@@ -6,41 +6,45 @@ import { readUserPermissions, type AccessLevel } from "@/lib/auth/store";
 
 export type { AccessLevel } from "@/lib/auth/store";
 
-export async function hasModuleAccess(userId: string, moduleKey: string, required: AccessLevel) {
-  const user = await readUserPermissions(userId);
-  const access = user?.modulePermissions[moduleKey];
-  if (!access) return false;
-  if (required === "READ") return true;
-  return access === "WRITE";
+export async function hasModuleAccess(
+  idUtilisateur: string,
+  cleModule: string,
+  niveauRequis: AccessLevel,
+) {
+  const utilisateur = await readUserPermissions(idUtilisateur);
+  const acces = utilisateur?.modulePermissions[cleModule];
+  if (!acces) return false;
+  if (niveauRequis === "READ") return true;
+  return acces === "WRITE";
 }
 
-export async function listReadableModules(userId: string): Promise<string[]> {
-  const user = await readUserPermissions(userId);
-  return user ? Object.keys(user.modulePermissions) : [];
+export async function listReadableModules(idUtilisateur: string): Promise<string[]> {
+  const utilisateur = await readUserPermissions(idUtilisateur);
+  return utilisateur ? Object.keys(utilisateur.modulePermissions) : [];
 }
 
-export async function hasSpecialPermission(userId: string, permissionKey: string) {
-  const user = await readUserPermissions(userId);
-  return user?.specialPermissions.includes(permissionKey) === true;
+export async function hasSpecialPermission(idUtilisateur: string, clePermission: string) {
+  const utilisateur = await readUserPermissions(idUtilisateur);
+  return utilisateur?.specialPermissions.includes(clePermission) === true;
 }
 
-export async function listSpecialPermissions(userId: string): Promise<string[]> {
-  const user = await readUserPermissions(userId);
-  return user ? [...user.specialPermissions].sort() : [];
+export async function listSpecialPermissions(idUtilisateur: string): Promise<string[]> {
+  const utilisateur = await readUserPermissions(idUtilisateur);
+  return utilisateur ? [...utilisateur.specialPermissions].sort() : [];
 }
 
 export async function hasEffectiveSpecialPermission(
-  user: Pick<CurrentUser, "id">,
-  permissionKey: SpecialPermissionKey,
+  utilisateur: Pick<CurrentUser, "id">,
+  clePermission: SpecialPermissionKey,
 ) {
-  return hasSpecialPermission(user.id, permissionKey);
+  return hasSpecialPermission(utilisateur.id, clePermission);
 }
 
 export async function requireSpecialPermission(
-  user: Pick<CurrentUser, "id">,
-  permissionKey: SpecialPermissionKey,
+  utilisateur: Pick<CurrentUser, "id">,
+  clePermission: SpecialPermissionKey,
 ) {
-  if (!(await hasEffectiveSpecialPermission(user, permissionKey))) {
+  if (!(await hasEffectiveSpecialPermission(utilisateur, clePermission))) {
     throw new Error("SPECIAL_PERMISSION_FORBIDDEN");
   }
 }

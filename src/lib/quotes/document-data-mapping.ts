@@ -29,20 +29,18 @@ export type QuoteDocumentDataSources = {
 };
 
 export function buildQuoteDocumentDataFromPayloads(
-  input: QuoteDocumentDataMappingInput,
+  saisie: QuoteDocumentDataMappingInput,
   payloads: QuoteDocumentDataPayloads,
 ): QuoteDocumentData {
-  const quote = payloads.quotes.quotes.find((candidate) => candidate.id === input.quoteId);
+  const quote = payloads.quotes.quotes.find((candidat) => candidat.id === saisie.quoteId);
   if (!quote) throw new Error("QUOTE_DOCUMENT_QUOTE_NOT_FOUND");
 
   const commercialCase = payloads.commercial.cases.find(
-    (candidate) => candidate.id === quote.commercialCaseId,
+    (candidat) => candidat.id === quote.commercialCaseId,
   );
   if (!commercialCase) throw new Error("QUOTE_DOCUMENT_AFFAIR_NOT_FOUND");
 
-  const client = payloads.clients.clients.find(
-    (candidate) => candidate.id === quote.model.clientId,
-  );
+  const client = payloads.clients.clients.find((candidat) => candidat.id === quote.model.clientId);
   if (!client) throw new Error("QUOTE_DOCUMENT_CLIENT_NOT_FOUND");
 
   if (commercialCase.clientId && commercialCase.clientId !== client.id) {
@@ -54,13 +52,13 @@ export function buildQuoteDocumentDataFromPayloads(
     client,
     commercialCase,
     company: payloads.companyProfile,
-    quoteNumber: input.quoteNumber,
-    clientCountry: input.clientCountry,
+    quoteNumber: saisie.quoteNumber,
+    clientCountry: saisie.clientCountry,
   });
 }
 
 export async function loadQuoteDocumentDataFromSources(
-  input: QuoteDocumentDataMappingInput,
+  saisie: QuoteDocumentDataMappingInput,
   sources: QuoteDocumentDataSources,
 ): Promise<QuoteDocumentData> {
   const [quotes, clients, commercial, companyProfile] = await Promise.all([
@@ -70,7 +68,7 @@ export async function loadQuoteDocumentDataFromSources(
     sources.companyProfile.load(),
   ]);
 
-  return buildQuoteDocumentDataFromPayloads(input, {
+  return buildQuoteDocumentDataFromPayloads(saisie, {
     quotes,
     clients,
     commercial,

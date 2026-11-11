@@ -24,12 +24,12 @@ const options: { value: BillingType; label: string }[] = [
   { value: "FINAL", label: "Solde" },
   { value: "STANDARD", label: "Classique" },
 ];
-const parseMoney = (text: string) => {
-  const norm = text.replace(/\s/g, "").replace(",", ".");
+const parseMoney = (texte: string) => {
+  const norm = texte.replace(/\s/g, "").replace(",", ".");
   return /^\d+(\.\d{1,2})?$/.test(norm) ? Math.round(Number(norm) * 100) : NaN;
 };
 export function BillingWorkspace({
-  quoteId,
+  quoteId: idDevis,
   chantierId,
   initialTab,
 }: {
@@ -38,15 +38,15 @@ export function BillingWorkspace({
   initialTab?: string;
 }) {
   const router = useRouter();
-  const [data, setData] = useState<Snapshot | null>(null);
-  const [error, setError] = useState("");
+  const [donnees, setData] = useState<Snapshot | null>(null);
+  const [erreur, setError] = useState("");
   const [notice, setNotice] = useState("");
   const [busy, setBusy] = useState(false);
-  const [selection, setSelection] = useState(quoteId ?? "");
+  const [selectionCourante, setSelection] = useState(idDevis ?? "");
   const [type, setType] = useState<BillingType>("DEPOSIT");
   const [mode, setMode] = useState<"AMOUNT" | "PERCENT" | "LINES">("PERCENT");
   const [lineValues, setLineValues] = useState<Record<string, string>>({});
-  const [value, setValue] = useState("");
+  const [valeur, setValue] = useState("");
   const [tab, setTab] = useState<"CHANTIER" | "PROJECTS" | "FOLLOWUP">(
     chantierId ? "CHANTIER" : initialTab === "FOLLOWUP" ? "FOLLOWUP" : "PROJECTS",
   );
@@ -59,15 +59,15 @@ export function BillingWorkspace({
   const [projectChantier, setProjectChantier] = useState("ALL");
   const [projectSort, setProjectSort] = useState<BillingProjectSort>("RECENT");
   async function refresh() {
-    const response = await fetch("/api/desktop/billing", { cache: "no-store" });
-    const body = (await response.json()) as Snapshot & { error?: string };
-    if (!response.ok) throw new Error(body.error ?? "BILLING_LOAD_FAILED");
-    setData(body);
+    const reponse = await fetch("/api/desktop/billing", { cache: "no-store" });
+    const corps = (await reponse.json()) as Snapshot & { error?: string };
+    if (!reponse.ok) throw new Error(corps.error ?? "BILLING_LOAD_FAILED");
+    setData(corps);
   }
   useEffect(() => {
     void refresh().catch(() => setError("Impossible de charger la facturation."));
   }, []);
-  const allSources = data?.sources ?? [];
+  const allSources = donnees?.sources ?? [];
   const chantierChoices = [
     ...new Map<string, { id: string; name: string; client: string }>(
       allSources
@@ -82,15 +82,19 @@ export function BillingWorkspace({
     ? selectedChantier
     : (chantierChoices[0]?.id ?? "");
   const sources = allSources.filter((source) => source.chantierId === activeChantierId);
-  const active = sources.find((source) => source.quoteId === selection) ?? sources[0];
-  const drafts = data?.payload.drafts ?? [];
-  const followup = billingPreparationFollowup(allSources, drafts);
-  const visibleFollowup = followup.filter((row) => {
-    if (followupStatus !== "ALL" && row.status !== followupStatus) return false;
+  const active = sources.find((source) => source.quoteId === selectionCourante) ?? sources[0];
+  const brouillons = donnees?.payload.drafts ?? [];
+  const followup = billingPreparationFollowup(allSources, brouillons);
+  const visibleFollowup = followup.filter((ligneTableau) => {
+    if (followupStatus !== "ALL" && ligneTableau.status !== followupStatus) return false;
     const needle = followupSearch.trim().toLocaleLowerCase("fr-FR");
     return (
       !needle ||
-      [row.source.clientName, row.source.affairName, row.source.quoteLabel]
+      [
+        ligneTableau.source.clientName,
+        ligneTableau.source.affairName,
+        ligneTableau.source.quoteLabel,
+      ]
         .join(" ")
         .toLocaleLowerCase("fr-FR")
         .includes(needle)
@@ -98,12 +102,15 @@ export function BillingWorkspace({
   });
   const projectChantiers = [
     ...new Map<string, { id: string; label: string }>(
-      drafts
-        .filter((draft) => draft.chantierId !== null)
-        .map((draft) => [draft.chantierId!, { id: draft.chantierId!, label: draft.affairName }]),
+      brouillons
+        .filter((brouillon) => brouillon.chantierId !== null)
+        .map((brouillon) => [
+          brouillon.chantierId!,
+          { id: brouillon.chantierId!, label: brouillon.affairName },
+        ]),
     ).values(),
   ].sort((a, b) => a.label.localeCompare(b.label, "fr-FR"));
-  const visibleDrafts = filterBillingProjects(drafts, {
+  const visibleDrafts = filterBillingProjects(brouillons, {
     search: projectSearch,
     status: projectStatus,
     type: projectType,
@@ -111,21 +118,21 @@ export function BillingWorkspace({
     sort: projectSort,
   });
   const used = active
-    ? (data?.payload.drafts ?? [])
+    ? (donnees?.payload.drafts ?? [])
         .filter((d) => d.quoteId === active.quoteId)
         .reduce((n, d) => n + d.amountHtCents, 0)
     : 0;
   const remaining = Math.max(0, (active?.contractHtCents ?? 0) - used);
   function previousPercents(source: BillingSource): Record<string, string> {
-    const latest = (data?.payload.drafts ?? [])
-      .filter((draft) => draft.quoteId === source.quoteId && draft.type === "PROGRESS")
+    const latest = (donnees?.payload.drafts ?? [])
+      .filter((brouillon) => brouillon.quoteId === source.quoteId && brouillon.type === "PROGRESS")
       .sort((a, b) => a.createdAt.localeCompare(b.createdAt))
       .at(-1);
     return Object.fromEntries(
-      (source.lines ?? []).map((line) => [
-        line.lineId,
+      (source.lines ?? []).map((ligne) => [
+        ligne.lineId,
         String(
-          latest?.lineProgress?.find((progress) => progress.lineId === line.lineId)?.percent ??
+          latest?.lineProgress?.find((progress) => progress.lineId === ligne.lineId)?.percent ??
             latest?.cumulativePercent ??
             0,
         ),
@@ -134,27 +141,27 @@ export function BillingWorkspace({
   }
   // Preview and submit the same percentages, including visible saved defaults.
   const previousLineValues = active ? previousPercents(active) : {};
-  const enteredLineRows = (active?.lines ?? []).map((line) => ({
-    lineId: line.lineId,
+  const enteredLineRows = (active?.lines ?? []).map((ligne) => ({
+    lineId: ligne.lineId,
     percent: Number(
-      (lineValues[line.lineId] ?? previousLineValues[line.lineId] ?? "0").replace(",", "."),
+      (lineValues[ligne.lineId] ?? previousLineValues[ligne.lineId] ?? "0").replace(",", "."),
     ),
   }));
-  const cumulativeLinesCents = (active?.lines ?? []).reduce((sum, line, index) => {
-    const percent = enteredLineRows[index]?.percent;
+  const cumulativeLinesCents = (active?.lines ?? []).reduce((somme, ligne, indice) => {
+    const percent = enteredLineRows[indice]?.percent;
     const lineValue =
       typeof percent === "number" && Number.isFinite(percent)
-        ? Math.round((line.amountHtCents * percent) / 100)
+        ? Math.round((ligne.amountHtCents * percent) / 100)
         : 0;
-    return sum + lineValue;
+    return somme + lineValue;
   }, 0);
   const progressPreviewError = (() => {
-    if (type !== "PROGRESS" || mode !== "LINES" || !active || !data) return "";
+    if (type !== "PROGRESS" || mode !== "LINES" || !active || !donnees) return "";
     try {
-      calculateLineProgress(data.payload, active, enteredLineRows);
+      calculateLineProgress(donnees.payload, active, enteredLineRows);
       return "";
-    } catch (error) {
-      const code = error instanceof Error ? error.message : "";
+    } catch (erreur) {
+      const code = erreur instanceof Error ? erreur.message : "";
       if (code === "BILLING_PROGRESS_TAX_ALLOCATION_UNAVAILABLE") {
         if (cumulativeLinesCents < used) {
           const minimum =
@@ -182,36 +189,36 @@ export function BillingWorkspace({
       return "Vérifie les avancements cumulés avant de créer cette situation.";
     }
   })();
-  async function write(body: Record<string, unknown>, success: string) {
+  async function write(corps: Record<string, unknown>, success: string) {
     setBusy(true);
     setError("");
     setNotice("");
     try {
-      const response = await fetch("/api/desktop/billing", {
+      const reponse = await fetch("/api/desktop/billing", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(body),
+        body: JSON.stringify(corps),
       });
-      const result = (await response.json()) as {
+      const resultat = (await reponse.json()) as {
         error?: string;
         fields?: string[];
         payload?: BillingPayload;
       };
-      if (!response.ok) {
-        const fields = result.fields?.length ? ` (champs : ${result.fields.join(", ")})` : "";
-        if (result.error === "BILLING_REQUEST_INVALID") {
+      if (!reponse.ok) {
+        const fields = resultat.fields?.length ? ` (champs : ${resultat.fields.join(", ")})` : "";
+        if (resultat.error === "BILLING_REQUEST_INVALID") {
           throw new Error(`La demande de facturation est invalide${fields}.`);
         }
-        if (result.error === "BILLING_DRAFT_DATA_INVALID") {
+        if (resultat.error === "BILLING_DRAFT_DATA_INVALID") {
           throw new Error(
             `Des données du devis empêchent la création${fields}. Vérifie les lignes du devis.`,
           );
         }
-        throw new Error(result.error ?? "Erreur de facturation");
+        throw new Error(resultat.error ?? "Erreur de facturation");
       }
       await refresh();
       setNotice(success);
-      return result.payload ?? null;
+      return resultat.payload ?? null;
     } catch (e) {
       setError(e instanceof Error ? e.message : "Erreur de facturation");
       return null;
@@ -223,7 +230,7 @@ export function BillingWorkspace({
     if (!active) return;
     const linesMode = type === "PROGRESS" && mode === "LINES";
     const percentMode = mode === "PERCENT" && (type === "PROGRESS" || type === "DEPOSIT");
-    const numeric = percentMode ? parseBillingPercentageInput(value) : parseMoney(value);
+    const numeric = percentMode ? parseBillingPercentageInput(valeur) : parseMoney(valeur);
     if (percentMode && numeric === null) {
       setError("Saisis un pourcentage entre 0,01 et 100 (par exemple 30).");
       return;
@@ -232,7 +239,7 @@ export function BillingWorkspace({
       setError("Montant invalide.");
       return;
     }
-    const payload: Record<string, unknown> = {
+    const contenu: Record<string, unknown> = {
       action: "CREATE",
       requestId: crypto.randomUUID(),
       quoteId: active.quoteId,
@@ -244,24 +251,29 @@ export function BillingWorkspace({
         setError(progressPreviewError);
         return;
       }
-      const rows = enteredLineRows;
+      const lignesTableau = enteredLineRows;
       if (
-        rows.length === 0 ||
-        rows.some((row) => !Number.isFinite(row.percent) || row.percent < 0 || row.percent > 100)
+        lignesTableau.length === 0 ||
+        lignesTableau.some(
+          (ligneTableau) =>
+            !Number.isFinite(ligneTableau.percent) ||
+            ligneTableau.percent < 0 ||
+            ligneTableau.percent > 100,
+        )
       ) {
         setError("Renseigne un avancement entre 0 et 100 % pour chaque ligne.");
         return;
       }
-      payload.linePercentages = rows;
-    } else if (percentMode) payload.cumulativePercent = numeric;
-    else if (type !== "STANDARD" && type !== "FINAL") payload.amountHtCents = numeric;
-    const result = await write(
-      payload,
+      contenu.linePercentages = lignesTableau;
+    } else if (percentMode) contenu.cumulativePercent = numeric;
+    else if (type !== "STANDARD" && type !== "FINAL") contenu.amountHtCents = numeric;
+    const resultat = await write(
+      contenu,
       "Projet enregistré. Aucune facture officielle émise. Ouvre son éditeur pour personnaliser les lignes.",
     );
-    const created = result?.drafts.find((draft) => draft.requestId === payload.requestId);
+    const created = resultat?.drafts.find((brouillon) => brouillon.requestId === contenu.requestId);
     if (created) router.push(`/facturation/${encodeURIComponent(created.id)}`);
-    else if (result) setValue("");
+    else if (resultat) setValue("");
   }
   return (
     <div
@@ -283,9 +295,9 @@ export function BillingWorkspace({
         Les montants préparés sont des brouillons analytiques : aucun numéro officiel, aucune
         écriture comptable et aucun envoi.
       </p>
-      {error && (
+      {erreur && (
         <p role="alert" style={{ color: "#aa2525" }}>
-          {error}
+          {erreur}
         </p>
       )}
       {notice && (
@@ -301,18 +313,18 @@ export function BillingWorkspace({
         {(
           [
             ["CHANTIER", "Nouvelle facture depuis chantier"],
-            ["PROJECTS", `Projets de factures (${drafts.length})`],
+            ["PROJECTS", `Projets de factures (${brouillons.length})`],
             ["FOLLOWUP", `Devis à facturer (${followup.length})`],
           ] as const
-        ).map(([key, caption]) => (
+        ).map(([cle, caption]) => (
           <button
-            key={key}
+            key={cle}
             type="button"
             role="tab"
-            aria-selected={tab === key}
-            className={tab === key ? "primaryButton" : "secondaryButton"}
+            aria-selected={tab === cle}
+            className={tab === cle ? "primaryButton" : "secondaryButton"}
             onClick={() => {
-              setTab(key);
+              setTab(cle);
               setSelection("");
               setLineValues({});
               setValue("");
@@ -324,8 +336,8 @@ export function BillingWorkspace({
           </button>
         ))}
       </div>
-      {!data && <p>Chargement…</p>}
-      {data && tab === "CHANTIER" && (
+      {!donnees && <p>Chargement…</p>}
+      {donnees && tab === "CHANTIER" && (
         <section
           role="tabpanel"
           style={{ background: "white", padding: 20, borderRadius: 12, display: "grid", gap: 12 }}
@@ -369,7 +381,7 @@ export function BillingWorkspace({
                   value={active?.quoteId ?? ""}
                   onChange={(e) => {
                     setSelection(e.target.value);
-                    const source = sources.find((item) => item.quoteId === e.target.value);
+                    const source = sources.find((element) => element.quoteId === e.target.value);
                     if (source) setLineValues(previousPercents(source));
                   }}
                 >
@@ -409,9 +421,9 @@ export function BillingWorkspace({
                       style={{ padding: 9 }}
                       value={mode}
                       onChange={(e) => {
-                        const next = e.target.value as "AMOUNT" | "PERCENT" | "LINES";
-                        setMode(next);
-                        if (next === "LINES" && active) {
+                        const suivant = e.target.value as "AMOUNT" | "PERCENT" | "LINES";
+                        setMode(suivant);
+                        if (suivant === "LINES" && active) {
                           setLineValues(previousPercents(active));
                         }
                       }}
@@ -431,7 +443,7 @@ export function BillingWorkspace({
                       <input
                         style={{ padding: 9 }}
                         inputMode="decimal"
-                        value={value}
+                        value={valeur}
                         onChange={(e) => {
                           setValue(e.target.value);
                           setError("");
@@ -460,32 +472,32 @@ export function BillingWorkspace({
                             </tr>
                           </thead>
                           <tbody>
-                            {active.lines.map((line) => {
-                              const previous = Number(previousLineValues[line.lineId] ?? "0");
-                              const entered = lineValues[line.lineId] ?? String(previous);
+                            {active.lines.map((ligne) => {
+                              const precedent = Number(previousLineValues[ligne.lineId] ?? "0");
+                              const entered = lineValues[ligne.lineId] ?? String(precedent);
                               const percent = Number(entered.replace(",", "."));
                               const cumulative = Number.isFinite(percent)
-                                ? Math.round((line.amountHtCents * percent) / 100)
+                                ? Math.round((ligne.amountHtCents * percent) / 100)
                                 : 0;
                               return (
-                                <tr key={line.lineId}>
+                                <tr key={ligne.lineId}>
                                   <td style={{ padding: 8, borderBottom: "1px solid #eee" }}>
-                                    {line.description}
+                                    {ligne.description}
                                   </td>
                                   <td style={{ textAlign: "right", padding: 8 }}>
-                                    {money(line.amountHtCents)}
+                                    {money(ligne.amountHtCents)}
                                   </td>
-                                  <td style={{ textAlign: "center", padding: 8 }}>{previous} %</td>
+                                  <td style={{ textAlign: "center", padding: 8 }}>{precedent} %</td>
                                   <td style={{ textAlign: "center", padding: 8 }}>
                                     <input
-                                      aria-label={`Avancement ${line.description}`}
+                                      aria-label={`Avancement ${ligne.description}`}
                                       style={{ maxWidth: 95, padding: 8 }}
                                       inputMode="decimal"
                                       value={entered}
                                       onChange={(e) => {
-                                        setLineValues((current) => ({
-                                          ...current,
-                                          [line.lineId]: e.target.value,
+                                        setLineValues((courant) => ({
+                                          ...courant,
+                                          [ligne.lineId]: e.target.value,
                                         }));
                                         setError("");
                                       }}
@@ -523,7 +535,9 @@ export function BillingWorkspace({
               <button
                 type="button"
                 className="primaryButton"
-                disabled={!data.canWrite || busy || remaining <= 0 || Boolean(progressPreviewError)}
+                disabled={
+                  !donnees.canWrite || busy || remaining <= 0 || Boolean(progressPreviewError)
+                }
                 onClick={() => void create()}
               >
                 Créer le projet
@@ -532,7 +546,7 @@ export function BillingWorkspace({
           )}
         </section>
       )}
-      {data && tab === "FOLLOWUP" && (
+      {donnees && tab === "FOLLOWUP" && (
         <section
           role="tabpanel"
           style={{ background: "white", padding: 20, borderRadius: 12, display: "grid", gap: 14 }}
@@ -557,7 +571,7 @@ export function BillingWorkspace({
               Rechercher un devis accepté
               <input
                 value={followupSearch}
-                onChange={(event) => setFollowupSearch(event.target.value)}
+                onChange={(evenement) => setFollowupSearch(evenement.target.value)}
                 placeholder="Chantier, client ou référence"
               />
             </label>
@@ -565,7 +579,9 @@ export function BillingWorkspace({
               Préparation des factures
               <select
                 value={followupStatus}
-                onChange={(event) => setFollowupStatus(event.target.value as typeof followupStatus)}
+                onChange={(evenement) =>
+                  setFollowupStatus(evenement.target.value as typeof followupStatus)
+                }
               >
                 <option value="ALL">Tous les devis</option>
                 <option value="NONE">Aucun projet</option>
@@ -589,41 +605,48 @@ export function BillingWorkspace({
                 </tr>
               </thead>
               <tbody>
-                {visibleFollowup.map((row) => (
-                  <tr key={row.source.quoteId} style={{ borderBottom: "1px solid #ece8f0" }}>
+                {visibleFollowup.map((ligneTableau) => (
+                  <tr
+                    key={ligneTableau.source.quoteId}
+                    style={{ borderBottom: "1px solid #ece8f0" }}
+                  >
                     <td style={{ padding: 9 }}>
-                      <strong>{row.source.clientName}</strong>
-                      <div>{row.source.affairName}</div>
+                      <strong>{ligneTableau.source.clientName}</strong>
+                      <div>{ligneTableau.source.affairName}</div>
                     </td>
                     <td style={{ padding: 9 }}>
-                      <Link href={`/devis/${encodeURIComponent(row.source.quoteId)}`}>
-                        {row.source.quoteLabel}
+                      <Link href={`/devis/${encodeURIComponent(ligneTableau.source.quoteId)}`}>
+                        {ligneTableau.source.quoteLabel}
                       </Link>
                     </td>
                     <td style={{ padding: 9, textAlign: "right" }}>
-                      {money(row.source.contractHtCents)}
+                      {money(ligneTableau.source.contractHtCents)}
                     </td>
-                    <td style={{ padding: 9, textAlign: "right" }}>{money(row.preparedHtCents)}</td>
                     <td style={{ padding: 9, textAlign: "right" }}>
-                      {money(row.remainingToPrepareHtCents)}
+                      {money(ligneTableau.preparedHtCents)}
+                    </td>
+                    <td style={{ padding: 9, textAlign: "right" }}>
+                      {money(ligneTableau.remainingToPrepareHtCents)}
                     </td>
                     <td style={{ padding: 9 }}>
-                      {row.status === "NONE"
+                      {ligneTableau.status === "NONE"
                         ? "Aucun projet"
-                        : row.status === "PARTIAL"
+                        : ligneTableau.status === "PARTIAL"
                           ? "Préparation partielle"
                           : "Totalité préparée"}
-                      <div style={{ fontSize: 11 }}>{row.projectCount} projet(s) non émis</div>
+                      <div style={{ fontSize: 11 }}>
+                        {ligneTableau.projectCount} projet(s) non émis
+                      </div>
                     </td>
                     <td style={{ padding: 9 }}>À rapprocher avec Pennylane</td>
                     <td style={{ padding: 9 }}>
-                      {row.source.chantierId ? (
+                      {ligneTableau.source.chantierId ? (
                         <button
                           type="button"
                           className="secondaryButton"
                           onClick={() => {
-                            setSelectedChantier(row.source.chantierId!);
-                            setSelection(row.source.quoteId);
+                            setSelectedChantier(ligneTableau.source.chantierId!);
+                            setSelection(ligneTableau.source.quoteId);
                             setTab("CHANTIER");
                             setValue("");
                           }}
@@ -633,7 +656,7 @@ export function BillingWorkspace({
                       ) : (
                         <Link
                           className="secondaryButton"
-                          href={`/devis/${encodeURIComponent(row.source.quoteId)}`}
+                          href={`/devis/${encodeURIComponent(ligneTableau.source.quoteId)}`}
                         >
                           Voir le devis
                         </Link>
@@ -647,12 +670,12 @@ export function BillingWorkspace({
           </div>
         </section>
       )}
-      {data && tab === "PROJECTS" && (
+      {donnees && tab === "PROJECTS" && (
         <section
           role="tabpanel"
           style={{ background: "white", padding: 20, borderRadius: 12, display: "grid", gap: 12 }}
         >
-          <h2>Projets de factures ({drafts.length})</h2>
+          <h2>Projets de factures ({brouillons.length})</h2>
           <div style={{ display: "flex", gap: 12, flexWrap: "wrap", alignItems: "end" }}>
             <label style={{ display: "grid", gap: 5, flex: "2 1 220px" }}>
               Rechercher (client, chantier, devis)
@@ -721,7 +744,7 @@ export function BillingWorkspace({
             </label>
           </div>
           <p>
-            {visibleDrafts.length} projet(s) affiché(s) sur {drafts.length}.
+            {visibleDrafts.length} projet(s) affiché(s) sur {brouillons.length}.
           </p>
           {visibleDrafts.length === 0 ? (
             <p>Aucun projet ne correspond aux filtres.</p>
@@ -773,7 +796,7 @@ export function BillingWorkspace({
                           >
                             {d.status === "APPROVED" ? "Consulter" : "Ouvrir"}
                           </Link>
-                          {data.canWrite && d.status === "DRAFT" ? (
+                          {donnees.canWrite && d.status === "DRAFT" ? (
                             <button
                               type="button"
                               className="secondaryButton"

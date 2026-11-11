@@ -15,8 +15,8 @@ const optionalSiretSchema = z
   .string()
   .trim()
   .max(30)
-  .transform((value) => value.replace(/\s+/g, ""))
-  .refine((value) => value === "" || /^\d{14}$/.test(value), "CLIENT_SIRET_INVALID");
+  .transform((valeur) => valeur.replace(/\s+/g, ""))
+  .refine((valeur) => valeur === "" || /^\d{14}$/.test(valeur), "CLIENT_SIRET_INVALID");
 
 const contactInputSchema = z.object({
   id: z.string().uuid().optional(),
@@ -73,14 +73,14 @@ export type ClientsMutationResult = { payload: ClientsPayload; focusClientId?: s
 
 type WritableMutation = Extract<ClientsMutation, { action: "create" | "update" }>;
 
-function findClient(payload: ClientsPayload, clientId: string): ClientRecord {
-  const client = payload.clients.find((candidate) => candidate.id === clientId);
+function findClient(contenu: ClientsPayload, idClient: string): ClientRecord {
+  const client = contenu.clients.find((candidat) => candidat.id === idClient);
   if (!client) throw new Error("CLIENT_NOT_FOUND");
   return client;
 }
 
-function normalizeContacts(input: WritableMutation["contacts"]): ClientContact[] {
-  const contacts = input.map((contact) =>
+function normalizeContacts(saisie: WritableMutation["contacts"]): ClientContact[] {
+  const contacts = saisie.map((contact) =>
     clientContactSchema.parse({
       ...contact,
       id: contact.id ?? randomUUID(),
@@ -94,10 +94,10 @@ function normalizeContacts(input: WritableMutation["contacts"]): ClientContact[]
   return contacts;
 }
 
-function ensureUniqueSiret(payload: ClientsPayload, siret: string, exceptClientId?: string): void {
+function ensureUniqueSiret(contenu: ClientsPayload, siret: string, exceptClientId?: string): void {
   if (!siret) return;
   if (
-    payload.clients.some(
+    contenu.clients.some(
       (client) => client.id !== exceptClientId && client.siret !== "" && client.siret === siret,
     )
   ) {
@@ -105,109 +105,109 @@ function ensureUniqueSiret(payload: ClientsPayload, siret: string, exceptClientI
   }
 }
 
-function writableValues(input: WritableMutation, existing?: ClientRecord) {
+function writableValues(saisie: WritableMutation, existing?: ClientRecord) {
   return {
-    type: input.type,
-    companyName: input.companyName,
-    firstName: input.firstName,
-    lastName: input.lastName,
-    addressLine1: input.addressLine1,
-    addressLine2: input.addressLine2,
-    postalCode: input.postalCode,
-    city: input.city,
-    phone: input.phone,
-    email: input.email,
-    siret: input.siret,
-    vatNumber: input.vatNumber ?? existing?.vatNumber ?? "",
-    paymentTerms: input.paymentTerms,
+    type: saisie.type,
+    companyName: saisie.companyName,
+    firstName: saisie.firstName,
+    lastName: saisie.lastName,
+    addressLine1: saisie.addressLine1,
+    addressLine2: saisie.addressLine2,
+    postalCode: saisie.postalCode,
+    city: saisie.city,
+    phone: saisie.phone,
+    email: saisie.email,
+    siret: saisie.siret,
+    vatNumber: saisie.vatNumber ?? existing?.vatNumber ?? "",
+    paymentTerms: saisie.paymentTerms,
     defaultVatRatePercent:
-      input.defaultVatRatePercent ?? existing?.defaultVatRatePercent ?? DEFAULT_VAT_RATE_PERCENT,
-    notes: input.notes,
-    contacts: normalizeContacts(input.contacts),
+      saisie.defaultVatRatePercent ?? existing?.defaultVatRatePercent ?? DEFAULT_VAT_RATE_PERCENT,
+    notes: saisie.notes,
+    contacts: normalizeContacts(saisie.contacts),
   };
 }
 
-function parseBusinessClient(candidate: ClientRecord): ClientRecord {
-  const parsed = clientRecordSchema.safeParse(candidate);
-  if (parsed.success) return parsed.data;
+function parseBusinessClient(candidat: ClientRecord): ClientRecord {
+  const analyse = clientRecordSchema.safeParse(candidat);
+  if (analyse.success) return analyse.data;
 
-  const issue = parsed.error.issues.find((item) => item.code === "custom");
+  const issue = analyse.error.issues.find((element) => element.code === "custom");
   if (issue?.message) throw new Error(issue.message);
   throw new Error("CLIENT_REQUEST_INVALID");
 }
 
 export function applyClientsMutation(
   source: ClientsPayload,
-  input: ClientsMutation,
-  actor: ClientsActor,
+  saisie: ClientsMutation,
+  auteur: ClientsActor,
   nowDate: Date = new Date(),
 ): ClientsMutationResult {
-  const payload = structuredClone(source);
-  const now = nowDate.toISOString();
+  const contenu = structuredClone(source);
+  const maintenant = nowDate.toISOString();
 
-  if (input.action === "create") {
-    ensureUniqueSiret(payload, input.siret);
+  if (saisie.action === "create") {
+    ensureUniqueSiret(contenu, saisie.siret);
     const client = parseBusinessClient({
-      id: input.clientId ?? randomUUID(),
-      ...writableValues(input),
+      id: saisie.clientId ?? randomUUID(),
+      ...writableValues(saisie),
       isArchived: false,
       archivedAt: null,
-      createdAt: now,
-      createdByName: actor.displayName,
-      updatedAt: now,
-      updatedByName: actor.displayName,
+      createdAt: maintenant,
+      createdByName: auteur.displayName,
+      updatedAt: maintenant,
+      updatedByName: auteur.displayName,
     });
-    payload.clients.unshift(client);
-    return { payload, focusClientId: client.id };
+    contenu.clients.unshift(client);
+    return { payload: contenu, focusClientId: client.id };
   }
 
-  const client = findClient(payload, input.clientId);
+  const client = findClient(contenu, saisie.clientId);
 
-  if (input.action === "update") {
+  if (saisie.action === "update") {
     if (client.isArchived) throw new Error("CLIENT_ARCHIVED");
-    ensureUniqueSiret(payload, input.siret, client.id);
+    ensureUniqueSiret(contenu, saisie.siret, client.id);
     const updated = parseBusinessClient({
       ...client,
-      ...writableValues(input, client),
-      updatedAt: now,
-      updatedByName: actor.displayName,
+      ...writableValues(saisie, client),
+      updatedAt: maintenant,
+      updatedByName: auteur.displayName,
     });
-    const index = payload.clients.findIndex((candidate) => candidate.id === client.id);
-    payload.clients[index] = updated;
-    return { payload, focusClientId: updated.id };
+    const indice = contenu.clients.findIndex((candidat) => candidat.id === client.id);
+    contenu.clients[indice] = updated;
+    return { payload: contenu, focusClientId: updated.id };
   }
 
-  if (input.action === "updateVat") {
+  if (saisie.action === "updateVat") {
     if (client.isArchived) throw new Error("CLIENT_ARCHIVED");
     const updated = parseBusinessClient({
       ...client,
-      defaultVatRatePercent: input.defaultVatRatePercent,
-      updatedAt: now,
-      updatedByName: actor.displayName,
+      defaultVatRatePercent: saisie.defaultVatRatePercent,
+      updatedAt: maintenant,
+      updatedByName: auteur.displayName,
     });
-    const index = payload.clients.findIndex((candidate) => candidate.id === client.id);
-    payload.clients[index] = updated;
-    return { payload, focusClientId: updated.id };
+    const indice = contenu.clients.findIndex((candidat) => candidat.id === client.id);
+    contenu.clients[indice] = updated;
+    return { payload: contenu, focusClientId: updated.id };
   }
 
-  if (input.action === "archive") {
+  if (saisie.action === "archive") {
     if (!client.isArchived) {
       client.isArchived = true;
-      client.archivedAt = now;
-      client.updatedAt = now;
-      client.updatedByName = actor.displayName;
+      client.archivedAt = maintenant;
+      client.updatedAt = maintenant;
+      client.updatedByName = auteur.displayName;
     }
-    return { payload, focusClientId: client.id };
+    return { payload: contenu, focusClientId: client.id };
   }
 
-  if (input.action === "reactivate") {
+  if (saisie.action === "reactivate") {
     if (client.isArchived) {
       client.isArchived = false;
       client.archivedAt = null;
-      client.updatedAt = now;
-      client.updatedByName = actor.displayName;
+      client.updatedAt = maintenant;
+      client.updatedByName = auteur.displayName;
     }
-    return { payload, focusClientId: client.id };
+    return { payload: contenu, focusClientId: client.id };
   }
 
   throw new Error("CLIENT_MUTATION_UNSUPPORTED");

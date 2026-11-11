@@ -7,8 +7,8 @@ import type { QuoteItemPhoto } from "./model";
 export const QUOTE_ITEM_PHOTO_MAX_BYTES = 15 * 1024 * 1024;
 const ALLOWED_TYPES = new Set(["image/jpeg", "image/png", "image/webp"]);
 
-function safeName(value: string): string {
-  const base = path.basename(value || "photo").normalize("NFKC");
+function safeName(valeur: string): string {
+  const base = path.basename(valeur || "photo").normalize("NFKC");
   const cleaned = base
     .replace(/[<>:"/\|?*\x00-\x1F]/g, "-")
     .replace(/[. ]+$/g, "")
@@ -18,38 +18,38 @@ function safeName(value: string): string {
 
 export async function uploadQuoteItemPhotos(
   store: ServerFileStore,
-  input: { quoteId: string; itemId: string; files: File[]; uploadedByName: string },
+  saisie: { quoteId: string; itemId: string; files: File[]; uploadedByName: string },
 ): Promise<QuoteItemPhoto[]> {
-  if (input.files.length === 0) throw new Error("QUOTE_ITEM_PHOTO_REQUIRED");
+  if (saisie.files.length === 0) throw new Error("QUOTE_ITEM_PHOTO_REQUIRED");
   const uploaded: QuoteItemPhoto[] = [];
   try {
-    for (const file of input.files) {
-      if (!ALLOWED_TYPES.has(file.type)) throw new Error("QUOTE_ITEM_PHOTO_TYPE_INVALID");
-      if (file.size <= 0) throw new Error("QUOTE_ITEM_PHOTO_EMPTY");
-      if (file.size > QUOTE_ITEM_PHOTO_MAX_BYTES) throw new Error("QUOTE_ITEM_PHOTO_TOO_LARGE");
+    for (const fichier of saisie.files) {
+      if (!ALLOWED_TYPES.has(fichier.type)) throw new Error("QUOTE_ITEM_PHOTO_TYPE_INVALID");
+      if (fichier.size <= 0) throw new Error("QUOTE_ITEM_PHOTO_EMPTY");
+      if (fichier.size > QUOTE_ITEM_PHOTO_MAX_BYTES) throw new Error("QUOTE_ITEM_PHOTO_TOO_LARGE");
       const id = globalThis.crypto.randomUUID();
-      const fileName = safeName(file.name);
-      const storagePath = `quotes/${input.quoteId}/items/${input.itemId}/photos/${id}/${fileName}`;
-      const bytes = new Uint8Array(await file.arrayBuffer());
+      const fileName = safeName(fichier.name);
+      const storagePath = `quotes/${saisie.quoteId}/items/${saisie.itemId}/photos/${id}/${fileName}`;
+      const bytes = new Uint8Array(await fichier.arrayBuffer());
       const written = await store.writeBytes(storagePath, bytes);
       uploaded.push({
         id,
         fileName,
-        contentType: file.type as QuoteItemPhoto["contentType"],
+        contentType: fichier.type as QuoteItemPhoto["contentType"],
         sizeBytes: written.sizeBytes,
         sha256: written.sha256,
         storagePath: written.storagePath,
         clientVisible: false,
         uploadedAt: new Date().toISOString(),
-        uploadedByName: input.uploadedByName,
+        uploadedByName: saisie.uploadedByName,
       });
     }
     return uploaded;
-  } catch (error) {
+  } catch (erreur) {
     await Promise.all(
       uploaded.map((photo) => store.deleteFile(photo.storagePath).catch(() => false)),
     );
-    throw error;
+    throw erreur;
   }
 }
 

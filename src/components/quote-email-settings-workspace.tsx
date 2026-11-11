@@ -21,53 +21,53 @@ function message(code: string) {
 }
 
 export function QuoteEmailSettingsWorkspace() {
-  const [settings, setSettings] = useState<QuoteEmailSettings | null>(null);
-  const [error, setError] = useState("");
+  const [reglages, setSettings] = useState<QuoteEmailSettings | null>(null);
+  const [erreur, setError] = useState("");
   const [saved, setSaved] = useState(false);
   const [busy, setBusy] = useState(false);
 
   useEffect(() => {
     void (async () => {
-      const response = await fetch("/api/admin/quote-email-settings", { cache: "no-store" });
-      const body = (await response.json().catch(() => null)) as ApiResponse | null;
-      if (!response.ok || !body?.settings) {
-        setError(message(body?.error ?? "Chargement impossible."));
+      const reponse = await fetch("/api/admin/quote-email-settings", { cache: "no-store" });
+      const corps = (await reponse.json().catch(() => null)) as ApiResponse | null;
+      if (!reponse.ok || !corps?.settings) {
+        setError(message(corps?.error ?? "Chargement impossible."));
         return;
       }
-      setSettings(body.settings);
+      setSettings(corps.settings);
     })();
   }, []);
 
-  function update<K extends keyof QuoteEmailSettings>(key: K, value: QuoteEmailSettings[K]) {
-    setSettings((current) => (current ? { ...current, [key]: value } : current));
+  function update<K extends keyof QuoteEmailSettings>(cle: K, valeur: QuoteEmailSettings[K]) {
+    setSettings((courant) => (courant ? { ...courant, [cle]: valeur } : courant));
     setSaved(false);
   }
 
   async function save() {
-    if (!settings) return;
+    if (!reglages) return;
     setBusy(true);
     setError("");
     setSaved(false);
     try {
-      const response = await fetch("/api/admin/quote-email-settings", {
+      const reponse = await fetch("/api/admin/quote-email-settings", {
         method: "POST",
         headers: { "content-type": "application/json" },
-        body: JSON.stringify(settings),
+        body: JSON.stringify(reglages),
       });
-      const body = (await response.json().catch(() => null)) as ApiResponse | null;
-      if (!response.ok || !body?.settings) {
-        setError(message(body?.error ?? "Enregistrement impossible."));
+      const corps = (await reponse.json().catch(() => null)) as ApiResponse | null;
+      if (!reponse.ok || !corps?.settings) {
+        setError(message(corps?.error ?? "Enregistrement impossible."));
         return;
       }
-      setSettings(body.settings);
+      setSettings(corps.settings);
       setSaved(true);
     } finally {
       setBusy(false);
     }
   }
 
-  if (!settings) {
-    return <p className="muted">{error || "Chargement…"}</p>;
+  if (!reglages) {
+    return <p className="muted">{erreur || "Chargement…"}</p>;
   }
 
   return (
@@ -82,9 +82,9 @@ export function QuoteEmailSettingsWorkspace() {
         </div>
       </div>
 
-      {error ? (
+      {erreur ? (
         <p className="formError" role="alert">
-          {error}
+          {erreur}
         </p>
       ) : null}
       {saved ? <p className="companySaved">Modèle d’e-mail enregistré.</p> : null}
@@ -95,20 +95,20 @@ export function QuoteEmailSettingsWorkspace() {
           <Field
             label="Adresse d’envoi"
             type="email"
-            value={settings.fromEmail}
-            onChange={(value) => update("fromEmail", value)}
+            value={reglages.fromEmail}
+            onChange={(valeur) => update("fromEmail", valeur)}
           />
           <Field
             label="Copie automatique"
             type="email"
-            value={settings.ccEmail}
-            onChange={(value) => update("ccEmail", value)}
+            value={reglages.ccEmail}
+            onChange={(valeur) => update("ccEmail", valeur)}
           />
           <Field
             label="Réponses vers"
             type="email"
-            value={settings.replyToEmail}
-            onChange={(value) => update("replyToEmail", value)}
+            value={reglages.replyToEmail}
+            onChange={(valeur) => update("replyToEmail", valeur)}
           />
         </div>
       </article>
@@ -119,21 +119,21 @@ export function QuoteEmailSettingsWorkspace() {
           <label>
             Objet
             <input
-              value={settings.subjectTemplate}
-              onChange={(event) => update("subjectTemplate", event.target.value)}
+              value={reglages.subjectTemplate}
+              onChange={(evenement) => update("subjectTemplate", evenement.target.value)}
             />
           </label>
           <label>
             Message
             <textarea
               rows={12}
-              value={settings.bodyTemplate}
-              onChange={(event) => update("bodyTemplate", event.target.value)}
+              value={reglages.bodyTemplate}
+              onChange={(evenement) => update("bodyTemplate", evenement.target.value)}
             />
           </label>
           <p className="muted">
             Variables disponibles :{" "}
-            {QUOTE_EMAIL_TEMPLATE_VARIABLES.map((name) => `{{${name}}}`).join(", ")}
+            {QUOTE_EMAIL_TEMPLATE_VARIABLES.map((nom) => `{{${nom}}}`).join(", ")}
           </p>
         </div>
       </article>
@@ -225,20 +225,24 @@ export function QuoteEmailSettingsWorkspace() {
 }
 
 function Field({
-  label,
-  value,
+  label: libelle,
+  value: valeur,
   onChange,
   type = "text",
 }: {
   label: string;
   value: string;
-  onChange: (value: string) => void;
+  onChange: (valeur: string) => void;
   type?: "text" | "email";
 }) {
   return (
     <label className="companyField">
-      {label}
-      <input type={type} value={value} onChange={(event) => onChange(event.target.value)} />
+      {libelle}
+      <input
+        type={type}
+        value={valeur}
+        onChange={(evenement) => onChange(evenement.target.value)}
+      />
     </label>
   );
 }

@@ -11,12 +11,12 @@ type ClientsSnapshot = {
   error?: string;
 };
 
-function rateInput(value: number): string {
-  return String(value).replace(".", ",");
+function rateInput(valeur: number): string {
+  return String(valeur).replace(".", ",");
 }
 
-function parseRate(value: string): number | null {
-  const rate = Number(value.trim().replace(",", "."));
+function parseRate(valeur: string): number | null {
+  const rate = Number(valeur.trim().replace(",", "."));
   return Number.isFinite(rate) && rate >= 0 && rate <= 100 ? rate : null;
 }
 
@@ -25,19 +25,19 @@ export function ClientVatDefaultsPanel() {
   const [selectedId, setSelectedId] = useState("");
   const [rate, setRate] = useState("20");
   const [busy, setBusy] = useState(false);
-  const [error, setError] = useState("");
+  const [erreur, setError] = useState("");
   const [notice, setNotice] = useState("");
 
   useEffect(() => {
     let cancelled = false;
     async function load() {
       try {
-        const response = await fetch("/api/desktop/clients", { cache: "no-store" });
-        const body = (await response.json()) as ClientsSnapshot;
-        if (!response.ok) throw new Error(body.error ?? "CLIENTS_LOAD_FAILED");
+        const reponse = await fetch("/api/desktop/clients", { cache: "no-store" });
+        const corps = (await reponse.json()) as ClientsSnapshot;
+        if (!reponse.ok) throw new Error(corps.error ?? "CLIENTS_LOAD_FAILED");
         if (cancelled) return;
-        setSnapshot(body);
-        const first = body.payload.clients.find((client) => !client.isArchived);
+        setSnapshot(corps);
+        const first = corps.payload.clients.find((client) => !client.isArchived);
         if (first) {
           setSelectedId(first.id);
           setRate(rateInput(first.defaultVatRatePercent));
@@ -56,17 +56,17 @@ export function ClientVatDefaultsPanel() {
     () =>
       (snapshot?.payload.clients ?? [])
         .filter((client) => !client.isArchived)
-        .sort((left, right) =>
-          clientDisplayName(left).localeCompare(clientDisplayName(right), "fr-FR", {
+        .sort((gauche, droite) =>
+          clientDisplayName(gauche).localeCompare(clientDisplayName(droite), "fr-FR", {
             sensitivity: "base",
           }),
         ),
     [snapshot?.payload.clients],
   );
 
-  function selectClient(clientId: string) {
-    setSelectedId(clientId);
-    const client = snapshot?.payload.clients.find((candidate) => candidate.id === clientId);
+  function selectClient(idClient: string) {
+    setSelectedId(idClient);
+    const client = snapshot?.payload.clients.find((candidat) => candidat.id === idClient);
     if (client) setRate(rateInput(client.defaultVatRatePercent));
     setError("");
     setNotice("");
@@ -74,8 +74,8 @@ export function ClientVatDefaultsPanel() {
 
   async function save() {
     if (!snapshot?.canWrite || !selectedId || busy) return;
-    const parsed = parseRate(rate);
-    if (parsed === null) {
+    const analyse = parseRate(rate);
+    if (analyse === null) {
       setError("Le taux de TVA doit être compris entre 0 et 100 %.");
       return;
     }
@@ -84,19 +84,19 @@ export function ClientVatDefaultsPanel() {
     setError("");
     setNotice("");
     try {
-      const response = await fetch("/api/desktop/clients", {
+      const reponse = await fetch("/api/desktop/clients", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           action: "updateVat",
           clientId: selectedId,
-          defaultVatRatePercent: parsed,
+          defaultVatRatePercent: analyse,
         }),
       });
-      const body = (await response.json()) as ClientsSnapshot;
-      if (!response.ok) throw new Error(body.error ?? "CLIENT_VAT_UPDATE_FAILED");
-      setSnapshot(body);
-      const saved = body.payload.clients.find((client) => client.id === selectedId);
+      const corps = (await reponse.json()) as ClientsSnapshot;
+      if (!reponse.ok) throw new Error(corps.error ?? "CLIENT_VAT_UPDATE_FAILED");
+      setSnapshot(corps);
+      const saved = corps.payload.clients.find((client) => client.id === selectedId);
       if (saved) setRate(rateInput(saved.defaultVatRatePercent));
       setNotice("TVA par défaut enregistrée pour cette fiche client.");
     } catch {
@@ -106,7 +106,7 @@ export function ClientVatDefaultsPanel() {
     }
   }
 
-  if (!snapshot && !error) return null;
+  if (!snapshot && !erreur) return null;
 
   return (
     <section className="panel clientVatPanel" aria-label="TVA par défaut des fiches clients">
@@ -126,7 +126,10 @@ export function ClientVatDefaultsPanel() {
         <div className="clientVatForm">
           <label>
             <span>Client</span>
-            <select value={selectedId} onChange={(event) => selectClient(event.target.value)}>
+            <select
+              value={selectedId}
+              onChange={(evenement) => selectClient(evenement.target.value)}
+            >
               {clients.map((client) => (
                 <option key={client.id} value={client.id}>
                   {clientDisplayName(client)}
@@ -138,7 +141,7 @@ export function ClientVatDefaultsPanel() {
             <span>Taux de TVA par défaut (%)</span>
             <input
               value={rate}
-              onChange={(event) => setRate(event.target.value)}
+              onChange={(evenement) => setRate(evenement.target.value)}
               inputMode="decimal"
               disabled={!snapshot?.canWrite || busy}
               aria-label="Taux de TVA par défaut"
@@ -159,7 +162,7 @@ export function ClientVatDefaultsPanel() {
         <p className="muted">Aucun client actif.</p>
       )}
 
-      {error ? <p className="clientVatError">{error}</p> : null}
+      {erreur ? <p className="clientVatError">{erreur}</p> : null}
       {notice ? <p className="clientVatSuccess">{notice}</p> : null}
 
       <style jsx>{`

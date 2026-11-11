@@ -28,7 +28,7 @@ describe("Affaire to Devis web flow", () => {
   });
 
   it("preserves the displayed Affaire revision and exposes Create quote", () => {
-    expect(commercialV2).toContain("expectedUpdatedAt: selected.updatedAt");
+    expect(commercialV2).toContain("expectedUpdatedAt: selectionne.updatedAt");
     expect(commercialV2).toContain('form.set("expectedUpdatedAt", expectedUpdatedAt)');
     expect(commercialV2).toContain("/devis/nouveau?affaire=");
     expect(commercialV2).toContain("Créer un devis");

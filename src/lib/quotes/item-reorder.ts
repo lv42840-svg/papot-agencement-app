@@ -2,42 +2,44 @@ import type { QuoteItem, QuoteLine, QuoteSection, QuoteSubsection } from "./mode
 
 export type QuoteItemPlacement = "BEFORE" | "AFTER" | "INSIDE";
 
-function sectionBlockEnd(items: QuoteItem[], startIndex: number): number {
-  for (let index = startIndex + 1; index < items.length; index += 1) {
-    if (items[index].kind === "SECTION") return index;
+function sectionBlockEnd(elements: QuoteItem[], startIndex: number): number {
+  for (let indice = startIndex + 1; indice < elements.length; indice += 1) {
+    if (elements[indice].kind === "SECTION") return indice;
   }
-  return items.length;
+  return elements.length;
 }
 
-function subsectionBlockEnd(items: QuoteItem[], startIndex: number): number {
-  const subsection = items[startIndex];
+function subsectionBlockEnd(elements: QuoteItem[], startIndex: number): number {
+  const subsection = elements[startIndex];
   if (!subsection || subsection.kind !== "SUBSECTION") return startIndex + 1;
 
-  let index = startIndex + 1;
-  while (index < items.length) {
-    const candidate = items[index];
+  let indice = startIndex + 1;
+  while (indice < elements.length) {
+    const candidat = elements[indice];
     if (
-      (candidate.kind === "LINE" || candidate.kind === "COMMENT") &&
-      candidate.parentId === subsection.id
+      (candidat.kind === "LINE" || candidat.kind === "COMMENT") &&
+      candidat.parentId === subsection.id
     ) {
-      index += 1;
+      indice += 1;
       continue;
     }
     break;
   }
-  return index;
+  return indice;
 }
 
-function sourceBlockEnd(items: QuoteItem[], startIndex: number): number {
-  const item = items[startIndex];
-  if (!item) return startIndex + 1;
-  if (item.kind === "SECTION") return sectionBlockEnd(items, startIndex);
-  if (item.kind === "SUBSECTION") return subsectionBlockEnd(items, startIndex);
+function sourceBlockEnd(elements: QuoteItem[], startIndex: number): number {
+  const element = elements[startIndex];
+  if (!element) return startIndex + 1;
+  if (element.kind === "SECTION") return sectionBlockEnd(elements, startIndex);
+  if (element.kind === "SUBSECTION") return subsectionBlockEnd(elements, startIndex);
   return startIndex + 1;
 }
 
-function isDraggableItem(item: QuoteItem): item is QuoteLine | QuoteSection | QuoteSubsection {
-  return item.kind === "LINE" || item.kind === "SECTION" || item.kind === "SUBSECTION";
+function isDraggableItem(
+  element: QuoteItem,
+): element is QuoteLine | QuoteSection | QuoteSubsection {
+  return element.kind === "LINE" || element.kind === "SECTION" || element.kind === "SUBSECTION";
 }
 
 function reparentSourceBlock(
@@ -47,37 +49,37 @@ function reparentSourceBlock(
 ): QuoteItem[] {
   if (parentId === undefined || source.kind === "SECTION") return block;
 
-  return block.map((item, index) => {
-    if (index !== 0) return item;
-    if (item.kind === "SUBSECTION") {
+  return block.map((element, indice) => {
+    if (indice !== 0) return element;
+    if (element.kind === "SUBSECTION") {
       if (parentId === null) throw new Error("QUOTE_ITEM_REORDER_BLOCKED");
-      return { ...item, parentId };
+      return { ...element, parentId };
     }
-    if (item.kind === "LINE") return { ...item, parentId };
-    return item;
+    if (element.kind === "LINE") return { ...element, parentId };
+    return element;
   });
 }
 
-function findTargetIndex(items: QuoteItem[], targetId: string): number {
-  const targetIndex = items.findIndex((item) => item.id === targetId);
+function findTargetIndex(elements: QuoteItem[], targetId: string): number {
+  const targetIndex = elements.findIndex((element) => element.id === targetId);
   if (targetIndex < 0) throw new Error("QUOTE_ITEM_NOT_FOUND");
   return targetIndex;
 }
 
 export function reorderQuoteItems(
   sourceItems: QuoteItem[],
-  itemId: string,
+  idElement: string,
   targetId: string,
   placement: QuoteItemPlacement,
 ): QuoteItem[] {
-  if (itemId === targetId) throw new Error("QUOTE_ITEM_REORDER_BLOCKED");
+  if (idElement === targetId) throw new Error("QUOTE_ITEM_REORDER_BLOCKED");
 
-  const sourceIndex = sourceItems.findIndex((item) => item.id === itemId);
-  const targetIndex = sourceItems.findIndex((item) => item.id === targetId);
+  const sourceIndex = sourceItems.findIndex((element) => element.id === idElement);
+  const targetIndex = sourceItems.findIndex((element) => element.id === targetId);
   if (sourceIndex < 0 || targetIndex < 0) throw new Error("QUOTE_ITEM_NOT_FOUND");
 
   const source = sourceItems[sourceIndex];
-  const target = sourceItems[targetIndex];
+  const cible = sourceItems[targetIndex];
   if (!isDraggableItem(source)) throw new Error("QUOTE_ITEM_REORDER_BLOCKED");
 
   const sourceEnd = sourceBlockEnd(sourceItems, sourceIndex);
@@ -88,26 +90,26 @@ export function reorderQuoteItems(
   let nextParentId: string | null | undefined;
 
   if (source.kind === "SECTION") {
-    if (target.kind !== "SECTION" || placement === "INSIDE") {
+    if (cible.kind !== "SECTION" || placement === "INSIDE") {
       throw new Error("QUOTE_ITEM_REORDER_BLOCKED");
     }
   } else if (source.kind === "SUBSECTION") {
-    if (target.kind === "SECTION") {
+    if (cible.kind === "SECTION") {
       if (placement !== "INSIDE") throw new Error("QUOTE_ITEM_REORDER_BLOCKED");
-      nextParentId = target.id;
-    } else if (target.kind === "SUBSECTION") {
+      nextParentId = cible.id;
+    } else if (cible.kind === "SUBSECTION") {
       if (placement === "INSIDE") throw new Error("QUOTE_ITEM_REORDER_BLOCKED");
-      nextParentId = target.parentId;
+      nextParentId = cible.parentId;
     } else {
       throw new Error("QUOTE_ITEM_REORDER_BLOCKED");
     }
   } else {
-    if (target.kind === "SECTION" || target.kind === "SUBSECTION") {
+    if (cible.kind === "SECTION" || cible.kind === "SUBSECTION") {
       if (placement !== "INSIDE") throw new Error("QUOTE_ITEM_REORDER_BLOCKED");
-      nextParentId = target.id;
-    } else if (target.kind === "LINE") {
+      nextParentId = cible.id;
+    } else if (cible.kind === "LINE") {
       if (placement === "INSIDE") throw new Error("QUOTE_ITEM_REORDER_BLOCKED");
-      nextParentId = target.parentId;
+      nextParentId = cible.parentId;
     } else {
       throw new Error("QUOTE_ITEM_REORDER_BLOCKED");
     }

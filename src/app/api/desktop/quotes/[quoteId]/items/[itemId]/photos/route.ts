@@ -31,50 +31,52 @@ function statusFor(code: string): number {
   return 400;
 }
 
-export async function POST(request: Request, context: RouteContext) {
+export async function POST(requete: Request, contexte: RouteContext) {
   let uploaded: Awaited<ReturnType<typeof uploadQuoteItemPhotos>> = [];
   let store: ReturnType<typeof getServerFileStore> | undefined;
   try {
-    const { quoteId, itemId } = await context.params;
+    const { quoteId: idDevis, itemId: idElement } = await contexte.params;
     const requestContext = await requireModuleRequestContext("quotes", "WRITE");
     const repository = createQuotesRepository();
-    const expectedRevision = expectedQuoteRevision(request);
-    const current = await repository.load();
-    const quote = assertQuoteRevision(current, quoteId, expectedRevision);
+    const expectedRevision = expectedQuoteRevision(requete);
+    const courant = await repository.load();
+    const quote = assertQuoteRevision(courant, idDevis, expectedRevision);
     if (!quote) throw new Error("QUOTE_NOT_FOUND");
     if (quote.status !== "DRAFT") throw new Error("QUOTE_NOT_EDITABLE");
-    const item = quote.model.items.find((candidate) => candidate.id === itemId);
-    if (!item) throw new Error("QUOTE_ITEM_NOT_FOUND");
+    const element = quote.model.items.find((candidat) => candidat.id === idElement);
+    if (!element) throw new Error("QUOTE_ITEM_NOT_FOUND");
 
-    const form = await request.formData();
-    const files = form.getAll("files").filter((value): value is File => value instanceof File);
-    if ((item.presentation?.photos.length ?? 0) + files.length > 20) {
+    const form = await requete.formData();
+    const fichiers = form
+      .getAll("files")
+      .filter((valeur): valeur is File => valeur instanceof File);
+    if ((element.presentation?.photos.length ?? 0) + fichiers.length > 20) {
       throw new Error("QUOTE_ITEM_PHOTO_LIMIT");
     }
 
     store = getServerFileStore();
     await store.assertReady();
     uploaded = await uploadQuoteItemPhotos(store, {
-      quoteId,
-      itemId,
-      files,
+      quoteId: idDevis,
+      itemId: idElement,
+      files: fichiers,
       uploadedByName: requestContext.user.displayName,
     });
-    const actor = {
+    const auteur = {
       userId: requestContext.user.id,
       displayName: requestContext.user.displayName,
     };
-    const mutation = await repository.mutate((payload) => {
-      assertQuoteRevision(payload, quoteId, expectedRevision);
-      return registerQuoteItemPhotos(payload, quoteId, itemId, uploaded, actor);
+    const mutation = await repository.mutate((contenu) => {
+      assertQuoteRevision(contenu, idDevis, expectedRevision);
+      return registerQuoteItemPhotos(contenu, idDevis, idElement, uploaded, auteur);
     });
     return NextResponse.json(
       { payload: mutation.payload },
       { headers: { "Cache-Control": "no-store" } },
     );
-  } catch (error) {
+  } catch (erreur) {
     if (store && uploaded.length > 0) await cleanupQuoteItemPhotos(store, uploaded);
-    const code = error instanceof Error ? error.message : "QUOTE_ITEM_PHOTO_UPLOAD_FAILED";
+    const code = erreur instanceof Error ? erreur.message : "QUOTE_ITEM_PHOTO_UPLOAD_FAILED";
     return NextResponse.json(
       { error: code },
       { status: statusFor(code), headers: { "Cache-Control": "no-store" } },

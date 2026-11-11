@@ -122,39 +122,39 @@ const errorMessages: Record<string, string> = {
     "L'affaire doit être confirmée avant d'ajouter un devis complémentaire.",
 };
 
-function formatDateOnly(value: string): string {
-  const [year, month, day] = value.split("-").map(Number);
+function formatDateOnly(valeur: string): string {
+  const [annee, mois, jour] = valeur.split("-").map(Number);
   return new Intl.DateTimeFormat("fr-FR", {
     day: "numeric",
     month: "short",
     year: "numeric",
-  }).format(new Date(year, month - 1, day, 12));
+  }).format(new Date(annee, mois - 1, jour, 12));
 }
 
-function formatDateTime(value: string): string {
+function formatDateTime(valeur: string): string {
   return new Intl.DateTimeFormat("fr-FR", { dateStyle: "short", timeStyle: "short" }).format(
-    new Date(value),
+    new Date(valeur),
   );
 }
 
-function formatBytes(value: number): string {
-  if (value < 1024) return `${value} o`;
-  if (value < 1024 * 1024) return `${Math.round(value / 1024)} Ko`;
-  return `${(value / (1024 * 1024)).toFixed(value >= 10 * 1024 * 1024 ? 0 : 1)} Mo`;
+function formatBytes(valeur: number): string {
+  if (valeur < 1024) return `${valeur} o`;
+  if (valeur < 1024 * 1024) return `${Math.round(valeur / 1024)} Ko`;
+  return `${(valeur / (1024 * 1024)).toFixed(valeur >= 10 * 1024 * 1024 ? 0 : 1)} Mo`;
 }
 
 function documentHref(
-  item: CommercialCase,
+  element: CommercialCase,
   document: CommercialDocument,
   download = false,
 ): string {
-  return `/api/desktop/commercial/${item.id}/documents/${document.id}${download ? "?download=1" : ""}`;
+  return `/api/desktop/commercial/${element.id}/documents/${document.id}${download ? "?download=1" : ""}`;
 }
 
-function statusTone(item: ChantierRecord): string {
-  if (item.status === "DONE") return "done";
-  if (item.status === "CANCELLED") return "cancelled";
-  if (item.status === "ARCHIVED") return "archived";
+function statusTone(element: ChantierRecord): string {
+  if (element.status === "DONE") return "done";
+  if (element.status === "CANCELLED") return "cancelled";
+  if (element.status === "ARCHIVED") return "archived";
   return "active";
 }
 
@@ -163,9 +163,9 @@ export function ChantierWorkspace({ chantierId }: { chantierId: string }) {
   const [commercialSnapshot, setCommercialSnapshot] = useState<CommercialSnapshot | null>(null);
   const [clientsSnapshot, setClientsSnapshot] = useState<ClientsSnapshot | null>(null);
   const [quotesSnapshot, setQuotesSnapshot] = useState<QuotesSnapshot | null>(null);
-  const [loading, setLoading] = useState(true);
+  const [chargement, setLoading] = useState(true);
   const [busy, setBusy] = useState(false);
-  const [error, setError] = useState<string | null>(null);
+  const [erreur, setError] = useState<string | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
   const [activeTab, setActiveTab] = useState<ChantierTab>("client");
 
@@ -209,13 +209,13 @@ export function ChantierWorkspace({ chantierId }: { chantierId: string }) {
   }, [load]);
 
   const chantier = useMemo(
-    () => chantiersSnapshot?.payload.chantiers.find((item) => item.id === chantierId) ?? null,
+    () => chantiersSnapshot?.payload.chantiers.find((element) => element.id === chantierId) ?? null,
     [chantiersSnapshot, chantierId],
   );
   const commercialCase = useMemo(
     () =>
       commercialSnapshot?.payload.cases.find(
-        (item) => item.id === chantier?.sourceCommercialCaseId,
+        (element) => element.id === chantier?.sourceCommercialCaseId,
       ) ?? null,
     [commercialSnapshot, chantier?.sourceCommercialCaseId],
   );
@@ -226,19 +226,19 @@ export function ChantierWorkspace({ chantierId }: { chantierId: string }) {
     [clientsSnapshot, commercialCase?.clientId],
   );
 
-  const mutateCommercial = useCallback(async (body: MutationBody, successMessage: string) => {
+  const mutateCommercial = useCallback(async (corps: MutationBody, successMessage: string) => {
     setBusy(true);
     setError(null);
     setNotice(null);
     try {
-      const response = await fetch("/api/desktop/commercial", {
+      const reponse = await fetch("/api/desktop/commercial", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(body),
+        body: JSON.stringify(corps),
       });
-      const result = (await response.json()) as CommercialSnapshot & { error?: string };
-      if (!response.ok) throw new Error(result.error ?? "COMMERCIAL_MUTATION_FAILED");
-      setCommercialSnapshot(result);
+      const resultat = (await reponse.json()) as CommercialSnapshot & { error?: string };
+      if (!reponse.ok) throw new Error(resultat.error ?? "COMMERCIAL_MUTATION_FAILED");
+      setCommercialSnapshot(resultat);
       setNotice(successMessage);
       return true;
     } catch (mutationError) {
@@ -252,26 +252,26 @@ export function ChantierWorkspace({ chantierId }: { chantierId: string }) {
   }, []);
 
   const mutate = useCallback(
-    async (body: MutationBody, successMessage: string) => {
+    async (corps: MutationBody, successMessage: string) => {
       setBusy(true);
       setError(null);
       setNotice(null);
       try {
-        const current = chantiersSnapshot?.payload.chantiers.find(
-          (item) => item.id === body.chantierId,
+        const courant = chantiersSnapshot?.payload.chantiers.find(
+          (element) => element.id === corps.chantierId,
         );
-        if (!current) throw new Error("CHANTIER_NOT_FOUND");
-        const response = await fetch("/api/desktop/chantiers", {
+        if (!courant) throw new Error("CHANTIER_NOT_FOUND");
+        const reponse = await fetch("/api/desktop/chantiers", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({
-            ...body,
-            expectedUpdatedAt: body.expectedUpdatedAt ?? current.updatedAt,
+            ...corps,
+            expectedUpdatedAt: corps.expectedUpdatedAt ?? courant.updatedAt,
           }),
         });
-        const result = (await response.json()) as ChantiersSnapshot & { error?: string };
-        if (!response.ok) throw new Error(result.error ?? "CHANTIERS_MUTATION_FAILED");
-        setChantiersSnapshot(result);
+        const resultat = (await reponse.json()) as ChantiersSnapshot & { error?: string };
+        if (!reponse.ok) throw new Error(resultat.error ?? "CHANTIERS_MUTATION_FAILED");
+        setChantiersSnapshot(resultat);
         setNotice(successMessage);
         return true;
       } catch (mutationError) {
@@ -286,7 +286,7 @@ export function ChantierWorkspace({ chantierId }: { chantierId: string }) {
     [chantiersSnapshot],
   );
 
-  if (loading && !chantiersSnapshot) {
+  if (chargement && !chantiersSnapshot) {
     return (
       <div className="chantierLoading">
         <RefreshCw className="chantierSpin" size={20} /> Chargement du chantier…
@@ -369,18 +369,18 @@ export function ChantierWorkspace({ chantierId }: { chantierId: string }) {
         </div>
       </section>
 
-      {error ? <div className="chantierMessage chantierError">{error}</div> : null}
+      {erreur ? <div className="chantierMessage chantierError">{erreur}</div> : null}
       {notice ? <div className="chantierMessage chantierSuccess">{notice}</div> : null}
 
       <nav className="chantierTabs" aria-label="Rubriques du chantier">
-        {tabs.map(({ id, label, icon: Icon, badge }) => (
+        {tabs.map(({ id, label: libelle, icon: Icon, badge }) => (
           <button
             key={id}
             type="button"
             className={activeTab === id ? "isActive" : undefined}
             onClick={() => setActiveTab(id)}
           >
-            <Icon size={16} /> <span>{label}</span>
+            <Icon size={16} /> <span>{libelle}</span>
             {badge !== undefined ? <small>{badge}</small> : null}
           </button>
         ))}
@@ -479,7 +479,7 @@ function ClientTab({
   commercialCase: CommercialCase | null;
   busy: boolean;
   canModify: boolean;
-  mutate: (body: MutationBody, message: string) => Promise<boolean>;
+  mutate: (corps: MutationBody, message: string) => Promise<boolean>;
 }) {
   const primaryContact =
     clientRecord?.contacts.find((contact) => contact.id === commercialCase?.primaryContactId) ??
@@ -500,7 +500,7 @@ function ClientTab({
 
   const [editing, setEditing] = useState(false);
   const [reference, setReference] = useState(chantier.reference ?? commercialCase?.name ?? "");
-  const [name, setName] = useState(chantier.name);
+  const [nom, setName] = useState(chantier.name);
   const [clientName, setClientName] = useState(sourceClientName);
   const [companyName, setCompanyName] = useState(sourceCompanyName);
   const [siteLabel, setSiteLabel] = useState(chantier.siteLabel ?? commercialCase?.siteLabel ?? "");
@@ -534,7 +534,7 @@ function ClientTab({
         chantierId: chantier.id,
         number: chantier.number ?? "",
         reference,
-        name,
+        name: nom,
         clientName,
         companyName,
         siteLabel,
@@ -572,7 +572,7 @@ function ClientTab({
               <button
                 type="button"
                 className="primaryButton"
-                disabled={busy || !name.trim()}
+                disabled={busy || !nom.trim()}
                 onClick={() => void save()}
               >
                 <Save size={14} /> Enregistrer
@@ -598,34 +598,49 @@ function ClientTab({
               <input value={chantier.number ?? ""} disabled />
             </Field>
             <Field label="Référence chantier">
-              <input value={reference} onChange={(event) => setReference(event.target.value)} />
+              <input
+                value={reference}
+                onChange={(evenement) => setReference(evenement.target.value)}
+              />
             </Field>
             <Field label="Nom du chantier">
-              <input value={name} onChange={(event) => setName(event.target.value)} />
+              <input value={nom} onChange={(evenement) => setName(evenement.target.value)} />
             </Field>
             <Field label="Client">
-              <input value={clientName} onChange={(event) => setClientName(event.target.value)} />
+              <input
+                value={clientName}
+                onChange={(evenement) => setClientName(evenement.target.value)}
+              />
             </Field>
             <Field label="Société">
-              <input value={companyName} onChange={(event) => setCompanyName(event.target.value)} />
+              <input
+                value={companyName}
+                onChange={(evenement) => setCompanyName(evenement.target.value)}
+              />
             </Field>
             <Field label="Lieu chantier">
-              <input value={siteLabel} onChange={(event) => setSiteLabel(event.target.value)} />
+              <input
+                value={siteLabel}
+                onChange={(evenement) => setSiteLabel(evenement.target.value)}
+              />
             </Field>
             <Field label="Contact">
-              <input value={contactName} onChange={(event) => setContactName(event.target.value)} />
+              <input
+                value={contactName}
+                onChange={(evenement) => setContactName(evenement.target.value)}
+              />
             </Field>
             <Field label="Téléphone">
               <input
                 value={contactPhone}
-                onChange={(event) => setContactPhone(event.target.value)}
+                onChange={(evenement) => setContactPhone(evenement.target.value)}
               />
             </Field>
             <Field label="E-mail">
               <input
                 type="email"
                 value={contactEmail}
-                onChange={(event) => setContactEmail(event.target.value)}
+                onChange={(evenement) => setContactEmail(evenement.target.value)}
               />
             </Field>
             <Field label="Pose prévisionnelle">
@@ -636,14 +651,14 @@ function ClientTab({
             <textarea
               rows={3}
               value={description}
-              onChange={(event) => setDescription(event.target.value)}
+              onChange={(evenement) => setDescription(evenement.target.value)}
             />
           </Field>
           <Field label="J'en fais quoi ?">
             <textarea
               rows={2}
               value={nextAction}
-              onChange={(event) => setNextAction(event.target.value)}
+              onChange={(evenement) => setNextAction(evenement.target.value)}
             />
           </Field>
         </>
@@ -690,18 +705,18 @@ function ClientTab({
 }
 
 function InfoCell({
-  label,
-  value,
+  label: libelle,
+  value: valeur,
   strong = false,
 }: {
   label: string;
   value: string | null | undefined;
   strong?: boolean;
 }) {
-  const display = value?.trim() || "Non renseigné";
+  const display = valeur?.trim() || "Non renseigné";
   return (
     <div className={`chantierInfoCell${strong ? " isStrong" : ""}`}>
-      <span>{label}</span>
+      <span>{libelle}</span>
       <strong>{display}</strong>
     </div>
   );
@@ -722,7 +737,7 @@ function LifecycleTab({
   closeWarning: ChantierPlanningCloseWarning | null;
   purchaseWarning: PurchaseCloseWarning | null;
   canRemovePurchases: boolean;
-  mutate: (body: MutationBody, message: string) => Promise<boolean>;
+  mutate: (corps: MutationBody, message: string) => Promise<boolean>;
 }) {
   const [closingAction, setClosingAction] = useState<"close" | "cancel" | null>(null);
   const [cancelReason, setCancelReason] = useState("");
@@ -742,7 +757,7 @@ function LifecycleTab({
         closeWarning.remainingToAllocateHours > 0
           ? `${closeWarning.remainingToAllocateHours} h encore à répartir`
           : null,
-      ].filter((value): value is string => Boolean(value))
+      ].filter((valeur): valeur is string => Boolean(valeur))
     : [];
 
   return (
@@ -817,7 +832,7 @@ function LifecycleTab({
                     <span>Motif de clôture</span>
                     <input
                       value={closeReason}
-                      onChange={(event) => setCloseReason(event.target.value)}
+                      onChange={(evenement) => setCloseReason(evenement.target.value)}
                       maxLength={1000}
                       disabled={busy}
                       placeholder="Motif obligatoire de fermeture"
@@ -843,10 +858,10 @@ function LifecycleTab({
                         opérationnel. Vérifie ces engagements avant de clôturer.
                       </p>
                       <ul>
-                        {purchaseWarning.orders.map((order) => (
-                          <li key={order.orderId}>
-                            {order.reference} · {order.supplierName} ·{" "}
-                            {(order.amountHtCents / 100).toLocaleString("fr-FR", {
+                        {purchaseWarning.orders.map((commande) => (
+                          <li key={commande.orderId}>
+                            {commande.reference} · {commande.supplierName} ·{" "}
+                            {(commande.amountHtCents / 100).toLocaleString("fr-FR", {
                               style: "currency",
                               currency: "EUR",
                             })}{" "}
@@ -884,7 +899,7 @@ function LifecycleTab({
                             type="checkbox"
                             checked={removeConfirmed}
                             disabled={busy}
-                            onChange={(event) => setRemoveConfirmed(event.target.checked)}
+                            onChange={(evenement) => setRemoveConfirmed(evenement.target.checked)}
                           />
                           Je confirme le retrait des engagements sur ce chantier, sans toucher aux
                           éventuelles affectations des autres chantiers.
@@ -938,7 +953,7 @@ function LifecycleTab({
                     <span>Motif d’annulation</span>
                     <input
                       value={cancelReason}
-                      onChange={(event) => setCancelReason(event.target.value)}
+                      onChange={(evenement) => setCancelReason(evenement.target.value)}
                       maxLength={1000}
                       disabled={busy}
                       placeholder="Ex. abandon du client, chantier de test, lancement par erreur…"
@@ -949,7 +964,7 @@ function LifecycleTab({
                       type="checkbox"
                       checked={cancelConfirmed}
                       disabled={busy}
-                      onChange={(event) => setCancelConfirmed(event.target.checked)}
+                      onChange={(evenement) => setCancelConfirmed(evenement.target.checked)}
                     />
                     Je confirme l’annulation de ce chantier et son retrait du planning actif.
                   </label>
@@ -994,7 +1009,10 @@ function LifecycleTab({
         <div className="chantierLifecycleWarning" role="status">
           <strong>Chantier annulé</strong>
           <span>
-            {[...chantier.history].reverse().find((event) => event.type === "CANCELLED")?.summary}
+            {
+              [...chantier.history].reverse().find((evenement) => evenement.type === "CANCELLED")
+                ?.summary
+            }
           </span>
           <span>
             Le dossier reste consultable. Une réouverture remettra le chantier en Actif, avec des
@@ -1010,7 +1028,7 @@ function LifecycleTab({
               <strong>Reprendre les travaux</strong>
               <input
                 value={reactivateReason}
-                onChange={(event) => setReactivateReason(event.target.value)}
+                onChange={(evenement) => setReactivateReason(evenement.target.value)}
                 placeholder="Motif obligatoire de réouverture"
               />
               <button
@@ -1039,7 +1057,7 @@ function LifecycleTab({
                 <input
                   type="checkbox"
                   checked={archiveReviewed}
-                  onChange={(event) => setArchiveReviewed(event.target.checked)}
+                  onChange={(evenement) => setArchiveReviewed(evenement.target.checked)}
                 />{" "}
                 J&apos;ai vérifié les éléments encore ouverts
               </label>
@@ -1070,7 +1088,7 @@ function LifecycleTab({
           </p>
           <input
             value={unarchiveReason}
-            onChange={(event) => setUnarchiveReason(event.target.value)}
+            onChange={(evenement) => setUnarchiveReason(evenement.target.value)}
             placeholder="Motif obligatoire"
           />
           <button
@@ -1106,8 +1124,8 @@ function FollowTab({
   quotes: NativeQuotesPayload;
   busy: boolean;
   capabilities: ChantierCapabilities;
-  mutate: (body: MutationBody, message: string) => Promise<boolean>;
-  mutateCommercial: (body: MutationBody, message: string) => Promise<boolean>;
+  mutate: (corps: MutationBody, message: string) => Promise<boolean>;
+  mutateCommercial: (corps: MutationBody, message: string) => Promise<boolean>;
 }) {
   return (
     <ChantierOperationalWorkspace
@@ -1187,12 +1205,18 @@ function DocumentsTab({
   );
 }
 
-function DocumentRow({ item, document }: { item: CommercialCase; document: CommercialDocument }) {
-  const [preview, setPreview] = useState(false);
+function DocumentRow({
+  item: element,
+  document,
+}: {
+  item: CommercialCase;
+  document: CommercialDocument;
+}) {
+  const [apercu, setPreview] = useState(false);
   const image = document.contentType.startsWith("image/");
   const pdf = document.contentType === "application/pdf";
   const Icon = image ? ImageIcon : FileText;
-  const url = documentHref(item, document);
+  const url = documentHref(element, document);
   return (
     <div className="chantierDocumentRow">
       <span className="chantierDocumentIcon">
@@ -1210,16 +1234,16 @@ function DocumentRow({ item, document }: { item: CommercialCase; document: Comme
           <button
             type="button"
             className="secondaryButton"
-            onClick={() => setPreview((value) => !value)}
+            onClick={() => setPreview((valeur) => !valeur)}
           >
-            <Eye size={14} /> {preview ? "Fermer" : "Aperçu"}
+            <Eye size={14} /> {apercu ? "Fermer" : "Aperçu"}
           </button>
         ) : null}
-        <a className="secondaryButton" href={documentHref(item, document, true)}>
+        <a className="secondaryButton" href={documentHref(element, document, true)}>
           <Download size={14} /> Télécharger
         </a>
       </div>
-      {preview ? (
+      {apercu ? (
         <div className="chantierDocumentPreview">
           {image ? (
             <img src={url} alt={document.fileName} />
@@ -1241,7 +1265,7 @@ function CapacityTab({
   chantier: ChantierRecord;
   busy: boolean;
   canModify: boolean;
-  mutate: (body: MutationBody, message: string) => Promise<boolean>;
+  mutate: (corps: MutationBody, message: string) => Promise<boolean>;
 }) {
   const [be, setBe] = useState(String(chantier.plannedHours.be));
   const [workshop, setWorkshop] = useState(String(chantier.plannedHours.workshop));
@@ -1289,7 +1313,7 @@ function CapacityTab({
                 min="0"
                 step="0.5"
                 value={be}
-                onChange={(event) => setBe(event.target.value)}
+                onChange={(evenement) => setBe(evenement.target.value)}
               />
             </Field>
             <Field label="Atelier prévisionnel (h)">
@@ -1298,7 +1322,7 @@ function CapacityTab({
                 min="0"
                 step="0.5"
                 value={workshop}
-                onChange={(event) => setWorkshop(event.target.value)}
+                onChange={(evenement) => setWorkshop(evenement.target.value)}
               />
             </Field>
             <Field label="Pose prévisionnelle (h)">
@@ -1307,14 +1331,14 @@ function CapacityTab({
                 min="0"
                 step="0.5"
                 value={install}
-                onChange={(event) => setInstall(event.target.value)}
+                onChange={(evenement) => setInstall(evenement.target.value)}
               />
             </Field>
           </div>
           <Field label="Motif obligatoire de modification">
             <input
               value={reason}
-              onChange={(event) => setReason(event.target.value)}
+              onChange={(evenement) => setReason(evenement.target.value)}
               placeholder="Ex. complément demandé, réévaluation atelier…"
             />
           </Field>
@@ -1345,9 +1369,9 @@ function CapacityTab({
 }
 
 function HourMetric({
-  label,
+  label: libelle,
   planned,
-  actual,
+  actual: reel,
   remaining,
 }: {
   label: string;
@@ -1357,11 +1381,11 @@ function HourMetric({
 }) {
   return (
     <div className={remaining < 0 ? "isNegative" : undefined}>
-      <strong>{label}</strong>
+      <strong>{libelle}</strong>
       <span>
         <b>{planned}</b> h prévues
       </span>
-      <span>{actual} h réelles</span>
+      <span>{reel} h réelles</span>
       <span>{remaining} h restantes</span>
     </div>
   );
@@ -1374,13 +1398,13 @@ function HistoryTab({ chantier }: { chantier: ChantierRecord }) {
         <History size={17} /> Historique
       </div>
       <div className="chantierHistory">
-        {[...chantier.history].reverse().map((event) => (
-          <div key={event.id} className="chantierHistoryRow">
+        {[...chantier.history].reverse().map((evenement) => (
+          <div key={evenement.id} className="chantierHistoryRow">
             <span />
             <div>
-              <strong>{event.summary}</strong>
+              <strong>{evenement.summary}</strong>
               <small>
-                {event.actorName} · {formatDateTime(event.at)}
+                {evenement.actorName} · {formatDateTime(evenement.at)}
               </small>
             </div>
           </div>
@@ -1390,10 +1414,10 @@ function HistoryTab({ chantier }: { chantier: ChantierRecord }) {
   );
 }
 
-function Field({ label, children }: { label: string; children: React.ReactNode }) {
+function Field({ label: libelle, children }: { label: string; children: React.ReactNode }) {
   return (
     <label className="chantierField">
-      <span>{label}</span>
+      <span>{libelle}</span>
       {children}
     </label>
   );

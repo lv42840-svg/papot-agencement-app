@@ -18,7 +18,7 @@ import type { NativeQuoteRecord, NativeQuotesPayload } from "@/lib/quotes/store"
 type Props = {
   quote: NativeQuoteRecord | null;
   canWrite: boolean;
-  onSaved: (payload: NativeQuotesPayload) => void;
+  onSaved: (contenu: NativeQuotesPayload) => void;
   headerActions?: ReactNode;
 };
 
@@ -43,57 +43,57 @@ type RichSaveResponse = {
   error?: string;
 };
 
-function itemText(item: QuoteItem): string | null {
-  if (item.kind === "SECTION" || item.kind === "SUBSECTION") return item.title;
-  if (item.kind === "LINE") return item.description;
+function itemText(element: QuoteItem): string | null {
+  if (element.kind === "SECTION" || element.kind === "SUBSECTION") return element.title;
+  if (element.kind === "LINE") return element.description;
   return null;
 }
 
-function trimmedRichText(value: QuoteRichText): QuoteRichText {
-  const plain = quoteRichTextToPlainText(value);
+function trimmedRichText(valeur: QuoteRichText): QuoteRichText {
+  const plain = quoteRichTextToPlainText(valeur);
   const trimmed = plain.trim();
   if (!trimmed) return { runs: [] };
 
-  const start = plain.indexOf(trimmed);
-  const end = start + trimmed.length;
+  const debut = plain.indexOf(trimmed);
+  const fin = debut + trimmed.length;
   const runs: QuoteRichText["runs"] = [];
   let cursor = 0;
 
-  for (const run of value.runs) {
+  for (const run of valeur.runs) {
     const runStart = cursor;
     const runEnd = cursor + run.text.length;
     cursor = runEnd;
-    if (runEnd <= start || runStart >= end) continue;
+    if (runEnd <= debut || runStart >= fin) continue;
 
-    const localStart = Math.max(0, start - runStart);
-    const localEnd = Math.min(run.text.length, end - runStart);
-    const text = run.text.slice(localStart, localEnd);
-    if (text) runs.push({ text, style: { ...run.style } });
+    const localStart = Math.max(0, debut - runStart);
+    const localEnd = Math.min(run.text.length, fin - runStart);
+    const texte = run.text.slice(localStart, localEnd);
+    if (texte) runs.push({ text: texte, style: { ...run.style } });
   }
 
   return normalizeQuoteRichText({ runs });
 }
 
-function plainTextForNativeInput(value: string): string {
-  return value.replace(/\r\n?|\n/g, " ");
+function plainTextForNativeInput(valeur: string): string {
+  return valeur.replace(/\r\n?|\n/g, " ");
 }
 
-function setNativeInputValue(input: HTMLInputElement, value: string) {
+function setNativeInputValue(saisie: HTMLInputElement, valeur: string) {
   const setter = Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, "value")?.set;
-  const nativeValue = plainTextForNativeInput(value);
-  if (setter) setter.call(input, nativeValue);
-  else input.value = nativeValue;
-  input.dispatchEvent(new Event("input", { bubbles: true }));
+  const nativeValue = plainTextForNativeInput(valeur);
+  if (setter) setter.call(saisie, nativeValue);
+  else saisie.value = nativeValue;
+  saisie.dispatchEvent(new Event("input", { bubbles: true }));
 }
 
-function editableKind(input: HTMLInputElement): RichEditableKind | null {
-  if (input.closest(".quoteOuvrageEditing")) return "LINE";
-  if (!input.closest(".quoteHeadingEditing")) return null;
-  return input.placeholder === "Sous-titre" ? "SUBSECTION" : "SECTION";
+function editableKind(saisie: HTMLInputElement): RichEditableKind | null {
+  if (saisie.closest(".quoteOuvrageEditing")) return "LINE";
+  if (!saisie.closest(".quoteHeadingEditing")) return null;
+  return saisie.placeholder === "Sous-titre" ? "SUBSECTION" : "SECTION";
 }
 
-function itemMatchesKind(item: QuoteItem, kind: RichEditableKind): boolean {
-  return item.kind === kind;
+function itemMatchesKind(element: QuoteItem, kind: RichEditableKind): boolean {
+  return element.kind === kind;
 }
 
 export function QuoteStructuredLinesRichEditor({ quote, canWrite, onSaved, headerActions }: Props) {
@@ -110,16 +110,16 @@ export function QuoteStructuredLinesRichEditor({ quote, canWrite, onSaved, heade
     const map = new Map<string, QuoteItem>();
     if (!quote) return map;
     const numbers = buildQuoteItemNumbers(quote.model.items);
-    for (const item of quote.model.items) {
-      const number = numbers.get(item.id);
-      if (number) map.set(number, item);
+    for (const element of quote.model.items) {
+      const number = numbers.get(element.id);
+      if (number) map.set(number, element);
     }
     return map;
   }, [quote]);
 
-  function updateSession(next: RichSession | null) {
-    sessionRef.current = next;
-    setSession(next);
+  function updateSession(suivant: RichSession | null) {
+    sessionRef.current = suivant;
+    setSession(suivant);
   }
 
   useEffect(() => {
@@ -140,8 +140,8 @@ export function QuoteStructuredLinesRichEditor({ quote, canWrite, onSaved, heade
       );
 
     const connect = () => {
-      const input = findEditingInput();
-      if (!input) {
+      const saisie = findEditingInput();
+      if (!saisie) {
         if (activeInputRef.current) {
           detachCurrentInput();
           updateSession(null);
@@ -149,33 +149,38 @@ export function QuoteStructuredLinesRichEditor({ quote, canWrite, onSaved, heade
         return;
       }
 
-      const kind = editableKind(input);
+      const kind = editableKind(saisie);
       if (!kind) return;
-      const row = input.closest<HTMLElement>(".quoteMainRow");
-      const number = row?.querySelector<HTMLElement>(".quoteNumber")?.textContent?.trim() ?? "+";
-      const item = number === "+" ? undefined : itemByNumber.get(number);
-      const itemId = item && itemMatchesKind(item, kind) ? item.id : undefined;
-      const key = `${kind}:${itemId ?? "new"}:${number}`;
+      const ligneTableau = saisie.closest<HTMLElement>(".quoteMainRow");
+      const number =
+        ligneTableau?.querySelector<HTMLElement>(".quoteNumber")?.textContent?.trim() ?? "+";
+      const element = number === "+" ? undefined : itemByNumber.get(number);
+      const idElement = element && itemMatchesKind(element, kind) ? element.id : undefined;
+      const cle = `${kind}:${idElement ?? "new"}:${number}`;
 
-      if (input !== activeInputRef.current) {
+      if (saisie !== activeInputRef.current) {
         detachCurrentInput();
-        const host = input.ownerDocument.createElement("div");
+        const host = saisie.ownerDocument.createElement("div");
         host.className = "quoteRichInlineHost";
-        input.insertAdjacentElement("beforebegin", host);
-        input.style.display = "none";
-        activeInputRef.current = input;
+        saisie.insertAdjacentElement("beforebegin", host);
+        saisie.style.display = "none";
+        activeInputRef.current = saisie;
         activeHostRef.current = host;
         setActiveHost(host);
       }
 
-      const current = sessionRef.current;
-      if (current?.key === key) return;
+      const courant = sessionRef.current;
+      if (courant?.key === cle) return;
 
-      const text = item ? (itemText(item) ?? input.value) : input.value;
-      const richText = item
-        ? resolveQuoteRichText(text, item.presentation?.richText, item.presentation?.textStyle)
-        : quoteRichTextFromPlainText(text);
-      updateSession({ key, kind, itemId, richText });
+      const texte = element ? (itemText(element) ?? saisie.value) : saisie.value;
+      const richText = element
+        ? resolveQuoteRichText(
+            texte,
+            element.presentation?.richText,
+            element.presentation?.textStyle,
+          )
+        : quoteRichTextFromPlainText(texte);
+      updateSession({ key: cle, kind, itemId: idElement, richText });
       setRichSaveError("");
     };
 
@@ -183,17 +188,17 @@ export function QuoteStructuredLinesRichEditor({ quote, canWrite, onSaved, heade
     const observer = new MutationObserver(connect);
     observer.observe(root, { childList: true, subtree: true });
 
-    const rememberPendingSave = (event: Event) => {
-      const form = event.target;
+    const rememberPendingSave = (evenement: Event) => {
+      const form = evenement.target;
       if (!(form instanceof HTMLFormElement)) return;
       if (!form.matches(".quoteHeadingEditing, .quoteOuvrageEditing")) return;
-      const current = sessionRef.current;
-      if (!current) return;
+      const courant = sessionRef.current;
+      if (!courant) return;
       pendingSaveRef.current = {
-        kind: current.kind,
-        itemId: current.itemId,
-        richText: trimmedRichText(current.richText),
-        beforeItemIds: new Set(quote.model.items.map((item) => item.id)),
+        kind: courant.kind,
+        itemId: courant.itemId,
+        richText: trimmedRichText(courant.richText),
+        beforeItemIds: new Set(quote.model.items.map((element) => element.id)),
       };
     };
     root.addEventListener("submit", rememberPendingSave, true);
@@ -215,38 +220,39 @@ export function QuoteStructuredLinesRichEditor({ quote, canWrite, onSaved, heade
     return () => window.cancelAnimationFrame(frame);
   }, [sessionKey]);
 
-  async function handleStructuredSaved(payload: NativeQuotesPayload) {
+  async function handleStructuredSaved(contenu: NativeQuotesPayload) {
     const pending = pendingSaveRef.current;
     pendingSaveRef.current = null;
     if (!pending || !quote) {
-      onSaved(payload);
+      onSaved(contenu);
       return;
     }
 
-    const updatedQuote = payload.quotes.find((candidate) => candidate.id === quote.id);
+    const updatedQuote = contenu.quotes.find((candidat) => candidat.id === quote.id);
     const plainText = quoteRichTextToPlainText(pending.richText);
     if (!updatedQuote || !plainText) {
-      onSaved(payload);
+      onSaved(contenu);
       return;
     }
 
-    const target = pending.itemId
+    const cible = pending.itemId
       ? updatedQuote.model.items.find(
-          (item) => item.id === pending.itemId && itemMatchesKind(item, pending.kind),
+          (element) => element.id === pending.itemId && itemMatchesKind(element, pending.kind),
         )
       : updatedQuote.model.items.find(
-          (item) => !pending.beforeItemIds.has(item.id) && itemMatchesKind(item, pending.kind),
+          (element) =>
+            !pending.beforeItemIds.has(element.id) && itemMatchesKind(element, pending.kind),
         );
 
-    if (!target) {
+    if (!cible) {
       setRichSaveError("Le texte est enregistré, mais sa mise en forme n’a pas pu être associée.");
-      onSaved(payload);
+      onSaved(contenu);
       return;
     }
 
     try {
-      const response = await fetch(
-        `/api/desktop/quotes/${updatedQuote.id}/items/${target.id}/rich-text`,
+      const reponse = await fetch(
+        `/api/desktop/quotes/${updatedQuote.id}/items/${cible.id}/rich-text`,
         {
           method: "POST",
           headers: {
@@ -256,27 +262,27 @@ export function QuoteStructuredLinesRichEditor({ quote, canWrite, onSaved, heade
           body: JSON.stringify({ text: plainText, richText: pending.richText }),
         },
       );
-      const data = (await response.json()) as RichSaveResponse;
-      if (!response.ok || !data.payload) {
-        throw new Error(data.error ?? "QUOTE_RICH_TEXT_SAVE_FAILED");
+      const donnees = (await reponse.json()) as RichSaveResponse;
+      if (!reponse.ok || !donnees.payload) {
+        throw new Error(donnees.error ?? "QUOTE_RICH_TEXT_SAVE_FAILED");
       }
       setRichSaveError("");
-      onSaved(data.payload);
+      onSaved(donnees.payload);
     } catch {
       setRichSaveError(
         "Le texte est enregistré, mais la mise en forme n’a pas pu être enregistrée.",
       );
-      onSaved(payload);
+      onSaved(contenu);
     }
   }
 
-  function changeRichText(next: QuoteRichText) {
-    const current = sessionRef.current;
-    const input = activeInputRef.current;
-    if (!current || !input) return;
-    const updated = { ...current, richText: next };
+  function changeRichText(suivant: QuoteRichText) {
+    const courant = sessionRef.current;
+    const saisie = activeInputRef.current;
+    if (!courant || !saisie) return;
+    const updated = { ...courant, richText: suivant };
     updateSession(updated);
-    setNativeInputValue(input, quoteRichTextToPlainText(next));
+    setNativeInputValue(saisie, quoteRichTextToPlainText(suivant));
   }
 
   return (
@@ -284,7 +290,7 @@ export function QuoteStructuredLinesRichEditor({ quote, canWrite, onSaved, heade
       <QuoteStructuredLinesEditor
         quote={quote}
         canWrite={canWrite}
-        onSaved={(payload) => void handleStructuredSaved(payload)}
+        onSaved={(contenu) => void handleStructuredSaved(contenu)}
         headerActions={headerActions}
       />
 

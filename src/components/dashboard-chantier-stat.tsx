@@ -15,12 +15,12 @@ export function DashboardChantierStat() {
   useEffect(() => {
     let active = true;
     void fetch("/api/desktop/chantiers", { cache: "no-store" })
-      .then(async (response) => {
-        if (!response.ok) return null;
-        return (await response.json()) as ChantiersDashboardSnapshot;
+      .then(async (reponse) => {
+        if (!reponse.ok) return null;
+        return (await reponse.json()) as ChantiersDashboardSnapshot;
       })
-      .then((result) => {
-        if (active && result) setSnapshot(result);
+      .then((resultat) => {
+        if (active && resultat) setSnapshot(resultat);
       })
       .catch(() => undefined);
     return () => {
@@ -29,7 +29,7 @@ export function DashboardChantierStat() {
   }, []);
 
   const activeCount = useMemo(
-    () => snapshot?.payload.chantiers.filter((item) => item.status === "ACTIVE").length ?? 0,
+    () => snapshot?.payload.chantiers.filter((element) => element.status === "ACTIVE").length ?? 0,
     [snapshot],
   );
 

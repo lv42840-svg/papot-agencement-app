@@ -19,8 +19,8 @@ export const dynamic = "force-dynamic";
 
 export async function GET() {
   try {
-    const context = await requireModuleRequestContext("pilotage", "READ");
-    await requireSpecialPermission(context.user, "dashboard.view_global");
+    const contexte = await requireModuleRequestContext("pilotage", "READ");
+    await requireSpecialPermission(contexte.user, "dashboard.view_global");
     await Promise.all([
       requireModuleRequestContext("commercial", "READ"),
       requireModuleRequestContext("quotes", "READ"),
@@ -31,10 +31,10 @@ export async function GET() {
       createQuotesRepository().load(),
     ]);
 
-    const now = new Date();
-    const sales = calculateDashboardSoldSummary(commercial.cases, quotes.quotes, now);
+    const maintenant = new Date();
+    const sales = calculateDashboardSoldSummary(commercial.cases, quotes.quotes, maintenant);
     // Do not expose salary-derived SAV / overhead costs to users without Paie access.
-    const canReadPayroll = await hasModuleAccess(context.user.id, "payroll", "READ");
+    const canReadPayroll = await hasModuleAccess(contexte.user.id, "payroll", "READ");
     if (!canReadPayroll) {
       return NextResponse.json(
         { ...sales, indirect: null },
@@ -52,14 +52,14 @@ export async function GET() {
       planning.indirectHours,
       payroll.records,
       planning.peopleCapacity,
-      now,
+      maintenant,
     );
     const monthly = calculateIndirectLaborCostsForPeriod(
       sales.month,
       planning.indirectHours,
       payroll.records,
       planning.peopleCapacity,
-      now,
+      maintenant,
     );
     return NextResponse.json(
       {
@@ -79,8 +79,8 @@ export async function GET() {
       },
       { headers: { "Cache-Control": "no-store" } },
     );
-  } catch (error) {
-    const code = error instanceof Error ? error.message : "DASHBOARD_SOLD_FAILED";
+  } catch (erreur) {
+    const code = erreur instanceof Error ? erreur.message : "DASHBOARD_SOLD_FAILED";
     return NextResponse.json(
       { error: code },
       { status: desktopRequestErrorStatus(code) ?? 400, headers: { "Cache-Control": "no-store" } },

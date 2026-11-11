@@ -35,9 +35,9 @@ describe("chantier profitability UI", () => {
     expect(panel).toContain("Achats et frais réels HT");
     expect(panel).toContain("Coût des heures réalisées");
     expect(panel).toContain("Coût total réel");
-    expect(panel).toContain("result.actualLaborCostCents");
-    expect(panel).toContain("result.actualPurchaseCostCents");
-    expect(panel).toContain("result.actualTotalCostCents");
+    expect(panel).toContain("resultat.actualLaborCostCents");
+    expect(panel).toContain("resultat.actualPurchaseCostCents");
+    expect(panel).toContain("resultat.actualTotalCostCents");
     expect(panel.indexOf("Prévisionnel depuis le devis")).toBeLessThan(
       panel.indexOf("Réalisé à ce jour"),
     );
@@ -47,9 +47,9 @@ describe("chantier profitability UI", () => {
     expect(panel).toContain("Achats engagés (BC) HT");
     expect(panel).toContain("Écart engagé - prévu HT");
     expect(panel).toContain("Consommation du budget à date");
-    expect(panel).toContain("result.knownCostCommitmentsCents");
-    expect(panel).toContain("result.remainingCostBudgetCents");
-    expect(panel).toContain("result.remainingLaborBudgetCents");
+    expect(panel).toContain("resultat.knownCostCommitmentsCents");
+    expect(panel).toContain("resultat.remainingCostBudgetCents");
+    expect(panel).toContain("resultat.remainingLaborBudgetCents");
     expect(panel).toContain("Dépassement du budget total de coûts");
     expect(panel).toContain("n&apos;est ni une marge à terminaison");
     expect(engine).toContain("knownCostCommitmentsCents");

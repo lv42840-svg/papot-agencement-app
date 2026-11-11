@@ -4,20 +4,22 @@ import { monthlySharesForWeek } from "./chantier-labor-cost";
 
 /** Holding hours reuse actual BE/atelier/pose, SAV and FG, never the planning forecast. */
 export function holdingRecordedHoursForMonth(
-  month: string,
-  personId: string,
+  mois: string,
+  idPersonne: string,
   planning: Pick<PlanningPayload, "actualHours" | "indirectHours">,
-  capacities: readonly PlanningPersonCapacity[],
+  capacites: readonly PlanningPersonCapacity[],
 ): number {
-  const schedule = capacities.find((row) => row.userId === personId)?.weeklySchedule;
-  const rows = [
-    ...planning.actualHours.filter((r) => r.userId === personId),
-    ...planning.indirectHours.filter((r) => r.userId === personId),
+  const horaire = capacites.find((ligne) => ligne.userId === idPersonne)?.weeklySchedule;
+  const lignes = [
+    ...planning.actualHours.filter((ligne) => ligne.userId === idPersonne),
+    ...planning.indirectHours.filter((ligne) => ligne.userId === idPersonne),
   ];
-  let hours = 0;
-  for (const entry of rows) {
-    const part = monthlySharesForWeek(entry.week, schedule).find((s) => s.month === month);
-    if (part) hours += entry.hours * part.fraction;
+  let heures = 0;
+  for (const entree of lignes) {
+    const part = monthlySharesForWeek(entree.week, horaire).find(
+      (repartition) => repartition.month === mois,
+    );
+    if (part) heures += entree.hours * part.fraction;
   }
-  return Math.round(hours * 100) / 100;
+  return Math.round(heures * 100) / 100;
 }

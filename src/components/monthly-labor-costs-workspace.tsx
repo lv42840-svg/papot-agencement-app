@@ -37,28 +37,28 @@ type Snapshot = {
 type Draft = { cost: string; hours: string; sourceType: "SALARY" | "HOLDING" };
 
 function previousMonth(): string {
-  const current = parisCurrentMonth();
-  const [year, month] = current.split("-").map(Number);
-  return month === 1 ? String(year - 1) + "-12" : year + "-" + String(month - 1).padStart(2, "0");
+  const courant = parisCurrentMonth();
+  const [annee, mois] = courant.split("-").map(Number);
+  return mois === 1 ? String(annee - 1) + "-12" : annee + "-" + String(mois - 1).padStart(2, "0");
 }
 
-function displayMoney(value: number): string {
-  return new Intl.NumberFormat("fr-FR", { style: "currency", currency: "EUR" }).format(value);
+function displayMoney(valeur: number): string {
+  return new Intl.NumberFormat("fr-FR", { style: "currency", currency: "EUR" }).format(valeur);
 }
-function decimal(text: string): number | null {
-  const normalized = text.trim().replace(",", ".");
+function decimal(texte: string): number | null {
+  const normalized = texte.trim().replace(",", ".");
   if (!/^\d+(?:\.\d{1,2})?$/.test(normalized)) return null;
   const number = Number(normalized);
   return Number.isFinite(number) ? number : null;
 }
 
 export function MonthlyLaborCostsWorkspace() {
-  const [month, setMonth] = useState(previousMonth);
+  const [mois, setMonth] = useState(previousMonth);
   const [snapshot, setSnapshot] = useState<Snapshot | null>(null);
-  const [drafts, setDrafts] = useState<Record<string, Draft>>({});
-  const [loading, setLoading] = useState(true);
-  const [saving, setSaving] = useState<string | null>(null);
-  const [error, setError] = useState("");
+  const [brouillons, setDrafts] = useState<Record<string, Draft>>({});
+  const [chargement, setLoading] = useState(true);
+  const [sauvegardeEnCours, setSaving] = useState<string | null>(null);
+  const [erreur, setError] = useState("");
   const [message, setMessage] = useState("");
   const [forbidden, setForbidden] = useState(false);
 
@@ -67,19 +67,19 @@ export function MonthlyLaborCostsWorkspace() {
     setError("");
     setMessage("");
     try {
-      const response = await fetch(
-        "/api/desktop/payroll/monthly-labor-costs?month=" + encodeURIComponent(month),
+      const reponse = await fetch(
+        "/api/desktop/payroll/monthly-labor-costs?month=" + encodeURIComponent(mois),
         { cache: "no-store" },
       );
-      if (response.status === 403) {
+      if (reponse.status === 403) {
         setForbidden(true);
         setSnapshot(null);
         return;
       }
-      const body = (await response.json()) as Snapshot & { error?: string };
-      if (!response.ok) throw new Error(body.error ?? "Chargement impossible.");
+      const corps = (await reponse.json()) as Snapshot & { error?: string };
+      if (!reponse.ok) throw new Error(corps.error ?? "Chargement impossible.");
       setForbidden(false);
-      setSnapshot(body);
+      setSnapshot(corps);
       setDrafts({});
     } catch (cause) {
       setSnapshot(null);
@@ -87,74 +87,78 @@ export function MonthlyLaborCostsWorkspace() {
     } finally {
       setLoading(false);
     }
-  }, [month]);
+  }, [mois]);
 
   useEffect(() => {
     void load();
   }, [load]);
 
   function rowDraft(personId: string): Draft {
-    const row = snapshot?.records.find((item) => item.personId === personId);
+    const ligneTableau = snapshot?.records.find((element) => element.personId === personId);
     return (
-      drafts[personId] ?? {
-        cost: row ? (row.employerCostCents / 100).toFixed(2).replace(".", ",") : "",
-        hours: row ? String(row.derivedHoldingHours ?? row.workedHours).replace(".", ",") : "",
-        sourceType: row?.sourceType ?? "SALARY",
+      brouillons[personId] ?? {
+        cost: ligneTableau
+          ? (ligneTableau.employerCostCents / 100).toFixed(2).replace(".", ",")
+          : "",
+        hours: ligneTableau
+          ? String(ligneTableau.derivedHoldingHours ?? ligneTableau.workedHours).replace(".", ",")
+          : "",
+        sourceType: ligneTableau?.sourceType ?? "SALARY",
       }
     );
   }
 
   async function save(personId: string) {
-    if (!snapshot?.editable || saving) return;
-    const draft = rowDraft(personId);
-    const cost = decimal(draft.cost);
-    const hours = decimal(draft.hours);
-    if (cost === null || hours === null || hours < 0 || hours > 744 || cost > 1_000_000) {
+    if (!snapshot?.editable || sauvegardeEnCours) return;
+    const brouillon = rowDraft(personId);
+    const cout = decimal(brouillon.cost);
+    const heures = decimal(brouillon.hours);
+    if (cout === null || heures === null || heures < 0 || heures > 744 || cout > 1_000_000) {
       setMessage("Renseigne un montant valide et des heures comprises entre 0 et 744.");
       return;
     }
     setSaving(personId);
     setMessage("");
     try {
-      const response = await fetch("/api/desktop/payroll/monthly-labor-costs", {
+      const reponse = await fetch("/api/desktop/payroll/monthly-labor-costs", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           action: "saveMonthlyLaborCost",
-          expectedRevision: snapshot.editRevisions?.[`${month}:${personId}`] ?? 0,
-          month,
+          expectedRevision: snapshot.editRevisions?.[`${mois}:${personId}`] ?? 0,
+          month: mois,
           personId,
-          employerCostCents: Math.round(cost * 100),
-          workedHours: hours,
-          sourceType: draft.sourceType,
+          employerCostCents: Math.round(cout * 100),
+          workedHours: heures,
+          sourceType: brouillon.sourceType,
         }),
       });
-      const body = (await response.json()) as Snapshot & { error?: string };
-      if (!response.ok)
+      const corps = (await reponse.json()) as Snapshot & { error?: string };
+      if (!reponse.ok)
         throw new Error(
-          body.error === "EDIT_VERSION_CONFLICT"
+          corps.error === "EDIT_VERSION_CONFLICT"
             ? EDIT_CONFLICT_MESSAGE
-            : (body.error ?? "Enregistrement impossible."),
+            : (corps.error ?? "Enregistrement impossible."),
         );
       setSnapshot((old) =>
         old
           ? {
-              ...body,
+              ...corps,
               records: [
-                ...old.records.filter((row) => row.personId !== personId),
-                ...body.records.filter((row) => row.personId === personId),
+                ...old.records.filter((ligneTableau) => ligneTableau.personId !== personId),
+                ...corps.records.filter((ligneTableau) => ligneTableau.personId === personId),
               ],
               editRevisions: {
                 ...old.editRevisions,
-                [`${month}:${personId}`]: body.editRevisions[`${month}:${personId}`],
+                [`${mois}:${personId}`]: corps.editRevisions[`${mois}:${personId}`],
               },
             }
-          : body,
+          : corps,
       );
       setDrafts((old) => {
-        const next = { ...old };
-        delete next[personId];
-        return next;
+        const suivant = { ...old };
+        delete suivant[personId];
+        return suivant;
       });
       setMessage("Coût mensuel enregistré. La valorisation des chantiers est actualisée.");
     } catch (cause) {
@@ -185,27 +189,27 @@ export function MonthlyLaborCostsWorkspace() {
           id="monthly-cost-month"
           aria-label="Mois des coûts salariaux"
           type="month"
-          value={month}
+          value={mois}
           max={parisCurrentMonth()}
-          disabled={loading || saving !== null}
-          onChange={(event) => {
-            if (/^\d{4}-\d{2}$/.test(event.target.value)) setMonth(event.target.value);
+          disabled={chargement || sauvegardeEnCours !== null}
+          onChange={(evenement) => {
+            if (/^\d{4}-\d{2}$/.test(evenement.target.value)) setMonth(evenement.target.value);
           }}
         />
       </div>
-      {loading ? <p className="monthlyCostsNotice">Chargement…</p> : null}
+      {chargement ? <p className="monthlyCostsNotice">Chargement…</p> : null}
       {forbidden ? (
         <p className="monthlyCostsNotice" role="alert">
           Accès réservé aux utilisateurs autorisés au module Paie. Les montants salariaux restent
           confidentiels.
         </p>
       ) : null}
-      {error ? (
+      {erreur ? (
         <p className="monthlyCostsNotice" role="alert">
-          {error}
+          {erreur}
         </p>
       ) : null}
-      {snapshot && !loading ? (
+      {snapshot && !chargement ? (
         <>
           {!snapshot.editable ? (
             <p className="monthlyCostsNotice">
@@ -225,27 +229,29 @@ export function MonthlyLaborCostsWorkspace() {
                 </tr>
               </thead>
               <tbody>
-                {snapshot.people.map((person) => {
-                  const value = rowDraft(person.id);
-                  const cost = decimal(value.cost);
-                  const hours = decimal(value.hours);
-                  const stored = snapshot.records.find((record) => record.personId === person.id);
+                {snapshot.people.map((personne) => {
+                  const valeur = rowDraft(personne.id);
+                  const cout = decimal(valeur.cost);
+                  const heures = decimal(valeur.hours);
+                  const stored = snapshot.records.find(
+                    (enregistrement) => enregistrement.personId === personne.id,
+                  );
                   const automaticHours =
-                    snapshot.people.find((p) => p.id === person.id)?.holdingHours ?? null;
+                    snapshot.people.find((p) => p.id === personne.id)?.holdingHours ?? null;
                   const effectiveHours =
-                    value.sourceType === "HOLDING" && automaticHours !== null
+                    valeur.sourceType === "HOLDING" && automaticHours !== null
                       ? automaticHours
-                      : hours;
+                      : heures;
                   const rate =
-                    cost !== null && effectiveHours !== null && effectiveHours > 0
-                      ? cost / effectiveHours
+                    cout !== null && effectiveHours !== null && effectiveHours > 0
+                      ? cout / effectiveHours
                       : null;
                   // Holding hours are recomputed on the server for every save.
-                  const changed = drafts[person.id] !== undefined;
+                  const changed = brouillons[personne.id] !== undefined;
                   return (
-                    <tr key={person.id}>
+                    <tr key={personne.id}>
                       <th scope="row">
-                        {person.name}
+                        {personne.name}
                         {stored ? (
                           <small>Enregistré pour ce mois</small>
                         ) : (
@@ -254,15 +260,15 @@ export function MonthlyLaborCostsWorkspace() {
                       </th>
                       <td>
                         <select
-                          aria-label={"Source de coût " + person.name}
-                          value={value.sourceType}
-                          disabled={!snapshot.editable || saving !== null}
-                          onChange={(event) =>
+                          aria-label={"Source de coût " + personne.name}
+                          value={valeur.sourceType}
+                          disabled={!snapshot.editable || sauvegardeEnCours !== null}
+                          onChange={(evenement) =>
                             setDrafts((old) => ({
                               ...old,
-                              [person.id]: {
-                                ...value,
-                                sourceType: event.target.value as "SALARY" | "HOLDING",
+                              [personne.id]: {
+                                ...valeur,
+                                sourceType: evenement.target.value as "SALARY" | "HOLDING",
                               },
                             }))
                           }
@@ -275,14 +281,14 @@ export function MonthlyLaborCostsWorkspace() {
                         <input
                           type="text"
                           inputMode="decimal"
-                          aria-label={"Coût mensuel " + person.name}
-                          value={value.cost}
+                          aria-label={"Coût mensuel " + personne.name}
+                          value={valeur.cost}
                           placeholder="0,00"
-                          disabled={!snapshot.editable || saving !== null}
-                          onChange={(event) =>
+                          disabled={!snapshot.editable || sauvegardeEnCours !== null}
+                          onChange={(evenement) =>
                             setDrafts((old) => ({
                               ...old,
-                              [person.id]: { ...value, cost: event.target.value },
+                              [personne.id]: { ...valeur, cost: evenement.target.value },
                             }))
                           }
                         />
@@ -291,26 +297,28 @@ export function MonthlyLaborCostsWorkspace() {
                         <input
                           type="text"
                           inputMode="decimal"
-                          aria-label={"Heures travaillées " + person.name}
+                          aria-label={"Heures travaillées " + personne.name}
                           value={
-                            value.sourceType === "HOLDING" && automaticHours !== null
+                            valeur.sourceType === "HOLDING" && automaticHours !== null
                               ? String(automaticHours).replace(".", ",")
-                              : value.hours
+                              : valeur.hours
                           }
                           placeholder="0"
                           disabled={
-                            !snapshot.editable || saving !== null || value.sourceType === "HOLDING"
+                            !snapshot.editable ||
+                            sauvegardeEnCours !== null ||
+                            valeur.sourceType === "HOLDING"
                           }
-                          onChange={(event) =>
+                          onChange={(evenement) =>
                             setDrafts((old) => ({
                               ...old,
-                              [person.id]: { ...value, hours: event.target.value },
+                              [personne.id]: { ...valeur, hours: evenement.target.value },
                             }))
                           }
-                          onKeyDown={(event) => {
-                            if (event.key === "Enter") {
-                              event.preventDefault();
-                              void save(person.id);
+                          onKeyDown={(evenement) => {
+                            if (evenement.key === "Enter") {
+                              evenement.preventDefault();
+                              void save(personne.id);
                             }
                           }}
                         />
@@ -322,10 +330,10 @@ export function MonthlyLaborCostsWorkspace() {
                         <button
                           className="secondaryButton"
                           type="button"
-                          disabled={!snapshot.editable || !changed || saving !== null}
-                          onClick={() => void save(person.id)}
+                          disabled={!snapshot.editable || !changed || sauvegardeEnCours !== null}
+                          onClick={() => void save(personne.id)}
                         >
-                          {saving === person.id ? "Enregistrement…" : "Enregistrer"}
+                          {sauvegardeEnCours === personne.id ? "Enregistrement…" : "Enregistrer"}
                         </button>
                       </td>
                     </tr>

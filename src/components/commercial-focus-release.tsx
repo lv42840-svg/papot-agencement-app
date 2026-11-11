@@ -17,8 +17,8 @@ export function CommercialFocusRelease() {
         return false;
 
       url.searchParams.delete("focus");
-      const query = url.searchParams.toString();
-      const nextUrl = `${url.pathname}${query ? `?${query}` : ""}${url.hash}`;
+      const requeteRecherche = url.searchParams.toString();
+      const nextUrl = `${url.pathname}${requeteRecherche ? `?${requeteRecherche}` : ""}${url.hash}`;
       window.history.replaceState(window.history.state, "", nextUrl);
       return true;
     };

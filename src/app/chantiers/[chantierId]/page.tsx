@@ -4,11 +4,11 @@ import { DesktopAppShell } from "@/components/desktop-app-shell";
 export const dynamic = "force-dynamic";
 
 export default async function ChantierPage({
-  params,
+  params: parametres,
 }: {
   params: Promise<{ chantierId: string }>;
 }) {
-  const { chantierId } = await params;
+  const { chantierId } = await parametres;
   return (
     <DesktopAppShell>
       <ChantierWorkspace chantierId={chantierId} />

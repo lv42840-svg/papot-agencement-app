@@ -12,7 +12,8 @@ const euro = (cents: number | null) =>
     ? "Incomplet"
     : (cents / 100).toLocaleString("fr-FR", { style: "currency", currency: "EUR" });
 const actualEuro = (cents: number | null) => (cents === null ? "Non disponible" : euro(cents));
-const hours = (value: number) => value.toLocaleString("fr-FR", { maximumFractionDigits: 1 }) + " h";
+const heures = (valeur: number) =>
+  valeur.toLocaleString("fr-FR", { maximumFractionDigits: 1 }) + " h";
 const statuses: Record<CompanyProfitabilityRow["status"], string> = {
   ACTIVE: "Actif",
   DONE: "Terminé",
@@ -21,29 +22,29 @@ const statuses: Record<CompanyProfitabilityRow["status"], string> = {
 };
 
 export function EnterpriseProfitabilityWorkspace() {
-  const [rows, setRows] = useState<CompanyProfitabilityRow[] | null>(null);
+  const [lignesTableau, setRows] = useState<CompanyProfitabilityRow[] | null>(null);
   const [canReadPayroll, setCanReadPayroll] = useState(false);
-  const [error, setError] = useState("");
-  const [year, setYear] = useState("ALL");
-  const [status, setStatus] = useState("ALL");
-  const [search, setSearch] = useState("");
+  const [erreur, setError] = useState("");
+  const [annee, setYear] = useState("ALL");
+  const [statut, setStatus] = useState("ALL");
+  const [recherche, setSearch] = useState("");
 
   async function reload() {
     try {
       setError("");
-      const response = await fetch("/api/desktop/pilotage/rentabilite", { cache: "no-store" });
-      if (!response.ok)
+      const reponse = await fetch("/api/desktop/pilotage/rentabilite", { cache: "no-store" });
+      if (!reponse.ok)
         throw new Error(
-          response.status === 403
+          reponse.status === 403
             ? "Accès Pilotage global, Chantiers, Commercial, Devis et Achats nécessaire."
             : "Impossible de charger la rentabilité entreprise.",
         );
-      const result = (await response.json()) as {
+      const resultat = (await reponse.json()) as {
         rows: CompanyProfitabilityRow[];
         canReadPayroll: boolean;
       };
-      setRows(result.rows);
-      setCanReadPayroll(result.canReadPayroll);
+      setRows(resultat.rows);
+      setCanReadPayroll(resultat.canReadPayroll);
     } catch (cause) {
       setError(cause instanceof Error ? cause.message : "Chargement impossible.");
     }
@@ -52,17 +53,20 @@ export function EnterpriseProfitabilityWorkspace() {
     void reload();
   }, []);
 
-  const years = useMemo(
-    () => [...new Set((rows ?? []).map((row) => row.launchYear))].sort((a, b) => b - a),
-    [rows],
+  const annees = useMemo(
+    () =>
+      [...new Set((lignesTableau ?? []).map((ligneTableau) => ligneTableau.launchYear))].sort(
+        (a, b) => b - a,
+      ),
+    [lignesTableau],
   );
-  const filtered = (rows ?? [])
-    .filter((row) => year === "ALL" || row.launchYear === Number(year))
-    .filter((row) => status === "ALL" || row.status === status)
-    .filter((row) =>
-      (row.name + " " + row.clientName)
+  const filtered = (lignesTableau ?? [])
+    .filter((ligneTableau) => annee === "ALL" || ligneTableau.launchYear === Number(annee))
+    .filter((ligneTableau) => statut === "ALL" || ligneTableau.status === statut)
+    .filter((ligneTableau) =>
+      (ligneTableau.name + " " + ligneTableau.clientName)
         .toLocaleLowerCase("fr-FR")
-        .includes(search.toLocaleLowerCase("fr-FR").trim()),
+        .includes(recherche.toLocaleLowerCase("fr-FR").trim()),
     )
     .sort((a, b) => {
       if (a.missingData !== b.missingData) return a.missingData ? 1 : -1;
@@ -70,11 +74,13 @@ export function EnterpriseProfitabilityWorkspace() {
     });
   const total = companyProfitabilityTotals(filtered);
   const overrun = filtered.filter(
-    (row) =>
-      row.plannedPurchasesCents !== null && row.committedPurchasesCents > row.plannedPurchasesCents,
+    (ligneTableau) =>
+      ligneTableau.plannedPurchasesCents !== null &&
+      ligneTableau.committedPurchasesCents > ligneTableau.plannedPurchasesCents,
   ).length;
   const overtime = filtered.filter(
-    (row) => row.plannedHours > 0 && row.actualHours > row.plannedHours,
+    (ligneTableau) =>
+      ligneTableau.plannedHours > 0 && ligneTableau.actualHours > ligneTableau.plannedHours,
   ).length;
 
   return (
@@ -98,22 +104,22 @@ export function EnterpriseProfitabilityWorkspace() {
         devis retenus, non des factures clients. Les achats engagés sont des BC, non des factures
         fournisseurs. Les coûts réels complets nécessitent Pennylane.
       </p>
-      {error ? <p role="alert">{error}</p> : null}
-      {!rows && !error ? <p>Calcul des chantiers en cours…</p> : null}
-      {rows && (
+      {erreur ? <p role="alert">{erreur}</p> : null}
+      {!lignesTableau && !erreur ? <p>Calcul des chantiers en cours…</p> : null}
+      {lignesTableau && (
         <>
           <div style={{ display: "flex", gap: 12, flexWrap: "wrap" }}>
             <label>
               Année de lancement
               <select
                 aria-label="Filtrer par année"
-                value={year}
+                value={annee}
                 onChange={(e) => setYear(e.target.value)}
               >
                 <option value="ALL">Toutes les années</option>
-                {years.map((value) => (
-                  <option key={value} value={value}>
-                    {value}
+                {annees.map((valeur) => (
+                  <option key={valeur} value={valeur}>
+                    {valeur}
                   </option>
                 ))}
               </select>
@@ -122,7 +128,7 @@ export function EnterpriseProfitabilityWorkspace() {
               État du chantier
               <select
                 aria-label="Filtrer par état"
-                value={status}
+                value={statut}
                 onChange={(e) => setStatus(e.target.value)}
               >
                 <option value="ALL">Tous</option>
@@ -135,7 +141,7 @@ export function EnterpriseProfitabilityWorkspace() {
               Rechercher
               <input
                 aria-label="Rechercher chantier ou client"
-                value={search}
+                value={recherche}
                 onChange={(e) => setSearch(e.target.value)}
                 placeholder="Chantier ou client"
               />
@@ -162,9 +168,9 @@ export function EnterpriseProfitabilityWorkspace() {
               ["Coût des heures prévues", euro(total.plannedLaborCostCents)],
               ["Coût total prévu HT", euro(total.plannedTotalCostCents)],
               ["Marge prévue HT", euro(total.plannedMarginCents)],
-            ].map(([label, value]) => (
+            ].map(([libelle, valeur]) => (
               <div
-                key={label}
+                key={libelle}
                 style={{
                   background: "white",
                   borderRadius: 10,
@@ -172,8 +178,8 @@ export function EnterpriseProfitabilityWorkspace() {
                   minWidth: 0,
                 }}
               >
-                <div style={{ fontSize: 12, color: "#6f677a" }}>{label}</div>
-                <strong style={{ fontSize: 20 }}>{value}</strong>
+                <div style={{ fontSize: 12, color: "#6f677a" }}>{libelle}</div>
+                <strong style={{ fontSize: 20 }}>{valeur}</strong>
               </div>
             ))}
           </div>
@@ -196,9 +202,9 @@ export function EnterpriseProfitabilityWorkspace() {
               ],
               ["Coût total réel HT", actualEuro(total.actualTotalCostCents)],
               ["Marge réelle HT", actualEuro(total.actualMarginCents)],
-            ].map(([label, value]) => (
+            ].map(([libelle, valeur]) => (
               <div
-                key={label}
+                key={libelle}
                 style={{
                   background: "white",
                   borderRadius: 10,
@@ -206,8 +212,8 @@ export function EnterpriseProfitabilityWorkspace() {
                   minWidth: 0,
                 }}
               >
-                <div style={{ fontSize: 12, color: "#6f677a" }}>{label}</div>
-                <strong style={{ fontSize: 20 }}>{value}</strong>
+                <div style={{ fontSize: 12, color: "#6f677a" }}>{libelle}</div>
+                <strong style={{ fontSize: 20 }}>{valeur}</strong>
               </div>
             ))}
           </div>
@@ -240,10 +246,10 @@ export function EnterpriseProfitabilityWorkspace() {
               ["Budget heures restant", actualEuro(total.remainingLaborBudgetCents)],
               ["Chantiers dépassant le budget total", String(total.budgetOverrunCount)],
               ["Chantiers dépassant le budget heures", String(total.laborBudgetOverrunCount)],
-            ].map(([label, value]) => (
-              <div key={label} style={{ background: "white", borderRadius: 10, padding: 15 }}>
-                <div style={{ fontSize: 12, color: "#6f677a" }}>{label}</div>
-                <strong style={{ fontSize: 20 }}>{value}</strong>
+            ].map(([libelle, valeur]) => (
+              <div key={libelle} style={{ background: "white", borderRadius: 10, padding: 15 }}>
+                <div style={{ fontSize: 12, color: "#6f677a" }}>{libelle}</div>
+                <strong style={{ fontSize: 20 }}>{valeur}</strong>
               </div>
             ))}
           </div>
@@ -268,8 +274,8 @@ export function EnterpriseProfitabilityWorkspace() {
           <p>
             <strong>{overrun}</strong> chantier(s) avec achats commandés au-dessus du budget ;{" "}
             <strong>{overtime}</strong> avec dépassement d&apos;heures ;{" "}
-            <strong>{hours(total.actualHours)}</strong> enregistrées pour{" "}
-            <strong>{hours(total.plannedHours)}</strong> prévues.
+            <strong>{heures(total.actualHours)}</strong> enregistrées pour{" "}
+            <strong>{heures(total.plannedHours)}</strong> prévues.
           </p>
           <section
             style={{ background: "white", padding: 14, borderRadius: 12, overflowX: "auto" }}
@@ -297,41 +303,42 @@ export function EnterpriseProfitabilityWorkspace() {
                 </tr>
               </thead>
               <tbody>
-                {filtered.map((row) => (
-                  <tr key={row.chantierId} style={{ borderBottom: "1px solid #ece8f0" }}>
+                {filtered.map((ligneTableau) => (
+                  <tr key={ligneTableau.chantierId} style={{ borderBottom: "1px solid #ece8f0" }}>
                     <td style={{ padding: 8 }}>
-                      <Link href={`/chantiers/${encodeURIComponent(row.chantierId)}`}>
-                        <strong>{row.name}</strong>
+                      <Link href={`/chantiers/${encodeURIComponent(ligneTableau.chantierId)}`}>
+                        <strong>{ligneTableau.name}</strong>
                       </Link>
-                      <div style={{ fontSize: 11 }}>{row.clientName}</div>
-                      {row.missingData ? (
+                      <div style={{ fontSize: 11 }}>{ligneTableau.clientName}</div>
+                      {ligneTableau.missingData ? (
                         <small style={{ color: "#a35018" }}>Coûts à compléter</small>
                       ) : null}
                     </td>
-                    <td style={{ padding: 8 }}>{statuses[row.status]}</td>
+                    <td style={{ padding: 8 }}>{statuses[ligneTableau.status]}</td>
                     {[
-                      row.soldCents,
-                      row.plannedLaborCostCents,
-                      row.plannedOtherCostCents,
-                      row.plannedTotalCostCents,
-                      row.plannedMarginCents,
-                      row.committedPurchasesCents,
-                      row.actualLaborCostCents,
-                      row.actualPurchaseCostCents,
-                      row.actualMarginCents,
-                      row.remainingCostBudgetCents,
-                      row.remainingLaborBudgetCents,
-                    ].map((value, index) => (
+                      ligneTableau.soldCents,
+                      ligneTableau.plannedLaborCostCents,
+                      ligneTableau.plannedOtherCostCents,
+                      ligneTableau.plannedTotalCostCents,
+                      ligneTableau.plannedMarginCents,
+                      ligneTableau.committedPurchasesCents,
+                      ligneTableau.actualLaborCostCents,
+                      ligneTableau.actualPurchaseCostCents,
+                      ligneTableau.actualMarginCents,
+                      ligneTableau.remainingCostBudgetCents,
+                      ligneTableau.remainingLaborBudgetCents,
+                    ].map((valeur, indice) => (
                       <td
-                        key={index}
+                        key={indice}
                         style={{ padding: 8, textAlign: "right", whiteSpace: "nowrap" }}
                       >
-                        {index >= 6 ? actualEuro(value) : euro(value)}
+                        {indice >= 6 ? actualEuro(valeur) : euro(valeur)}
                       </td>
                     ))}
                     <td style={{ padding: 8, textAlign: "right", whiteSpace: "nowrap" }}>
-                      {hours(row.plannedHours)} / {hours(row.actualHours)}
-                      {row.plannedHours > 0 && row.actualHours > row.plannedHours ? (
+                      {heures(ligneTableau.plannedHours)} / {heures(ligneTableau.actualHours)}
+                      {ligneTableau.plannedHours > 0 &&
+                      ligneTableau.actualHours > ligneTableau.plannedHours ? (
                         <div style={{ color: "#b33138" }}>Dépassement</div>
                       ) : null}
                     </td>

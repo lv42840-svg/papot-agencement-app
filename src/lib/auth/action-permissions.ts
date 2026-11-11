@@ -1,34 +1,39 @@
 import type { SpecialPermissionKey } from "@/lib/auth/permission-catalog";
 
-export function commercialSpecialPermissionForMutation(input: {
+export function commercialSpecialPermissionForMutation(saisie: {
   action: string;
   status?: string;
   nextStatus?: string;
 }): SpecialPermissionKey | null {
-  if (input.action === "create") return "commercial.create";
+  if (saisie.action === "create") return "commercial.create";
   if (
-    input.action === "updateProvision" ||
-    input.action === "setForecastQuotes" ||
-    input.action === "useManualProvision"
-  )
+    saisie.action === "updateProvision" ||
+    saisie.action === "setForecastQuotes" ||
+    saisie.action === "useManualProvision"
+  ) {
     return "commercial.provision";
-  if (input.action === "retainAdditionalQuote") return "commercial.confirm_launch";
-  if (input.action === "setStatus" && input.status === "CONFIRMED") {
+  }
+  if (saisie.action === "retainAdditionalQuote") return "commercial.confirm_launch";
+  if (saisie.action === "setStatus" && saisie.status === "CONFIRMED") {
     return "commercial.confirm_launch";
   }
-  if (input.action === "recordFollowUp" && input.nextStatus === "CONFIRMED") {
+  if (saisie.action === "recordFollowUp" && saisie.nextStatus === "CONFIRMED") {
     return "commercial.confirm_launch";
   }
   return null;
 }
 
-export function chantierSpecialPermissionForMutation(input: {
+export function chantierSpecialPermissionForMutation(saisie: {
   action: string;
 }): SpecialPermissionKey | null {
-  if (input.action === "markDone" || input.action === "cancel" || input.action === "reactivate") {
+  if (
+    saisie.action === "markDone" ||
+    saisie.action === "cancel" ||
+    saisie.action === "reactivate"
+  ) {
     return "chantiers.close_reopen";
   }
-  if (input.action === "archive" || input.action === "unarchive") {
+  if (saisie.action === "archive" || saisie.action === "unarchive") {
     return "chantiers.archive_reactivate";
   }
   return null;

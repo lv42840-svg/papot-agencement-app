@@ -46,8 +46,8 @@ type ParagraphOptions = {
   fontSizePx?: number;
 };
 
-function escapeXmlText(value: string): string {
-  return value
+function escapeXmlText(valeur: string): string {
+  return valeur
     .replaceAll("&", "&amp;")
     .replaceAll("<", "&lt;")
     .replaceAll(">", "&gt;")
@@ -59,24 +59,24 @@ function wordTextNodes(paragraph: string): WordTextNode[] {
   const nodes: WordTextNode[] = [];
   let joinedOffset = 0;
 
-  for (const match of paragraph.matchAll(WORD_TEXT_PATTERN)) {
-    if (match.index === undefined) continue;
-    const full = match[0];
+  for (const correspondance of paragraph.matchAll(WORD_TEXT_PATTERN)) {
+    if (correspondance.index === undefined) continue;
+    const full = correspondance[0];
     const openingEnd = full.indexOf(">");
     const closingStart = full.lastIndexOf("</w:t>");
     if (openingEnd < 0 || closingStart < 0) continue;
 
-    const text = full.slice(openingEnd + 1, closingStart);
-    const textStart = match.index + openingEnd + 1;
-    const textEnd = match.index + closingStart;
+    const texte = full.slice(openingEnd + 1, closingStart);
+    const textStart = correspondance.index + openingEnd + 1;
+    const textEnd = correspondance.index + closingStart;
     nodes.push({
       textStart,
       textEnd,
       joinedStart: joinedOffset,
-      joinedEnd: joinedOffset + text.length,
-      text,
+      joinedEnd: joinedOffset + texte.length,
+      text: texte,
     });
-    joinedOffset += text.length;
+    joinedOffset += texte.length;
   }
 
   return nodes;
@@ -118,35 +118,35 @@ function replaceFirstTokenInParagraph(
     });
   }
 
-  let next = paragraph;
+  let suivant = paragraph;
   for (const nodeReplacement of nodeReplacements.reverse()) {
-    next = `${next.slice(0, nodeReplacement.start)}${nodeReplacement.text}${next.slice(nodeReplacement.end)}`;
+    suivant = `${suivant.slice(0, nodeReplacement.start)}${nodeReplacement.text}${suivant.slice(nodeReplacement.end)}`;
   }
 
-  return { paragraph: next, replaced: true };
+  return { paragraph: suivant, replaced: true };
 }
 
 export function replaceWordXmlScalarTokens(
   xml: string,
-  values: Readonly<Record<string, string>>,
+  valeurs: Readonly<Record<string, string>>,
 ): WordScalarReplacementResult {
   const replacementCounts = new Map<string, number>();
-  for (const key of Object.keys(values)) replacementCounts.set(key, 0);
+  for (const cle of Object.keys(valeurs)) replacementCounts.set(cle, 0);
 
   const nextXml = xml.replace(WORD_PARAGRAPH_PATTERN, (originalParagraph) => {
     let paragraph = originalParagraph;
 
-    for (const [key, value] of Object.entries(values)) {
-      const token = `{{${key}}}`;
+    for (const [cle, valeur] of Object.entries(valeurs)) {
+      const token = `{{${cle}}}`;
       let guard = 0;
       while (guard < 100) {
-        const result = replaceFirstTokenInParagraph(paragraph, token, value);
-        if (!result.replaced) break;
-        paragraph = result.paragraph;
-        replacementCounts.set(key, (replacementCounts.get(key) ?? 0) + 1);
+        const resultat = replaceFirstTokenInParagraph(paragraph, token, valeur);
+        if (!resultat.replaced) break;
+        paragraph = resultat.paragraph;
+        replacementCounts.set(cle, (replacementCounts.get(cle) ?? 0) + 1);
         guard += 1;
       }
-      if (guard >= 100) throw new Error(`QUOTE_WORD_V2_SCALAR_REPLACEMENT_LOOP:${key}`);
+      if (guard >= 100) throw new Error(`QUOTE_WORD_V2_SCALAR_REPLACEMENT_LOOP:${cle}`);
     }
 
     return paragraph;
@@ -155,8 +155,8 @@ export function replaceWordXmlScalarTokens(
   return { xml: nextXml, replacementCounts };
 }
 
-function isWordXmlEntry(name: string): boolean {
-  return name.startsWith("word/") && name.endsWith(".xml");
+function isWordXmlEntry(nom: string): boolean {
+  return nom.startsWith("word/") && nom.endsWith(".xml");
 }
 
 function formatMoneyCents(cents: number): string {
@@ -179,8 +179,8 @@ function wordHalfPointsFromPixels(fontSizePx: number): number {
   return Math.max(2, Math.round(fontSizePx * 1.5));
 }
 
-function hexWithoutHash(value: string): string {
-  return value.replace(/^#/, "").toUpperCase();
+function hexWithoutHash(valeur: string): string {
+  return valeur.replace(/^#/, "").toUpperCase();
 }
 
 function runProperties(style: QuoteRichTextRunStyle | null, defaults: ParagraphOptions): string {
@@ -206,26 +206,26 @@ function runProperties(style: QuoteRichTextRunStyle | null, defaults: ParagraphO
   return properties.length > 0 ? `<w:rPr>${properties.join("")}</w:rPr>` : "";
 }
 
-function textToWordRuns(text: string, properties: string): string {
-  const normalized = text.replaceAll("\r\n", "\n").replaceAll("\r", "\n");
+function textToWordRuns(texte: string, properties: string): string {
+  const normalized = texte.replaceAll("\r\n", "\n").replaceAll("\r", "\n");
   const parts = normalized.split("\n");
   const runs: string[] = [];
 
-  parts.forEach((part, index) => {
+  parts.forEach((part, indice) => {
     if (part.length > 0) {
       runs.push(`<w:r>${properties}<w:t xml:space="preserve">${escapeXmlText(part)}</w:t></w:r>`);
     }
-    if (index < parts.length - 1) runs.push(`<w:r>${properties}<w:br/></w:r>`);
+    if (indice < parts.length - 1) runs.push(`<w:r>${properties}<w:br/></w:r>`);
   });
 
   if (runs.length === 0) runs.push(`<w:r>${properties}<w:t></w:t></w:r>`);
   return runs.join("");
 }
 
-function itemWordRuns(item: QuoteDocumentItem, defaults: ParagraphOptions): string {
-  const richText = item.richText;
+function itemWordRuns(element: QuoteDocumentItem, defaults: ParagraphOptions): string {
+  const richText = element.richText;
   if (!richText || richText.runs.length === 0) {
-    return textToWordRuns(item.text, runProperties(null, defaults));
+    return textToWordRuns(element.text, runProperties(null, defaults));
   }
 
   return richText.runs
@@ -242,8 +242,8 @@ function paragraphXml(runs: string, options: ParagraphOptions = {}): string {
   return `<w:p>${pPr}${runs}</w:p>`;
 }
 
-function plainParagraphXml(value: string, options: ParagraphOptions = {}): string {
-  return paragraphXml(textToWordRuns(value, runProperties(null, options)), options);
+function plainParagraphXml(valeur: string, options: ParagraphOptions = {}): string {
+  return paragraphXml(textToWordRuns(valeur, runProperties(null, options)), options);
 }
 
 function cellProperties(cellXml: string): string {
@@ -251,15 +251,15 @@ function cellProperties(cellXml: string): string {
 }
 
 function addBottomBorderToCellProperties(properties: string): string {
-  const bottom = '<w:bottom w:val="single" w:sz="4" w:space="0" w:color="D9D9D9"/>';
+  const bas = '<w:bottom w:val="single" w:sz="4" w:space="0" w:color="D9D9D9"/>';
   if (/<w:tcBorders>[\s\S]*?<\/w:tcBorders>/.test(properties)) {
     return properties.replace(
       /<w:tcBorders>([\s\S]*?)<\/w:tcBorders>/,
-      (_match, body: string) =>
-        `<w:tcBorders>${body.replace(/<w:bottom\b[^>]*\/>/, "")}${bottom}</w:tcBorders>`,
+      (_match, corps: string) =>
+        `<w:tcBorders>${corps.replace(/<w:bottom\b[^>]*\/>/, "")}${bas}</w:tcBorders>`,
     );
   }
-  return properties.replace("</w:tcPr>", `<w:tcBorders>${bottom}</w:tcBorders></w:tcPr>`);
+  return properties.replace("</w:tcPr>", `<w:tcBorders>${bas}</w:tcBorders></w:tcPr>`);
 }
 
 function addCellShadingToProperties(properties: string, fill: string): string {
@@ -298,16 +298,19 @@ function makeCell(
 function findOpeningTagStart(xml: string, tagName: string, beforeIndex: number): number {
   const openingTagPattern = new RegExp(`<${tagName}(?:\\s[^>]*)?>`, "g");
   let lastStart = -1;
-  for (const match of xml.slice(0, beforeIndex + 1).matchAll(openingTagPattern)) {
-    if (match.index !== undefined) lastStart = match.index;
+  for (const correspondance of xml.slice(0, beforeIndex + 1).matchAll(openingTagPattern)) {
+    if (correspondance.index !== undefined) lastStart = correspondance.index;
   }
   return lastStart;
 }
 
 const QUOTE_TABLE_WIDTHS = [850, 4933, 1134, 1417, 1077, 1587] as const;
-const QUOTE_TABLE_TOTAL_WIDTH = QUOTE_TABLE_WIDTHS.reduce((sum, width) => sum + width, 0);
+const QUOTE_TABLE_TOTAL_WIDTH = QUOTE_TABLE_WIDTHS.reduce((somme, width) => somme + width, 0);
 const FINANCIAL_TABLE_WIDTHS = [6314, 4572] as const;
-const FINANCIAL_TABLE_TOTAL_WIDTH = FINANCIAL_TABLE_WIDTHS.reduce((sum, width) => sum + width, 0);
+const FINANCIAL_TABLE_TOTAL_WIDTH = FINANCIAL_TABLE_WIDTHS.reduce(
+  (somme, width) => somme + width,
+  0,
+);
 const FINANCIAL_TOTALS_WIDTHS = [2900, 1672] as const;
 
 function paragraphVisibleText(paragraph: string): string {
@@ -328,13 +331,13 @@ function tableRangeAroundAnchor(
 ): { start: number; end: number; table: string } {
   const anchorIndex = xml.indexOf(anchor);
   if (anchorIndex < 0) throw new Error(`QUOTE_WORD_V2_LAYOUT_ANCHOR_MISSING:${anchor}`);
-  const start = findOpeningTagStart(xml, "w:tbl", anchorIndex);
+  const debut = findOpeningTagStart(xml, "w:tbl", anchorIndex);
   const closeStart = xml.indexOf("</w:tbl>", anchorIndex);
-  if (start < 0 || closeStart < 0) {
+  if (debut < 0 || closeStart < 0) {
     throw new Error(`QUOTE_WORD_V2_LAYOUT_TABLE_MISSING:${anchor}`);
   }
-  const end = closeStart + "</w:tbl>".length;
-  return { start, end, table: xml.slice(start, end) };
+  const fin = closeStart + "</w:tbl>".length;
+  return { start: debut, end: fin, table: xml.slice(debut, fin) };
 }
 
 function fixedTableGrid(widths: readonly number[]): string {
@@ -346,11 +349,11 @@ function normalizeTableProperties(
   widths: readonly number[],
   options: { removeRepeatingHeader?: boolean } = {},
 ): string {
-  const totalWidth = widths.reduce((sum, width) => sum + width, 0);
-  let next = table.replace(/<w:tblGrid>[\s\S]*?<\/w:tblGrid>/, fixedTableGrid(widths));
+  const totalWidth = widths.reduce((somme, width) => somme + width, 0);
+  let suivant = table.replace(/<w:tblGrid>[\s\S]*?<\/w:tblGrid>/, fixedTableGrid(widths));
 
-  next = next.replace(/<w:tblPr>([\s\S]*?)<\/w:tblPr>/, (_match, body: string) => {
-    let properties = body;
+  suivant = suivant.replace(/<w:tblPr>([\s\S]*?)<\/w:tblPr>/, (_match, corps: string) => {
+    let properties = corps;
     if (/<w:tblW\b[^>]*\/>/.test(properties)) {
       properties = properties.replace(
         /<w:tblW\b[^>]*\/>/,
@@ -368,9 +371,9 @@ function normalizeTableProperties(
   });
 
   if (options.removeRepeatingHeader) {
-    next = next.replace(/<w:tblHeader\b[^>]*\/?\s*>/g, "");
+    suivant = suivant.replace(/<w:tblHeader\b[^>]*\/?\s*>/g, "");
   }
-  return next;
+  return suivant;
 }
 
 function replaceTableAroundAnchor(
@@ -385,16 +388,16 @@ function replaceTableAroundAnchor(
 function matchingTagRangeFromStart(
   xml: string,
   tagName: string,
-  start: number,
+  debut: number,
 ): { start: number; end: number; xml: string } | null {
   const pattern = new RegExp(`<(/?)${tagName}\\b[^>]*?(\\/?)>`, "g");
-  pattern.lastIndex = start;
+  pattern.lastIndex = debut;
   let depth = 0;
-  let match: RegExpExecArray | null;
+  let correspondance: RegExpExecArray | null;
 
-  while ((match = pattern.exec(xml)) !== null) {
-    const closing = match[1] === "/";
-    const selfClosing = match[2] === "/";
+  while ((correspondance = pattern.exec(xml)) !== null) {
+    const closing = correspondance[1] === "/";
+    const selfClosing = correspondance[2] === "/";
     if (!closing && !selfClosing) {
       depth += 1;
       continue;
@@ -402,7 +405,7 @@ function matchingTagRangeFromStart(
     if (!closing) continue;
     depth -= 1;
     if (depth === 0) {
-      return { start, end: pattern.lastIndex, xml: xml.slice(start, pattern.lastIndex) };
+      return { start: debut, end: pattern.lastIndex, xml: xml.slice(debut, pattern.lastIndex) };
     }
   }
   return null;
@@ -418,14 +421,14 @@ function containingTableWithTexts(
 
   const openingPattern = /<w:tbl(?:\s[^>]*)?>/g;
   const starts = Array.from(xml.slice(0, anchorIndex + 1).matchAll(openingPattern))
-    .map((match) => match.index)
-    .filter((index): index is number => index !== undefined)
+    .map((correspondance) => correspondance.index)
+    .filter((indice): indice is number => indice !== undefined)
     .reverse();
 
-  for (const start of starts) {
-    const range = matchingTagRangeFromStart(xml, "w:tbl", start);
+  for (const debut of starts) {
+    const range = matchingTagRangeFromStart(xml, "w:tbl", debut);
     if (!range || range.end <= anchorIndex) continue;
-    if (requiredTexts.every((text) => range.xml.includes(text))) {
+    if (requiredTexts.every((texte) => range.xml.includes(texte))) {
       return { start: range.start, end: range.end, table: range.xml };
     }
   }
@@ -439,8 +442,8 @@ function replaceFinancialTable(documentXml: string): string {
 }
 
 function setCellWidth(cell: string, width: number): string {
-  return cell.replace(/<w:tcPr>([\s\S]*?)<\/w:tcPr>/, (_match, body: string) => {
-    let properties = body;
+  return cell.replace(/<w:tcPr>([\s\S]*?)<\/w:tcPr>/, (_match, corps: string) => {
+    let properties = corps;
     if (/<w:tcW\b[^>]*\/>/.test(properties)) {
       properties = properties.replace(/<w:tcW\b[^>]*\/>/, `<w:tcW w:w="${width}" w:type="dxa"/>`);
     } else {
@@ -457,15 +460,15 @@ function directTagRanges(xml: string, tagName: string): DirectTagRange[] {
   const ranges: DirectTagRange[] = [];
   let depth = 0;
   let directStart = -1;
-  let match: RegExpExecArray | null;
+  let correspondance: RegExpExecArray | null;
 
-  while ((match = pattern.exec(xml)) !== null) {
-    const closing = match[1] === "/";
-    const selfClosing = match[2] === "/";
+  while ((correspondance = pattern.exec(xml)) !== null) {
+    const closing = correspondance[1] === "/";
+    const selfClosing = correspondance[2] === "/";
 
     if (!closing && !selfClosing) {
       depth += 1;
-      if (depth === 1) directStart = match.index;
+      if (depth === 1) directStart = correspondance.index;
       continue;
     }
 
@@ -482,27 +485,27 @@ function directTagRanges(xml: string, tagName: string): DirectTagRange[] {
 }
 
 function normalizeTwoColumnTable(table: string, widths: readonly [number, number]): string {
-  let next = normalizeTableProperties(table, widths).replace(/<w:tblInd\b[^>]*\/>/g, "");
-  const rows = directTagRanges(next, "w:tr").reverse();
+  let suivant = normalizeTableProperties(table, widths).replace(/<w:tblInd\b[^>]*\/>/g, "");
+  const lignesTableau = directTagRanges(suivant, "w:tr").reverse();
 
-  for (const rowRange of rows) {
-    let row = next.slice(rowRange.start, rowRange.end);
-    const cells = directTagRanges(row, "w:tc");
+  for (const rowRange of lignesTableau) {
+    let ligneTableau = suivant.slice(rowRange.start, rowRange.end);
+    const cells = directTagRanges(ligneTableau, "w:tc");
     if (cells.length !== 2) continue;
 
-    for (let index = cells.length - 1; index >= 0; index -= 1) {
-      const cellRange = cells[index]!;
-      const cell = row.slice(cellRange.start, cellRange.end);
-      row =
-        row.slice(0, cellRange.start) +
-        setCellWidth(cell, widths[index]!) +
-        row.slice(cellRange.end);
+    for (let indice = cells.length - 1; indice >= 0; indice -= 1) {
+      const cellRange = cells[indice]!;
+      const cell = ligneTableau.slice(cellRange.start, cellRange.end);
+      ligneTableau =
+        ligneTableau.slice(0, cellRange.start) +
+        setCellWidth(cell, widths[indice]!) +
+        ligneTableau.slice(cellRange.end);
     }
 
-    next = next.slice(0, rowRange.start) + row + next.slice(rowRange.end);
+    suivant = suivant.slice(0, rowRange.start) + ligneTableau + suivant.slice(rowRange.end);
   }
 
-  return next;
+  return suivant;
 }
 
 function normalizeFinancialTotalsContent(content: string): string {
@@ -519,63 +522,63 @@ function splitFinancialSignature(table: string): string {
     throw new Error("QUOTE_WORD_V2_LAYOUT_FINANCIAL_ROW_MISSING");
   }
 
-  const row = table.slice(rowRange.start, rowRange.end);
-  const cellRanges = directTagRanges(row, "w:tc");
+  const ligneTableau = table.slice(rowRange.start, rowRange.end);
+  const cellRanges = directTagRanges(ligneTableau, "w:tc");
   if (cellRanges.length !== 2) {
     throw new Error("QUOTE_WORD_V2_LAYOUT_FINANCIAL_CELL_COUNT_INVALID");
   }
 
-  const cells = cellRanges.map((range) => row.slice(range.start, range.end));
-  const right = cells[1]!;
-  const signatureTextIndex = right.indexOf("Pour le client");
+  const cells = cellRanges.map((range) => ligneTableau.slice(range.start, range.end));
+  const droite = cells[1]!;
+  const signatureTextIndex = droite.indexOf("Pour le client");
   if (signatureTextIndex < 0) {
     throw new Error("QUOTE_WORD_V2_LAYOUT_SIGNATURE_MISSING");
   }
-  const signatureStart = findOpeningTagStart(right, "w:p", signatureTextIndex);
+  const signatureStart = findOpeningTagStart(droite, "w:p", signatureTextIndex);
   if (signatureStart < 0) {
     throw new Error("QUOTE_WORD_V2_LAYOUT_SIGNATURE_PARAGRAPH_MISSING");
   }
 
-  const rightTcPr = cellProperties(right);
-  const contentStart = right.indexOf(rightTcPr) + rightTcPr.length;
-  const contentEnd = right.lastIndexOf("</w:tc>");
+  const rightTcPr = cellProperties(droite);
+  const contentStart = droite.indexOf(rightTcPr) + rightTcPr.length;
+  const contentEnd = droite.lastIndexOf("</w:tc>");
   const beforeSignature = normalizeFinancialTotalsContent(
-    right.slice(contentStart, signatureStart),
+    droite.slice(contentStart, signatureStart),
   );
-  const signatureContent = right.slice(signatureStart, contentEnd);
+  const signatureContent = droite.slice(signatureStart, contentEnd);
 
   const leftCell = setCellWidth(cells[0]!, FINANCIAL_TABLE_WIDTHS[0]);
   const rightCell = setCellWidth(
     `<w:tc>${rightTcPr}${beforeSignature}</w:tc>`,
     FINANCIAL_TABLE_WIDTHS[1],
   );
-  const rowProperties = row.match(/<w:trPr>[\s\S]*?<\/w:trPr>/)?.[0] ?? "";
+  const rowProperties = ligneTableau.match(/<w:trPr>[\s\S]*?<\/w:trPr>/)?.[0] ?? "";
   const financialRow = `<w:tr>${rowProperties}${leftCell}${rightCell}</w:tr>`;
   const signatureRow =
     `<w:tr><w:tc><w:tcPr><w:tcW w:w="${FINANCIAL_TABLE_TOTAL_WIDTH}" w:type="dxa"/>` +
     '<w:gridSpan w:val="2"/></w:tcPr>' +
     `${signatureContent}</w:tc></w:tr>`;
 
-  let next = `${table.slice(0, rowRange.start)}${financialRow}${signatureRow}${table.slice(rowRange.end)}`;
-  next = normalizeTableProperties(next, FINANCIAL_TABLE_WIDTHS);
-  return next;
+  let suivant = `${table.slice(0, rowRange.start)}${financialRow}${signatureRow}${table.slice(rowRange.end)}`;
+  suivant = normalizeTableProperties(suivant, FINANCIAL_TABLE_WIDTHS);
+  return suivant;
 }
 
 export function replaceQuoteWordV2Layout(documentXml: string): string {
-  let next = documentXml.replace(WORD_PARAGRAPH_PATTERN, (paragraph) =>
+  let suivant = documentXml.replace(WORD_PARAGRAPH_PATTERN, (paragraph) =>
     paragraphVisibleText(paragraph) === "OPTIONS NON COMPRISES DANS LE TOTAL PRINCIPAL"
       ? ""
       : paragraph,
   );
 
-  next = replaceTableAroundAnchor(next, QUOTE_BODY_ANCHOR, (table) =>
+  suivant = replaceTableAroundAnchor(suivant, QUOTE_BODY_ANCHOR, (table) =>
     normalizeTableProperties(table, QUOTE_TABLE_WIDTHS),
   );
-  next = replaceTableAroundAnchor(next, QUOTE_OPTIONS_ANCHOR, (table) =>
+  suivant = replaceTableAroundAnchor(suivant, QUOTE_OPTIONS_ANCHOR, (table) =>
     normalizeTableProperties(table, QUOTE_TABLE_WIDTHS, { removeRepeatingHeader: true }),
   );
-  next = replaceFinancialTable(next);
-  return next;
+  suivant = replaceFinancialTable(suivant);
+  return suivant;
 }
 
 export function renderQuoteWordV2Layout(template: Uint8Array): Uint8Array {
@@ -586,13 +589,13 @@ export function renderQuoteWordV2Layout(template: Uint8Array): Uint8Array {
   );
 }
 
-function visibleBodyItemIds(items: QuoteDocumentItem[]): Set<string> {
-  const itemById = new Map(items.map((item) => [item.id, item]));
+function visibleBodyItemIds(elements: QuoteDocumentItem[]): Set<string> {
+  const itemById = new Map(elements.map((element) => [element.id, element]));
   const visible = new Set<string>();
-  const leafItems = items.filter(
-    (item) =>
-      (item.kind === "LINE" || item.kind === "COMMENT") &&
-      (item.scope === "MAIN" || item.scope === "RETAINED_OPTION"),
+  const leafItems = elements.filter(
+    (element) =>
+      (element.kind === "LINE" || element.kind === "COMMENT") &&
+      (element.scope === "MAIN" || element.scope === "RETAINED_OPTION"),
   );
 
   for (const leaf of leafItems) {
@@ -614,26 +617,26 @@ function visibleBodyItemIds(items: QuoteDocumentItem[]): Set<string> {
 function bodyRowXml(
   anchorRow: string,
   templateCells: readonly string[],
-  item: QuoteDocumentItem,
+  element: QuoteDocumentItem,
   options: { bottomBorder?: boolean } = {},
 ): string {
   const rowProperties = anchorRow.match(/<w:trPr>[\s\S]*?<\/w:trPr>/)?.[0] ?? "";
-  const cells = Array.from({ length: 6 }, (_, index) => templateCells[index]);
+  const cells = Array.from({ length: 6 }, (_, indice) => templateCells[indice]);
   if (cells.some((cell) => !cell)) throw new Error("QUOTE_WORD_V2_BODY_TEMPLATE_CELL_MISSING");
 
-  const isHeading = item.kind === "SECTION" || item.kind === "SUBSECTION";
-  const headingFontSize = item.kind === "SECTION" ? 16 : 13;
+  const isHeading = element.kind === "SECTION" || element.kind === "SUBSECTION";
+  const headingFontSize = element.kind === "SECTION" ? 16 : 13;
   const headingFill =
-    item.kind === "SECTION" ? "E9E2F7" : item.kind === "SUBSECTION" ? "F5F1FB" : undefined;
+    element.kind === "SECTION" ? "E9E2F7" : element.kind === "SUBSECTION" ? "F5F1FB" : undefined;
   const cellOptions: CellRenderOptions = { ...options, fill: headingFill };
-  const numberParagraph = plainParagraphXml(item.number, {
+  const numberParagraph = plainParagraphXml(element.number, {
     align: "left",
     bold: isHeading,
     fontSizePx: isHeading ? headingFontSize : undefined,
     keepNext: isHeading,
   });
   const descriptionParagraph = paragraphXml(
-    itemWordRuns(item, {
+    itemWordRuns(element, {
       bold: isHeading,
       fontSizePx: isHeading ? headingFontSize : undefined,
       keepNext: isHeading,
@@ -653,29 +656,29 @@ function bodyRowXml(
     }),
     makeCell(
       cells[2],
-      item.kind === "LINE"
-        ? plainParagraphXml(formatQuantity(item.quantity ?? 0), { align: "right" })
+      element.kind === "LINE"
+        ? plainParagraphXml(formatQuantity(element.quantity ?? 0), { align: "right" })
         : plainParagraphXml(""),
       { ...cellOptions, width: QUOTE_TABLE_WIDTHS[2] },
     ),
     makeCell(
       cells[3],
-      item.kind === "LINE" && item.unitPriceHt !== null
-        ? plainParagraphXml(formatMoneyEuros(item.unitPriceHt), { align: "right" })
+      element.kind === "LINE" && element.unitPriceHt !== null
+        ? plainParagraphXml(formatMoneyEuros(element.unitPriceHt), { align: "right" })
         : plainParagraphXml(""),
       { ...cellOptions, width: QUOTE_TABLE_WIDTHS[3] },
     ),
     makeCell(
       cells[4],
-      item.kind === "LINE" && item.vatRatePercent !== null
-        ? plainParagraphXml(formatVat(item.vatRatePercent), { align: "center" })
+      element.kind === "LINE" && element.vatRatePercent !== null
+        ? plainParagraphXml(formatVat(element.vatRatePercent), { align: "center" })
         : plainParagraphXml(""),
       { ...cellOptions, width: QUOTE_TABLE_WIDTHS[4] },
     ),
     makeCell(
       cells[5],
-      item.totalHtCents !== null
-        ? plainParagraphXml(formatMoneyCents(item.totalHtCents), {
+      element.totalHtCents !== null
+        ? plainParagraphXml(formatMoneyCents(element.totalHtCents), {
             align: "right",
             bold: isHeading,
           })
@@ -695,7 +698,7 @@ function simpleSixColumnRowXml(
   options: { bold?: boolean; fontSizePx?: number; keepNext?: boolean } = {},
 ): string {
   const rowProperties = anchorRow.match(/<w:trPr>[\s\S]*?<\/w:trPr>/)?.[0] ?? "";
-  const cells = Array.from({ length: 6 }, (_, index) => templateCells[index]);
+  const cells = Array.from({ length: 6 }, (_, indice) => templateCells[indice]);
   if (cells.some((cell) => !cell)) {
     throw new Error("QUOTE_WORD_V2_OPTIONS_TEMPLATE_CELL_MISSING");
   }
@@ -737,17 +740,17 @@ export function replaceQuoteBodyAnchor(documentXml: string, document: QuoteDocum
   const anchorRow = documentXml.slice(rowStart, rowEnd);
   const templateCells = Array.from(
     anchorRow.matchAll(WORD_TABLE_CELL_PATTERN),
-    (match) => match[0],
+    (correspondance) => correspondance[0],
   );
   if (templateCells.length !== 6) throw new Error("QUOTE_WORD_V2_BODY_COLUMN_COUNT_INVALID");
 
   const visibleIds = visibleBodyItemIds(document.items);
-  const rows = document.items
-    .filter((item) => visibleIds.has(item.id))
-    .map((item) => bodyRowXml(anchorRow, templateCells, item))
+  const lignesTableau = document.items
+    .filter((element) => visibleIds.has(element.id))
+    .map((element) => bodyRowXml(anchorRow, templateCells, element))
     .join("");
 
-  return `${documentXml.slice(0, rowStart)}${rows}${documentXml.slice(rowEnd)}`;
+  return `${documentXml.slice(0, rowStart)}${lignesTableau}${documentXml.slice(rowEnd)}`;
 }
 
 export function replaceQuoteOptionsAnchor(
@@ -780,13 +783,13 @@ export function replaceQuoteOptionsAnchor(
   const anchorRow = documentXml.slice(rowStart, rowEnd);
   const templateCells = Array.from(
     anchorRow.matchAll(WORD_TABLE_CELL_PATTERN),
-    (match) => match[0],
+    (correspondance) => correspondance[0],
   );
   if (templateCells.length !== 6) {
     throw new Error("QUOTE_WORD_V2_OPTIONS_COLUMN_COUNT_INVALID");
   }
 
-  const rows: string[] = [
+  const lignesTableau: string[] = [
     simpleSixColumnRowXml(
       anchorRow,
       templateCells,
@@ -797,7 +800,7 @@ export function replaceQuoteOptionsAnchor(
   ];
 
   for (const option of document.pendingOptions) {
-    rows.push(
+    lignesTableau.push(
       simpleSixColumnRowXml(anchorRow, templateCells, option.label, "", {
         bold: true,
         fontSizePx: 12,
@@ -806,14 +809,14 @@ export function replaceQuoteOptionsAnchor(
     );
 
     const optionItems = document.items.filter(
-      (item) => item.scope === "PENDING_OPTION" && item.optionId === option.id,
+      (element) => element.scope === "PENDING_OPTION" && element.optionId === option.id,
     );
-    for (const item of optionItems) {
-      rows.push(bodyRowXml(anchorRow, templateCells, item, { bottomBorder: true }));
+    for (const element of optionItems) {
+      lignesTableau.push(bodyRowXml(anchorRow, templateCells, element, { bottomBorder: true }));
     }
   }
 
-  return `${documentXml.slice(0, rowStart)}${rows.join("")}${documentXml.slice(rowEnd)}`;
+  return `${documentXml.slice(0, rowStart)}${lignesTableau.join("")}${documentXml.slice(rowEnd)}`;
 }
 
 function replaceQuoteCustomerDiscountRow(documentXml: string, document: QuoteDocumentData): string {
@@ -821,22 +824,22 @@ function replaceQuoteCustomerDiscountRow(documentXml: string, document: QuoteDoc
   if (discountCents <= 0 || !document.totals.customerDiscountLabel) return documentXml;
 
   const range = tableRangeAroundAnchor(documentXml, "{{total_ht}}");
-  const rowRange = directTagRanges(range.table, "w:tr").find((candidate) =>
-    range.table.slice(candidate.start, candidate.end).includes("{{total_ht}}"),
+  const rowRange = directTagRanges(range.table, "w:tr").find((candidat) =>
+    range.table.slice(candidat.start, candidat.end).includes("{{total_ht}}"),
   );
   if (!rowRange) throw new Error("QUOTE_WORD_V2_DISCOUNT_TOTAL_ROW_MISSING");
 
   const totalRow = range.table.slice(rowRange.start, rowRange.end);
   const discountRow = totalRow.replace(WORD_PARAGRAPH_PATTERN, (paragraph) => {
-    const text = paragraphVisibleText(paragraph);
-    if (text.includes("Total net HT")) {
+    const texte = paragraphVisibleText(paragraph);
+    if (texte.includes("Total net HT")) {
       return replaceFirstTokenInParagraph(
         paragraph,
         "Total net HT",
         document.totals.customerDiscountLabel ?? "Remise client",
       ).paragraph;
     }
-    if (text.includes("{{total_ht}}")) {
+    if (texte.includes("{{total_ht}}")) {
       return replaceFirstTokenInParagraph(
         paragraph,
         "{{total_ht}}",
@@ -867,14 +870,14 @@ function renderDocumentXml(
   transform: (xml: string) => string,
   missingDocumentError: string,
 ): Uint8Array {
-  const entries = readZipArchive(template);
+  const entrees = readZipArchive(template);
   let documentXmlFound = false;
 
-  const renderedEntries = entries.map((entry) => {
-    if (entry.name !== "word/document.xml") return entry;
+  const renderedEntries = entrees.map((entree) => {
+    if (entree.name !== "word/document.xml") return entree;
     documentXmlFound = true;
-    const xml = Buffer.from(entry.data).toString("utf8");
-    return cloneZipEntryWithData(entry, Buffer.from(transform(xml), "utf8"));
+    const xml = Buffer.from(entree.data).toString("utf8");
+    return cloneZipEntryWithData(entree, Buffer.from(transform(xml), "utf8"));
   });
 
   if (!documentXmlFound) throw new Error(missingDocumentError);
@@ -907,26 +910,26 @@ export function renderQuoteWordV2Scalars(
   template: Uint8Array,
   scalarData: QuoteWordV2ScalarData,
 ): Uint8Array {
-  const entries = readZipArchive(template);
+  const entrees = readZipArchive(template);
   const totalReplacementCounts = new Map<string, number>();
-  for (const key of Object.keys(scalarData)) totalReplacementCounts.set(key, 0);
+  for (const cle of Object.keys(scalarData)) totalReplacementCounts.set(cle, 0);
 
-  const renderedEntries = entries.map((entry) => {
-    if (!isWordXmlEntry(entry.name)) return entry;
+  const renderedEntries = entrees.map((entree) => {
+    if (!isWordXmlEntry(entree.name)) return entree;
 
-    const xml = Buffer.from(entry.data).toString("utf8");
+    const xml = Buffer.from(entree.data).toString("utf8");
     const rendered = replaceWordXmlScalarTokens(
       xml,
       scalarData as unknown as Readonly<Record<string, string>>,
     );
-    for (const [key, count] of rendered.replacementCounts) {
-      totalReplacementCounts.set(key, (totalReplacementCounts.get(key) ?? 0) + count);
+    for (const [cle, nombre] of rendered.replacementCounts) {
+      totalReplacementCounts.set(cle, (totalReplacementCounts.get(cle) ?? 0) + nombre);
     }
-    return cloneZipEntryWithData(entry, Buffer.from(rendered.xml, "utf8"));
+    return cloneZipEntryWithData(entree, Buffer.from(rendered.xml, "utf8"));
   });
 
-  for (const [key, count] of totalReplacementCounts) {
-    if (count === 0) throw new Error(`QUOTE_WORD_V2_SCALAR_TOKEN_MISSING:${key}`);
+  for (const [cle, nombre] of totalReplacementCounts) {
+    if (nombre === 0) throw new Error(`QUOTE_WORD_V2_SCALAR_TOKEN_MISSING:${cle}`);
   }
 
   return writeZipArchive(renderedEntries);
