@@ -51,7 +51,7 @@ describe("quote Word template V2", () => {
       ]),
     );
     expect(manifest.layoutRules).toContain(
-      "Internal pricing adjustments are never rendered as separate client rows.",
+      "Internal pricing adjustments are never rendered as separate client lignesTableau.",
     );
     expect(manifest.layoutRules).toContain(
       "Options are visually separated and excluded from total_ht/total_ttc/net_a_payer.",

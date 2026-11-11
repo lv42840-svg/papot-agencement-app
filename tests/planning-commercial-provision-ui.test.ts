@@ -44,14 +44,14 @@ describe("grand planning commercial provision bridge", () => {
   });
 
   it("allows authorized reordering of provisioned cases", () => {
-    expect(apiSource).toContain('input.action === "setPotentialOrder"');
+    expect(apiSource).toContain('saisie.action === "setPotentialOrder"');
     expect(workspaceSource).toContain('action: "setPotentialOrder"');
-    expect(gridSource).toContain("onMoveProvision(item.caseId, -1)");
-    expect(gridSource).toContain("onMoveProvision(item.caseId, 1)");
+    expect(gridSource).toContain("onMoveProvision(element.caseId, -1)");
+    expect(gridSource).toContain("onMoveProvision(element.caseId, 1)");
   });
 
   it("edits provisional hours in the same Excel grid with a lighter visual treatment", () => {
-    expect(apiSource).toContain('input.action === "setProvisionHours"');
+    expect(apiSource).toContain('saisie.action === "setProvisionHours"');
     expect(workspaceSource).toContain('action: "setProvisionHours"');
     expect(gridSource).toMatch(/hoursInput\(\s*"provisional"/);
     expect(workspaceSource).toContain(".excelProvisionalRow .excelWeekCell");

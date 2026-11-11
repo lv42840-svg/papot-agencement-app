@@ -29,14 +29,14 @@ describe("paramétrage des intitulés de factures", () => {
     expect(editor).toContain("availableTitles.map");
     expect(editor).toContain("/settings/billing");
     expect(editor).toContain("Déjà préparé sur ce devis");
-    expect(editor).toContain("item.quoteId === draft.quoteId");
+    expect(editor).toContain("element.quoteId === brouillon.quoteId");
     expect(editor).toContain("Validé en interne");
     const settings = readFileSync("src/components/billing-titles-settings.tsx", "utf8");
     expect(settings).toContain("SET_TITLES");
     expect(settings).toContain("Ajouter un intitulé");
     const api = readFileSync("src/app/api/desktop/billing/route.ts", "utf8");
     expect(api).toContain('z.literal("SET_TITLES")');
-    expect(api).toContain("...current, drafts");
+    expect(api).toContain("...current, brouillons");
     expect(api).toContain("...current, invoiceTitles");
   });
 });

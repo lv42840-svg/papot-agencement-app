@@ -22,7 +22,7 @@ describe("monthly salary costs in the Heures screen", () => {
     const chantierApi = source("../src/app/api/desktop/chantiers/route.ts");
     expect(api).toContain('requireModuleRequestContext("payroll", "READ")');
     expect(api).toContain('requireModuleRequestContext("payroll", "WRITE")');
-    expect(chantierApi).toContain('hasModuleAccess(user.id, "payroll", "READ")');
+    expect(chantierApi).toContain('hasModuleAccess(utilisateur.id, "payroll", "READ")');
   });
 
   it("connects monthly salaries to profitability without modifying planned or actual hours", () => {

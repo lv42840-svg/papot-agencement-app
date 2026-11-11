@@ -249,12 +249,12 @@ describe("chantier cancellation", () => {
       new URL("../src/components/chantiers-workspace.tsx", import.meta.url),
       "utf8",
     );
-    expect(ui).toContain("expectedUpdatedAt: body.expectedUpdatedAt ?? current.updatedAt");
+    expect(ui).toContain("expectedUpdatedAt: corps.expectedUpdatedAt ?? courant.updatedAt");
     expect(ui).toContain("Confirmer l’annulation");
     expect(ui).toContain("Clôturer le chantier");
     expect(ui).toContain("!cancelConfirmed");
     expect(ui).toContain("confirmed: true");
-    expect(api).toContain('input.action === "markDone" || input.action === "cancel"');
+    expect(api).toContain('saisie.action === "markDone" || saisie.action === "cancel"');
     expect(api).toContain("assertChantierRevision(openedChantier, expectedUpdatedAt)");
     expect(list).toContain('setMode("CANCELLED")');
   });

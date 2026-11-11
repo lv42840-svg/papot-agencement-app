@@ -5,52 +5,54 @@ const ts = require("typescript");
 const ROOT = process.cwd();
 const TESTS = path.join(ROOT, "tests");
 
-const RENOMMAGES = new Map(Object.entries({
-  context: "contexte",
-  input: "saisie",
-  body: "corps",
-  event: "evenement",
-  user: "utilisateur",
-  person: "personne",
-  data: "donnees",
-  row: "ligneTableau",
-  line: "ligne",
-  item: "element",
-  candidate: "candidat",
-  result: "resultat",
-  selected: "selectionne",
-  target: "cible",
-  draft: "brouillon",
-  entries: "entrees",
-  value: "valeur",
-  next: "suivant",
-  previous: "precedent",
-  week: "semaine",
-  year: "annee",
-  key: "cle",
-  params: "parametres",
-  request: "requete",
-  response: "reponse",
-  current: "courant",
-  error: "erreur",
-  file: "fichier",
-  path: "chemin",
-  actor: "auteur",
-  record: "enregistrement",
-  search: "recherche",
-  filter: "filtre",
-  rows: "lignesTableau",
-  drafts: "brouillons",
-  quoteId: "idDevis",
-  itemId: "idElement",
-  userId: "idUtilisateur",
-  caseId: "idAffaire",
-  entryId: "idEntree",
-  documentId: "idDocument",
-  clientId: "idClient",
-  orderId: "idCommande",
-  draftId: "idBrouillon",
-}));
+const RENOMMAGES = new Map(
+  Object.entries({
+    context: "contexte",
+    input: "saisie",
+    body: "corps",
+    event: "evenement",
+    user: "utilisateur",
+    person: "personne",
+    data: "donnees",
+    row: "ligneTableau",
+    line: "ligne",
+    item: "element",
+    candidate: "candidat",
+    result: "resultat",
+    selected: "selectionne",
+    target: "cible",
+    draft: "brouillon",
+    entries: "entrees",
+    value: "valeur",
+    next: "suivant",
+    previous: "precedent",
+    week: "semaine",
+    year: "annee",
+    key: "cle",
+    params: "parametres",
+    request: "requete",
+    response: "reponse",
+    current: "courant",
+    error: "erreur",
+    file: "fichier",
+    path: "chemin",
+    actor: "auteur",
+    record: "enregistrement",
+    search: "recherche",
+    filter: "filtre",
+    rows: "lignesTableau",
+    drafts: "brouillons",
+    quoteId: "idDevis",
+    itemId: "idElement",
+    userId: "idUtilisateur",
+    caseId: "idAffaire",
+    entryId: "idEntree",
+    documentId: "idDocument",
+    clientId: "idClient",
+    orderId: "idCommande",
+    draftId: "idBrouillon",
+  }),
+);
 
 function echapperRegExp(texte) {
   return texte.replace(/[.*+?^$\{\}()|[\]\\]/g, "\\$&");
@@ -81,17 +83,17 @@ function transformer(texte) {
   // Paramètres de callbacks, ex. .map((person) => ...)
   for (const [ancien, nouveau] of RENOMMAGES) {
     const mot = echapperRegExp(ancien);
-    sortie = sortie.replace(
-      new RegExp("(\\(\\s*)" + mot + "(?=\\s*[,):])", "g"),
-      "$1" + nouveau,
-    );
+    sortie = sortie.replace(new RegExp("(\\(\\s*)" + mot + "(?=\\s*[,):])", "g"), "$1" + nouveau);
   }
 
   // Identifiants utilisés comme valeurs/arguments, jamais comme clés de propriété.
   for (const [ancien, nouveau] of RENOMMAGES) {
     const mot = echapperRegExp(ancien);
     sortie = sortie.replace(
-      new RegExp("([=(,+!\\[{:?&|]\\s*)" + mot + "(?=\\s*(?:[),}\\];+]|\\?\\?|&&|\\|\\||=>|$))", "g"),
+      new RegExp(
+        "([=(,+!\\[{:?&|]\\s*)" + mot + "(?=\\s*(?:[),}\\];+]|\\?\\?|&&|\\|\\||=>|$))",
+        "g",
+      ),
       "$1" + nouveau,
     );
   }

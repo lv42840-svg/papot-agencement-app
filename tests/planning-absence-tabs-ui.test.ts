@@ -14,8 +14,8 @@ describe("person-by-person absence register", () => {
   it("provides one tab for each person and filters the displayed absences", () => {
     expect(source).toContain('aria-label="Absences par personne"');
     expect(source).toContain('role="tab"');
-    expect(source).toContain("aria-selected={selected}");
-    expect(source).toContain("setAbsenceUserId(person.id)");
+    expect(source).toContain("aria-selected={selectionne}");
+    expect(source).toContain("setAbsenceUserId(personne.id)");
     expect(source).toContain("shownAbsences.map((absence)");
     expect(source).toContain("groupPlanningAbsences");
   });
@@ -25,7 +25,7 @@ describe("person-by-person absence register", () => {
     expect(source).toContain("Supprimer la semaine");
     expect(source).toContain("deleteAbsenceBatch");
     expect(source).toContain("setAbsenceWeek(absence.week)");
-    expect(route).toContain('input.action === "deleteAbsenceBatch"');
+    expect(route).toContain('saisie.action === "deleteAbsenceBatch"');
     expect(route).toContain("applyPlanningDeleteAbsenceBatchMutation");
   });
 });

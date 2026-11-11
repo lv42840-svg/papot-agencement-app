@@ -17,7 +17,7 @@ const api = readFileSync(
 describe("compact weekly print and independent personnel visibility", () => {
   it("prints only a small week number, not the dashboard header or chantier summary", () => {
     expect(board).toContain('className="weeklyBoardPrintWeek"');
-    expect(board).toContain("S{week.slice(-2)} · {week.slice(0, 4)}");
+    expect(board).toContain("S{semaine.slice(-2)} · {semaine.slice(0, 4)}");
     expect(board).toContain("window.print()");
     const printRules = board.slice(board.indexOf("@media print"));
     expect(printRules).toContain(".weeklyBoardTop,");
@@ -44,7 +44,7 @@ describe("compact weekly print and independent personnel visibility", () => {
   });
 
   it("hides people only from the weekly board, never from actual team capacity", () => {
-    expect(api).toContain("!person.hiddenInWeeklyBoard");
+    expect(api).toContain("!personne.hiddenInWeeklyBoard");
     expect(api).toMatch(/buildWeeklyCapacityIndicators\(\s*\[week\],\s*allPeople,/);
     expect(personnel).toContain("Masquer une personne du petit planning ne retire pas ses heures");
     expect(personnel).toContain("Visible au petit planning");

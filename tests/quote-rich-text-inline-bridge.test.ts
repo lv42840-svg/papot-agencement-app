@@ -8,11 +8,11 @@ const bridge = readFileSync(
 
 describe("quote rich text inline bridge", () => {
   it("supports existing and newly created quote items", () => {
-    expect(bridge).toContain('const key = `${kind}:${itemId ?? "new"}:${number}`');
+    expect(bridge).toContain('const cle = `${kind}:${idElement ?? "new"}:${number}`');
     expect(bridge).toContain("beforeItemIds");
-    expect(bridge).toContain("!pending.beforeItemIds.has(item.id)");
-    expect(bridge).toContain("itemMatchesKind(item, pending.kind)");
-    expect(bridge).not.toContain("itemText(item) === plainText");
+    expect(bridge).toContain("!pending.beforeItemIds.has(element.id)");
+    expect(bridge).toContain("itemMatchesKind(element, pending.kind)");
+    expect(bridge).not.toContain("itemText(element) === plainText");
   });
 
   it("keeps the business form synchronized with the rich editor", () => {
@@ -20,13 +20,13 @@ describe("quote rich text inline bridge", () => {
       'Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, "value")',
     );
     expect(bridge).toContain('new Event("input", { bubbles: true })');
-    expect(bridge).toContain("quoteRichTextToPlainText(next)");
+    expect(bridge).toContain("quoteRichTextToPlainText(suivant)");
   });
 
   it("persists the rich runs after the structured form save", () => {
     expect(bridge).toContain("pendingSaveRef");
     expect(bridge).toContain("trimmedRichText");
-    expect(bridge).toContain("/items/${target.id}/rich-text");
-    expect(bridge).toContain("onSaved(data.payload)");
+    expect(bridge).toContain("/items/${cible.id}/rich-text");
+    expect(bridge).toContain("onSaved(donnees.payload)");
   });
 });

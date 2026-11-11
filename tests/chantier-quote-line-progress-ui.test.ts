@@ -15,12 +15,12 @@ describe("chantier retained quote line checklist UI", () => {
     expect(operational).toContain("setQuoteLineProgress");
     expect(operational).toContain("Marquer réalisée");
     expect(operational).toContain("Ligne remise à faire.");
-    expect(operational).toContain("line.quantity");
-    expect(operational).toContain("line.unit");
+    expect(operational).toContain("ligne.quantity");
+    expect(operational).toContain("ligne.unit");
   });
 
   it("validates progress changes against a retained quote line on the server", () => {
-    expect(route).toContain('input.action === "setQuoteLineProgress"');
+    expect(route).toContain('saisie.action === "setQuoteLineProgress"');
     expect(route).toContain("resolveRetainedChantierQuoteLine");
     expect(route).toContain("chantierQuoteLineDisplay(reference)");
   });

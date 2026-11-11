@@ -22,7 +22,7 @@ describe("accueil : chiffre d'affaires réellement facturé", () => {
   it("protège le CA par les droits Pilotage et Facturation", () => {
     expect(route).toContain('requireModuleRequestContext("pilotage", "READ")');
     expect(route).toContain('requireModuleRequestContext("billing", "READ")');
-    expect(route).toContain('requireSpecialPermission(context.user, "dashboard.view_global")');
+    expect(route).toContain('requireSpecialPermission(contexte.user, "dashboard.view_global")');
     expect(route).toContain("summarizeIssuedInvoices([], false)");
     expect(route).toContain("Cache-Control");
   });

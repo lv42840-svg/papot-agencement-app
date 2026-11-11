@@ -32,8 +32,8 @@ describe("quote rich text UI wiring", () => {
 
     expect(wrapper).toContain("createPortal");
     expect(wrapper).toContain("quoteRichInlineHost");
-    expect(wrapper).toContain('input.insertAdjacentElement("beforebegin", host)');
-    expect(wrapper).toContain('input.style.display = "none"');
+    expect(wrapper).toContain('saisie.insertAdjacentElement("beforebegin", host)');
+    expect(wrapper).toContain('saisie.style.display = "none"');
     expect(wrapper).not.toContain("quoteRichInlineOverlay");
     expect(wrapper).not.toContain("position: fixed");
   });
@@ -76,12 +76,14 @@ describe("quote rich text UI wiring", () => {
     const wrapper = source("src/components/quote-structured-lines-rich-editor.tsx");
 
     expect(editor).toContain('aria-multiline="true"');
-    expect(editor).toContain('insertPlainTextAtSelection(event.currentTarget, "\\n", maxLength)');
+    expect(editor).toContain(
+      'insertPlainTextAtSelection(evenement.currentTarget, "\\n", maxLength)',
+    );
     expect(editor).toContain('.replace(/\\r\\n?/g, "\\n")');
-    expect(editor).not.toContain('if (event.key === "Enter") event.preventDefault()');
+    expect(editor).not.toContain('if (evenement.key === "Enter") evenement.preventDefault()');
     expect(wrapper).toContain("plainTextForNativeInput");
-    expect(wrapper).toContain('value.replace(/\\r\\n?|\\n/g, " ")');
-    expect(wrapper).not.toContain("itemText(item) === plainText");
+    expect(wrapper).toContain('valeur.replace(/\\r\\n?|\\n/g, " ")');
+    expect(wrapper).not.toContain("itemText(element) === plainText");
   });
 
   it("keeps saved line breaks visible after leaving rich-text edit mode", () => {

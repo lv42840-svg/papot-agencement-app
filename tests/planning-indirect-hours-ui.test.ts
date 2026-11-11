@@ -20,8 +20,8 @@ describe("SAV and general overhead hour allocation", () => {
   it("secures SAV entry behind the existing weekly actual-hours permission", () => {
     const api = source("../src/app/api/desktop/planning/actual-hours/route.ts");
     expect(api).toContain('requireModuleRequestContext("planning", "WRITE")');
-    expect(api).toContain('requireSpecialPermission(context.user, "planning.enter_actual_hours")');
-    expect(api).toContain("if (!isPlanningWeekPast(input.week))");
+    expect(api).toContain('requireSpecialPermission(contexte.user, "planning.enter_actual_hours")');
+    expect(api).toContain("if (!isPlanningWeekPast(saisie.week))");
     expect(api).toContain("indirectHoursRowSchema.parse");
     expect(api).toContain("applyIndirectHoursRow");
     expect(api).toContain("indirectRecords:");
@@ -35,7 +35,7 @@ describe("SAV and general overhead hour allocation", () => {
     expect(chantier).not.toContain("indirectHours");
     expect(company).toContain("calculateIndicativeCompanyMarginCents");
     expect(dashboard).toContain("calculateIndirectLaborCostsForPeriod");
-    expect(dashboard).toContain('hasModuleAccess(context.user.id, "payroll", "READ")');
+    expect(dashboard).toContain('hasModuleAccess(contexte.user.id, "payroll", "READ")');
     expect(ui).toContain("Marge globale indicative");
     expect(ui).toContain("Frais généraux / an");
     expect(ui).toContain("Heures SAV / an");

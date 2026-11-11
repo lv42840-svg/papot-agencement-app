@@ -20,9 +20,9 @@ describe("new personnel hours and absence suggestions", () => {
 
   it("proposes the selected person's scheduled hours for the date, without locking the input", () => {
     expect(component).toContain("suggestedAbsenceHoursForDate");
-    expect(component).toContain("person.weeklySchedule, absenceDate");
+    expect(component).toContain("personne.weeklySchedule, absenceDate");
     expect(component).toContain("value={displayedAbsenceHours}");
-    expect(component).toContain("setAbsenceHours(event.target.value)");
+    expect(component).toContain("setAbsenceHours(evenement.target.value)");
     expect(component).toContain("setAbsenceHours(null)");
     expect(component).toContain("setAbsenceHours(formatHours(absence.hours))");
     expect(component).toContain("parseHours(displayedAbsenceHours)");

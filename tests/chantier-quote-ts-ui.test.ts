@@ -54,6 +54,6 @@ describe("chantier native quote and TS bridge", () => {
   });
 
   it("recognizes retained native quotes on the launch sheet", () => {
-    expect(launchWorkspace).toContain("item.retainedQuoteIds.length > 0");
+    expect(launchWorkspace).toContain("element.retainedQuoteIds.length > 0");
   });
 });

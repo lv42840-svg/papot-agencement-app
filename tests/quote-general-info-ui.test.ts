@@ -33,7 +33,7 @@ describe("quote general info UI", () => {
   it("utilise une sélection structurée pour les conditions de règlement", () => {
     expect(editor).toMatch(/<span>Conditions de règlement<\/span>\s*<select/);
     expect(editor).toContain("availablePaymentTerms.map");
-    expect(page).toContain("clients.clients.map((candidate) => candidate.paymentTerms)");
+    expect(page).toContain("clients.clients.map((candidat) => candidat.paymentTerms)");
   });
 
   it("ne présente plus de champ de validité dans ce bloc", () => {

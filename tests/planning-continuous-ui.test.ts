@@ -18,7 +18,7 @@ describe("continuous grand planning", () => {
   it("provides rolling multi-year snapshots after data edits, not just for initial loading", () => {
     expect(api).toContain("parseYearRange");
     expect(api).toContain("planningYearWeekIdsRange");
-    expect(api).toContain("body.endYear");
+    expect(api).toContain("corps.endYear");
     expect(workspace).toContain("endYear: snapshot.endYear");
     expect(workspace).toContain("snapshot.endYear + 1");
     expect(workspace).toContain("onScroll={handlePlanningScroll}");
@@ -29,7 +29,7 @@ describe("continuous grand planning", () => {
     expect(grid.match(/className="excelActivityTotalRow"/g)).toHaveLength(1);
     expect(grid).toContain("TOTAL CHANTIERS");
     expect(grid).toContain(
-      "tripleValues(ACTIVITIES.map((activity) => weeklyTotalFor(activity, week)))",
+      "tripleValues(ACTIVITIES.map((activity) => weeklyTotalFor(activity, semaine)))",
     );
     expect(grid).toContain("month.year");
   });

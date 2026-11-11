@@ -25,18 +25,18 @@ describe("dashboard real weekly planning preview", () => {
     expect(component).toContain("/api/desktop/planning/weekly-board?week=");
     expect(component).toContain('cache: "no-store"');
     expect(api).toContain('requireModuleRequestContext("planning", "READ")');
-    expect(component).toContain("data.people.map");
-    expect(component).toContain("data.dates.map");
-    expect(component).toContain("data?.assignments");
-    expect(component).toContain("data?.absences");
-    expect(component).toContain("data?.holidays");
+    expect(component).toContain("donnees.people.map");
+    expect(component).toContain("donnees.dates.map");
+    expect(component).toContain("donnees?.assignments");
+    expect(component).toContain("donnees?.absences");
+    expect(component).toContain("donnees?.holidays");
   });
 
   it("provides week arrows and a live link to the editable full weekly board", () => {
     expect(component).toContain('aria-label="Semaine précédente"');
     expect(component).toContain('aria-label="Semaine suivante"');
-    expect(component).toContain('href={"/planning/" + week}');
-    expect(component).toContain("shiftDashboardPlanningWeek(previous, 1)");
+    expect(component).toContain('href={"/planning/" + semaine}');
+    expect(component).toContain("shiftDashboardPlanningWeek(precedent, 1)");
     expect(component).toContain("Cette semaine");
   });
 });
