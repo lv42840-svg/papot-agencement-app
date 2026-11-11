@@ -16,15 +16,24 @@ type ChantiersStateRow = {
   payload: unknown;
 };
 
-type Queryable = Pick<Pool, "query"> | Pick<PoolClient, "query">;
+type Queryable =
+  | Pick<Pool, "query">
+  | Pick<PoolClient, "query">;
 
-async function loadState(queryable: Queryable): Promise<ChantiersStateRow> {
-  const result = await queryable.query<ChantiersStateRow>(
-    "SELECT version, payload FROM papot_chantiers_state WHERE scope = 'global'",
-  );
-  const row = result.rows[0];
-  if (!row) throw new Error("CHANTIERS_STORAGE_NOT_INITIALIZED");
-  return row;
+async function loadState(
+  sourceRequete: Queryable,
+): Promise<ChantiersStateRow> {
+  const resultat =
+    await sourceRequete.query<ChantiersStateRow>(
+      "SELECT version, payload FROM papot_chantiers_state WHERE scope = 'global'",
+    );
+  const ligne = resultat.rows[0];
+  if (!ligne) {
+    throw new Error(
+      "CHANTIERS_STORAGE_NOT_INITIALIZED",
+    );
+  }
+  return ligne;
 }
 
 export function createPostgresChantiersRepository(
@@ -32,32 +41,47 @@ export function createPostgresChantiersRepository(
 ): ChantiersRepository {
   return {
     async load() {
-      const row = await loadState(pool);
-      return parseChantiersPayload(row.payload);
+      const ligne = await loadState(pool);
+      return parseChantiersPayload(ligne.payload);
     },
 
-    async mutate(transform: ChantiersMutationTransform) {
+    async mutate(
+      transformation: ChantiersMutationTransform,
+    ) {
       return withServerDbTransaction(async (client) => {
-        const locked = await client.query<ChantiersStateRow>(
-          `
+        const verrouillage =
+          await client.query<ChantiersStateRow>(
+            `
             SELECT version, payload
             FROM papot_chantiers_state
             WHERE scope = 'global'
             FOR UPDATE
           `,
-        );
-        const row = locked.rows[0];
-        if (!row) throw new Error("CHANTIERS_STORAGE_NOT_INITIALIZED");
+          );
+        const ligne = verrouillage.rows[0];
+        if (!ligne) {
+          throw new Error(
+            "CHANTIERS_STORAGE_NOT_INITIALIZED",
+          );
+        }
 
-        const mutation = await transform(parseChantiersPayload(row.payload), false);
+        const mutation = await transformation(
+          parseChantiersPayload(ligne.payload),
+          false,
+        );
         if (mutation.shouldPersist === false) {
           return {
-            payload: parseChantiersPayload(mutation.payload),
-            focusChantierId: mutation.focusChantierId,
+            payload: parseChantiersPayload(
+              mutation.payload,
+            ),
+            focusChantierId:
+              mutation.focusChantierId,
           };
         }
 
-        const saved = await client.query<{ payload: unknown }>(
+        const sauvegarde = await client.query<{
+          payload: unknown;
+        }>(
           `
             UPDATE papot_chantiers_state
             SET version = version + 1,
@@ -66,15 +90,20 @@ export function createPostgresChantiersRepository(
             WHERE scope = 'global' AND version = $2
             RETURNING payload
           `,
-          [mutation.payload, row.version],
+          [mutation.payload, ligne.version],
         );
-        if (saved.rowCount === 0) {
-          throw new ChantiersRepositoryError("CHANTIERS_VERSION_CONFLICT");
+        if (sauvegarde.rowCount === 0) {
+          throw new ChantiersRepositoryError(
+            "CHANTIERS_VERSION_CONFLICT",
+          );
         }
 
         return {
-          payload: parseChantiersPayload(saved.rows[0]?.payload),
-          focusChantierId: mutation.focusChantierId,
+          payload: parseChantiersPayload(
+            sauvegarde.rows[0]?.payload,
+          ),
+          focusChantierId:
+            mutation.focusChantierId,
         };
       }, pool);
     },

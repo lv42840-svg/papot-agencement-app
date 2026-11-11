@@ -1,8 +1,12 @@
 import type { CommercialDocumentCategory } from "./domain";
 
-const WINDOWS_RESERVED_NAME = /^(con|prn|aux|nul|com[1-9]|lpt[1-9])(?:\..*)?$/i;
+const WINDOWS_RESERVED_NAME =
+  /^(con|prn|aux|nul|com[1-9]|lpt[1-9])(?:\..*)?$/i;
 
-const COMMERCIAL_DOCUMENT_FOLDER_NAMES: Record<CommercialDocumentCategory, string> = {
+const COMMERCIAL_DOCUMENT_FOLDER_NAMES: Record<
+  CommercialDocumentCategory,
+  string
+> = {
   RECEIVED: "Documents reçus",
   INTERNAL_QUOTING: "Chiffrage interne",
   QUOTE: "Devis",
@@ -10,51 +14,91 @@ const COMMERCIAL_DOCUMENT_FOLDER_NAMES: Record<CommercialDocumentCategory, strin
   MISC: "Divers",
 };
 
-function cleanSegment(value: string, fallback: string, maxLength: number): string {
-  const normalized = value
+function cleanSegment(
+  valeur: string,
+  valeurSecours: string,
+  longueurMaximale: number,
+): string {
+  const normalise = valeur
     .trim()
     .replace(/[<>:"/\\|?*\x00-\x1F]/g, "-")
     .replace(/\s+/g, " ")
     .replace(/[. ]+$/g, "");
-  const clipped = (normalized || fallback).slice(0, maxLength).replace(/[. ]+$/g, "");
-  if (WINDOWS_RESERVED_NAME.test(clipped)) return `_${clipped}`;
-  return clipped || fallback;
+  const tronque = (
+    normalise || valeurSecours
+  )
+    .slice(0, longueurMaximale)
+    .replace(/[. ]+$/g, "");
+  if (WINDOWS_RESERVED_NAME.test(tronque)) {
+    return `_${tronque}`;
+  }
+  return tronque || valeurSecours;
 }
 
-export function commercialAffairFolderName(clientName: string | null, caseName: string): string {
-  const client = cleanSegment(clientName ?? "", "Client à préciser", 90);
-  const affair = cleanSegment(caseName, "Affaire", 90);
-  return cleanSegment(`${client}_${affair}`, "Affaire", 180);
+export function commercialAffairFolderName(
+  nomClient: string | null,
+  nomAffaire: string,
+): string {
+  const client = cleanSegment(
+    nomClient ?? "",
+    "Client à préciser",
+    90,
+  );
+  const affaire = cleanSegment(
+    nomAffaire,
+    "Affaire",
+    90,
+  );
+  return cleanSegment(
+    `${client}_${affaire}`,
+    "Affaire",
+    180,
+  );
 }
 
-export function commercialDocumentFolderName(category: CommercialDocumentCategory): string {
-  return COMMERCIAL_DOCUMENT_FOLDER_NAMES[category];
+export function commercialDocumentFolderName(
+  categorie: CommercialDocumentCategory,
+): string {
+  return COMMERCIAL_DOCUMENT_FOLDER_NAMES[categorie];
 }
 
-export function commercialDocumentFileName(fileName: string): string {
-  return cleanSegment(fileName, "document", 180);
+export function commercialDocumentFileName(
+  nomFichier: string,
+): string {
+  return cleanSegment(
+    nomFichier,
+    "document",
+    180,
+  );
 }
 
-export function commercialDocumentStoragePath(input: {
-  creationYear: number;
-  clientName: string | null;
-  caseName: string;
-  category: CommercialDocumentCategory;
-  fileName: string;
-}): string {
+export function commercialDocumentStoragePath(
+  saisie: {
+    creationYear: number;
+    clientName: string | null;
+    caseName: string;
+    category: CommercialDocumentCategory;
+    fileName: string;
+  },
+): string {
   if (
-    !Number.isInteger(input.creationYear) ||
-    input.creationYear < 2000 ||
-    input.creationYear > 9999
+    !Number.isInteger(saisie.creationYear) ||
+    saisie.creationYear < 2000 ||
+    saisie.creationYear > 9999
   ) {
-    throw new Error("COMMERCIAL_DOCUMENT_YEAR_INVALID");
+    throw new Error(
+      "COMMERCIAL_DOCUMENT_YEAR_INVALID",
+    );
   }
 
   return [
     "Commercial",
-    String(input.creationYear),
-    commercialAffairFolderName(input.clientName, input.caseName),
-    commercialDocumentFolderName(input.category),
-    commercialDocumentFileName(input.fileName),
+    String(saisie.creationYear),
+    commercialAffairFolderName(
+      saisie.clientName,
+      saisie.caseName,
+    ),
+    commercialDocumentFolderName(saisie.category),
+    commercialDocumentFileName(saisie.fileName),
   ].join("/");
 }

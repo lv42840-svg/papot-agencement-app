@@ -1,21 +1,28 @@
 import type { CommercialPayload } from "./domain";
 import type { CommercialMutationResult } from "./mutations";
 
-export type CommercialRepositoryMutation = CommercialMutationResult & {
-  shouldPersist?: boolean;
-};
+export type CommercialRepositoryMutation =
+  CommercialMutationResult & {
+    shouldPersist?: boolean;
+  };
 
 export type CommercialMutationTransform = (
-  payload: CommercialPayload,
-  isRetry: boolean,
-) => CommercialRepositoryMutation | Promise<CommercialRepositoryMutation>;
+  donnees: CommercialPayload,
+  estNouvelleTentative: boolean,
+) =>
+  | CommercialRepositoryMutation
+  | Promise<CommercialRepositoryMutation>;
 
 export interface CommercialRepository {
   load(): Promise<CommercialPayload>;
-  mutate(transform: CommercialMutationTransform): Promise<CommercialMutationResult>;
+  mutate(
+    transformation: CommercialMutationTransform,
+  ): Promise<CommercialMutationResult>;
 }
 
-export type CommercialRepositoryErrorCode = "COMMERCIAL_LOCKED" | "COMMERCIAL_VERSION_CONFLICT";
+export type CommercialRepositoryErrorCode =
+  | "COMMERCIAL_LOCKED"
+  | "COMMERCIAL_VERSION_CONFLICT";
 
 export class CommercialRepositoryError extends Error {
   constructor(

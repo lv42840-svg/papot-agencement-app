@@ -2,7 +2,9 @@ import type { ChantierHours } from "./domain";
 import { calculateCommercialContractSummary } from "../quotes/commercial-summary";
 import type { NativeQuotesPayload } from "../quotes/store";
 
-export type ChantierLaunchHoursSource = "RETAINED_QUOTES" | "COMMERCIAL_PROVISION";
+export type ChantierLaunchHoursSource =
+  | "RETAINED_QUOTES"
+  | "COMMERCIAL_PROVISION";
 
 export type ChantierLaunchHours = {
   hours: ChantierHours;
@@ -16,31 +18,43 @@ type LaunchHoursAffair = {
 };
 
 export function deriveChantierLaunchHours(
-  affair: LaunchHoursAffair,
-  quotes: NativeQuotesPayload,
+  affaire: LaunchHoursAffair,
+  devis: NativeQuotesPayload,
 ): ChantierLaunchHours {
-  if (affair.retainedQuoteIds.length === 0) {
+  if (affaire.retainedQuoteIds.length === 0) {
     return {
-      hours: { ...affair.provisionHours },
+      hours: { ...affaire.provisionHours },
       source: "COMMERCIAL_PROVISION",
     };
   }
 
-  const quotesById = new Map(quotes.quotes.map((quote) => [quote.id, quote]));
-  const retainedQuotes = affair.retainedQuoteIds.map((quoteId) => {
-    const quote = quotesById.get(quoteId);
-    if (!quote || quote.commercialCaseId !== affair.id) {
-      throw new Error("CHANTIER_RETAINED_QUOTE_NOT_FOUND");
-    }
-    return quote;
-  });
+  const devisParId = new Map(
+    devis.quotes.map((unDevis) => [unDevis.id, unDevis]),
+  );
+  const devisRetenus = affaire.retainedQuoteIds.map(
+    (idDevis) => {
+      const unDevis = devisParId.get(idDevis);
+      if (
+        !unDevis ||
+        unDevis.commercialCaseId !== affaire.id
+      ) {
+        throw new Error(
+          "CHANTIER_RETAINED_QUOTE_NOT_FOUND",
+        );
+      }
+      return unDevis;
+    },
+  );
 
-  const contract = calculateCommercialContractSummary(retainedQuotes, affair.retainedQuoteIds);
+  const contrat = calculateCommercialContractSummary(
+    devisRetenus,
+    affaire.retainedQuoteIds,
+  );
   return {
     hours: {
-      be: contract.soldHoursByActivity.be,
-      workshop: contract.soldHoursByActivity.workshop,
-      install: contract.soldHoursByActivity.install,
+      be: contrat.soldHoursByActivity.be,
+      workshop: contrat.soldHoursByActivity.workshop,
+      install: contrat.soldHoursByActivity.install,
     },
     source: "RETAINED_QUOTES",
   };

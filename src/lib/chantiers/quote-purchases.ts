@@ -21,7 +21,11 @@ export type PlannedPurchaseLine = {
 
 export type QuotePurchaseExtraction = {
   lines: PlannedPurchaseLine[];
-  unclassified: { quoteLineId: string; description: string; reason: string }[];
+  unclassified: {
+    quoteLineId: string;
+    description: string;
+    reason: string;
+  }[];
   totalCents: number | null;
 };
 
@@ -31,95 +35,151 @@ export type QuotePurchaseExtraction = {
  * Quoted cost adjustments (hotel, pass-through fees) are intentionally not
  * treated as purchasable materials. Unknown lines make the total incomplete.
  */
-export function extractPlannedPurchases(quote: NativeQuoteRecord): QuotePurchaseExtraction {
-  const pricing = calculateQuoteAdjustedPricing(quote.model.items, quote.pricingConfig);
-  const byLineId = new Map(
-    quote.model.items
-      .filter((item): item is QuoteLine => item.kind === "LINE")
-      .map((line) => [line.id, line]),
+export function extractPlannedPurchases(
+  devis: NativeQuoteRecord,
+): QuotePurchaseExtraction {
+  const tarification = calculateQuoteAdjustedPricing(
+    devis.model.items,
+    devis.pricingConfig,
   );
-  const lines: PlannedPurchaseLine[] = [];
-  const unclassified: QuotePurchaseExtraction["unclassified"] = [];
-  const quoteReference = quote.finalPdf?.quoteNumber ?? quote.model.subject;
+  const lignesParId = new Map(
+    devis.model.items
+      .filter(
+        (element): element is QuoteLine =>
+          element.kind === "LINE",
+      )
+      .map((ligne) => [ligne.id, ligne]),
+  );
+  const lignes: PlannedPurchaseLine[] = [];
+  const nonClasses: QuotePurchaseExtraction["unclassified"] =
+    [];
+  const referenceDevis =
+    devis.finalPdf?.quoteNumber ?? devis.model.subject;
 
-  for (const adjusted of pricing.lines) {
-    if (adjusted.optionStatus !== null && adjusted.optionStatus !== "RETAINED") continue;
-    const line = byLineId.get(adjusted.lineId);
-    if (!line) continue;
+  for (const ligneAjustee of tarification.lines) {
+    if (
+      ligneAjustee.optionStatus !== null &&
+      ligneAjustee.optionStatus !== "RETAINED"
+    ) {
+      continue;
+    }
+    const ligne = lignesParId.get(
+      ligneAjustee.lineId,
+    );
+    if (!ligne) continue;
 
-    const components: QuoteOuvrageComponent[] = line.components ?? [];
-    // A direct library component does not always create nested ouvrage components.
-    if (components.length === 0) {
-      if (line.librarySource?.kind === "COMPONENT") {
-        const source = line.librarySource.component;
+    const composants: QuoteOuvrageComponent[] =
+      ligne.components ?? [];
+    if (composants.length === 0) {
+      if (
+        ligne.librarySource?.kind === "COMPONENT"
+      ) {
+        const source =
+          ligne.librarySource.component;
         if (source.activity) continue;
-        if (/^(h|hr|heure|heures)$/i.test(source.unit.trim())) {
-          unclassified.push({
-            quoteLineId: line.id,
-            description: line.description,
-            reason: "Activité manquante sur un composant en heures",
+        if (
+          /^(h|hr|heure|heures)$/i.test(
+            source.unit.trim(),
+          )
+        ) {
+          nonClasses.push({
+            quoteLineId: ligne.id,
+            description: ligne.description,
+            reason:
+              "Activité manquante sur un composant en heures",
           });
           continue;
         }
-        lines.push({
-          quoteId: quote.id,
-          quoteReference,
-          quoteLineId: line.id,
+        lignes.push({
+          quoteId: devis.id,
+          quoteReference: referenceDevis,
+          quoteLineId: ligne.id,
           componentId: source.sourceComponentId,
-          quoteLineDescription: line.description,
+          quoteLineDescription: ligne.description,
           description: source.name,
-          quantity: line.quantity,
+          quantity: ligne.quantity,
           unit: source.unit,
           unitCostCents: source.costPriceCents,
-          totalCostCents: Math.round(line.quantity * source.costPriceCents),
+          totalCostCents: Math.round(
+            ligne.quantity *
+              source.costPriceCents,
+          ),
         });
       } else {
-        unclassified.push({
-          quoteLineId: line.id,
-          description: line.description,
-          reason: "Aucun composant d'achat ou de main-d'œuvre renseigné",
+        nonClasses.push({
+          quoteLineId: ligne.id,
+          description: ligne.description,
+          reason:
+            "Aucun composant d'achat ou de main-d'œuvre renseigné",
         });
       }
       continue;
     }
 
-    for (const component of components) {
-      const activity = component.activity ?? component.librarySource?.component.activity ?? null;
-      if (activity !== null) continue;
-      if (/^(h|hr|heure|heures)$/i.test(component.unit.trim())) {
-        unclassified.push({
-          quoteLineId: line.id,
-          description: component.description,
-          reason: "Activité manquante sur un composant en heures",
+    for (const composant of composants) {
+      const activite =
+        composant.activity ??
+        composant.librarySource?.component
+          .activity ??
+        null;
+      if (activite !== null) continue;
+      if (
+        /^(h|hr|heure|heures)$/i.test(
+          composant.unit.trim(),
+        )
+      ) {
+        nonClasses.push({
+          quoteLineId: ligne.id,
+          description: composant.description,
+          reason:
+            "Activité manquante sur un composant en heures",
         });
         continue;
       }
-      const unitCostCents = quoteOuvrageComponentCostPriceCents(component);
-      const totalCostCents =
-        unitCostCents === null
+      const coutUnitaireCentimes =
+        quoteOuvrageComponentCostPriceCents(
+          composant,
+        );
+      const coutTotalCentimes =
+        coutUnitaireCentimes === null
           ? null
-          : Math.round(line.quantity * Math.round(component.quantity * unitCostCents));
-      lines.push({
-        quoteId: quote.id,
-        quoteReference,
-        quoteLineId: line.id,
-        componentId: component.id,
-        quoteLineDescription: line.description,
-        description: component.description,
-        quantity: line.quantity * component.quantity,
-        unit: component.unit,
-        unitCostCents,
-        totalCostCents,
+          : Math.round(
+              ligne.quantity *
+                Math.round(
+                  composant.quantity *
+                    coutUnitaireCentimes,
+                ),
+            );
+      lignes.push({
+        quoteId: devis.id,
+        quoteReference: referenceDevis,
+        quoteLineId: ligne.id,
+        componentId: composant.id,
+        quoteLineDescription: ligne.description,
+        description: composant.description,
+        quantity:
+          ligne.quantity * composant.quantity,
+        unit: composant.unit,
+        unitCostCents: coutUnitaireCentimes,
+        totalCostCents: coutTotalCentimes,
       });
     }
   }
 
-  const complete = unclassified.length === 0 && lines.every((line) => line.totalCostCents !== null);
+  const complet =
+    nonClasses.length === 0 &&
+    lignes.every(
+      (ligne) => ligne.totalCostCents !== null,
+    );
   return {
-    lines,
-    unclassified,
-    totalCents: complete
-      ? lines.reduce((total, line) => total + (line.totalCostCents ?? 0), 0)
+    lines: lignes,
+    unclassified: nonClasses,
+    totalCents: complet
+      ? lignes.reduce(
+          (total, ligne) =>
+            total + (ligne.totalCostCents ?? 0),
+          0,
+        )
       : null,
   };
 }
