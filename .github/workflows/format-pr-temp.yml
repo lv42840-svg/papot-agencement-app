@@ -19,16 +19,17 @@ jobs:
           node-version: 22
           cache: npm
       - run: npm ci
+      - run: node scripts/franciser-lib-temp.cjs
       - run: npm run format
-      - name: Commit du formatage si necessaire
+      - name: Commit du lot lib si necessaire
         shell: bash
         run: |
           if git diff --quiet; then
-            echo "Aucun formatage a appliquer."
+            echo "Aucune francisation lib a appliquer."
             exit 0
           fi
           git config user.name "papot-format-bot"
           git config user.email "actions@users.noreply.github.com"
           git add .
-          git commit -m "Style: appliquer Prettier automatiquement"
+          git commit -m "Refactor: franciser les variables restantes de src/lib"
           git push origin HEAD:${{ github.event.pull_request.head.ref }}
