@@ -10,9 +10,14 @@ export type CommercialAssignableUser = {
 export async function listCommercialAssignableUsers(): Promise<CommercialAssignableUser[]> {
   const donneesAuthentification = await readAuthPayload();
   return donneesAuthentification.users
-    .filter((utilisateur) => utilisateur.isActive && Boolean(utilisateur.modulePermissions.commercial))
+    .filter(
+      (utilisateur) =>
+        utilisateur.isActive && Boolean(utilisateur.modulePermissions.commercial),
+    )
     .sort((utilisateurA, utilisateurB) =>
-      utilisateurA.displayName.localeCompare(utilisateurB.displayName, "fr", { sensitivity: "base" }),
+      utilisateurA.displayName.localeCompare(utilisateurB.displayName, "fr", {
+        sensitivity: "base",
+      }),
     )
     .map((utilisateur) => ({ id: utilisateur.id, displayName: utilisateur.displayName }));
 }
