@@ -80,12 +80,23 @@ export function createPostgresClientsRepository(pool: Pool = getServerDbPool()):
             const old = source.clients.find((candidate) => candidate.id === input.clientId);
             if (old?.pennylaneId) {
               const sourceKeys = [
-                "type", "companyName", "firstName", "lastName", "addressLine1",
-                "addressLine2", "postalCode", "city", "phone", "email", "siret",
+                "type",
+                "companyName",
+                "firstName",
+                "lastName",
+                "addressLine1",
+                "addressLine2",
+                "postalCode",
+                "city",
+                "phone",
+                "email",
+                "siret",
                 "paymentTerms",
               ] as const;
-              if (sourceKeys.some((key) => old[key] !== input[key]) ||
-                  (input.vatNumber !== undefined && old.vatNumber !== input.vatNumber)) {
+              if (
+                sourceKeys.some((key) => old[key] !== input[key]) ||
+                (input.vatNumber !== undefined && old.vatNumber !== input.vatNumber)
+              ) {
                 throw new Error("CLIENT_PENNYLANE_READONLY");
               }
             }

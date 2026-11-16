@@ -19,7 +19,12 @@ function noStoreJson(body: unknown, init?: ResponseInit) {
 }
 
 function publicSnapshot(payload: ClientsPayload, canWrite: boolean, focusClientId?: string) {
-  return { payload, canWrite, focusClientId, pennylaneMode: !isLocalStorageMode() && pennylaneEnabled() };
+  return {
+    payload,
+    canWrite,
+    focusClientId,
+    pennylaneMode: !isLocalStorageMode() && pennylaneEnabled(),
+  };
 }
 
 function errorStatus(code: string): number {

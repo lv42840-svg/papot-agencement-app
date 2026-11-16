@@ -99,7 +99,8 @@ const errorMessages: Record<string, string> = {
   CLIENT_NOT_FOUND: "Cette fiche client n’existe plus.",
   CLIENT_ARCHIVED: "Ce client est archivé. Réactive-le avant de le modifier.",
   CLIENT_CREATE_IN_PENNYLANE: "Crée le client dans Pennylane, puis importe-le ici.",
-  CLIENT_PENNYLANE_READONLY: "Les coordonnées et conditions comptables se modifient dans Pennylane. Les notes, contacts et la TVA restent modifiables ici.",
+  CLIENT_PENNYLANE_READONLY:
+    "Les coordonnées et conditions comptables se modifient dans Pennylane. Les notes, contacts et la TVA restent modifiables ici.",
 };
 
 function emptyDraft(): ClientDraft {
@@ -386,17 +387,24 @@ export function ClientsWorkspace() {
           </p>
         </div>
         <div className="buttonRow">
-          <Link href="/clients/pennylane" className="secondaryButton">Clients Pennylane · Importer</Link>
-        {canWrite && !pennylaneMode ? (
-          <button className="primaryButton" type="button" onClick={startNew} disabled={busy}>
-            <Plus size={15} aria-hidden="true" />
-            Nouveau client
-          </button>
-        ) : null}
+          <Link href="/clients/pennylane" className="secondaryButton">
+            Clients Pennylane · Importer
+          </Link>
+          {canWrite && !pennylaneMode ? (
+            <button className="primaryButton" type="button" onClick={startNew} disabled={busy}>
+              <Plus size={15} aria-hidden="true" />
+              Nouveau client
+            </button>
+          ) : null}
         </div>
       </header>
 
-      {pennylaneMode ? <p className="muted">Crée les clients dans Pennylane puis importe-les dans PAPOT. Les anciennes fiches restent conservées.</p> : null}
+      {pennylaneMode ? (
+        <p className="muted">
+          Crée les clients dans Pennylane puis importe-les dans PAPOT. Les anciennes fiches restent
+          conservées.
+        </p>
+      ) : null}
       {error ? <div className="clientsAlert clientsAlertError">{error}</div> : null}
       {notice ? <div className="clientsAlert clientsAlertSuccess">{notice}</div> : null}
 
@@ -530,7 +538,12 @@ export function ClientsWorkspace() {
 
               <div className="clientsSection">
                 <h3>Identité</h3>
-                {selectedClient?.pennylaneId ? <p className="muted">Identité liée à Pennylane : modifie ses coordonnées dans Pennylane, puis actualise.</p> : null}
+                {selectedClient?.pennylaneId ? (
+                  <p className="muted">
+                    Identité liée à Pennylane : modifie ses coordonnées dans Pennylane, puis
+                    actualise.
+                  </p>
+                ) : null}
                 <div className="clientsFormGrid">
                   <label className="clientsField">
                     Type de client

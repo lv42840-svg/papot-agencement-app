@@ -1,26 +1,30 @@
 import { z } from "zod";
 import type { ClientRecord, ClientType } from "@/lib/clients/domain";
 
-const customerSchema = z.object({
-  id: z.union([z.string(), z.number()]),
-  customer_type: z.enum(["company", "individual"]),
-  name: z.string().nullish(),
-  first_name: z.string().nullish(),
-  last_name: z.string().nullish(),
-  vat_number: z.string().nullish(),
-  reg_no: z.string().nullish(),
-  electronic_billing_address: z.string().nullish(),
-  public_administration: z.boolean().nullish(),
-  phone: z.string().nullish(),
-  emails: z.array(z.string()).nullish(),
-  payment_conditions: z.string().nullish(),
-  updated_at: z.string().nullish(),
-  billing_address: z.object({
-    address: z.string().nullish(),
-    postal_code: z.string().nullish(),
-    city: z.string().nullish(),
-  }).nullish(),
-}).passthrough();
+const customerSchema = z
+  .object({
+    id: z.union([z.string(), z.number()]),
+    customer_type: z.enum(["company", "individual"]),
+    name: z.string().nullish(),
+    first_name: z.string().nullish(),
+    last_name: z.string().nullish(),
+    vat_number: z.string().nullish(),
+    reg_no: z.string().nullish(),
+    electronic_billing_address: z.string().nullish(),
+    public_administration: z.boolean().nullish(),
+    phone: z.string().nullish(),
+    emails: z.array(z.string()).nullish(),
+    payment_conditions: z.string().nullish(),
+    updated_at: z.string().nullish(),
+    billing_address: z
+      .object({
+        address: z.string().nullish(),
+        postal_code: z.string().nullish(),
+        city: z.string().nullish(),
+      })
+      .nullish(),
+  })
+  .passthrough();
 
 const terms: Record<string, string> = {
   upon_receipt: "À réception de facture",
@@ -49,8 +53,19 @@ function customerSiret(regNo: string, electronicAddress: string): string {
 
 export type PennylaneCustomerFields = Pick<
   ClientRecord,
-  "type" | "companyName" | "firstName" | "lastName" | "addressLine1" | "addressLine2" |
-  "postalCode" | "city" | "phone" | "email" | "siret" | "vatNumber" | "paymentTerms"
+  | "type"
+  | "companyName"
+  | "firstName"
+  | "lastName"
+  | "addressLine1"
+  | "addressLine2"
+  | "postalCode"
+  | "city"
+  | "phone"
+  | "email"
+  | "siret"
+  | "vatNumber"
+  | "paymentTerms"
 >;
 
 export type PennylaneCustomer = {
@@ -73,14 +88,14 @@ export function normalizePennylaneCustomer(input: unknown): PennylaneCustomer {
   if ((individual && !lastName) || (!individual && !companyName)) {
     throw new Error("PENNYLANE_CUSTOMER_DATA_INVALID");
   }
-  const email = (raw.emails ?? []).find(item => z.string().email().safeParse(item).success) ?? "";
+  const email = (raw.emails ?? []).find((item) => z.string().email().safeParse(item).success) ?? "";
   const regNo = trim(raw.reg_no, 20);
-  const siret = individual
-    ? ""
-    : customerSiret(regNo, trim(raw.electronic_billing_address, 70));
+  const siret = individual ? "" : customerSiret(regNo, trim(raw.electronic_billing_address, 70));
   const type: ClientType = individual
     ? "PARTICULIER"
-    : raw.public_administration ? "COLLECTIVITE" : "ENTREPRISE";
+    : raw.public_administration
+      ? "COLLECTIVITE"
+      : "ENTREPRISE";
   const fields: PennylaneCustomerFields = {
     type,
     companyName,
@@ -105,8 +120,12 @@ export function normalizePennylaneCustomer(input: unknown): PennylaneCustomer {
 }
 
 export function normalizedClientIdentity(value: string): string {
-  return value.normalize("NFKD").replace(/[\u0300-\u036f]/g, "")
-    .toLowerCase().replace(/[^a-z0-9]+/g, " ").trim();
+  return value
+    .normalize("NFKD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, " ")
+    .trim();
 }
 
 export function possibleClientMatches(
@@ -114,14 +133,16 @@ export function possibleClientMatches(
   existing: readonly ClientRecord[],
 ): ClientRecord[] {
   const name = normalizedClientIdentity(candidate.name);
-  return existing.filter(client => (
-    (candidate.fields.siret !== "" && client.siret === candidate.fields.siret) ||
-    (name !== "" && normalizedClientIdentity(
-      client.type === "PARTICULIER"
-        ? [client.firstName, client.lastName].join(" ")
-        : client.companyName,
-    ) === name)
-  ));
+  return existing.filter(
+    (client) =>
+      (candidate.fields.siret !== "" && client.siret === candidate.fields.siret) ||
+      (name !== "" &&
+        normalizedClientIdentity(
+          client.type === "PARTICULIER"
+            ? [client.firstName, client.lastName].join(" ")
+            : client.companyName,
+        ) === name),
+  );
 }
 
 /**

@@ -1,7 +1,10 @@
 import { NextResponse } from "next/server";
 import { z } from "zod";
 import { isLocalStorageMode } from "@/lib/local-db/runtime";
-import { requireModuleRequestContext, desktopRequestErrorStatus } from "@/lib/desktop/request-context";
+import {
+  requireModuleRequestContext,
+  desktopRequestErrorStatus,
+} from "@/lib/desktop/request-context";
 import { pennylaneEnabled } from "@/lib/pennylane/config";
 import {
   readPennylaneCustomerCatalog,
@@ -14,15 +17,19 @@ export const dynamic = "force-dynamic";
 
 const bodySchema = z.discriminatedUnion("action", [
   z.object({ action: z.literal("REFRESH") }).strict(),
-  z.object({
-    action: z.literal("IMPORT"),
-    customerId: z.string().regex(/^\d{1,20}$/),
-  }).strict(),
-  z.object({
-    action: z.literal("LINK"),
-    customerId: z.string().regex(/^\d{1,20}$/),
-    clientId: z.string().uuid(),
-  }).strict(),
+  z
+    .object({
+      action: z.literal("IMPORT"),
+      customerId: z.string().regex(/^\d{1,20}$/),
+    })
+    .strict(),
+  z
+    .object({
+      action: z.literal("LINK"),
+      customerId: z.string().regex(/^\d{1,20}$/),
+      clientId: z.string().uuid(),
+    })
+    .strict(),
 ]);
 
 function json(body: unknown, status = 200) {
@@ -49,27 +56,48 @@ function sameOrigin(request: Request): boolean {
 }
 
 function failure(error: unknown) {
-  const code = error instanceof z.ZodError
-    ? "PENNYLANE_CLIENT_REQUEST_INVALID"
-    : error instanceof Error ? error.message : "PENNYLANE_CLIENT_FAILED";
+  const code =
+    error instanceof z.ZodError
+      ? "PENNYLANE_CLIENT_REQUEST_INVALID"
+      : error instanceof Error
+        ? error.message
+        : "PENNYLANE_CLIENT_FAILED";
   const known = [
-    "AUTH_REQUIRED", "MODULE_FORBIDDEN", "PASSWORD_CHANGE_REQUIRED",
-    "PENNYLANE_DISABLED", "PENNYLANE_NOT_CONFIGURED",
-    "PENNYLANE_CUSTOMER_REQUEST_INVALID", "PENNYLANE_CLIENT_REQUEST_INVALID",
-    "PENNYLANE_CUSTOMER_NOT_IMPORTED", "PENNYLANE_CUSTOMER_DATA_INVALID",
-    "PENNYLANE_CUSTOMER_ID_INVALID", "PENNYLANE_CLIENT_LINK_REQUIRED",
-    "PENNYLANE_CLIENT_LINK_CONFLICT", "PENNYLANE_CLIENT_SIRET_CONFLICT",
-    "CLIENT_NOT_FOUND", "CLIENT_SIRET_EXISTS", "CLIENTS_VERSION_CONFLICT",
-    "PENNYLANE_TOKEN_INVALID", "PENNYLANE_SCOPE_FORBIDDEN",
-    "PENNYLANE_NETWORK_ERROR", "PENNYLANE_COMPANY_MISMATCH",
-    "PENNYLANE_RATE_LIMITED", "PENNYLANE_PAGE_INVALID",
+    "AUTH_REQUIRED",
+    "MODULE_FORBIDDEN",
+    "PASSWORD_CHANGE_REQUIRED",
+    "PENNYLANE_DISABLED",
+    "PENNYLANE_NOT_CONFIGURED",
+    "PENNYLANE_CUSTOMER_REQUEST_INVALID",
+    "PENNYLANE_CLIENT_REQUEST_INVALID",
+    "PENNYLANE_CUSTOMER_NOT_IMPORTED",
+    "PENNYLANE_CUSTOMER_DATA_INVALID",
+    "PENNYLANE_CUSTOMER_ID_INVALID",
+    "PENNYLANE_CLIENT_LINK_REQUIRED",
+    "PENNYLANE_CLIENT_LINK_CONFLICT",
+    "PENNYLANE_CLIENT_SIRET_CONFLICT",
+    "CLIENT_NOT_FOUND",
+    "CLIENT_SIRET_EXISTS",
+    "CLIENTS_VERSION_CONFLICT",
+    "PENNYLANE_TOKEN_INVALID",
+    "PENNYLANE_SCOPE_FORBIDDEN",
+    "PENNYLANE_NETWORK_ERROR",
+    "PENNYLANE_COMPANY_MISMATCH",
+    "PENNYLANE_RATE_LIMITED",
+    "PENNYLANE_PAGE_INVALID",
   ];
   const safe = known.includes(code) ? code : "PENNYLANE_CLIENT_FAILED";
-  const status = desktopRequestErrorStatus(safe) ??
-    (safe === "PENNYLANE_DISABLED" || safe === "PENNYLANE_NOT_CONFIGURED" ? 503 :
-      safe === "CLIENT_NOT_FOUND" || safe === "PENNYLANE_CUSTOMER_NOT_IMPORTED" ? 404 :
-        safe.includes("LINK") || safe.includes("CONFLICT") || safe === "CLIENT_SIRET_EXISTS" ? 409 :
-          safe === "PENNYLANE_CLIENT_FAILED" ? 500 : 400);
+  const status =
+    desktopRequestErrorStatus(safe) ??
+    (safe === "PENNYLANE_DISABLED" || safe === "PENNYLANE_NOT_CONFIGURED"
+      ? 503
+      : safe === "CLIENT_NOT_FOUND" || safe === "PENNYLANE_CUSTOMER_NOT_IMPORTED"
+        ? 404
+        : safe.includes("LINK") || safe.includes("CONFLICT") || safe === "CLIENT_SIRET_EXISTS"
+          ? 409
+          : safe === "PENNYLANE_CLIENT_FAILED"
+            ? 500
+            : 400);
   return json({ error: safe }, status);
 }
 
@@ -78,12 +106,20 @@ export async function GET() {
     const context = await requireModuleRequestContext("clients", "READ");
     if (isLocalStorageMode() || !pennylaneEnabled()) {
       return json({
-        enabled: false, synced: false, lastSyncedAt: null,
-        count: 0, truncated: false, customers: [], existingClients: [],
+        enabled: false,
+        synced: false,
+        lastSyncedAt: null,
+        count: 0,
+        truncated: false,
+        customers: [],
+        existingClients: [],
         canWrite: context.moduleAccess.canWrite,
       });
     }
-    return json({ ...(await readPennylaneCustomerCatalog()), canWrite: context.moduleAccess.canWrite });
+    return json({
+      ...(await readPennylaneCustomerCatalog()),
+      canWrite: context.moduleAccess.canWrite,
+    });
   } catch (error) {
     return failure(error);
   }

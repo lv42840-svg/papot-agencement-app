@@ -44,11 +44,17 @@ function existing(): ClientRecord {
     paymentTerms: "Comptant",
     defaultVatRatePercent: 10,
     notes: "Numéro de badge et informations du chantier",
-    contacts: [{
-      id: "22222222-2222-4222-8222-222222222222",
-      firstName: "Nadia", lastName: "Martin", role: "Assistante",
-      phone: "", email: "", isPrimary: true,
-    }],
+    contacts: [
+      {
+        id: "22222222-2222-4222-8222-222222222222",
+        firstName: "Nadia",
+        lastName: "Martin",
+        role: "Assistante",
+        phone: "",
+        email: "",
+        isPrimary: true,
+      },
+    ],
     isArchived: false,
     archivedAt: null,
     createdAt: now,
@@ -65,22 +71,30 @@ describe("import clients Pennylane en lecture seule", () => {
     expect(c.fields.paymentTerms).toBe("30 jours fin de mois");
     expect(c.fields.city).toBe("Charlieu");
     expect(c.fields.email).toBe("compta@example.org");
-    expect(normalizePennylaneCustomer({
-      ...provider, electronic_billing_address: null,
-    }).fields.siret).toBe("");
+    expect(
+      normalizePennylaneCustomer({
+        ...provider,
+        electronic_billing_address: null,
+      }).fields.siret,
+    ).toBe("");
   });
 
   it("refuse une adresse électronique incompatible avec le SIREN", () => {
     const c = normalizePennylaneCustomer({
-      ...provider, electronic_billing_address: "987654321_00012",
+      ...provider,
+      electronic_billing_address: "987654321_00012",
     });
     expect(c.fields.siret).toBe("");
   });
 
   it("prend en charge les particuliers sans inventer de SIRET", () => {
     const c = normalizePennylaneCustomer({
-      id: 43, customer_type: "individual", first_name: "Alice", last_name: "Martin",
-      name: "Alice Martin", emails: ["alice@example.org"],
+      id: 43,
+      customer_type: "individual",
+      first_name: "Alice",
+      last_name: "Martin",
+      name: "Alice Martin",
+      emails: ["alice@example.org"],
     });
     expect(c.fields.type).toBe("PARTICULIER");
     expect(c.fields.firstName).toBe("Alice");
@@ -91,7 +105,7 @@ describe("import clients Pennylane en lecture seule", () => {
   it("détecte une fiche déjà existante et conserve son UUID, notes, contacts et TVA", () => {
     const c = normalizePennylaneCustomer(provider);
     const old = existing();
-    expect(possibleClientMatches(c, [old]).map(item => item.id)).toEqual([old.id]);
+    expect(possibleClientMatches(c, [old]).map((item) => item.id)).toEqual([old.id]);
     const updated = mergePennylaneIdentity(old, c, "Nadia", new Date("2026-11-16T12:00:00Z"));
     expect(updated.id).toBe(old.id);
     expect(updated.pennylaneId).toBe("42");
@@ -104,17 +118,34 @@ describe("import clients Pennylane en lecture seule", () => {
 
   it("refuse une association avec des identités déjà contradictoires", () => {
     const c = normalizePennylaneCustomer(provider);
-    expect(() => mergePennylaneIdentity({
-      ...existing(), pennylaneId: "999",
-    }, c, "Nadia")).toThrow("PENNYLANE_CLIENT_LINK_CONFLICT");
-    expect(() => mergePennylaneIdentity({
-      ...existing(), siret: "98765432100010",
-    }, c, "Nadia")).toThrow("PENNYLANE_CLIENT_SIRET_CONFLICT");
+    expect(() =>
+      mergePennylaneIdentity(
+        {
+          ...existing(),
+          pennylaneId: "999",
+        },
+        c,
+        "Nadia",
+      ),
+    ).toThrow("PENNYLANE_CLIENT_LINK_CONFLICT");
+    expect(() =>
+      mergePennylaneIdentity(
+        {
+          ...existing(),
+          siret: "98765432100010",
+        },
+        c,
+        "Nadia",
+      ),
+    ).toThrow("PENNYLANE_CLIENT_SIRET_CONFLICT");
   });
 
   it("refuse les fiches sans nom exploitable au lieu de créer des doublons sans identité", () => {
-    expect(() => normalizePennylaneCustomer({
-      ...provider, name: "",
-    })).toThrow("PENNYLANE_CUSTOMER_DATA_INVALID");
+    expect(() =>
+      normalizePennylaneCustomer({
+        ...provider,
+        name: "",
+      }),
+    ).toThrow("PENNYLANE_CUSTOMER_DATA_INVALID");
   });
 });
