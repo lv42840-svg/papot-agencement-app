@@ -75,7 +75,7 @@ export async function readPennylaneCustomerCatalog(
       "SELECT synced_at, item_count FROM papot_pennylane_sync_state WHERE resource='customers'",
     ),
     pool.query<ClientRow>(
-      "SELECT id, version, record, sort_order::text FROM papot_clients ORDER BY sort_order ASC",
+      "SELECT id, version, record, sort_order::text AS sort_order FROM papot_clients ORDER BY sort_order ASC",
     ),
   ]);
   const clients = parseNativeClients(existing.rows);
@@ -188,7 +188,7 @@ export async function importPennylaneCustomer(
     if (!customerRows.rows[0]) throw new Error("PENNYLANE_CUSTOMER_NOT_IMPORTED");
     const customer = normalizePennylaneCustomer(customerRows.rows[0].payload);
     const raw = await client.query<ClientRow>(
-      "SELECT id, version, record, sort_order::text FROM papot_clients ORDER BY sort_order ASC FOR UPDATE",
+      "SELECT id, version, record, sort_order::text AS sort_order FROM papot_clients ORDER BY sort_order ASC FOR UPDATE",
     );
     const native = parseNativeClients(raw.rows);
     const alreadyLinked = native.find((c) => c.pennylaneId === customer.id);
@@ -199,9 +199,11 @@ export async function importPennylaneCustomer(
     const target =
       alreadyLinked ?? (chosenClientId ? native.find((c) => c.id === chosenClientId) : undefined);
     if (action === "LINK" && !target) throw new Error("CLIENT_NOT_FOUND");
-    const candidates = possibleClientMatches(customer, native).filter(
-      (c) => !target || c.id !== target.id,
-    );
+    // Once linked by its stable provider ID, a later name collision with another
+    // client must not prevent the normal refresh of that established link.
+    const candidates = alreadyLinked
+      ? []
+      : possibleClientMatches(customer, native).filter((c) => !target || c.id !== target.id);
     if (candidates.length > 0) throw new Error("PENNYLANE_CLIENT_LINK_REQUIRED");
     const now = new Date();
     if (target) {
