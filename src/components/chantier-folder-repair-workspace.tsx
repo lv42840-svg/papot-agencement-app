@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { ChantierFolderTemplateEditor } from "./chantier-folder-template-editor";
 
 type AuditItem = {
   chantierId: string;
@@ -107,6 +108,7 @@ export function ChantierFolderRepairWorkspace() {
 
   return (
     <section className="chantierFoldersRepair">
+      <ChantierFolderTemplateEditor onUpdated={() => void inspect()} />
       <h1>Dossiers physiques des chantiers</h1>
       <p>
         Vérifie les chantiers déjà créés, leurs liens avec les affaires, devis et éléments BE, puis
