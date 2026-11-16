@@ -20,6 +20,7 @@ const { planFor, safeRelative, assertPayrollNotPrepared } =
         }>;
         clientsKept: string[];
         testHoursToRemove: ActualHoursFixture[];
+        planning: { historicalEdits: number; revisionKeys: number };
       };
       clientsToDelete: string[];
       next: {
@@ -32,6 +33,8 @@ const { planFor, safeRelative, assertPayrollNotPrepared } =
           macroAllocations: unknown[];
           dailyAssignments: unknown[];
           actualHours: unknown[];
+          editHistory: unknown[];
+          editRevisions: Record<string, number>;
         };
       };
       signature: string;
@@ -154,6 +157,16 @@ function fixture() {
       ],
       actualHours: [] as ActualHoursFixture[],
       payrollWeekConfirmations: {} as Record<string, string>,
+      editHistory: [] as Array<{
+        revision: number;
+        key: string;
+        before: unknown;
+        after: unknown;
+        actorId: string;
+        actorName: string;
+        at: string;
+      }>,
+      editRevisions: {} as Record<string, number>,
       chantierOrder: [ids.site1, ids.site2],
       provisionalOrder: [ids.case2],
       dailyAssignments: [{ chantierId: ids.site1, userId: "a", date: "2026-11-16", label: "Test" }],
@@ -255,6 +268,103 @@ describe("one-off cancelled site cleanup", () => {
     payloads.planning.payrollWeekConfirmations = {};
     payloads.planning.actualHours[0].hours = 11;
     expect(() => planFor(states, clients)).toThrow("REAL_EMPLOYEE_HOURS_EXIST");
+  });
+
+  it("removes the three test-only planning history entries and three revisions", () => {
+    const { states, clients, payloads } = fixture();
+    const otherId = "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa";
+    const targetKeys = [
+      "2026-W42:user:" + ids.site1,
+      "2026-W42:user:" + ids.site2,
+      "2026-W41:user:" + ids.site2,
+    ];
+    for (const [index, key] of targetKeys.entries()) {
+      const chantierId = index === 0 ? ids.site1 : ids.site2;
+      payloads.planning.editHistory.push({
+        revision: index + 1,
+        key,
+        before: [{ chantierId }],
+        after: { chantierId },
+        actorId: "editor",
+        actorName: "Test",
+        at: "2026-11-10T12:00:00Z",
+      });
+      payloads.planning.editRevisions[key] = index + 1;
+    }
+    const retained = "2026-W44:user:" + otherId;
+    payloads.planning.editHistory.push({
+      revision: 4,
+      key: retained,
+      before: [],
+      after: { chantierId: otherId },
+      actorId: "editor",
+      actorName: "Test",
+      at: "2026-11-10T12:00:00Z",
+    });
+    payloads.planning.editRevisions[retained] = 4;
+
+    const result = planFor(states, clients);
+    expect(result.scope.planning.historicalEdits).toBe(3);
+    expect(result.scope.planning.revisionKeys).toBe(3);
+    expect(result.next.planning.editHistory).toHaveLength(1);
+    expect(result.next.planning.editHistory[0]).toMatchObject({ key: retained });
+    expect(result.next.planning.editRevisions).toEqual({ [retained]: 4 });
+  });
+
+  it("blocks planning history shared with another chantier", () => {
+    const { states, clients, payloads } = fixture();
+    const otherId = "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa";
+    payloads.chantiers.chantiers.push({
+      id: otherId,
+      name: "Chantier réel",
+      clientName: "Client réel",
+      number: "2026-099",
+      launchYear: 2026,
+      sourceCommercialCaseId: otherId,
+      status: "ACTIVE",
+    });
+    payloads.planning.editHistory.push({
+      revision: 1,
+      key: "2026-W42:user:" + ids.site2,
+      before: [{ chantierId: ids.site2 }, { chantierId: otherId }],
+      after: { chantierId: ids.site2 },
+      actorId: "editor",
+      actorName: "Test",
+      at: "2026-11-10T12:00:00Z",
+    });
+    expect(() => planFor(states, clients)).toThrow("PLANNING_HISTORY_SHARED_RECORD");
+  });
+
+  it("blocks a shared planning revision key", () => {
+    const { states, clients, payloads } = fixture();
+    const otherId = "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa";
+    payloads.chantiers.chantiers.push({
+      id: otherId,
+      name: "Chantier réel",
+      clientName: "Client réel",
+      number: "2026-099",
+      launchYear: 2026,
+      sourceCommercialCaseId: otherId,
+      status: "ACTIVE",
+    });
+    const mixedKey = "2026-W42:" + ids.site2 + ":" + otherId;
+    payloads.planning.editRevisions[mixedKey] = 1;
+    expect(() => planFor(states, clients)).toThrow("PLANNING_REVISION_SHARED_RECORD");
+  });
+
+  it("refuses to erase a history record whose key belongs to another chantier", () => {
+    const { states, clients, payloads } = fixture();
+    const key = "2026-W45:other";
+    payloads.planning.editHistory.push({
+      revision: 1,
+      key,
+      before: [{ chantierId: ids.site1 }],
+      after: { chantierId: "other" },
+      actorId: "editor",
+      actorName: "Test",
+      at: "2026-11-10T12:00:00Z",
+    });
+    expect(() => planFor(states, clients)).toThrow("PLANNING_HISTORY_SHARED_RECORD");
   });
 
   it("refuses unmatched or duplicate names", () => {

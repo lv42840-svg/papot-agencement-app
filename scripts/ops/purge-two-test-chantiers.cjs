@@ -306,6 +306,55 @@ function planFor(states, clientRows) {
   );
   const clientsKept = [...clientIds].filter((id) => !clientsToDelete.includes(id));
 
+  const deletingIds = new Set([
+    ...siteIds,
+    ...affairIds,
+    ...quoteIds,
+    ...selectedDraftIds,
+    ...purchaseOrderIds,
+    ...entryIds,
+    ...clientsToDelete,
+  ]);
+  const protectedBusinessIds = new Set(
+    unique([
+      ...otherSites.flatMap((site) => [site.id, site.sourceCommercialCaseId]),
+      ...remainingAffairs.map((affair) => affair.id),
+      ...remainingQuotes.map((quote) => quote.id),
+      ...remainingDrafts.map((draft) => draft.id),
+      ...remainingOrders.map((order) => order.id),
+      ...remainingEntries.map((entry) => entry.id),
+      ...clientRows
+        .filter((client) => !clientsToDelete.includes(client.id))
+        .map((client) => client.id),
+    ]),
+  );
+
+  // Planning edit history contains snapshots of the test rows, even after
+  // their live allocations are removed. Discard only entries explicitly keyed
+  // to the two test sites and NEVER a snapshot referencing another business.
+  const targetedPlanningHistory = (payload.planning.editHistory ?? []).filter((entry) =>
+    hasId(entry, deletingIds),
+  );
+  for (const entry of targetedPlanningHistory) {
+    if (!hasId(entry.key, deletingIds) || hasId(entry, protectedBusinessIds)) {
+      fail("PLANNING_HISTORY_SHARED_RECORD", entry.key);
+    }
+  }
+  const retainedPlanningHistory = (payload.planning.editHistory ?? []).filter(
+    (entry) => !hasId(entry, deletingIds),
+  );
+  const targetedPlanningRevisionKeys = Object.keys(payload.planning.editRevisions ?? {}).filter(
+    (key) => hasId(key, deletingIds),
+  );
+  for (const key of targetedPlanningRevisionKeys) {
+    if (hasId(key, protectedBusinessIds)) fail("PLANNING_REVISION_SHARED_RECORD", key);
+  }
+  const retainedPlanningRevisions = Object.fromEntries(
+    Object.entries(payload.planning.editRevisions ?? {}).filter(
+      ([key]) => !hasId(key, deletingIds),
+    ),
+  );
+
   const rest = {
     chantiers: { ...payload.chantiers, chantiers: otherSites },
     commercial: {
@@ -320,6 +369,8 @@ function planFor(states, clientRows) {
     purchases: { ...payload.purchases, orders: remainingOrders },
     planning: {
       ...payload.planning,
+      editHistory: retainedPlanningHistory,
+      editRevisions: retainedPlanningRevisions,
       macroAllocations: payload.planning.macroAllocations.filter((x) => !siteIds.has(x.chantierId)),
       provisionalAllocations: (payload.planning.provisionalAllocations ?? []).filter(
         (x) => !affairIds.has(x.caseId),
@@ -339,16 +390,6 @@ function planFor(states, clientRows) {
       notifications: (payload.entries.notifications ?? []).filter((n) => !entryIds.has(n.entryId)),
     },
   };
-  const deletingIds = new Set([
-    ...siteIds,
-    ...affairIds,
-    ...quoteIds,
-    ...selectedDraftIds,
-    ...purchaseOrderIds,
-    ...entryIds,
-    ...clientsToDelete,
-  ]);
-
   // Prevent silent dangling relations in any of the preserved business objects.
   for (const [key, value] of Object.entries(rest)) {
     if (hasId(value, deletingIds)) fail("OTHER_RECORD_REFERENCES_DELETION", key);
@@ -477,6 +518,8 @@ function planFor(states, clientRows) {
       })),
     clientsKept,
     planning: {
+      historicalEdits: targetedPlanningHistory.length,
+      revisionKeys: targetedPlanningRevisionKeys.length,
       allocations: payload.planning.macroAllocations.filter((x) => siteIds.has(x.chantierId))
         .length,
       provisional: (payload.planning.provisionalAllocations ?? []).filter((x) =>
