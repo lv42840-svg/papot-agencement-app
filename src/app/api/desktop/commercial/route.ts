@@ -206,17 +206,6 @@ async function persistAutomaticTransitions(
 export async function GET() {
   try {
     const context = await requireModuleRequestContext("commercial", "READ");
-    // An accepted affair can still be cancelled before chantier launch, but
-    // changing a launched chantier to "Perdu" must never orphan its records.
-    if (closureRequested(input)) {
-      const existing = await createChantiersRepository().load();
-      if (existing.chantiers.some(
-        (site) => site.sourceCommercialCaseId === input.caseId && site.status !== "CANCELLED",
-      )) {
-        throw new Error("COMMERCIAL_ACTIVE_CHANTIER_CANNOT_CLOSE_AS_LOST");
-      }
-    }
-
     const repository = createCommercialRepository();
     const clients = await createClientsRepository();
     const parsed = await repository.load();
@@ -255,6 +244,16 @@ export async function POST(request: Request) {
     }
     stage = "create-runtime";
     const context = await requireModuleRequestContext("commercial", "WRITE");
+    // An accepted affair can still be cancelled before chantier launch, but
+    // changing a launched chantier to "Perdu" must never orphan its records.
+    if (closureRequested(input)) {
+      const existing = await createChantiersRepository().load();
+      if (existing.chantiers.some(
+        (site) => site.sourceCommercialCaseId === input.caseId && site.status !== "CANCELLED",
+      )) {
+        throw new Error("COMMERCIAL_ACTIVE_CHANTIER_CANNOT_CLOSE_AS_LOST");
+      }
+    }
     const requiredSpecialPermission = commercialSpecialPermissionForMutation(input);
     if (requiredSpecialPermission) {
       await requireSpecialPermission(context.user, requiredSpecialPermission);
