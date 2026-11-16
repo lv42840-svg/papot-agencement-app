@@ -35,7 +35,7 @@ describe("commercial lost status in the direct status editor", () => {
   it("rejects closure of an affaire with an uncancelled chantier", () => {
     expect(route).toContain("function closureRequested");
     expect(route).toContain("createChantiersRepository().load()");
-    expect(route).toContain("site.sourceCommercialCaseId === input.caseId");
+    expect(route).toContain("site.sourceCommercialCaseId === closingCaseId");
     expect(route).toContain('site.status !== "CANCELLED"');
     expect(route).toContain("COMMERCIAL_ACTIVE_CHANTIER_CANNOT_CLOSE_AS_LOST");
   });
