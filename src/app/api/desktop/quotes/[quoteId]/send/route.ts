@@ -2,6 +2,8 @@ import { NextResponse } from "next/server";
 import { z, ZodError } from "zod";
 import { createClientsRepository } from "@/lib/clients/create-repository";
 import { createCommercialRepository } from "@/lib/commercial/create-repository";
+import { createChantiersRepository } from "@/lib/chantiers/create-repository";
+import { chantierStorageFolder } from "@/lib/chantiers/folder-lifecycle";
 import { createCommercialDocumentTransport } from "@/lib/commercial/document-file-runtime";
 import { applyCommercialMutation, registerCommercialDocuments } from "@/lib/commercial/mutations";
 import { createCompanyProfileRepository } from "@/lib/company-profile/create-repository";
@@ -193,11 +195,15 @@ export async function POST(request: Request, { params }: { params: Promise<{ quo
       const generated = await renderQuoteWordV2PdfWithPhotos(template, document, (photo) =>
         transport.store.readBytes(photo.storagePath, photo.sha256),
       );
+      const linkedChantier = (await createChantiersRepository().load()).chantiers.find(
+        (item) => item.sourceCommercialCaseId === commercialCase.id,
+      );
       const archive = await archiveFinalQuotePdf(transport.store, {
         quote,
         quoteNumber,
         context: {
           creationYear: new Date(commercialCase.createdAt).getFullYear(),
+          businessFolder: linkedChantier ? chantierStorageFolder(linkedChantier) : undefined,
           clientName: commercialCase.clientName,
           caseName: commercialCase.name,
         },
