@@ -62,6 +62,8 @@ const errorMessages: Record<string, string> = {
     "Le suivi commercial a changé sur un autre poste. Actualise puis réessaie.",
   COMMERCIAL_CASE_NOT_FOUND: "Cette affaire n'existe plus dans le suivi commercial.",
   COMMERCIAL_CASE_CLOSED: "Cette affaire est clôturée. Il faut la rouvrir avant de la modifier.",
+  COMMERCIAL_ACTIVE_CHANTIER_CANNOT_CLOSE_AS_LOST:
+    "Un chantier non annulé est lié à cette affaire. Il faut d’abord traiter ce chantier avant de classer l’affaire en perdu.",
   COMMERCIAL_REVIEW_DATE_REQUIRED:
     "Une date de revue ou de relance est obligatoire pour ce statut.",
   COMMERCIAL_CONFIRMATION_DATE_REQUIRED: "La date prévisionnelle de confirmation est obligatoire.",
