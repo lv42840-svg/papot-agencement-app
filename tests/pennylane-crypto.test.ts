@@ -34,6 +34,8 @@ describe("Pennylane admin credential encryption", () => {
     );
     const corrupted = first.slice(0, -3) + "AAA";
     expect(() => unsealPennylaneToken(corrupted, env)).toThrow("PENNYLANE_SECRET_UNREADABLE");
-    expect(() => sealPennylaneToken("space in token", env)).toThrow("PENNYLANE_TOKEN_FORMAT_INVALID");
+    expect(() => sealPennylaneToken("space in token", env)).toThrow(
+      "PENNYLANE_TOKEN_FORMAT_INVALID",
+    );
   });
 });

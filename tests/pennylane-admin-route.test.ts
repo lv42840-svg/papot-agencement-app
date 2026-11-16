@@ -3,7 +3,7 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 vi.mock("server-only", () => ({}));
 vi.mock("@/lib/auth/user-admin", () => ({
   requirePermissionAdministrator: vi.fn(),
-  userAdminErrorStatus: (code: string) => code === "ADMIN_FORBIDDEN" ? 403 : 401,
+  userAdminErrorStatus: (code: string) => (code === "ADMIN_FORBIDDEN" ? 403 : 401),
 }));
 vi.mock("@/lib/pennylane/connection", () => ({
   getPennylaneConnectionOverview: vi.fn(),
@@ -27,9 +27,13 @@ import { probePennylaneAccess } from "../src/lib/pennylane/client";
 
 const secret = "fake-pennylane-private-admin-test-token";
 const overview = {
-  configured: true, encryptionReady: true, syncEnabled: false,
-  expectedCompany: "PAPOT LIBERAL", updatedAt: "2026-11-16T12:00:00Z",
-  lastTestedAt: null, lastTest: null,
+  configured: true,
+  encryptionReady: true,
+  syncEnabled: false,
+  expectedCompany: "PAPOT LIBERAL",
+  updatedAt: "2026-11-16T12:00:00Z",
+  lastTestedAt: null,
+  lastTest: null,
 };
 
 function request(action: unknown, origin = "https://agencement.papot.app") {
@@ -49,26 +53,36 @@ beforeEach(() => {
   vi.mocked(requirePermissionAdministrator).mockResolvedValue({} as never);
   vi.mocked(getPennylaneConnectionOverview).mockResolvedValue(overview);
   vi.mocked(readPennylaneStoredConfig).mockResolvedValue({
-    expectedCompany: "PAPOT LIBERAL", token: secret,
+    expectedCompany: "PAPOT LIBERAL",
+    token: secret,
   });
 });
 
 describe("Pennylane admin settings API", () => {
   it("denies unauthorized admin requests before reading or saving any secret", async () => {
     vi.mocked(requirePermissionAdministrator).mockRejectedValueOnce(new Error("ADMIN_FORBIDDEN"));
-    const response = await POST(request({ action: "SAVE", token: secret, expectedCompany: "PAPOT LIBERAL" }));
+    const response = await POST(
+      request({ action: "SAVE", token: secret, expectedCompany: "PAPOT LIBERAL" }),
+    );
     expect(response.status).toBe(403);
     expect(savePennylaneConnection).not.toHaveBeenCalled();
   });
 
   it("denies cross-site writes even with an authenticated administrator", async () => {
-    const response = await POST(request({ action: "SAVE", token: secret, expectedCompany: "PAPOT LIBERAL" }, "https://evil.example"));
+    const response = await POST(
+      request(
+        { action: "SAVE", token: secret, expectedCompany: "PAPOT LIBERAL" },
+        "https://evil.example",
+      ),
+    );
     expect(response.status).toBe(403);
     expect(savePennylaneConnection).not.toHaveBeenCalled();
   });
 
   it("never sends the saved token back in GET or POST responses", async () => {
-    const post = await POST(request({ action: "SAVE", token: secret, expectedCompany: "PAPOT LIBERAL" }));
+    const post = await POST(
+      request({ action: "SAVE", token: secret, expectedCompany: "PAPOT LIBERAL" }),
+    );
     expect(post.status).toBe(200);
     expect(savePennylaneConnection).toHaveBeenCalledWith(secret, "PAPOT LIBERAL");
     expect(await post.text()).not.toContain(secret);
@@ -84,15 +98,18 @@ describe("Pennylane admin settings API", () => {
     const probe = {
       companyName: "PAPOT LIBERAL",
       access: {
-        suppliers: "allowed", supplier_invoices: "forbidden",
-        customers: "allowed", customer_invoices: "forbidden",
+        suppliers: "allowed",
+        supplier_invoices: "forbidden",
+        customers: "allowed",
+        customer_invoices: "forbidden",
       },
     } as const;
     vi.mocked(probePennylaneAccess).mockResolvedValue(probe);
     const response = await POST(request({ action: "TEST" }));
     expect(response.status).toBe(200);
     expect(probePennylaneAccess).toHaveBeenCalledWith({
-      token: secret, expectedCompany: "PAPOT LIBERAL",
+      token: secret,
+      expectedCompany: "PAPOT LIBERAL",
     });
     expect(recordPennylaneConnectionTest).toHaveBeenCalledWith(probe);
     const body = await response.text();

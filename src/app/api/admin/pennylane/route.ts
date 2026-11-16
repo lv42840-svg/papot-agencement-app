@@ -14,11 +14,13 @@ export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
 const bodySchema = z.discriminatedUnion("action", [
-  z.object({
-    action: z.literal("SAVE"),
-    token: z.string().min(20).max(2048).regex(/^\S+$/),
-    expectedCompany: z.string().trim().min(2).max(120),
-  }).strict(),
+  z
+    .object({
+      action: z.literal("SAVE"),
+      token: z.string().min(20).max(2048).regex(/^\S+$/),
+      expectedCompany: z.string().trim().min(2).max(120),
+    })
+    .strict(),
   z.object({ action: z.literal("TEST") }).strict(),
   z.object({ action: z.literal("REMOVE") }).strict(),
 ]);
@@ -28,7 +30,7 @@ function json(body: unknown, status = 200) {
     status,
     headers: {
       "Cache-Control": "private, no-store, max-age=0",
-      "Pragma": "no-cache",
+      Pragma: "no-cache",
       "X-Content-Type-Options": "nosniff",
       "Referrer-Policy": "no-referrer",
     },
@@ -49,9 +51,12 @@ function sameOrigin(request: Request): boolean {
 }
 
 function failure(error: unknown) {
-  const code = error instanceof z.ZodError
-    ? "PENNYLANE_REQUEST_INVALID"
-    : error instanceof Error ? error.message : "PENNYLANE_ADMIN_ERROR";
+  const code =
+    error instanceof z.ZodError
+      ? "PENNYLANE_REQUEST_INVALID"
+      : error instanceof Error
+        ? error.message
+        : "PENNYLANE_ADMIN_ERROR";
   // Never return exception detail, API bodies, ciphertext or the submitted token.
   const safe = [
     "AUTH_REQUIRED",
@@ -70,14 +75,22 @@ function failure(error: unknown) {
     "PENNYLANE_SECRET_UNREADABLE",
     "PENNYLANE_TOKEN_FORMAT_INVALID",
     "PENNYLANE_HTTP_ERROR",
-  ].includes(code) ? code : "PENNYLANE_ADMIN_ERROR";
-  const status = safe.startsWith("PENNYLANE_ENCRYPTION_") ? 503
-    : safe === "PENNYLANE_NOT_CONFIGURED" ? 409
-    : safe === "PENNYLANE_COMPANY_MISMATCH" ? 409
-    : safe === "PENNYLANE_TOKEN_INVALID" || safe === "PENNYLANE_SCOPE_FORBIDDEN" ? 422
-    : safe.startsWith("PENNYLANE_REQUEST_") || safe === "PENNYLANE_TOKEN_FORMAT_INVALID" ? 400
-    : safe === "PENNYLANE_ADMIN_ERROR" || safe === "PENNYLANE_NETWORK_ERROR" ? 502
-    : userAdminErrorStatus(safe);
+  ].includes(code)
+    ? code
+    : "PENNYLANE_ADMIN_ERROR";
+  const status = safe.startsWith("PENNYLANE_ENCRYPTION_")
+    ? 503
+    : safe === "PENNYLANE_NOT_CONFIGURED"
+      ? 409
+      : safe === "PENNYLANE_COMPANY_MISMATCH"
+        ? 409
+        : safe === "PENNYLANE_TOKEN_INVALID" || safe === "PENNYLANE_SCOPE_FORBIDDEN"
+          ? 422
+          : safe.startsWith("PENNYLANE_REQUEST_") || safe === "PENNYLANE_TOKEN_FORMAT_INVALID"
+            ? 400
+            : safe === "PENNYLANE_ADMIN_ERROR" || safe === "PENNYLANE_NETWORK_ERROR"
+              ? 502
+              : userAdminErrorStatus(safe);
   return json({ error: safe }, status);
 }
 

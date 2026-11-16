@@ -37,7 +37,12 @@ export function sealPennylaneToken(
   const nonce = randomBytes(12);
   const cipher = createCipheriv("aes-256-gcm", key, nonce);
   const encrypted = Buffer.concat([cipher.update(token, "utf8"), cipher.final()]);
-  return ["v1", nonce.toString("base64"), cipher.getAuthTag().toString("base64"), encrypted.toString("base64")].join(":");
+  return [
+    "v1",
+    nonce.toString("base64"),
+    cipher.getAuthTag().toString("base64"),
+    encrypted.toString("base64"),
+  ].join(":");
 }
 
 export function unsealPennylaneToken(

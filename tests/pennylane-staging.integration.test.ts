@@ -81,13 +81,18 @@ describeWithPostgres("Pennylane transactional staging", () => {
       expectedCompany: "PAPOT LIBERAL",
     });
 
-    await recordPennylaneConnectionTest({
-      companyName: "PAPOT LIBERAL",
-      access: {
-        suppliers: "allowed", supplier_invoices: "forbidden",
-        customers: "allowed", customer_invoices: "forbidden",
+    await recordPennylaneConnectionTest(
+      {
+        companyName: "PAPOT LIBERAL",
+        access: {
+          suppliers: "allowed",
+          supplier_invoices: "forbidden",
+          customers: "allowed",
+          customer_invoices: "forbidden",
+        },
       },
-    }, pool);
+      pool,
+    );
     const tested = await getPennylaneConnectionOverview(pool, env);
     expect(tested.lastTest?.access.supplier_invoices).toBe("forbidden");
 
@@ -104,5 +109,4 @@ describeWithPostgres("Pennylane transactional staging", () => {
     expect(leftovers.rows[0]?.count).toBe("0");
     await expect(readPennylaneStoredConfig(pool, env)).rejects.toThrow("PENNYLANE_NOT_CONFIGURED");
   });
-
 });

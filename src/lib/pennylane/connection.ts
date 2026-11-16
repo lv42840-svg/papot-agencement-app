@@ -6,7 +6,11 @@ import { withServerDbTransaction } from "@/lib/server-db/transaction";
 import type { PennylaneConfig } from "./config";
 import { pennylaneEnabled } from "./config";
 import type { PennylaneAccessProbe } from "./client";
-import { pennylaneEncryptionReady, sealPennylaneToken, unsealPennylaneToken } from "./secret-crypto";
+import {
+  pennylaneEncryptionReady,
+  sealPennylaneToken,
+  unsealPennylaneToken,
+} from "./secret-crypto";
 
 export const DEFAULT_PENNYLANE_COMPANY = "PAPOT LIBERAL";
 
