@@ -42,7 +42,7 @@ function invoiceSource(row: InvoiceRow, suppliers: Map<string, string>): Invoice
   const data = obj(row.payload);
   const supplier = obj(data.supplier);
   const supplierId = supplier.id === null || supplier.id === undefined ? null : str(supplier.id);
-  const amountHtCents = euroToCents(data.amount_before_tax);
+  const amountHtCents = euroToCents(data.currency_amount_before_tax);
   const invoiceNumber = str(data.invoice_number);
   const invoiceDate = str(data.date) || null;
   const filename = str(data.filename) || null;
