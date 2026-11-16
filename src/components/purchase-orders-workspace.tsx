@@ -413,10 +413,8 @@ export function PurchaseOrdersWorkspace({ chantierId }: { chantierId?: string })
             <div>
               <button type="button" className="secondaryButton" disabled={busy || !snapshot.canWrite || !snapshot.supplierCatalog}
                 onClick={() => void refreshSuppliers()}>Actualiser les fournisseurs</button>
-              <small> La récupération exige la clé Pennylane et l'autorisation d'import serveur.</small>
+              <small> La récupération exige la clé Pennylane et l&apos;autorisation d&apos;import serveur.</small>
             </div>
-            <small>
-            </small>
             <div style={{ display: "flex", flexWrap: "wrap", gap: 8 }}>
               <button
                 type="button"
