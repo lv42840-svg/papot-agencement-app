@@ -5,14 +5,12 @@ import { useEffect, useMemo, useState } from "react";
 import { purchaseOrderAllocations, type PurchaseOrder } from "@/lib/purchases/domain";
 import {
   calculateInvoiceAllocation,
+  distributeCharge,
   destinationKey,
   type InvoiceAllocationDraft,
   type InvoiceDestination,
 } from "@/lib/pennylane/purchase-allocations";
-import type {
-  PurchaseInvoiceListItem,
-  PurchaseInvoiceWorkspaceData,
-} from "@/lib/pennylane/purchase-invoice-store";
+import type { PurchaseInvoiceWorkspaceData } from "@/lib/pennylane/purchase-invoice-store";
 
 type ResponseBody = PurchaseInvoiceWorkspaceData & { canWrite: boolean; error?: string };
 type Line = { id: string; label: string; amountHtCents: number | null };
@@ -81,7 +79,6 @@ export function PurchaseInvoicesWorkspace() {
       .catch(() => setLines([]));
   }, [selected?.id, selected?.state?.version]);
 
-  const proposalIds = new Set(selected?.proposedOrders.map(item => item.id) ?? []);
   const destinationOptions = [
     ...(data?.chantiers ?? []).map(site => ({
       value: site.id,
@@ -126,19 +123,33 @@ export function PurchaseInvoicesWorkspace() {
   function applyOrder(order: PurchaseOrder) {
     if (draft.orderLinks.some(link => link.orderId === order.id)) return;
     const links = purchaseOrderAllocations(order);
+    const balance = data?.orderBalances[order.id];
+    if (balance?.settled) {
+      setError("Ce bon de commande est soldé. Corrige d'abord le rapprochement précédent.");
+      return;
+    }
+    const toApply = balance ? balance.remainingHtCents : order.amountHtCents;
+    if (toApply <= 0) {
+      setError("Ce bon de commande est déjà intégralement facturé.");
+      return;
+    }
+    const shares = distributeCharge(
+      toApply,
+      links.map((link, index) => ({ key: String(index), weight: link.amountHtCents })),
+    );
     setDraft(current => ({
       ...current,
-      rows: [...current.rows, ...links.map(link => ({
+      rows: [...current.rows, ...links.map((link, index) => ({
         id: crypto.randomUUID(),
         sourceLineId: null,
         destination: {
           kind: link.destinationType ?? "CHANTIER",
           chantierId: link.chantierId,
         } as InvoiceDestination,
-        amountHtCents: link.amountHtCents,
+        amountHtCents: shares.get(String(index)) ?? 0,
       }))],
       orderLinks: [...current.orderLinks, {
-        orderId: order.id, appliedHtCents: order.amountHtCents, settle: false,
+        orderId: order.id, appliedHtCents: toApply, settle: false,
       }],
     }));
     setNotice("Répartition du BC reprise. Vérifie les montants et les éventuels frais.");
@@ -271,6 +282,8 @@ export function PurchaseInvoicesWorkspace() {
                     <div key={proposal.id} style={{ border: "1px solid #e8e0ee", borderRadius: 8, padding: 9, display: "grid", gap: 6 }}>
                       <strong>{proposal.reference} · {proposal.chantierName}</strong>
                       <small>BC : {money(proposal.amountHtCents)} HT</small>
+                      <small>Déjà rapproché : {money(data.orderBalances[proposal.id]?.billedHtCents ?? 0)} · Reste : {money(data.orderBalances[proposal.id]?.remainingHtCents ?? proposal.amountHtCents)}
+                        {data.orderBalances[proposal.id]?.settled ? " · BC soldé" : ""}</small>
                       {link ? (
                         <>
                           <label>Part rapprochée HT (€)
@@ -293,7 +306,7 @@ export function PurchaseInvoicesWorkspace() {
                             }))}>Dissocier ce BC</button>
                         </>
                       ) : (
-                        <button className="secondaryButton" type="button" disabled={busy || !data.canWrite || !order}
+                        <button className="secondaryButton" type="button" disabled={busy || !data.canWrite || !order || Boolean(data.orderBalances[proposal.id]?.settled)}
                           onClick={() => order && applyOrder(order)}>Reprendre cette commande</button>
                       )}
                     </div>
@@ -398,6 +411,19 @@ export function PurchaseInvoicesWorkspace() {
                     </small>
                   ))}
                 </section>
+                {selected.state?.history.length ? (
+                  <details>
+                    <summary>Historique des affectations ({selected.state.history.length})</summary>
+                    <ul>
+                      {selected.state.history.map((event, index) => (
+                        <li key={event.version + "-" + index}>
+                          {new Date(event.at).toLocaleString("fr-FR")} · {event.actor} ·
+                          {event.action === "VALIDATE" ? " Validation" : " Brouillon"}
+                        </li>
+                      ))}
+                    </ul>
+                  </details>
+                ) : null}
                 {selected.workflow === "REVALIDATION" ? <p role="alert">Facture ou affectation modifiée : la dernière validation reste en référence provisoire jusqu&apos;à nouvelle validation.</p> : null}
                 <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
                   <button type="button" className="secondaryButton" disabled={busy || !data.canWrite}
