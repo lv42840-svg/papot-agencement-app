@@ -20,6 +20,7 @@ type Snapshot = {
   payload: PurchaseOrdersPayload;
   chantiers: Site[];
   canWrite: boolean;
+  supplierCatalog?: { suppliers: Array<{ id: string; name: string }>; synced: boolean; syncedAt: string | null };
   error?: string;
 };
 type QuickAllocation = { id: string; chantierId: string; amount: string };
@@ -64,6 +65,8 @@ const messageFor = (code: string) => {
     PURCHASE_CHANTIER_NOT_ACTIVE: "Aucune nouvelle commande sur un chantier fermé ou annulé.",
     PURCHASE_ORDER_VERSION_CONFLICT: "Ce BC a été modifié. Recharge la page.",
     MODULE_FORBIDDEN: "Tu n'as pas les droits de modification des achats.",
+    PURCHASE_SUPPLIER_PENNYLANE_REQUIRED: "Choisis un fournisseur de la liste officielle Pennylane.",
+    PENNYLANE_DISABLED: "La synchronisation Pennylane doit être activée sur le serveur.",
   };
   return messages[code] ?? code;
 };
@@ -75,6 +78,7 @@ export function PurchaseOrdersWorkspace({ chantierId }: { chantierId?: string })
   const [error, setError] = useState("");
   const [siteId, setSiteId] = useState(chantierId ?? "");
   const [supplierName, setSupplierName] = useState("");
+  const [supplierPennylaneId, setSupplierPennylaneId] = useState("");
   const [mode, setMode] = useState<"QUICK" | "DETAILED">("QUICK");
   const [description, setDescription] = useState("");
   const [allocations, setAllocations] = useState<QuickAllocation[]>([
@@ -109,10 +113,7 @@ export function PurchaseOrdersWorkspace({ chantierId }: { chantierId?: string })
     sites[0]?.id ??
     "";
   const suppliers = useMemo(
-    () =>
-      [...new Set((snapshot?.payload.orders ?? []).map((order) => order.supplierName))].sort(
-        (a, b) => a.localeCompare(b, "fr-FR"),
-      ),
+    () => [...new Set((snapshot?.payload.orders ?? []).map(order => order.supplierName))].sort((a, b) => a.localeCompare(b, "fr-FR")),
     [snapshot],
   );
   const commitmentTotals = snapshot ? committedPurchasesByDestination(snapshot.payload) : null;
@@ -161,9 +162,33 @@ export function PurchaseOrdersWorkspace({ chantierId }: { chantierId?: string })
     );
     setError("");
   }
+  async function refreshSuppliers() {
+    if (!snapshot?.canWrite || busy) return;
+    setBusy(true);
+    setError("");
+    try {
+      const response = await fetch("/api/desktop/purchases", {
+        method: "POST", headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ action: "REFRESH_SUPPLIERS" }),
+      });
+      const result = await response.json() as { error?: string; supplierCount?: number };
+      if (!response.ok) throw new Error(result.error ?? "PURCHASE_SUPPLIER_REFRESH_FAILED");
+      await reload();
+      setNotice(String(result.supplierCount ?? 0) + " fournisseurs Pennylane actualisés.");
+    } catch (cause) {
+      setError(messageFor(cause instanceof Error ? cause.message : "PURCHASE_SUPPLIER_REFRESH_FAILED"));
+    } finally {
+      setBusy(false);
+    }
+  }
+
   async function create() {
     if (!snapshot?.canWrite || busy) return;
     setError("");
+    if (snapshot.supplierCatalog?.synced && !supplierPennylaneId) {
+      setError("Choisis un fournisseur Pennylane. Crée-le dans Pennylane puis actualise si nécessaire.");
+      return;
+    }
     if (!supplierName.trim()) {
       setError("Renseigne le nom du fournisseur.");
       return;
@@ -190,6 +215,7 @@ export function PurchaseOrdersWorkspace({ chantierId }: { chantierId?: string })
           purchaseAllocationFromSelection(row.chantierId, row.amountHtCents!),
         ),
         supplierName: supplierName.trim(),
+        supplierPennylaneId: snapshot.supplierCatalog?.synced ? supplierPennylaneId : undefined,
         description: description.trim(),
       };
     } else {
@@ -226,6 +252,7 @@ export function PurchaseOrdersWorkspace({ chantierId }: { chantierId?: string })
         mode: "DETAILED",
         chantierId: selected,
         supplierName: supplierName.trim(),
+        supplierPennylaneId: snapshot.supplierCatalog?.synced ? supplierPennylaneId : undefined,
         description: description.trim(),
         lines: parsed,
       };
@@ -351,28 +378,44 @@ export function PurchaseOrdersWorkspace({ chantierId }: { chantierId?: string })
               ) : null}
               <label style={{ display: "grid", gap: 5 }}>
                 Fournisseur *
-                <input
-                  aria-label="Fournisseur du BC"
-                  list="bc-supplier-names"
-                  maxLength={240}
-                  placeholder="Nom du fournisseur"
-                  value={supplierName}
-                  disabled={busy || !snapshot.canWrite}
-                  onChange={(e) => {
-                    setSupplierName(e.target.value);
-                    setError("");
-                  }}
-                />
-                <datalist id="bc-supplier-names">
-                  {suppliers.map((supplier) => (
-                    <option key={supplier} value={supplier} />
-                  ))}
-                </datalist>
+                {snapshot.supplierCatalog?.synced ? (
+                  <select aria-label="Fournisseur du BC" value={supplierPennylaneId}
+                    disabled={busy || !snapshot.canWrite}
+                    onChange={event => {
+                      const id = event.target.value;
+                      setSupplierPennylaneId(id);
+                      setSupplierName(snapshot.supplierCatalog?.suppliers.find(item => item.id === id)?.name ?? "");
+                      setError("");
+                    }}>
+                    <option value="">Sélectionner dans Pennylane</option>
+                    {snapshot.supplierCatalog.suppliers.map(item => (
+                      <option key={item.id} value={item.id}>{item.name}</option>
+                    ))}
+                  </select>
+                ) : (
+                  <>
+                    <input aria-label="Fournisseur du BC" list="bc-supplier-names"
+                      maxLength={240} placeholder="Nom du fournisseur"
+                      value={supplierName} disabled={busy || !snapshot.canWrite}
+                      onChange={event => { setSupplierName(event.target.value); setError(""); }}/>
+                    <datalist id="bc-supplier-names">
+                      {suppliers.map(supplier => <option key={supplier} value={supplier} />)}
+                    </datalist>
+                  </>
+                )}
               </label>
             </div>
             <small>
-              Fournisseurs proposés à partir des BC déjà saisis. Ce nom provisoire ne crée pas de
-              fournisseur comptable dans Pennylane.
+              {snapshot.supplierCatalog?.synced
+                ? "Fournisseur absent ? Crée-le dans Pennylane puis clique sur Actualiser."
+                : "Liste Pennylane non synchronisée : les anciens noms des BC restent provisoirement utilisables."}
+            </small>
+            <div>
+              <button type="button" className="secondaryButton" disabled={busy || !snapshot.canWrite || !snapshot.supplierCatalog}
+                onClick={() => void refreshSuppliers()}>Actualiser les fournisseurs</button>
+              <small> La récupération exige la clé Pennylane et l'autorisation d'import serveur.</small>
+            </div>
+            <small>
             </small>
             <div style={{ display: "flex", flexWrap: "wrap", gap: 8 }}>
               <button
