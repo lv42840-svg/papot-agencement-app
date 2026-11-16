@@ -7,6 +7,8 @@ import {
   listCanonicalCommercialClients,
 } from "@/lib/commercial/client-integration";
 import { createCommercialRepository } from "@/lib/commercial/create-repository";
+import { createChantiersRepository } from "@/lib/chantiers/create-repository";
+import { chantierStorageFolder } from "@/lib/chantiers/folder-lifecycle";
 import { createCommercialDocumentTransport } from "@/lib/commercial/document-file-runtime";
 import {
   cleanupCommercialDocuments,
@@ -102,6 +104,9 @@ export async function POST(request: Request, context: RouteContext) {
     assertCommercialRevision(item, expectedUpdatedAt);
 
     const creationYear = new Date(item.createdAt).getFullYear();
+    const chantier = (await createChantiersRepository().load()).chantiers.find(
+      (candidate) => candidate.sourceCommercialCaseId === item.id,
+    );
     const actor = { userId: owner.userId, displayName: owner.displayName };
     const transport = await createCommercialDocumentTransport({
       displayName: user.displayName,
@@ -111,6 +116,7 @@ export async function POST(request: Request, context: RouteContext) {
     try {
       uploaded = await uploadCommercialDocuments(transport, {
         creationYear,
+        businessFolder: chantier ? chantierStorageFolder(chantier) : undefined,
         clientName: item.clientName,
         caseName: item.name,
         files,
