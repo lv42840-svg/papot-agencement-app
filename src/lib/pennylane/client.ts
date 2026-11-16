@@ -113,3 +113,36 @@ export async function listPennylaneResource(
   }
   throw new Error("PENNYLANE_PAGE_LIMIT");
 }
+
+export type PennylaneAccessState = "allowed" | "forbidden" | "invalid_token" | "error";
+
+export type PennylaneAccessProbe = {
+  companyName: string;
+  access: Record<PennylaneResource, PennylaneAccessState>;
+};
+
+/**
+ * GET-only credential and scope check. Reads at most one record per resource,
+ * never returns upstream data and never modifies either system.
+ */
+export async function probePennylaneAccess(
+  config: PennylaneConfig,
+  fetcher: PennylaneFetcher = fetch,
+): Promise<PennylaneAccessProbe> {
+  const companyName = await verifyPennylaneCompany(config, fetcher);
+  const access = {} as Record<PennylaneResource, PennylaneAccessState>;
+  for (const resource of ["suppliers", "supplier_invoices", "customers", "customer_invoices"] as const) {
+    try {
+      const url = new URL(resource, BASE_URL);
+      url.searchParams.set("limit", "1");
+      const result = await requestJson(url, config, fetcher);
+      access[resource] = pageSchema.safeParse(result).success ? "allowed" : "error";
+    } catch (error) {
+      const code = error instanceof Error ? error.message : "";
+      access[resource] = code === "PENNYLANE_SCOPE_FORBIDDEN"
+        ? "forbidden"
+        : code === "PENNYLANE_TOKEN_INVALID" ? "invalid_token" : "error";
+    }
+  }
+  return { companyName, access };
+}
