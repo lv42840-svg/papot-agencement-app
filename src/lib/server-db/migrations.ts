@@ -35,6 +35,8 @@ const PAYROLL_PREPARATION_VERSION = 16;
 const PAYROLL_PREPARATION_NAME = "payroll_preparation_storage";
 const PENNYLANE_STAGING_VERSION = 17;
 const PENNYLANE_CONNECTION_VERSION = 18;
+const PENNYLANE_PURCHASE_ALLOCATION_VERSION = 19;
+const PENNYLANE_PURCHASE_ALLOCATION_NAME = "pennylane_purchase_allocations";
 const PENNYLANE_CONNECTION_NAME = "pennylane_encrypted_connection";
 const PENNYLANE_STAGING_NAME = "pennylane_readonly_staging";
 const BILLING_STORAGE_VERSION = 15;
@@ -577,6 +579,19 @@ async function ensurePennylaneConnection(client: PoolClient): Promise<void> {
   `);
 }
 
+async function ensurePennylanePurchaseAllocations(client: PoolClient): Promise<void> {
+  await client.query(`
+    CREATE TABLE IF NOT EXISTS papot_pennylane_purchase_allocations (
+      invoice_id TEXT PRIMARY KEY,
+      version INTEGER NOT NULL DEFAULT 1 CHECK (version > 0),
+      draft JSONB CHECK (draft IS NULL OR jsonb_typeof(draft) = 'object'),
+      approved JSONB CHECK (approved IS NULL OR jsonb_typeof(approved) = 'object'),
+      history JSONB NOT NULL DEFAULT '[]'::jsonb CHECK (jsonb_typeof(history) = 'array'),
+      updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+    )
+  `);
+}
+
 async function ensurePurchaseOrdersStorage(client: PoolClient): Promise<void> {
   await client.query(`
     CREATE TABLE IF NOT EXISTS papot_purchase_orders_state (
@@ -782,6 +797,13 @@ export async function runServerDbMigrations(
       `INSERT INTO papot_schema_migrations (version, name)
        VALUES ($1, $2) ON CONFLICT (version) DO NOTHING`,
       [PENNYLANE_CONNECTION_VERSION, PENNYLANE_CONNECTION_NAME],
+    );
+
+    await ensurePennylanePurchaseAllocations(client);
+    await client.query(
+      `INSERT INTO papot_schema_migrations (version, name)
+       VALUES ($1, $2) ON CONFLICT (version) DO NOTHING`,
+      [PENNYLANE_PURCHASE_ALLOCATION_VERSION, PENNYLANE_PURCHASE_ALLOCATION_NAME],
     );
 
     await ensureBillingStorage(client);
