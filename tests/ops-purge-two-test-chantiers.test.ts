@@ -36,6 +36,14 @@ const ids = {
   draft1: "99999999-9999-4999-8999-999999999999",
 };
 
+type ActualHoursFixture = {
+  chantierId: string;
+  userId: string;
+  activity: string;
+  week: string;
+  hours: number;
+};
+
 function fixture() {
   const payloads = {
     chantiers: {
@@ -124,7 +132,7 @@ function fixture() {
       provisionalAllocations: [
         { caseId: ids.case2, activity: "INSTALL", week: "2026-W47", hours: 3 },
       ],
-      actualHours: [] as Array<{ chantierId: string; userId: string; activity: string; week: string; hours: number }>,
+      actualHours: [] as ActualHoursFixture[],
       chantierOrder: [ids.site1, ids.site2],
       provisionalOrder: [ids.case2],
       dailyAssignments: [{ chantierId: ids.site1, userId: "a", date: "2026-11-16", label: "Test" }],
