@@ -5,7 +5,7 @@ import Link from "next/link";
 export function SettingsSectionNav({
   active,
 }: {
-  active: "company" | "users" | "entries" | "emails" | "billing" | "pennylane";
+  active: "company" | "users" | "entries" | "emails" | "billing" | "pennylane" | "chantiers";
 }) {
   return (
     <nav className="settingsSectionNav" aria-label="Paramètres">
@@ -26,6 +26,9 @@ export function SettingsSectionNav({
       </Link>
       <Link className={active === "pennylane" ? "isActive" : undefined} href="/settings/pennylane">
         Pennylane
+      </Link>
+      <Link className={active === "chantiers" ? "isActive" : undefined} href="/settings/chantiers">
+        Dossiers chantiers
       </Link>
       <style jsx global>{`
         .settingsSectionNav {
