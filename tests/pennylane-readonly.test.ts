@@ -1,6 +1,10 @@
 import { describe, expect, it, vi } from "vitest";
 import { getPennylaneConfig, PENNYLANE_RESOURCES } from "../src/lib/pennylane/config";
-import { listPennylaneResource, probePennylaneAccess, verifyPennylaneCompany } from "../src/lib/pennylane/client";
+import {
+  listPennylaneResource,
+  probePennylaneAccess,
+  verifyPennylaneCompany,
+} from "../src/lib/pennylane/client";
 import { preparePennylaneSnapshot } from "../src/lib/pennylane/sync";
 
 const config = { token: "fake-test-token-never-deployed", expectedCompany: "PAPOT LIBERAL" };
@@ -135,7 +139,11 @@ describe("Pennylane V2 read-only staged connector", () => {
       if (url.pathname.endsWith("/me")) return reply({ company: { name: "PAPOT LIBERAL" } });
       if (url.pathname.endsWith("/suppliers")) return reply({ error: "Missing permission" }, 403);
       expect(url.searchParams.get("limit")).toBe("1");
-      return reply({ items: [{ id: 123, confidential: "not returned" }], has_more: false, next_cursor: null });
+      return reply({
+        items: [{ id: 123, confidential: "not returned" }],
+        has_more: false,
+        next_cursor: null,
+      });
     });
     const probe = await probePennylaneAccess(config, fetcher);
     expect(probe.companyName).toBe("PAPOT LIBERAL");
