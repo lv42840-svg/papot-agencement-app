@@ -312,6 +312,27 @@ async function main() {
       (applying ? " FOR UPDATE" : ""),
     );
     const plan = planFor(states, clientResult.rows);
+    // Refuse a purge that would orphan external accounting or payroll references.
+    const externalTables = [
+      "papot_pennylane_staging",
+      "papot_payroll_preparation_state",
+      "papot_monthly_labor_costs_state",
+    ];
+    const targetIds = [
+      ...plan.scope.sites.map(s => s.id),
+      ...plan.scope.affaireIds,
+      ...plan.scope.devis.map(q => q.id),
+      ...plan.scope.factures.map(d => d.id),
+    ];
+    for (const table of externalTables) {
+      const sql = "SELECT COUNT(*)::int AS count FROM " + table +
+        " AS checked WHERE EXISTS (SELECT 1 FROM unnest($1::text[]) AS needle" +
+        " WHERE to_jsonb(checked)::text LIKE '%' || needle || '%')";
+      const checked = await db.query(sql, [targetIds]);
+      if (Number(checked.rows[0].count) !== 0) {
+        fail("EXTERNAL_ACCOUNTING_OR_PAYROLL_REFERENCE", table);
+      }
+    }
     process.stdout.write("\nPAPOT | NETTOYAGE DE DEUX CHANTIERS ANNULES\n" +
       "Mode : " + (applying ? "APPLICATION" : "PREVISUALISATION SANS MODIFICATION") + "\n" +
       json(plan.scope) + "\nEmpreinte de controle : " + plan.signature + "\n");
@@ -381,7 +402,9 @@ async function main() {
   }
 }
 
-main().catch(error => {
+if (process.env.PAPOT_PURGE_TEST_MODE === "1") {
+  module.exports = { planFor, compact, safeRelative };
+} else main().catch(error => {
   console.error("\nNETTOYAGE INTERROMPU SANS SUPPRESSION CONFIRMEE : " + error.message);
   process.exitCode = 1;
 });
