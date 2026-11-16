@@ -1,0 +1,34 @@
+name: Temporary PR 254 final formatting
+
+on:
+  pull_request:
+    types: [opened, synchronize, reopened]
+
+permissions:
+  contents: write
+
+jobs:
+  format:
+    if: github.event.pull_request.number == 254
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ops/purge-two-cancelled-test-chantiers-20261116
+          persist-credentials: true
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - name: Fix final fixture format
+        run: npx prettier --write tests/ops-purge-two-test-chantiers.test.ts
+      - name: Commit formatting
+        run: |
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add tests/ops-purge-two-test-chantiers.test.ts
+          if ! git diff --cached --quiet; then
+            git commit -m 'style: reformat final purge safety tests'
+            git push origin HEAD:ops/purge-two-cancelled-test-chantiers-20261116
+          fi
