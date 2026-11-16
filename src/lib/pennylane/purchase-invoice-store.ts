@@ -93,6 +93,7 @@ export type PurchaseInvoiceWorkspaceData = {
   suppliers: Array<{ id: string; name: string }>;
   chantiers: Array<{ id: string; name: string; status: string }>;
   orders: PurchaseOrder[];
+  orderBalances: Record<string, { billedHtCents: number; remainingHtCents: number; settled: boolean; invoiceCount: number }>;
   lastImportedAt: string | null;
   truncated: boolean;
   importEnabled: boolean;
@@ -129,6 +130,24 @@ export async function readPurchaseInvoiceWorkspace(
     const key = duplicateKey(item);
     if (key) duplicates.set(key, [...(duplicates.get(key) ?? []), item.id]);
   }
+  const usage = new Map<string, { billedHtCents: number; settled: boolean; invoiceCount: number }>();
+  for (const state of states.values()) {
+    for (const link of state?.approved?.draft.orderLinks ?? []) {
+      const row = usage.get(link.orderId) ?? { billedHtCents: 0, settled: false, invoiceCount: 0 };
+      row.billedHtCents += link.appliedHtCents;
+      row.settled ||= link.settle;
+      row.invoiceCount += 1;
+      usage.set(link.orderId, row);
+    }
+  }
+  const orderBalances = Object.fromEntries(orders.map(order => {
+    const used = usage.get(order.id) ?? { billedHtCents: 0, settled: false, invoiceCount: 0 };
+    return [order.id, {
+      ...used,
+      remainingHtCents: used.settled ? 0 : Math.max(0, order.amountHtCents - used.billedHtCents),
+    }];
+  }));
+
   const invoices = sources.map(source => {
     const state = states.get(source.id) ?? null;
     const key = duplicateKey(source);
@@ -153,6 +172,7 @@ export async function readPurchaseInvoiceWorkspace(
     invoices,
     suppliers,
     orders,
+    orderBalances,
     chantiers: sites.map(site => ({ id: site.id, name: site.name, status: site.status })),
     lastImportedAt: stateResult.rows[0]?.synced_at.toISOString() ?? null,
     truncated: invoiceRows.rows.length > 500 || supplierRows.rows.length > 20000,
