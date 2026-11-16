@@ -262,15 +262,20 @@ function planFor(states, clientRows) {
     const allDestinations = [...current, ...past, ...historicalRemoved];
     if (
       allDestinations.length === 0 ||
-      allDestinations.some((allocation) =>
-        allocation.destinationType && allocation.destinationType !== "CHANTIER" ||
-        !allocation.chantierId || !siteIds.has(allocation.chantierId)
+      allDestinations.some(
+        (allocation) =>
+          (allocation.destinationType && allocation.destinationType !== "CHANTIER") ||
+          !allocation.chantierId ||
+          !siteIds.has(allocation.chantierId),
       )
     ) {
       fail("PURCHASE_ORDER_SHARED_OR_REASSIGNED", order.reference ?? order.id);
     }
-    if (["pennylaneInvoiceId", "supplierInvoiceId", "invoiceId", "externalInvoiceId"]
-      .some((key) => order[key] != null)) {
+    if (
+      ["pennylaneInvoiceId", "supplierInvoiceId", "invoiceId", "externalInvoiceId"].some(
+        (key) => order[key] != null,
+      )
+    ) {
       fail("PURCHASE_ORDER_INVOICE_REFERENCE", order.reference ?? order.id);
     }
   }
@@ -396,7 +401,9 @@ function planFor(states, clientRows) {
       businessFolder(other.clientName, other.name);
     if (dirs.includes(otherRoot)) fail("SHARED_COMMERCIAL_FOLDER_NAME", otherRoot);
   }
-  const linkedPaths = unique(allPaths([...affairs, ...quotes, ...linkedEntries, ...purchaseOrders]));
+  const linkedPaths = unique(
+    allPaths([...affairs, ...quotes, ...linkedEntries, ...purchaseOrders]),
+  );
   const unsafeFiles = linkedPaths.filter((p) => {
     try {
       safeRelative(p);
@@ -437,10 +444,20 @@ function planFor(states, clientRows) {
       statut: order.status,
       mode: order.mode,
       chantierId: order.chantierId,
-      destinations: (order.allocations?.length ? order.allocations :
-        [{ chantierId: order.chantierId, destinationType: "CHANTIER", amountHtCents: order.amountHtCents }])
-        .map((row) => ({ chantierId: row.chantierId, type: row.destinationType ?? "CHANTIER",
-          montantHtCents: row.amountHtCents })),
+      destinations: (order.allocations?.length
+        ? order.allocations
+        : [
+            {
+              chantierId: order.chantierId,
+              destinationType: "CHANTIER",
+              amountHtCents: order.amountHtCents,
+            },
+          ]
+      ).map((row) => ({
+        chantierId: row.chantierId,
+        type: row.destinationType ?? "CHANTIER",
+        montantHtCents: row.amountHtCents,
+      })),
       createdAt: order.createdAt,
     })),
     linkedTaskIds: [...entryIds],
