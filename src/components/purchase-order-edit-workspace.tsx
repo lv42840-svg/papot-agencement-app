@@ -19,7 +19,11 @@ type Snapshot = {
   payload: PurchaseOrdersPayload;
   chantiers: Site[];
   canWrite: boolean;
-  supplierCatalog?: { suppliers: Array<{ id: string; name: string }>; synced: boolean; syncedAt: string | null };
+  supplierCatalog?: {
+    suppliers: Array<{ id: string; name: string }>;
+    synced: boolean;
+    syncedAt: string | null;
+  };
 };
 type Allocated = { id: string; chantierId: string; amount: string };
 type Line = { id: string; description: string; quantity: string; unit: string; unitPrice: string };
@@ -162,7 +166,9 @@ export function PurchaseOrderEditWorkspace({ orderId }: { orderId: string }) {
       input = {
         mode: "QUICK",
         supplierName: supplier.trim(),
-        supplierPennylaneId: data.supplierCatalog?.synced ? supplierPennylaneId : original.supplierPennylaneId,
+        supplierPennylaneId: data.supplierCatalog?.synced
+          ? supplierPennylaneId
+          : original.supplierPennylaneId,
         description: description.trim(),
         allocations: rows.map((row) =>
           purchaseAllocationFromSelection(row.chantierId, row.amountHtCents!),
@@ -198,7 +204,9 @@ export function PurchaseOrderEditWorkspace({ orderId }: { orderId: string }) {
         mode: "DETAILED",
         chantierId: siteId,
         supplierName: supplier.trim(),
-        supplierPennylaneId: data.supplierCatalog?.synced ? supplierPennylaneId : original.supplierPennylaneId,
+        supplierPennylaneId: data.supplierCatalog?.synced
+          ? supplierPennylaneId
+          : original.supplierPennylaneId,
         description: description.trim(),
         lines: parsed,
       };
@@ -279,23 +287,36 @@ export function PurchaseOrderEditWorkspace({ orderId }: { orderId: string }) {
           <label style={{ display: "grid", gap: 5 }}>
             Fournisseur
             {data.supplierCatalog?.synced ? (
-              <select value={supplierPennylaneId} disabled={readOnly || busy}
-                onChange={event => {
+              <select
+                value={supplierPennylaneId}
+                disabled={readOnly || busy}
+                onChange={(event) => {
                   const id = event.target.value;
                   setSupplierPennylaneId(id);
-                  setSupplier(data.supplierCatalog?.suppliers.find(item => item.id === id)?.name ?? "");
-                }}>
+                  setSupplier(
+                    data.supplierCatalog?.suppliers.find((item) => item.id === id)?.name ?? "",
+                  );
+                }}
+              >
                 <option value="">Choisir un fournisseur Pennylane</option>
-                {data.supplierCatalog.suppliers.map(item => (
-                  <option key={item.id} value={item.id}>{item.name}</option>
+                {data.supplierCatalog.suppliers.map((item) => (
+                  <option key={item.id} value={item.id}>
+                    {item.name}
+                  </option>
                 ))}
               </select>
             ) : (
               <>
-                <input list="edit-bc-suppliers" value={supplier} disabled={readOnly || busy}
-                  onChange={event => setSupplier(event.target.value)} />
+                <input
+                  list="edit-bc-suppliers"
+                  value={supplier}
+                  disabled={readOnly || busy}
+                  onChange={(event) => setSupplier(event.target.value)}
+                />
                 <datalist id="edit-bc-suppliers">
-                  {suppliers.map(name => <option key={name} value={name} />)}
+                  {suppliers.map((name) => (
+                    <option key={name} value={name} />
+                  ))}
                 </datalist>
               </>
             )}

@@ -32,6 +32,8 @@ describe("monthly salary costs in the Heures screen", () => {
     expect(api).toContain("provisionalLaborCostsByChantier");
     expect(api).toContain("actualLaborCostsByChantier");
     expect(workspace).toContain("actualLaborCostsByChantier");
-    expect(workspace).toContain("purchaseCostCents: chantiersSnapshot.actualPurchaseCostsByChantier");
+    expect(workspace).toContain(
+      "purchaseCostCents: chantiersSnapshot.actualPurchaseCostsByChantier",
+    );
   });
 });

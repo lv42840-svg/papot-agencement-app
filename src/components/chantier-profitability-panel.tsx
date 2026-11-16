@@ -138,9 +138,19 @@ export function ChantierProfitabilityPanel({
           }
         />
         <Metric
-          label={actualPurchaseCostProvisional ? "Achats et frais réels HT · provisoire" : "Achats et frais réels HT"}
+          label={
+            actualPurchaseCostProvisional
+              ? "Achats et frais réels HT · provisoire"
+              : "Achats et frais réels HT"
+          }
           value={money(result.actualPurchaseCostCents)}
-          detail={result.actualPurchaseCostCents === null ? "Pas encore de coûts fournisseurs doublement validés" : actualPurchaseCostProvisional ? "Une facture a changé : dernière répartition validée conservée" : "Factures Pennylane et affectations PAPOT validées"}
+          detail={
+            result.actualPurchaseCostCents === null
+              ? "Pas encore de coûts fournisseurs doublement validés"
+              : actualPurchaseCostProvisional
+                ? "Une facture a changé : dernière répartition validée conservée"
+                : "Factures Pennylane et affectations PAPOT validées"
+          }
         />
         <Metric
           label={

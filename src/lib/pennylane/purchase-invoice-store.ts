@@ -32,7 +32,7 @@ type AllocationRow = {
 
 function obj(value: unknown): Record<string, unknown> {
   return value && typeof value === "object" && !Array.isArray(value)
-    ? value as Record<string, unknown>
+    ? (value as Record<string, unknown>)
     : {};
 }
 function str(value: unknown): string {
@@ -43,7 +43,8 @@ function invoiceSource(row: InvoiceRow, suppliers: Map<string, string>): Invoice
   const supplier = obj(data.supplier);
   const supplierId = supplier.id === null || supplier.id === undefined ? null : str(supplier.id);
   // Foreign currencies must not be misrepresented as EUR costs.
-  const amountHtCents = data.currency === "EUR" ? euroToCents(data.currency_amount_before_tax) : null;
+  const amountHtCents =
+    data.currency === "EUR" ? euroToCents(data.currency_amount_before_tax) : null;
   const invoiceNumber = str(data.invoice_number);
   const invoiceDate = str(data.date) || null;
   const filename = str(data.filename) || null;
@@ -57,7 +58,11 @@ function invoiceSource(row: InvoiceRow, suppliers: Map<string, string>): Invoice
     accountingStatus: str(data.accounting_status),
     hasPdf: Boolean(data.public_file_url || filename),
     sourceRevision: sourceRevision({
-      supplierId, amountHtCents, invoiceNumber, invoiceDate, filename,
+      supplierId,
+      amountHtCents,
+      invoiceNumber,
+      invoiceDate,
+      filename,
     }),
   };
 }
@@ -65,13 +70,13 @@ function invoiceSource(row: InvoiceRow, suppliers: Map<string, string>): Invoice
 function stateOf(row: AllocationRow | undefined): InvoiceAllocationState | null {
   return row
     ? {
-      invoiceId: row.invoice_id,
-      version: row.version,
-      draft: row.draft,
-      approved: row.approved,
-      history: row.history,
-      updatedAt: row.updated_at.toISOString(),
-    }
+        invoiceId: row.invoice_id,
+        version: row.version,
+        draft: row.draft,
+        approved: row.approved,
+        history: row.history,
+        updatedAt: row.updated_at.toISOString(),
+      }
     : null;
 }
 
@@ -85,7 +90,12 @@ export type PurchaseInvoiceListItem = InvoiceSource & {
   workflow: ReturnType<typeof invoiceWorkflowState>;
   state: InvoiceAllocationState | null;
   duplicateIds: string[];
-  proposedOrders: Array<{ id: string; reference: string; amountHtCents: number; chantierName: string }>;
+  proposedOrders: Array<{
+    id: string;
+    reference: string;
+    amountHtCents: number;
+    chantierName: string;
+  }>;
 };
 
 export type PurchaseInvoiceWorkspaceData = {
@@ -93,7 +103,10 @@ export type PurchaseInvoiceWorkspaceData = {
   suppliers: Array<{ id: string; name: string }>;
   chantiers: Array<{ id: string; name: string; status: string }>;
   orders: PurchaseOrder[];
-  orderBalances: Record<string, { billedHtCents: number; remainingHtCents: number; settled: boolean; invoiceCount: number }>;
+  orderBalances: Record<
+    string,
+    { billedHtCents: number; remainingHtCents: number; settled: boolean; invoiceCount: number }
+  >;
   lastImportedAt: string | null;
   truncated: boolean;
   importEnabled: boolean;
@@ -112,25 +125,34 @@ export async function readPurchaseInvoiceWorkspace(
         "SELECT external_id, payload FROM papot_pennylane_staging WHERE resource = 'suppliers' ORDER BY external_id LIMIT 20001",
       ),
       pool.query<AllocationRow>("SELECT * FROM papot_pennylane_purchase_allocations"),
-      pool.query<{ payload: unknown }>("SELECT payload FROM papot_purchase_orders_state WHERE scope = 'global'"),
-      pool.query<{ payload: unknown }>("SELECT payload FROM papot_chantiers_state WHERE scope = 'global'"),
-      pool.query<{ synced_at: Date }>("SELECT synced_at FROM papot_pennylane_sync_state WHERE resource = 'supplier_invoices'"),
+      pool.query<{ payload: unknown }>(
+        "SELECT payload FROM papot_purchase_orders_state WHERE scope = 'global'",
+      ),
+      pool.query<{ payload: unknown }>(
+        "SELECT payload FROM papot_chantiers_state WHERE scope = 'global'",
+      ),
+      pool.query<{ synced_at: Date }>(
+        "SELECT synced_at FROM papot_pennylane_sync_state WHERE resource = 'supplier_invoices'",
+      ),
     ]);
-  const suppliers = supplierRows.rows.slice(0, 20000).map(row => ({
+  const suppliers = supplierRows.rows.slice(0, 20000).map((row) => ({
     id: row.external_id,
     name: str(row.payload.name) || "Fournisseur #" + row.external_id,
   }));
-  const bySupplierId = new Map(suppliers.map(row => [row.id, row.name]));
-  const states = new Map(allocationRows.rows.map(row => [row.invoice_id, stateOf(row)]));
+  const bySupplierId = new Map(suppliers.map((row) => [row.id, row.name]));
+  const states = new Map(allocationRows.rows.map((row) => [row.invoice_id, stateOf(row)]));
   const orders = parsePurchaseOrdersPayload(ordersResult.rows[0]?.payload).orders;
   const sites = parseChantiersPayload(sitesResult.rows[0]?.payload).chantiers;
-  const sources = invoiceRows.rows.slice(0, 500).map(row => invoiceSource(row, bySupplierId));
+  const sources = invoiceRows.rows.slice(0, 500).map((row) => invoiceSource(row, bySupplierId));
   const duplicates = new Map<string, string[]>();
   for (const item of sources) {
     const key = duplicateKey(item);
     if (key) duplicates.set(key, [...(duplicates.get(key) ?? []), item.id]);
   }
-  const usage = new Map<string, { billedHtCents: number; settled: boolean; invoiceCount: number }>();
+  const usage = new Map<
+    string,
+    { billedHtCents: number; settled: boolean; invoiceCount: number }
+  >();
   for (const state of states.values()) {
     for (const link of state?.approved?.draft.orderLinks ?? []) {
       const row = usage.get(link.orderId) ?? { billedHtCents: 0, settled: false, invoiceCount: 0 };
@@ -140,27 +162,38 @@ export async function readPurchaseInvoiceWorkspace(
       usage.set(link.orderId, row);
     }
   }
-  const orderBalances = Object.fromEntries(orders.map(order => {
-    const used = usage.get(order.id) ?? { billedHtCents: 0, settled: false, invoiceCount: 0 };
-    return [order.id, {
-      ...used,
-      remainingHtCents: used.settled ? 0 : Math.max(0, order.amountHtCents - used.billedHtCents),
-    }];
-  }));
+  const orderBalances = Object.fromEntries(
+    orders.map((order) => {
+      const used = usage.get(order.id) ?? { billedHtCents: 0, settled: false, invoiceCount: 0 };
+      return [
+        order.id,
+        {
+          ...used,
+          remainingHtCents: used.settled
+            ? 0
+            : Math.max(0, order.amountHtCents - used.billedHtCents),
+        },
+      ];
+    }),
+  );
 
-  const invoices = sources.map(source => {
+  const invoices = sources.map((source) => {
     const state = states.get(source.id) ?? null;
     const key = duplicateKey(source);
     return {
       ...source,
       workflow: invoiceWorkflowState(source, state),
       state,
-      duplicateIds: key
-        ? (duplicates.get(key) ?? []).filter(id => id !== source.id)
-        : [],
+      duplicateIds: key ? (duplicates.get(key) ?? []).filter((id) => id !== source.id) : [],
       proposedOrders: orders
-        .filter(order => order.status === "COMMITTED" && (source.supplierId && order.supplierPennylaneId ? order.supplierPennylaneId === source.supplierId : supplierKey(order.supplierName) === supplierKey(source.supplierName)))
-        .map(order => ({
+        .filter(
+          (order) =>
+            order.status === "COMMITTED" &&
+            (source.supplierId && order.supplierPennylaneId
+              ? order.supplierPennylaneId === source.supplierId
+              : supplierKey(order.supplierName) === supplierKey(source.supplierName)),
+        )
+        .map((order) => ({
           id: order.id,
           reference: order.reference,
           amountHtCents: order.amountHtCents,
@@ -173,7 +206,7 @@ export async function readPurchaseInvoiceWorkspace(
     suppliers,
     orders,
     orderBalances,
-    chantiers: sites.map(site => ({ id: site.id, name: site.name, status: site.status })),
+    chantiers: sites.map((site) => ({ id: site.id, name: site.name, status: site.status })),
     lastImportedAt: stateResult.rows[0]?.synced_at.toISOString() ?? null,
     truncated: invoiceRows.rows.length > 500 || supplierRows.rows.length > 20000,
     importEnabled: process.env.PAPOT_PENNYLANE_ENABLED === "true",
@@ -189,9 +222,9 @@ async function loadInvoiceForUpdate(client: PoolClient, invoiceId: string) {
   const suppliers = await client.query<InvoiceRow>(
     "SELECT external_id, payload FROM papot_pennylane_staging WHERE resource = 'suppliers'",
   );
-  const bySupplierId = new Map(suppliers.rows.map(row => [
-    row.external_id, str(row.payload.name),
-  ]));
+  const bySupplierId = new Map(
+    suppliers.rows.map((row) => [row.external_id, str(row.payload.name)]),
+  );
   return invoiceSource(response.rows[0], bySupplierId);
 }
 
@@ -206,7 +239,7 @@ export async function writePurchaseInvoiceAllocation(
 ): Promise<InvoiceAllocationState> {
   await runServerDbMigrations(pool);
   const draft = invoiceAllocationDraftSchema.parse(submitted);
-  return withServerDbTransaction(async client => {
+  return withServerDbTransaction(async (client) => {
     // The same lock is used by the staging publisher and credential removal.
     await client.query("SELECT pg_advisory_xact_lock($1)", ["7332170416238558"]);
     const source = await loadInvoiceForUpdate(client, invoiceId);
@@ -218,16 +251,27 @@ export async function writePurchaseInvoiceAllocation(
     const previous = stored.rows[0];
     if ((previous?.version ?? 0) !== expectedVersion) throw new Error("INVOICE_VERSION_CONFLICT");
     const [siteResult, orderResult] = await Promise.all([
-      client.query<{ payload: unknown }>("SELECT payload FROM papot_chantiers_state WHERE scope = 'global'"),
-      client.query<{ payload: unknown }>("SELECT payload FROM papot_purchase_orders_state WHERE scope = 'global'"),
+      client.query<{ payload: unknown }>(
+        "SELECT payload FROM papot_chantiers_state WHERE scope = 'global'",
+      ),
+      client.query<{ payload: unknown }>(
+        "SELECT payload FROM papot_purchase_orders_state WHERE scope = 'global'",
+      ),
     ]);
-    const sites = new Set(parseChantiersPayload(siteResult.rows[0]?.payload).chantiers.map(item => item.id));
+    const sites = new Set(
+      parseChantiersPayload(siteResult.rows[0]?.payload).chantiers.map((item) => item.id),
+    );
     for (const row of draft.rows) {
       if (row.destination.kind === "CHANTIER" && !sites.has(row.destination.chantierId!)) {
         throw new Error("INVOICE_CHANTIER_NOT_FOUND");
       }
     }
-    const orders = new Map(parsePurchaseOrdersPayload(orderResult.rows[0]?.payload).orders.map(item => [item.id, item]));
+    const orders = new Map(
+      parsePurchaseOrdersPayload(orderResult.rows[0]?.payload).orders.map((item) => [
+        item.id,
+        item,
+      ]),
+    );
     for (const link of draft.orderLinks) {
       const order = orders.get(link.orderId);
       if (!order || order.status !== "COMMITTED") throw new Error("INVOICE_ORDER_NOT_FOUND");
@@ -274,7 +318,13 @@ export async function writePurchaseInvoiceAllocation(
     ];
     await client.query(
       "INSERT INTO papot_pennylane_purchase_allocations (invoice_id, version, draft, approved, history, updated_at) VALUES ($1, $2, $3::jsonb, $4::jsonb, $5::jsonb, NOW()) ON CONFLICT (invoice_id) DO UPDATE SET version = EXCLUDED.version, draft = EXCLUDED.draft, approved = EXCLUDED.approved, history = EXCLUDED.history, updated_at = NOW()",
-      [invoiceId, nextVersion, JSON.stringify(draft), approved ? JSON.stringify(approved) : null, JSON.stringify(history)],
+      [
+        invoiceId,
+        nextVersion,
+        JSON.stringify(draft),
+        approved ? JSON.stringify(approved) : null,
+        JSON.stringify(history),
+      ],
     );
     return {
       invoiceId,
@@ -293,7 +343,9 @@ export async function readValidatedPurchaseCosts(pool: Pool = getServerDbPool())
   provisionalByChantier: Record<string, boolean>;
 }> {
   await runServerDbMigrations(pool);
-  const imported = await pool.query("SELECT 1 FROM papot_pennylane_sync_state WHERE resource = 'supplier_invoices'");
+  const imported = await pool.query(
+    "SELECT 1 FROM papot_pennylane_sync_state WHERE resource = 'supplier_invoices'",
+  );
   if (!imported.rows[0]) return { imported: false, byChantier: {}, provisionalByChantier: {} };
   const result = await pool.query<InvoiceRow & { approved: ApprovedInvoiceAllocation | null }>(
     "SELECT s.external_id, s.payload, a.approved, a.draft FROM papot_pennylane_staging s LEFT JOIN papot_pennylane_purchase_allocations a ON a.invoice_id = s.external_id WHERE s.resource = 'supplier_invoices'",
@@ -306,9 +358,13 @@ export async function readValidatedPurchaseCosts(pool: Pool = getServerDbPool())
     // This only counts amounts once they have both approvals.
     if (source.accountingStatus !== "complete") continue;
     const calc = calculateInvoiceAllocation(row.approved.draft);
-    const provisional = source.sourceRevision !== row.approved.sourceRevision ||
-      Boolean((row as typeof row & { draft: InvoiceAllocationDraft | null }).draft &&
-        JSON.stringify((row as typeof row & { draft: InvoiceAllocationDraft | null }).draft) !== JSON.stringify(row.approved.draft));
+    const provisional =
+      source.sourceRevision !== row.approved.sourceRevision ||
+      Boolean(
+        (row as typeof row & { draft: InvoiceAllocationDraft | null }).draft &&
+          JSON.stringify((row as typeof row & { draft: InvoiceAllocationDraft | null }).draft) !==
+            JSON.stringify(row.approved.draft),
+      );
     for (const allocation of calc.destinations) {
       if (allocation.destination.kind !== "CHANTIER") continue;
       const id = allocation.destination.chantierId!;

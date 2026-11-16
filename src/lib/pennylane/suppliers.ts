@@ -14,7 +14,9 @@ export type SupplierCatalog = {
   syncedAt: string | null;
 };
 
-export async function readSupplierCatalog(pool: Pool = getServerDbPool()): Promise<SupplierCatalog> {
+export async function readSupplierCatalog(
+  pool: Pool = getServerDbPool(),
+): Promise<SupplierCatalog> {
   await runServerDbMigrations(pool);
   const [rows, status] = await Promise.all([
     pool.query<{ external_id: string; payload: { name?: unknown } }>(
@@ -25,10 +27,12 @@ export async function readSupplierCatalog(pool: Pool = getServerDbPool()): Promi
     ),
   ]);
   return {
-    suppliers: rows.rows.slice(0, 20000).map(row => ({
+    suppliers: rows.rows.slice(0, 20000).map((row) => ({
       id: row.external_id,
-      name: typeof row.payload.name === "string" && row.payload.name.trim()
-        ? row.payload.name.trim() : "Fournisseur #" + row.external_id,
+      name:
+        typeof row.payload.name === "string" && row.payload.name.trim()
+          ? row.payload.name.trim()
+          : "Fournisseur #" + row.external_id,
     })),
     synced: Boolean(status.rows[0]),
     syncedAt: status.rows[0]?.synced_at.toISOString() ?? null,
@@ -41,13 +45,17 @@ export async function refreshSupplierCatalog(pool: Pool = getServerDbPool()): Pr
   const config = await readPennylaneStoredConfig(pool);
   const company = await verifyPennylaneCompany(config);
   const suppliers = await listPennylaneResource("suppliers", config);
-  await withServerDbTransaction(async client => {
+  await withServerDbTransaction(async (client) => {
     await client.query("SELECT pg_advisory_xact_lock($1)", ["7332170416238558"]);
     await client.query("DELETE FROM papot_pennylane_staging WHERE resource = 'suppliers'");
     if (suppliers.length > 0) {
       await client.query(
         "INSERT INTO papot_pennylane_staging (resource, external_id, payload, synced_at) SELECT 'suppliers', r.id, r.payload, NOW() FROM jsonb_to_recordset($1::jsonb) AS r(id text, payload jsonb)",
-        [JSON.stringify(suppliers.map(supplier => ({ id: String(supplier.id), payload: supplier })))],
+        [
+          JSON.stringify(
+            suppliers.map((supplier) => ({ id: String(supplier.id), payload: supplier })),
+          ),
+        ],
       );
     }
     await client.query(

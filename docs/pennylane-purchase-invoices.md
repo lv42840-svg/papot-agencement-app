@@ -40,6 +40,7 @@
 - Ne pas fusionner ni déployer tant que CI, tests en base, dossier Pennylane et comportement de Nadia ne sont pas validés.
 
 Références API :
+
 - https://pennylane.readme.io/reference/getsupplierinvoices
 - https://pennylane.readme.io/reference/getsupplierinvoicelines
 - https://pennylane.readme.io/reference/getsuppliers

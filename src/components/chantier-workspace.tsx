@@ -448,9 +448,12 @@ export function ChantierWorkspace({ chantierId }: { chantierId: string }) {
             quotes={quotesSnapshot?.payload ?? { schemaVersion: 1, quotes: [] }}
             actualCosts={{
               laborCostCents: chantiersSnapshot.actualLaborCostsByChantier?.[chantier.id] ?? null,
-              purchaseCostCents: chantiersSnapshot.actualPurchaseCostsByChantier?.[chantier.id] ?? null,
+              purchaseCostCents:
+                chantiersSnapshot.actualPurchaseCostsByChantier?.[chantier.id] ?? null,
             }}
-            actualPurchaseCostProvisional={chantiersSnapshot.provisionalPurchaseCostsByChantier?.[chantier.id] ?? false}
+            actualPurchaseCostProvisional={
+              chantiersSnapshot.provisionalPurchaseCostsByChantier?.[chantier.id] ?? false
+            }
             actualLaborCostProvisional={
               chantiersSnapshot.provisionalLaborCostsByChantier?.[chantier.id] ?? false
             }

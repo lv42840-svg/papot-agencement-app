@@ -97,7 +97,9 @@ export async function POST(request: Request) {
     if (input.action !== "CANCEL") {
       const catalog = await readSupplierCatalog();
       if (catalog.synced) {
-        const supplier = catalog.suppliers.find(row => row.id === input.order.supplierPennylaneId);
+        const supplier = catalog.suppliers.find(
+          (row) => row.id === input.order.supplierPennylaneId,
+        );
         if (!supplier || supplier.name !== input.order.supplierName) {
           throw new Error("PURCHASE_SUPPLIER_PENNYLANE_REQUIRED");
         }

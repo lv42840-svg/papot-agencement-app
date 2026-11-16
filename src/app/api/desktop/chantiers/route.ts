@@ -123,12 +123,16 @@ async function snapshot(
       ]),
     ),
     actualPurchaseCostsByChantier: Object.fromEntries(
-      payload.chantiers.map(site => [
-        site.id, actualPurchases?.imported ? actualPurchases.byChantier[site.id] ?? null : null,
+      payload.chantiers.map((site) => [
+        site.id,
+        actualPurchases?.imported ? (actualPurchases.byChantier[site.id] ?? null) : null,
       ]),
     ),
     provisionalPurchaseCostsByChantier: Object.fromEntries(
-      payload.chantiers.map(site => [site.id, actualPurchases?.provisionalByChantier[site.id] ?? false]),
+      payload.chantiers.map((site) => [
+        site.id,
+        actualPurchases?.provisionalByChantier[site.id] ?? false,
+      ]),
     ),
     provisionalLaborCostsByChantier: Object.fromEntries(
       payload.chantiers.map((chantier) => [

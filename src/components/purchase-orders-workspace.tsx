@@ -20,7 +20,11 @@ type Snapshot = {
   payload: PurchaseOrdersPayload;
   chantiers: Site[];
   canWrite: boolean;
-  supplierCatalog?: { suppliers: Array<{ id: string; name: string }>; synced: boolean; syncedAt: string | null };
+  supplierCatalog?: {
+    suppliers: Array<{ id: string; name: string }>;
+    synced: boolean;
+    syncedAt: string | null;
+  };
   error?: string;
 };
 type QuickAllocation = { id: string; chantierId: string; amount: string };
@@ -65,7 +69,8 @@ const messageFor = (code: string) => {
     PURCHASE_CHANTIER_NOT_ACTIVE: "Aucune nouvelle commande sur un chantier fermé ou annulé.",
     PURCHASE_ORDER_VERSION_CONFLICT: "Ce BC a été modifié. Recharge la page.",
     MODULE_FORBIDDEN: "Tu n'as pas les droits de modification des achats.",
-    PURCHASE_SUPPLIER_PENNYLANE_REQUIRED: "Choisis un fournisseur de la liste officielle Pennylane.",
+    PURCHASE_SUPPLIER_PENNYLANE_REQUIRED:
+      "Choisis un fournisseur de la liste officielle Pennylane.",
     PENNYLANE_DISABLED: "La synchronisation Pennylane doit être activée sur le serveur.",
   };
   return messages[code] ?? code;
@@ -113,7 +118,10 @@ export function PurchaseOrdersWorkspace({ chantierId }: { chantierId?: string })
     sites[0]?.id ??
     "";
   const suppliers = useMemo(
-    () => [...new Set((snapshot?.payload.orders ?? []).map(order => order.supplierName))].sort((a, b) => a.localeCompare(b, "fr-FR")),
+    () =>
+      [...new Set((snapshot?.payload.orders ?? []).map((order) => order.supplierName))].sort(
+        (a, b) => a.localeCompare(b, "fr-FR"),
+      ),
     [snapshot],
   );
   const commitmentTotals = snapshot ? committedPurchasesByDestination(snapshot.payload) : null;
@@ -168,15 +176,18 @@ export function PurchaseOrdersWorkspace({ chantierId }: { chantierId?: string })
     setError("");
     try {
       const response = await fetch("/api/desktop/purchases", {
-        method: "POST", headers: { "Content-Type": "application/json" },
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ action: "REFRESH_SUPPLIERS" }),
       });
-      const result = await response.json() as { error?: string; supplierCount?: number };
+      const result = (await response.json()) as { error?: string; supplierCount?: number };
       if (!response.ok) throw new Error(result.error ?? "PURCHASE_SUPPLIER_REFRESH_FAILED");
       await reload();
       setNotice(String(result.supplierCount ?? 0) + " fournisseurs Pennylane actualisés.");
     } catch (cause) {
-      setError(messageFor(cause instanceof Error ? cause.message : "PURCHASE_SUPPLIER_REFRESH_FAILED"));
+      setError(
+        messageFor(cause instanceof Error ? cause.message : "PURCHASE_SUPPLIER_REFRESH_FAILED"),
+      );
     } finally {
       setBusy(false);
     }
@@ -186,7 +197,9 @@ export function PurchaseOrdersWorkspace({ chantierId }: { chantierId?: string })
     if (!snapshot?.canWrite || busy) return;
     setError("");
     if (snapshot.supplierCatalog?.synced && !supplierPennylaneId) {
-      setError("Choisis un fournisseur Pennylane. Crée-le dans Pennylane puis actualise si nécessaire.");
+      setError(
+        "Choisis un fournisseur Pennylane. Crée-le dans Pennylane puis actualise si nécessaire.",
+      );
       return;
     }
     if (!supplierName.trim()) {
@@ -311,7 +324,9 @@ export function PurchaseOrdersWorkspace({ chantierId }: { chantierId?: string })
     <main style={{ padding: 22, display: "grid", gap: 18, maxWidth: 1480, margin: "0 auto" }}>
       <div>
         <h1>Achats · Bons de commande</h1>
-        <Link href="/achats/factures" className="secondaryButton">Factures fournisseurs · Pennylane</Link>
+        <Link href="/achats/factures" className="secondaryButton">
+          Factures fournisseurs · Pennylane
+        </Link>
         <p>
           Un BC enregistré est un <strong>coût engagé HT</strong>. Il ne crée ni facture
           fournisseur, ni coût réel validé, ni envoi automatique. Rapprochement Pennylane à venir.
@@ -379,27 +394,45 @@ export function PurchaseOrdersWorkspace({ chantierId }: { chantierId?: string })
               <label style={{ display: "grid", gap: 5 }}>
                 Fournisseur *
                 {snapshot.supplierCatalog?.synced ? (
-                  <select aria-label="Fournisseur du BC" value={supplierPennylaneId}
+                  <select
+                    aria-label="Fournisseur du BC"
+                    value={supplierPennylaneId}
                     disabled={busy || !snapshot.canWrite}
-                    onChange={event => {
+                    onChange={(event) => {
                       const id = event.target.value;
                       setSupplierPennylaneId(id);
-                      setSupplierName(snapshot.supplierCatalog?.suppliers.find(item => item.id === id)?.name ?? "");
+                      setSupplierName(
+                        snapshot.supplierCatalog?.suppliers.find((item) => item.id === id)?.name ??
+                          "",
+                      );
                       setError("");
-                    }}>
+                    }}
+                  >
                     <option value="">Sélectionner dans Pennylane</option>
-                    {snapshot.supplierCatalog.suppliers.map(item => (
-                      <option key={item.id} value={item.id}>{item.name}</option>
+                    {snapshot.supplierCatalog.suppliers.map((item) => (
+                      <option key={item.id} value={item.id}>
+                        {item.name}
+                      </option>
                     ))}
                   </select>
                 ) : (
                   <>
-                    <input aria-label="Fournisseur du BC" list="bc-supplier-names"
-                      maxLength={240} placeholder="Nom du fournisseur"
-                      value={supplierName} disabled={busy || !snapshot.canWrite}
-                      onChange={event => { setSupplierName(event.target.value); setError(""); }}/>
+                    <input
+                      aria-label="Fournisseur du BC"
+                      list="bc-supplier-names"
+                      maxLength={240}
+                      placeholder="Nom du fournisseur"
+                      value={supplierName}
+                      disabled={busy || !snapshot.canWrite}
+                      onChange={(event) => {
+                        setSupplierName(event.target.value);
+                        setError("");
+                      }}
+                    />
                     <datalist id="bc-supplier-names">
-                      {suppliers.map(supplier => <option key={supplier} value={supplier} />)}
+                      {suppliers.map((supplier) => (
+                        <option key={supplier} value={supplier} />
+                      ))}
                     </datalist>
                   </>
                 )}
@@ -411,9 +444,18 @@ export function PurchaseOrdersWorkspace({ chantierId }: { chantierId?: string })
                 : "Liste Pennylane non synchronisée : les anciens noms des BC restent provisoirement utilisables."}
             </small>
             <div>
-              <button type="button" className="secondaryButton" disabled={busy || !snapshot.canWrite || !snapshot.supplierCatalog}
-                onClick={() => void refreshSuppliers()}>Actualiser les fournisseurs</button>
-              <small> La récupération exige la clé Pennylane et l&apos;autorisation d&apos;import serveur.</small>
+              <button
+                type="button"
+                className="secondaryButton"
+                disabled={busy || !snapshot.canWrite || !snapshot.supplierCatalog}
+                onClick={() => void refreshSuppliers()}
+              >
+                Actualiser les fournisseurs
+              </button>
+              <small>
+                {" "}
+                La récupération exige la clé Pennylane et l&apos;autorisation d&apos;import serveur.
+              </small>
             </div>
             <div style={{ display: "flex", flexWrap: "wrap", gap: 8 }}>
               <button

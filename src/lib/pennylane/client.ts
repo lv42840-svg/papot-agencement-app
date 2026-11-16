@@ -155,7 +155,6 @@ export async function probePennylaneAccess(
   return { companyName, access };
 }
 
-
 /** A fresh read is required for PDF links, which expire after 30 minutes. */
 export async function getPennylaneSupplierInvoice(
   id: string,
