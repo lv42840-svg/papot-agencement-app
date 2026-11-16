@@ -139,7 +139,7 @@ export async function readPurchaseInvoiceWorkspace(
         ? (duplicates.get(key) ?? []).filter(id => id !== source.id)
         : [],
       proposedOrders: orders
-        .filter(order => order.status === "COMMITTED" && supplierKey(order.supplierName) === supplierKey(source.supplierName))
+        .filter(order => order.status === "COMMITTED" && (source.supplierId && order.supplierPennylaneId ? order.supplierPennylaneId === source.supplierId : supplierKey(order.supplierName) === supplierKey(source.supplierName)))
         .map(order => ({
           id: order.id,
           reference: order.reference,
@@ -275,7 +275,7 @@ export async function readValidatedPurchaseCosts(pool: Pool = getServerDbPool())
   const imported = await pool.query("SELECT 1 FROM papot_pennylane_sync_state WHERE resource = 'supplier_invoices'");
   if (!imported.rows[0]) return { imported: false, byChantier: {}, provisionalByChantier: {} };
   const result = await pool.query<InvoiceRow & { approved: ApprovedInvoiceAllocation | null }>(
-    "SELECT s.external_id, s.payload, a.approved FROM papot_pennylane_staging s LEFT JOIN papot_pennylane_purchase_allocations a ON a.invoice_id = s.external_id WHERE s.resource = 'supplier_invoices'",
+    "SELECT s.external_id, s.payload, a.approved, a.draft FROM papot_pennylane_staging s LEFT JOIN papot_pennylane_purchase_allocations a ON a.invoice_id = s.external_id WHERE s.resource = 'supplier_invoices'",
   );
   const byChantier: Record<string, number> = {};
   const provisionalByChantier: Record<string, boolean> = {};
@@ -285,7 +285,9 @@ export async function readValidatedPurchaseCosts(pool: Pool = getServerDbPool())
     // This only counts amounts once they have both approvals.
     if (source.accountingStatus !== "complete") continue;
     const calc = calculateInvoiceAllocation(row.approved.draft);
-    const provisional = source.sourceRevision !== row.approved.sourceRevision;
+    const provisional = source.sourceRevision !== row.approved.sourceRevision ||
+      Boolean((row as typeof row & { draft: InvoiceAllocationDraft | null }).draft &&
+        JSON.stringify((row as typeof row & { draft: InvoiceAllocationDraft | null }).draft) !== JSON.stringify(row.approved.draft));
     for (const allocation of calc.destinations) {
       if (allocation.destination.kind !== "CHANTIER") continue;
       const id = allocation.destination.chantierId!;
