@@ -64,14 +64,14 @@ export function commercialStorageFolder(
 function documentFolder(storagePath: string): string | null {
   const segments = storagePath.split("/");
   if (segments[0] === "Commercial") {
-    if (segments.length < 5 || !/^\\d{4}$/.test(segments[1])) {
+    if (segments.length < 5 || !/^\d{4}$/.test(segments[1])) {
       throw new Error("CHANTIER_SOURCE_DOCUMENT_PATH_INVALID");
     }
     return segments.slice(0, 3).join("/");
   }
   if (segments[0] === "Chantier") {
     const archived = segments[2] === "Archive";
-    if (segments.length < (archived ? 6 : 5) || !/^\\d{4}$/.test(segments[1])) {
+    if (segments.length < (archived ? 6 : 5) || !/^\d{4}$/.test(segments[1])) {
       throw new Error("CHANTIER_SOURCE_DOCUMENT_PATH_INVALID");
     }
     return segments.slice(0, archived ? 4 : 3).join("/");
