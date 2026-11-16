@@ -28,6 +28,8 @@ export const clientContactSchema = z
 export const clientRecordSchema = z
   .object({
     id: z.string().uuid(),
+    /** Stable accounting identity. Native UUID never changes after linking. */
+    pennylaneId: z.string().regex(/^\d{1,20}$/).optional(),
     type: clientTypeSchema,
     companyName: z.string().trim().max(240),
     firstName: z.string().trim().max(120),
