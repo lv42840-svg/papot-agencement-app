@@ -1,8 +1,16 @@
 import { getPennylaneConfig, PENNYLANE_RESOURCES, type PennylaneResource } from "./config";
-import { listPennylaneResource, verifyPennylaneCompany, type PennylaneFetcher, type PennylaneItem } from "./client";
+import {
+  listPennylaneResource,
+  verifyPennylaneCompany,
+  type PennylaneFetcher,
+  type PennylaneItem,
+} from "./client";
 import { publishPennylaneSnapshots } from "./store";
 
-export type PennylaneSyncResult = { companyName: string; counts: Record<PennylaneResource, number> };
+export type PennylaneSyncResult = {
+  companyName: string;
+  counts: Record<PennylaneResource, number>;
+};
 
 /** Calls only GET endpoints. No sync runs until explicitly invoked after enablement. */
 export async function preparePennylaneSnapshot(
@@ -24,8 +32,8 @@ export async function synchronizePennylane(): Promise<PennylaneSyncResult> {
   await publishPennylaneSnapshots(companyName, records);
   return {
     companyName,
-    counts: Object.fromEntries(PENNYLANE_RESOURCES.map(
-      (resource) => [resource, records[resource].length],
-    )) as Record<PennylaneResource, number>,
+    counts: Object.fromEntries(
+      PENNYLANE_RESOURCES.map((resource) => [resource, records[resource].length]),
+    ) as Record<PennylaneResource, number>,
   };
 }

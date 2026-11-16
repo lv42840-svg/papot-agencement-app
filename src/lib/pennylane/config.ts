@@ -12,7 +12,9 @@ export type PennylaneConfig = {
   expectedCompany: string;
 };
 
-export function getPennylaneConfig(env: Record<string, string | undefined> = process.env): PennylaneConfig {
+export function getPennylaneConfig(
+  env: Record<string, string | undefined> = process.env,
+): PennylaneConfig {
   if (env.PAPOT_PENNYLANE_ENABLED !== "true") {
     throw new Error("PENNYLANE_DISABLED");
   }

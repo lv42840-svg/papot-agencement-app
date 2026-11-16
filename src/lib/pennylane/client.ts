@@ -7,11 +7,13 @@ const MAX_PAGES = 2000;
 const MAX_RECORDS = 200000;
 
 const itemSchema = z.object({ id: z.union([z.number(), z.string()]) }).passthrough();
-const pageSchema = z.object({
-  items: z.array(itemSchema),
-  has_more: z.boolean(),
-  next_cursor: z.string().nullable(),
-}).passthrough();
+const pageSchema = z
+  .object({
+    items: z.array(itemSchema),
+    has_more: z.boolean(),
+    next_cursor: z.string().nullable(),
+  })
+  .passthrough();
 
 export type PennylaneItem = z.infer<typeof itemSchema>;
 export type PennylaneFetcher = typeof fetch;
@@ -23,7 +25,11 @@ function errorCode(status: number): string {
   return "PENNYLANE_HTTP_ERROR";
 }
 
-async function requestJson(url: URL, config: PennylaneConfig, fetcher: PennylaneFetcher): Promise<unknown> {
+async function requestJson(
+  url: URL,
+  config: PennylaneConfig,
+  fetcher: PennylaneFetcher,
+): Promise<unknown> {
   // Never log response bodies, URL query cursors, tokens or raw provider errors.
   for (let attempt = 0; attempt < 3; attempt += 1) {
     let response: Response;
@@ -43,9 +49,10 @@ async function requestJson(url: URL, config: PennylaneConfig, fetcher: Pennylane
     }
     if ((response.status === 429 || response.status === 503) && attempt < 2) {
       const seconds = Number(response.headers.get("retry-after"));
-      const wait = Number.isFinite(seconds) && seconds >= 0
-        ? Math.min(seconds * 1000, 3000)
-        : (attempt + 1) * 500;
+      const wait =
+        Number.isFinite(seconds) && seconds >= 0
+          ? Math.min(seconds * 1000, 3000)
+          : (attempt + 1) * 500;
       await new Promise((resolve) => setTimeout(resolve, wait));
       continue;
     }
@@ -67,8 +74,10 @@ export async function verifyPennylaneCompany(
   const parsed = z.object({ company: z.object({ name: z.string().min(1) }) }).safeParse(data);
   if (!parsed.success) throw new Error("PENNYLANE_ME_RESPONSE_INVALID");
   const name = parsed.data.company.name;
-  if (name.normalize("NFKC").trim().toLocaleLowerCase("fr") !==
-      config.expectedCompany.normalize("NFKC").trim().toLocaleLowerCase("fr")) {
+  if (
+    name.normalize("NFKC").trim().toLocaleLowerCase("fr") !==
+    config.expectedCompany.normalize("NFKC").trim().toLocaleLowerCase("fr")
+  ) {
     throw new Error("PENNYLANE_COMPANY_MISMATCH");
   }
   return name;

@@ -11,9 +11,14 @@ export type PennylaneSnapshot = {
   count: number;
 };
 
-export async function getPennylaneSnapshots(pool: Pool = getServerDbPool()): Promise<PennylaneSnapshot[]> {
+export async function getPennylaneSnapshots(
+  pool: Pool = getServerDbPool(),
+): Promise<PennylaneSnapshot[]> {
   const result = await pool.query<{
-    resource: PennylaneResource; company_name: string; synced_at: Date; item_count: number;
+    resource: PennylaneResource;
+    company_name: string;
+    synced_at: Date;
+    item_count: number;
   }>(`SELECT resource, company_name, synced_at, item_count
       FROM papot_pennylane_sync_state ORDER BY resource`);
   return result.rows.map((row) => ({
@@ -50,9 +55,16 @@ export async function publishPennylaneSnapshots(
            SELECT source.resource, source.external_id, source.payload, $2::timestamptz
            FROM jsonb_to_recordset($1::jsonb)
              AS source(resource text, external_id text, payload jsonb)`,
-          [JSON.stringify(rows.map((row) => ({
-            resource: row.resource, external_id: row.externalId, payload: row.payload,
-          }))), syncedAt.toISOString()],
+          [
+            JSON.stringify(
+              rows.map((row) => ({
+                resource: row.resource,
+                external_id: row.externalId,
+                payload: row.payload,
+              })),
+            ),
+            syncedAt.toISOString(),
+          ],
         );
       }
       await client.query(
@@ -68,6 +80,9 @@ export async function publishPennylaneSnapshots(
     }
   }, pool);
   return PENNYLANE_RESOURCES.map((resource) => ({
-    resource, companyName, syncedAt: syncedAt.toISOString(), count: records[resource].length,
+    resource,
+    companyName,
+    syncedAt: syncedAt.toISOString(),
+    count: records[resource].length,
   }));
 }

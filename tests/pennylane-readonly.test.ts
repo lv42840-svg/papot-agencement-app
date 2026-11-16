@@ -20,8 +20,9 @@ function reply(body: unknown, status = 200): Response {
 describe("Pennylane V2 read-only staged connector", () => {
   it("is disabled by default and requires a token and expected company", () => {
     expect(() => getPennylaneConfig({})).toThrow("PENNYLANE_DISABLED");
-    expect(() => getPennylaneConfig({ PAPOT_PENNYLANE_ENABLED: "true" }))
-      .toThrow("PENNYLANE_NOT_CONFIGURED");
+    expect(() => getPennylaneConfig({ PAPOT_PENNYLANE_ENABLED: "true" })).toThrow(
+      "PENNYLANE_NOT_CONFIGURED",
+    );
     expect(getPennylaneConfig(enabled)).toEqual(config);
   });
 
@@ -32,13 +33,34 @@ describe("Pennylane V2 read-only staged connector", () => {
     expect(ok.mock.calls[0][0]).toBe("https://app.pennylane.com/api/external/v2/me");
 
     const wrong = vi.fn().mockResolvedValue(reply({ company: { name: "OTHER" } }));
-    await expect(verifyPennylaneCompany(config, wrong)).rejects.toThrow("PENNYLANE_COMPANY_MISMATCH");
+    await expect(verifyPennylaneCompany(config, wrong)).rejects.toThrow(
+      "PENNYLANE_COMPANY_MISMATCH",
+    );
   });
 
   it("uses only GET, follows cursor pages and removes duplicate external IDs", async () => {
-    const fetcher = vi.fn()
-      .mockResolvedValueOnce(reply({ items: [{ id: 1, name: "A" }, { id: 2, name: "B" }], has_more: true, next_cursor: "opaque==" }))
-      .mockResolvedValueOnce(reply({ items: [{ id: 2, name: "B updated" }, { id: 3, name: "C" }], has_more: false, next_cursor: null }));
+    const fetcher = vi
+      .fn()
+      .mockResolvedValueOnce(
+        reply({
+          items: [
+            { id: 1, name: "A" },
+            { id: 2, name: "B" },
+          ],
+          has_more: true,
+          next_cursor: "opaque==",
+        }),
+      )
+      .mockResolvedValueOnce(
+        reply({
+          items: [
+            { id: 2, name: "B updated" },
+            { id: 3, name: "C" },
+          ],
+          has_more: false,
+          next_cursor: null,
+        }),
+      );
     const items = await listPennylaneResource("suppliers", config, fetcher);
     expect(items).toHaveLength(3);
     expect(items.find((item) => item.id === 2)?.name).toBe("B updated");
@@ -52,24 +74,38 @@ describe("Pennylane V2 read-only staged connector", () => {
   });
 
   it("rejects 403 without leaking the upstream response or token", async () => {
-    const fetcher = vi.fn().mockResolvedValue(reply({
-      error: "Access to this resource requires scope",
-      token: config.token,
-    }, 403));
-    await expect(listPennylaneResource("suppliers", config, fetcher))
-      .rejects.toThrow("PENNYLANE_SCOPE_FORBIDDEN");
+    const fetcher = vi.fn().mockResolvedValue(
+      reply(
+        {
+          error: "Access to this resource requires scope",
+          token: config.token,
+        },
+        403,
+      ),
+    );
+    await expect(listPennylaneResource("suppliers", config, fetcher)).rejects.toThrow(
+      "PENNYLANE_SCOPE_FORBIDDEN",
+    );
   });
 
   it("rejects invalid cursors and malformed responses instead of treating them as empty", async () => {
-    const invalidCursor = vi.fn().mockResolvedValue(reply({
-      items: [{ id: 1 }], has_more: true, next_cursor: null,
-    }));
-    await expect(listPennylaneResource("customers", config, invalidCursor))
-      .rejects.toThrow("PENNYLANE_CURSOR_INVALID");
+    const invalidCursor = vi.fn().mockResolvedValue(
+      reply({
+        items: [{ id: 1 }],
+        has_more: true,
+        next_cursor: null,
+      }),
+    );
+    await expect(listPennylaneResource("customers", config, invalidCursor)).rejects.toThrow(
+      "PENNYLANE_CURSOR_INVALID",
+    );
 
-    const invalidPage = vi.fn().mockResolvedValue(reply({ items: [], has_more: null, next_cursor: null }));
-    await expect(listPennylaneResource("customers", config, invalidPage))
-      .rejects.toThrow("PENNYLANE_PAGE_INVALID");
+    const invalidPage = vi
+      .fn()
+      .mockResolvedValue(reply({ items: [], has_more: null, next_cursor: null }));
+    await expect(listPennylaneResource("customers", config, invalidPage)).rejects.toThrow(
+      "PENNYLANE_PAGE_INVALID",
+    );
   });
 
   it("fetches all four resource types after company check without making mutations", async () => {
@@ -77,7 +113,11 @@ describe("Pennylane V2 read-only staged connector", () => {
       expect(options.method).toBe("GET");
       const url = new URL(value);
       if (url.pathname.endsWith("/me")) return reply({ company: { name: "PAPOT LIBERAL" } });
-      return reply({ items: [{ id: url.pathname.split("/").pop(), value: 1 }], has_more: false, next_cursor: null });
+      return reply({
+        items: [{ id: url.pathname.split("/").pop(), value: 1 }],
+        has_more: false,
+        next_cursor: null,
+      });
     });
     const snapshot = await preparePennylaneSnapshot(enabled, fetcher);
     expect(snapshot.companyName).toBe("PAPOT LIBERAL");
@@ -93,8 +133,9 @@ describe("Pennylane V2 read-only staged connector", () => {
       if (value.includes("supplier_invoices")) return reply({ error: "forbidden" }, 403);
       return reply({ items: [], has_more: false, next_cursor: null });
     });
-    await expect(preparePennylaneSnapshot(enabled, fetcher))
-      .rejects.toThrow("PENNYLANE_SCOPE_FORBIDDEN");
+    await expect(preparePennylaneSnapshot(enabled, fetcher)).rejects.toThrow(
+      "PENNYLANE_SCOPE_FORBIDDEN",
+    );
     expect(fetcher).toHaveBeenCalledTimes(3);
   });
 });
