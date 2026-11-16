@@ -138,7 +138,7 @@ export function PennylaneClientsWorkspace() {
       {data && !data.enabled ? (
         <section className="panel" style={{ padding: 20 }}>
           <h2>Connexion Pennylane en attente</h2>
-          <p>Enregistre et teste la nouvelle clé dans Paramètres → Pennylane. L'import reste désactivé tant que l'activation serveur n'est pas effectuée.</p>
+          <p>Enregistre et teste la nouvelle clé dans Paramètres → Pennylane. L&apos;import reste désactivé tant que l&apos;activation serveur n&apos;est pas effectuée.</p>
           <Link className="secondaryButton" href="/settings/pennylane">Configurer la connexion</Link>
         </section>
       ) : null}
@@ -146,7 +146,7 @@ export function PennylaneClientsWorkspace() {
         <>
           <p style={{ fontSize: 13, color: "#68637b" }}>
             Dernière lecture : {data.lastSyncedAt ? new Date(data.lastSyncedAt).toLocaleString("fr-FR") : "Jamais"}.
-            {" "}{data.count} fiche(s) dans l'import.
+            {" "}{data.count} fiche(s) dans l&apos;import.
             {data.truncated ? " Affichage limité à 2 000 clients : recherche paginée à prévoir." : ""}
           </p>
           <div style={{ display: "grid", gridTemplateColumns: "minmax(260px, 1fr) minmax(350px, 1.4fr)", gap: 16, alignItems: "start" }}>
@@ -235,7 +235,7 @@ export function PennylaneClientsWorkspace() {
                           disabled={busy || !data.canWrite}
                           onClick={() => void mutate("IMPORT")}>Importer comme nouveau client PAPOT</button>
                       ) : null}
-                      <small>Le rattachement conserve l'UUID PAPOT et les affaires associées. Seules les coordonnées comptables sont actualisées.</small>
+                      <small>Le rattachement conserve l&apos;UUID PAPOT et les affaires associées. Seules les coordonnées comptables sont actualisées.</small>
                     </>
                   )}
                 </>
