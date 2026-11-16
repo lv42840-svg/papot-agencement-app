@@ -14,6 +14,7 @@ import {
 import { purchaseChantierNamesForInput } from "@/lib/purchases/destination-policy";
 import { createPurchaseOrdersRepository } from "@/lib/purchases/repository";
 import { readSupplierCatalog, refreshSupplierCatalog } from "@/lib/pennylane/suppliers";
+import { isLocalStorageMode } from "@/lib/local-db/runtime";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -68,7 +69,7 @@ export async function GET() {
     const [payload, chantiers, supplierCatalog] = await Promise.all([
       createPurchaseOrdersRepository().load(),
       createChantiersRepository().load(),
-      readSupplierCatalog(),
+      isLocalStorageMode() ? Promise.resolve({ suppliers: [], synced: false, syncedAt: null }) : readSupplierCatalog(),
     ]);
     return json({
       payload,
@@ -92,10 +93,13 @@ export async function POST(request: Request) {
     const context = await requireModuleRequestContext("purchases", "WRITE");
     const input = requestSchema.parse(await request.json());
     if (input.action === "REFRESH_SUPPLIERS") {
+      if (isLocalStorageMode()) throw new Error("PENNYLANE_LOCAL_UNAVAILABLE");
       return json({ supplierCount: await refreshSupplierCatalog() });
     }
     if (input.action !== "CANCEL") {
-      const catalog = await readSupplierCatalog();
+      const catalog = isLocalStorageMode()
+        ? { suppliers: [], synced: false, syncedAt: null }
+        : await readSupplierCatalog();
       if (catalog.synced) {
         const supplier = catalog.suppliers.find(
           (row) => row.id === input.order.supplierPennylaneId,
