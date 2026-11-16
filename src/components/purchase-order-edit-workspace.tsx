@@ -286,7 +286,7 @@ export function PurchaseOrderEditWorkspace({ orderId }: { orderId: string }) {
           ) : null}
           <label style={{ display: "grid", gap: 5 }}>
             Fournisseur
-            {data.supplierCatalog?.synced ? (
+            {data?.supplierCatalog?.synced ? (
               <select
                 value={supplierPennylaneId}
                 disabled={readOnly || busy}
@@ -299,7 +299,7 @@ export function PurchaseOrderEditWorkspace({ orderId }: { orderId: string }) {
                 }}
               >
                 <option value="">Choisir un fournisseur Pennylane</option>
-                {data.supplierCatalog.suppliers.map((item) => (
+                {data?.supplierCatalog?.suppliers.map((item) => (
                   <option key={item.id} value={item.id}>
                     {item.name}
                   </option>
