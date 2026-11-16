@@ -1,7 +1,10 @@
 import "server-only";
 
 import type { CommercialCase } from "@/lib/commercial/domain";
-import { commercialAffairFolderName, commercialDocumentFileName } from "@/lib/commercial/document-path";
+import {
+  commercialAffairFolderName,
+  commercialDocumentFileName,
+} from "@/lib/commercial/document-path";
 import type { ServerFileStore } from "@/lib/server-files/storage";
 import type { ChantierRecord } from "./domain";
 
@@ -101,27 +104,36 @@ export async function prepareChantierFolder(
 ): Promise<PreparedChantierFolder> {
   await store.assertReady();
   const target = chantierStorageFolder(chantier);
-  const currentRoots = [...new Set([...affair.documents.map((document) => document.storagePath), ...additionalStoragePaths]
-    .map(documentFolder)
-    .filter((folder): folder is string => folder !== null))];
+  const currentRoots = [
+    ...new Set(
+      [...affair.documents.map((document) => document.storagePath), ...additionalStoragePaths]
+        .map(documentFolder)
+        .filter((folder): folder is string => folder !== null),
+    ),
+  ];
   if (currentRoots.length > 1) throw new Error("CHANTIER_SOURCE_MULTIPLE_FOLDERS");
 
   const commercialSource = commercialStorageFolder(affair);
   const activeTarget = chantierStorageFolder({ ...chantier, status: "ACTIVE" });
-  const fallbackSource = chantier.status === "ARCHIVED" && await store.directoryExists(activeTarget)
-    ? activeTarget
-    : commercialSource;
+  const fallbackSource =
+    chantier.status === "ARCHIVED" && (await store.directoryExists(activeTarget))
+      ? activeTarget
+      : commercialSource;
   const source = currentRoots[0] ?? fallbackSource;
-  if (allAffairs.some((other) =>
-    other.id !== affair.id &&
-    other.documents.some((document) => document.storagePath.startsWith(`${source}/`))
-  )) {
+  if (
+    allAffairs.some(
+      (other) =>
+        other.id !== affair.id &&
+        other.documents.some((document) => document.storagePath.startsWith(`${source}/`)),
+    )
+  ) {
     throw new Error("CHANTIER_SOURCE_FOLDER_SHARED");
   }
 
   const sourceExists = await store.directoryExists(source);
   const targetExists = await store.directoryExists(target);
-  if (source !== target && sourceExists && targetExists) throw new Error("CHANTIER_DESTINATION_FOLDER_EXISTS");
+  if (source !== target && sourceExists && targetExists)
+    throw new Error("CHANTIER_DESTINATION_FOLDER_EXISTS");
   if (!sourceExists && !targetExists && currentRoots.length > 0) {
     throw new Error("CHANTIER_SOURCE_FOLDER_MISSING");
   }

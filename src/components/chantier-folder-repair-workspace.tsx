@@ -65,7 +65,9 @@ export function ChantierFolderRepairWorkspace() {
     void inspect();
   }, []);
 
-  const toRepair = items.filter((item) => item.action !== "ALREADY_PRESENT" && item.action !== "CONFLICT");
+  const toRepair = items.filter(
+    (item) => item.action !== "ALREADY_PRESENT" && item.action !== "CONFLICT",
+  );
   const conflicts = items.filter((item) => item.action === "CONFLICT");
 
   async function repairAll() {
@@ -89,7 +91,9 @@ export function ChantierFolderRepairWorkspace() {
         if (!response.ok || !body.result) {
           throw new Error(body.error ?? "REPAIR_FAILED");
         }
-        messages.push(`✓ ${item.number ?? "Sans numéro"} · ${item.name} : ${body.result.filesRelinked} document(s), ${body.result.quotePdfsRelinked} PDF de devis relié(s)${body.result.warning ? " · " + body.result.warning : ""}`);
+        messages.push(
+          `✓ ${item.number ?? "Sans numéro"} · ${item.name} : ${body.result.filesRelinked} document(s), ${body.result.quotePdfsRelinked} PDF de devis relié(s)${body.result.warning ? " · " + body.result.warning : ""}`,
+        );
       } catch (failure) {
         const message = failure instanceof Error ? failure.message : "Erreur inconnue";
         messages.push(`À contrôler · ${item.number ?? "Sans numéro"} · ${item.name} : ${message}`);
@@ -105,9 +109,9 @@ export function ChantierFolderRepairWorkspace() {
     <section className="chantierFoldersRepair">
       <h1>Dossiers physiques des chantiers</h1>
       <p>
-        Vérifie les chantiers déjà créés, leurs liens avec les affaires, devis et éléments BE,
-        puis crée les dossiers physiques manquants (Devis-Chiffrage, Documents chantier,
-        BE - Atelier, Pose, Réception, SAV…).
+        Vérifie les chantiers déjà créés, leurs liens avec les affaires, devis et éléments BE, puis
+        crée les dossiers physiques manquants (Devis-Chiffrage, Documents chantier, BE - Atelier,
+        Pose, Réception, SAV…).
       </p>
       <p className="muted">
         Les documents restent uniques : aucun fichier n’est écrasé, aucun faux devis ou élément BE
@@ -115,13 +119,28 @@ export function ChantierFolderRepairWorkspace() {
       </p>
 
       <div className="chantierRepairSummary">
-        <span><strong>{items.length}</strong> chantiers examinés</span>
-        <span><strong>{toRepair.length}</strong> à réparer</span>
-        <span><strong>{conflicts.length}</strong> à contrôler manuellement</span>
+        <span>
+          <strong>{items.length}</strong> chantiers examinés
+        </span>
+        <span>
+          <strong>{toRepair.length}</strong> à réparer
+        </span>
+        <span>
+          <strong>{conflicts.length}</strong> à contrôler manuellement
+        </span>
       </div>
-      {error ? <p className="formError" role="alert">{error}</p> : null}
+      {error ? (
+        <p className="formError" role="alert">
+          {error}
+        </p>
+      ) : null}
       <div className="chantierRepairActions">
-        <button type="button" className="secondaryButton" disabled={busy || loading} onClick={() => void inspect()}>
+        <button
+          type="button"
+          className="secondaryButton"
+          disabled={busy || loading}
+          onClick={() => void inspect()}
+        >
           {loading ? "Inspection…" : "Actualiser le diagnostic"}
         </button>
         <label>
@@ -139,52 +158,155 @@ export function ChantierFolderRepairWorkspace() {
           disabled={loading || busy || !backupConfirmed || toRepair.length === 0}
           onClick={() => void repairAll()}
         >
-          {busy ? `Réparation ${progress.done}/${progress.total}` : `Réparer les ${toRepair.length} dossiers`}
+          {busy
+            ? `Réparation ${progress.done}/${progress.total}`
+            : `Réparer les ${toRepair.length} dossiers`}
         </button>
       </div>
 
       {log.length > 0 ? (
         <article className="chantierRepairLog">
           <h2>Compte rendu des opérations</h2>
-          <ul>{log.map((message, index) => <li key={index}>{message}</li>)}</ul>
+          <ul>
+            {log.map((message, index) => (
+              <li key={index}>{message}</li>
+            ))}
+          </ul>
         </article>
       ) : null}
 
       <div className="chantierRepairTableWrap">
         <table>
-          <thead><tr><th>Chantier</th><th>Action prévue</th><th>Liens existants</th><th>Chemin physique</th></tr></thead>
+          <thead>
+            <tr>
+              <th>Chantier</th>
+              <th>Action prévue</th>
+              <th>Liens existants</th>
+              <th>Chemin physique</th>
+            </tr>
+          </thead>
           <tbody>
             {items.map((item) => (
               <tr key={item.chantierId}>
-                <td><strong>{item.number ?? "Sans numéro"} · {item.name}</strong><small>{item.status}</small></td>
-                <td>{ACTION_LABELS[item.action]}{item.warning ? <small className="formError">{item.warning}</small> : null}</td>
-                <td>{item.quoteCount} devis · {item.retainedQuoteCount} retenu(s) · {item.beItemCount} BE</td>
-                <td><code>{item.folder}</code></td>
+                <td>
+                  <strong>
+                    {item.number ?? "Sans numéro"} · {item.name}
+                  </strong>
+                  <small>{item.status}</small>
+                </td>
+                <td>
+                  {ACTION_LABELS[item.action]}
+                  {item.warning ? <small className="formError">{item.warning}</small> : null}
+                </td>
+                <td>
+                  {item.quoteCount} devis · {item.retainedQuoteCount} retenu(s) · {item.beItemCount}{" "}
+                  BE
+                </td>
+                <td>
+                  <code>{item.folder}</code>
+                </td>
               </tr>
             ))}
           </tbody>
         </table>
       </div>
       <style jsx>{`
-        .chantierFoldersRepair { display:grid; gap:14px; }
-        h1 { margin:0; font-size:24px; }
-        h2 { font-size:16px; margin:0 0 8px; }
-        p { margin:0; font-size:14px; line-height:1.5; }
-        .muted { color:#746d80; }
-        .chantierRepairSummary { display:flex; flex-wrap:wrap; gap:12px; }
-        .chantierRepairSummary span { padding:12px 16px; border:1px solid #ded8e9; background:white; border-radius:10px; }
-        .chantierRepairActions { display:flex; gap:12px; align-items:center; flex-wrap:wrap; padding:14px; background:#fff; border:1px solid #e4ddec; border-radius:12px; }
-        .chantierRepairActions label { font-size:13px; display:flex; gap:7px; align-items:center; }
-        .chantierRepairActions button { padding:9px 14px; }
-        .chantierRepairLog { border:1px solid #d5c9ee; padding:13px; border-radius:12px; background:#fff; }
-        .chantierRepairLog ul { margin:0; padding-left:18px; font-size:12px; line-height:1.6; }
-        .chantierRepairTableWrap { overflow:auto; background:white; border:1px solid #ddd8e6; border-radius:12px; }
-        table { width:100%; border-collapse:collapse; font-size:12px; min-width:850px; }
-        td,th { padding:10px; text-align:left; vertical-align:top; border-bottom:1px solid #eeeaf2; }
-        th { background:#f7f5fc; }
-        td small { display:block; color:#847c8c; margin-top:4px; }
-        td .formError { color:#ab3c51; }
-        td code { overflow-wrap:anywhere; font-size:11px; }
+        .chantierFoldersRepair {
+          display: grid;
+          gap: 14px;
+        }
+        h1 {
+          margin: 0;
+          font-size: 24px;
+        }
+        h2 {
+          font-size: 16px;
+          margin: 0 0 8px;
+        }
+        p {
+          margin: 0;
+          font-size: 14px;
+          line-height: 1.5;
+        }
+        .muted {
+          color: #746d80;
+        }
+        .chantierRepairSummary {
+          display: flex;
+          flex-wrap: wrap;
+          gap: 12px;
+        }
+        .chantierRepairSummary span {
+          padding: 12px 16px;
+          border: 1px solid #ded8e9;
+          background: white;
+          border-radius: 10px;
+        }
+        .chantierRepairActions {
+          display: flex;
+          gap: 12px;
+          align-items: center;
+          flex-wrap: wrap;
+          padding: 14px;
+          background: #fff;
+          border: 1px solid #e4ddec;
+          border-radius: 12px;
+        }
+        .chantierRepairActions label {
+          font-size: 13px;
+          display: flex;
+          gap: 7px;
+          align-items: center;
+        }
+        .chantierRepairActions button {
+          padding: 9px 14px;
+        }
+        .chantierRepairLog {
+          border: 1px solid #d5c9ee;
+          padding: 13px;
+          border-radius: 12px;
+          background: #fff;
+        }
+        .chantierRepairLog ul {
+          margin: 0;
+          padding-left: 18px;
+          font-size: 12px;
+          line-height: 1.6;
+        }
+        .chantierRepairTableWrap {
+          overflow: auto;
+          background: white;
+          border: 1px solid #ddd8e6;
+          border-radius: 12px;
+        }
+        table {
+          width: 100%;
+          border-collapse: collapse;
+          font-size: 12px;
+          min-width: 850px;
+        }
+        td,
+        th {
+          padding: 10px;
+          text-align: left;
+          vertical-align: top;
+          border-bottom: 1px solid #eeeaf2;
+        }
+        th {
+          background: #f7f5fc;
+        }
+        td small {
+          display: block;
+          color: #847c8c;
+          margin-top: 4px;
+        }
+        td .formError {
+          color: #ab3c51;
+        }
+        td code {
+          overflow-wrap: anywhere;
+          font-size: 11px;
+        }
       `}</style>
     </section>
   );

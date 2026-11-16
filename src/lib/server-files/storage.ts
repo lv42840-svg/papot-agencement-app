@@ -96,9 +96,11 @@ export class ServerFileStore {
   async moveDirectory(fromPath: string, toPath: string): Promise<void> {
     const from = this.resolve(fromPath);
     const to = this.resolve(toPath);
-    if (from.absolute === to.absolute ||
-        to.absolute.startsWith(from.absolute + path.sep) ||
-        from.absolute.startsWith(to.absolute + path.sep)) {
+    if (
+      from.absolute === to.absolute ||
+      to.absolute.startsWith(from.absolute + path.sep) ||
+      from.absolute.startsWith(to.absolute + path.sep)
+    ) {
       throw new Error("SERVER_DIRECTORY_MOVE_INVALID");
     }
     if (!(await this.directoryExists(from.logical))) throw new Error("SERVER_DIRECTORY_NOT_FOUND");

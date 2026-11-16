@@ -47,11 +47,14 @@ export async function auditChantierFolders(): Promise<ChantierFolderAudit[]> {
   const result: ChantierFolderAudit[] = [];
   for (const chantier of chantiers.chantiers) {
     const affair = commercial.cases.find((item) => item.id === chantier.sourceCommercialCaseId);
-    const relatedQuotes = quotes.quotes.filter((quote) => quote.commercialCaseId === chantier.sourceCommercialCaseId);
+    const relatedQuotes = quotes.quotes.filter(
+      (quote) => quote.commercialCaseId === chantier.sourceCommercialCaseId,
+    );
     const folder = chantierStorageFolder(chantier);
     const targetExists = await store.directoryExists(folder);
     const candidateSource = affair
-      ? affair.documents.find((document) => document.storagePath.startsWith("Commercial/"))?.storagePath
+      ? affair.documents.find((document) => document.storagePath.startsWith("Commercial/"))
+          ?.storagePath
       : undefined;
     const rootFromDocument = candidateSource
       ? candidateSource.split("/").slice(0, 3).join("/")
@@ -59,21 +62,40 @@ export async function auditChantierFolders(): Promise<ChantierFolderAudit[]> {
     const commercialRoot = affair ? (rootFromDocument ?? commercialStorageFolder(affair)) : null;
     const sourceExists = commercialRoot ? await store.directoryExists(commercialRoot) : false;
     const activeFolder = chantierStorageFolder({ ...chantier, status: "ACTIVE" });
-    const archivedSourceExists = chantier.status === "ARCHIVED" && activeFolder !== folder && await store.directoryExists(activeFolder);
-    const needsRelinking = Boolean(affair?.documents.some((document) => document.storagePath.startsWith("Commercial/"))) || relatedQuotes.some((quote) => quote.finalPdf?.storagePath.startsWith("Commercial/"));
-    const keyFoldersComplete = targetExists && (await Promise.all([
-      "Devis-Chiffrage/Devis", "BE - Atelier/TOP", "Documents chantier/Plans", "Pose", "SAV",
-    ].map((subfolder) => store.directoryExists(`${folder}/${subfolder}`)))).every(Boolean);
+    const archivedSourceExists =
+      chantier.status === "ARCHIVED" &&
+      activeFolder !== folder &&
+      (await store.directoryExists(activeFolder));
+    const needsRelinking =
+      Boolean(
+        affair?.documents.some((document) => document.storagePath.startsWith("Commercial/")),
+      ) || relatedQuotes.some((quote) => quote.finalPdf?.storagePath.startsWith("Commercial/"));
+    const keyFoldersComplete =
+      targetExists &&
+      (
+        await Promise.all(
+          [
+            "Devis-Chiffrage/Devis",
+            "BE - Atelier/TOP",
+            "Documents chantier/Plans",
+            "Pose",
+            "SAV",
+          ].map((subfolder) => store.directoryExists(`${folder}/${subfolder}`)),
+        )
+      ).every(Boolean);
     let action: ChantierFolderAudit["action"] = "CREATE";
     if (targetExists && (sourceExists || archivedSourceExists)) action = "CONFLICT";
     else if (sourceExists || archivedSourceExists) action = "MOVE";
-    else if (targetExists) action = keyFoldersComplete && !needsRelinking ? "ALREADY_PRESENT" : "COMPLETE";
+    else if (targetExists)
+      action = keyFoldersComplete && !needsRelinking ? "ALREADY_PRESENT" : "COMPLETE";
     // Folder is not created until a repair is explicitly confirmed.
     const warning = !affair
       ? "Affaire commerciale d'origine absente : vérifier manuellement les devis et documents."
       : action === "CONFLICT"
         ? "Deux dossiers physiques existent : rapprochement manuel nécessaire avant toute opération."
-        : affair.documents.some((document) => document.storagePath.startsWith("Commercial/")) && !sourceExists && !targetExists
+        : affair.documents.some((document) => document.storagePath.startsWith("Commercial/")) &&
+            !sourceExists &&
+            !targetExists
           ? "Documents référencés, mais dossier source introuvable."
           : null;
     if (warning && action !== "CONFLICT" && affair) action = "CONFLICT";
@@ -122,7 +144,9 @@ export async function repairChantierFolder(chantierId: string): Promise<{
       const chantier = chantiers.chantiers.find((item) => item.id === chantierId);
       if (!chantier) throw new Error("CHANTIER_NOT_FOUND");
       const affair = commercial.cases.find((item) => item.id === chantier.sourceCommercialCaseId);
-      const relatedQuotes = quotes.quotes.filter((quote) => quote.commercialCaseId === chantier.sourceCommercialCaseId);
+      const relatedQuotes = quotes.quotes.filter(
+        (quote) => quote.commercialCaseId === chantier.sourceCommercialCaseId,
+      );
       const folder = chantierStorageFolder(chantier);
       let filesRelinked = 0;
       let quotePdfsRelinked = 0;
@@ -166,8 +190,11 @@ export async function repairChantierFolder(chantierId: string): Promise<{
           });
         }
         if (quotePdfsRelinked > 0) {
-          const focusQuoteId = relatedQuotes.find((quote) => quote.finalPdf &&
-            prepared.remap(quote.finalPdf.storagePath) !== quote.finalPdf.storagePath)?.id;
+          const focusQuoteId = relatedQuotes.find(
+            (quote) =>
+              quote.finalPdf &&
+              prepared.remap(quote.finalPdf.storagePath) !== quote.finalPdf.storagePath,
+          )?.id;
           if (!focusQuoteId) throw new Error("CHANTIER_QUOTE_RELINK_CONFLICT");
           await quotesRepository.mutate((payload) => {
             for (const quote of payload.quotes) {
@@ -190,7 +217,9 @@ export async function repairChantierFolder(chantierId: string): Promise<{
         quotePdfsRelinked,
         relatedQuotes: relatedQuotes.length,
         beItems: chantier.operational.beItems.length,
-        warning: affair ? null : "Affaire commerciale absente : liens devis à vérifier manuellement.",
+        warning: affair
+          ? null
+          : "Affaire commerciale absente : liens devis à vérifier manuellement.",
       };
     });
     state.committed = true;

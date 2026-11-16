@@ -18,7 +18,10 @@ import {
 import { createPlanningRepository } from "@/lib/planning/create-repository";
 import { convertPlanningProvisionToFirm } from "@/lib/planning/mutations";
 import { createQuotesRepository } from "@/lib/quotes/create-repository";
-import { prepareChantierFolder, type PreparedChantierFolder } from "@/lib/chantiers/folder-lifecycle";
+import {
+  prepareChantierFolder,
+  type PreparedChantierFolder,
+} from "@/lib/chantiers/folder-lifecycle";
 import { getServerFileStore } from "@/lib/server-files/runtime";
 
 export const runtime = "nodejs";
@@ -87,11 +90,17 @@ export async function POST(request: Request) {
             },
             actor,
           );
-          const chantier = launch.payload.chantiers.find((item) => item.id === launch.focusChantierId);
+          const chantier = launch.payload.chantiers.find(
+            (item) => item.id === launch.focusChantierId,
+          );
           if (!chantier) throw new Error("CHANTIER_LAUNCH_FOCUS_MISSING");
           state.prepared = await prepareChantierFolder(
-            store, affair, chantier, commercial.cases,
-            quotes.quotes.filter((quote) => quote.commercialCaseId === affair.id && quote.finalPdf)
+            store,
+            affair,
+            chantier,
+            commercial.cases,
+            quotes.quotes
+              .filter((quote) => quote.commercialCaseId === affair.id && quote.finalPdf)
               .map((quote) => quote.finalPdf!.storagePath),
           );
           return launch;
@@ -114,7 +123,8 @@ export async function POST(request: Request) {
           });
           // A final quote PDF is also referenced separately by the native quotes store.
           const changedQuotes = quotes.quotes.filter(
-            (quote) => quote.commercialCaseId === affair.id &&
+            (quote) =>
+              quote.commercialCaseId === affair.id &&
               quote.finalPdf &&
               folder.remap(quote.finalPdf.storagePath) !== quote.finalPdf.storagePath,
           );

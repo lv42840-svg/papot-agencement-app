@@ -6,7 +6,11 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 vi.mock("server-only", () => ({}));
 
 import { ServerFileStore } from "../src/lib/server-files/storage";
-import { commercialStorageFolder, chantierStorageFolder, prepareChantierFolder } from "../src/lib/chantiers/folder-lifecycle";
+import {
+  commercialStorageFolder,
+  chantierStorageFolder,
+  prepareChantierFolder,
+} from "../src/lib/chantiers/folder-lifecycle";
 import type { CommercialCase } from "../src/lib/commercial/domain";
 import type { ChantierRecord } from "../src/lib/chantiers/domain";
 
@@ -62,9 +66,14 @@ describe("chantier physical folder lifecycle", () => {
     const source = commercialStorageFolder(affair);
     const previousPdf = `${source}/Devis/devis-2025.pdf`;
     await files.writeBytes(previousPdf, Buffer.from("old quote"));
-    const business = { ...affair, documents: [{ storagePath: previousPdf, sha256: undefined }] } as CommercialCase;
+    const business = {
+      ...affair,
+      documents: [{ storagePath: previousPdf, sha256: undefined }],
+    } as CommercialCase;
     const prepared = await prepareChantierFolder(files, business, chantier, [business]);
-    expect(prepared.remap(previousPdf)).toBe(`${prepared.path}/Devis-Chiffrage/Devis/devis-2025.pdf`);
+    expect(prepared.remap(previousPdf)).toBe(
+      `${prepared.path}/Devis-Chiffrage/Devis/devis-2025.pdf`,
+    );
     expect(await files.readBytes(prepared.remap(previousPdf))).toEqual(Buffer.from("old quote"));
     expect(await files.directoryExists(`${prepared.path}/BE - Atelier/TOP`)).toBe(true);
     expect(await files.directoryExists(`${prepared.path}/BE - Atelier/Programme CN`)).toBe(true);
@@ -77,7 +86,9 @@ describe("chantier physical folder lifecycle", () => {
     const first = await prepareChantierFolder(files, affair, chantier, [affair]);
     await files.writeBytes(`${first.path}/BE - Atelier/DXF/plan.dxf`, Buffer.from("DXF"));
     await prepareChantierFolder(files, affair, chantier, [affair]);
-    expect(await files.readBytes(`${first.path}/BE - Atelier/DXF/plan.dxf`)).toEqual(Buffer.from("DXF"));
+    expect(await files.readBytes(`${first.path}/BE - Atelier/DXF/plan.dxf`)).toEqual(
+      Buffer.from("DXF"),
+    );
   });
 
   it("moves archived chantiers into the Archive branch without losing their technical files", async () => {
@@ -87,7 +98,9 @@ describe("chantier physical folder lifecycle", () => {
     const archived = { ...chantier, status: "ARCHIVED" as const };
     const prepared = await prepareChantierFolder(files, affair, archived, [affair]);
     expect(prepared.path).toContain("Chantier/2026/Archive/");
-    expect(await files.readBytes(`${prepared.path}/BE - Atelier/TOP/top.pdf`)).toEqual(Buffer.from("TOP"));
+    expect(await files.readBytes(`${prepared.path}/BE - Atelier/TOP/top.pdf`)).toEqual(
+      Buffer.from("TOP"),
+    );
   });
 
   it("does not overwrite a chantier folder already occupied", async () => {
@@ -104,7 +117,11 @@ describe("chantier physical folder lifecycle", () => {
   it("refuses to move a directory referenced by another commercial case", async () => {
     const files = await store();
     const source = commercialStorageFolder(affair);
-    const shared = { ...affair, id: "33333333-3333-4333-8333-333333333333", documents: [{ storagePath: `${source}/Devis/other.pdf` }] } as CommercialCase;
+    const shared = {
+      ...affair,
+      id: "33333333-3333-4333-8333-333333333333",
+      documents: [{ storagePath: `${source}/Devis/other.pdf` }],
+    } as CommercialCase;
     await files.ensureDirectory(source);
     await expect(prepareChantierFolder(files, affair, chantier, [affair, shared])).rejects.toThrow(
       "CHANTIER_SOURCE_FOLDER_SHARED",

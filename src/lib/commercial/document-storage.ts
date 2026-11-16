@@ -78,7 +78,12 @@ export async function uploadCommercialDocuments(
     for (const file of params.files) {
       const id = randomUUID();
       const storagePath = params.businessFolder
-        ? [params.businessFolder, "Devis-Chiffrage", commercialDocumentFolderName(category), commercialDocumentFileName(file.name)].join("/")
+        ? [
+            params.businessFolder,
+            "Devis-Chiffrage",
+            commercialDocumentFolderName(category),
+            commercialDocumentFileName(file.name),
+          ].join("/")
         : commercialDocumentStoragePath({
             creationYear: params.creationYear,
             clientName: params.clientName,

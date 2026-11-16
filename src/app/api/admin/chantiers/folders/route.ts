@@ -16,12 +16,17 @@ function noStoreJson(payload: unknown, status = 200) {
 }
 
 function statusFor(code: string) {
-  if (code === "AUTH_REQUIRED" || code === "ADMIN_FORBIDDEN" || code === "PASSWORD_CHANGE_REQUIRED") {
+  if (
+    code === "AUTH_REQUIRED" ||
+    code === "ADMIN_FORBIDDEN" ||
+    code === "PASSWORD_CHANGE_REQUIRED"
+  ) {
     return userAdminErrorStatus(code);
   }
   if (code === "CHANTIER_NOT_FOUND") return 404;
   if (code.includes("EXISTS") || code.includes("MULTIPLE") || code.includes("SHARED")) return 409;
-  if (code.includes("MISSING") || code.includes("UNAVAILABLE") || code.includes("INTEGRITY")) return 409;
+  if (code.includes("MISSING") || code.includes("UNAVAILABLE") || code.includes("INTEGRITY"))
+    return 409;
   if (code === "CHANTIER_FOLDER_REQUEST_INVALID") return 400;
   return 500;
 }
@@ -44,11 +49,12 @@ export async function POST(request: Request) {
     const result = await repairChantierFolder(input.chantierId);
     return noStoreJson({ result });
   } catch (error) {
-    const code = error instanceof z.ZodError
-      ? "CHANTIER_FOLDER_REQUEST_INVALID"
-      : error instanceof Error
-        ? error.message
-        : "CHANTIER_FOLDER_REPAIR_FAILED";
+    const code =
+      error instanceof z.ZodError
+        ? "CHANTIER_FOLDER_REQUEST_INVALID"
+        : error instanceof Error
+          ? error.message
+          : "CHANTIER_FOLDER_REPAIR_FAILED";
     console.error("[PAPOT][Admin] chantier folder repair", { code });
     return noStoreJson({ error: code }, statusFor(code));
   }
