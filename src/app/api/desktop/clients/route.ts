@@ -1,6 +1,8 @@
 import { NextResponse } from "next/server";
 import { ZodError } from "zod";
 import { createClientsRepository } from "@/lib/clients/create-repository";
+import { isLocalStorageMode } from "@/lib/local-db/runtime";
+import { pennylaneEnabled } from "@/lib/pennylane/config";
 import type { ClientsPayload } from "@/lib/clients/domain";
 import { clientsMutationSchema } from "@/lib/clients/mutations";
 import { ClientsRepositoryError } from "@/lib/clients/repository";
@@ -17,7 +19,7 @@ function noStoreJson(body: unknown, init?: ResponseInit) {
 }
 
 function publicSnapshot(payload: ClientsPayload, canWrite: boolean, focusClientId?: string) {
-  return { payload, canWrite, focusClientId };
+  return { payload, canWrite, focusClientId, pennylaneMode: !isLocalStorageMode() && pennylaneEnabled() };
 }
 
 function errorStatus(code: string): number {
@@ -27,6 +29,7 @@ function errorStatus(code: string): number {
   if (code === "CLIENT_NOT_FOUND") return 404;
   if (code === "CLIENT_SIRET_EXISTS" || code === "CLIENTS_VERSION_CONFLICT") return 409;
   if (code === "CLIENT_ARCHIVED") return 409;
+  if (code === "CLIENT_CREATE_IN_PENNYLANE" || code === "CLIENT_PENNYLANE_READONLY") return 409;
   return 400;
 }
 
