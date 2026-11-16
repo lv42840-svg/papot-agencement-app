@@ -4,7 +4,22 @@ import { describe, expect, it } from "vitest";
 const require = createRequire(import.meta.url);
 process.env.PAPOT_PURGE_TEST_MODE = "1";
 const { planFor, safeRelative } = require("../scripts/ops/purge-two-test-chantiers.cjs") as {
-  planFor: (states: Record<string, unknown>, clients: unknown[]) => any;
+  planFor: (states: Record<string, unknown>, clients: unknown[]) => {
+    scope: {
+      sites: Array<{ id: string }>;
+      factures: Array<{ id: string; status: string; type: string }>;
+      clientsKept: string[];
+    };
+    clientsToDelete: string[];
+    next: {
+      chantiers: { chantiers: unknown[] };
+      commercial: { cases: unknown[] };
+      quotes: { quotes: unknown[] };
+      billing: { drafts: unknown[] };
+      planning: { macroAllocations: unknown[]; dailyAssignments: unknown[] };
+    };
+    signature: string;
+  };
   safeRelative: (value: string) => string;
 };
 delete process.env.PAPOT_PURGE_TEST_MODE;
