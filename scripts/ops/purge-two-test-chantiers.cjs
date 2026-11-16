@@ -211,11 +211,31 @@ function planFor(states, clientRows) {
   const personnelHours = (payload.planning.actualHours ?? []).filter((x) =>
     siteIds.has(x.chantierId),
   );
-  if (personnelHours.length)
-    fail(
-      "REAL_EMPLOYEE_HOURS_EXIST",
-      String(personnelHours.length) + " lignes d'heures enregistrées",
-    );
+  if (personnelHours.length) {
+    // Exception ONLY for the three known October test entries shown in the
+    // audited terminal output. Any additional hours or changed value blocks.
+    const testSite = found.find((site) => compact(site.name) === compact("Lucien VAGINAY"));
+    const employeeId = "f1bc2388-99d5-42b3-a67e-d47e1316dfbd";
+    const week = "2026-W41";
+    const allowed = new Set(["BE", "WORKSHOP", "INSTALL"]);
+    if (
+      !testSite ||
+      personnelHours.length !== 3 ||
+      personnelHours.some((entry) =>
+        entry.chantierId !== testSite.id ||
+        entry.userId !== employeeId ||
+        entry.week !== week ||
+        entry.hours !== 10 ||
+        !allowed.has(entry.activity)
+      ) ||
+      new Set(personnelHours.map((entry) => entry.activity)).size !== 3
+    ) {
+      fail("REAL_EMPLOYEE_HOURS_EXIST", "Pointages differents des trois tests identifies");
+    }
+    if (payload.planning.payrollWeekConfirmations?.[employeeId + ":" + week]) {
+      fail("PAYROLL_WEEK_CONFIRMED", "2026-W41 deja confirmee pour ce personnel");
+    }
+  }
   if (hasId(payload.purchases.orders, new Set([...siteIds, ...affairIds, ...quoteIds])))
     fail("PURCHASE_ORDER_REFERENCES_CHANTIER");
 
@@ -369,6 +389,13 @@ function planFor(states, clientRows) {
     devis: quotes.map((q) => ({ id: q.id, status: q.status, version: q.version })),
     factures: drafts.map((d) => ({ id: d.id, status: d.status, type: d.type })),
     linkedTaskIds: [...entryIds],
+    testHoursToRemove: personnelHours.map((entry) => ({
+      chantierId: entry.chantierId,
+      userId: entry.userId,
+      week: entry.week,
+      activity: entry.activity,
+      hours: entry.hours,
+    })),
     clientsToDelete: clientRows
       .filter((c) => clientsToDelete.includes(c.id))
       .map((c) => ({
@@ -396,6 +423,21 @@ function planFor(states, clientRows) {
     clientRowVersions: clientRows.filter((x) => clientIds.has(x.id)).map((x) => [x.id, x.version]),
   });
   return { scope, signature, next: rest, clientsToDelete, dirs, filePaths };
+}
+
+function assertPayrollNotPrepared(payrollPayload, selectedHours) {
+  if (selectedHours.length === 0) return;
+  const month = (payrollPayload?.months ?? []).find((row) => row.month === "2026-10");
+  if (!month) return;
+  const personWeek = "f1bc2388-99d5-42b3-a67e-d47e1316dfbd:2026-W41";
+  const edited = month.status !== "PREPARING" ||
+    (month.versions ?? []).length > 0 ||
+    (month.eventLog ?? []).some((event) => /VALIDAT|PREPAR|REOPEN|RESTOR/i.test(event.action)) ||
+    (month.validatedWeeks ?? []).includes(personWeek);
+  if (edited) {
+    fail("PAYROLL_OCTOBER_ALREADY_PREPARED",
+      "Des donnees de paie d'octobre 2026 sont confirmees ou historiques");
+  }
 }
 
 async function existingSafeFiles(root, candidates, kind) {
@@ -447,6 +489,12 @@ async function main() {
         (applying ? " FOR UPDATE" : ""),
     );
     const plan = planFor(states, clientResult.rows);
+    const payrollState = await db.query(
+      "SELECT payload FROM papot_payroll_preparation_state WHERE scope = 'global'" +
+        (applying ? " FOR UPDATE" : ""),
+    );
+    if (payrollState.rows.length !== 1) fail("PAYROLL_STATE_MISSING");
+    assertPayrollNotPrepared(payrollState.rows[0].payload, plan.scope.testHoursToRemove);
     // Refuse a purge that would orphan external accounting or payroll references.
     const externalTables = [
       "papot_pennylane_staging",
@@ -564,7 +612,7 @@ async function main() {
 }
 
 if (process.env.PAPOT_PURGE_TEST_MODE === "1") {
-  module.exports = { planFor, compact, safeRelative };
+  module.exports = { planFor, compact, safeRelative, assertPayrollNotPrepared };
 } else
   main().catch((error) => {
     console.error("\nNETTOYAGE INTERROMPU SANS SUPPRESSION CONFIRMEE : " + error.message);
