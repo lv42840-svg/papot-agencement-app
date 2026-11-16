@@ -1,4 +1,6 @@
 import "server-only";
+import { canonicalFolderPath } from "@/lib/chantiers/folder-template";
+import { loadChantierFolderTemplate } from "@/lib/chantiers/folder-template-storage";
 
 import { randomUUID } from "node:crypto";
 import type { ServerFileStore } from "@/lib/server-files/storage";
@@ -7,6 +9,7 @@ import {
   type CommercialDocument,
   type CommercialDocumentCategory,
 } from "./domain";
+import { commercialDocumentFileName, commercialDocumentFolderName } from "./document-path";
 import { commercialDocumentStoragePath } from "./document-path";
 
 export const MAX_COMMERCIAL_DOCUMENTS_PER_UPLOAD = 12;
@@ -41,7 +44,8 @@ function validateFiles(files: File[]): void {
 function validateDocumentPath(document: CommercialDocument): string[] {
   const isCurrentPath = document.storagePath.startsWith("Commercial/");
   const isLegacyPath = document.storagePath.startsWith("documents/commercial/");
-  if (!isCurrentPath && !isLegacyPath) {
+  const isChantierPath = document.storagePath.startsWith("Chantier/");
+  if (!isCurrentPath && !isLegacyPath && !isChantierPath) {
     throw new Error("COMMERCIAL_DOCUMENT_PATH_INVALID");
   }
   const segments = document.storagePath.split("/").filter(Boolean);
@@ -60,12 +64,14 @@ export async function uploadCommercialDocuments(
     files: File[];
     options: CommercialDocumentUploadOptions;
     now?: Date;
+    businessFolder?: string;
   },
 ): Promise<CommercialDocument[]> {
   validateFiles(params.files);
   const category = commercialDocumentCategorySchema.parse(params.options.category);
   const now = params.now ?? new Date();
   const uploaded: CommercialDocument[] = [];
+  const template = params.businessFolder ? await loadChantierFolderTemplate() : null;
 
   if (params.options.isSignedQuote && category !== "QUOTE") {
     throw new Error("COMMERCIAL_SIGNED_QUOTE_CATEGORY_INVALID");
@@ -74,13 +80,22 @@ export async function uploadCommercialDocuments(
   try {
     for (const file of params.files) {
       const id = randomUUID();
-      const storagePath = commercialDocumentStoragePath({
-        creationYear: params.creationYear,
-        clientName: params.clientName,
-        caseName: params.caseName,
-        category,
-        fileName: file.name,
-      });
+      const storagePath = params.businessFolder
+        ? [
+            params.businessFolder,
+            canonicalFolderPath(
+              template!,
+              "Devis-Chiffrage/" + commercialDocumentFolderName(category),
+            ),
+            commercialDocumentFileName(file.name),
+          ].join("/")
+        : commercialDocumentStoragePath({
+            creationYear: params.creationYear,
+            clientName: params.clientName,
+            caseName: params.caseName,
+            category,
+            fileName: file.name,
+          });
       const bytes = Buffer.from(await file.arrayBuffer());
       const written = await transport.store.writeBytes(storagePath, bytes);
 

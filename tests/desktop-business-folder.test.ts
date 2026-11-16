@@ -89,22 +89,22 @@ describe("desktop business folder", () => {
     ).toThrow("DESKTOP_BUSINESS_FILE_INVALID");
   });
 
-  it("rejects a document outside the commercial storage branch", () => {
+  it("opens files that have moved from Commercial into Chantier", () => {
     const root = path.resolve("/tmp/papot-business-files");
 
-    expect(() =>
+    expect(
       resolveBusinessFolderPath(root, {
         kind: "commercial-case",
         storagePath: "Chantier/2026/Dupont_Cuisine/Plans/plan.pdf",
       }),
-    ).toThrow("DESKTOP_BUSINESS_FOLDER_INVALID");
+    ).toBe(path.join(root, "Chantier", "2026", "Dupont_Cuisine"));
 
-    expect(() =>
+    expect(
       resolveBusinessFilePath(root, {
         kind: "commercial-document",
         storagePath: "Chantier/2026/Dupont_Cuisine/Plans/plan.pdf",
       }),
-    ).toThrow("DESKTOP_BUSINESS_FILE_INVALID");
+    ).toBe(path.join(root, "Chantier", "2026", "Dupont_Cuisine", "Plans", "plan.pdf"));
   });
 
   it("rejects the obsolete technical commercial folder layout", () => {

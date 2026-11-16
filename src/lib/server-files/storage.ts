@@ -75,6 +75,40 @@ export class ServerFileStore {
     }
   }
 
+  async directoryExists(storagePath: string): Promise<boolean> {
+    const target = this.resolve(storagePath);
+    try {
+      const stats = await fs.lstat(target.absolute);
+      if (stats.isSymbolicLink()) throw new Error("SERVER_DIRECTORY_UNSAFE");
+      if (!stats.isDirectory()) throw new Error("SERVER_DIRECTORY_NOT_DIRECTORY");
+      return true;
+    } catch (error) {
+      if (errorCode(error) === "ENOENT") return false;
+      throw error;
+    }
+  }
+
+  async ensureDirectory(storagePath: string): Promise<void> {
+    const target = this.resolve(storagePath);
+    await fs.mkdir(target.absolute, { recursive: true });
+  }
+
+  async moveDirectory(fromPath: string, toPath: string): Promise<void> {
+    const from = this.resolve(fromPath);
+    const to = this.resolve(toPath);
+    if (
+      from.absolute === to.absolute ||
+      to.absolute.startsWith(from.absolute + path.sep) ||
+      from.absolute.startsWith(to.absolute + path.sep)
+    ) {
+      throw new Error("SERVER_DIRECTORY_MOVE_INVALID");
+    }
+    if (!(await this.directoryExists(from.logical))) throw new Error("SERVER_DIRECTORY_NOT_FOUND");
+    if (await this.directoryExists(to.logical)) throw new Error("SERVER_DIRECTORY_EXISTS");
+    await fs.mkdir(path.dirname(to.absolute), { recursive: true });
+    await fs.rename(from.absolute, to.absolute);
+  }
+
   async writeBytes(storagePath: string, bytes: Uint8Array): Promise<ServerFileWriteResult> {
     const target = this.resolve(storagePath);
     await fs.mkdir(path.dirname(target.absolute), { recursive: true });
