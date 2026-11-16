@@ -1,4 +1,6 @@
 import "server-only";
+import { canonicalFolderPath } from "@/lib/chantiers/folder-template";
+import { loadChantierFolderTemplate } from "@/lib/chantiers/folder-template-storage";
 
 import { randomUUID } from "node:crypto";
 import type { ServerFileStore } from "@/lib/server-files/storage";
@@ -69,6 +71,7 @@ export async function uploadCommercialDocuments(
   const category = commercialDocumentCategorySchema.parse(params.options.category);
   const now = params.now ?? new Date();
   const uploaded: CommercialDocument[] = [];
+  const template = params.businessFolder ? await loadChantierFolderTemplate() : null;
 
   if (params.options.isSignedQuote && category !== "QUOTE") {
     throw new Error("COMMERCIAL_SIGNED_QUOTE_CATEGORY_INVALID");
@@ -80,8 +83,7 @@ export async function uploadCommercialDocuments(
       const storagePath = params.businessFolder
         ? [
             params.businessFolder,
-            "Devis-Chiffrage",
-            commercialDocumentFolderName(category),
+            canonicalFolderPath(template!, "Devis-Chiffrage/" + commercialDocumentFolderName(category)),
             commercialDocumentFileName(file.name),
           ].join("/")
         : commercialDocumentStoragePath({
