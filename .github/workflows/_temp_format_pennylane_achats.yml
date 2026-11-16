@@ -1,0 +1,57 @@
+name: Temporary Pennylane purchase formatting
+
+on:
+  push:
+    branches:
+      - feat/pennylane-achats-factures-nadia
+
+permissions:
+  contents: write
+
+jobs:
+  prettier:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: true
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - name: Format touched files and push formatting
+        run: |
+          npx prettier --write \
+            src/lib/pennylane/purchase-allocations.ts \
+            src/lib/pennylane/purchase-invoice-store.ts \
+            src/lib/pennylane/client.ts \
+            src/lib/pennylane/connection.ts \
+            src/lib/pennylane/suppliers.ts \
+            src/lib/server-db/migrations.ts \
+            src/lib/purchases/domain.ts \
+            src/app/api/desktop/purchase-invoices/route.ts \
+            'src/app/api/desktop/purchase-invoices/[invoiceId]/route.ts' \
+            'src/app/api/desktop/purchase-invoices/[invoiceId]/pdf/route.ts' \
+            src/app/api/desktop/purchases/route.ts \
+            src/app/api/desktop/chantiers/route.ts \
+            src/app/achats/factures/page.tsx \
+            src/components/purchase-invoices-workspace.tsx \
+            src/components/purchase-orders-workspace.tsx \
+            src/components/purchase-order-edit-workspace.tsx \
+            src/components/chantier-workspace.tsx \
+            src/components/chantier-profitability-panel.tsx \
+            tests/pennylane-purchase-allocations.test.ts \
+            tests/pennylane-purchase-invoices.integration.test.ts \
+            tests/chantier-profitability-ui.test.ts \
+            tests/chantier-purchases-lifecycle-ui.test.ts \
+            tests/monthly-labor-costs-ui.test.ts \
+            .github/workflows/ci.yml \
+            docs/pennylane-purchase-invoices.md
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add -u
+          if ! git diff --cached --quiet; then
+            git commit -m "style(achats): prettier pour le module factures fournisseurs"
+            git push origin HEAD:feat/pennylane-achats-factures-nadia
+          fi
