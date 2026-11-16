@@ -57,7 +57,7 @@ describe("chantier profitability UI", () => {
 
   it("does not invent actual costs while their source modules are absent", () => {
     expect(panel).toContain("Coût employeur manquant pour un mois clos ou son mois précédent");
-    expect(panel).toContain("factures fournisseurs doublement validés");
+    expect(panel).toContain("coûts fournisseurs doublement validés");
     expect(panel).toContain("actualPurchaseCostProvisional");
     expect(panel).toContain("actualLaborCostProvisional");
     expect(engine).toContain("laborCostCents: null");
