@@ -207,7 +207,9 @@ export async function POST(request: Request, { params }: { params: Promise<{ quo
         context: {
           creationYear: new Date(commercialCase.createdAt).getFullYear(),
           businessFolder: linkedChantier ? chantierStorageFolder(linkedChantier) : undefined,
-          businessQuoteFolder: linkedTemplate ? canonicalFolderPath(linkedTemplate, "Devis-Chiffrage/Devis") : undefined,
+          businessQuoteFolder: linkedTemplate
+            ? canonicalFolderPath(linkedTemplate, "Devis-Chiffrage/Devis")
+            : undefined,
           clientName: commercialCase.clientName,
           caseName: commercialCase.name,
         },

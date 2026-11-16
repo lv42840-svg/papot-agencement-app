@@ -41,7 +41,9 @@ export async function mutateChantierFolderTemplate(
 ): Promise<FolderTemplate> {
   const previous = pending;
   let release!: () => void;
-  pending = new Promise<void>((resolve) => { release = resolve; });
+  pending = new Promise<void>((resolve) => {
+    release = resolve;
+  });
   await previous;
   try {
     const current = await loadChantierFolderTemplate();

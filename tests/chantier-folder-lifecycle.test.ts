@@ -13,7 +13,10 @@ import {
 } from "../src/lib/chantiers/folder-lifecycle";
 import type { CommercialCase } from "../src/lib/commercial/domain";
 import type { ChantierRecord } from "../src/lib/chantiers/domain";
-import { applyFolderTemplateAction, defaultFolderTemplate } from "../src/lib/chantiers/folder-template";
+import {
+  applyFolderTemplateAction,
+  defaultFolderTemplate,
+} from "../src/lib/chantiers/folder-template";
 
 const roots: string[] = [];
 async function store() {
@@ -87,11 +90,16 @@ describe("chantier physical folder lifecycle", () => {
     const initial = defaultFolderTemplate();
     const devis = initial.folders.find((item) => item.name === "Devis")!;
     const changed = applyFolderTemplateAction(initial, {
-      action: "rename", id: devis.id, name: "Offres clients",
+      action: "rename",
+      id: devis.id,
+      name: "Offres clients",
     });
     const configRoot = path.join(files.rootPath, "_papot_settings");
     await mkdir(configRoot, { recursive: true });
-    await writeFile(path.join(configRoot, "chantier-folder-template.json"), JSON.stringify(changed));
+    await writeFile(
+      path.join(configRoot, "chantier-folder-template.json"),
+      JSON.stringify(changed),
+    );
 
     const previousPdf = commercialStorageFolder(affair) + "/Devis/offre.pdf";
     await files.writeBytes(previousPdf, Buffer.from("devis conservé"));
@@ -103,7 +111,9 @@ describe("chantier physical folder lifecycle", () => {
     const expected = prepared.path + "/Devis-Chiffrage/Offres clients/offre.pdf";
     expect(prepared.remap(previousPdf)).toBe(expected);
     expect(await files.readBytes(expected)).toEqual(Buffer.from("devis conservé"));
-    expect(await files.directoryExists(prepared.path + "/Devis-Chiffrage/Offres clients")).toBe(true);
+    expect(await files.directoryExists(prepared.path + "/Devis-Chiffrage/Offres clients")).toBe(
+      true,
+    );
   });
 
   it("is repeatable after a first repair without recreating or erasing files", async () => {

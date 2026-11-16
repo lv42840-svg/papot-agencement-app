@@ -83,7 +83,10 @@ export async function uploadCommercialDocuments(
       const storagePath = params.businessFolder
         ? [
             params.businessFolder,
-            canonicalFolderPath(template!, "Devis-Chiffrage/" + commercialDocumentFolderName(category)),
+            canonicalFolderPath(
+              template!,
+              "Devis-Chiffrage/" + commercialDocumentFolderName(category),
+            ),
             commercialDocumentFileName(file.name),
           ].join("/")
         : commercialDocumentStoragePath({

@@ -44,9 +44,12 @@ export async function PUT(request: Request) {
       template: await mutateChantierFolderTemplate(input.expectedRevision, input.change),
     });
   } catch (error) {
-    const code = error instanceof z.ZodError
-      ? "CHANTIER_TEMPLATE_REQUEST_INVALID"
-      : error instanceof Error ? error.message : "CHANTIER_TEMPLATE_SAVE_FAILED";
+    const code =
+      error instanceof z.ZodError
+        ? "CHANTIER_TEMPLATE_REQUEST_INVALID"
+        : error instanceof Error
+          ? error.message
+          : "CHANTIER_TEMPLATE_SAVE_FAILED";
     return result({ error: code }, statusFor(code));
   }
 }

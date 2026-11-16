@@ -8,7 +8,11 @@ import {
 import type { ServerFileStore } from "@/lib/server-files/storage";
 import type { ChantierRecord } from "./domain";
 
-import { DEFAULT_CHANTIER_FOLDER_PATHS, canonicalFolderPath, folderTemplatePaths } from "./folder-template";
+import {
+  DEFAULT_CHANTIER_FOLDER_PATHS,
+  canonicalFolderPath,
+  folderTemplatePaths,
+} from "./folder-template";
 import { loadChantierFolderTemplate } from "./folder-template-storage";
 
 export const CHANTIER_STANDARD_FOLDERS = DEFAULT_CHANTIER_FOLDER_PATHS;

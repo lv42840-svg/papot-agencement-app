@@ -30,7 +30,11 @@ export const DEFAULT_CHANTIER_FOLDER_PATHS = [
 ] as const;
 
 export const folderNodeSchema = z.object({
-  id: z.string().min(1).max(80).regex(/^[a-zA-Z0-9_-]+$/),
+  id: z
+    .string()
+    .min(1)
+    .max(80)
+    .regex(/^[a-zA-Z0-9_-]+$/),
   parentId: z.string().min(1).max(80).nullable(),
   name: z.string().trim().min(1).max(80),
 });
@@ -56,7 +60,7 @@ export function defaultFolderTemplate(): FolderTemplate {
     const parts = folderPath.split("/");
     const parentPath = parts.slice(0, -1).join("/");
     const id = "standard-" + String(index + 1).padStart(3, "0");
-    const parentId = parentPath ? byPath.get(parentPath) ?? null : null;
+    const parentId = parentPath ? (byPath.get(parentPath) ?? null) : null;
     byPath.set(folderPath, id);
     return { id, parentId, name: parts[parts.length - 1] };
   });

@@ -78,9 +78,7 @@ export async function auditChantierFolders(): Promise<ChantierFolderAudit[]> {
       targetExists &&
       (
         await Promise.all(
-          expectedFolders.map((subfolder) =>
-            store.directoryExists(`${folder}/${subfolder}`),
-          ),
+          expectedFolders.map((subfolder) => store.directoryExists(`${folder}/${subfolder}`)),
         )
       ).every(Boolean);
     let action: ChantierFolderAudit["action"] = "CREATE";

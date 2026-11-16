@@ -21,8 +21,14 @@ describe("configurable chantier directory template", () => {
   it("renames a business folder without losing the canonical devis role", () => {
     const source = defaultFolderTemplate();
     const devisId = source.folders.find((folder) => folder.name === "Devis")!.id;
-    const modified = applyFolderTemplateAction(source, { action: "rename", id: devisId, name: "Offres clients" });
-    expect(canonicalFolderPath(modified, "Devis-Chiffrage/Devis")).toBe("Devis-Chiffrage/Offres clients");
+    const modified = applyFolderTemplateAction(source, {
+      action: "rename",
+      id: devisId,
+      name: "Offres clients",
+    });
+    expect(canonicalFolderPath(modified, "Devis-Chiffrage/Devis")).toBe(
+      "Devis-Chiffrage/Offres clients",
+    );
     expect(modified.revision).toBe(source.revision + 1);
   });
 
@@ -30,10 +36,18 @@ describe("configurable chantier directory template", () => {
     const source = defaultFolderTemplate();
     const be = source.folders.find((folder) => folder.name === "BE - Atelier")!;
     const plans = source.folders.find((folder) => folder.name === "Documents chantier")!;
-    const added = applyFolderTemplateAction(source, { action: "add", parentId: be.id, name: "Maquettes 3D" });
+    const added = applyFolderTemplateAction(source, {
+      action: "add",
+      parentId: be.id,
+      name: "Maquettes 3D",
+    });
     const created = added.folders.find((folder) => folder.name === "Maquettes 3D")!;
     expect(folderNodePath(added, created.id)).toBe("BE - Atelier/Maquettes 3D");
-    const moved = applyFolderTemplateAction(added, { action: "move", id: created.id, parentId: plans.id });
+    const moved = applyFolderTemplateAction(added, {
+      action: "move",
+      id: created.id,
+      parentId: plans.id,
+    });
     expect(folderNodePath(moved, created.id)).toBe("Documents chantier/Maquettes 3D");
   });
 
@@ -41,10 +55,18 @@ describe("configurable chantier directory template", () => {
     const source = defaultFolderTemplate();
     const be = source.folders.find((folder) => folder.name === "BE - Atelier")!;
     const top = source.folders.find((folder) => folder.name === "TOP")!;
-    expect(() => applyFolderTemplateAction(source, { action: "add", parentId: null, name: "../secret" })).toThrow("CHANTIER_TEMPLATE_NAME_INVALID");
-    expect(() => applyFolderTemplateAction(source, { action: "add", parentId: null, name: "CON" })).toThrow("CHANTIER_TEMPLATE_NAME_INVALID");
-    expect(() => applyFolderTemplateAction(source, { action: "add", parentId: be.id, name: "TOP" })).toThrow("CHANTIER_TEMPLATE_DUPLICATE_NAME");
-    expect(() => applyFolderTemplateAction(source, { action: "move", id: be.id, parentId: top.id })).toThrow("CHANTIER_TEMPLATE_CYCLE");
+    expect(() =>
+      applyFolderTemplateAction(source, { action: "add", parentId: null, name: "../secret" }),
+    ).toThrow("CHANTIER_TEMPLATE_NAME_INVALID");
+    expect(() =>
+      applyFolderTemplateAction(source, { action: "add", parentId: null, name: "CON" }),
+    ).toThrow("CHANTIER_TEMPLATE_NAME_INVALID");
+    expect(() =>
+      applyFolderTemplateAction(source, { action: "add", parentId: be.id, name: "TOP" }),
+    ).toThrow("CHANTIER_TEMPLATE_DUPLICATE_NAME");
+    expect(() =>
+      applyFolderTemplateAction(source, { action: "move", id: be.id, parentId: top.id }),
+    ).toThrow("CHANTIER_TEMPLATE_CYCLE");
   });
 
   it("refuses to remove system folders from a submitted model", () => {
@@ -56,8 +78,14 @@ describe("configurable chantier directory template", () => {
     const source = defaultFolderTemplate();
     const be = source.folders.find((folder) => folder.name === "BE - Atelier")!;
     const top = source.folders.find((folder) => folder.name === "TOP")!;
-    const changed = applyFolderTemplateAction(source, { action: "reorder", id: top.id, direction: "down" });
-    const names = changed.folders.filter((item) => item.parentId === be.id).map((item) => item.name);
+    const changed = applyFolderTemplateAction(source, {
+      action: "reorder",
+      id: top.id,
+      direction: "down",
+    });
+    const names = changed.folders
+      .filter((item) => item.parentId === be.id)
+      .map((item) => item.name);
     expect(names.slice(0, 2)).toEqual(["DFT", "TOP"]);
     expect(folderNodePath(changed, top.id)).toBe("BE - Atelier/TOP");
   });
