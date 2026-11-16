@@ -862,10 +862,9 @@ function StatusSection({
   suggestedPeople: string[];
   mutate: (body: MutationBody, successMessage: string) => Promise<CommercialSnapshot | null>;
 }) {
-  const [target, setTarget] = useState<Exclude<CommercialStatus, "LOST" | "ABANDONED">>(
-    item.status === "LOST" || item.status === "ABANDONED" ? "PISTE" : item.status,
-  );
+  const [target, setTarget] = useState<CommercialStatus>(item.status);
   const [reviewDate, setReviewDate] = useState(item.reviewDate ?? "");
+  const [closingReason, setClosingReason] = useState("");
   const [expectedDate, setExpectedDate] = useState(item.expectedConfirmationDate ?? "");
   const [quoteDueDate, setQuoteDueDate] = useState(item.quoteDueDate ?? "");
   const [quoteOwnerName, setQuoteOwnerName] = useState(item.quoteOwnerName ?? "");
@@ -878,6 +877,13 @@ function StatusSection({
   const [postponeReason, setPostponeReason] = useState("");
 
   function saveStatus() {
+    if (target === "LOST" || target === "ABANDONED") {
+      void mutate(
+        { action: "close", caseId: item.id, status: target, reason: closingReason },
+        target === "LOST" ? "Affaire classée Perdu." : "Affaire classée Abandonné.",
+      );
+      return;
+    }
     void mutate(
       {
         action: "setStatus",
@@ -921,6 +927,8 @@ function StatusSection({
               <option value="FOLLOW_UP">À relancer</option>
               <option value="LIKELY">Ça va tomber</option>
               {canConfirm ? <option value="CONFIRMED">Confirmée</option> : null}
+              <option value="LOST">Perdu</option>
+              <option value="ABANDONED">Abandonné</option>
             </select>
           </Field>
           {target === "PISTE" || target === "WAITING" ? (
@@ -973,13 +981,32 @@ function StatusSection({
               />
             </Field>
           ) : null}
+          {target === "LOST" || target === "ABANDONED" ? (
+            <div className="commercialSubcard">
+              <strong>Clôturer l'affaire commerciale</strong>
+              <p>
+                L'affaire passera dans les archives commerciales et sa charge potentielle
+                sera retirée du planning. Les devis, documents et l'historique sont conservés.
+              </p>
+              <Field label="Motif (facultatif)">
+                <textarea
+                  rows={2}
+                  maxLength={2000}
+                  value={closingReason}
+                  onChange={(event) => setClosingReason(event.target.value)}
+                  placeholder="Ex. Devis non retenu"
+                />
+              </Field>
+            </div>
+          ) : null}
           <button
             type="button"
             className="secondaryButton commercialStatusSave"
             disabled={busy}
             onClick={saveStatus}
           >
-            <Save size={13} /> Appliquer
+            <Save size={13} />{" "}
+            {target === "LOST" ? "Classer comme perdu" : target === "ABANDONED" ? "Classer comme abandonné" : "Appliquer"}
           </button>
         </div>
       ) : null}
