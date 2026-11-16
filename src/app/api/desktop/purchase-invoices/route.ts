@@ -5,6 +5,7 @@ import {
   requireModuleRequestContext,
 } from "@/lib/desktop/request-context";
 import { pennylaneEnabled } from "@/lib/pennylane/config";
+import { isLocalStorageMode } from "@/lib/local-db/runtime";
 import { synchronizePennylane } from "@/lib/pennylane/sync";
 import { invoiceAllocationDraftSchema } from "@/lib/pennylane/purchase-allocations";
 import {
@@ -100,6 +101,19 @@ function sameOrigin(request: Request) {
 export async function GET() {
   try {
     const context = await requireModuleRequestContext("purchases", "READ");
+    if (isLocalStorageMode()) {
+      return json({
+        invoices: [],
+        suppliers: [],
+        chantiers: [],
+        orders: [],
+        orderBalances: {},
+        lastImportedAt: null,
+        truncated: false,
+        importEnabled: false,
+        canWrite: context.moduleAccess.canWrite,
+      });
+    }
     return json({
       ...(await readPurchaseInvoiceWorkspace()),
       canWrite: context.moduleAccess.canWrite,
@@ -111,7 +125,8 @@ export async function GET() {
 
 export async function POST(request: Request) {
   try {
-    const context = await requireModuleRequestContext("purchases", "WRITE");
+    await requireModuleRequestContext("purchases", "WRITE");
+    if (isLocalStorageMode()) throw new Error("PENNYLANE_DISABLED");
     if (!sameOrigin(request)) return json({ error: "INVOICE_ORIGIN_FORBIDDEN" }, 403);
     if (!request.headers.get("content-type")?.toLowerCase().startsWith("application/json")) {
       return json({ error: "INVOICE_REQUEST_INVALID" }, 400);
