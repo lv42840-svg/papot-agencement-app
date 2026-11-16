@@ -985,10 +985,10 @@ function StatusSection({
           ) : null}
           {target === "LOST" || target === "ABANDONED" ? (
             <div className="commercialSubcard">
-              <strong>Clôturer l'affaire commerciale</strong>
+              <strong>Clôturer l&apos;affaire commerciale</strong>
               <p>
-                L'affaire passera dans les archives commerciales et sa charge potentielle
-                sera retirée du planning. Les devis, documents et l'historique sont conservés.
+                L&apos;affaire passera dans les archives commerciales et sa charge potentielle
+                sera retirée du planning. Les devis, documents et l&apos;historique sont conservés.
               </p>
               <Field label="Motif (facultatif)">
                 <textarea
