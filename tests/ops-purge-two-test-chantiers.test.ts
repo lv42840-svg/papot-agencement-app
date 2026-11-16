@@ -12,6 +12,7 @@ const { planFor, safeRelative, assertPayrollNotPrepared } =
       scope: {
         sites: Array<{ id: string }>;
         factures: Array<{ id: string; status: string; type: string }>;
+        commandesFournisseurs: Array<{ id: string; reference: string; fournisseur: string; statut: string }>;
         clientsKept: string[];
         testHoursToRemove: ActualHoursFixture[];
       };
@@ -21,6 +22,7 @@ const { planFor, safeRelative, assertPayrollNotPrepared } =
         commercial: { cases: unknown[] };
         quotes: { quotes: unknown[] };
         billing: { drafts: unknown[] };
+        purchases: { orders: unknown[]; nextNumber: number };
         planning: {
           macroAllocations: unknown[];
           dailyAssignments: unknown[];
@@ -152,7 +154,7 @@ function fixture() {
       dailyAssignments: [{ chantierId: ids.site1, userId: "a", date: "2026-11-16", label: "Test" }],
     },
     entries: { schemaVersion: 1, entries: [], notifications: [] },
-    purchases: { schemaVersion: 1, orders: [], nextNumber: 1 },
+    purchases: { schemaVersion: 1, orders: [] as Record<string, unknown>[], nextNumber: 1 },
   };
   const states = Object.fromEntries(
     Object.entries(payloads).map(([key, payload]) => [
@@ -254,6 +256,77 @@ describe("one-off cancelled site cleanup", () => {
     const { states, clients, payloads } = fixture();
     payloads.chantiers.chantiers[0].name = "Autre affaire";
     expect(() => planFor(states, clients)).toThrow("CHANTIER_MATCH_NOT_UNIQUE");
+  });
+
+  it("includes only exclusive supplier orders, regardless of COMMITTED or CANCELLED status", () => {
+    const { states, clients, payloads } = fixture();
+    const bc1 = {
+      id: "bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb", reference: "BC-000018",
+      chantierId: ids.site1, chantierName: "Loan Maître", status: "COMMITTED",
+      supplierName: "Fournisseur test", amountHtCents: 12500,
+      mode: "QUICK", createdAt: "2026-11-01T12:00:00Z",
+      allocations: [{ chantierId: ids.site1, destinationType: "CHANTIER", amountHtCents: 12500 }],
+    };
+    const bc2 = {
+      ...bc1, id: "cccccccc-cccc-4ccc-8ccc-cccccccccccc",
+      reference: "BC-000019", chantierId: ids.site2, status: "CANCELLED",
+      allocations: [{ chantierId: ids.site2, destinationType: "CHANTIER", amountHtCents: 12500 }],
+    };
+    payloads.purchases.orders.push(bc1, bc2);
+    const plan = planFor(states, clients);
+    expect(plan.scope.commandesFournisseurs).toHaveLength(2);
+    expect(plan.scope.commandesFournisseurs.map((o) => o.reference)).toEqual([
+      "BC-000018", "BC-000019",
+    ]);
+    expect(plan.next.purchases.orders).toHaveLength(0);
+    expect(plan.next.purchases.nextNumber).toBe(1);
+    expect(plan.scope.commandesFournisseurs[0].fournisseur).toBe("Fournisseur test");
+  });
+
+  it("refuses deleting a purchase order allocated to any other chantier", () => {
+    const { states, clients, payloads } = fixture();
+    payloads.purchases.orders.push({
+      id: "bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb", reference: "BC-000020",
+      chantierId: ids.site1, status: "COMMITTED", supplierName: "Test",
+      amountHtCents: 15000,
+      allocations: [
+        { chantierId: ids.site1, destinationType: "CHANTIER", amountHtCents: 10000 },
+        { chantierId: "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa",
+          destinationType: "CHANTIER", amountHtCents: 5000 },
+      ],
+    });
+    expect(() => planFor(states, clients)).toThrow("PURCHASE_ORDER_SHARED_OR_REASSIGNED");
+  });
+
+  it("refuses deleting a supplier order that was previously allocated elsewhere", () => {
+    const { states, clients, payloads } = fixture();
+    payloads.purchases.orders.push({
+      id: "bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb", reference: "BC-000021",
+      chantierId: ids.site2, status: "CANCELLED", supplierName: "Test",
+      amountHtCents: 4500,
+      revisions: [{ previousChantierIds: ["aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa"] }],
+    });
+    expect(() => planFor(states, clients)).toThrow("PURCHASE_ORDER_SHARED_OR_REASSIGNED");
+  });
+
+  it("keeps unrelated orders in the supplier orders state", () => {
+    const { states, clients, payloads } = fixture();
+    payloads.purchases.orders.push({
+      id: "bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb", reference: "BC-000022",
+      chantierId: "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa",
+      status: "COMMITTED", supplierName: "Autre client", amountHtCents: 5000,
+    });
+    const plan = planFor(states, clients);
+    expect(plan.scope.commandesFournisseurs).toHaveLength(0);
+    expect(plan.next.purchases.orders).toHaveLength(1);
+  });
+
+  it("checks supplier invoice allocations in Pennylane before any purge", () => {
+    const scriptSource = require("node:fs").readFileSync(
+      new URL("../scripts/ops/purge-two-test-chantiers.cjs", import.meta.url), "utf8",
+    );
+    expect(scriptSource).toContain("papot_pennylane_purchase_allocations");
+    expect(scriptSource).toContain("plan.scope.commandesFournisseurs.map");
   });
 
   it("refuses directory traversal", () => {
