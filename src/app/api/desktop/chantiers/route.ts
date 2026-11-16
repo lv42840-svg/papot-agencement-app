@@ -85,9 +85,8 @@ async function snapshot(
   const canReadPurchases =
     (await hasModuleAccess(user.id, "purchases", "READ")) || (canWrite && canCloseReopenSpecial);
   const purchasePayload = canReadPurchases ? await createPurchaseOrdersRepository().load() : null;
-  const actualPurchases = canReadPurchases && !isLocalStorageMode()
-    ? await readValidatedPurchaseCosts()
-    : null;
+  const actualPurchases =
+    canReadPurchases && !isLocalStorageMode() ? await readValidatedPurchaseCosts() : null;
   // Reconcile the chantier's read-only production metrics from the real hours register.
   // Do not write the projection into the chantier repository: the planning ledger is the source.
   const realizedChantierIds = new Set(planningPayload.actualHours.map((entry) => entry.chantierId));
