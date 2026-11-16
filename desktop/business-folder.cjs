@@ -32,7 +32,7 @@ function commercialStorageSegments(rawInput, expectedKind) {
       : "DESKTOP_BUSINESS_FOLDER_INVALID";
 
   if (
-    segments.length < 5 ||
+    segments.length < (segments[0] === "Chantier" && segments[2] === "Archive" ? 6 : 5) ||
     (segments[0] !== "Commercial" && segments[0] !== "Chantier") ||
     !/^\d{4}$/.test(segments[1] || "") ||
     Number(segments[1]) < 2000 ||
@@ -62,7 +62,8 @@ function assertInsideRoot(root, target, errorCode) {
 function resolveBusinessFolderPath(rootPath, rawInput) {
   const root = resolveRoot(rootPath, "DESKTOP_BUSINESS_FOLDER_ROOT_INVALID");
   const segments = commercialStorageSegments(rawInput, "commercial-case");
-  const target = path.resolve(root, ...segments.slice(0, 3));
+  const archived = segments[0] === "Chantier" && segments[2] === "Archive";
+  const target = path.resolve(root, ...segments.slice(0, archived ? 4 : 3));
   assertInsideRoot(root, target, "DESKTOP_BUSINESS_FOLDER_INVALID");
   return target;
 }
