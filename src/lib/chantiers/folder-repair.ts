@@ -7,6 +7,7 @@ import type { NativeQuoteRecord } from "@/lib/quotes/store";
 import { withBusinessTransaction } from "@/lib/server-db/business-transaction";
 import { getServerFileStore } from "@/lib/server-files/runtime";
 import {
+  CHANTIER_STANDARD_FOLDERS,
   chantierStorageFolder,
   commercialStorageFolder,
   ensureChantierStructure,
@@ -74,13 +75,9 @@ export async function auditChantierFolders(): Promise<ChantierFolderAudit[]> {
       targetExists &&
       (
         await Promise.all(
-          [
-            "Devis-Chiffrage/Devis",
-            "BE - Atelier/TOP",
-            "Documents chantier/Plans",
-            "Pose",
-            "SAV",
-          ].map((subfolder) => store.directoryExists(`${folder}/${subfolder}`)),
+          CHANTIER_STANDARD_FOLDERS.map((subfolder) =>
+            store.directoryExists(`${folder}/${subfolder}`),
+          ),
         )
       ).every(Boolean);
     let action: ChantierFolderAudit["action"] = "CREATE";
