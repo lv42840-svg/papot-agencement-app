@@ -120,7 +120,7 @@ export async function prepareChantierFolder(
 
   let movedRoot = false;
   const categoryMoves: Array<{ from: string; to: string }> = [];
-  const template = await loadChantierFolderTemplate();
+  const template = await loadChantierFolderTemplate(store);
   const rollback = async () => {
     for (const move of [...categoryMoves].reverse()) {
       await store.moveDirectory(move.to, move.from);
