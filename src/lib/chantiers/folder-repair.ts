@@ -46,7 +46,7 @@ export async function auditChantierFolders(): Promise<ChantierFolderAudit[]> {
     createQuotesRepository().load(),
   ]);
 
-  const template = await loadChantierFolderTemplate();
+  const template = await loadChantierFolderTemplate(store);
   const expectedFolders = folderTemplatePaths(template);
   const result: ChantierFolderAudit[] = [];
   for (const chantier of chantiers.chantiers) {
