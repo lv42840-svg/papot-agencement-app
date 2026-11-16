@@ -41,6 +41,8 @@ import {
   removeChantierPurchaseCommitments,
 } from "@/lib/purchases/domain";
 import { createPurchaseOrdersRepository } from "@/lib/purchases/repository";
+import { readValidatedPurchaseCosts } from "@/lib/pennylane/purchase-invoice-store";
+import { isLocalStorageMode } from "@/lib/local-db/runtime";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -83,6 +85,8 @@ async function snapshot(
   const canReadPurchases =
     (await hasModuleAccess(user.id, "purchases", "READ")) || (canWrite && canCloseReopenSpecial);
   const purchasePayload = canReadPurchases ? await createPurchaseOrdersRepository().load() : null;
+  const actualPurchases =
+    canReadPurchases && !isLocalStorageMode() ? await readValidatedPurchaseCosts() : null;
   // Reconcile the chantier's read-only production metrics from the real hours register.
   // Do not write the projection into the chantier repository: the planning ledger is the source.
   const realizedChantierIds = new Set(planningPayload.actualHours.map((entry) => entry.chantierId));
@@ -118,6 +122,18 @@ async function snapshot(
       payload.chantiers.map((chantier) => [
         chantier.id,
         laborEstimates?.get(chantier.id)?.costCents ?? null,
+      ]),
+    ),
+    actualPurchaseCostsByChantier: Object.fromEntries(
+      payload.chantiers.map((site) => [
+        site.id,
+        actualPurchases?.imported ? (actualPurchases.byChantier[site.id] ?? null) : null,
+      ]),
+    ),
+    provisionalPurchaseCostsByChantier: Object.fromEntries(
+      payload.chantiers.map((site) => [
+        site.id,
+        actualPurchases?.provisionalByChantier[site.id] ?? false,
       ]),
     ),
     provisionalLaborCostsByChantier: Object.fromEntries(

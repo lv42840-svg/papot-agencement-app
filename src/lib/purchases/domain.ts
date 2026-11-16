@@ -100,6 +100,10 @@ export const purchaseOrderSchema = z
       )
       .optional(),
     supplierName: text,
+    supplierPennylaneId: z
+      .string()
+      .regex(/^\d{1,20}$/)
+      .optional(),
     mode: z.enum(["QUICK", "DETAILED"]),
     description: z.string().trim().max(2000),
     quickAmountHtCents: cents.nullable(),
@@ -159,6 +163,10 @@ export const purchaseOrderInputSchema = z.discriminatedUnion("mode", [
       mode: z.literal("QUICK"),
       allocations: quickAllocationsInputSchema,
       supplierName: text,
+      supplierPennylaneId: z
+        .string()
+        .regex(/^\d{1,20}$/)
+        .optional(),
       description: z.string().trim().max(2000),
     })
     .strict(),
@@ -167,6 +175,10 @@ export const purchaseOrderInputSchema = z.discriminatedUnion("mode", [
       mode: z.literal("DETAILED"),
       chantierId: z.string().uuid(),
       supplierName: text,
+      supplierPennylaneId: z
+        .string()
+        .regex(/^\d{1,20}$/)
+        .optional(),
       description: z.string().trim().max(2000),
       lines: z.array(purchaseOrderLineSchema).min(1).max(200),
     })
@@ -241,6 +253,7 @@ export function addPurchaseOrder(
     chantierName: primary.chantierName,
     allocations: value.mode === "QUICK" ? allocations : undefined,
     supplierName: value.supplierName,
+    supplierPennylaneId: value.supplierPennylaneId,
     mode: value.mode,
     description: value.description,
     quickAmountHtCents: value.mode === "QUICK" ? amountHtCents : null,
@@ -485,6 +498,7 @@ export function updatePurchaseOrder(
     chantierName: primary.chantierName,
     allocations: value.mode === "QUICK" ? allocations : undefined,
     supplierName: value.supplierName,
+    supplierPennylaneId: value.supplierPennylaneId,
     description: value.description,
     quickAmountHtCents: value.mode === "QUICK" ? amountHtCents : null,
     lines: value.mode === "DETAILED" ? value.lines : [],

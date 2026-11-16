@@ -154,3 +154,46 @@ export async function probePennylaneAccess(
   }
   return { companyName, access };
 }
+
+/** A fresh read is required for PDF links, which expire after 30 minutes. */
+export async function getPennylaneSupplierInvoice(
+  id: string,
+  config: PennylaneConfig,
+  fetcher: PennylaneFetcher = fetch,
+): Promise<PennylaneItem> {
+  if (!/^\d{1,20}$/.test(id)) throw new Error("PENNYLANE_ITEM_ID_INVALID");
+  const body = await requestJson(new URL("supplier_invoices/" + id, BASE_URL), config, fetcher);
+  const parsed = itemSchema.safeParse(body);
+  if (!parsed.success || String(parsed.data.id) !== id) {
+    throw new Error("PENNYLANE_RESPONSE_INVALID");
+  }
+  return parsed.data;
+}
+
+/** Reads only the explicitly selected bill's line items, never arbitrary remote URLs. */
+export async function listPennylaneSupplierInvoiceLines(
+  id: string,
+  config: PennylaneConfig,
+  fetcher: PennylaneFetcher = fetch,
+): Promise<PennylaneItem[]> {
+  if (!/^\d{1,20}$/.test(id)) throw new Error("PENNYLANE_ITEM_ID_INVALID");
+  const result: PennylaneItem[] = [];
+  const seen = new Set<string>();
+  let cursor: string | null = null;
+  for (let page = 0; page < 100; page += 1) {
+    const url = new URL("supplier_invoices/" + id + "/invoice_lines", BASE_URL);
+    url.searchParams.set("limit", "100");
+    if (cursor) url.searchParams.set("cursor", cursor);
+    const parsed = pageSchema.safeParse(await requestJson(url, config, fetcher));
+    if (!parsed.success) throw new Error("PENNYLANE_PAGE_INVALID");
+    result.push(...parsed.data.items);
+    if (result.length > 2000) throw new Error("PENNYLANE_RECORD_LIMIT");
+    if (!parsed.data.has_more) return result;
+    if (!parsed.data.next_cursor || seen.has(parsed.data.next_cursor)) {
+      throw new Error("PENNYLANE_CURSOR_INVALID");
+    }
+    cursor = parsed.data.next_cursor;
+    seen.add(cursor);
+  }
+  throw new Error("PENNYLANE_PAGE_LIMIT");
+}

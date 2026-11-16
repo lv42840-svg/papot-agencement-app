@@ -12,7 +12,8 @@ describe("raccordement BC et clôture chantier", () => {
     expect(profit).toContain("Achats engagés (BC) HT");
     expect(profit).toContain("Écart engagé - prévu HT");
     expect(profit).toContain("Dépassement du budget achats");
-    expect(profit).toContain("En attente du rapprochement Pennylane");
+    expect(profit).toContain("Factures Pennylane et affectations PAPOT validées");
+    expect(api).toContain("actualPurchaseCostsByChantier");
   });
   it("demande un choix exprès de conserver ou retirer les BC en clôture", () => {
     expect(ui).toContain("purchaseWarning.count > 0");

@@ -42,6 +42,7 @@ export function ChantierProfitabilityPanel({
   commercialCase,
   quotes,
   actualCosts,
+  actualPurchaseCostProvisional = false,
   actualLaborCostProvisional = false,
   committedPurchasesCents = null,
 }: {
@@ -50,6 +51,7 @@ export function ChantierProfitabilityPanel({
   quotes: NativeQuotesPayload;
   actualCosts?: ChantierActualCostSnapshot;
   actualLaborCostProvisional?: boolean;
+  actualPurchaseCostProvisional?: boolean;
   committedPurchasesCents?: number | null;
 }) {
   const result = calculateChantierProfitability(
@@ -136,9 +138,19 @@ export function ChantierProfitabilityPanel({
           }
         />
         <Metric
-          label="Achats et frais réels HT"
+          label={
+            actualPurchaseCostProvisional
+              ? "Achats et frais réels HT · provisoire"
+              : "Achats et frais réels HT"
+          }
           value={money(result.actualPurchaseCostCents)}
-          detail="En attente du rapprochement Pennylane : factures fournisseurs validées"
+          detail={
+            result.actualPurchaseCostCents === null
+              ? "Pas encore de coûts fournisseurs doublement validés"
+              : actualPurchaseCostProvisional
+                ? "Une facture a changé : dernière répartition validée conservée"
+                : "Factures Pennylane et affectations PAPOT validées"
+          }
         />
         <Metric
           label={

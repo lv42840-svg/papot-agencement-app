@@ -107,6 +107,7 @@ export async function removePennylaneConnection(pool: Pool = getServerDbPool()):
   await withServerDbTransaction(async (client) => {
     await client.query("SELECT pg_advisory_xact_lock($1)", ["7332170416238558"]);
     await client.query("DELETE FROM papot_pennylane_connection WHERE scope = 'global'");
+    await client.query("DELETE FROM papot_pennylane_purchase_allocations");
     await client.query("DELETE FROM papot_pennylane_staging");
     await client.query("DELETE FROM papot_pennylane_sync_state");
   }, pool);
