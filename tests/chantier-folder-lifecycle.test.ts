@@ -57,6 +57,39 @@ describe("chantier physical folder lifecycle", () => {
     expect(await files.readBytes(doc)).toEqual(Buffer.from("PDF TEST"));
   });
 
+  it("creates BE and Devis structure and moves historical devis into the correct place", async () => {
+    const files = await store();
+    const source = commercialStorageFolder(affair);
+    const previousPdf = `${source}/Devis/devis-2025.pdf`;
+    await files.writeBytes(previousPdf, Buffer.from("old quote"));
+    const business = { ...affair, documents: [{ storagePath: previousPdf, sha256: undefined }] } as CommercialCase;
+    const prepared = await prepareChantierFolder(files, business, chantier, [business]);
+    expect(prepared.remap(previousPdf)).toBe(`${prepared.path}/Devis-Chiffrage/Devis/devis-2025.pdf`);
+    expect(await files.readBytes(prepared.remap(previousPdf))).toEqual(Buffer.from("old quote"));
+    expect(await files.directoryExists(`${prepared.path}/BE - Atelier/TOP`)).toBe(true);
+    expect(await files.directoryExists(`${prepared.path}/BE - Atelier/Programme CN`)).toBe(true);
+    expect(await files.directoryExists(`${prepared.path}/Documents chantier/Plans`)).toBe(true);
+    expect(await files.directoryExists(`${prepared.path}/Pose`)).toBe(true);
+  });
+
+  it("is repeatable after a first repair without recreating or erasing files", async () => {
+    const files = await store();
+    const first = await prepareChantierFolder(files, affair, chantier, [affair]);
+    await files.writeBytes(`${first.path}/BE - Atelier/DXF/plan.dxf`, Buffer.from("DXF"));
+    await prepareChantierFolder(files, affair, chantier, [affair]);
+    expect(await files.readBytes(`${first.path}/BE - Atelier/DXF/plan.dxf`)).toEqual(Buffer.from("DXF"));
+  });
+
+  it("moves archived chantiers into the Archive branch without losing their technical files", async () => {
+    const files = await store();
+    const active = chantierStorageFolder(chantier);
+    await files.writeBytes(`${active}/BE - Atelier/TOP/top.pdf`, Buffer.from("TOP"));
+    const archived = { ...chantier, status: "ARCHIVED" as const };
+    const prepared = await prepareChantierFolder(files, affair, archived, [affair]);
+    expect(prepared.path).toContain("Chantier/2026/Archive/");
+    expect(await files.readBytes(`${prepared.path}/BE - Atelier/TOP/top.pdf`)).toEqual(Buffer.from("TOP"));
+  });
+
   it("does not overwrite a chantier folder already occupied", async () => {
     const files = await store();
     const source = commercialStorageFolder(affair);
