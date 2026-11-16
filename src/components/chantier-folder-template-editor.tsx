@@ -163,7 +163,7 @@ export function ChantierFolderTemplateEditor({ onUpdated }: { onUpdated?: () => 
       >
         Les nouveaux dossiers suivent ce modèle. Pour les chantiers déjà créés, la réparation
         ci-dessous ajoute les dossiers manquants. Les anciens fichiers et répertoires ne sont jamais
-        supprimés automatiquement lors d'une modification du modèle.
+        supprimés automatiquement lors d&apos;une modification du modèle.
       </p>
       {error ? (
         <p className="formError" role="alert">
@@ -313,7 +313,7 @@ export function ChantierFolderTemplateEditor({ onUpdated }: { onUpdated?: () => 
                   </button>
                 </section>
                 <section style={PANEL}>
-                  <strong>Modifier l'ordre</strong>
+                  <strong>Modifier l&apos;ordre</strong>
                   <div style={{ display: "flex", flexWrap: "wrap", gap: 8 }}>
                     <button
                       type="button"
@@ -344,7 +344,7 @@ export function ChantierFolderTemplateEditor({ onUpdated }: { onUpdated?: () => 
           </div>
         </div>
       ) : (
-        <p>Chargement de l'arborescence…</p>
+        <p>Chargement de l&apos;arborescence…</p>
       )}
     </article>
   );
