@@ -59,10 +59,13 @@ export async function auditChantierFolders(): Promise<ChantierFolderAudit[]> {
       : null;
     const commercialRoot = affair ? (rootFromDocument ?? commercialStorageFolder(affair)) : null;
     const sourceExists = commercialRoot ? await store.directoryExists(commercialRoot) : false;
+    const keyFoldersComplete = targetExists && (await Promise.all([
+      "Devis-Chiffrage/Devis", "BE - Atelier/TOP", "Documents chantier/Plans", "Pose", "SAV",
+    ].map((subfolder) => store.directoryExists(`${folder}/${subfolder}`)))).every(Boolean);
     let action: ChantierFolderAudit["action"] = "CREATE";
     if (targetExists && sourceExists) action = "CONFLICT";
     else if (sourceExists) action = "MOVE";
-    else if (targetExists) action = "ALREADY_PRESENT";
+    else if (targetExists) action = keyFoldersComplete ? "ALREADY_PRESENT" : "COMPLETE";
     // Folder is not created until a repair is explicitly confirmed.
     const warning = !affair
       ? "Affaire commerciale d'origine absente : vérifier manuellement les devis et documents."
@@ -72,7 +75,6 @@ export async function auditChantierFolders(): Promise<ChantierFolderAudit[]> {
           ? "Documents référencés, mais dossier source introuvable."
           : null;
     if (warning && action !== "CONFLICT" && affair) action = "CONFLICT";
-    if (action === "ALREADY_PRESENT") action = "COMPLETE";
     result.push({
       chantierId: chantier.id,
       number: chantier.number,
