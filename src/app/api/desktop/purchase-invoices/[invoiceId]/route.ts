@@ -24,7 +24,7 @@ export async function GET(_request: Request, { params }: { params: Promise<{ inv
     const lines = items.map(item => ({
       id: String(item.id),
       label: typeof item.label === "string" ? item.label : "Ligne " + item.id,
-      amountHtCents: euroToCents(item.amount_before_tax),
+      amountHtCents: euroToCents(item.currency_amount_before_tax),
     }));
     return NextResponse.json({ lines }, { headers: { "Cache-Control": "private, no-store" } });
   } catch (error) {
