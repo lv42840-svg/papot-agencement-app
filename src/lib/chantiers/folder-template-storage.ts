@@ -4,6 +4,7 @@ import { randomUUID } from "node:crypto";
 import { promises as fs } from "node:fs";
 import path from "node:path";
 import { getServerFileStore } from "@/lib/server-files/runtime";
+import type { ServerFileStore } from "@/lib/server-files/storage";
 import {
   applyFolderTemplateAction,
   defaultFolderTemplate,
@@ -15,13 +16,13 @@ import {
 const FILE = "chantier-folder-template.json";
 let pending: Promise<void> = Promise.resolve();
 
-function location() {
-  const root = getServerFileStore().rootPath;
+function location(store?: ServerFileStore) {
+  const root = (store ?? getServerFileStore()).rootPath;
   return path.join(root, "_papot_settings", FILE);
 }
 
-export async function loadChantierFolderTemplate(): Promise<FolderTemplate> {
-  const filepath = location();
+export async function loadChantierFolderTemplate(store?: ServerFileStore): Promise<FolderTemplate> {
+  const filepath = location(store);
   try {
     const json = await fs.readFile(filepath, "utf8");
     return validateFolderTemplate(JSON.parse(json));
