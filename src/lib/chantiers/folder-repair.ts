@@ -2,7 +2,6 @@ import "server-only";
 
 import { createChantiersRepository } from "@/lib/chantiers/create-repository";
 import { createCommercialRepository } from "@/lib/commercial/create-repository";
-import type { CommercialCase } from "@/lib/commercial/domain";
 import { createQuotesRepository } from "@/lib/quotes/create-repository";
 import type { NativeQuoteRecord } from "@/lib/quotes/store";
 import { withBusinessTransaction } from "@/lib/server-db/business-transaction";
@@ -173,7 +172,7 @@ export async function repairChantierFolder(chantierId: string): Promise<{
                 quote.finalPdf.storagePath = prepared.remap(quote.finalPdf.storagePath);
               }
             }
-            return { payload };
+            return { payload, focusQuoteId: undefined };
           });
         }
       } else {
