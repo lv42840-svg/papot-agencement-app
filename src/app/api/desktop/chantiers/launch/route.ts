@@ -18,6 +18,8 @@ import {
 import { createPlanningRepository } from "@/lib/planning/create-repository";
 import { convertPlanningProvisionToFirm } from "@/lib/planning/mutations";
 import { createQuotesRepository } from "@/lib/quotes/create-repository";
+import { prepareChantierFolder } from "@/lib/chantiers/folder-lifecycle";
+import { getServerFileStore } from "@/lib/server-files/runtime";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -63,30 +65,72 @@ export async function POST(request: Request) {
     const planningRepository = createPlanningRepository();
     await Promise.all([chantiersRepository.load(), planningRepository.load()]);
     stage = "apply-and-save-launch";
-    const mutation = await withBusinessTransaction(async () => {
-      const result = await chantiersRepository.mutate((payload) => {
-        const existing = payload.chantiers.find(
-          (site) => site.sourceCommercialCaseId === affair.id,
+    const store = getServerFileStore();
+    let prepared: Awaited<ReturnType<typeof prepareChantierFolder>> | null = null;
+    let launched = false;
+    let mutation: Awaited<ReturnType<typeof chantiersRepository.mutate>>;
+    try {
+      mutation = await withBusinessTransaction(async () => {
+        const result = await chantiersRepository.mutate(async (payload) => {
+          const existing = payload.chantiers.find(
+            (site) => site.sourceCommercialCaseId === affair.id,
+          );
+          if (existing) return { payload, focusChantierId: existing.id, shouldPersist: false };
+          const launch = launchChantierFromAffair(
+            payload,
+            affair,
+            {
+              ...input,
+              be: launchHours.hours.be,
+              workshop: launchHours.hours.workshop,
+              install: launchHours.hours.install,
+            },
+            actor,
+          );
+          const chantier = launch.payload.chantiers.find((item) => item.id === launch.focusChantierId);
+          if (!chantier) throw new Error("CHANTIER_LAUNCH_FOCUS_MISSING");
+          prepared = await prepareChantierFolder(store, affair, chantier, commercial.cases);
+          return launch;
+        });
+        if (!result.focusChantierId) throw new Error("CHANTIER_LAUNCH_FOCUS_MISSING");
+        await planningRepository.mutate((payload) =>
+          convertPlanningProvisionToFirm(payload, affair.id, result.focusChantierId!),
         );
-        if (existing) return { payload, focusChantierId: existing.id, shouldPersist: false };
-        return launchChantierFromAffair(
-          payload,
-          affair,
-          {
-            ...input,
-            be: launchHours.hours.be,
-            workshop: launchHours.hours.workshop,
-            install: launchHours.hours.install,
-          },
-          actor,
-        );
+        if (prepared) {
+          // Keep commercial document references valid after physically moving the dossier.
+          const folder = prepared;
+          await commercialRepository.mutate((payload) => {
+            const item = payload.cases.find((candidate) => candidate.id === affair.id);
+            if (!item) throw new Error("CHANTIER_COMMERCIAL_CASE_NOT_FOUND");
+            item.documents = item.documents.map((document) => ({
+              ...document,
+              storagePath: folder.remap(document.storagePath),
+            }));
+            return { payload, focusCaseId: item.id };
+          });
+          // A final quote PDF is also referenced separately by the native quotes store.
+          await createQuotesRepository().mutate((payload) => {
+            for (const quote of payload.quotes) {
+              if (quote.commercialCaseId === affair.id && quote.finalPdf) {
+                quote.finalPdf.storagePath = folder.remap(quote.finalPdf.storagePath);
+              }
+            }
+            return { payload };
+          });
+        }
+        return result;
       });
-      if (!result.focusChantierId) throw new Error("CHANTIER_LAUNCH_FOCUS_MISSING");
-      await planningRepository.mutate((payload) =>
-        convertPlanningProvisionToFirm(payload, affair.id, result.focusChantierId!),
-      );
-      return result;
-    });
+      launched = true;
+    } catch (error) {
+      if (prepared && !launched) {
+        try {
+          await prepared.rollback();
+        } catch (rollbackError) {
+          console.error("[PAPOT][Chantiers] folder rollback failed", rollbackError);
+        }
+      }
+      throw error;
+    }
 
     console.info("[PAPOT][Chantiers] launch from affair saved", { ms: Date.now() - startedAt });
     return noStoreJson({
