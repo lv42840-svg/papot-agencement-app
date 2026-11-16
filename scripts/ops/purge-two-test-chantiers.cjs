@@ -323,7 +323,9 @@ function planFor(states, clientRows) {
       ...remainingDrafts.map((draft) => draft.id),
       ...remainingOrders.map((order) => order.id),
       ...remainingEntries.map((entry) => entry.id),
-      ...clientRows.filter((client) => !clientsToDelete.includes(client.id)).map((client) => client.id),
+      ...clientRows
+        .filter((client) => !clientsToDelete.includes(client.id))
+        .map((client) => client.id),
     ]),
   );
 

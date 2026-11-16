@@ -158,8 +158,13 @@ function fixture() {
       actualHours: [] as ActualHoursFixture[],
       payrollWeekConfirmations: {} as Record<string, string>,
       editHistory: [] as Array<{
-        revision: number; key: string; before: unknown; after: unknown;
-        actorId: string; actorName: string; at: string;
+        revision: number;
+        key: string;
+        before: unknown;
+        after: unknown;
+        actorId: string;
+        actorName: string;
+        at: string;
       }>,
       editRevisions: {} as Record<string, number>,
       chantierOrder: [ids.site1, ids.site2],
@@ -277,15 +282,24 @@ describe("one-off cancelled site cleanup", () => {
       const chantierId = index === 0 ? ids.site1 : ids.site2;
       payloads.planning.editHistory.push({
         revision: index + 1,
-        key, before: [{ chantierId }], after: { chantierId },
-        actorId: "editor", actorName: "Test", at: "2026-11-10T12:00:00Z",
+        key,
+        before: [{ chantierId }],
+        after: { chantierId },
+        actorId: "editor",
+        actorName: "Test",
+        at: "2026-11-10T12:00:00Z",
       });
       payloads.planning.editRevisions[key] = index + 1;
     }
     const retained = "2026-W44:user:" + otherId;
     payloads.planning.editHistory.push({
-      revision: 4, key: retained, before: [], after: { chantierId: otherId },
-      actorId: "editor", actorName: "Test", at: "2026-11-10T12:00:00Z",
+      revision: 4,
+      key: retained,
+      before: [],
+      after: { chantierId: otherId },
+      actorId: "editor",
+      actorName: "Test",
+      at: "2026-11-10T12:00:00Z",
     });
     payloads.planning.editRevisions[retained] = 4;
 
@@ -301,15 +315,22 @@ describe("one-off cancelled site cleanup", () => {
     const { states, clients, payloads } = fixture();
     const otherId = "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa";
     payloads.chantiers.chantiers.push({
-      id: otherId, name: "Chantier réel", clientName: "Client réel",
-      number: "2026-099", launchYear: 2026, sourceCommercialCaseId: otherId,
+      id: otherId,
+      name: "Chantier réel",
+      clientName: "Client réel",
+      number: "2026-099",
+      launchYear: 2026,
+      sourceCommercialCaseId: otherId,
       status: "ACTIVE",
     });
     payloads.planning.editHistory.push({
-      revision: 1, key: "2026-W42:user:" + ids.site2,
+      revision: 1,
+      key: "2026-W42:user:" + ids.site2,
       before: [{ chantierId: ids.site2 }, { chantierId: otherId }],
       after: { chantierId: ids.site2 },
-      actorId: "editor", actorName: "Test", at: "2026-11-10T12:00:00Z",
+      actorId: "editor",
+      actorName: "Test",
+      at: "2026-11-10T12:00:00Z",
     });
     expect(() => planFor(states, clients)).toThrow("PLANNING_HISTORY_SHARED_RECORD");
   });
@@ -318,8 +339,12 @@ describe("one-off cancelled site cleanup", () => {
     const { states, clients, payloads } = fixture();
     const otherId = "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa";
     payloads.chantiers.chantiers.push({
-      id: otherId, name: "Chantier réel", clientName: "Client réel",
-      number: "2026-099", launchYear: 2026, sourceCommercialCaseId: otherId,
+      id: otherId,
+      name: "Chantier réel",
+      clientName: "Client réel",
+      number: "2026-099",
+      launchYear: 2026,
+      sourceCommercialCaseId: otherId,
       status: "ACTIVE",
     });
     const mixedKey = "2026-W42:" + ids.site2 + ":" + otherId;
@@ -331,9 +356,13 @@ describe("one-off cancelled site cleanup", () => {
     const { states, clients, payloads } = fixture();
     const key = "2026-W45:other";
     payloads.planning.editHistory.push({
-      revision: 1, key,
-      before: [{ chantierId: ids.site1 }], after: { chantierId: "other" },
-      actorId: "editor", actorName: "Test", at: "2026-11-10T12:00:00Z",
+      revision: 1,
+      key,
+      before: [{ chantierId: ids.site1 }],
+      after: { chantierId: "other" },
+      actorId: "editor",
+      actorName: "Test",
+      at: "2026-11-10T12:00:00Z",
     });
     expect(() => planFor(states, clients)).toThrow("PLANNING_HISTORY_SHARED_RECORD");
   });
