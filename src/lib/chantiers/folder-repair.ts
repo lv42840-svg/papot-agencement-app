@@ -59,13 +59,16 @@ export async function auditChantierFolders(): Promise<ChantierFolderAudit[]> {
       : null;
     const commercialRoot = affair ? (rootFromDocument ?? commercialStorageFolder(affair)) : null;
     const sourceExists = commercialRoot ? await store.directoryExists(commercialRoot) : false;
+    const activeFolder = chantierStorageFolder({ ...chantier, status: "ACTIVE" });
+    const archivedSourceExists = chantier.status === "ARCHIVED" && activeFolder !== folder && await store.directoryExists(activeFolder);
+    const needsRelinking = Boolean(affair?.documents.some((document) => document.storagePath.startsWith("Commercial/"))) || relatedQuotes.some((quote) => quote.finalPdf?.storagePath.startsWith("Commercial/"));
     const keyFoldersComplete = targetExists && (await Promise.all([
       "Devis-Chiffrage/Devis", "BE - Atelier/TOP", "Documents chantier/Plans", "Pose", "SAV",
     ].map((subfolder) => store.directoryExists(`${folder}/${subfolder}`)))).every(Boolean);
     let action: ChantierFolderAudit["action"] = "CREATE";
-    if (targetExists && sourceExists) action = "CONFLICT";
-    else if (sourceExists) action = "MOVE";
-    else if (targetExists) action = keyFoldersComplete ? "ALREADY_PRESENT" : "COMPLETE";
+    if (targetExists && (sourceExists || archivedSourceExists)) action = "CONFLICT";
+    else if (sourceExists || archivedSourceExists) action = "MOVE";
+    else if (targetExists) action = keyFoldersComplete && !needsRelinking ? "ALREADY_PRESENT" : "COMPLETE";
     // Folder is not created until a repair is explicitly confirmed.
     const warning = !affair
       ? "Affaire commerciale d'origine absente : vérifier manuellement les devis et documents."
