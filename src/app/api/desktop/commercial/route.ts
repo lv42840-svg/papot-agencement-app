@@ -248,11 +248,12 @@ export async function POST(request: Request) {
     const context = await requireModuleRequestContext("commercial", "WRITE");
     // An accepted affair can still be cancelled before chantier launch, but
     // changing a launched chantier to "Perdu" must never orphan its records.
-    if (closureRequested(input)) {
+    const closingCaseId = closureRequested(input) ? caseIdForMutation(input) : null;
+    if (closingCaseId) {
       const existing = await createChantiersRepository().load();
       if (
         existing.chantiers.some(
-          (site) => site.sourceCommercialCaseId === input.caseId && site.status !== "CANCELLED",
+          (site) => site.sourceCommercialCaseId === closingCaseId && site.status !== "CANCELLED",
         )
       ) {
         throw new Error("COMMERCIAL_ACTIVE_CHANTIER_CANNOT_CLOSE_AS_LOST");
