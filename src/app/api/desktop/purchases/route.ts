@@ -13,11 +13,13 @@ import {
 } from "@/lib/purchases/domain";
 import { purchaseChantierNamesForInput } from "@/lib/purchases/destination-policy";
 import { createPurchaseOrdersRepository } from "@/lib/purchases/repository";
+import { readSupplierCatalog, refreshSupplierCatalog } from "@/lib/pennylane/suppliers";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
 const requestSchema = z.discriminatedUnion("action", [
+  z.object({ action: z.literal("REFRESH_SUPPLIERS") }).strict(),
   z
     .object({
       action: z.literal("CREATE"),
@@ -50,6 +52,7 @@ function statusOf(code: string) {
   const auth = desktopRequestErrorStatus(code);
   if (auth) return auth;
   if (code === "PURCHASE_ORDER_NOT_FOUND" || code === "PURCHASE_CHANTIER_NOT_FOUND") return 404;
+  if (code === "PENNYLANE_DISABLED") return 503;
   if (
     code.includes("CONFLICT") ||
     code.includes("CANCELLED") ||
@@ -62,12 +65,14 @@ function statusOf(code: string) {
 export async function GET() {
   try {
     const context = await requireModuleRequestContext("purchases", "READ");
-    const [payload, chantiers] = await Promise.all([
+    const [payload, chantiers, supplierCatalog] = await Promise.all([
       createPurchaseOrdersRepository().load(),
       createChantiersRepository().load(),
+      readSupplierCatalog(),
     ]);
     return json({
       payload,
+      supplierCatalog,
       chantiers: chantiers.chantiers.map((site) => ({
         id: site.id,
         name: site.name,
@@ -86,6 +91,18 @@ export async function POST(request: Request) {
   try {
     const context = await requireModuleRequestContext("purchases", "WRITE");
     const input = requestSchema.parse(await request.json());
+    if (input.action === "REFRESH_SUPPLIERS") {
+      return json({ supplierCount: await refreshSupplierCatalog() });
+    }
+    if (input.action !== "CANCEL") {
+      const catalog = await readSupplierCatalog();
+      if (catalog.synced) {
+        const supplier = catalog.suppliers.find(row => row.id === input.order.supplierPennylaneId);
+        if (!supplier || supplier.name !== input.order.supplierName) {
+          throw new Error("PURCHASE_SUPPLIER_PENNYLANE_REQUIRED");
+        }
+      }
+    }
     const sites =
       input.action === "CANCEL" ? [] : (await createChantiersRepository().load()).chantiers;
     const payload = await createPurchaseOrdersRepository().mutate((current) => {
