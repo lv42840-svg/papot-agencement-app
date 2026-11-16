@@ -69,7 +69,7 @@ describe("chantier physical folder lifecycle", () => {
     const business = {
       ...affair,
       documents: [{ storagePath: previousPdf, sha256: undefined }],
-    } as CommercialCase;
+    } as unknown as CommercialCase;
     const prepared = await prepareChantierFolder(files, business, chantier, [business]);
     expect(prepared.remap(previousPdf)).toBe(
       `${prepared.path}/Devis-Chiffrage/Devis/devis-2025.pdf`,
