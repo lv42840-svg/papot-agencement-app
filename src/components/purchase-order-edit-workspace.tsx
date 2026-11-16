@@ -19,6 +19,7 @@ type Snapshot = {
   payload: PurchaseOrdersPayload;
   chantiers: Site[];
   canWrite: boolean;
+  supplierCatalog?: { suppliers: Array<{ id: string; name: string }>; synced: boolean; syncedAt: string | null };
 };
 type Allocated = { id: string; chantierId: string; amount: string };
 type Line = { id: string; description: string; quantity: string; unit: string; unitPrice: string };
@@ -42,6 +43,7 @@ export function PurchaseOrderEditWorkspace({ orderId }: { orderId: string }) {
   const [data, setData] = useState<Snapshot | null>(null);
   const [original, setOriginal] = useState<PurchaseOrder | null>(null);
   const [supplier, setSupplier] = useState("");
+  const [supplierPennylaneId, setSupplierPennylaneId] = useState("");
   const [description, setDescription] = useState("");
   const [allocations, setAllocations] = useState<Allocated[]>([]);
   const [lines, setLines] = useState<Line[]>([]);
@@ -53,6 +55,7 @@ export function PurchaseOrderEditWorkspace({ orderId }: { orderId: string }) {
   function initialize(order: PurchaseOrder) {
     setOriginal(order);
     setSupplier(order.supplierName);
+    setSupplierPennylaneId(order.supplierPennylaneId ?? "");
     setDescription(order.description);
     setSiteId(order.chantierId ?? "");
     setAllocations(
@@ -127,6 +130,10 @@ export function PurchaseOrderEditWorkspace({ orderId }: { orderId: string }) {
   async function save() {
     if (!data || !original || busy || readOnly) return;
     setError("");
+    if (data.supplierCatalog?.synced && !supplierPennylaneId) {
+      setError("Sélectionne un fournisseur Pennylane avant de modifier le BC.");
+      return;
+    }
     if (!supplier.trim()) {
       setError("Le fournisseur est obligatoire.");
       return;
@@ -155,6 +162,7 @@ export function PurchaseOrderEditWorkspace({ orderId }: { orderId: string }) {
       input = {
         mode: "QUICK",
         supplierName: supplier.trim(),
+        supplierPennylaneId: data.supplierCatalog?.synced ? supplierPennylaneId : original.supplierPennylaneId,
         description: description.trim(),
         allocations: rows.map((row) =>
           purchaseAllocationFromSelection(row.chantierId, row.amountHtCents!),
@@ -190,6 +198,7 @@ export function PurchaseOrderEditWorkspace({ orderId }: { orderId: string }) {
         mode: "DETAILED",
         chantierId: siteId,
         supplierName: supplier.trim(),
+        supplierPennylaneId: data.supplierCatalog?.synced ? supplierPennylaneId : original.supplierPennylaneId,
         description: description.trim(),
         lines: parsed,
       };
@@ -269,17 +278,27 @@ export function PurchaseOrderEditWorkspace({ orderId }: { orderId: string }) {
           ) : null}
           <label style={{ display: "grid", gap: 5 }}>
             Fournisseur
-            <input
-              list="edit-bc-suppliers"
-              value={supplier}
-              disabled={readOnly || busy}
-              onChange={(event) => setSupplier(event.target.value)}
-            />
-            <datalist id="edit-bc-suppliers">
-              {suppliers.map((name) => (
-                <option key={name} value={name} />
-              ))}
-            </datalist>
+            {data.supplierCatalog?.synced ? (
+              <select value={supplierPennylaneId} disabled={readOnly || busy}
+                onChange={event => {
+                  const id = event.target.value;
+                  setSupplierPennylaneId(id);
+                  setSupplier(data.supplierCatalog?.suppliers.find(item => item.id === id)?.name ?? "");
+                }}>
+                <option value="">Choisir un fournisseur Pennylane</option>
+                {data.supplierCatalog.suppliers.map(item => (
+                  <option key={item.id} value={item.id}>{item.name}</option>
+                ))}
+              </select>
+            ) : (
+              <>
+                <input list="edit-bc-suppliers" value={supplier} disabled={readOnly || busy}
+                  onChange={event => setSupplier(event.target.value)} />
+                <datalist id="edit-bc-suppliers">
+                  {suppliers.map(name => <option key={name} value={name} />)}
+                </datalist>
+              </>
+            )}
           </label>
           <label style={{ display: "grid", gap: 5 }}>
             Descriptif / remarque
