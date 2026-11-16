@@ -33,7 +33,7 @@ function commercialStorageSegments(rawInput, expectedKind) {
 
   if (
     segments.length < 5 ||
-    segments[0] !== "Commercial" ||
+    (segments[0] !== "Commercial" && segments[0] !== "Chantier") ||
     !/^\d{4}$/.test(segments[1] || "") ||
     Number(segments[1]) < 2000 ||
     Number(segments[1]) > 9999 ||
