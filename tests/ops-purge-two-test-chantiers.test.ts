@@ -124,7 +124,7 @@ function fixture() {
       provisionalAllocations: [
         { caseId: ids.case2, activity: "INSTALL", week: "2026-W47", hours: 3 },
       ],
-      actualHours: [],
+      actualHours: [] as Array<{ chantierId: string; userId: string; activity: string; week: string; hours: number }>,
       chantierOrder: [ids.site1, ids.site2],
       provisionalOrder: [ids.case2],
       dailyAssignments: [{ chantierId: ids.site1, userId: "a", date: "2026-11-16", label: "Test" }],
@@ -142,7 +142,7 @@ function fixture() {
     { id: ids.client1, version: 1, record: { companyName: "JULES SAS" } },
     { id: ids.client2, version: 1, record: { companyName: "test" } },
   ];
-  return { states, clients };
+  return { states, clients, payloads };
 }
 
 describe("one-off cancelled site cleanup", () => {
@@ -162,14 +162,14 @@ describe("one-off cancelled site cleanup", () => {
   });
 
   it("refuses deletion if a target site is not cancelled", () => {
-    const { states, clients } = fixture();
-    states.chantiers.payload.chantiers[0].status = "ACTIVE";
+    const { states, clients, payloads } = fixture();
+    payloads.chantiers.payload.chantiers[0].status = "ACTIVE";
     expect(() => planFor(states, clients)).toThrow("CHANTIER_NOT_CANCELLED");
   });
 
   it("protects shared clients, leaving them in the client directory", () => {
-    const { states, clients } = fixture();
-    states.commercial.payload.cases.push({
+    const { states, clients, payloads } = fixture();
+    payloads.commercial.payload.cases.push({
       id: "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa",
       name: "Affaire réelle",
       clientId: ids.client1,
@@ -185,8 +185,8 @@ describe("one-off cancelled site cleanup", () => {
   });
 
   it("refuses deletion if real employee hours exist", () => {
-    const { states, clients } = fixture();
-    states.planning.payload.actualHours.push({
+    const { states, clients, payloads } = fixture();
+    payloads.planning.payload.actualHours.push({
       chantierId: ids.site1,
       userId: "employee",
       activity: "BE",
@@ -197,8 +197,8 @@ describe("one-off cancelled site cleanup", () => {
   });
 
   it("refuses unmatched or duplicate names", () => {
-    const { states, clients } = fixture();
-    states.chantiers.payload.chantiers[0].name = "Autre affaire";
+    const { states, clients, payloads } = fixture();
+    payloads.chantiers.payload.chantiers[0].name = "Autre affaire";
     expect(() => planFor(states, clients)).toThrow("CHANTIER_MATCH_NOT_UNIQUE");
   });
 
