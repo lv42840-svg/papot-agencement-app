@@ -3,7 +3,7 @@ import { describe, expect, it } from "vitest";
 
 const require = createRequire(import.meta.url);
 process.env.PAPOT_PURGE_TEST_MODE = "1";
-const { planFor, safeRelative } = require("../scripts/ops/purge-two-test-chantiers.cjs") as {
+const { planFor, safeRelative, assertPayrollNotPrepared } = require("../scripts/ops/purge-two-test-chantiers.cjs") as {
   planFor: (
     states: Record<string, unknown>,
     clients: unknown[],
@@ -12,6 +12,7 @@ const { planFor, safeRelative } = require("../scripts/ops/purge-two-test-chantie
       sites: Array<{ id: string }>;
       factures: Array<{ id: string; status: string; type: string }>;
       clientsKept: string[];
+      testHoursToRemove: ActualHoursFixture[];
     };
     clientsToDelete: string[];
     next: {
@@ -19,11 +20,12 @@ const { planFor, safeRelative } = require("../scripts/ops/purge-two-test-chantie
       commercial: { cases: unknown[] };
       quotes: { quotes: unknown[] };
       billing: { drafts: unknown[] };
-      planning: { macroAllocations: unknown[]; dailyAssignments: unknown[] };
+      planning: { macroAllocations: unknown[]; dailyAssignments: unknown[]; actualHours: unknown[] };
     };
     signature: string;
   };
   safeRelative: (value: string) => string;
+  assertPayrollNotPrepared: (payrollPayload: unknown, selectedHours: ActualHoursFixture[]) => void;
 };
 delete process.env.PAPOT_PURGE_TEST_MODE;
 
@@ -136,6 +138,7 @@ function fixture() {
         { caseId: ids.case2, activity: "INSTALL", week: "2026-W47", hours: 3 },
       ],
       actualHours: [] as ActualHoursFixture[],
+      payrollWeekConfirmations: {} as Record<string, string>,
       chantierOrder: [ids.site1, ids.site2],
       provisionalOrder: [ids.case2],
       dailyAssignments: [{ chantierId: ids.site1, userId: "a", date: "2026-11-16", label: "Test" }],
@@ -204,6 +207,35 @@ describe("one-off cancelled site cleanup", () => {
       week: "2026-W46",
       hours: 8,
     });
+    expect(() => planFor(states, clients)).toThrow("REAL_EMPLOYEE_HOURS_EXIST");
+  });
+
+  it("accepts ONLY the three known 10-hour test entries from Lucien VAGINAY W41", () => {
+    const { states, clients, payloads } = fixture();
+    const id = "f1bc2388-99d5-42b3-a67e-d47e1316dfbd";
+    payloads.planning.actualHours.push(
+      { chantierId: ids.site2, userId: id, week: "2026-W41", activity: "BE", hours: 10 },
+      { chantierId: ids.site2, userId: id, week: "2026-W41", activity: "WORKSHOP", hours: 10 },
+      { chantierId: ids.site2, userId: id, week: "2026-W41", activity: "INSTALL", hours: 10 },
+    );
+    const plan = planFor(states, clients);
+    expect(plan.scope.testHoursToRemove).toHaveLength(3);
+    expect(plan.scope.testHoursToRemove.reduce((sum, row) => sum + row.hours, 0)).toBe(30);
+    expect(plan.next.planning.actualHours).toEqual([]);
+    assertPayrollNotPrepared({ months: [] }, plan.scope.testHoursToRemove);
+    expect(() => assertPayrollNotPrepared(
+      { months: [{ month: "2026-10", status: "PREPARED", versions: [{}] }] },
+      plan.scope.testHoursToRemove,
+    )).toThrow("PAYROLL_OCTOBER_ALREADY_PREPARED");
+    expect(() => assertPayrollNotPrepared(
+      { months: [{ month: "2026-10", status: "PREPARING",
+        validatedWeeks: [id + ":2026-W41"] }] },
+      plan.scope.testHoursToRemove,
+    )).toThrow("PAYROLL_OCTOBER_ALREADY_PREPARED");
+    payloads.planning.payrollWeekConfirmations = { [id + ":2026-W41"]: "confirmed" };
+    expect(() => planFor(states, clients)).toThrow("PAYROLL_WEEK_CONFIRMED");
+    payloads.planning.payrollWeekConfirmations = {};
+    payloads.planning.actualHours[0].hours = 11;
     expect(() => planFor(states, clients)).toThrow("REAL_EMPLOYEE_HOURS_EXIST");
   });
 
