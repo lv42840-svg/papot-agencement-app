@@ -16,6 +16,7 @@ export type QuoteFinalPdfArchiveContext = {
   clientName: string | null;
   caseName: string;
   businessFolder?: string;
+  businessQuoteFolder?: string;
 };
 
 export type QuoteFinalPdfArchiveResult = {
@@ -53,7 +54,7 @@ export function quoteFinalPdfStoragePath(
   quoteNumber: string,
 ): string {
   if (context.businessFolder) {
-    return `${context.businessFolder}/Devis-Chiffrage/Devis/${quoteFinalPdfFileName(quote, quoteNumber)}`;
+    return `${context.businessFolder}/${context.businessQuoteFolder ?? "Devis-Chiffrage/Devis"}/${quoteFinalPdfFileName(quote, quoteNumber)}`;
   }
   return commercialDocumentStoragePath({
     creationYear: context.creationYear,
