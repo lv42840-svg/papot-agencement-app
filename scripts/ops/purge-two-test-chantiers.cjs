@@ -144,7 +144,7 @@ function planFor(states, clientRows) {
     const matches = payload.chantiers.chantiers.filter(
       (item) =>
         compact(item.name) === compact(target.name) &&
-        compact(item.clientName) === compact(target.client),
+        compact(item.clientName || item.companyName || item.siteLabel) === compact(target.client),
     );
     if (matches.length !== 1)
       fail(
