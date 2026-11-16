@@ -69,7 +69,9 @@ export async function GET() {
     const [payload, chantiers, supplierCatalog] = await Promise.all([
       createPurchaseOrdersRepository().load(),
       createChantiersRepository().load(),
-      isLocalStorageMode() ? Promise.resolve({ suppliers: [], synced: false, syncedAt: null }) : readSupplierCatalog(),
+      isLocalStorageMode()
+        ? Promise.resolve({ suppliers: [], synced: false, syncedAt: null })
+        : readSupplierCatalog(),
     ]);
     return json({
       payload,
