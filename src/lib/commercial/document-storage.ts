@@ -41,7 +41,8 @@ function validateFiles(files: File[]): void {
 function validateDocumentPath(document: CommercialDocument): string[] {
   const isCurrentPath = document.storagePath.startsWith("Commercial/");
   const isLegacyPath = document.storagePath.startsWith("documents/commercial/");
-  if (!isCurrentPath && !isLegacyPath) {
+  const isChantierPath = document.storagePath.startsWith("Chantier/");
+  if (!isCurrentPath && !isLegacyPath && !isChantierPath) {
     throw new Error("COMMERCIAL_DOCUMENT_PATH_INVALID");
   }
   const segments = document.storagePath.split("/").filter(Boolean);
