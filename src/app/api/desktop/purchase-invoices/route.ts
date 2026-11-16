@@ -125,7 +125,7 @@ export async function GET() {
 
 export async function POST(request: Request) {
   try {
-    await requireModuleRequestContext("purchases", "WRITE");
+    const context = await requireModuleRequestContext("purchases", "WRITE");
     if (isLocalStorageMode()) throw new Error("PENNYLANE_DISABLED");
     if (!sameOrigin(request)) return json({ error: "INVOICE_ORIGIN_FORBIDDEN" }, 403);
     if (!request.headers.get("content-type")?.toLowerCase().startsWith("application/json")) {
