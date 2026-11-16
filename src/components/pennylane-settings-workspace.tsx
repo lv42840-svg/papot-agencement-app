@@ -278,8 +278,8 @@ export function PennylaneSettingsWorkspace() {
           </div>
         </div>
         <p className="muted pennylaneHelp">
-          Utilise une nouvelle clé : l&apos;ancienne clé envoyée par e-mail doit être révoquée. Seuls les
-          administrateurs PAPOT autorisés peuvent modifier cette configuration.
+          Utilise une nouvelle clé : l&apos;ancienne clé envoyée par e-mail doit être révoquée.
+          Seuls les administrateurs PAPOT autorisés peuvent modifier cette configuration.
         </p>
       </article>
 

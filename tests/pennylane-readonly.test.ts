@@ -131,7 +131,6 @@ describe("Pennylane V2 read-only staged connector", () => {
     expect(fetcher).toHaveBeenCalledTimes(5);
   });
 
-
   it("reports missing scopes without exposing API data or saving any invoices", async () => {
     const fetcher = vi.fn().mockImplementation(async (value: string, options: RequestInit) => {
       expect(options.method).toBe("GET");

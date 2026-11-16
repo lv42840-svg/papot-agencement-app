@@ -29,9 +29,7 @@ describe("Pennylane admin credential encryption", () => {
 
   it("fails closed when ciphertext is tampered with or the key changes", () => {
     const first = sealPennylaneToken(testToken, env);
-    expect(() => unsealPennylaneToken(first, other)).toThrow(
-      "PENNYLANE_SECRET_UNREADABLE",
-    );
+    expect(() => unsealPennylaneToken(first, other)).toThrow("PENNYLANE_SECRET_UNREADABLE");
     const corrupted = first.slice(0, -3) + "AAA";
     expect(() => unsealPennylaneToken(corrupted, env)).toThrow("PENNYLANE_SECRET_UNREADABLE");
     expect(() => sealPennylaneToken("space in token", env)).toThrow(
