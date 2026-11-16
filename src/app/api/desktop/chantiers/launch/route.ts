@@ -89,7 +89,11 @@ export async function POST(request: Request) {
           );
           const chantier = launch.payload.chantiers.find((item) => item.id === launch.focusChantierId);
           if (!chantier) throw new Error("CHANTIER_LAUNCH_FOCUS_MISSING");
-          state.prepared = await prepareChantierFolder(store, affair, chantier, commercial.cases);
+          state.prepared = await prepareChantierFolder(
+            store, affair, chantier, commercial.cases,
+            quotes.quotes.filter((quote) => quote.commercialCaseId === affair.id && quote.finalPdf)
+              .map((quote) => quote.finalPdf!.storagePath),
+          );
           return launch;
         });
         if (!result.focusChantierId) throw new Error("CHANTIER_LAUNCH_FOCUS_MISSING");
@@ -109,14 +113,21 @@ export async function POST(request: Request) {
             return { payload, focusCaseId: item.id };
           });
           // A final quote PDF is also referenced separately by the native quotes store.
-          await createQuotesRepository().mutate((payload) => {
-            for (const quote of payload.quotes) {
-              if (quote.commercialCaseId === affair.id && quote.finalPdf) {
-                quote.finalPdf.storagePath = folder.remap(quote.finalPdf.storagePath);
+          const changedQuotes = quotes.quotes.filter(
+            (quote) => quote.commercialCaseId === affair.id &&
+              quote.finalPdf &&
+              folder.remap(quote.finalPdf.storagePath) !== quote.finalPdf.storagePath,
+          );
+          if (changedQuotes.length > 0) {
+            await createQuotesRepository().mutate((payload) => {
+              for (const quote of payload.quotes) {
+                if (quote.commercialCaseId === affair.id && quote.finalPdf) {
+                  quote.finalPdf.storagePath = folder.remap(quote.finalPdf.storagePath);
+                }
               }
-            }
-            return { payload, focusQuoteId: undefined };
-          });
+              return { payload, focusQuoteId: changedQuotes[0].id };
+            });
+          }
         }
         return result;
       });
