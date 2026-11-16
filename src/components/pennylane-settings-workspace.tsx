@@ -151,7 +151,7 @@ export function PennylaneSettingsWorkspace() {
           <h1>Connexion Pennylane</h1>
           <p className="muted">
             Configure la clé API depuis PAPOT. La connexion est uniquement en lecture : aucune
-            facture ou donnée comptable n'est modifiée.
+            facture ou donnée comptable n&apos;est modifiée.
           </p>
         </div>
       </div>
@@ -198,10 +198,10 @@ export function PennylaneSettingsWorkspace() {
       </article>
 
       <article className="companyProfileCard">
-        <h2>Clé d'accès API</h2>
+        <h2>Clé d&apos;accès API</h2>
         {!connection.encryptionReady ? (
           <p className="formError" role="alert">
-            Protection serveur non configurée : l'administrateur technique doit ajouter
+            Protection serveur non configurée : l&apos;administrateur technique doit ajouter
             PAPOT_PENNYLANE_ENCRYPTION_KEY sur le VPS avant de pouvoir enregistrer une clé.
           </p>
         ) : null}
@@ -278,7 +278,7 @@ export function PennylaneSettingsWorkspace() {
           </div>
         </div>
         <p className="muted pennylaneHelp">
-          Utilise une nouvelle clé : l'ancienne clé envoyée par e-mail doit être révoquée. Seuls les
+          Utilise une nouvelle clé : l&apos;ancienne clé envoyée par e-mail doit être révoquée. Seuls les
           administrateurs PAPOT autorisés peuvent modifier cette configuration.
         </p>
       </article>
@@ -297,7 +297,7 @@ export function PennylaneSettingsWorkspace() {
           </dl>
           <p className="muted pennylaneHelp">
             Un accès manquant signifie que la clé ne possède pas encore les permissions requises. Le
-            test n'enregistre aucune facture.
+            test n&apos;enregistre aucune facture.
           </p>
         </article>
       ) : null}
