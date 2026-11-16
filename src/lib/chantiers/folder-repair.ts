@@ -7,7 +7,6 @@ import type { NativeQuoteRecord } from "@/lib/quotes/store";
 import { withBusinessTransaction } from "@/lib/server-db/business-transaction";
 import { getServerFileStore } from "@/lib/server-files/runtime";
 import {
-  CHANTIER_STANDARD_FOLDERS,
   chantierStorageFolder,
   commercialStorageFolder,
   ensureChantierStructure,
@@ -15,6 +14,8 @@ import {
   type PreparedChantierFolder,
 } from "./folder-lifecycle";
 import type { ChantierRecord } from "./domain";
+import { folderTemplatePaths } from "./folder-template";
+import { loadChantierFolderTemplate } from "./folder-template-storage";
 
 export type ChantierFolderAudit = {
   chantierId: string;
@@ -45,6 +46,8 @@ export async function auditChantierFolders(): Promise<ChantierFolderAudit[]> {
     createQuotesRepository().load(),
   ]);
 
+  const template = await loadChantierFolderTemplate();
+  const expectedFolders = folderTemplatePaths(template);
   const result: ChantierFolderAudit[] = [];
   for (const chantier of chantiers.chantiers) {
     const affair = commercial.cases.find((item) => item.id === chantier.sourceCommercialCaseId);
@@ -75,7 +78,7 @@ export async function auditChantierFolders(): Promise<ChantierFolderAudit[]> {
       targetExists &&
       (
         await Promise.all(
-          CHANTIER_STANDARD_FOLDERS.map((subfolder) =>
+          expectedFolders.map((subfolder) =>
             store.directoryExists(`${folder}/${subfolder}`),
           ),
         )
