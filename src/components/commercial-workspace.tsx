@@ -688,6 +688,7 @@ function CommercialCaseDetail({
           ) : (
             <>
               <StatusSection
+                key={item.id}
                 item={item}
                 busy={busy}
                 canModify={capabilities.canModify}
@@ -696,6 +697,7 @@ function CommercialCaseDetail({
                 mutate={mutate}
               />
               <CloseSection
+                key={item.id}
                 item={item}
                 busy={busy}
                 canModify={capabilities.canModify}
