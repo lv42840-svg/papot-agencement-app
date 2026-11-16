@@ -177,7 +177,8 @@ function planFor(states, clientRows) {
 
   const rest = {
     chantiers: { ...payload.chantiers, chantiers: otherSites },
-    commercial: { ...payload.commercial, cases: remainingAffairs },
+    commercial: { ...payload.commercial, cases: remainingAffairs,
+      clients: (payload.commercial.clients ?? []).filter(client => !clientsToDelete.includes(client.id)) },
     quotes: { ...payload.quotes, quotes: remainingQuotes },
     billing: { ...payload.billing, drafts: remainingDrafts },
     planning: { ...payload.planning,
