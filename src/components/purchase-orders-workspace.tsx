@@ -284,6 +284,7 @@ export function PurchaseOrdersWorkspace({ chantierId }: { chantierId?: string })
     <main style={{ padding: 22, display: "grid", gap: 18, maxWidth: 1480, margin: "0 auto" }}>
       <div>
         <h1>Achats · Bons de commande</h1>
+        <Link href="/achats/factures" className="secondaryButton">Factures fournisseurs · Pennylane</Link>
         <p>
           Un BC enregistré est un <strong>coût engagé HT</strong>. Il ne crée ni facture
           fournisseur, ni coût réel validé, ni envoi automatique. Rapprochement Pennylane à venir.
