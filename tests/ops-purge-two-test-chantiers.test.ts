@@ -3,30 +3,38 @@ import { describe, expect, it } from "vitest";
 
 const require = createRequire(import.meta.url);
 process.env.PAPOT_PURGE_TEST_MODE = "1";
-const { planFor, safeRelative, assertPayrollNotPrepared } = require("../scripts/ops/purge-two-test-chantiers.cjs") as {
-  planFor: (
-    states: Record<string, unknown>,
-    clients: unknown[],
-  ) => {
-    scope: {
-      sites: Array<{ id: string }>;
-      factures: Array<{ id: string; status: string; type: string }>;
-      clientsKept: string[];
-      testHoursToRemove: ActualHoursFixture[];
+const { planFor, safeRelative, assertPayrollNotPrepared } =
+  require("../scripts/ops/purge-two-test-chantiers.cjs") as {
+    planFor: (
+      states: Record<string, unknown>,
+      clients: unknown[],
+    ) => {
+      scope: {
+        sites: Array<{ id: string }>;
+        factures: Array<{ id: string; status: string; type: string }>;
+        clientsKept: string[];
+        testHoursToRemove: ActualHoursFixture[];
+      };
+      clientsToDelete: string[];
+      next: {
+        chantiers: { chantiers: unknown[] };
+        commercial: { cases: unknown[] };
+        quotes: { quotes: unknown[] };
+        billing: { drafts: unknown[] };
+        planning: {
+          macroAllocations: unknown[];
+          dailyAssignments: unknown[];
+          actualHours: unknown[];
+        };
+      };
+      signature: string;
     };
-    clientsToDelete: string[];
-    next: {
-      chantiers: { chantiers: unknown[] };
-      commercial: { cases: unknown[] };
-      quotes: { quotes: unknown[] };
-      billing: { drafts: unknown[] };
-      planning: { macroAllocations: unknown[]; dailyAssignments: unknown[]; actualHours: unknown[] };
-    };
-    signature: string;
+    safeRelative: (value: string) => string;
+    assertPayrollNotPrepared: (
+      payrollPayload: unknown,
+      selectedHours: ActualHoursFixture[],
+    ) => void;
   };
-  safeRelative: (value: string) => string;
-  assertPayrollNotPrepared: (payrollPayload: unknown, selectedHours: ActualHoursFixture[]) => void;
-};
 delete process.env.PAPOT_PURGE_TEST_MODE;
 
 const ids = {
@@ -223,15 +231,18 @@ describe("one-off cancelled site cleanup", () => {
     expect(plan.scope.testHoursToRemove.reduce((sum, row) => sum + row.hours, 0)).toBe(30);
     expect(plan.next.planning.actualHours).toEqual([]);
     assertPayrollNotPrepared({ months: [] }, plan.scope.testHoursToRemove);
-    expect(() => assertPayrollNotPrepared(
-      { months: [{ month: "2026-10", status: "PREPARED", versions: [{}] }] },
-      plan.scope.testHoursToRemove,
-    )).toThrow("PAYROLL_OCTOBER_ALREADY_PREPARED");
-    expect(() => assertPayrollNotPrepared(
-      { months: [{ month: "2026-10", status: "PREPARING",
-        validatedWeeks: [id + ":2026-W41"] }] },
-      plan.scope.testHoursToRemove,
-    )).toThrow("PAYROLL_OCTOBER_ALREADY_PREPARED");
+    expect(() =>
+      assertPayrollNotPrepared(
+        { months: [{ month: "2026-10", status: "PREPARED", versions: [{}] }] },
+        plan.scope.testHoursToRemove,
+      ),
+    ).toThrow("PAYROLL_OCTOBER_ALREADY_PREPARED");
+    expect(() =>
+      assertPayrollNotPrepared(
+        { months: [{ month: "2026-10", status: "PREPARING", validatedWeeks: [id + ":2026-W41"] }] },
+        plan.scope.testHoursToRemove,
+      ),
+    ).toThrow("PAYROLL_OCTOBER_ALREADY_PREPARED");
     payloads.planning.payrollWeekConfirmations = { [id + ":2026-W41"]: "confirmed" };
     expect(() => planFor(states, clients)).toThrow("PAYROLL_WEEK_CONFIRMED");
     payloads.planning.payrollWeekConfirmations = {};

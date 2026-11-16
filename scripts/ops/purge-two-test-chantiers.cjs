@@ -221,12 +221,13 @@ function planFor(states, clientRows) {
     if (
       !testSite ||
       personnelHours.length !== 3 ||
-      personnelHours.some((entry) =>
-        entry.chantierId !== testSite.id ||
-        entry.userId !== employeeId ||
-        entry.week !== week ||
-        entry.hours !== 10 ||
-        !allowed.has(entry.activity)
+      personnelHours.some(
+        (entry) =>
+          entry.chantierId !== testSite.id ||
+          entry.userId !== employeeId ||
+          entry.week !== week ||
+          entry.hours !== 10 ||
+          !allowed.has(entry.activity),
       ) ||
       new Set(personnelHours.map((entry) => entry.activity)).size !== 3
     ) {
@@ -430,13 +431,16 @@ function assertPayrollNotPrepared(payrollPayload, selectedHours) {
   const month = (payrollPayload?.months ?? []).find((row) => row.month === "2026-10");
   if (!month) return;
   const personWeek = "f1bc2388-99d5-42b3-a67e-d47e1316dfbd:2026-W41";
-  const edited = month.status !== "PREPARING" ||
+  const edited =
+    month.status !== "PREPARING" ||
     (month.versions ?? []).length > 0 ||
     (month.eventLog ?? []).some((event) => /VALIDAT|PREPAR|REOPEN|RESTOR/i.test(event.action)) ||
     (month.validatedWeeks ?? []).includes(personWeek);
   if (edited) {
-    fail("PAYROLL_OCTOBER_ALREADY_PREPARED",
-      "Des donnees de paie d'octobre 2026 sont confirmees ou historiques");
+    fail(
+      "PAYROLL_OCTOBER_ALREADY_PREPARED",
+      "Des donnees de paie d'octobre 2026 sont confirmees ou historiques",
+    );
   }
 }
 
