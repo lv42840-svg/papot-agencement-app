@@ -3,6 +3,7 @@ import "server-only";
 import type { Pool, PoolClient } from "pg";
 
 import { getServerDbPool } from "../server-db/pool";
+import { pennylaneEnabled } from "../pennylane/config";
 import { withServerDbTransaction } from "../server-db/transaction";
 import { parseClientsPayload, type ClientRecord, type ClientsPayload } from "./domain";
 import { applyClientsMutation } from "./mutations";
@@ -71,6 +72,37 @@ export function createPostgresClientsRepository(pool: Pool = getServerDbPool()):
         const rows = await loadRows(client);
         const source = rowsToPayload(rows);
         const versions = new Map(rows.map((row) => [row.id, row.version]));
+        // Pennylane owns client creation and identity once the integration is enabled.
+        // Operational-only fields (local notes, contacts, VAT preference) stay editable.
+        if (pennylaneEnabled()) {
+          if (input.action === "create") throw new Error("CLIENT_CREATE_IN_PENNYLANE");
+          if (input.action === "update") {
+            const old = source.clients.find((candidate) => candidate.id === input.clientId);
+            if (old?.pennylaneId) {
+              const sourceKeys = [
+                "type",
+                "companyName",
+                "firstName",
+                "lastName",
+                "addressLine1",
+                "addressLine2",
+                "postalCode",
+                "city",
+                "phone",
+                "email",
+                "siret",
+                "paymentTerms",
+              ] as const;
+              if (
+                sourceKeys.some((key) => old[key] !== input[key]) ||
+                (input.vatNumber !== undefined && old.vatNumber !== input.vatNumber)
+              ) {
+                throw new Error("CLIENT_PENNYLANE_READONLY");
+              }
+            }
+          }
+        }
+
         const mutation = applyClientsMutation(source, input, actor);
         const clientId = mutation.focusClientId;
 
