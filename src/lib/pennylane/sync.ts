@@ -6,6 +6,7 @@ import {
   type PennylaneItem,
 } from "./client";
 import { publishPennylaneSnapshots } from "./store";
+import { readPennylaneStoredConfig } from "./connection";
 
 export type PennylaneSyncResult = {
   companyName: string;
@@ -28,7 +29,14 @@ export async function preparePennylaneSnapshot(
 }
 
 export async function synchronizePennylane(): Promise<PennylaneSyncResult> {
-  const { companyName, records } = await preparePennylaneSnapshot();
+  // Production imports use only the encrypted token saved by an administrator.
+  // The legacy environment-token interface is retained for mock-only unit tests.
+  const stored = await readPennylaneStoredConfig();
+  const { companyName, records } = await preparePennylaneSnapshot({
+    PAPOT_PENNYLANE_ENABLED: process.env.PAPOT_PENNYLANE_ENABLED,
+    PAPOT_PENNYLANE_API_TOKEN: stored.token,
+    PAPOT_PENNYLANE_EXPECTED_COMPANY: stored.expectedCompany,
+  });
   await publishPennylaneSnapshots(companyName, records);
   return {
     companyName,
