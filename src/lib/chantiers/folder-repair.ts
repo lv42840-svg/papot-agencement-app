@@ -166,13 +166,16 @@ export async function repairChantierFolder(chantierId: string): Promise<{
           });
         }
         if (quotePdfsRelinked > 0) {
+          const focusQuoteId = relatedQuotes.find((quote) => quote.finalPdf &&
+            prepared.remap(quote.finalPdf.storagePath) !== quote.finalPdf.storagePath)?.id;
+          if (!focusQuoteId) throw new Error("CHANTIER_QUOTE_RELINK_CONFLICT");
           await quotesRepository.mutate((payload) => {
             for (const quote of payload.quotes) {
               if (quote.commercialCaseId === affair.id && quote.finalPdf) {
                 quote.finalPdf.storagePath = prepared.remap(quote.finalPdf.storagePath);
               }
             }
-            return { payload, focusQuoteId: undefined };
+            return { payload, focusQuoteId };
           });
         }
       } else {
