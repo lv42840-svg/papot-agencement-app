@@ -8,35 +8,10 @@ import {
 import type { ServerFileStore } from "@/lib/server-files/storage";
 import type { ChantierRecord } from "./domain";
 
-// "BE / Atelier" and "Documents architecte / MOE" are interface labels.
-// The slash cannot be part of a physical Windows-compatible folder name.
-export const CHANTIER_STANDARD_FOLDERS = [
-  "Administratif",
-  "Devis-Chiffrage",
-  "Devis-Chiffrage/Documents reçus",
-  "Devis-Chiffrage/Chiffrage interne",
-  "Devis-Chiffrage/Devis",
-  "Devis-Chiffrage/Déboursé",
-  "Devis-Chiffrage/Divers",
-  "Documents chantier",
-  "Documents chantier/Plans",
-  "Documents chantier/Plannings",
-  "Documents chantier/Documents architecte - MOE",
-  "Documents chantier/Divers",
-  "BE - Atelier",
-  "BE - Atelier/TOP",
-  "BE - Atelier/DFT",
-  "BE - Atelier/DXF",
-  "BE - Atelier/Débit",
-  "BE - Atelier/Documents divers",
-  "BE - Atelier/Programme CN",
-  "Atelier",
-  "Pose",
-  "Réunions",
-  "Mails",
-  "Réception",
-  "SAV",
-] as const;
+import { DEFAULT_CHANTIER_FOLDER_PATHS, canonicalFolderPath, folderTemplatePaths } from "./folder-template";
+import { loadChantierFolderTemplate } from "./folder-template-storage";
+
+export const CHANTIER_STANDARD_FOLDERS = DEFAULT_CHANTIER_FOLDER_PATHS;
 
 const LEGACY_COMMERCIAL_CATEGORIES = [
   "Documents reçus",
@@ -80,8 +55,9 @@ function documentFolder(storagePath: string): string | null {
 }
 
 export async function ensureChantierStructure(store: ServerFileStore, root: string) {
+  const template = await loadChantierFolderTemplate();
   await store.ensureDirectory(root);
-  for (const folder of CHANTIER_STANDARD_FOLDERS) {
+  for (const folder of folderTemplatePaths(template)) {
     await store.ensureDirectory(`${root}/${folder}`);
   }
 }
@@ -140,6 +116,7 @@ export async function prepareChantierFolder(
 
   let movedRoot = false;
   const categoryMoves: Array<{ from: string; to: string }> = [];
+  const template = await loadChantierFolderTemplate();
   const rollback = async () => {
     for (const move of [...categoryMoves].reverse()) {
       await store.moveDirectory(move.to, move.from);
@@ -159,12 +136,12 @@ export async function prepareChantierFolder(
     // Reclassify whole directories, never copy documents or overwrite files.
     for (const category of LEGACY_COMMERCIAL_CATEGORIES) {
       const previous = `${target}/${category}`;
-      const next = `${target}/Devis-Chiffrage/${category}`;
-      if (!(await store.directoryExists(previous))) continue;
+      const next = `${target}/${canonicalFolderPath(template, "Devis-Chiffrage/" + category)}`;
+      if (previous === next || !(await store.directoryExists(previous))) continue;
       if (await store.directoryExists(next)) {
         throw new Error("CHANTIER_CATEGORY_DESTINATION_EXISTS");
       }
-      await store.ensureDirectory(`${target}/Devis-Chiffrage`);
+      await store.ensureDirectory(next.slice(0, next.lastIndexOf("/")));
       await store.moveDirectory(previous, next);
       categoryMoves.push({ from: previous, to: next });
     }
@@ -177,7 +154,7 @@ export async function prepareChantierFolder(
       for (const category of LEGACY_COMMERCIAL_CATEGORIES) {
         const oldPrefix = `${target}/${category}/`;
         if (value.startsWith(oldPrefix)) {
-          value = `${target}/Devis-Chiffrage/${category}/${value.slice(oldPrefix.length)}`;
+          value = `${target}/${canonicalFolderPath(template, "Devis-Chiffrage/" + category)}/${value.slice(oldPrefix.length)}`;
           break;
         }
       }
