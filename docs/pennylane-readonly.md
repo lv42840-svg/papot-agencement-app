@@ -19,21 +19,58 @@ n'est nécessaire pour exécuter les tests unitaires.
 - Aucune création ou mise à jour de fournisseur, client ou facture dans Pennylane,
   aucune modification des objets métier PAPOT.
 
-## Configuration (VPS seulement, pas dans GitHub)
+## Configuration de la clé depuis les Paramètres administrateur
 
-Dans `deploy/agencement-web/.env` du VPS, une fois les accès obtenus :
+La clé API Pennylane se saisit dans **Paramètres → Pennylane** depuis
+l'application, uniquement pour un compte administrateur
+(`canManagePermissions`). Le formulaire peut :
+
+- enregistrer ou remplacer le jeton via un champ masqué ;
+- afficher seulement « enregistrée » ou « non configurée » (jamais le jeton) ;
+- tester la société avec GET `/me` puis les quatre permissions avec
+  quatre GET `?limit=1` ; aucun document n'est importé lors du test ;
+- supprimer le jeton et les données isolées précédemment importées.
+
+Le jeton ne peut pas être récupéré par le navigateur après enregistrement.
+Il est chiffré **AES-256-GCM** avec un nonce aléatoire et un tag
+d'authenticité avant stockage dans `papot_pennylane_connection`.
+Le secret de chiffrement reste **uniquement sur le VPS**, jamais en base
+ni dans GitHub. Le test conserve seulement les noms des ressources et
+leurs résultats d'autorisation.
+
+Dans le fichier privé `deploy/agencement-web/.env` **sur le VPS**,
+un opérateur installe une clé indépendante :
 
 ```dotenv
 PAPOT_PENNYLANE_ENABLED=false
-PAPOT_PENNYLANE_EXPECTED_COMPANY=PAPOT LIBERAL
-PAPOT_PENNYLANE_API_TOKEN=<nouveau-jeton-prive>
+PAPOT_PENNYLANE_ENCRYPTION_KEY=<cle-aleatoire-base64-de-32-octets>
 ```
 
-Le fichier ci-dessus est exclu de Git. Ne jamais coller le jeton dans une PR,
-une conversation, un ticket, une capture ou une commande de journalisation.
+Pour générer cette clé directement sur le VPS : `openssl rand -base64 32`.
+Ne jamais utiliser cette valeur dans les tests, la PR, une capture ou
+un message. **Sauvegarder le secret de chiffrement dans un gestionnaire
+de secrets sécurisé** : sa perte rend impossible le déchiffrement des
+jetons précédemment enregistrés. Sa rotation demande un réenregistrement
+du jeton depuis l'interface.
 
-Après validation fonctionnelle et une sauvegarde PostgreSQL, passer explicitement
-`PAPOT_PENNYLANE_ENABLED=true` lors d'un futur déploiement autorisé.
+Aucune synchronisation n'est déclenchée à l'enregistrement ou au test.
+Même avec un jeton enregistré, l'import reste **désactivé** par défaut.
+Le drapeau `PAPOT_PENNYLANE_ENABLED=true` devra être activé sur le VPS
+après une validation séparée et un déploiement explicitement autorisé.
+La clé précédemment envoyée par e-mail étant exposée, demander sa
+révocation et en générer une nouvelle avec les droits de lecture.
+
+## Sécurité du formulaire
+
+- Routes `/api/admin/pennylane` GET/POST protégées par
+  `requirePermissionAdministrator`.
+- Les opérations POST exigent JSON strict et un en-tête Origin de même
+  domaine, pour bloquer les envois cross-origin.
+- Réponses `private, no-store`, sans clé ni extrait de clé.
+- Le contrôle des droits utilise GET seulement, et ne divulgue pas
+  de réponses brutes de Pennylane.
+- La suppression efface également les instantanés de staging, sans
+  toucher aux données métier PAPOT.
 
 ## Parcours de synchronisation
 
@@ -67,13 +104,13 @@ chantiers, les avoirs, les acomptes, les statuts et l'analytique doivent
 - `store.ts` : publication transactionnelle dans
   `papot_pennylane_staging` et `papot_pennylane_sync_state`.
 - `src/app/api/desktop/pennylane/route.ts` : administration protégée.
-- `src/lib/server-db/migrations.ts` : schéma PostgreSQL version 17.
+- `src/lib/server-db/migrations.ts` : schémas PostgreSQL versions 17 et 18.\n- `src/lib/pennylane/connection.ts` et `secret-crypto.ts` : stockage et chiffrement du jeton.\n- `src/app/settings/pennylane/page.tsx` : page administrateur.\n- `src/app/api/admin/pennylane/route.ts` : sauvegarde, test et suppression du jeton.
 
 ## Tests
 
 ```bash
 npm ci
-npm test -- tests/pennylane-readonly.test.ts
+npm test -- tests/pennylane-readonly.test.ts tests/pennylane-crypto.test.ts tests/pennylane-admin-route.test.ts
 PAPOT_DATABASE_URL=postgresql://... npm test -- tests/pennylane-staging.integration.test.ts
 npm run lint
 npm run typecheck
