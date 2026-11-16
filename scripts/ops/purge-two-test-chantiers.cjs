@@ -237,8 +237,46 @@ function planFor(states, clientRows) {
       fail("PAYROLL_WEEK_CONFIRMED", "2026-W41 deja confirmee pour ce personnel");
     }
   }
-  if (hasId(payload.purchases.orders, new Set([...siteIds, ...affairIds, ...quoteIds])))
-    fail("PURCHASE_ORDER_REFERENCES_CHANTIER");
+  const relatedBusinessIds = new Set([...siteIds, ...affairIds, ...quoteIds]);
+  const purchaseOrders = payload.purchases.orders.filter((order) =>
+    hasId(order, relatedBusinessIds),
+  );
+  const purchaseOrderIds = new Set(purchaseOrders.map((order) => order.id));
+  if (purchaseOrderIds.size !== purchaseOrders.length) {
+    fail("PURCHASE_ORDER_ID_DUPLICATE");
+  }
+  // An order shared with any live site or non-site destination must not be
+  // deleted wholesale. Historical moves also count as shared usage.
+  for (const order of purchaseOrders) {
+    const current = order.allocations?.length
+      ? order.allocations
+      : [{ chantierId: order.chantierId, destinationType: "CHANTIER" }];
+    const past = (order.revisions ?? []).flatMap((revision) => [
+      ...(revision.previousAllocations ?? []),
+      ...(revision.previousChantierIds ?? []).map((id) => ({
+        chantierId: id,
+        destinationType: "CHANTIER",
+      })),
+    ]);
+    const historicalRemoved = order.removedAllocations ?? [];
+    const allDestinations = [...current, ...past, ...historicalRemoved];
+    if (
+      allDestinations.length === 0 ||
+      allDestinations.some((allocation) =>
+        allocation.destinationType && allocation.destinationType !== "CHANTIER" ||
+        !allocation.chantierId || !siteIds.has(allocation.chantierId)
+      )
+    ) {
+      fail("PURCHASE_ORDER_SHARED_OR_REASSIGNED", order.reference ?? order.id);
+    }
+    if (["pennylaneInvoiceId", "supplierInvoiceId", "invoiceId", "externalInvoiceId"]
+      .some((key) => order[key] != null)) {
+      fail("PURCHASE_ORDER_INVOICE_REFERENCE", order.reference ?? order.id);
+    }
+  }
+  const remainingOrders = payload.purchases.orders.filter(
+    (order) => !purchaseOrderIds.has(order.id),
+  );
 
   const clientIds = new Set(
     unique([
@@ -256,7 +294,7 @@ function planFor(states, clientRows) {
     ...remainingQuotes,
     ...remainingDrafts,
     ...remainingEntries,
-    ...payload.purchases.orders,
+    ...remainingOrders,
   ];
   const clientsToDelete = [...clientIds].filter(
     (id) => clientRows.some((row) => row.id === id) && !hasId(clientDependencies, new Set([id])),
@@ -274,6 +312,7 @@ function planFor(states, clientRows) {
     },
     quotes: { ...payload.quotes, quotes: remainingQuotes },
     billing: { ...payload.billing, drafts: remainingDrafts },
+    purchases: { ...payload.purchases, orders: remainingOrders },
     planning: {
       ...payload.planning,
       macroAllocations: payload.planning.macroAllocations.filter((x) => !siteIds.has(x.chantierId)),
@@ -300,6 +339,7 @@ function planFor(states, clientRows) {
     ...affairIds,
     ...quoteIds,
     ...selectedDraftIds,
+    ...purchaseOrderIds,
     ...entryIds,
     ...clientsToDelete,
   ]);
@@ -308,7 +348,7 @@ function planFor(states, clientRows) {
   for (const [key, value] of Object.entries(rest)) {
     if (hasId(value, deletingIds)) fail("OTHER_RECORD_REFERENCES_DELETION", key);
   }
-  if (hasId(payload.purchases, deletingIds)) fail("PURCHASE_REFERENCE_REMAINING");
+  if (hasId(rest.purchases, deletingIds)) fail("PURCHASE_REFERENCE_REMAINING");
   const otherClientRows = clientRows.filter((row) => !clientsToDelete.includes(row.id));
   if (
     hasId(
@@ -356,7 +396,7 @@ function planFor(states, clientRows) {
       businessFolder(other.clientName, other.name);
     if (dirs.includes(otherRoot)) fail("SHARED_COMMERCIAL_FOLDER_NAME", otherRoot);
   }
-  const linkedPaths = unique(allPaths([...affairs, ...quotes, ...linkedEntries]));
+  const linkedPaths = unique(allPaths([...affairs, ...quotes, ...linkedEntries, ...purchaseOrders]));
   const unsafeFiles = linkedPaths.filter((p) => {
     try {
       safeRelative(p);
@@ -367,7 +407,7 @@ function planFor(states, clientRows) {
   });
   if (unsafeFiles.length) fail("UNSAFE_REFERENCED_FILES", unsafeFiles.join(", "));
 
-  const remainingPaths = allPaths([rest.commercial, rest.quotes, rest.entries, payload.purchases]);
+  const remainingPaths = allPaths([rest.commercial, rest.quotes, rest.entries, rest.purchases]);
   for (const directory of dirs) {
     if (remainingPaths.some((p) => p.startsWith(directory + "/"))) {
       fail("SHARED_PHYSICAL_DIRECTORY", directory);
@@ -389,6 +429,20 @@ function planFor(states, clientRows) {
     affaireIds: [...affairIds],
     devis: quotes.map((q) => ({ id: q.id, status: q.status, version: q.version })),
     factures: drafts.map((d) => ({ id: d.id, status: d.status, type: d.type })),
+    commandesFournisseurs: purchaseOrders.map((order) => ({
+      id: order.id,
+      reference: order.reference,
+      fournisseur: order.supplierName,
+      montantHtCents: order.amountHtCents,
+      statut: order.status,
+      mode: order.mode,
+      chantierId: order.chantierId,
+      destinations: (order.allocations?.length ? order.allocations :
+        [{ chantierId: order.chantierId, destinationType: "CHANTIER", amountHtCents: order.amountHtCents }])
+        .map((row) => ({ chantierId: row.chantierId, type: row.destinationType ?? "CHANTIER",
+          montantHtCents: row.amountHtCents })),
+      createdAt: order.createdAt,
+    })),
     linkedTaskIds: [...entryIds],
     testHoursToRemove: personnelHours.map((entry) => ({
       chantierId: entry.chantierId,
@@ -502,6 +556,7 @@ async function main() {
     // Refuse a purge that would orphan external accounting or payroll references.
     const externalTables = [
       "papot_pennylane_staging",
+      "papot_pennylane_purchase_allocations",
       "papot_payroll_preparation_state",
       "papot_monthly_labor_costs_state",
     ];
@@ -510,6 +565,7 @@ async function main() {
       ...plan.scope.affaireIds,
       ...plan.scope.devis.map((q) => q.id),
       ...plan.scope.factures.map((d) => d.id),
+      ...plan.scope.commandesFournisseurs.map((order) => order.id),
     ];
     for (const table of externalTables) {
       const sql =
