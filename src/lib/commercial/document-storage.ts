@@ -7,6 +7,7 @@ import {
   type CommercialDocument,
   type CommercialDocumentCategory,
 } from "./domain";
+import { commercialDocumentFileName, commercialDocumentFolderName } from "./document-path";
 import { commercialDocumentStoragePath } from "./document-path";
 
 export const MAX_COMMERCIAL_DOCUMENTS_PER_UPLOAD = 12;
@@ -61,6 +62,7 @@ export async function uploadCommercialDocuments(
     files: File[];
     options: CommercialDocumentUploadOptions;
     now?: Date;
+    businessFolder?: string;
   },
 ): Promise<CommercialDocument[]> {
   validateFiles(params.files);
@@ -75,13 +77,15 @@ export async function uploadCommercialDocuments(
   try {
     for (const file of params.files) {
       const id = randomUUID();
-      const storagePath = commercialDocumentStoragePath({
-        creationYear: params.creationYear,
-        clientName: params.clientName,
-        caseName: params.caseName,
-        category,
-        fileName: file.name,
-      });
+      const storagePath = params.businessFolder
+        ? [params.businessFolder, commercialDocumentFolderName(category), commercialDocumentFileName(file.name)].join("/")
+        : commercialDocumentStoragePath({
+            creationYear: params.creationYear,
+            clientName: params.clientName,
+            caseName: params.caseName,
+            category,
+            fileName: file.name,
+          });
       const bytes = Buffer.from(await file.arrayBuffer());
       const written = await transport.store.writeBytes(storagePath, bytes);
 
