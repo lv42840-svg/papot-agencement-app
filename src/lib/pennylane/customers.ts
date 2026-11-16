@@ -166,6 +166,14 @@ export function mergePennylaneIdentity(
     ...customer.fields,
     // Provider may have no usable SIRET/payment schedule: preserve any
     // existing explicitly-entered value rather than erasing it.
+    // Empty fields in Pennylane must not erase useful existing data.
+    addressLine1: customer.fields.addressLine1 || current.addressLine1,
+    addressLine2: customer.fields.addressLine2 || current.addressLine2,
+    postalCode: customer.fields.postalCode || current.postalCode,
+    city: customer.fields.city || current.city,
+    phone: customer.fields.phone || current.phone,
+    email: customer.fields.email || current.email,
+    vatNumber: customer.fields.vatNumber || current.vatNumber,
     siret: customer.fields.siret || current.siret,
     paymentTerms: customer.fields.paymentTerms || current.paymentTerms,
     pennylaneId: customer.id,
