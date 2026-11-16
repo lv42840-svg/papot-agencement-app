@@ -75,9 +75,11 @@ function caseIdForMutation(input: CommercialMutation): string | null {
 }
 
 function closureRequested(input: CommercialMutation): boolean {
-  return input.action === "close" ||
+  return (
+    input.action === "close" ||
     (input.action === "recordFollowUp" &&
-      (input.nextStatus === "LOST" || input.nextStatus === "ABANDONED"));
+      (input.nextStatus === "LOST" || input.nextStatus === "ABANDONED"))
+  );
 }
 
 function planningProvisionMustBeCleared(input: CommercialMutation): boolean {
@@ -248,9 +250,11 @@ export async function POST(request: Request) {
     // changing a launched chantier to "Perdu" must never orphan its records.
     if (closureRequested(input)) {
       const existing = await createChantiersRepository().load();
-      if (existing.chantiers.some(
-        (site) => site.sourceCommercialCaseId === input.caseId && site.status !== "CANCELLED",
-      )) {
+      if (
+        existing.chantiers.some(
+          (site) => site.sourceCommercialCaseId === input.caseId && site.status !== "CANCELLED",
+        )
+      ) {
         throw new Error("COMMERCIAL_ACTIVE_CHANTIER_CANNOT_CLOSE_AS_LOST");
       }
     }

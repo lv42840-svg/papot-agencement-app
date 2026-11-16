@@ -989,8 +989,8 @@ function StatusSection({
             <div className="commercialSubcard">
               <strong>Clôturer l&apos;affaire commerciale</strong>
               <p>
-                L&apos;affaire passera dans les archives commerciales et sa charge potentielle
-                sera retirée du planning. Les devis, documents et l&apos;historique sont conservés.
+                L&apos;affaire passera dans les archives commerciales et sa charge potentielle sera
+                retirée du planning. Les devis, documents et l&apos;historique sont conservés.
               </p>
               <Field label="Motif (facultatif)">
                 <textarea
@@ -1010,7 +1010,11 @@ function StatusSection({
             onClick={saveStatus}
           >
             <Save size={13} />{" "}
-            {target === "LOST" ? "Classer comme perdu" : target === "ABANDONED" ? "Classer comme abandonné" : "Appliquer"}
+            {target === "LOST"
+              ? "Classer comme perdu"
+              : target === "ABANDONED"
+                ? "Classer comme abandonné"
+                : "Appliquer"}
           </button>
         </div>
       ) : null}
