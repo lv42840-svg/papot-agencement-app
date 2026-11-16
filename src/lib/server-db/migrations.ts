@@ -33,6 +33,8 @@ const MONTHLY_LABOR_COSTS_STORAGE_VERSION = 14;
 const MONTHLY_LABOR_COSTS_STORAGE_NAME = "monthly_labor_costs_storage";
 const PAYROLL_PREPARATION_VERSION = 16;
 const PAYROLL_PREPARATION_NAME = "payroll_preparation_storage";
+const PENNYLANE_STAGING_VERSION = 17;
+const PENNYLANE_STAGING_NAME = "pennylane_readonly_staging";
 const BILLING_STORAGE_VERSION = 15;
 const BILLING_STORAGE_NAME = "billing_draft_storage";
 
@@ -534,6 +536,30 @@ async function ensureBillingStorage(client: PoolClient): Promise<void> {
   `);
 }
 
+async function ensurePennylaneStaging(client: PoolClient): Promise<void> {
+  await client.query(`
+    CREATE TABLE IF NOT EXISTS papot_pennylane_staging (
+      resource TEXT NOT NULL CHECK (resource IN (
+        'suppliers', 'supplier_invoices', 'customers', 'customer_invoices'
+      )),
+      external_id TEXT NOT NULL,
+      payload JSONB NOT NULL CHECK (jsonb_typeof(payload) = 'object'),
+      synced_at TIMESTAMPTZ NOT NULL,
+      PRIMARY KEY (resource, external_id)
+    )
+  `);
+  await client.query(`
+    CREATE TABLE IF NOT EXISTS papot_pennylane_sync_state (
+      resource TEXT PRIMARY KEY CHECK (resource IN (
+        'suppliers', 'supplier_invoices', 'customers', 'customer_invoices'
+      )),
+      company_name TEXT NOT NULL,
+      synced_at TIMESTAMPTZ NOT NULL,
+      item_count INTEGER NOT NULL CHECK (item_count >= 0)
+    )
+  `);
+}
+
 async function ensurePurchaseOrdersStorage(client: PoolClient): Promise<void> {
   await client.query(`
     CREATE TABLE IF NOT EXISTS papot_purchase_orders_state (
@@ -726,6 +752,13 @@ export async function runServerDbMigrations(
     );
 
     await ensurePurchaseOrdersStorage(client);
+
+    await ensurePennylaneStaging(client);
+    await client.query(
+      `INSERT INTO papot_schema_migrations (version, name)
+       VALUES ($1, $2) ON CONFLICT (version) DO NOTHING`,
+      [PENNYLANE_STAGING_VERSION, PENNYLANE_STAGING_NAME],
+    );
 
     await ensureBillingStorage(client);
     await client.query(
