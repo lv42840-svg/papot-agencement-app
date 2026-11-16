@@ -18,7 +18,7 @@ import {
 import { createPlanningRepository } from "@/lib/planning/create-repository";
 import { convertPlanningProvisionToFirm } from "@/lib/planning/mutations";
 import { createQuotesRepository } from "@/lib/quotes/create-repository";
-import { prepareChantierFolder } from "@/lib/chantiers/folder-lifecycle";
+import { prepareChantierFolder, type PreparedChantierFolder } from "@/lib/chantiers/folder-lifecycle";
 import { getServerFileStore } from "@/lib/server-files/runtime";
 
 export const runtime = "nodejs";
@@ -66,7 +66,7 @@ export async function POST(request: Request) {
     await Promise.all([chantiersRepository.load(), planningRepository.load()]);
     stage = "apply-and-save-launch";
     const store = getServerFileStore();
-    let prepared: Awaited<ReturnType<typeof prepareChantierFolder>> | null = null;
+    const state: { prepared: PreparedChantierFolder | null } = { prepared: null };
     let launched = false;
     let mutation: Awaited<ReturnType<typeof chantiersRepository.mutate>>;
     try {
@@ -89,16 +89,16 @@ export async function POST(request: Request) {
           );
           const chantier = launch.payload.chantiers.find((item) => item.id === launch.focusChantierId);
           if (!chantier) throw new Error("CHANTIER_LAUNCH_FOCUS_MISSING");
-          prepared = await prepareChantierFolder(store, affair, chantier, commercial.cases);
+          state.prepared = await prepareChantierFolder(store, affair, chantier, commercial.cases);
           return launch;
         });
         if (!result.focusChantierId) throw new Error("CHANTIER_LAUNCH_FOCUS_MISSING");
         await planningRepository.mutate((payload) =>
           convertPlanningProvisionToFirm(payload, affair.id, result.focusChantierId!),
         );
-        if (prepared) {
+        if (state.prepared) {
           // Keep commercial document references valid after physically moving the dossier.
-          const folder = prepared;
+          const folder = state.prepared;
           await commercialRepository.mutate((payload) => {
             const item = payload.cases.find((candidate) => candidate.id === affair.id);
             if (!item) throw new Error("CHANTIER_COMMERCIAL_CASE_NOT_FOUND");
@@ -122,9 +122,9 @@ export async function POST(request: Request) {
       });
       launched = true;
     } catch (error) {
-      if (prepared && !launched) {
+      if (state.prepared && !launched) {
         try {
-          await prepared.rollback();
+          await state.prepared.rollback();
         } catch (rollbackError) {
           console.error("[PAPOT][Chantiers] folder rollback failed", rollbackError);
         }
