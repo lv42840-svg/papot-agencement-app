@@ -83,6 +83,7 @@ export async function readPennylaneCustomerCatalog(
   const customers = staging.rows.slice(0, 2000).map((row) => {
     try {
       const candidate = normalizePennylaneCustomer(row.payload);
+      if (candidate.id !== row.external_id) throw new Error("PENNYLANE_CUSTOMER_DATA_INVALID");
       const alreadyLinked = linked.get(candidate.id);
       const potentialMatches = possibleClientMatches(candidate, clients)
         .filter((client) => !client.pennylaneId || client.pennylaneId === candidate.id)
@@ -187,6 +188,7 @@ export async function importPennylaneCustomer(
     );
     if (!customerRows.rows[0]) throw new Error("PENNYLANE_CUSTOMER_NOT_IMPORTED");
     const customer = normalizePennylaneCustomer(customerRows.rows[0].payload);
+    if (customer.id !== customerId) throw new Error("PENNYLANE_CUSTOMER_DATA_INVALID");
     const raw = await client.query<ClientRow>(
       "SELECT id, version, record, sort_order::text AS sort_order FROM papot_clients ORDER BY sort_order ASC FOR UPDATE",
     );
