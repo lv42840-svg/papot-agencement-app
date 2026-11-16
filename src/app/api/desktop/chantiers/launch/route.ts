@@ -115,7 +115,7 @@ export async function POST(request: Request) {
                 quote.finalPdf.storagePath = folder.remap(quote.finalPdf.storagePath);
               }
             }
-            return { payload };
+            return { payload, focusQuoteId: undefined };
           });
         }
         return result;
