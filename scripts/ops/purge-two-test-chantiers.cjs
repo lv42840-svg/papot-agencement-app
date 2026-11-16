@@ -30,7 +30,14 @@ const TABLES = [
   ["papot_entries_state", "entries"],
   ["papot_purchase_orders_state", "purchases"],
 ];
-const ID_FIELDS = ["id", "sourceCommercialCaseId", "commercialCaseId", "clientId", "quoteId", "chantierId"];
+const ID_FIELDS = [
+  "id",
+  "sourceCommercialCaseId",
+  "commercialCaseId",
+  "clientId",
+  "quoteId",
+  "chantierId",
+];
 
 function fail(code, detail) {
   const error = new Error(code + (detail ? ": " + detail : ""));
@@ -38,28 +45,40 @@ function fail(code, detail) {
   throw error;
 }
 function compact(value) {
-  return String(value ?? "").normalize("NFD").replace(/[\u0300-\u036f]/g, "")
-    .replace(/\s+/g, " ").trim().toLocaleLowerCase("fr-FR");
+  return String(value ?? "")
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .replace(/\s+/g, " ")
+    .trim()
+    .toLocaleLowerCase("fr-FR");
 }
 function safeSegment(value, fallback, maxLength) {
-  const cleaned = String(value ?? "").trim()
+  const cleaned = String(value ?? "")
+    .trim()
     .replace(/[<>:"/\\|?*\x00-\x1F]/g, "-")
-    .replace(/\s+/g, " ").replace(/[. ]+$/g, "");
+    .replace(/\s+/g, " ")
+    .replace(/[. ]+$/g, "");
   const clipped = (cleaned || fallback).slice(0, maxLength).replace(/[. ]+$/g, "");
   return /^(con|prn|aux|nul|com[1-9]|lpt[1-9])(?:\..*)?$/i.test(clipped)
-    ? "_" + clipped : clipped || fallback;
+    ? "_" + clipped
+    : clipped || fallback;
 }
 function businessFolder(client, name) {
   return safeSegment(
     safeSegment(client, "Client à préciser", 90) + "_" + safeSegment(name, "Affaire", 90),
-    "Affaire", 180,
+    "Affaire",
+    180,
   );
 }
 function safeRelative(value) {
   const v = String(value).replace(/\\/g, "/");
   const parts = v.split("/");
-  if (!v || path.isAbsolute(v) || /^[A-Za-z]:/.test(v) ||
-      parts.some(s => !s || s === "." || s === ".." || /[<>:"|?*\x00-\x1F]/.test(s))) {
+  if (
+    !v ||
+    path.isAbsolute(v) ||
+    /^[A-Za-z]:/.test(v) ||
+    parts.some((s) => !s || s === "." || s === ".." || /[<>:"|?*\x00-\x1F]/.test(s))
+  ) {
     fail("UNSAFE_STORAGE_PATH", v);
   }
   return v;
@@ -78,17 +97,26 @@ function allPaths(object, output = []) {
 }
 function hasId(value, ids) {
   const encoded = JSON.stringify(value);
-  return [...ids].some(id => encoded.includes(id));
+  return [...ids].some((id) => encoded.includes(id));
 }
-function unique(values) { return [...new Set(values.filter(Boolean))]; }
-function digest(data) { return crypto.createHash("sha256").update(JSON.stringify(data)).digest("hex").slice(0, 16); }
-function json(data) { return JSON.stringify(data, null, 2); }
+function unique(values) {
+  return [...new Set(values.filter(Boolean))];
+}
+function digest(data) {
+  return crypto.createHash("sha256").update(JSON.stringify(data)).digest("hex").slice(0, 16);
+}
+function json(data) {
+  return JSON.stringify(data, null, 2);
+}
 
 async function loadStates(client, lock) {
   const result = {};
   for (const [table, key] of TABLES) {
     const r = await client.query(
-      'SELECT version, payload FROM ' + table + " WHERE scope = 'global'" + (lock ? " FOR UPDATE" : ""),
+      "SELECT version, payload FROM " +
+        table +
+        " WHERE scope = 'global'" +
+        (lock ? " FOR UPDATE" : ""),
     );
     if (r.rows.length !== 1) fail("STATE_MISSING", table);
     result[key] = { ...r.rows[0], table };
@@ -97,108 +125,161 @@ async function loadStates(client, lock) {
 }
 
 function planFor(states, clientRows) {
-  const payload = Object.fromEntries(Object.entries(states).map(([key, value]) => [key, value.payload]));
+  const payload = Object.fromEntries(
+    Object.entries(states).map(([key, value]) => [key, value.payload]),
+  );
   for (const [key, field] of [
-    ["chantiers", "chantiers"], ["commercial", "cases"], ["quotes", "quotes"],
-    ["billing", "drafts"], ["planning", "macroAllocations"], ["entries", "entries"],
+    ["chantiers", "chantiers"],
+    ["commercial", "cases"],
+    ["quotes", "quotes"],
+    ["billing", "drafts"],
+    ["planning", "macroAllocations"],
+    ["entries", "entries"],
     ["purchases", "orders"],
   ]) {
     if (!Array.isArray(payload[key]?.[field])) fail("UNEXPECTED_STATE_SHAPE", key + "." + field);
   }
 
-  const found = TARGETS.map(target => {
-    const matches = payload.chantiers.chantiers.filter(item =>
-      compact(item.name) === compact(target.name) &&
-      compact(item.clientName) === compact(target.client));
-    if (matches.length !== 1) fail("CHANTIER_MATCH_NOT_UNIQUE",
-      target.name + " / " + target.client + " (trouvé " + matches.length + ")");
+  const found = TARGETS.map((target) => {
+    const matches = payload.chantiers.chantiers.filter(
+      (item) =>
+        compact(item.name) === compact(target.name) &&
+        compact(item.clientName) === compact(target.client),
+    );
+    if (matches.length !== 1)
+      fail(
+        "CHANTIER_MATCH_NOT_UNIQUE",
+        target.name + " / " + target.client + " (trouvé " + matches.length + ")",
+      );
     if (matches[0].status !== "CANCELLED") fail("CHANTIER_NOT_CANCELLED", target.name);
     return matches[0];
   });
-  if (new Set(found.map(x => x.id)).size !== 2) fail("CHANTIERS_NOT_DISTINCT");
+  if (new Set(found.map((x) => x.id)).size !== 2) fail("CHANTIERS_NOT_DISTINCT");
 
-  const siteIds = new Set(found.map(x => x.id));
-  const affairIds = new Set(found.map(x => x.sourceCommercialCaseId));
+  const siteIds = new Set(found.map((x) => x.id));
+  const affairIds = new Set(found.map((x) => x.sourceCommercialCaseId));
   if (affairIds.size !== 2) fail("SHARED_COMMERCIAL_CASE");
-  const affairs = payload.commercial.cases.filter(x => affairIds.has(x.id));
+  const affairs = payload.commercial.cases.filter((x) => affairIds.has(x.id));
   if (affairs.length !== 2) fail("AFFAIRE_NOT_FOUND_OR_SHARED");
 
-  const otherSites = payload.chantiers.chantiers.filter(x => !siteIds.has(x.id));
-  if (otherSites.some(x => affairIds.has(x.sourceCommercialCaseId))) fail("AFFAIRE_USED_BY_OTHER_CHANTIER");
+  const otherSites = payload.chantiers.chantiers.filter((x) => !siteIds.has(x.id));
+  if (otherSites.some((x) => affairIds.has(x.sourceCommercialCaseId)))
+    fail("AFFAIRE_USED_BY_OTHER_CHANTIER");
 
-  const quotes = payload.quotes.quotes.filter(q => affairIds.has(q.commercialCaseId));
-  const quoteIds = new Set(quotes.map(q => q.id));
-  const drafts = payload.billing.drafts.filter(d =>
-    siteIds.has(d.chantierId) || affairIds.has(d.commercialCaseId) || quoteIds.has(d.quoteId));
-  if (drafts.some(d => !["DRAFT", "APPROVED"].includes(d.status))) fail("INVOICE_EXTERNALLY_ISSUED");
+  const quotes = payload.quotes.quotes.filter((q) => affairIds.has(q.commercialCaseId));
+  const quoteIds = new Set(quotes.map((q) => q.id));
+  const drafts = payload.billing.drafts.filter(
+    (d) =>
+      siteIds.has(d.chantierId) || affairIds.has(d.commercialCaseId) || quoteIds.has(d.quoteId),
+  );
+  if (drafts.some((d) => !["DRAFT", "APPROVED"].includes(d.status)))
+    fail("INVOICE_EXTERNALLY_ISSUED");
   for (const draft of drafts) {
-    if (["invoiceNumber", "issuedAt", "externalId", "pennylaneId", "paidAt", "sentAt"]
-      .some(key => draft[key] != null)) fail("INVOICE_EXTERNAL_REFERENCE", draft.id);
+    if (
+      ["invoiceNumber", "issuedAt", "externalId", "pennylaneId", "paidAt", "sentAt"].some(
+        (key) => draft[key] != null,
+      )
+    )
+      fail("INVOICE_EXTERNAL_REFERENCE", draft.id);
   }
-  const selectedDraftIds = new Set(drafts.map(d => d.id));
-  if (payload.billing.drafts.some(d => !selectedDraftIds.has(d.id) &&
-      (siteIds.has(d.chantierId) || affairIds.has(d.commercialCaseId) || quoteIds.has(d.quoteId))))
+  const selectedDraftIds = new Set(drafts.map((d) => d.id));
+  if (
+    payload.billing.drafts.some(
+      (d) =>
+        !selectedDraftIds.has(d.id) &&
+        (siteIds.has(d.chantierId) || affairIds.has(d.commercialCaseId) || quoteIds.has(d.quoteId)),
+    )
+  )
     fail("BILLING_LINK_INCONSISTENT");
-  if (payload.quotes.quotes.some(q => !quoteIds.has(q.id) && affairIds.has(q.commercialCaseId)))
+  if (payload.quotes.quotes.some((q) => !quoteIds.has(q.id) && affairIds.has(q.commercialCaseId)))
     fail("QUOTE_LINK_INCONSISTENT");
 
-  const sourceEntryIds = new Set(unique(affairs.map(x => x.sourceEntryId)));
-  const linkedEntries = payload.entries.entries.filter(e =>
-    sourceEntryIds.has(e.id) || affairIds.has(e.commercialCaseId));
-  const entryIds = new Set(linkedEntries.map(e => e.id));
-  if (payload.entries.entries.some(e => !entryIds.has(e.id) &&
-      (entryIds.has(e.parentEntryId) || (e.derivedEntryIds ?? []).some(id => entryIds.has(id)))))
+  const sourceEntryIds = new Set(unique(affairs.map((x) => x.sourceEntryId)));
+  const linkedEntries = payload.entries.entries.filter(
+    (e) => sourceEntryIds.has(e.id) || affairIds.has(e.commercialCaseId),
+  );
+  const entryIds = new Set(linkedEntries.map((e) => e.id));
+  if (
+    payload.entries.entries.some(
+      (e) =>
+        !entryIds.has(e.id) &&
+        (entryIds.has(e.parentEntryId) || (e.derivedEntryIds ?? []).some((id) => entryIds.has(id))),
+    )
+  )
     fail("TASK_LINKED_FROM_ANOTHER_TASK");
 
-  const personnelHours = (payload.planning.actualHours ?? [])
-    .filter(x => siteIds.has(x.chantierId));
-  if (personnelHours.length) fail("REAL_EMPLOYEE_HOURS_EXIST",
-    String(personnelHours.length) + " lignes d'heures enregistrées");
+  const personnelHours = (payload.planning.actualHours ?? []).filter((x) =>
+    siteIds.has(x.chantierId),
+  );
+  if (personnelHours.length)
+    fail(
+      "REAL_EMPLOYEE_HOURS_EXIST",
+      String(personnelHours.length) + " lignes d'heures enregistrées",
+    );
   if (hasId(payload.purchases.orders, new Set([...siteIds, ...affairIds, ...quoteIds])))
     fail("PURCHASE_ORDER_REFERENCES_CHANTIER");
 
-  const clientIds = new Set(unique([
-    ...affairs.map(a => a.clientId),
-    ...quotes.map(q => q.model?.clientId),
-    ...drafts.map(d => d.clientId),
-  ]));
-  const remainingAffairs = payload.commercial.cases.filter(x => !affairIds.has(x.id));
-  const remainingQuotes = payload.quotes.quotes.filter(x => !quoteIds.has(x.id));
-  const remainingDrafts = payload.billing.drafts.filter(x => !selectedDraftIds.has(x.id));
-  const remainingEntries = payload.entries.entries.filter(x => !entryIds.has(x.id));
+  const clientIds = new Set(
+    unique([
+      ...affairs.map((a) => a.clientId),
+      ...quotes.map((q) => q.model?.clientId),
+      ...drafts.map((d) => d.clientId),
+    ]),
+  );
+  const remainingAffairs = payload.commercial.cases.filter((x) => !affairIds.has(x.id));
+  const remainingQuotes = payload.quotes.quotes.filter((x) => !quoteIds.has(x.id));
+  const remainingDrafts = payload.billing.drafts.filter((x) => !selectedDraftIds.has(x.id));
+  const remainingEntries = payload.entries.entries.filter((x) => !entryIds.has(x.id));
   const clientDependencies = [
-    ...remainingAffairs, ...remainingQuotes, ...remainingDrafts,
-    ...remainingEntries, ...payload.purchases.orders,
+    ...remainingAffairs,
+    ...remainingQuotes,
+    ...remainingDrafts,
+    ...remainingEntries,
+    ...payload.purchases.orders,
   ];
-  const clientsToDelete = [...clientIds].filter(id =>
-    clientRows.some(row => row.id === id) &&
-    !hasId(clientDependencies, new Set([id])));
-  const clientsKept = [...clientIds].filter(id => !clientsToDelete.includes(id));
+  const clientsToDelete = [...clientIds].filter(
+    (id) => clientRows.some((row) => row.id === id) && !hasId(clientDependencies, new Set([id])),
+  );
+  const clientsKept = [...clientIds].filter((id) => !clientsToDelete.includes(id));
 
   const rest = {
     chantiers: { ...payload.chantiers, chantiers: otherSites },
-    commercial: { ...payload.commercial, cases: remainingAffairs,
-      clients: (payload.commercial.clients ?? []).filter(client => !clientsToDelete.includes(client.id)) },
+    commercial: {
+      ...payload.commercial,
+      cases: remainingAffairs,
+      clients: (payload.commercial.clients ?? []).filter(
+        (client) => !clientsToDelete.includes(client.id),
+      ),
+    },
     quotes: { ...payload.quotes, quotes: remainingQuotes },
     billing: { ...payload.billing, drafts: remainingDrafts },
-    planning: { ...payload.planning,
-      macroAllocations: payload.planning.macroAllocations.filter(x => !siteIds.has(x.chantierId)),
-      provisionalAllocations: (payload.planning.provisionalAllocations ?? [])
-        .filter(x => !affairIds.has(x.caseId)),
-      chantierOrder: (payload.planning.chantierOrder ?? []).filter(id => !siteIds.has(id)),
-      provisionalOrder: (payload.planning.provisionalOrder ?? []).filter(id => !affairIds.has(id)),
-      actualHours: (payload.planning.actualHours ?? []).filter(x => !siteIds.has(x.chantierId)),
-      dailyAssignments: (payload.planning.dailyAssignments ?? [])
-        .filter(x => !siteIds.has(x.chantierId)),
+    planning: {
+      ...payload.planning,
+      macroAllocations: payload.planning.macroAllocations.filter((x) => !siteIds.has(x.chantierId)),
+      provisionalAllocations: (payload.planning.provisionalAllocations ?? []).filter(
+        (x) => !affairIds.has(x.caseId),
+      ),
+      chantierOrder: (payload.planning.chantierOrder ?? []).filter((id) => !siteIds.has(id)),
+      provisionalOrder: (payload.planning.provisionalOrder ?? []).filter(
+        (id) => !affairIds.has(id),
+      ),
+      actualHours: (payload.planning.actualHours ?? []).filter((x) => !siteIds.has(x.chantierId)),
+      dailyAssignments: (payload.planning.dailyAssignments ?? []).filter(
+        (x) => !siteIds.has(x.chantierId),
+      ),
     },
-    entries: { ...payload.entries,
+    entries: {
+      ...payload.entries,
       entries: remainingEntries,
-      notifications: (payload.entries.notifications ?? [])
-        .filter(n => !entryIds.has(n.entryId)),
+      notifications: (payload.entries.notifications ?? []).filter((n) => !entryIds.has(n.entryId)),
     },
   };
   const deletingIds = new Set([
-    ...siteIds, ...affairIds, ...quoteIds, ...selectedDraftIds, ...entryIds,
+    ...siteIds,
+    ...affairIds,
+    ...quoteIds,
+    ...selectedDraftIds,
+    ...entryIds,
     ...clientsToDelete,
   ]);
 
@@ -207,78 +288,112 @@ function planFor(states, clientRows) {
     if (hasId(value, deletingIds)) fail("OTHER_RECORD_REFERENCES_DELETION", key);
   }
   if (hasId(payload.purchases, deletingIds)) fail("PURCHASE_REFERENCE_REMAINING");
-  const otherClientRows = clientRows.filter(row => !clientsToDelete.includes(row.id));
-  if (hasId(otherClientRows.map(x => x.record), deletingIds))
+  const otherClientRows = clientRows.filter((row) => !clientsToDelete.includes(row.id));
+  if (
+    hasId(
+      otherClientRows.map((x) => x.record),
+      deletingIds,
+    )
+  )
     fail("OTHER_CLIENT_REFERENCES_DELETION");
 
-  const siteDirs = found.map(site => {
-    const folder = safeSegment(site.number || site.id.slice(0, 8), "document", 180) +
-      " - " + businessFolder(site.clientName, site.name);
-    return "Chantier/" + site.launchYear + "/" +
-      (site.status === "ARCHIVED" ? "Archive/" : "") + folder;
+  const siteDirs = found.map((site) => {
+    const folder =
+      safeSegment(site.number || site.id.slice(0, 8), "document", 180) +
+      " - " +
+      businessFolder(site.clientName, site.name);
+    return (
+      "Chantier/" + site.launchYear + "/" + (site.status === "ARCHIVED" ? "Archive/" : "") + folder
+    );
   });
-  const commercialDirs = affairs.map(a =>
-    "Commercial/" + new Date(a.createdAt).getUTCFullYear() + "/" +
-    businessFolder(a.clientName, a.name));
-  const dirs = unique([...siteDirs, ...commercialDirs,
-    ...quotes.map(q => "quotes/" + q.id)]).map(safeRelative);
+  const commercialDirs = affairs.map(
+    (a) =>
+      "Commercial/" +
+      new Date(a.createdAt).getUTCFullYear() +
+      "/" +
+      businessFolder(a.clientName, a.name),
+  );
+  const dirs = unique([...siteDirs, ...commercialDirs, ...quotes.map((q) => "quotes/" + q.id)]).map(
+    safeRelative,
+  );
   for (const other of otherSites) {
-    const otherRoot = "Chantier/" + other.launchYear + "/" +
+    const otherRoot =
+      "Chantier/" +
+      other.launchYear +
+      "/" +
       (other.status === "ARCHIVED" ? "Archive/" : "") +
       safeSegment(other.number || other.id.slice(0, 8), "document", 180) +
-      " - " + businessFolder(other.clientName, other.name);
+      " - " +
+      businessFolder(other.clientName, other.name);
     if (dirs.includes(otherRoot)) fail("SHARED_CHANTIER_FOLDER_NAME", otherRoot);
   }
   for (const other of remainingAffairs) {
-    const otherRoot = "Commercial/" + new Date(other.createdAt).getUTCFullYear() +
-      "/" + businessFolder(other.clientName, other.name);
+    const otherRoot =
+      "Commercial/" +
+      new Date(other.createdAt).getUTCFullYear() +
+      "/" +
+      businessFolder(other.clientName, other.name);
     if (dirs.includes(otherRoot)) fail("SHARED_COMMERCIAL_FOLDER_NAME", otherRoot);
   }
   const linkedPaths = unique(allPaths([...affairs, ...quotes, ...linkedEntries]));
-  const unsafeFiles = linkedPaths.filter(p => {
-    try { safeRelative(p); return false; } catch { return true; }
+  const unsafeFiles = linkedPaths.filter((p) => {
+    try {
+      safeRelative(p);
+      return false;
+    } catch {
+      return true;
+    }
   });
   if (unsafeFiles.length) fail("UNSAFE_REFERENCED_FILES", unsafeFiles.join(", "));
 
-  const remainingPaths = allPaths([
-    rest.commercial, rest.quotes, rest.entries, payload.purchases,
-  ]);
+  const remainingPaths = allPaths([rest.commercial, rest.quotes, rest.entries, payload.purchases]);
   for (const directory of dirs) {
-    if (remainingPaths.some(p => p.startsWith(directory + "/"))) {
+    if (remainingPaths.some((p) => p.startsWith(directory + "/"))) {
       fail("SHARED_PHYSICAL_DIRECTORY", directory);
     }
   }
   // Never move a file referenced by a record outside the purge.
-  const filePaths = linkedPaths.filter(p => !dirs.some(d => p.startsWith(d + "/")));
-  if (filePaths.some(p => remainingPaths.includes(p))) fail("SHARED_PHYSICAL_FILE");
+  const filePaths = linkedPaths.filter((p) => !dirs.some((d) => p.startsWith(d + "/")));
+  if (filePaths.some((p) => remainingPaths.includes(p))) fail("SHARED_PHYSICAL_FILE");
 
   const scope = {
-    sites: found.map(s => ({
-      id: s.id, number: s.number, name: s.name, clientName: s.clientName,
-      status: s.status, affaireId: s.sourceCommercialCaseId,
+    sites: found.map((s) => ({
+      id: s.id,
+      number: s.number,
+      name: s.name,
+      clientName: s.clientName,
+      status: s.status,
+      affaireId: s.sourceCommercialCaseId,
     })),
     affaireIds: [...affairIds],
-    devis: quotes.map(q => ({ id: q.id, status: q.status, version: q.version })),
-    factures: drafts.map(d => ({ id: d.id, status: d.status, type: d.type })),
+    devis: quotes.map((q) => ({ id: q.id, status: q.status, version: q.version })),
+    factures: drafts.map((d) => ({ id: d.id, status: d.status, type: d.type })),
     linkedTaskIds: [...entryIds],
-    clientsToDelete: clientRows.filter(c => clientsToDelete.includes(c.id))
-      .map(c => ({ id: c.id, name: c.record.companyName ||
-        [c.record.firstName, c.record.lastName].filter(Boolean).join(" ") })),
+    clientsToDelete: clientRows
+      .filter((c) => clientsToDelete.includes(c.id))
+      .map((c) => ({
+        id: c.id,
+        name:
+          c.record.companyName || [c.record.firstName, c.record.lastName].filter(Boolean).join(" "),
+      })),
     clientsKept,
     planning: {
-      allocations: payload.planning.macroAllocations.filter(x => siteIds.has(x.chantierId)).length,
-      provisional: (payload.planning.provisionalAllocations ?? [])
-        .filter(x => affairIds.has(x.caseId)).length,
-      assignments: (payload.planning.dailyAssignments ?? [])
-        .filter(x => siteIds.has(x.chantierId)).length,
+      allocations: payload.planning.macroAllocations.filter((x) => siteIds.has(x.chantierId))
+        .length,
+      provisional: (payload.planning.provisionalAllocations ?? []).filter((x) =>
+        affairIds.has(x.caseId),
+      ).length,
+      assignments: (payload.planning.dailyAssignments ?? []).filter((x) =>
+        siteIds.has(x.chantierId),
+      ).length,
     },
     physicalDirectories: dirs,
     looseFiles: filePaths,
   };
   const signature = digest({
     scope,
-    versions: Object.fromEntries(Object.entries(states).map(([k,v]) => [k,v.version])),
-    clientRowVersions: clientRows.filter(x => clientIds.has(x.id)).map(x=>[x.id,x.version]),
+    versions: Object.fromEntries(Object.entries(states).map(([k, v]) => [k, v.version])),
+    clientRowVersions: clientRows.filter((x) => clientIds.has(x.id)).map((x) => [x.id, x.version]),
   });
   return { scope, signature, next: rest, clientsToDelete, dirs, filePaths };
 }
@@ -290,8 +405,9 @@ async function existingSafeFiles(root, candidates, kind) {
     const absolute = path.resolve(root, rel);
     if (!absolute.startsWith(root + path.sep)) fail("UNSAFE_FS_LOCATION");
     let info;
-    try { info = await fs.lstat(absolute); }
-    catch (error) {
+    try {
+      info = await fs.lstat(absolute);
+    } catch (error) {
       if (error.code === "ENOENT") continue;
       throw error;
     }
@@ -306,11 +422,17 @@ async function existingSafeFiles(root, candidates, kind) {
 async function main() {
   const args = process.argv.slice(2);
   const applying = args.includes("--apply");
-  if (args.some(a => !["--preview", "--apply", "--backup-ok"].includes(a) && !a.startsWith("--confirm=")))
+  if (
+    args.some(
+      (a) => !["--preview", "--apply", "--backup-ok"].includes(a) && !a.startsWith("--confirm="),
+    )
+  )
     fail("INVALID_COMMAND", args.join(" "));
   if (!process.env.PAPOT_DATABASE_URL) fail("PAPOT_DATABASE_URL_MISSING");
-  const db = new Client({ connectionString: process.env.PAPOT_DATABASE_URL,
-    application_name: "papot-one-off-two-test-site-cleanup" });
+  const db = new Client({
+    connectionString: process.env.PAPOT_DATABASE_URL,
+    application_name: "papot-one-off-two-test-site-cleanup",
+  });
   await db.connect();
   let inTransaction = false;
   const moved = [];
@@ -322,7 +444,7 @@ async function main() {
     const states = await loadStates(db, applying);
     const clientResult = await db.query(
       "SELECT id::text AS id, version, record FROM papot_clients ORDER BY id" +
-      (applying ? " FOR UPDATE" : ""),
+        (applying ? " FOR UPDATE" : ""),
     );
     const plan = planFor(states, clientResult.rows);
     // Refuse a purge that would orphan external accounting or payroll references.
@@ -332,13 +454,15 @@ async function main() {
       "papot_monthly_labor_costs_state",
     ];
     const targetIds = [
-      ...plan.scope.sites.map(s => s.id),
+      ...plan.scope.sites.map((s) => s.id),
       ...plan.scope.affaireIds,
-      ...plan.scope.devis.map(q => q.id),
-      ...plan.scope.factures.map(d => d.id),
+      ...plan.scope.devis.map((q) => q.id),
+      ...plan.scope.factures.map((d) => d.id),
     ];
     for (const table of externalTables) {
-      const sql = "SELECT COUNT(*)::int AS count FROM " + table +
+      const sql =
+        "SELECT COUNT(*)::int AS count FROM " +
+        table +
         " AS checked WHERE EXISTS (SELECT 1 FROM unnest($1::text[]) AS needle" +
         " WHERE to_jsonb(checked)::text LIKE '%' || needle || '%')";
       const checked = await db.query(sql, [targetIds]);
@@ -346,39 +470,60 @@ async function main() {
         fail("EXTERNAL_ACCOUNTING_OR_PAYROLL_REFERENCE", table);
       }
     }
-    process.stdout.write("\nPAPOT | NETTOYAGE DE DEUX CHANTIERS ANNULES\n" +
-      "Mode : " + (applying ? "APPLICATION" : "PREVISUALISATION SANS MODIFICATION") + "\n" +
-      json(plan.scope) + "\nEmpreinte de controle : " + plan.signature + "\n");
+    process.stdout.write(
+      "\nPAPOT | NETTOYAGE DE DEUX CHANTIERS ANNULES\n" +
+        "Mode : " +
+        (applying ? "APPLICATION" : "PREVISUALISATION SANS MODIFICATION") +
+        "\n" +
+        json(plan.scope) +
+        "\nEmpreinte de controle : " +
+        plan.signature +
+        "\n",
+    );
 
     if (!applying) {
-      await db.query("ROLLBACK"); inTransaction = false;
-      process.stdout.write("\nAUCUNE DONNEE SUPPRIMEE. Faire et verifier une sauvegarde complete " +
-        "avant toute application. Les clients partages sont conserves.\n");
+      await db.query("ROLLBACK");
+      inTransaction = false;
+      process.stdout.write(
+        "\nAUCUNE DONNEE SUPPRIMEE. Faire et verifier une sauvegarde complete " +
+          "avant toute application. Les clients partages sont conserves.\n",
+      );
       return;
     }
-    if (!args.includes("--backup-ok") ||
-        args.find(a => a.startsWith("--confirm=")) !== "--confirm=" + plan.signature) {
+    if (
+      !args.includes("--backup-ok") ||
+      args.find((a) => a.startsWith("--confirm=")) !== "--confirm=" + plan.signature
+    ) {
       fail("APPLY_REQUIRES_BACKUP_AND_PREVIEW_FINGERPRINT");
     }
     const root = process.env.PAPOT_SERVER_FILES_ROOT;
     if (!root || !path.isAbsolute(root)) fail("PAPOT_SERVER_FILES_ROOT_MISSING");
     const rootPath = path.resolve(root);
-    const quarantine = "_papot_quarantine/purge-two-tests-" +
-      new Date().toISOString().replace(/[:.]/g, "-") + "-" +
+    const quarantine =
+      "_papot_quarantine/purge-two-tests-" +
+      new Date().toISOString().replace(/[:.]/g, "-") +
+      "-" +
       crypto.randomBytes(3).toString("hex");
     const physical = [
-      ...await existingSafeFiles(rootPath, plan.dirs, "dir"),
-      ...await existingSafeFiles(rootPath, plan.filePaths, "file"),
+      ...(await existingSafeFiles(rootPath, plan.dirs, "dir")),
+      ...(await existingSafeFiles(rootPath, plan.filePaths, "file")),
     ];
     const snapshotDirectory = path.join(rootPath, quarantine);
     await fs.mkdir(snapshotDirectory, { recursive: true, mode: 0o700 });
-    await fs.writeFile(path.join(snapshotDirectory, "database-before.json"),
-      json({ at: new Date().toISOString(), scope: plan.scope, signature: plan.signature,
-        tables: states, clients: clientResult.rows.filter(c =>
-          plan.clientsToDelete.includes(c.id)) }), { flag: "wx", mode: 0o600 });
+    await fs.writeFile(
+      path.join(snapshotDirectory, "database-before.json"),
+      json({
+        at: new Date().toISOString(),
+        scope: plan.scope,
+        signature: plan.signature,
+        tables: states,
+        clients: clientResult.rows.filter((c) => plan.clientsToDelete.includes(c.id)),
+      }),
+      { flag: "wx", mode: 0o600 },
+    );
 
     for (const rel of physical) {
-      if (moved.some(item => rel.startsWith(item.source + "/"))) continue;
+      if (moved.some((item) => rel.startsWith(item.source + "/"))) continue;
       const from = path.resolve(rootPath, rel);
       const to = path.resolve(snapshotDirectory, rel);
       await fs.mkdir(path.dirname(to), { recursive: true });
@@ -390,8 +535,9 @@ async function main() {
     for (const [key, next] of Object.entries(plan.next)) {
       const table = states[key].table;
       await db.query(
-        "UPDATE " + table +
-        " SET payload = $1::jsonb, version = version + 1, updated_at = NOW() WHERE scope = 'global'",
+        "UPDATE " +
+          table +
+          " SET payload = $1::jsonb, version = version + 1, updated_at = NOW() WHERE scope = 'global'",
         [JSON.stringify(next)],
       );
     }
@@ -401,13 +547,15 @@ async function main() {
     }
     await db.query("COMMIT");
     inTransaction = false;
-    process.stdout.write("\nSUPPRESSION APPLICATIVE TERMINEE. Fichiers mis en quarantaine : " +
-      snapshotDirectory + "\nVérifier PAPOT après actualisation.\n");
+    process.stdout.write(
+      "\nSUPPRESSION APPLICATIVE TERMINEE. Fichiers mis en quarantaine : " +
+        snapshotDirectory +
+        "\nVérifier PAPOT après actualisation.\n",
+    );
   } catch (error) {
     if (inTransaction) await db.query("ROLLBACK").catch(() => undefined);
     for (const { from, to } of moved.reverse()) {
-      await fs.rename(to, from).catch(e =>
-        console.error("RESTORE_FILE_FAILED", from, e.message));
+      await fs.rename(to, from).catch((e) => console.error("RESTORE_FILE_FAILED", from, e.message));
     }
     throw error;
   } finally {
@@ -417,7 +565,8 @@ async function main() {
 
 if (process.env.PAPOT_PURGE_TEST_MODE === "1") {
   module.exports = { planFor, compact, safeRelative };
-} else main().catch(error => {
-  console.error("\nNETTOYAGE INTERROMPU SANS SUPPRESSION CONFIRMEE : " + error.message);
-  process.exitCode = 1;
-});
+} else
+  main().catch((error) => {
+    console.error("\nNETTOYAGE INTERROMPU SANS SUPPRESSION CONFIRMEE : " + error.message);
+    process.exitCode = 1;
+  });

@@ -23,31 +23,106 @@ const ids = {
 
 function fixture() {
   const payloads = {
-    chantiers: { schemaVersion: 1, chantiers: [
-      { id: ids.site1, name: "Loan Maître", clientName: "JULES SAS", number: "2026-004", launchYear: 2026, sourceCommercialCaseId: ids.case1, status: "CANCELLED" },
-      { id: ids.site2, name: "Lucien VAGINAY", clientName: "test", number: "2026-005", launchYear: 2026, sourceCommercialCaseId: ids.case2, status: "CANCELLED" },
-    ]},
-    commercial: { schemaVersion: 2, clients: [], cases: [
-      { id: ids.case1, clientId: ids.client1, clientName: "JULES SAS", name: "Loan Maître", createdAt: "2026-11-01T12:00:00Z", documents: [], sourceEntryId: null },
-      { id: ids.case2, clientId: ids.client2, clientName: "test", name: "Lucien VAGINAY", createdAt: "2026-11-01T12:00:00Z", documents: [], sourceEntryId: null },
-    ] },
-    quotes: { schemaVersion: 1, quotes: [
-      { id: ids.quote1, commercialCaseId: ids.case1, model: { clientId: ids.client1 }, status: "SENT", version: 1 },
-      { id: ids.quote2, commercialCaseId: ids.case2, model: { clientId: ids.client2 }, status: "ACCEPTED", version: 1 },
-    ] },
-    billing: { schemaVersion: 1, drafts: [
-      { id: ids.draft1, commercialCaseId: ids.case1, chantierId: ids.site1, quoteId: ids.quote1, clientId: ids.client1, status: "APPROVED", type: "STANDARD" },
-    ] },
-    planning: { schemaVersion: 1, macroAllocations: [
-      { chantierId: ids.site1, week: "2026-W46", activity: "BE", hours: 4 },
-    ], provisionalAllocations: [{ caseId: ids.case2, activity: "INSTALL", week: "2026-W47", hours: 3 }],
-      actualHours: [], chantierOrder: [ids.site1, ids.site2], provisionalOrder: [ids.case2],
-      dailyAssignments: [{ chantierId: ids.site1, userId: "a", date: "2026-11-16", label: "Test" }] },
+    chantiers: {
+      schemaVersion: 1,
+      chantiers: [
+        {
+          id: ids.site1,
+          name: "Loan Maître",
+          clientName: "JULES SAS",
+          number: "2026-004",
+          launchYear: 2026,
+          sourceCommercialCaseId: ids.case1,
+          status: "CANCELLED",
+        },
+        {
+          id: ids.site2,
+          name: "Lucien VAGINAY",
+          clientName: "test",
+          number: "2026-005",
+          launchYear: 2026,
+          sourceCommercialCaseId: ids.case2,
+          status: "CANCELLED",
+        },
+      ],
+    },
+    commercial: {
+      schemaVersion: 2,
+      clients: [],
+      cases: [
+        {
+          id: ids.case1,
+          clientId: ids.client1,
+          clientName: "JULES SAS",
+          name: "Loan Maître",
+          createdAt: "2026-11-01T12:00:00Z",
+          documents: [],
+          sourceEntryId: null,
+        },
+        {
+          id: ids.case2,
+          clientId: ids.client2,
+          clientName: "test",
+          name: "Lucien VAGINAY",
+          createdAt: "2026-11-01T12:00:00Z",
+          documents: [],
+          sourceEntryId: null,
+        },
+      ],
+    },
+    quotes: {
+      schemaVersion: 1,
+      quotes: [
+        {
+          id: ids.quote1,
+          commercialCaseId: ids.case1,
+          model: { clientId: ids.client1 },
+          status: "SENT",
+          version: 1,
+        },
+        {
+          id: ids.quote2,
+          commercialCaseId: ids.case2,
+          model: { clientId: ids.client2 },
+          status: "ACCEPTED",
+          version: 1,
+        },
+      ],
+    },
+    billing: {
+      schemaVersion: 1,
+      drafts: [
+        {
+          id: ids.draft1,
+          commercialCaseId: ids.case1,
+          chantierId: ids.site1,
+          quoteId: ids.quote1,
+          clientId: ids.client1,
+          status: "APPROVED",
+          type: "STANDARD",
+        },
+      ],
+    },
+    planning: {
+      schemaVersion: 1,
+      macroAllocations: [{ chantierId: ids.site1, week: "2026-W46", activity: "BE", hours: 4 }],
+      provisionalAllocations: [
+        { caseId: ids.case2, activity: "INSTALL", week: "2026-W47", hours: 3 },
+      ],
+      actualHours: [],
+      chantierOrder: [ids.site1, ids.site2],
+      provisionalOrder: [ids.case2],
+      dailyAssignments: [{ chantierId: ids.site1, userId: "a", date: "2026-11-16", label: "Test" }],
+    },
     entries: { schemaVersion: 1, entries: [], notifications: [] },
     purchases: { schemaVersion: 1, orders: [], nextNumber: 1 },
   };
-  const states = Object.fromEntries(Object.entries(payloads).map(([key, payload]) =>
-    [key, { table: "papot_" + key + "_state", version: 1, payload }]));
+  const states = Object.fromEntries(
+    Object.entries(payloads).map(([key, payload]) => [
+      key,
+      { table: "papot_" + key + "_state", version: 1, payload },
+    ]),
+  );
   const clients = [
     { id: ids.client1, version: 1, record: { companyName: "JULES SAS" } },
     { id: ids.client2, version: 1, record: { companyName: "test" } },
@@ -80,9 +155,13 @@ describe("one-off cancelled site cleanup", () => {
   it("protects shared clients, leaving them in the client directory", () => {
     const { states, clients } = fixture();
     states.commercial.payload.cases.push({
-      id: "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa", name: "Affaire réelle",
-      clientId: ids.client1, clientName: "JULES SAS", createdAt: "2026-11-02T12:00:00Z",
-      documents: [], sourceEntryId: null,
+      id: "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa",
+      name: "Affaire réelle",
+      clientId: ids.client1,
+      clientName: "JULES SAS",
+      createdAt: "2026-11-02T12:00:00Z",
+      documents: [],
+      sourceEntryId: null,
     });
     const plan = planFor(states, clients);
     expect(plan.scope.clientsKept).toContain(ids.client1);
@@ -93,8 +172,11 @@ describe("one-off cancelled site cleanup", () => {
   it("refuses deletion if real employee hours exist", () => {
     const { states, clients } = fixture();
     states.planning.payload.actualHours.push({
-      chantierId: ids.site1, userId: "employee", activity: "BE",
-      week: "2026-W46", hours: 8,
+      chantierId: ids.site1,
+      userId: "employee",
+      activity: "BE",
+      week: "2026-W46",
+      hours: 8,
     });
     expect(() => planFor(states, clients)).toThrow("REAL_EMPLOYEE_HOURS_EXIST");
   });
