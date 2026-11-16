@@ -55,7 +55,7 @@ function documentFolder(storagePath: string): string | null {
 }
 
 export async function ensureChantierStructure(store: ServerFileStore, root: string) {
-  const template = await loadChantierFolderTemplate();
+  const template = await loadChantierFolderTemplate(store);
   await store.ensureDirectory(root);
   for (const folder of folderTemplatePaths(template)) {
     await store.ensureDirectory(`${root}/${folder}`);
