@@ -1,0 +1,35 @@
+name: Temporary PR 253 format
+
+on:
+  pull_request:
+    types: [opened, synchronize, reopened]
+
+permissions:
+  contents: write
+
+jobs:
+  format:
+    if: github.event.pull_request.number == 253
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: fix/commercial-lost-status-20261116
+          persist-credentials: true
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - name: Format edited files
+        run: |
+          npx prettier --write src/components/commercial-workspace.tsx src/app/api/desktop/commercial/route.ts tests/commercial-lost-status-ui.test.ts
+      - name: Push formatting
+        run: |
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add src/components/commercial-workspace.tsx src/app/api/desktop/commercial/route.ts tests/commercial-lost-status-ui.test.ts
+          if ! git diff --cached --quiet; then
+            git commit -m 'style: format commercial lost status fix'
+            git push origin HEAD:fix/commercial-lost-status-20261116
+          fi
