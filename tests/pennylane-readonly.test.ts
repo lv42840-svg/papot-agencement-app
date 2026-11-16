@@ -1,6 +1,6 @@
 import { describe, expect, it, vi } from "vitest";
 import { getPennylaneConfig, PENNYLANE_RESOURCES } from "../src/lib/pennylane/config";
-import { listPennylaneResource, verifyPennylaneCompany } from "../src/lib/pennylane/client";
+import { listPennylaneResource, probePennylaneAccess, verifyPennylaneCompany } from "../src/lib/pennylane/client";
 import { preparePennylaneSnapshot } from "../src/lib/pennylane/sync";
 
 const config = { token: "fake-test-token-never-deployed", expectedCompany: "PAPOT LIBERAL" };
@@ -124,6 +124,28 @@ describe("Pennylane V2 read-only staged connector", () => {
     for (const resource of PENNYLANE_RESOURCES) {
       expect(snapshot.records[resource]).toHaveLength(1);
     }
+    expect(fetcher).toHaveBeenCalledTimes(5);
+  });
+
+
+  it("reports missing scopes without exposing API data or saving any invoices", async () => {
+    const fetcher = vi.fn().mockImplementation(async (value: string, options: RequestInit) => {
+      expect(options.method).toBe("GET");
+      const url = new URL(value);
+      if (url.pathname.endsWith("/me")) return reply({ company: { name: "PAPOT LIBERAL" } });
+      if (url.pathname.endsWith("/suppliers")) return reply({ error: "Missing permission" }, 403);
+      expect(url.searchParams.get("limit")).toBe("1");
+      return reply({ items: [{ id: 123, confidential: "not returned" }], has_more: false, next_cursor: null });
+    });
+    const probe = await probePennylaneAccess(config, fetcher);
+    expect(probe.companyName).toBe("PAPOT LIBERAL");
+    expect(probe.access).toEqual({
+      suppliers: "forbidden",
+      supplier_invoices: "allowed",
+      customers: "allowed",
+      customer_invoices: "allowed",
+    });
+    expect(JSON.stringify(probe)).not.toContain("not returned");
     expect(fetcher).toHaveBeenCalledTimes(5);
   });
 
