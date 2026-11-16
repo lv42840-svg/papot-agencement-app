@@ -88,15 +88,21 @@ export async function prepareChantierFolder(
   affair: CommercialCase,
   chantier: ChantierRecord,
   allAffairs: CommercialCase[],
+  additionalStoragePaths: string[] = [],
 ): Promise<PreparedChantierFolder> {
   await store.assertReady();
   const target = chantierStorageFolder(chantier);
-  const currentRoots = [...new Set(affair.documents
-    .map((document) => documentFolder(document.storagePath))
+  const currentRoots = [...new Set([...affair.documents.map((document) => document.storagePath), ...additionalStoragePaths]
+    .map(documentFolder)
     .filter((folder): folder is string => folder !== null))];
   if (currentRoots.length > 1) throw new Error("CHANTIER_SOURCE_MULTIPLE_FOLDERS");
 
-  const source = currentRoots[0] ?? commercialStorageFolder(affair);
+  const commercialSource = commercialStorageFolder(affair);
+  const activeTarget = chantierStorageFolder({ ...chantier, status: "ACTIVE" });
+  const fallbackSource = chantier.status === "ARCHIVED" && await store.directoryExists(activeTarget)
+    ? activeTarget
+    : commercialSource;
+  const source = currentRoots[0] ?? fallbackSource;
   if (allAffairs.some((other) =>
     other.id !== affair.id &&
     other.documents.some((document) => document.storagePath.startsWith(`${source}/`))
@@ -106,7 +112,7 @@ export async function prepareChantierFolder(
 
   const sourceExists = await store.directoryExists(source);
   const targetExists = await store.directoryExists(target);
-  if (sourceExists && targetExists) throw new Error("CHANTIER_DESTINATION_FOLDER_EXISTS");
+  if (source !== target && sourceExists && targetExists) throw new Error("CHANTIER_DESTINATION_FOLDER_EXISTS");
   if (!sourceExists && !targetExists && currentRoots.length > 0) {
     throw new Error("CHANTIER_SOURCE_FOLDER_MISSING");
   }
@@ -121,7 +127,7 @@ export async function prepareChantierFolder(
   };
 
   try {
-    if (sourceExists) {
+    if (sourceExists && source !== target) {
       await store.moveDirectory(source, target);
       movedRoot = true;
     } else if (!targetExists) {
@@ -161,8 +167,14 @@ export async function prepareChantierFolder(
     // whose files really exist at their proposed new location.
     for (const document of affair.documents) {
       const next = remap(document.storagePath);
-      if (next !== document.storagePath && !sourceExists) {
+      if (next !== document.storagePath && !movedRoot) {
         await store.readBytes(next, document.sha256);
+      }
+    }
+    if (!movedRoot) {
+      for (const storagePath of additionalStoragePaths) {
+        const next = remap(storagePath);
+        if (next !== storagePath) await store.readBytes(next);
       }
     }
     return { path: target, remap, rollback };
