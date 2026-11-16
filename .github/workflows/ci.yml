@@ -80,7 +80,8 @@ jobs:
           if-no-files-found: error
 
   browser:
-    runs-on: ubuntu-latest
+    # Playwright 1.56 does not support the ubuntu-26.04 latest runner.
+    runs-on: ubuntu-24.04
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
@@ -97,7 +98,8 @@ jobs:
           path: test-results
 
   restore-drill:
-    runs-on: ubuntu-latest
+    # PostgreSQL 16 test service needs a matching pg_dump/psql client.
+    runs-on: ubuntu-24.04
     services:
       postgres:
         image: postgres:16-alpine
