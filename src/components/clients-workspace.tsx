@@ -11,6 +11,7 @@ import {
   UserRound,
   X,
 } from "lucide-react";
+import Link from "next/link";
 import { useSearchParams } from "next/navigation";
 import { FormEvent, useCallback, useEffect, useMemo, useState } from "react";
 import {
@@ -26,6 +27,7 @@ import { DEFAULT_VAT_RATE_PERCENT } from "@/lib/vat";
 type ClientsSnapshot = {
   payload: ClientsPayload;
   canWrite: boolean;
+  pennylaneMode?: boolean;
   focusClientId?: string;
 };
 
@@ -96,6 +98,8 @@ const errorMessages: Record<string, string> = {
   CLIENT_PRIMARY_CONTACT_DUPLICATE: "Un seul contact principal peut être défini par client.",
   CLIENT_NOT_FOUND: "Cette fiche client n’existe plus.",
   CLIENT_ARCHIVED: "Ce client est archivé. Réactive-le avant de le modifier.",
+  CLIENT_CREATE_IN_PENNYLANE: "Crée le client dans Pennylane, puis importe-le ici.",
+  CLIENT_PENNYLANE_READONLY: "Les coordonnées et conditions comptables se modifient dans Pennylane. Les notes, contacts et la TVA restent modifiables ici.",
 };
 
 function emptyDraft(): ClientDraft {
@@ -367,7 +371,9 @@ export function ClientsWorkspace() {
   }
 
   const canWrite = snapshot?.canWrite === true;
+  const pennylaneMode = snapshot?.pennylaneMode === true;
   const editable = canWrite && (mode === "edit" || mode === "new");
+  const identityEditable = editable && !selectedClient?.pennylaneId;
   const displayedClient = mode === "new" ? null : selectedClient;
 
   return (
@@ -379,14 +385,18 @@ export function ClientsWorkspace() {
             Référentiel unique pour les affaires, devis, chantiers et factures.
           </p>
         </div>
-        {canWrite ? (
+        <div className="buttonRow">
+          <Link href="/clients/pennylane" className="secondaryButton">Clients Pennylane · Importer</Link>
+        {canWrite && !pennylaneMode ? (
           <button className="primaryButton" type="button" onClick={startNew} disabled={busy}>
             <Plus size={15} aria-hidden="true" />
             Nouveau client
           </button>
         ) : null}
+        </div>
       </header>
 
+      {pennylaneMode ? <p className="muted">Crée les clients dans Pennylane puis importe-les dans PAPOT. Les anciennes fiches restent conservées.</p> : null}
       {error ? <div className="clientsAlert clientsAlertError">{error}</div> : null}
       {notice ? <div className="clientsAlert clientsAlertSuccess">{notice}</div> : null}
 
@@ -520,13 +530,14 @@ export function ClientsWorkspace() {
 
               <div className="clientsSection">
                 <h3>Identité</h3>
+                {selectedClient?.pennylaneId ? <p className="muted">Identité liée à Pennylane : modifie ses coordonnées dans Pennylane, puis actualise.</p> : null}
                 <div className="clientsFormGrid">
                   <label className="clientsField">
                     Type de client
                     <select
                       value={draft.type}
                       onChange={(event) => updateDraft("type", event.target.value as ClientType)}
-                      disabled={!editable}
+                      disabled={!identityEditable}
                     >
                       {Object.entries(typeLabels).map(([value, label]) => (
                         <option key={value} value={value}>
@@ -543,7 +554,7 @@ export function ClientsWorkspace() {
                         <input
                           value={draft.lastName}
                           onChange={(event) => updateDraft("lastName", event.target.value)}
-                          disabled={!editable}
+                          disabled={!identityEditable}
                           required
                         />
                       </label>
@@ -552,7 +563,7 @@ export function ClientsWorkspace() {
                         <input
                           value={draft.firstName}
                           onChange={(event) => updateDraft("firstName", event.target.value)}
-                          disabled={!editable}
+                          disabled={!identityEditable}
                         />
                       </label>
                     </>
@@ -563,7 +574,7 @@ export function ClientsWorkspace() {
                         <input
                           value={draft.companyName}
                           onChange={(event) => updateDraft("companyName", event.target.value)}
-                          disabled={!editable}
+                          disabled={!identityEditable}
                           required
                         />
                       </label>
@@ -572,7 +583,7 @@ export function ClientsWorkspace() {
                         <input
                           value={draft.siret}
                           onChange={(event) => updateDraft("siret", event.target.value)}
-                          disabled={!editable}
+                          disabled={!identityEditable}
                           inputMode="numeric"
                           placeholder="14 chiffres"
                         />
@@ -582,7 +593,7 @@ export function ClientsWorkspace() {
                         <input
                           value={draft.vatNumber}
                           onChange={(event) => updateDraft("vatNumber", event.target.value)}
-                          disabled={!editable}
+                          disabled={!identityEditable}
                           placeholder="FR..."
                           autoCapitalize="characters"
                         />
@@ -600,7 +611,7 @@ export function ClientsWorkspace() {
                     <input
                       value={draft.addressLine1}
                       onChange={(event) => updateDraft("addressLine1", event.target.value)}
-                      disabled={!editable}
+                      disabled={!identityEditable}
                     />
                   </label>
                   <label className="clientsField clientsFieldWide">
@@ -608,7 +619,7 @@ export function ClientsWorkspace() {
                     <input
                       value={draft.addressLine2}
                       onChange={(event) => updateDraft("addressLine2", event.target.value)}
-                      disabled={!editable}
+                      disabled={!identityEditable}
                     />
                   </label>
                   <label className="clientsField">
@@ -616,7 +627,7 @@ export function ClientsWorkspace() {
                     <input
                       value={draft.postalCode}
                       onChange={(event) => updateDraft("postalCode", event.target.value)}
-                      disabled={!editable}
+                      disabled={!identityEditable}
                     />
                   </label>
                   <label className="clientsField">
@@ -624,7 +635,7 @@ export function ClientsWorkspace() {
                     <input
                       value={draft.city}
                       onChange={(event) => updateDraft("city", event.target.value)}
-                      disabled={!editable}
+                      disabled={!identityEditable}
                     />
                   </label>
                   <label className="clientsField">
@@ -632,7 +643,7 @@ export function ClientsWorkspace() {
                     <input
                       value={draft.phone}
                       onChange={(event) => updateDraft("phone", event.target.value)}
-                      disabled={!editable}
+                      disabled={!identityEditable}
                       type="tel"
                     />
                   </label>
@@ -641,7 +652,7 @@ export function ClientsWorkspace() {
                     <input
                       value={draft.email}
                       onChange={(event) => updateDraft("email", event.target.value)}
-                      disabled={!editable}
+                      disabled={!identityEditable}
                       type="email"
                     />
                   </label>
@@ -659,7 +670,7 @@ export function ClientsWorkspace() {
                     <select
                       value={draft.paymentTerms}
                       onChange={(event) => updateDraft("paymentTerms", event.target.value)}
-                      disabled={!editable}
+                      disabled={!identityEditable}
                     >
                       <option value="">À définir</option>
                       {paymentTermsOptions.map((option) => (
