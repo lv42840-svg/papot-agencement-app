@@ -221,6 +221,18 @@ function planFor(states, clientRows) {
     businessFolder(a.clientName, a.name));
   const dirs = unique([...siteDirs, ...commercialDirs,
     ...quotes.map(q => "quotes/" + q.id)]).map(safeRelative);
+  for (const other of otherSites) {
+    const otherRoot = "Chantier/" + other.launchYear + "/" +
+      (other.status === "ARCHIVED" ? "Archive/" : "") +
+      safeSegment(other.number || other.id.slice(0, 8), "document", 180) +
+      " - " + businessFolder(other.clientName, other.name);
+    if (dirs.includes(otherRoot)) fail("SHARED_CHANTIER_FOLDER_NAME", otherRoot);
+  }
+  for (const other of remainingAffairs) {
+    const otherRoot = "Commercial/" + new Date(other.createdAt).getUTCFullYear() +
+      "/" + businessFolder(other.clientName, other.name);
+    if (dirs.includes(otherRoot)) fail("SHARED_COMMERCIAL_FOLDER_NAME", otherRoot);
+  }
   const linkedPaths = unique(allPaths([...affairs, ...quotes, ...linkedEntries]));
   const unsafeFiles = linkedPaths.filter(p => {
     try { safeRelative(p); return false; } catch { return true; }
