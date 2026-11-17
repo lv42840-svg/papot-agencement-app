@@ -13,6 +13,7 @@ type Props = {
 function itemText(item: QuoteItem): string | null {
   if (item.kind === "SECTION" || item.kind === "SUBSECTION") return item.title;
   if (item.kind === "LINE") return item.description;
+  if (item.kind === "COMMENT") return item.text;
   return null;
 }
 
@@ -88,7 +89,7 @@ export function QuoteRichTextLayer({ quote }: Props) {
 
     const decorate = () => {
       const targets = document.querySelectorAll<HTMLElement>(
-        ".quoteHeadingTitle, .quoteLineDescription > strong",
+        ".quoteHeadingTitle, .quoteLineDescription > strong, .quoteCommentText",
       );
       for (const target of targets) {
         const item = resolveItemFromTarget(target, quote, itemByNumber);
