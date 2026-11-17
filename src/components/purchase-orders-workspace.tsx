@@ -557,14 +557,6 @@ export function PurchaseOrdersWorkspace({ chantierId }: { chantierId?: string })
                               />
                             </td>
                             <td>
-                              {euro(
-                                committedPurchaseDestinationTotal(
-                                  snapshot.payload,
-                                  selectedDestination,
-                                ),
-                              )}
-                            </td>
-                            <td>
                               <button
                                 type="button"
                                 className="secondaryButton"
