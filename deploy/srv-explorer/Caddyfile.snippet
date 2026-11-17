@@ -1,0 +1,9 @@
+srv.papot.app {
+    encode zstd gzip
+    request_body {
+        max_size 512MB
+    }
+    reverse_proxy 127.0.0.1:3003 {
+        header_up X-Papot-Client-IP {remote_host}
+    }
+}
