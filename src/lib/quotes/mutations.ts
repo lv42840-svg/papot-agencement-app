@@ -12,6 +12,7 @@ import {
   quoteDateSchema,
   quoteItemTextStyleSchema,
   type QuoteItem,
+  type QuoteComment,
   type QuoteLibraryComponentSource,
   type QuoteLine,
   type QuoteOuvrageComponent,
@@ -123,6 +124,14 @@ const updateItemPresentationMutationSchema = z.object({
   textStyle: quoteItemTextStyleSchema.nullable(),
 });
 
+const upsertCommentMutationSchema = z.object({
+  action: z.literal("upsertComment"),
+  quoteId: z.string().uuid(),
+  itemId: z.string().uuid().optional(),
+  parentId: z.string().uuid().nullable().optional(),
+  text: z.string().trim().min(1).max(4000),
+});
+
 const upsertSectionMutationSchema = z.object({
   action: z.literal("upsertSection"),
   quoteId: z.string().uuid(),
@@ -151,6 +160,7 @@ export const quotesMutationSchema = z.discriminatedUnion("action", [
   deleteItemMutationSchema,
   updateItemPresentationMutationSchema,
   upsertSectionMutationSchema,
+  upsertCommentMutationSchema,
   upsertSubsectionMutationSchema,
 ]);
 
@@ -413,7 +423,6 @@ function deleteDraftItem(
   if (itemIndex < 0) throw new Error("QUOTE_ITEM_NOT_FOUND");
 
   const item = quote.model.items[itemIndex];
-  if (item.kind === "COMMENT") throw new Error("QUOTE_ITEM_DELETE_UNSUPPORTED");
 
   const deleteEnd =
     item.kind === "SECTION" || item.kind === "SUBSECTION"
@@ -601,6 +610,34 @@ function updateDraftItemPresentation(
   }
 
   return saveDraftItem(payload, quoteIndex, item, itemIndex, actor, now);
+}
+
+function upsertDraftComment(
+  payload: NativeQuotesPayload,
+  input: Extract<QuotesMutation, { action: "upsertComment" }>,
+  actor: QuotesActor,
+  now: Date,
+): QuotesMutationResult {
+  const { quoteIndex, quote } = findDraftQuote(payload, input.quoteId);
+  const index = input.itemId
+    ? quote.model.items.findIndex((item) => item.id === input.itemId) : -1;
+  if (input.itemId && (index < 0 || quote.model.items[index].kind !== "COMMENT"))
+    throw new Error("QUOTE_COMMENT_NOT_FOUND");
+  const existing = index >= 0 ? quote.model.items[index] : null;
+  const parentId = input.parentId === undefined ? existing?.parentId ?? null : input.parentId;
+  if (parentId) {
+    const parent = quote.model.items.find((item) => item.id === parentId);
+    if (!parent || (parent.kind !== "SECTION" && parent.kind !== "SUBSECTION"))
+      throw new Error("QUOTE_ITEM_PARENT_INVALID");
+  }
+  const comment: QuoteComment = {
+    id: input.itemId ?? globalThis.crypto.randomUUID(),
+    kind: "COMMENT",
+    parentId,
+    text: input.text,
+    ...(existing?.presentation ? { presentation: existing.presentation } : {}),
+  };
+  return saveDraftItem(payload, quoteIndex, comment, index, actor, now);
 }
 
 function upsertDraftHeading(
@@ -791,6 +828,9 @@ export function applyQuotesMutation(
     payload.quotes.splice(quoteIndex, 1);
     // No quote remains selected after deleting a draft, including the last draft.
     return { payload, focusQuoteId: "" };
+  }
+  if (input.action === "upsertComment") {
+    return upsertDraftComment(payload, input, actor, now);
   }
   if (input.action === "upsertSection" || input.action === "upsertSubsection") {
     return upsertDraftHeading(payload, input, actor, now);
