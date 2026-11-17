@@ -13,7 +13,7 @@ import {
   purchaseDestinationKey,
 } from "@/lib/purchases/domain";
 
-type Site = { id: string; name: string; clientName: string; status: string };
+type Site = { id: string; name: string; clientName: string; reference?: string | null; status: string };
 type Snapshot = {
   payload: PurchaseOrdersPayload;
   chantiers: Site[];
@@ -77,6 +77,9 @@ export function PurchaseOrdersWorkspace({ chantierId }: { chantierId?: string })
   const [notice, setNotice] = useState("");
   const [error, setError] = useState("");
   const [siteId, setSiteId] = useState(chantierId ?? "");
+  const [siteQuery, setSiteQuery] = useState("");
+  const [destinationQuery, setDestinationQuery] = useState("");
+  const [extraDestinations, setExtraDestinations] = useState<string[]>([]);
   const [supplierName, setSupplierName] = useState("");
   const [supplierPennylaneId, setSupplierPennylaneId] = useState("");
   const [mode, setMode] = useState<"QUICK" | "DETAILED">("QUICK");
@@ -102,11 +105,18 @@ export function PurchaseOrdersWorkspace({ chantierId }: { chantierId?: string })
 
   const allSites = snapshot?.chantiers ?? [];
   const sites = allSites.filter((site) => site.status === "ACTIVE");
+  const matchingSites = sites.filter((site) =>
+    [site.name, site.clientName, site.reference].filter(Boolean).join(" ").toLocaleLowerCase("fr-FR")
+      .includes(siteQuery.trim().toLocaleLowerCase("fr-FR")),
+  );
   const destinations = [
     ...sites.map((site) => ({ id: site.id, label: `${site.name} · ${site.clientName ?? ""}` })),
     { id: "SAV", label: "SAV (hors chantier)" },
     { id: "GENERAL_EXPENSES", label: "Frais généraux (hors chantier)" },
   ];
+  const filteredDestinations = destinations.filter((item) =>
+    item.label.toLocaleLowerCase("fr-FR").includes(destinationQuery.trim().toLocaleLowerCase("fr-FR")),
+  );
   const selected =
     sites.find((site) => site.id === siteId)?.id ??
     sites.find((site) => site.id === chantierId)?.id ??
@@ -353,6 +363,9 @@ export function PurchaseOrdersWorkspace({ chantierId }: { chantierId?: string })
               {mode === "DETAILED" ? (
                 <label style={{ display: "grid", gap: 5 }}>
                   Chantier *
+                  <input type="search" aria-label="Rechercher un chantier pour le BC détaillé"
+                    placeholder="Filtrer par chantier, client ou référence"
+                    value={siteQuery} onChange={(event) => setSiteQuery(event.target.value)} />
                   <select
                     value={selected}
                     disabled={busy || !snapshot.canWrite}
@@ -362,7 +375,7 @@ export function PurchaseOrdersWorkspace({ chantierId }: { chantierId?: string })
                     }}
                   >
                     {sites.length === 0 ? <option value="">Aucun chantier actif</option> : null}
-                    {sites.map((site) => (
+                    {sites.filter((site) => matchingSites.some((match) => match.id === site.id) || site.id === selected).map((site) => (
                       <option key={site.id} value={site.id}>
                         {site.name} · {site.clientName}
                       </option>
@@ -469,6 +482,9 @@ export function PurchaseOrdersWorkspace({ chantierId }: { chantierId?: string })
             {mode === "QUICK" ? (
               <div style={{ display: "grid", gap: 10 }}>
                 <strong>Répartition du BC par chantier, SAV ou frais généraux</strong>
+                <input type="search" aria-label="Filtrer les destinations du BC"
+                  placeholder="Filtrer les chantiers par nom, client ou référence"
+                  value={destinationQuery} onChange={(event) => setDestinationQuery(event.target.value)} />
                 <div style={{ overflowX: "auto" }}>
                   <table style={{ width: "100%", minWidth: 630, borderCollapse: "collapse" }}>
                     <thead>
@@ -507,7 +523,9 @@ export function PurchaseOrdersWorkspace({ chantierId }: { chantierId?: string })
                                     Chantier indisponible : choisir une destination
                                   </option>
                                 ) : null}
-                                {destinations.map((item) => (
+                                {destinations.filter((item) =>
+                                  item.id === selectedDestination || filteredDestinations.some((match) => match.id === item.id),
+                                ).map((item) => (
                                   <option key={item.id} value={item.id}>
                                     {item.label}
                                   </option>
@@ -566,20 +584,35 @@ export function PurchaseOrdersWorkspace({ chantierId }: { chantierId?: string })
                     </tbody>
                   </table>
                 </div>
-                <button
-                  type="button"
-                  className="secondaryButton"
+                <div style={{ display: "flex", flexWrap: "wrap", gap: 8 }}>
+                  {filteredDestinations.filter((item) => !allocations.some((row) =>
+                    (row.chantierId || selected) === item.id)).slice(0, 25).map((item) => (
+                    <label key={item.id} style={{ display: "flex", gap: 5, alignItems: "center" }}>
+                      <input type="checkbox" aria-label={`Ajouter ${item.label}`}
+                        checked={extraDestinations.includes(item.id)}
+                        disabled={busy || !snapshot.canWrite}
+                        onChange={(event) => setExtraDestinations((old) =>
+                          event.target.checked ? [...new Set([...old, item.id])] : old.filter((id) => id !== item.id))} />
+                      {item.label}
+                    </label>
+                  ))}
+                </div>
+                <button type="button" className="secondaryButton"
                   disabled={busy || !snapshot.canWrite || allocations.length >= 100}
                   onClick={() => {
-                    const firstUnused = destinations.find(
-                      (item) => !allocations.some((a) => (a.chantierId || selected) === item.id),
-                    );
-                    if (firstUnused)
-                      setAllocations((current) => [...current, newAllocation(firstUnused.id)]);
-                    else setError("Toutes les destinations disponibles sont déjà sélectionnées.");
-                  }}
-                >
-                  Ajouter un chantier / SAV / frais généraux
+                    const toAdd = extraDestinations.filter((id) =>
+                      destinations.some((item) => item.id === id) &&
+                      !allocations.some((row) => (row.chantierId || selected) === id));
+                    const defaultNext = filteredDestinations.find((item) =>
+                      !allocations.some((row) => (row.chantierId || selected) === item.id));
+                    const ids = toAdd.length ? toAdd : defaultNext ? [defaultNext.id] : [];
+                    if (ids.length) setAllocations((current) => [
+                      ...current, ...ids.slice(0, 100-current.length).map((id) => newAllocation(id)),
+                    ]);
+                    else setError("Toutes les destinations proposées sont déjà sélectionnées.");
+                    setExtraDestinations([]);
+                  }}>
+                  Ajouter les destinations sélectionnées ({extraDestinations.length || 1})
                 </button>
               </div>
             ) : (
