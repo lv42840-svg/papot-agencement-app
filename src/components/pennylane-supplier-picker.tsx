@@ -70,7 +70,20 @@ export function PennylaneSupplierPicker({
       {matches.length === 0 && search.trim() ? (
         <small>Aucun fournisseur trouvé. Vérifie Pennylane ou efface le filtre.</small>
       ) : selectedSupplier ? (
-        <small>Fournisseur sélectionné : {selectedSupplier.name}</small>
+        <div
+          role="status"
+          aria-live="polite"
+          style={{
+            padding: "10px 13px",
+            background: "#f0ebfc",
+            color: "#35246b",
+            border: "1px solid #a594db",
+            borderRadius: 8,
+            fontSize: 15,
+          }}
+        >
+          Fournisseur sélectionné : <strong style={{ fontWeight: 800 }}>{selectedSupplier.name}</strong>
+        </div>
       ) : (
         <small>{matches.length} fournisseur(s) dans la liste.</small>
       )}
