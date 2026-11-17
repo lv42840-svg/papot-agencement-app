@@ -62,8 +62,8 @@ function relativeWeek(week: string, offset: number): string {
   );
 }
 
-function lastCompletedWeek() {
-  return relativeWeek(isoWeekKey(new Date()), -1);
+function defaultActualHoursWeek() {
+  return isoWeekKey(new Date());
 }
 
 const formatHours = (hours: number) =>
@@ -79,7 +79,7 @@ const keyFor = (chantierId: string, activity: Activity) => chantierId + ":" + ac
 const ACTIVITIES = ["BE", "WORKSHOP", "INSTALL"] as const;
 
 export function ActualHoursWorkspace() {
-  const [week, setWeek] = useState(lastCompletedWeek);
+  const [week, setWeek] = useState(defaultActualHoursWeek);
   const [data, setData] = useState<HoursSnapshot | null>(null);
   const [personId, setPersonId] = useState("");
   const [extraIds, setExtraIds] = useState<string[]>([]);
@@ -385,7 +385,7 @@ export function ActualHoursWorkspace() {
           </select>
         </label>
         <label>
-          2 · Semaine écoulée
+          2 · Semaine de saisie
           <div className="actualHoursWeekControls">
             <button
               type="button"
@@ -407,7 +407,7 @@ export function ActualHoursWorkspace() {
             <button
               type="button"
               className="secondaryButton"
-              disabled={saving !== null || relativeWeek(week, 1) >= isoWeekKey(new Date())}
+              disabled={saving !== null || relativeWeek(week, 1) > isoWeekKey(new Date())}
               onClick={() => setWeek(relativeWeek(week, 1))}
             >
               →
@@ -431,11 +431,11 @@ export function ActualHoursWorkspace() {
         <>
           {!data.weekIsPast ? (
             <p className="actualHoursNotice">
-              Cette semaine n&apos;est pas terminée. Choisis une semaine écoulée pour saisir les
-              heures réelles.
+              Saisie provisoire de la semaine en cours. Les heures peuvent être corrigées,
+              mais la validation pour la paie ne sera disponible qu&apos;une fois la semaine terminée.
             </p>
           ) : null}
-          {data.weekIsPast && !data.editable ? (
+          {!data.editable ? (
             <p className="actualHoursNotice">
               Lecture seule : le droit « Saisir les heures passées » est requis.
             </p>
@@ -691,7 +691,7 @@ export function ActualHoursWorkspace() {
       ) : null}
 
       {data ? <EditHistory events={data.editHistory ?? []} people={data.people} /> : null}
-      {data?.editable && personId ? (
+      {data?.editable && data.weekIsPast && personId ? (
         <button
           type="button"
           className="secondaryButton"
