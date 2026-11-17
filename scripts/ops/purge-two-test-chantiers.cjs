@@ -544,17 +544,36 @@ function assertPayrollNotPrepared(payrollPayload, selectedHours) {
   if (selectedHours.length === 0) return;
   const month = (payrollPayload?.months ?? []).find((row) => row.month === "2026-10");
   if (!month) return;
-  const personWeek = "f1bc2388-99d5-42b3-a67e-d47e1316dfbd:2026-W41";
-  const edited =
-    month.status !== "PREPARING" ||
-    (month.versions ?? []).length > 0 ||
-    (month.eventLog ?? []).some((event) => /VALIDAT|PREPAR|REOPEN|RESTOR/i.test(event.action)) ||
-    (month.validatedWeeks ?? []).includes(personWeek);
-  if (edited) {
-    fail(
-      "PAYROLL_OCTOBER_ALREADY_PREPARED",
-      "Des donnees de paie d'octobre 2026 sont confirmees ou historiques",
-    );
+  const weeksToRemove = new Set(selectedHours.map((entry) => entry.userId + ":" + entry.week));
+  // A validated monthly payroll may be retained when its frozen versions
+  // explicitly used CONTRACT hours for the three test entries. In that case
+  // the 30 test hours were not included in the payroll figures.
+  if ((month.validatedWeeks ?? []).some((key) => weeksToRemove.has(key))) {
+    fail("PAYROLL_TEST_WEEK_VALIDATED", "La semaine de test est marquee validee en paie");
+  }
+  const versions = month.versions ?? [];
+  if (month.status === "PREPARED" && versions.length === 0) {
+    fail("PAYROLL_SNAPSHOT_INCOMPLETE", "Preparation marquee validee sans version");
+  }
+  for (const version of versions) {
+    if (!Array.isArray(version.summary?.rows)) {
+      fail("PAYROLL_SNAPSHOT_INCOMPLETE", "Impossible de verifier une version de paie");
+    }
+    for (const person of version.summary.rows) {
+      if (![...weeksToRemove].some((key) => key.startsWith(person.personId + ":"))) continue;
+      if (!Array.isArray(person.weeks)) {
+        fail("PAYROLL_SNAPSHOT_INCOMPLETE", "Semaines absentes de la version de paie");
+      }
+      for (const week of person.weeks) {
+        if (!weeksToRemove.has(person.personId + ":" + week.week)) continue;
+        if (week.source !== "CONTRACT") {
+          fail(
+            "PAYROLL_TEST_HOURS_USED_IN_VERSION",
+            "La semaine de test figure en heures reelles dans la version de paie",
+          );
+        }
+      }
+    }
   }
 }
 
