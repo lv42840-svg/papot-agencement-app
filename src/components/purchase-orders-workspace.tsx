@@ -335,20 +335,6 @@ export function PurchaseOrdersWorkspace({ chantierId }: { chantierId?: string })
           {notice}
         </p>
       ) : null}
-      {commitmentTotals ? (
-        <section style={{ background: "white", borderRadius: 12, padding: 18 }}>
-          <h2>Engagements actuels HT · toutes dates</h2>
-          <p>
-            Chantiers : <strong>{euro(commitmentTotals.chantierCents)}</strong> · SAV :{" "}
-            <strong>{euro(commitmentTotals.savCents)}</strong> · Frais généraux :{" "}
-            <strong>{euro(commitmentTotals.generalExpensesCents)}</strong>
-          </p>
-          <p>
-            Total unique : <strong>{euro(commitmentTotals.totalCents)}</strong>
-          </p>
-          <small>Ces engagements ne sont ni les factures du mois, ni un résultat réel.</small>
-        </section>
-      ) : null}
       {!snapshot ? (
         <p>Chargement des chantiers et des commandes…</p>
       ) : (
@@ -489,7 +475,6 @@ export function PurchaseOrdersWorkspace({ chantierId }: { chantierId?: string })
                       <tr style={{ textAlign: "left", borderBottom: "1px solid #ddd" }}>
                         <th>Destination</th>
                         <th>Montant HT (€)</th>
-                        <th>Déjà engagé HT</th>
                         <th />
                       </tr>
                     </thead>
@@ -546,6 +531,10 @@ export function PurchaseOrdersWorkspace({ chantierId }: { chantierId?: string })
                                   );
                                   setError("");
                                 }}
+                                onBlur={() => setAllocations((current) =>
+                                  current.map((item) => item.id === row.id
+                                    ? { ...item, amount: numericExpressionInput(item.amount, 2) } : item)
+                                )}
                                 style={{ width: 135 }}
                               />
                             </td>
@@ -625,6 +614,7 @@ export function PurchaseOrdersWorkspace({ chantierId }: { chantierId?: string })
                             value={line.quantity}
                             disabled={busy || !snapshot.canWrite}
                             onChange={(e) => patchLine(line.id, "quantity", e.target.value)}
+                            onBlur={() => patchLine(line.id, "quantity", numericExpressionInput(line.quantity, 6, 0.000001, 1_000_000))}
                             style={{ width: 80 }}
                           />
                         </td>
@@ -644,6 +634,7 @@ export function PurchaseOrdersWorkspace({ chantierId }: { chantierId?: string })
                             value={line.unitPrice}
                             disabled={busy || !snapshot.canWrite}
                             onChange={(e) => patchLine(line.id, "unitPrice", e.target.value)}
+                            onBlur={() => patchLine(line.id, "unitPrice", numericExpressionInput(line.unitPrice, 2))}
                             style={{ width: 110 }}
                           />
                         </td>
@@ -687,11 +678,7 @@ export function PurchaseOrdersWorkspace({ chantierId }: { chantierId?: string })
             >
               <div>
                 <strong>Total du BC : {preview === null ? "À renseigner" : euro(preview)}</strong>
-                {mode === "DETAILED" ? (
-                  <div>Déjà engagé sur ce chantier : {euro(committed)}</div>
-                ) : (
-                  <div>Le montant global sera ventilé une seule fois entre les destinations.</div>
-                )}
+                <div>Les montants sont engagés une seule fois selon les destinations.</div>
               </div>
               <button
                 type="button"
