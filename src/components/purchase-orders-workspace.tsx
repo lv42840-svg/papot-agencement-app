@@ -1,6 +1,7 @@
 "use client";
 
 import Link from "next/link";
+import { PennylaneSupplierPicker } from "@/components/pennylane-supplier-picker";
 import { evaluateNumericExpression, numericExpressionInput } from "@/lib/numeric-expression";
 import { useEffect, useMemo, useRef, useState } from "react";
 import type {
@@ -86,6 +87,8 @@ export function PurchaseOrdersWorkspace({ chantierId }: { chantierId?: string })
   const [supplierName, setSupplierName] = useState("");
   const [supplierPennylaneId, setSupplierPennylaneId] = useState("");
   const [preferencesOpen, setPreferencesOpen] = useState(false);
+  const [preferenceSearch, setPreferenceSearch] = useState("");
+  const [preferenceDraft, setPreferenceDraft] = useState<string[]>([]);
   const [mode, setMode] = useState<"QUICK" | "DETAILED">("QUICK");
   const [description, setDescription] = useState("");
   const [allocations, setAllocations] = useState<QuickAllocation[]>([
@@ -134,6 +137,11 @@ export function PurchaseOrdersWorkspace({ chantierId }: { chantierId?: string })
     sites.find((site) => site.id === chantierId)?.id ??
     sites[0]?.id ??
     "";
+  const preferenceSuppliers = snapshot?.supplierCatalog?.suppliers ?? [];
+  const filteredPreferenceSuppliers = preferenceSuppliers.filter((supplier) =>
+    supplier.name.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLocaleLowerCase("fr-FR")
+      .includes(preferenceSearch.trim().normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLocaleLowerCase("fr-FR")),
+  );
   const suppliers = useMemo(
     () =>
       [...new Set((snapshot?.payload.orders ?? []).map((order) => order.supplierName))].sort(
@@ -208,8 +216,13 @@ export function PurchaseOrdersWorkspace({ chantierId }: { chantierId?: string })
     }
   }
 
-  async function setSupplierPreference(supplierId: string, defaultGeneralExpenses: boolean) {
-    if (!snapshot?.canWrite || busy) return;
+  async function saveSupplierPreferences() {
+    if (!snapshot?.canWrite || !snapshot.supplierCatalog?.synced || busy) return;
+    if (
+      preferenceDraft.length === 0 &&
+      (snapshot.payload.supplierPreferences?.length ?? 0) > 0 &&
+      !window.confirm("Retirer tous les fournisseurs des frais généraux par défaut ?")
+    ) return;
     setBusy(true);
     setError("");
     try {
@@ -217,17 +230,19 @@ export function PurchaseOrdersWorkspace({ chantierId }: { chantierId?: string })
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          action: "SET_SUPPLIER_PREFERENCE",
-          supplierPennylaneId: supplierId,
-          defaultGeneralExpenses,
+          action: "SET_SUPPLIER_PREFERENCES",
+          supplierPennylaneIds: preferenceDraft,
         }),
       });
       const result = (await response.json()) as { payload?: PurchaseOrdersPayload; error?: string };
-      if (!response.ok || !result.payload) throw new Error(result.error ?? "Réglage impossible");
+      if (!response.ok || !result.payload) {
+        throw new Error(result.error ?? "Préférences non enregistrées.");
+      }
       setSnapshot((old) => (old ? { ...old, payload: result.payload! } : old));
-      setNotice("Préférence fournisseur enregistrée dans PAPOT.");
+      setPreferencesOpen(false);
+      setNotice("Affectations par défaut aux frais généraux enregistrées.");
     } catch (cause) {
-      setError(messageFor(cause instanceof Error ? cause.message : "Réglage impossible"));
+      setError(messageFor(cause instanceof Error ? cause.message : "Enregistrement impossible."));
     } finally {
       setBusy(false);
     }
@@ -362,15 +377,33 @@ export function PurchaseOrdersWorkspace({ chantierId }: { chantierId?: string })
 
   return (
     <main style={{ padding: 22, display: "grid", gap: 18, maxWidth: 1480, margin: "0 auto" }}>
-      <div>
+      <div style={{ display: "grid", gap: 10 }}>
         <h1>Achats · Bons de commande</h1>
-        <Link href="/achats/factures" className="secondaryButton">
-          Factures fournisseurs · Pennylane
-        </Link>
-        <p>
-          Un BC enregistré est un <strong>coût engagé HT</strong>. Il ne crée ni facture
-          fournisseur, ni coût réel validé, ni envoi automatique. Rapprochement Pennylane à venir.
-        </p>
+        <div style={{ display: "flex", flexWrap: "wrap", gap: 8, alignItems: "center" }}>
+          <Link href="/achats/factures" className="secondaryButton">
+            Factures fournisseurs · Pennylane
+          </Link>
+          <button type="button" className="secondaryButton"
+            disabled={!snapshot?.canWrite || busy} onClick={() => void refreshSuppliers()}>
+            Actualiser les fournisseurs
+          </button>
+          <button type="button" className="secondaryButton" aria-expanded={preferencesOpen}
+            disabled={!snapshot?.canWrite || !snapshot?.supplierCatalog?.synced || busy}
+            onClick={() => {
+              if (!preferencesOpen) {
+                const allowed = new Set(snapshot?.supplierCatalog?.suppliers.map((item) => item.id) ?? []);
+                setPreferenceDraft(
+                  (snapshot?.payload.supplierPreferences ?? [])
+                    .map((item) => item.supplierPennylaneId)
+                    .filter((id) => allowed.has(id)),
+                );
+                setPreferenceSearch("");
+              }
+              setPreferencesOpen((open) => !open);
+            }}>
+            Fournisseurs · Frais généraux
+          </button>
+        </div>
       </div>
       {error ? (
         <p role="alert" style={{ color: "#b33138" }}>
