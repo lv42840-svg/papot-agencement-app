@@ -1,6 +1,7 @@
 "use client";
 
 import Link from "next/link";
+import { evaluateNumericExpression, numericExpressionInput } from "@/lib/numeric-expression";
 import { useEffect, useMemo, useRef, useState } from "react";
 import type {
   PurchaseOrderInput,
@@ -8,9 +9,6 @@ import type {
   PurchaseOrdersPayload,
 } from "@/lib/purchases/domain";
 import {
-  committedPurchaseTotal,
-  committedPurchaseDestinationTotal,
-  committedPurchasesByDestination,
   purchaseAllocationFromSelection,
   purchaseDestinationKey,
 } from "@/lib/purchases/domain";
@@ -50,16 +48,13 @@ const newLine = (): EditableLine => ({
   unitPrice: "",
 });
 function moneyCents(raw: string): number | null {
-  const value = raw.trim().replace(",", ".");
-  if (!/^\d+(?:\.\d{1,2})?$/.test(value)) return null;
-  const cents = Math.round(Number(value) * 100);
-  return Number.isSafeInteger(cents) && cents >= 0 && cents <= 100_000_000_000 ? cents : null;
+  const value = evaluateNumericExpression(raw, 2, 0, 1_000_000_000);
+  if (value === null) return null;
+  const cents = Math.round(value * 100);
+  return Number.isSafeInteger(cents) ? cents : null;
 }
 function positiveQuantity(raw: string): number | null {
-  const value = raw.trim().replace(",", ".");
-  if (!/^\d+(?:\.\d{1,6})?$/.test(value)) return null;
-  const n = Number(value);
-  return Number.isFinite(n) && n > 0 && n <= 1_000_000 ? n : null;
+  return evaluateNumericExpression(raw, 6, 0.000001, 1_000_000);
 }
 const messageFor = (code: string) => {
   const messages: Record<string, string> = {
@@ -124,7 +119,6 @@ export function PurchaseOrdersWorkspace({ chantierId }: { chantierId?: string })
       ),
     [snapshot],
   );
-  const commitmentTotals = snapshot ? committedPurchasesByDestination(snapshot.payload) : null;
   const linePreview = lines.map((line) => {
     const qty = positiveQuantity(line.quantity);
     const price = moneyCents(line.unitPrice);
@@ -162,7 +156,6 @@ export function PurchaseOrdersWorkspace({ chantierId }: { chantierId?: string })
         .includes(search.trim().toLocaleLowerCase("fr-FR")),
     )
     .sort((a, b) => b.createdAt.localeCompare(a.createdAt));
-  const committed = snapshot ? committedPurchaseTotal(snapshot.payload, selected) : 0;
 
   function patchLine(id: string, key: keyof EditableLine, value: string) {
     setLines((current) =>
