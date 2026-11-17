@@ -134,6 +134,11 @@ function planningLocalCalendarDate(now: Date): Date {
   return new Date(Date.UTC(Number(values.year), Number(values.month) - 1, Number(values.day)));
 }
 
+/** La semaine en cours est saisissable, jamais automatiquement validée pour la paie. */
+export function isPlanningWeekCurrentOrPast(week: string, now = new Date()): boolean {
+  return week <= isoWeekKey(now);
+}
+
 export function isPlanningWeekPast(week: string, now = new Date()): boolean {
   const planningDate = planningLocalCalendarDate(now);
   const currentWeek = isoWeekKey(
