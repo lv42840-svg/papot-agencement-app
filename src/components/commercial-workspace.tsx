@@ -932,7 +932,6 @@ function StatusSection({
               <option value="LIKELY">Ça va tomber</option>
               {canConfirm ? <option value="CONFIRMED">Confirmée</option> : null}
               <option value="LOST">Perdu</option>
-              <option value="ABANDONED">Abandonné</option>
             </select>
           </Field>
           {target === "PISTE" || target === "WAITING" ? (
@@ -1110,7 +1109,6 @@ function StatusSection({
                 <option value="CHIFFRAGE">Chiffrage en cours</option>
                 {canConfirm ? <option value="CONFIRMED">Confirmée</option> : null}
                 <option value="LOST">Perdu</option>
-                <option value="ABANDONED">Abandonné</option>
               </select>
             </Field>
             {followUpDateNeeded ? (
@@ -1592,18 +1590,6 @@ function CloseSection({
           }
         >
           Perdu
-        </button>
-        <button
-          type="button"
-          disabled={busy}
-          onClick={() =>
-            void mutate(
-              { action: "close", caseId: item.id, status: "ABANDONED", reason },
-              "Affaire classée Abandonné.",
-            )
-          }
-        >
-          Abandonné
         </button>
       </div>
     </details>

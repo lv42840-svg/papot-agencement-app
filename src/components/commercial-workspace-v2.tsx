@@ -78,6 +78,8 @@ const errors: Record<string, string> = {
     "Le fichier clients est modifié sur un autre poste. Réessaie dans quelques secondes.",
   CLIENTS_VERSION_CONFLICT: "Le fichier clients a changé sur un autre poste. Réessaie.",
   COMMERCIAL_CASE_CLOSED: "Cette affaire est clôturée. Rouvre-la avant modification.",
+  COMMERCIAL_ACTIVE_CHANTIER_CANNOT_CLOSE_AS_LOST:
+    "Un chantier non annulé est lié à cette affaire. Termine ou annule ce chantier avant de la classer Perdu.",
   COMMERCIAL_REVIEW_DATE_REQUIRED: "Une date de prochaine revue est obligatoire.",
   COMMERCIAL_CONFIRMATION_DATE_REQUIRED: "La date prévisionnelle de confirmation est obligatoire.",
   COMMERCIAL_INSTALL_DATE_REQUIRED: "La date prévisionnelle de pose est obligatoire.",
@@ -889,6 +891,7 @@ function FollowForm({
 }) {
   const [status, setStatus] = useState<CommercialStatus>(followStatusForUi(item.status));
   const [confirmOpen, setConfirmOpen] = useState(false);
+  const [closingReason, setClosingReason] = useState("");
   const [date, setDate] = useState(nextCommercialDeadline(item) ?? item.plannedInstallDate ?? "");
   const open = !isCommercialClosed(item);
   const dateTitle =
@@ -901,8 +904,11 @@ function FollowForm({
           : "Prochaine revue";
 
   async function saveStatus() {
-    if (status === "LOST" || status === "ABANDONED") {
-      await mutate({ action: "close", caseId: item.id, status, reason: "" }, "Affaire clôturée.");
+    if (status === "LOST") {
+      await mutate(
+        { action: "close", caseId: item.id, status: "LOST", reason: closingReason },
+        "Affaire classée Perdu et rangée dans Archives.",
+      );
       return;
     }
     if (status === "CONFIRMED") {
@@ -967,7 +973,7 @@ function FollowForm({
             ))}
           </select>
         </label>
-        {status !== "FOLLOW_UP" ? (
+        {status !== "FOLLOW_UP" && status !== "LOST" ? (
           <label>
             <span>{dateTitle}</span>
             <input
@@ -978,6 +984,20 @@ function FollowForm({
             />
           </label>
         ) : null}
+        {status === "LOST" ? (
+          <label>
+            <span>Motif de perte (facultatif)</span>
+            <textarea
+              rows={2}
+              maxLength={2000}
+              value={closingReason}
+              onChange={(event) => setClosingReason(event.target.value)}
+              disabled={!canModify}
+              placeholder="Ex. Devis non retenu"
+            />
+            <small>Le dossier sera archivé et sa charge prévisionnelle retirée du planning.</small>
+          </label>
+        ) : null}
         {canModify ? (
           <button
             className="primaryButton fit"
@@ -985,7 +1005,7 @@ function FollowForm({
             disabled={busy}
             onClick={() => void saveStatus()}
           >
-            <Save size={14} /> Enregistrer
+            <Save size={14} /> {status === "LOST" ? "Classer comme perdu" : "Enregistrer"}
           </button>
         ) : null}
       </section>
@@ -1038,6 +1058,7 @@ function FollowUp({
 }) {
   const [summary, setSummary] = useState("");
   const [nextStatus, setNextStatus] = useState<CommercialStatus>("WAITING");
+  const [closingReason, setClosingReason] = useState("");
   const [nextDate, setNextDate] = useState("");
   const [confirmOpen, setConfirmOpen] = useState(false);
 
@@ -1052,9 +1073,12 @@ function FollowUp({
         caseId: item.id,
         summary,
         nextStatus,
-        nextDate: nextDate || undefined,
+        nextDate: nextStatus === "LOST" ? undefined : nextDate || undefined,
+        closingReason: nextStatus === "LOST" ? closingReason : undefined,
       },
-      "Relance enregistrée.",
+      nextStatus === "LOST"
+        ? "Relance enregistrée, affaire classée Perdu."
+        : "Relance enregistrée.",
     );
   }
 
@@ -1086,7 +1110,7 @@ function FollowUp({
           ))}
         </select>
       </label>
-      {nextStatus !== "FOLLOW_UP" ? (
+      {nextStatus !== "FOLLOW_UP" && nextStatus !== "LOST" ? (
         <label>
           <span>{nextStatus === "SENT" ? "Date de relance" : "Date suivante"}</span>
           <input
@@ -1097,13 +1121,28 @@ function FollowUp({
           />
         </label>
       ) : null}
+      {nextStatus === "LOST" ? (
+        <label>
+          <span>Motif de perte (facultatif)</span>
+          <textarea
+            rows={2}
+            maxLength={2000}
+            value={closingReason}
+            onChange={(event) => setClosingReason(event.target.value)}
+            disabled={!canModify}
+            placeholder="Ex. Devis non retenu"
+          />
+          <small>Après enregistrement, le dossier passera dans Archives.</small>
+        </label>
+      ) : null}
       {canModify ? (
         <button
           className="secondaryButton fit"
           disabled={busy || !summary.trim()}
           onClick={() => void saveFollowUp()}
         >
-          <Clock3 size={14} /> Enregistrer la relance
+          <Clock3 size={14} />{" "}
+          {nextStatus === "LOST" ? "Classer comme perdu" : "Enregistrer la relance"}
         </button>
       ) : null}
       {confirmOpen ? (

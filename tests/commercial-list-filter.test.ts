@@ -91,4 +91,18 @@ describe("commercial list filters", () => {
       "Affaire archivée",
     ]);
   });
+
+  it("conserve les anciens dossiers Abandonné dans Archives sans les reproposer dans les menus", () => {
+    const seed = addPiste(createInitialCommercialPayload(), "Ancienne affaire abandonnée");
+    const archived = applyCommercialMutation(
+      seed.payload,
+      { action: "close", caseId: seed.caseId, status: "ABANDONED", reason: "Historique" },
+      actor,
+      mutationNow,
+    ).payload;
+    expect(filterCommercialCases(archived.cases, "active")).toHaveLength(0);
+    expect(filterCommercialCases(archived.cases, "archives")).toMatchObject([
+      { name: "Ancienne affaire abandonnée", status: "ABANDONED", closingReason: "Historique" },
+    ]);
+  });
 });

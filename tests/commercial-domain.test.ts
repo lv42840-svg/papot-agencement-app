@@ -35,14 +35,16 @@ function createPiste(reviewDate = "2026-09-20") {
 }
 
 describe("Commercial V1", () => {
-  it("exposes only the five global follow-up statuses in the workspace", () => {
+  it("exposes Perdu but not Abandonné among available status choices", () => {
     expect(COMMERCIAL_FOLLOW_STATUS_OPTIONS).toEqual([
       "PISTE",
       "SENT",
       "FOLLOW_UP",
       "WAITING",
       "CONFIRMED",
+      "LOST",
     ]);
+    expect(COMMERCIAL_FOLLOW_STATUS_OPTIONS).not.toContain("ABANDONED");
   });
 
   it("creates a real piste with a mandatory review date", () => {
