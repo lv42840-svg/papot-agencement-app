@@ -14,7 +14,7 @@ export type InvoiceForGeneralExpenses = {
 };
 
 export type GeneralExpensesPlan = {
-  candidates: Array<{ invoiceId: string; draft: InvoiceAllocationDraft }>;
+  candidates: Array<{ invoiceId: string; draft: InvoiceAllocationDraft; amountHtCents: number; sourceRevision: string }>;
   matchingSupplierInvoices: number;
   skippedExisting: number;
   skippedChantierOrder: number;
@@ -99,7 +99,7 @@ export function planGeneralExpensesAllocations(
       orderLinks: [],
       note: "Affectation FG automatique validée dans PAPOT (Pennylane indépendant).",
     });
-    plan.candidates.push({ invoiceId: source.id, draft });
+    plan.candidates.push({ invoiceId: source.id, draft, amountHtCents: source.amountHtCents, sourceRevision: source.sourceRevision });
   }
   return plan;
 }
