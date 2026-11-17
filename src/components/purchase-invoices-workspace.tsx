@@ -500,35 +500,38 @@ export function PurchaseInvoicesWorkspace() {
             <h2>Affectation Nadia</h2>
             {selected ? (
               <>
+                <p style={{ fontSize: 13 }}>Répartition globale HT, par chantier, SAV ou frais généraux.</p>
+                <h3>Bons de commande proposés ({visibleProposedOrders.length})</h3>
+                <input
+                  aria-label="Filtrer les bons de commande par client ou chantier"
+                  placeholder="Rechercher BC, client ou chantier…"
+                  value={orderSearch}
+                  onChange={(event) => setOrderSearch(event.target.value)}
+                />
                 <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
-                  <button
-                    type="button"
-                    className={draft.mode === "GLOBAL" ? "primaryButton" : "secondaryButton"}
-                    disabled={busy}
-                    onClick={() =>
-                      setDraft((current) => ({
-                        ...current,
-                        mode: "GLOBAL",
-                        rows: current.rows.map((row) => ({ ...row, sourceLineId: null })),
-                      }))
-                    }
-                  >
-                    Montants globaux
-                  </button>
-                  <button
-                    type="button"
-                    className={draft.mode === "LINES" ? "primaryButton" : "secondaryButton"}
-                    disabled={busy}
-                    onClick={() => setDraft((current) => ({ ...current, mode: "LINES" }))}
-                  >
-                    Ligne par ligne
-                  </button>
+                  <label>
+                    Date BC du
+                    <input
+                      type="date"
+                      value={orderFrom}
+                      onChange={(event) => setOrderFrom(event.target.value)}
+                    />
+                  </label>
+                  <label>
+                    Au
+                    <input
+                      type="date"
+                      value={orderTo}
+                      onChange={(event) => setOrderTo(event.target.value)}
+                    />
+                  </label>
                 </div>
-                <h3>Bons de commande proposés</h3>
                 {selected.proposedOrders.length === 0 ? (
-                  <p>Aucun BC correspondant. Affectation manuelle possible.</p>
+                  <p>Aucun BC correspondant à ce fournisseur. Affectation manuelle possible.</p>
+                ) : visibleProposedOrders.length === 0 ? (
+                  <p>Aucun BC pour ces critères. Modifie les filtres.</p>
                 ) : null}
-                {selected.proposedOrders.map((proposal) => {
+                {visibleProposedOrders.map((proposal) => {
                   const order = data.orders.find((candidate) => candidate.id === proposal.id);
                   const link = draft.orderLinks.find((item) => item.orderId === proposal.id);
                   return (
@@ -545,6 +548,10 @@ export function PurchaseInvoicesWorkspace() {
                       <strong>
                         {proposal.reference} · {proposal.chantierName}
                       </strong>
+                      <small>
+                        BC du {new Date(proposal.createdAt).toLocaleDateString("fr-FR")}
+                        {proposal.clientName ? " · Client : " + proposal.clientName : ""}
+                      </small>
                       <small>BC : {money(proposal.amountHtCents)} HT</small>
                       <small>
                         Déjà rapproché :{" "}
@@ -559,30 +566,21 @@ export function PurchaseInvoicesWorkspace() {
                         <>
                           <label>
                             Part rapprochée HT (€)
-                            <input
-                              type="number"
-                              min="0"
-                              step="0.01"
-                              value={numberValue(link.appliedHtCents)}
+                            <CalculatedAmountInput
+                              label="Part rapprochée HT (€)"
+                              valueCents={link.appliedHtCents}
                               disabled={busy || !data.canWrite}
-                              onChange={(event) =>
+                              onCommit={(amountCents) =>
                                 setDraft((current) => ({
                                   ...current,
                                   orderLinks: current.orderLinks.map((item) =>
                                     item.orderId === proposal.id
-                                      ? {
-                                          ...item,
-                                          appliedHtCents: Math.max(
-                                            0,
-                                            fromInput(event.target.value),
-                                          ),
-                                        }
+                                      ? { ...item, appliedHtCents: amountCents }
                                       : item,
                                   ),
                                 }))
                               }
-                            />
-                          </label>
+                            />                         </label>
                           <label>
                             <input
                               type="checkbox"
@@ -648,26 +646,6 @@ export function PurchaseInvoicesWorkspace() {
                     }}
                   >
                     <strong>Affectation {index + 1}</strong>
-                    {draft.mode === "LINES" ? (
-                      <label>
-                        Ligne de la facture
-                        <select
-                          value={row.sourceLineId ?? ""}
-                          disabled={busy || !data.canWrite}
-                          onChange={(event) =>
-                            editRow(row.id, { sourceLineId: event.target.value || null })
-                          }
-                        >
-                          <option value="">Sélectionner la ligne</option>
-                          {lines.map((line) => (
-                            <option key={line.id} value={line.id}>
-                              {line.label}{" "}
-                              {line.amountHtCents !== null ? "· " + money(line.amountHtCents) : ""}
-                            </option>
-                          ))}
-                        </select>
-                      </label>
-                    ) : null}
                     <label>
                       Destination
                       <select
@@ -690,16 +668,37 @@ export function PurchaseInvoicesWorkspace() {
                     </label>
                     <label>
                       Montant achats HT (€)
-                      <input
-                        type="number"
-                        step="0.01"
-                        value={numberValue(row.amountHtCents)}
+                      <CalculatedAmountInput
+                        label="Montant achats HT (€)"
+                        valueCents={row.amountHtCents}
+                        allowNegative
                         disabled={busy || !data.canWrite}
-                        onChange={(event) =>
-                          editRow(row.id, { amountHtCents: fromInput(event.target.value) })
-                        }
+                        onCommit={(amountCents) => editRow(row.id, { amountHtCents: amountCents })}
                       />
                     </label>
+                    {draft.rows.length === 1 &&
+                    row.destination.kind === "CHANTIER" &&
+                    selected.amountHtCents !== null ? (
+                      <button
+                        type="button"
+                        className="secondaryButton"
+                        disabled={busy || !data.canWrite}
+                        onClick={() => {
+                          const chargesHtCents = draft.charges.reduce(
+                            (sum, charge) => sum + charge.amountHtCents,
+                            0,
+                          );
+                          const amountHtCents = selected.amountHtCents! - chargesHtCents;
+                          if (amountHtCents < 0) {
+                            setError("Les frais annexes dépassent le total HT de la facture.");
+                            return;
+                          }
+                          editRow(row.id, { amountHtCents });
+                        }}
+                      >
+                        Reprendre le total HT de la facture
+                      </button>
+                    ) : null}
                     <button
                       className="secondaryButton"
                       type="button"
@@ -753,17 +752,17 @@ export function PurchaseInvoicesWorkspace() {
                     </label>
                     <label>
                       Montant HT (€), remise en négatif
-                      <input
-                        type="number"
-                        step="0.01"
-                        value={numberValue(charge.amountHtCents)}
+                      <CalculatedAmountInput
+                        label="Montant HT des frais ou remises (€)"
+                        valueCents={charge.amountHtCents}
+                        allowNegative
                         disabled={busy || !data.canWrite}
-                        onChange={(event) =>
+                        onCommit={(amountCents) =>
                           setDraft((current) => ({
                             ...current,
                             charges: current.charges.map((item) =>
                               item.id === charge.id
-                                ? { ...item, amountHtCents: fromInput(event.target.value) }
+                                ? { ...item, amountHtCents: amountCents }
                                 : item,
                             ),
                           }))
