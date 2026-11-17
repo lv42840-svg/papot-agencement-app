@@ -22,7 +22,7 @@
 - Table papot_pennylane_purchase_allocations (migration 19) : un état courant par facture, brouillon, ventilation validée, historique et version.
 - Les modifications successives n'écrasent pas la dernière ventilation validée jusqu'à validation de sa révision.
 - Aucune écriture comptable et aucune synchronisation automatique au démarrage.
-- Les fournisseurs programmés en FG dans Bons de commande sont affectés **automatiquement et validés dans PAPOT** à chaque synchronisation Pennylane déclenchée, sans approbation Nadia supplémentaire. Pennylane reste en lecture seule.
+- Les fournisseurs programmés en FG dans Bons de commande sont affectés **automatiquement et validés dans PAPOT** à chaque synchronisation Pennylane déclenchée, sans validation supplémentaire de Nadia. Pennylane reste en lecture seule.
 - Dans **Achats → Factures fournisseurs**, le bouton **Affecter les factures FG** rafraîchit toutes les factures disponibles et rattrape l'historique ; il n'est pas dans Bons de commande.
 - Seules les factures jamais affectées, montant HT EUR positif, numéro et fournisseur fiables, sans doublon, sont validées automatiquement. Les affectations précédentes ne sont jamais écrasées.
 - **Priorité chantier** : si un BC engagé du même fournisseur comporte une destination chantier ou SAV et que le rapprochement n'est pas certain, la facture reste à affecter/à vérifier et n'est pas classée FG.
