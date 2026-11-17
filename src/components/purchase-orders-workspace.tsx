@@ -415,6 +415,60 @@ export function PurchaseOrdersWorkspace({ chantierId }: { chantierId?: string })
           {notice}
         </p>
       ) : null}
+      {preferencesOpen && snapshot?.supplierCatalog?.synced ? (
+        <section aria-label="Fournisseurs par défaut en frais généraux"
+          style={{ background: "white", padding: 18, borderRadius: 12, display: "grid", gap: 10, maxWidth: 760 }}>
+          <h2>Fournisseurs affectés par défaut aux frais généraux</h2>
+          <label style={{ display: "grid", gap: 5 }}>
+            Rechercher des fournisseurs
+            <input type="search" aria-label="Filtrer les fournisseurs pour frais généraux"
+              placeholder="Tape un nom pour filtrer…" value={preferenceSearch}
+              onChange={(event) => setPreferenceSearch(event.target.value)} />
+          </label>
+          <label style={{ display: "grid", gap: 5 }}>
+            Fournisseurs à affecter (sélection multiple)
+            <select multiple size={Math.min(8, Math.max(3, filteredPreferenceSuppliers.length))}
+              aria-label="Fournisseurs affectés par défaut aux frais généraux"
+              value={preferenceDraft} disabled={busy || !snapshot.canWrite}
+              onChange={(event) => {
+                const visible = new Set(filteredPreferenceSuppliers.map((item) => item.id));
+                const selected = Array.from(event.currentTarget.selectedOptions, (option) => option.value);
+                setPreferenceDraft((old) => [
+                  ...new Set([...old.filter((id) => !visible.has(id)), ...selected]),
+                ]);
+              }}>
+              {filteredPreferenceSuppliers.map((item) => (
+                <option key={item.id} value={item.id}>{item.name}</option>
+              ))}
+            </select>
+          </label>
+          <small>
+            {preferenceDraft.length} fournisseur(s) sélectionné(s). Ctrl/Maj pour en choisir plusieurs.
+            Les fournisseurs hors du filtre restent sélectionnés.
+          </small>
+          <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
+            <button type="button" className="secondaryButton"
+              disabled={busy || !snapshot.canWrite || !preferenceSearch.trim()}
+              onClick={() => setPreferenceDraft((old) =>
+                [...new Set([...old, ...filteredPreferenceSuppliers.map((item) => item.id)])])}>
+              Ajouter les fournisseurs filtrés
+            </button>
+            <button type="button" className="secondaryButton" disabled={busy || !snapshot.canWrite}
+              onClick={() => {
+                const visible = new Set(filteredPreferenceSuppliers.map((item) => item.id));
+                setPreferenceDraft((old) => old.filter((id) => !visible.has(id)));
+              }}>
+              Retirer ceux du filtre
+            </button>
+            <button type="button" className="primaryButton" disabled={busy || !snapshot.canWrite}
+              onClick={() => void saveSupplierPreferences()}>
+              Enregistrer les préférences
+            </button>
+            <button type="button" className="secondaryButton" disabled={busy}
+              onClick={() => setPreferencesOpen(false)}>Annuler</button>
+          </div>
+        </section>
+      ) : null}
       {!snapshot ? (
         <p>Chargement des chantiers et des commandes…</p>
       ) : (
