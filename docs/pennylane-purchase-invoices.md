@@ -9,7 +9,11 @@
 
 ## Interface
 
-- /achats/factures : liste de factures et états, PDF à gauche, commandes correspondantes et affectations à droite.
+- /achats/factures : deux onglets, **Toutes les factures** (500 dernières importées dans la liste) et **Factures validées** (500 dernières affectations validées PAPOT, y compris l'historique absent du dernier import) ; PDF au centre, rapprochement des commandes à droite.
+- Les BC proposés affichent leur date de création et leur client. Recherche par référence/client/chantier et filtre de dates (du/au).
+- Saisie globale HT uniquement : le bouton « Ligne par ligne » est supprimé. Les champs de montants (part BC, affectation HT, frais/remises) acceptent des calculs tels que `250+125`, `(100+50)/2`, avec évaluation sûre.
+- Pour une facture dirigée vers un seul chantier, « Reprendre le total HT de la facture » remplit l'affectation avec le montant HT restant après frais annexes éventuels.
+- Une facture conservée dans l'historique mais absente du snapshot Pennylane est visible en lecture seule dans les validations ; son coût validé reste dans le suivi chantier et est signalé provisoire jusqu'au retour de la source.
 - Sélection de plusieurs BC, reprise des destinations des commandes, affichage du reste à facturer, choix solder ou laisser ouvert.
 - Ventilation **globale ou par ligne**, ajouts de frais de transport, emballage et de remises négatives; prorata avec correction manuelle sur une destination.
 - Enregistrement de brouillon partiel, validation PAPOT seulement pour une répartition exactement équilibrée, journal d'audit des changements.
@@ -20,6 +24,8 @@
 
 - Table papot_pennylane_staging (PR #250) : copie brute isolée et remplaçable des factures / fournisseurs.
 - Table papot_pennylane_purchase_allocations (migration 19) : un état courant par facture, brouillon, ventilation validée, historique et version.
+- Table `papot_pennylane_supplier_invoice_archive` (migration 21) : dernière copie connue de la facture dont l'affectation PAPOT est validée. Avant chaque remplacement complet du staging, les sources validées sont archivées. Le calcul de coûts prend le staging courant en priorité puis l'archive, **une seule fois par facture** ; une source absente devient provisoire sans disparaître.
+- La déconnexion Pennylane explicite nettoie les données importées, les allocations et les archives correspondantes, conformément au fonctionnement existant. La sauvegarde PostgreSQL avant déploiement reste indispensable.
 - Les modifications successives n'écrasent pas la dernière ventilation validée jusqu'à validation de sa révision.
 - Aucune écriture comptable et aucune synchronisation automatique au démarrage.
 - Les fournisseurs programmés en FG dans Bons de commande sont affectés **automatiquement et validés dans PAPOT** à chaque synchronisation Pennylane déclenchée, sans validation supplémentaire de Nadia. Pennylane reste en lecture seule.
@@ -42,7 +48,7 @@
 - Vérifier les scopes réels suppliers:readonly et supplier_invoices:readonly, le retour des dates et montants, et le PDF éphémère sur une facture test.
 - Vérifier l'enregistrement, les droits achats READ/WRITE, la répartition multi-BC, l'historique et la suppression de clé.
 - Cas particuliers restant à spécifier/tester avec des factures réelles : **avoirs**, acomptes repris sur facture finale, factures multi-devises et changements de PDF sans variation du montant.
-- Automatisation horaire et traitement des volumes dépassant la limite d'affichage de 500 factures à finaliser **avant l'ouverture en production**.
+- Automatisation horaire à traiter séparément. L'affichage reste limité à 500 factures par onglet ; la conservation des coûts validés n'est pas limitée à ce nombre.
 - Ne pas fusionner ni déployer tant que CI, tests en base, dossier Pennylane et comportement de Nadia ne sont pas validés.
 
 Références API :
