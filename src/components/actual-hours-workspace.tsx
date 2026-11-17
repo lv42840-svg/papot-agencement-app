@@ -4,6 +4,7 @@ import { EditHistory, type EditEvent } from "./edit-history";
 
 import Link from "next/link";
 import { EDIT_CONFLICT_MESSAGE } from "@/lib/edit-history";
+import { evaluateNumericExpression, numericExpressionInput } from "@/lib/numeric-expression";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { isoWeekKey, isoWeekMonday, weekDateRangeLabel } from "@/lib/planning/time-markers";
 
@@ -71,11 +72,7 @@ const formatHours = (hours: number) =>
   }).format(hours);
 const inputHours = (hours: number) => (hours === 0 ? "" : String(hours).replace(".", ","));
 function parseHours(value: string): number | null {
-  const raw = value.trim().replace(",", ".");
-  if (!raw) return 0;
-  if (!/^(?:\d{1,3})(?:\.\d{1,2})?$/.test(raw)) return null;
-  const parsed = Number(raw);
-  return Number.isFinite(parsed) && parsed >= 0 && parsed <= 168 ? parsed : null;
+  return value.trim() ? evaluateNumericExpression(value, 2, 0, 168) : 0;
 }
 
 const keyFor = (chantierId: string, activity: Activity) => chantierId + ":" + activity;
