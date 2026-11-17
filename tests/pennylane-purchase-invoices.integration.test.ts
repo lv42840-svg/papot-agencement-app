@@ -9,6 +9,7 @@ import {
   readPurchaseInvoiceWorkspace,
   readValidatedPurchaseCosts,
   writePurchaseInvoiceAllocation,
+  autoAllocateImportedGeneralExpensesInvoices,
 } from "../src/lib/pennylane/purchase-invoice-store";
 import type { InvoiceAllocationDraft } from "../src/lib/pennylane/purchase-allocations";
 
@@ -161,5 +162,79 @@ describeIfPostgres("Pennylane purchase invoice workflow in isolated PostgreSQL",
     await expect(
       writePurchaseInvoiceAllocation("VALIDATE", id, 2, revision, draft(), "Nadia", pool),
     ).rejects.toThrow("INVOICE_SOURCE_CHANGED");
+  });
+  it("pré-affecte toutes les factures FG une fois sans modifier les validations ni les montants", async () => {
+    const { parsePurchaseOrdersPayload } = await import("../src/lib/purchases/domain");
+    const saved = await pool.query<{ payload: unknown }>(
+      "SELECT payload FROM papot_purchase_orders_state WHERE scope = 'global'",
+    );
+    const original = saved.rows[0]?.payload;
+    const preferences = {
+      ...parsePurchaseOrdersPayload(original),
+      supplierPreferences: [
+        { supplierPennylaneId: supplier, defaultDestination: "GENERAL_EXPENSES" },
+      ],
+    };
+    await pool.query(
+      "UPDATE papot_purchase_orders_state SET payload=$1::jsonb WHERE scope='global'",
+      [JSON.stringify(preferences)],
+    );
+    try {
+      await pool.query(
+        "INSERT INTO papot_pennylane_staging (resource, external_id, payload, synced_at) VALUES ('supplier_invoices',$1,$2::jsonb,NOW())",
+        [
+          otherId,
+          JSON.stringify({
+            ...basePayload,
+            id: Number(otherId),
+            invoice_number: "FG-AUTO-UNIQUE-2026",
+            accounting_status: "pending",
+            currency_amount_before_tax: "49.15",
+          }),
+        ],
+      );
+      const first = await autoAllocateImportedGeneralExpensesInvoices("Lucien", pool);
+      expect(first.supplierCount).toBe(1);
+      expect(first.assigned).toBe(1);
+      expect(first.skippedExisting).toBeGreaterThanOrEqual(1);
+      const read = await pool.query<{
+        version: number;
+        draft: InvoiceAllocationDraft;
+        approved: unknown;
+        history: Array<{ action: string; actor: string }>;
+      }>(
+        "SELECT version, draft, approved, history FROM papot_pennylane_purchase_allocations WHERE invoice_id=$1",
+        [otherId],
+      );
+      expect(read.rows[0].version).toBe(1);
+      expect(read.rows[0].draft.rows[0].destination).toEqual({
+        kind: "GENERAL_EXPENSES",
+        chantierId: null,
+      });
+      expect(read.rows[0].draft.rows[0].amountHtCents).toBe(4915);
+      expect(read.rows[0].approved).toBeNull();
+      expect(read.rows[0].history[0]).toMatchObject({ actor: "Lucien", action: "SAVE" });
+      const second = await autoAllocateImportedGeneralExpensesInvoices("Nadia", pool);
+      expect(second.assigned).toBe(0);
+      expect(second.skippedExisting).toBeGreaterThanOrEqual(2);
+      const after = await pool.query<{ version: number; history: unknown[] }>(
+        "SELECT version, history FROM papot_pennylane_purchase_allocations WHERE invoice_id=$1",
+        [otherId],
+      );
+      expect(after.rows[0]).toMatchObject({ version: 1 });
+      expect(after.rows[0].history).toHaveLength(1);
+    } finally {
+      await pool.query("DELETE FROM papot_pennylane_purchase_allocations WHERE invoice_id=$1", [
+        otherId,
+      ]);
+      await pool.query(
+        "DELETE FROM papot_pennylane_staging WHERE resource='supplier_invoices' AND external_id=$1",
+        [otherId],
+      );
+      await pool.query(
+        "UPDATE papot_purchase_orders_state SET payload=$1::jsonb WHERE scope='global'",
+        [JSON.stringify(original)],
+      );
+    }
   });
 });

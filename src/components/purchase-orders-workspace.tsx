@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 import { PennylaneSupplierPicker } from "@/components/pennylane-supplier-picker";
+import { PurchaseDestinationMultiPicker } from "@/components/purchase-destination-multi-picker";
 import { evaluateNumericExpression, numericExpressionInput } from "@/lib/numeric-expression";
 import { useEffect, useMemo, useRef, useState } from "react";
 import type {
@@ -71,6 +72,8 @@ const messageFor = (code: string) => {
     PURCHASE_SUPPLIER_PENNYLANE_REQUIRED:
       "Choisis un fournisseur de la liste officielle Pennylane.",
     PENNYLANE_DISABLED: "La synchronisation Pennylane doit être activée sur le serveur.",
+    INVOICE_FG_SUPPLIERS_NOT_CONFIGURED: "Sélectionne et enregistre d’abord les fournisseurs FG.",
+    INVOICE_NOT_IMPORTED: "Aucune facture Pennylane n’a encore été importée.",
   };
   return messages[code] ?? code;
 };
@@ -122,7 +125,7 @@ export function PurchaseOrdersWorkspace({ chantierId }: { chantierId?: string })
   const destinations = [
     ...sites.map((site) => ({
       id: site.id,
-      label: [site.reference, site.name, site.clientName].filter(Boolean).join(" · "),
+      label: [...new Set([site.reference, site.name, site.clientName].filter(Boolean))].join(" · "),
     })),
     { id: "SAV", label: "SAV (hors chantier)" },
     { id: "GENERAL_EXPENSES", label: "Frais généraux (hors chantier)" },
@@ -202,6 +205,53 @@ export function PurchaseOrdersWorkspace({ chantierId }: { chantierId?: string })
     );
     setError("");
   }
+  async function autoAssignFgInvoices() {
+    if (!snapshot?.canWrite || busy || !snapshot.payload.supplierPreferences?.length) return;
+    if (
+      !window.confirm(
+        "Actualiser Pennylane et pré-affecter toutes les factures non traitées des fournisseurs FG ? " +
+          "Les factures déjà affectées et les doublons seront préservés. " +
+          "Il restera à valider les affectations dans PAPOT.",
+      )
+    )
+      return;
+    setBusy(true);
+    setError("");
+    setNotice("");
+    try {
+      const response = await fetch("/api/desktop/purchase-invoices", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        cache: "no-store",
+        body: JSON.stringify({ action: "AUTO_ASSIGN_FG" }),
+      });
+      const body = (await response.json()) as {
+        result?: {
+          assigned: number;
+          supplierCount: number;
+          matchingSupplierInvoices: number;
+          skippedExisting: number;
+          skippedDuplicate: number;
+          skippedInvalid: number;
+        };
+        error?: string;
+      };
+      if (!response.ok || !body.result) {
+        throw new Error(body.error ?? "Affectation des factures FG impossible.");
+      }
+      const result = body.result;
+      setNotice(
+        `${result.assigned} facture(s) pré-affectée(s) aux frais généraux parmi ${result.matchingSupplierInvoices} facture(s) des ${result.supplierCount} fournisseurs FG. ` +
+          `${result.skippedExisting} déjà traitée(s), ${result.skippedDuplicate} doublon(s), ${result.skippedInvalid} facture(s) à vérifier. ` +
+          "Aucune validation financière automatique. Ouvre Factures fournisseurs pour contrôler.",
+      );
+    } catch (cause) {
+      setError(messageFor(cause instanceof Error ? cause.message : "INVOICE_ERROR"));
+    } finally {
+      setBusy(false);
+    }
+  }
+
   async function refreshSuppliers() {
     if (!snapshot?.canWrite || busy) return;
     setBusy(true);
@@ -422,6 +472,15 @@ export function PurchaseOrdersWorkspace({ chantierId }: { chantierId?: string })
             }}
           >
             Fournisseurs · Frais généraux
+          </button>
+          <button
+            type="button"
+            className="secondaryButton"
+            disabled={!snapshot?.canWrite || busy || !snapshot?.payload.supplierPreferences?.length}
+            title="Actualise Pennylane et crée des brouillons FG, sans validation financière"
+            onClick={() => void autoAssignFgInvoices()}
+          >
+            Affecter les factures des fournisseurs FG
           </button>
         </div>
       </div>
@@ -779,60 +838,40 @@ export function PurchaseOrdersWorkspace({ chantierId }: { chantierId?: string })
                     </tbody>
                   </table>
                 </div>
-                <div style={{ display: "flex", flexWrap: "wrap", gap: 8 }}>
-                  {filteredDestinations
-                    .filter(
-                      (item) =>
-                        !allocations.some((row) => (row.chantierId || selected) === item.id),
-                    )
-                    .slice(0, 25)
-                    .map((item) => (
-                      <label
-                        key={item.id}
-                        style={{ display: "flex", gap: 5, alignItems: "center" }}
-                      >
-                        <input
-                          type="checkbox"
-                          aria-label={`Ajouter ${item.label}`}
-                          checked={extraDestinations.includes(item.id)}
-                          disabled={busy || !snapshot.canWrite}
-                          onChange={(event) =>
-                            setExtraDestinations((old) =>
-                              event.target.checked
-                                ? [...new Set([...old, item.id])]
-                                : old.filter((id) => id !== item.id),
-                            )
-                          }
-                        />
-                        {item.label}
-                      </label>
-                    ))}
-                </div>
+                <PurchaseDestinationMultiPicker
+                  label="Chantiers ou destinations à ajouter au BC"
+                  options={filteredDestinations.filter(
+                    (item) => !allocations.some((row) => (row.chantierId || selected) === item.id),
+                  )}
+                  selectedIds={extraDestinations}
+                  onChange={setExtraDestinations}
+                  disabled={busy || !snapshot.canWrite || allocations.length >= 100}
+                />
                 <button
                   type="button"
                   className="secondaryButton"
-                  disabled={busy || !snapshot.canWrite || allocations.length >= 100}
+                  disabled={
+                    busy ||
+                    !snapshot.canWrite ||
+                    allocations.length >= 100 ||
+                    extraDestinations.length === 0
+                  }
                   onClick={() => {
-                    const toAdd = extraDestinations.filter(
+                    const ids = extraDestinations.filter(
                       (id) =>
                         destinations.some((item) => item.id === id) &&
                         !allocations.some((row) => (row.chantierId || selected) === id),
                     );
-                    const defaultNext = filteredDestinations.find(
-                      (item) =>
-                        !allocations.some((row) => (row.chantierId || selected) === item.id),
-                    );
-                    const ids = toAdd.length ? toAdd : defaultNext ? [defaultNext.id] : [];
-                    if (ids.length)
+                    if (ids.length) {
                       setAllocations((current) => [
                         ...current,
                         ...ids.slice(0, 100 - current.length).map((id) => newAllocation(id)),
                       ]);
-                    else setError("Toutes les destinations proposées sont déjà sélectionnées.");
+                    }
                     setExtraDestinations([]);
                   }}
                 >
-                  Ajouter les destinations sélectionnées ({extraDestinations.length || 1})
+                  Ajouter les destinations sélectionnées ({extraDestinations.length})
                 </button>
               </div>
             ) : (
