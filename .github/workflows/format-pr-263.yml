@@ -1,0 +1,29 @@
+name: Format PR 263 temporary
+on:
+  push:
+    branches:
+      - feat/achats-ux-et-texte-libre-20261117
+permissions:
+  contents: write
+jobs:
+  prettier:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.ref }}
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          cache: npm
+      - run: npm ci
+      - run: npx prettier --write src/app/api/desktop/purchases/route.ts src/components/quote-structured-lines-editor.tsx src/components/quote-structured-lines-rich-editor.tsx src/components/quote-rich-text-layer.tsx src/lib/quotes/rich-text-mutation.ts src/components/pennylane-supplier-picker.tsx src/components/purchase-orders-workspace.tsx src/components/purchase-order-edit-workspace.tsx tests/quote-rich-text-persistence.test.ts tests/papot-ux-fournisseurs-et-texte-libre.test.ts
+      - name: Commit formatting if needed
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add src/app/api/desktop/purchases/route.ts src/components/quote-structured-lines-editor.tsx src/components/quote-structured-lines-rich-editor.tsx src/components/quote-rich-text-layer.tsx src/lib/quotes/rich-text-mutation.ts src/components/pennylane-supplier-picker.tsx src/components/purchase-orders-workspace.tsx src/components/purchase-order-edit-workspace.tsx tests/quote-rich-text-persistence.test.ts tests/papot-ux-fournisseurs-et-texte-libre.test.ts
+          if ! git diff --cached --quiet; then
+            git commit -m "style: formatage du lot interface achats/devis"
+            git push origin HEAD:${{ github.ref_name }}
+          fi
