@@ -498,9 +498,26 @@ export async function readValidatedPurchaseCosts(pool: Pool = getServerDbPool())
     "SELECT 1 FROM papot_pennylane_sync_state WHERE resource = 'supplier_invoices'",
   );
   if (!imported.rows[0]) return { imported: false, byChantier: {}, provisionalByChantier: {} };
-  const result = await pool.query<InvoiceRow & { approved: ApprovedInvoiceAllocation | null }>(
-    "SELECT s.external_id, s.payload, a.approved, a.draft FROM papot_pennylane_staging s LEFT JOIN papot_pennylane_purchase_allocations a ON a.invoice_id = s.external_id WHERE s.resource = 'supplier_invoices'",
-  );
+  // Une facture validée reste dans le suivi même si le nouveau snapshot
+  // Pennylane ne la renvoie plus. La copie courante est toujours prioritaire.
+  const result = await pool.query<
+    InvoiceRow & {
+      approved: ApprovedInvoiceAllocation | null;
+      draft: InvoiceAllocationDraft | null;
+      source_missing: boolean;
+    }
+  >(`
+    SELECT a.invoice_id AS external_id,
+           COALESCE(s.payload, h.payload) AS payload,
+           a.approved, a.draft,
+           (s.external_id IS NULL) AS source_missing
+    FROM papot_pennylane_purchase_allocations a
+    LEFT JOIN papot_pennylane_staging s
+      ON s.resource = 'supplier_invoices' AND s.external_id = a.invoice_id
+    LEFT JOIN papot_pennylane_supplier_invoice_archive h
+      ON h.invoice_id = a.invoice_id
+    WHERE a.approved IS NOT NULL AND (s.external_id IS NOT NULL OR h.invoice_id IS NOT NULL)
+  `);
   const byChantier: Record<string, number> = {};
   const provisionalByChantier: Record<string, boolean> = {};
   for (const row of result.rows) {
@@ -510,11 +527,10 @@ export async function readValidatedPurchaseCosts(pool: Pool = getServerDbPool())
     if (source.accountingStatus !== "complete") continue;
     const calc = calculateInvoiceAllocation(row.approved.draft);
     const provisional =
+      row.source_missing ||
       source.sourceRevision !== row.approved.sourceRevision ||
       Boolean(
-        (row as typeof row & { draft: InvoiceAllocationDraft | null }).draft &&
-          JSON.stringify((row as typeof row & { draft: InvoiceAllocationDraft | null }).draft) !==
-            JSON.stringify(row.approved.draft),
+        row.draft && JSON.stringify(row.draft) !== JSON.stringify(row.approved.draft),
       );
     for (const allocation of calc.destinations) {
       if (allocation.destination.kind !== "CHANTIER") continue;
