@@ -159,6 +159,7 @@ export const COMMERCIAL_FOLLOW_STATUS_OPTIONS = [
   "FOLLOW_UP",
   "WAITING",
   "CONFIRMED",
+  "LOST",
 ] as const satisfies readonly CommercialStatus[];
 
 export const COMMERCIAL_DOCUMENT_CATEGORY_LABELS: Record<CommercialDocumentCategory, string> = {
