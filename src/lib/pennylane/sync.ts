@@ -6,13 +6,15 @@ import {
   type PennylaneItem,
 } from "./client";
 import { publishPennylaneSnapshots } from "./store";
+import type { GeneralExpensesAutoAllocationResult } from "./purchase-invoice-store";
 
 export type PennylaneSyncResult = {
   companyName: string;
   counts: Record<PennylaneResource, number>;
+  generalExpenses: GeneralExpensesAutoAllocationResult;
 };
 
-/** Calls only GET endpoints. No sync runs until explicitly invoked after enablement. */
+/** API Pennylane en lecture seule (GET). Aucun appel sans synchronisation explicite. */
 export async function preparePennylaneSnapshot(
   env: Record<string, string | undefined> = process.env,
   fetcher: PennylaneFetcher = fetch,
@@ -27,7 +29,9 @@ export async function preparePennylaneSnapshot(
   return { companyName, records };
 }
 
-export async function synchronizePennylane(): Promise<PennylaneSyncResult> {
+export async function synchronizePennylane(
+  actor = "PAPOT · synchronisation Pennylane",
+): Promise<PennylaneSyncResult> {
   // Production imports use only the encrypted token saved by an administrator.
   // The legacy environment-token interface is retained for mock-only unit tests.
   const { readPennylaneStoredConfig } = await import("./connection");
@@ -38,7 +42,12 @@ export async function synchronizePennylane(): Promise<PennylaneSyncResult> {
     PAPOT_PENNYLANE_EXPECTED_COMPANY: stored.expectedCompany,
   });
   await publishPennylaneSnapshots(companyName, records);
+  // Après chaque import, appliquer les fournisseurs FG sans toucher à Pennylane.
+  // Import dynamique : les tests du client GET restent indépendants du serveur DB.
+  const { autoAllocateImportedGeneralExpensesInvoices } = await import("./purchase-invoice-store");
+  const generalExpenses = await autoAllocateImportedGeneralExpensesInvoices(actor);
   return {
+    generalExpenses,
     companyName,
     counts: Object.fromEntries(
       PENNYLANE_RESOURCES.map((resource) => [resource, records[resource].length]),
