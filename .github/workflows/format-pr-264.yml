@@ -1,0 +1,29 @@
+name: Format PR 264 temporary
+on:
+  push:
+    branches:
+      - feat/achats-chantiers-fg-factures-lot-20261117
+permissions:
+  contents: write
+jobs:
+  format:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.ref }}
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          cache: npm
+      - run: npm ci
+      - run: npx prettier --write src/lib/pennylane/general-expenses-auto-allocation.ts src/lib/pennylane/purchase-invoice-store.ts src/app/api/desktop/purchase-invoices/route.ts src/components/purchase-destination-multi-picker.tsx src/components/purchase-orders-workspace.tsx src/components/purchase-order-edit-workspace.tsx src/components/pennylane-supplier-picker.tsx tests/pennylane-fg-auto-allocation.test.ts tests/pennylane-purchase-invoices.integration.test.ts tests/purchase-fg-multiselect-ui.test.ts
+      - name: Commit formatting if necessary
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add src/lib/pennylane/general-expenses-auto-allocation.ts src/lib/pennylane/purchase-invoice-store.ts src/app/api/desktop/purchase-invoices/route.ts src/components/purchase-destination-multi-picker.tsx src/components/purchase-orders-workspace.tsx src/components/purchase-order-edit-workspace.tsx src/components/pennylane-supplier-picker.tsx tests/pennylane-fg-auto-allocation.test.ts tests/pennylane-purchase-invoices.integration.test.ts tests/purchase-fg-multiselect-ui.test.ts
+          if ! git diff --cached --quiet; then
+            git commit -m "style: formater les améliorations Achats et factures FG"
+            git push origin HEAD:${{ github.ref_name }}
+          fi
