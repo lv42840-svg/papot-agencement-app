@@ -4,7 +4,7 @@ import type { Pool, PoolClient } from "pg";
 import { getServerDbPool } from "@/lib/server-db/pool";
 import { runServerDbMigrations } from "@/lib/server-db/migrations";
 import { withServerDbTransaction } from "@/lib/server-db/transaction";
-import { parsePurchaseOrdersPayload, type PurchaseOrder } from "@/lib/purchases/domain";
+import { parsePurchaseOrdersPayload, purchaseOrderAllocations, type PurchaseOrder } from "@/lib/purchases/domain";
 import { parseChantiersPayload } from "@/lib/chantiers/domain";
 import { planGeneralExpensesAllocations } from "./general-expenses-auto-allocation";
 import {
@@ -343,15 +343,33 @@ export type GeneralExpensesAutoAllocationResult = {
   matchingSupplierInvoices: number;
   assigned: number;
   skippedExisting: number;
+  skippedChantierOrder: number;
   skippedDuplicate: number;
   skippedInvalid: number;
 };
 
+/** Identifiant Pennylane prioritaire ; vieux BC sans ID : nom fournisseur exact normalisé. */
+function purchaseOrderMayBelongToInvoiceSupplier(
+  source: InvoiceSource,
+  order: PurchaseOrder,
+): boolean {
+  if (order.supplierPennylaneId) {
+    return order.supplierPennylaneId === source.supplierId;
+  }
+  return (
+    source.supplierName !== "Fournisseur non identifié" &&
+    supplierKey(order.supplierName) === supplierKey(source.supplierName)
+  );
+}
+
 /**
- * Batch operation over the entire imported Pennylane staging table (not the
- * 500-row screen). It creates only new PAPOT drafts, never an approval or a
- * change in Pennylane. The lock also protects against concurrent imports and
- * individual changes to the same invoice.
+ * Valide immédiatement dans PAPOT les factures sûres des fournisseurs FG.
+ * La validation comptable Pennylane est indépendante : une facture non comptabilisée
+ * restera AWAITING_PENNYLANE et ne deviendra pas un coût réel.
+ * 
+ * Ne modifie jamais une ligne d'affectation existante. Si un BC engagé du même
+ * fournisseur comporte un chantier (ou le SAV), le rapprochement est incertain :
+ * la facture reste sans affectation automatique, à examiner manuellement.
  */
 export async function autoAllocateImportedGeneralExpensesInvoices(
   actor: string,
@@ -359,6 +377,7 @@ export async function autoAllocateImportedGeneralExpensesInvoices(
 ): Promise<GeneralExpensesAutoAllocationResult> {
   await runServerDbMigrations(pool);
   return withServerDbTransaction(async (client) => {
+    // Verrou commun avec synchro staging et modifications manuelles.
     await client.query("SELECT pg_advisory_xact_lock($1)", ["7332170416238558"]);
     const imported = await client.query(
       "SELECT 1 FROM papot_pennylane_sync_state WHERE resource = 'supplier_invoices'",
@@ -368,45 +387,87 @@ export async function autoAllocateImportedGeneralExpensesInvoices(
     const preferences = await client.query<{ payload: unknown }>(
       "SELECT payload FROM papot_purchase_orders_state WHERE scope = 'global' FOR SHARE",
     );
+    const purchaseState = parsePurchaseOrdersPayload(preferences.rows[0]?.payload);
     const configured = new Set(
-      (parsePurchaseOrdersPayload(preferences.rows[0]?.payload).supplierPreferences ?? [])
+      (purchaseState.supplierPreferences ?? [])
         .filter((row) => row.defaultDestination === "GENERAL_EXPENSES")
         .map((row) => row.supplierPennylaneId),
     );
-    if (configured.size === 0) throw new Error("INVOICE_FG_SUPPLIERS_NOT_CONFIGURED");
+    const empty: GeneralExpensesAutoAllocationResult = {
+      supplierCount: configured.size,
+      matchingSupplierInvoices: 0,
+      assigned: 0,
+      skippedExisting: 0,
+      skippedChantierOrder: 0,
+      skippedDuplicate: 0,
+      skippedInvalid: 0,
+    };
+    // A sync without configured suppliers must continue normally.
+    if (!configured.size) return empty;
 
+    const supplierRows = await client.query<InvoiceRow>(
+      "SELECT external_id, payload FROM papot_pennylane_staging WHERE resource = 'suppliers'",
+    );
+    const supplierNames = new Map(
+      supplierRows.rows.map((row) => [
+        row.external_id,
+        str(row.payload.name) || "Fournisseur #" + row.external_id,
+      ]),
+    );
     const result = await client.query<InvoiceRow & { stored_invoice_id: string | null }>(
       "SELECT s.external_id, s.payload, a.invoice_id AS stored_invoice_id FROM papot_pennylane_staging s LEFT JOIN papot_pennylane_purchase_allocations a ON a.invoice_id = s.external_id WHERE s.resource = 'supplier_invoices' ORDER BY s.external_id",
     );
+    const relevantOrders = purchaseState.orders.filter(
+      (order) =>
+        order.status === "COMMITTED" &&
+        purchaseOrderAllocations(order).some(
+          (destination) => (destination.destinationType ?? "CHANTIER") !== "GENERAL_EXPENSES",
+        ),
+    );
     const plan = planGeneralExpensesAllocations(
-      result.rows.map((row) => ({
-        source: invoiceSource(row, new Map()),
-        alreadyAllocated: row.stored_invoice_id !== null,
-      })),
+      result.rows.map((row) => {
+        const source = invoiceSource(row, supplierNames);
+        return {
+          source,
+          alreadyAllocated: row.stored_invoice_id !== null,
+          possibleChantierOrder: relevantOrders.some((order) =>
+            purchaseOrderMayBelongToInvoiceSupplier(source, order),
+          ),
+        };
+      }),
       configured,
     );
     let assigned = 0;
     const now = new Date().toISOString();
-    // One transaction, batched inserts, unique invoice IDs: repeat clicks are idempotent.
+    // Une opération atomique, validations tracées, clics répétés idempotents.
     for (let index = 0; index < plan.candidates.length; index += 200) {
-      const records = plan.candidates.slice(index, index + 200).map((item) => ({
-        invoice_id: item.invoiceId,
-        draft: item.draft,
-        history: [
-          {
+      const records = plan.candidates.slice(index, index + 200).map((item) => {
+        assertInvoiceComplete(item.draft, item.amountHtCents);
+        const approved: ApprovedInvoiceAllocation = {
+          draft: item.draft,
+          amountHtCents: item.amountHtCents,
+          sourceRevision: item.sourceRevision,
+          validatedAt: now,
+          validatedBy: actor,
+        };
+        return {
+          invoice_id: item.invoiceId,
+          draft: item.draft,
+          approved,
+          history: [{
             at: now,
             actor,
-            action: "SAVE",
+            action: "VALIDATE",
             version: 1,
             previousDraft: null,
             previousApproved: null,
             newDraft: item.draft,
-            newApproved: null,
-          },
-        ],
-      }));
+            newApproved: approved,
+          }],
+        };
+      });
       const written = await client.query<{ invoice_id: string }>(
-        "INSERT INTO papot_pennylane_purchase_allocations (invoice_id, version, draft, approved, history, updated_at) SELECT x.invoice_id, 1, x.draft, NULL, x.history, NOW() FROM jsonb_to_recordset($1::jsonb) AS x(invoice_id TEXT, draft JSONB, history JSONB) ON CONFLICT (invoice_id) DO NOTHING RETURNING invoice_id",
+        "INSERT INTO papot_pennylane_purchase_allocations (invoice_id, version, draft, approved, history, updated_at) SELECT x.invoice_id, 1, x.draft, x.approved, x.history, NOW() FROM jsonb_to_recordset($1::jsonb) AS x(invoice_id TEXT, draft JSONB, approved JSONB, history JSONB) ON CONFLICT (invoice_id) DO NOTHING RETURNING invoice_id",
         [JSON.stringify(records)],
       );
       assigned += written.rowCount ?? 0;
@@ -416,6 +477,7 @@ export async function autoAllocateImportedGeneralExpensesInvoices(
       matchingSupplierInvoices: plan.matchingSupplierInvoices,
       assigned,
       skippedExisting: plan.skippedExisting + (plan.candidates.length - assigned),
+      skippedChantierOrder: plan.skippedChantierOrder,
       skippedDuplicate: plan.skippedDuplicate,
       skippedInvalid: plan.skippedInvalid,
     };
