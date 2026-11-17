@@ -137,10 +137,10 @@ export async function readPurchaseInvoiceWorkspace(
     sitesResult,
     stateResult,
   ] = await Promise.all([
-      pool.query<InvoiceRow>(
-        "SELECT external_id, payload FROM papot_pennylane_staging WHERE resource = 'supplier_invoices' ORDER BY external_id DESC LIMIT 501",
-      ),
-      pool.query<InvoiceRow & { source_current: boolean }>(`
+    pool.query<InvoiceRow>(
+      "SELECT external_id, payload FROM papot_pennylane_staging WHERE resource = 'supplier_invoices' ORDER BY external_id DESC LIMIT 501",
+    ),
+    pool.query<InvoiceRow & { source_current: boolean }>(`
         SELECT a.invoice_id AS external_id, COALESCE(s.payload, h.payload) AS payload,
                (s.external_id IS NOT NULL) AS source_current
         FROM papot_pennylane_purchase_allocations a
@@ -151,20 +151,20 @@ export async function readPurchaseInvoiceWorkspace(
           AND (s.external_id IS NOT NULL OR h.invoice_id IS NOT NULL)
         ORDER BY a.updated_at DESC LIMIT 501
       `),
-      pool.query<InvoiceRow>(
-        "SELECT external_id, payload FROM papot_pennylane_staging WHERE resource = 'suppliers' ORDER BY external_id LIMIT 20001",
-      ),
-      pool.query<AllocationRow>("SELECT * FROM papot_pennylane_purchase_allocations"),
-      pool.query<{ payload: unknown }>(
-        "SELECT payload FROM papot_purchase_orders_state WHERE scope = 'global'",
-      ),
-      pool.query<{ payload: unknown }>(
-        "SELECT payload FROM papot_chantiers_state WHERE scope = 'global'",
-      ),
-      pool.query<{ synced_at: Date }>(
-        "SELECT synced_at FROM papot_pennylane_sync_state WHERE resource = 'supplier_invoices'",
-      ),
-    ]);
+    pool.query<InvoiceRow>(
+      "SELECT external_id, payload FROM papot_pennylane_staging WHERE resource = 'suppliers' ORDER BY external_id LIMIT 20001",
+    ),
+    pool.query<AllocationRow>("SELECT * FROM papot_pennylane_purchase_allocations"),
+    pool.query<{ payload: unknown }>(
+      "SELECT payload FROM papot_purchase_orders_state WHERE scope = 'global'",
+    ),
+    pool.query<{ payload: unknown }>(
+      "SELECT payload FROM papot_chantiers_state WHERE scope = 'global'",
+    ),
+    pool.query<{ synced_at: Date }>(
+      "SELECT synced_at FROM papot_pennylane_sync_state WHERE resource = 'supplier_invoices'",
+    ),
+  ]);
   const suppliers = supplierRows.rows.slice(0, 20000).map((row) => ({
     id: row.external_id,
     name: str(row.payload.name) || "Fournisseur #" + row.external_id,
@@ -581,9 +581,7 @@ export async function readValidatedPurchaseCosts(pool: Pool = getServerDbPool())
     const provisional =
       row.source_missing ||
       source.sourceRevision !== row.approved.sourceRevision ||
-      Boolean(
-        row.draft && JSON.stringify(row.draft) !== JSON.stringify(row.approved.draft),
-      );
+      Boolean(row.draft && JSON.stringify(row.draft) !== JSON.stringify(row.approved.draft));
     for (const allocation of calc.destinations) {
       if (allocation.destination.kind !== "CHANTIER") continue;
       const id = allocation.destination.chantierId!;

@@ -11,7 +11,10 @@ import {
   writePurchaseInvoiceAllocation,
   autoAllocateImportedGeneralExpensesInvoices,
 } from "../src/lib/pennylane/purchase-invoice-store";
-import { sourceRevision, type InvoiceAllocationDraft } from "../src/lib/pennylane/purchase-allocations";
+import {
+  sourceRevision,
+  type InvoiceAllocationDraft,
+} from "../src/lib/pennylane/purchase-allocations";
 import { publishPennylaneSnapshots } from "../src/lib/pennylane/store";
 
 const describeIfPostgres = process.env.PAPOT_DATABASE_URL ? describe : describe.skip;
@@ -399,9 +402,12 @@ describeIfPostgres("Pennylane purchase invoice workflow in isolated PostgreSQL",
       );
       expect((await readValidatedPurchaseCosts(pool)).byChantier[chantierId]).toBe(10000);
     } finally {
-      await pool.query("DELETE FROM papot_pennylane_purchase_allocations WHERE invoice_id=$1", [archivedId]);
-      await pool.query("DELETE FROM papot_pennylane_supplier_invoice_archive WHERE invoice_id=$1", [archivedId]);
+      await pool.query("DELETE FROM papot_pennylane_purchase_allocations WHERE invoice_id=$1", [
+        archivedId,
+      ]);
+      await pool.query("DELETE FROM papot_pennylane_supplier_invoice_archive WHERE invoice_id=$1", [
+        archivedId,
+      ]);
     }
   });
-
 });

@@ -334,13 +334,20 @@ export function PurchaseInvoicesWorkspace() {
           : ""}
       </p>
       {data && (data.invoices.length > 0 || data.validatedInvoices.length > 0) ? (
-        <div role="tablist" aria-label="Vue des factures fournisseurs" style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
+        <div
+          role="tablist"
+          aria-label="Vue des factures fournisseurs"
+          style={{ display: "flex", gap: 8, flexWrap: "wrap" }}
+        >
           <button
             type="button"
             role="tab"
             aria-selected={invoiceTab === "ALL"}
             className={invoiceTab === "ALL" ? "primaryButton" : "secondaryButton"}
-            onClick={() => { setInvoiceTab("ALL"); setSelectedId(""); }}
+            onClick={() => {
+              setInvoiceTab("ALL");
+              setSelectedId("");
+            }}
           >
             Toutes les factures ({data.invoices.length})
           </button>
@@ -349,7 +356,10 @@ export function PurchaseInvoicesWorkspace() {
             role="tab"
             aria-selected={invoiceTab === "APPROVED"}
             className={invoiceTab === "APPROVED" ? "primaryButton" : "secondaryButton"}
-            onClick={() => { setInvoiceTab("APPROVED"); setSelectedId(""); }}
+            onClick={() => {
+              setInvoiceTab("APPROVED");
+              setSelectedId("");
+            }}
           >
             Factures validées ({data.validatedInvoices.length})
           </button>
@@ -388,7 +398,10 @@ export function PurchaseInvoicesWorkspace() {
               minWidth: 215,
             }}
           >
-            <h2>{invoiceTab === "ALL" ? "Toutes les factures" : "Factures validées"} ({visibleInvoices.length})</h2>
+            <h2>
+              {invoiceTab === "ALL" ? "Toutes les factures" : "Factures validées"} (
+              {visibleInvoices.length})
+            </h2>
             <input
               aria-label="Rechercher une facture"
               placeholder="Fournisseur, numéro, date…"
@@ -462,9 +475,9 @@ export function PurchaseInvoicesWorkspace() {
                 </div>
                 {!selected.availableInPennylane ? (
                   <p role="status" style={{ color: "#8a5d26" }}>
-                    Facture historisée dans PAPOT, absente du dernier import Pennylane.
-                    Son coût est conservé dans le suivi du chantier comme provisoire.
-                    Cette affectation est en lecture seule.
+                    Facture historisée dans PAPOT, absente du dernier import Pennylane. Son coût est
+                    conservé dans le suivi du chantier comme provisoire. Cette affectation est en
+                    lecture seule.
                   </p>
                 ) : null}
                 {selected.duplicateIds.length ? (
@@ -517,7 +530,9 @@ export function PurchaseInvoicesWorkspace() {
             <h2>Affectation PAPOT</h2>
             {selected ? (
               <>
-                <p style={{ fontSize: 13 }}>Répartition globale HT, par chantier, SAV ou frais généraux.</p>
+                <p style={{ fontSize: 13 }}>
+                  Répartition globale HT, par chantier, SAV ou frais généraux.
+                </p>
                 <h3>Bons de commande proposés ({visibleProposedOrders.length})</h3>
                 <input
                   aria-label="Filtrer les bons de commande par client ou chantier"
