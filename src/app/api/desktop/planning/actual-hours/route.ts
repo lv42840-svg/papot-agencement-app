@@ -188,7 +188,8 @@ export async function POST(request: Request) {
       raw?.action === "saveIndirectHoursRow"
         ? indirectHoursRowSchema.parse(raw)
         : actualHoursRowSchema.parse(raw);
-    if (!isPlanningWeekCurrentOrPast(input.week)) throw new Error("PLANNING_ACTUAL_HOURS_WEEK_IN_FUTURE");
+    if (!isPlanningWeekCurrentOrPast(input.week))
+      throw new Error("PLANNING_ACTUAL_HOURS_WEEK_IN_FUTURE");
 
     const [chantiers, auth] = await Promise.all([
       createChantiersRepository(context).load(),

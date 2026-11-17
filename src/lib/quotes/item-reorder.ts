@@ -36,8 +36,15 @@ function sourceBlockEnd(items: QuoteItem[], startIndex: number): number {
   return startIndex + 1;
 }
 
-function isDraggableItem(item: QuoteItem): item is QuoteLine | QuoteComment | QuoteSection | QuoteSubsection {
-  return item.kind === "LINE" || item.kind === "COMMENT" || item.kind === "SECTION" || item.kind === "SUBSECTION";
+function isDraggableItem(
+  item: QuoteItem,
+): item is QuoteLine | QuoteComment | QuoteSection | QuoteSubsection {
+  return (
+    item.kind === "LINE" ||
+    item.kind === "COMMENT" ||
+    item.kind === "SECTION" ||
+    item.kind === "SUBSECTION"
+  );
 }
 
 function reparentSourceBlock(

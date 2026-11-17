@@ -15,7 +15,13 @@ import {
   purchaseOrderAllocations,
 } from "@/lib/purchases/domain";
 
-type Site = { id: string; name: string; clientName?: string | null; reference?: string | null; status: string };
+type Site = {
+  id: string;
+  name: string;
+  clientName?: string | null;
+  reference?: string | null;
+  status: string;
+};
 type Snapshot = {
   payload: PurchaseOrdersPayload;
   chantiers: Site[];
@@ -35,8 +41,7 @@ const parseAmount = (text: string) => {
   const number = evaluateNumericExpression(text, 2, 0, 1_000_000_000);
   return number === null ? null : Math.round(number * 100);
 };
-const parseQuantity = (text: string) =>
-  evaluateNumericExpression(text, 6, 0.000001, 1_000_000);
+const parseQuantity = (text: string) => evaluateNumericExpression(text, 6, 0.000001, 1_000_000);
 
 export function PurchaseOrderEditWorkspace({ orderId }: { orderId: string }) {
   const [data, setData] = useState<Snapshot | null>(null);
@@ -108,11 +113,16 @@ export function PurchaseOrderEditWorkspace({ orderId }: { orderId: string }) {
     { id: "GENERAL_EXPENSES", name: "Frais généraux (hors chantier)", active: true },
   ];
   const filteredSites = sites.filter((site) =>
-    [site.name, site.clientName, site.reference].filter(Boolean).join(" ").toLocaleLowerCase("fr-FR")
+    [site.name, site.clientName, site.reference]
+      .filter(Boolean)
+      .join(" ")
+      .toLocaleLowerCase("fr-FR")
       .includes(siteSearch.trim().toLocaleLowerCase("fr-FR")),
   );
   const filteredDestinations = destinations.filter((destination) =>
-    destination.name.toLocaleLowerCase("fr-FR").includes(siteSearch.trim().toLocaleLowerCase("fr-FR")),
+    destination.name
+      .toLocaleLowerCase("fr-FR")
+      .includes(siteSearch.trim().toLocaleLowerCase("fr-FR")),
   );
   const suppliers = useMemo(
     () => [...new Set(data?.payload.orders.map((order) => order.supplierName) ?? [])].sort(),
@@ -338,9 +348,13 @@ export function PurchaseOrderEditWorkspace({ orderId }: { orderId: string }) {
           {original.mode === "QUICK" ? (
             <div style={{ display: "grid", gap: 10 }}>
               <h2>Montants par chantier, SAV ou frais généraux</h2>
-              <input type="search" aria-label="Rechercher une destination pour modifier le BC"
+              <input
+                type="search"
+                aria-label="Rechercher une destination pour modifier le BC"
                 placeholder="Filtrer les chantiers par nom, référence ou client"
-                value={siteSearch} onChange={(event) => setSiteSearch(event.target.value)} />
+                value={siteSearch}
+                onChange={(event) => setSiteSearch(event.target.value)}
+              />
               {allocations.map((row, index) => (
                 <div
                   key={row.id}
@@ -383,11 +397,16 @@ export function PurchaseOrderEditWorkspace({ orderId }: { orderId: string }) {
                           ),
                         )
                       }
-                    onBlur={() => setAllocations((items) =>
-                        items.map((item) => item.id === row.id
-                          ? { ...item, amount: numericExpressionInput(item.amount, 2) } : item)
-                      )}
-                      />
+                      onBlur={() =>
+                        setAllocations((items) =>
+                          items.map((item) =>
+                            item.id === row.id
+                              ? { ...item, amount: numericExpressionInput(item.amount, 2) }
+                              : item,
+                          ),
+                        )
+                      }
+                    />
                   </label>
                   <button
                     className="secondaryButton"
@@ -402,32 +421,56 @@ export function PurchaseOrderEditWorkspace({ orderId }: { orderId: string }) {
                 </div>
               ))}
               <div style={{ display: "flex", flexWrap: "wrap", gap: 8 }}>
-                {filteredDestinations.filter((item) => item.active &&
-                  !allocations.some((row) => row.chantierId === item.id)).slice(0, 25).map((item) => (
-                  <label key={item.id} style={{ display: "flex", alignItems: "center", gap: 5 }}>
-                    <input type="checkbox" aria-label={`Ajouter ${item.name}`}
-                      checked={extraDestinations.includes(item.id)}
-                      disabled={readOnly || busy}
-                      onChange={(event) => setExtraDestinations((old) => event.target.checked
-                        ? [...new Set([...old, item.id])]
-                        : old.filter((id) => id !== item.id))} />
-                    {item.name}
-                  </label>
-                ))}
+                {filteredDestinations
+                  .filter(
+                    (item) => item.active && !allocations.some((row) => row.chantierId === item.id),
+                  )
+                  .slice(0, 25)
+                  .map((item) => (
+                    <label key={item.id} style={{ display: "flex", alignItems: "center", gap: 5 }}>
+                      <input
+                        type="checkbox"
+                        aria-label={`Ajouter ${item.name}`}
+                        checked={extraDestinations.includes(item.id)}
+                        disabled={readOnly || busy}
+                        onChange={(event) =>
+                          setExtraDestinations((old) =>
+                            event.target.checked
+                              ? [...new Set([...old, item.id])]
+                              : old.filter((id) => id !== item.id),
+                          )
+                        }
+                      />
+                      {item.name}
+                    </label>
+                  ))}
               </div>
-              <button type="button" className="secondaryButton"
+              <button
+                type="button"
+                className="secondaryButton"
                 disabled={readOnly || busy || allocations.length >= 100}
                 onClick={() => {
-                  const candidate = filteredDestinations.find((item) =>
-                    item.active && !allocations.some((row) => row.chantierId === item.id));
-                  const ids = (extraDestinations.length ? extraDestinations : candidate ? [candidate.id] : [])
-                    .filter((id) => destinations.some((x) => x.active && x.id === id) &&
-                      !allocations.some((row) => row.chantierId === id));
-                  setAllocations((rows) => [...rows, ...ids.slice(0, 100-rows.length).map((id) => ({
-                    id: crypto.randomUUID(), chantierId: id, amount: "",
-                  }))]);
+                  const candidate = filteredDestinations.find(
+                    (item) => item.active && !allocations.some((row) => row.chantierId === item.id),
+                  );
+                  const ids = (
+                    extraDestinations.length ? extraDestinations : candidate ? [candidate.id] : []
+                  ).filter(
+                    (id) =>
+                      destinations.some((x) => x.active && x.id === id) &&
+                      !allocations.some((row) => row.chantierId === id),
+                  );
+                  setAllocations((rows) => [
+                    ...rows,
+                    ...ids.slice(0, 100 - rows.length).map((id) => ({
+                      id: crypto.randomUUID(),
+                      chantierId: id,
+                      amount: "",
+                    })),
+                  ]);
                   setExtraDestinations([]);
-                }}>
+                }}
+              >
                 Ajouter les destinations sélectionnées ({extraDestinations.length || 1})
               </button>
             </div>
@@ -435,23 +478,32 @@ export function PurchaseOrderEditWorkspace({ orderId }: { orderId: string }) {
             <div style={{ display: "grid", gap: 12 }}>
               <label>
                 Chantier
-                <input type="search" aria-label="Filtrer les chantiers dans le BC détaillé"
-                  value={siteSearch} onChange={(event) => setSiteSearch(event.target.value)}
-                  placeholder="Nom, référence, client..." />
+                <input
+                  type="search"
+                  aria-label="Filtrer les chantiers dans le BC détaillé"
+                  value={siteSearch}
+                  onChange={(event) => setSiteSearch(event.target.value)}
+                  placeholder="Nom, référence, client..."
+                />
                 <select
                   value={siteId}
                   disabled={readOnly || busy}
                   onChange={(event) => setSiteId(event.target.value)}
                 >
-                  {sites.filter((site) => site.id === siteId || filteredSites.some((item) => item.id === site.id)).map((site) => (
-                    <option
-                      key={site.id}
-                      value={site.id}
-                      disabled={site.status !== "ACTIVE" && site.id !== siteId}
-                    >
-                      {site.name}
-                    </option>
-                  ))}
+                  {sites
+                    .filter(
+                      (site) =>
+                        site.id === siteId || filteredSites.some((item) => item.id === site.id),
+                    )
+                    .map((site) => (
+                      <option
+                        key={site.id}
+                        value={site.id}
+                        disabled={site.status !== "ACTIVE" && site.id !== siteId}
+                      >
+                        {site.name}
+                      </option>
+                    ))}
                 </select>
               </label>
               <h2>Articles</h2>
@@ -495,9 +547,20 @@ export function PurchaseOrderEditWorkspace({ orderId }: { orderId: string }) {
                         }
                         onBlur={() => {
                           if (field === "unit") return;
-                          setLines((list) => list.map((item) => item.id === line.id
-                            ? { ...item, [field]: numericExpressionInput(item[field], field === "quantity" ? 6 : 2, field === "quantity" ? 0.000001 : 0) }
-                            : item));
+                          setLines((list) =>
+                            list.map((item) =>
+                              item.id === line.id
+                                ? {
+                                    ...item,
+                                    [field]: numericExpressionInput(
+                                      item[field],
+                                      field === "quantity" ? 6 : 2,
+                                      field === "quantity" ? 0.000001 : 0,
+                                    ),
+                                  }
+                                : item,
+                            ),
+                          );
                         }}
                       />
                     </label>

@@ -619,12 +619,11 @@ function upsertDraftComment(
   now: Date,
 ): QuotesMutationResult {
   const { quoteIndex, quote } = findDraftQuote(payload, input.quoteId);
-  const index = input.itemId
-    ? quote.model.items.findIndex((item) => item.id === input.itemId) : -1;
+  const index = input.itemId ? quote.model.items.findIndex((item) => item.id === input.itemId) : -1;
   if (input.itemId && (index < 0 || quote.model.items[index].kind !== "COMMENT"))
     throw new Error("QUOTE_COMMENT_NOT_FOUND");
   const existing = index >= 0 ? quote.model.items[index] : null;
-  const parentId = input.parentId === undefined ? existing?.parentId ?? null : input.parentId;
+  const parentId = input.parentId === undefined ? (existing?.parentId ?? null) : input.parentId;
   if (parentId) {
     const parent = quote.model.items.find((item) => item.id === parentId);
     if (!parent || (parent.kind !== "SECTION" && parent.kind !== "SUBSECTION"))

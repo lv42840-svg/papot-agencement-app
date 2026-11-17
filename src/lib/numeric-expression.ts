@@ -67,7 +67,12 @@ export function evaluateNumericExpression(
   return Number.isFinite(rounded) && rounded >= min && rounded <= max ? rounded : null;
 }
 
-export function numericExpressionInput(value: string, precision: number, min = 0, max = 1_000_000_000): string {
+export function numericExpressionInput(
+  value: string,
+  precision: number,
+  min = 0,
+  max = 1_000_000_000,
+): string {
   const result = evaluateNumericExpression(value, precision, min, max);
   return result === null ? value : String(result).replace(".", ",");
 }

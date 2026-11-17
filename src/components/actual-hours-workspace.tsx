@@ -115,7 +115,7 @@ export function ActualHoursWorkspace() {
       );
       setExtraIds([]);
       setExtraChoices([]);
-    setChantierSearch("");
+      setChantierSearch("");
       setShowAdd(false);
       setError("");
     } catch (cause) {
@@ -151,9 +151,16 @@ export function ActualHoursWorkspace() {
     [chantier.reference, chantier.name, chantier.clientName]
       .filter(Boolean)
       .join(" ")
-      .normalize("NFD").replace(/[\u0300-\u036f]/g, "")
+      .normalize("NFD")
+      .replace(/[\u0300-\u036f]/g, "")
       .toLocaleLowerCase("fr-FR")
-      .includes(chantierSearch.trim().normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLocaleLowerCase("fr-FR")),
+      .includes(
+        chantierSearch
+          .trim()
+          .normalize("NFD")
+          .replace(/[\u0300-\u036f]/g, "")
+          .toLocaleLowerCase("fr-FR"),
+      ),
   );
   const savedHours = useMemo(() => {
     const found = new Map<string, number>();
@@ -445,8 +452,8 @@ export function ActualHoursWorkspace() {
         <>
           {!data.weekIsPast ? (
             <p className="actualHoursNotice">
-              Saisie provisoire de la semaine en cours. Les heures peuvent être corrigées,
-              mais la validation pour la paie ne sera disponible qu&apos;une fois la semaine terminée.
+              Saisie provisoire de la semaine en cours. Les heures peuvent être corrigées, mais la
+              validation pour la paie ne sera disponible qu&apos;une fois la semaine terminée.
             </p>
           ) : null}
           {!data.editable ? (
@@ -519,13 +526,17 @@ export function ActualHoursWorkspace() {
                                 [keyFor(chantier.id, activity)]: event.target.value,
                               }))
                             }
-                            onBlur={() => setDrafts((current) => {
-                              const key = keyFor(chantier.id, activity);
-                              return current[key] === undefined ? current : {
-                                ...current,
-                                [key]: numericExpressionInput(current[key], 2, 0, 168),
-                              };
-                            })}
+                            onBlur={() =>
+                              setDrafts((current) => {
+                                const key = keyFor(chantier.id, activity);
+                                return current[key] === undefined
+                                  ? current
+                                  : {
+                                      ...current,
+                                      [key]: numericExpressionInput(current[key], 2, 0, 168),
+                                    };
+                              })
+                            }
                             onKeyDown={(event) => {
                               if (event.key === "Enter") {
                                 event.preventDefault();
@@ -583,48 +594,82 @@ export function ActualHoursWorkspace() {
 
           <div className="actualHoursAddSite">
             {!showAdd ? (
-              <button type="button" className="secondaryButton"
+              <button
+                type="button"
+                className="secondaryButton"
                 disabled={!data.editable || saving !== null || availableChantiers.length === 0}
-                onClick={() => setShowAdd(true)}>
+                onClick={() => setShowAdd(true)}
+              >
                 + Ajouter un ou plusieurs chantiers
               </button>
             ) : (
               <div style={{ display: "grid", gap: 8, width: "100%", maxWidth: 620 }}>
                 <label>
                   Rechercher par chantier, référence ou client
-                  <input type="search" aria-label="Filtrer les chantiers à ajouter"
+                  <input
+                    type="search"
+                    aria-label="Filtrer les chantiers à ajouter"
                     placeholder="Tape une partie du nom ou de la référence"
                     value={chantierSearch}
-                    onChange={(event) => setChantierSearch(event.target.value)} />
+                    onChange={(event) => setChantierSearch(event.target.value)}
+                  />
                 </label>
                 <label>
                   Chantiers à ajouter (plusieurs choix possibles)
-                  <select multiple size={Math.min(7, Math.max(3, filteredAvailableChantiers.length))}
+                  <select
+                    multiple
+                    size={Math.min(7, Math.max(3, filteredAvailableChantiers.length))}
                     aria-label="Chantiers à ajouter"
                     value={extraChoices}
                     onChange={(event) => {
-                      const selected = Array.from(event.currentTarget.selectedOptions, (option) => option.value);
-                      setExtraChoices((old) => [...new Set([
-                        ...old.filter((id) => !filteredAvailableChantiers.some((chantier) => chantier.id === id)),
-                        ...selected,
-                      ])]);
-                    }}>
+                      const selected = Array.from(
+                        event.currentTarget.selectedOptions,
+                        (option) => option.value,
+                      );
+                      setExtraChoices((old) => [
+                        ...new Set([
+                          ...old.filter(
+                            (id) =>
+                              !filteredAvailableChantiers.some((chantier) => chantier.id === id),
+                          ),
+                          ...selected,
+                        ]),
+                      ]);
+                    }}
+                  >
                     {filteredAvailableChantiers.map((chantier) => (
                       <option key={chantier.id} value={chantier.id}>
-                        {[chantier.reference, chantier.name, chantier.clientName].filter(Boolean).join(" · ")}
+                        {[chantier.reference, chantier.name, chantier.clientName]
+                          .filter(Boolean)
+                          .join(" · ")}
                       </option>
                     ))}
                   </select>
                 </label>
-                <small>{extraChoices.length} chantier(s) sélectionné(s). Utilise Ctrl ou Maj sur ordinateur.</small>
+                <small>
+                  {extraChoices.length} chantier(s) sélectionné(s). Utilise Ctrl ou Maj sur
+                  ordinateur.
+                </small>
                 <div style={{ display: "flex", gap: 8 }}>
-                  <button type="button" className="secondaryButton" disabled={!extraChoices.length}
-                    onClick={addChantiers}>Ajouter {extraChoices.length} chantier(s)</button>
-                  <button type="button" className="secondaryButton" onClick={() => {
-                    setExtraChoices([]);
-                    setChantierSearch("");
-                    setShowAdd(false);
-                  }}>Annuler</button>
+                  <button
+                    type="button"
+                    className="secondaryButton"
+                    disabled={!extraChoices.length}
+                    onClick={addChantiers}
+                  >
+                    Ajouter {extraChoices.length} chantier(s)
+                  </button>
+                  <button
+                    type="button"
+                    className="secondaryButton"
+                    onClick={() => {
+                      setExtraChoices([]);
+                      setChantierSearch("");
+                      setShowAdd(false);
+                    }}
+                  >
+                    Annuler
+                  </button>
                 </div>
               </div>
             )}
@@ -652,10 +697,17 @@ export function ActualHoursWorkspace() {
                           [entry.code]: event.target.value,
                         }))
                       }
-                      onBlur={() => setIndirectDrafts((old) => ({
-                        ...old,
-                        [entry.code]: numericExpressionInput(indirectValue(entry.code), 2, 0, 168),
-                      }))}
+                      onBlur={() =>
+                        setIndirectDrafts((old) => ({
+                          ...old,
+                          [entry.code]: numericExpressionInput(
+                            indirectValue(entry.code),
+                            2,
+                            0,
+                            168,
+                          ),
+                        }))
+                      }
                       onKeyDown={(event) => {
                         if (event.key === "Enter") {
                           event.preventDefault();

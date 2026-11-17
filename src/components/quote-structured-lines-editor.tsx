@@ -423,7 +423,11 @@ export function QuoteStructuredLinesEditor({
   const [ouvragePricingDriver, setOuvragePricingDriver] =
     useState<QuotePricingDriver>("SALE_PRICE");
   const [headingEditor, setHeadingEditor] = useState<HeadingEditor>(null);
-  const [commentEditor, setCommentEditor] = useState<{ itemId?: string; parentId: string | null; text: string } | null>(null);
+  const [commentEditor, setCommentEditor] = useState<{
+    itemId?: string;
+    parentId: string | null;
+    text: string;
+  } | null>(null);
   const [saving, setSaving] = useState(false);
   const [duplicatingLineId, setDuplicatingLineId] = useState<string | null>(null);
   const [duplicatingHeadingId, setDuplicatingHeadingId] = useState<string | null>(null);
@@ -2172,20 +2176,45 @@ export function QuoteStructuredLinesEditor({
   function renderCommentEditor(number = "+") {
     if (!commentEditor) return null;
     return (
-      <form className="quoteMainRow quoteCommentRow" onSubmit={saveComment} key={commentEditor.itemId ?? "new-comment"}>
+      <form
+        className="quoteMainRow quoteCommentRow"
+        onSubmit={saveComment}
+        key={commentEditor.itemId ?? "new-comment"}
+      >
         <span className="quoteNumber">{number}</span>
-        <textarea autoFocus required maxLength={4000} rows={3} aria-label="Texte libre du devis"
+        <textarea
+          autoFocus
+          required
+          maxLength={4000}
+          rows={3}
+          aria-label="Texte libre du devis"
           style={{ minWidth: 260, width: "100%", resize: "vertical" }}
           value={commentEditor.text}
-          onChange={(event) => setCommentEditor((old) => old ? { ...old, text: event.target.value } : old)} />
-        <span /><span /><span /><span /><span />
+          onChange={(event) =>
+            setCommentEditor((old) => (old ? { ...old, text: event.target.value } : old))
+          }
+        />
+        <span />
+        <span />
+        <span />
+        <span />
+        <span />
         <div className="quoteRowActions">
-          <button type="submit" className="miniActionButton quoteSaveButton"
-            disabled={saving || !commentEditor.text.trim()} aria-label="Enregistrer le texte libre">
+          <button
+            type="submit"
+            className="miniActionButton quoteSaveButton"
+            disabled={saving || !commentEditor.text.trim()}
+            aria-label="Enregistrer le texte libre"
+          >
             <Check size={14} aria-hidden="true" />
           </button>
-          <button type="button" className="miniActionButton" disabled={saving}
-            aria-label="Annuler le texte libre" onClick={() => setCommentEditor(null)}>
+          <button
+            type="button"
+            className="miniActionButton"
+            disabled={saving}
+            aria-label="Annuler le texte libre"
+            onClick={() => setCommentEditor(null)}
+          >
             <X size={14} aria-hidden="true" />
           </button>
         </div>
@@ -2284,32 +2313,51 @@ export function QuoteStructuredLinesEditor({
             return formOpen && editingLineId === item.id
               ? renderEditingOuvrage(item.id)
               : renderReadOuvrage(item);
-          if (commentEditor?.itemId === item.id) return renderCommentEditor(numbers.get(item.id) ?? "—");
+          if (commentEditor?.itemId === item.id)
+            return renderCommentEditor(numbers.get(item.id) ?? "—");
           return (
-            <div className={`quoteMainRow quoteCommentRow quoteDraggableItem${dropClass(item.id)}`}
+            <div
+              className={`quoteMainRow quoteCommentRow quoteDraggableItem${dropClass(item.id)}`}
               key={item.id}
               draggable={editable && !formOpen && headingEditor === null && commentEditor === null}
               onDragStart={(event) => startItemDrag(event, item)}
               onDragOver={(event) => dragItemOver(event, item)}
               onDrop={(event) => dropItem(event, item)}
-              onDragEnd={finishItemDrag}>
+              onDragEnd={finishItemDrag}
+            >
               <span className="quoteNumber">{numbers.get(item.id) ?? "—"}</span>
-              <span style={{ whiteSpace: "pre-wrap", ...quoteItemTextStyleToCss(item.presentation?.textStyle) }}>
+              <span
+                style={{
+                  whiteSpace: "pre-wrap",
+                  ...quoteItemTextStyleToCss(item.presentation?.textStyle),
+                }}
+              >
                 {item.text}
               </span>
-              <span /><span /><span /><span /><span />
+              <span />
+              <span />
+              <span />
+              <span />
+              <span />
               <div className="quoteRowActions">
                 {editable ? (
                   <>
-                    <button type="button" className="iconButton" aria-label="Modifier le texte libre"
+                    <button
+                      type="button"
+                      className="iconButton"
+                      aria-label="Modifier le texte libre"
                       disabled={formOpen || Boolean(headingEditor) || Boolean(commentEditor)}
-                      onClick={() => openEditComment(item)}>
+                      onClick={() => openEditComment(item)}
+                    >
                       <Pencil size={14} aria-hidden="true" />
                     </button>
-                    <button type="button" className="iconButton quoteDeleteItemButton"
+                    <button
+                      type="button"
+                      className="iconButton quoteDeleteItemButton"
                       aria-label="Supprimer le texte libre"
                       disabled={deletingItemId !== null || Boolean(commentEditor)}
-                      onClick={() => void deleteItem(item)}>
+                      onClick={() => void deleteItem(item)}
+                    >
                       <Trash2 size={14} aria-hidden="true" />
                     </button>
                   </>
@@ -2346,8 +2394,11 @@ export function QuoteStructuredLinesEditor({
               >
                 <Plus size={13} aria-hidden="true" /> Sous-titre
               </button>
-              <button type="button" onClick={openNewComment}
-                disabled={formOpen || headingEditor !== null || commentEditor !== null}>
+              <button
+                type="button"
+                onClick={openNewComment}
+                disabled={formOpen || headingEditor !== null || commentEditor !== null}
+              >
                 <Plus size={13} aria-hidden="true" /> Texte libre
               </button>
             </div>

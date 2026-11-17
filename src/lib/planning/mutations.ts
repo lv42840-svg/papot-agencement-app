@@ -584,9 +584,7 @@ export function applyPlanningAbsenceRangeMutation(
   const affectedDates = new Set<string>();
   const replacement = [];
   const existing = new Map(
-    payload.absences
-      .filter((row) => row.userId === input.userId)
-      .map((row) => [row.date, row]),
+    payload.absences.filter((row) => row.userId === input.userId).map((row) => [row.date, row]),
   );
   for (let index = 0; index < days; index += 1) {
     const day = new Date(start);
@@ -594,13 +592,14 @@ export function applyPlanningAbsenceRangeMutation(
     const dayId = day.toISOString().slice(0, 10);
     affectedDates.add(dayId);
     const hours = scheduleHoursForDate(schedule, day);
-    if (hours > 0) replacement.push({
-      id: existing.get(dayId)?.id ?? crypto.randomUUID(),
-      userId: input.userId,
-      type: input.type,
-      date: dayId,
-      hours,
-    });
+    if (hours > 0)
+      replacement.push({
+        id: existing.get(dayId)?.id ?? crypto.randomUUID(),
+        userId: input.userId,
+        type: input.type,
+        date: dayId,
+        hours,
+      });
   }
   const touchedGroups = new Set(
     payload.absences
@@ -611,8 +610,11 @@ export function applyPlanningAbsenceRangeMutation(
   payload.absences = [
     ...payload.absences
       .filter((row) => row.userId !== input.userId || !affectedDates.has(row.date))
-      .map((row) => row.weekGroupId && touchedGroups.has(row.weekGroupId)
-        ? { ...row, weekGroupId: undefined } : row),
+      .map((row) =>
+        row.weekGroupId && touchedGroups.has(row.weekGroupId)
+          ? { ...row, weekGroupId: undefined }
+          : row,
+      ),
     ...replacement,
   ];
   return parsePlanningPayload(payload);

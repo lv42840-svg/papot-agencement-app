@@ -21,11 +21,13 @@ export const dynamic = "force-dynamic";
 
 const requestSchema = z.discriminatedUnion("action", [
   z.object({ action: z.literal("REFRESH_SUPPLIERS") }).strict(),
-  z.object({
-    action: z.literal("SET_SUPPLIER_PREFERENCE"),
-    supplierPennylaneId: z.string().regex(/^\d{1,20}$/),
-    defaultGeneralExpenses: z.boolean(),
-  }).strict(),
+  z
+    .object({
+      action: z.literal("SET_SUPPLIER_PREFERENCE"),
+      supplierPennylaneId: z.string().regex(/^\d{1,20}$/),
+      defaultGeneralExpenses: z.boolean(),
+    })
+    .strict(),
   z
     .object({
       action: z.literal("CREATE"),
@@ -107,14 +109,24 @@ export async function POST(request: Request) {
     if (input.action === "SET_SUPPLIER_PREFERENCE") {
       if (isLocalStorageMode()) throw new Error("PENNYLANE_LOCAL_UNAVAILABLE");
       const catalog = await readSupplierCatalog();
-      if (!catalog.synced || !catalog.suppliers.some((supplier) => supplier.id === input.supplierPennylaneId))
+      if (
+        !catalog.synced ||
+        !catalog.suppliers.some((supplier) => supplier.id === input.supplierPennylaneId)
+      )
         throw new Error("PURCHASE_SUPPLIER_PENNYLANE_REQUIRED");
       const payload = await createPurchaseOrdersRepository().mutate((current) => ({
         ...current,
         supplierPreferences: [
-          ...(current.supplierPreferences ?? []).filter((p) => p.supplierPennylaneId !== input.supplierPennylaneId),
+          ...(current.supplierPreferences ?? []).filter(
+            (p) => p.supplierPennylaneId !== input.supplierPennylaneId,
+          ),
           ...(input.defaultGeneralExpenses
-            ? [{ supplierPennylaneId: input.supplierPennylaneId, defaultDestination: "GENERAL_EXPENSES" as const }]
+            ? [
+                {
+                  supplierPennylaneId: input.supplierPennylaneId,
+                  defaultDestination: "GENERAL_EXPENSES" as const,
+                },
+              ]
             : []),
         ],
       }));

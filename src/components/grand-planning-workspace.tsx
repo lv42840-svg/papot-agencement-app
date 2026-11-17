@@ -1359,7 +1359,9 @@ export function GrandPlanningWorkspace({
                 <button
                   type="button"
                   className="secondaryButton"
-                  disabled={!snapshot.capabilities.canManageSchedules || savingKey === "planning-mutation"}
+                  disabled={
+                    !snapshot.capabilities.canManageSchedules || savingKey === "planning-mutation"
+                  }
                   onClick={() => void saveAbsenceRange()}
                 >
                   Enregistrer la période d’absence

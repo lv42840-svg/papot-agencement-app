@@ -148,10 +148,15 @@ export const purchaseOrdersPayloadSchema = z.object({
   nextNumber: z.number().int().positive().safe(),
   orders: z.array(purchaseOrderSchema),
   /** Réglage analytique PAPOT, les identités fournisseurs restent dans Pennylane. */
-  supplierPreferences: z.array(z.object({
-    supplierPennylaneId: z.string().regex(/^\d{1,20}$/),
-    defaultDestination: z.literal("GENERAL_EXPENSES"),
-  })).max(5000).optional(),
+  supplierPreferences: z
+    .array(
+      z.object({
+        supplierPennylaneId: z.string().regex(/^\d{1,20}$/),
+        defaultDestination: z.literal("GENERAL_EXPENSES"),
+      }),
+    )
+    .max(5000)
+    .optional(),
 });
 export type PurchaseOrdersPayload = z.infer<typeof purchaseOrdersPayloadSchema>;
 
