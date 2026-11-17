@@ -30,6 +30,12 @@ const requestSchema = z.discriminatedUnion("action", [
     .strict(),
   z
     .object({
+      action: z.literal("SET_SUPPLIER_PREFERENCES"),
+      supplierPennylaneIds: z.array(z.string().regex(/^\d{1,20}$/)).max(5000),
+    })
+    .strict(),
+  z
+    .object({
       action: z.literal("CREATE"),
       requestId: z.string().uuid(),
       order: purchaseOrderInputSchema,
@@ -105,6 +111,25 @@ export async function POST(request: Request) {
     if (input.action === "REFRESH_SUPPLIERS") {
       if (isLocalStorageMode()) throw new Error("PENNYLANE_LOCAL_UNAVAILABLE");
       return json({ supplierCount: await refreshSupplierCatalog() });
+    }
+    if (input.action === "SET_SUPPLIER_PREFERENCES") {
+      if (isLocalStorageMode()) throw new Error("PENNYLANE_LOCAL_UNAVAILABLE");
+      const catalog = await readSupplierCatalog();
+      if (!catalog.synced) throw new Error("PURCHASE_SUPPLIER_PENNYLANE_REQUIRED");
+      const allowed = new Set(catalog.suppliers.map((supplier) => supplier.id));
+      const requested = new Set(input.supplierPennylaneIds);
+      if (requested.size !== input.supplierPennylaneIds.length ||
+          input.supplierPennylaneIds.some((id) => !allowed.has(id))) {
+        throw new Error("PURCHASE_SUPPLIER_PENNYLANE_REQUIRED");
+      }
+      const payload = await createPurchaseOrdersRepository().mutate((current) => ({
+        ...current,
+        supplierPreferences: input.supplierPennylaneIds.map((supplierPennylaneId) => ({
+          supplierPennylaneId,
+          defaultDestination: "GENERAL_EXPENSES" as const,
+        })),
+      }));
+      return json({ payload, canWrite: true });
     }
     if (input.action === "SET_SUPPLIER_PREFERENCE") {
       if (isLocalStorageMode()) throw new Error("PENNYLANE_LOCAL_UNAVAILABLE");
