@@ -108,6 +108,7 @@ async function snapshot(
         id: chantier.id,
         name: chantier.name,
         reference: chantier.reference,
+        clientName: chantier.clientName,
         status: chantier.status,
         plannedHours: chantier.plannedHours,
         actualHours: actual,
