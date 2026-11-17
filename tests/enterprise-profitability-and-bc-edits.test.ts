@@ -154,7 +154,7 @@ describe("rentabilité entreprise", () => {
     expect(api).toContain('requireModuleRequestContext("purchases", "WRITE")');
     expect(ui).toContain("expectedUpdatedAt: original.updatedAt");
     expect(ui).toContain("Enregistrer les modifications");
-    expect(ui).toContain("Ajouter un chantier");
+    expect(ui).toContain("Ajouter les destinations sélectionnées");
     expect(ui).toContain("Ajouter un article");
     expect(pdf).not.toContain("Document interne - non envoye automatiquement au fournisseur");
   });
