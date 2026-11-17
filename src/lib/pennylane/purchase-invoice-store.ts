@@ -6,6 +6,7 @@ import { runServerDbMigrations } from "@/lib/server-db/migrations";
 import { withServerDbTransaction } from "@/lib/server-db/transaction";
 import { parsePurchaseOrdersPayload, type PurchaseOrder } from "@/lib/purchases/domain";
 import { parseChantiersPayload } from "@/lib/chantiers/domain";
+import { planGeneralExpensesAllocations } from "./general-expenses-auto-allocation";
 import {
   assertInvoiceComplete,
   calculateInvoiceAllocation,
@@ -333,6 +334,89 @@ export async function writePurchaseInvoiceAllocation(
       approved,
       history,
       updatedAt: now,
+    };
+  }, pool);
+}
+
+
+export type GeneralExpensesAutoAllocationResult = {
+  supplierCount: number;
+  matchingSupplierInvoices: number;
+  assigned: number;
+  skippedExisting: number;
+  skippedDuplicate: number;
+  skippedInvalid: number;
+};
+
+/**
+ * Batch operation over the entire imported Pennylane staging table (not the
+ * 500-row screen). It creates only new PAPOT drafts, never an approval or a
+ * change in Pennylane. The lock also protects against concurrent imports and
+ * individual changes to the same invoice.
+ */
+export async function autoAllocateImportedGeneralExpensesInvoices(
+  actor: string,
+  pool: Pool = getServerDbPool(),
+): Promise<GeneralExpensesAutoAllocationResult> {
+  await runServerDbMigrations(pool);
+  return withServerDbTransaction(async (client) => {
+    await client.query("SELECT pg_advisory_xact_lock($1)", ["7332170416238558"]);
+    const imported = await client.query(
+      "SELECT 1 FROM papot_pennylane_sync_state WHERE resource = 'supplier_invoices'",
+    );
+    if (!imported.rows[0]) throw new Error("INVOICE_NOT_IMPORTED");
+
+    const preferences = await client.query<{ payload: unknown }>(
+      "SELECT payload FROM papot_purchase_orders_state WHERE scope = 'global' FOR SHARE",
+    );
+    const configured = new Set(
+      (parsePurchaseOrdersPayload(preferences.rows[0]?.payload).supplierPreferences ?? [])
+        .filter((row) => row.defaultDestination === "GENERAL_EXPENSES")
+        .map((row) => row.supplierPennylaneId),
+    );
+    if (configured.size === 0) throw new Error("INVOICE_FG_SUPPLIERS_NOT_CONFIGURED");
+
+    const result = await client.query<InvoiceRow & { stored_invoice_id: string | null }>(
+      "SELECT s.external_id, s.payload, a.invoice_id AS stored_invoice_id FROM papot_pennylane_staging s LEFT JOIN papot_pennylane_purchase_allocations a ON a.invoice_id = s.external_id WHERE s.resource = 'supplier_invoices' ORDER BY s.external_id",
+    );
+    const plan = planGeneralExpensesAllocations(
+      result.rows.map((row) => ({
+        source: invoiceSource(row, new Map()),
+        alreadyAllocated: row.stored_invoice_id !== null,
+      })),
+      configured,
+    );
+    let assigned = 0;
+    const now = new Date().toISOString();
+    // One transaction, batched inserts, unique invoice IDs: repeat clicks are idempotent.
+    for (let index = 0; index < plan.candidates.length; index += 200) {
+      const records = plan.candidates.slice(index, index + 200).map((item) => ({
+        invoice_id: item.invoiceId,
+        draft: item.draft,
+        history: [{
+          at: now,
+          actor,
+          action: "SAVE",
+          version: 1,
+          previousDraft: null,
+          previousApproved: null,
+          newDraft: item.draft,
+          newApproved: null,
+        }],
+      }));
+      const written = await client.query<{ invoice_id: string }>(
+        "INSERT INTO papot_pennylane_purchase_allocations (invoice_id, version, draft, approved, history, updated_at) SELECT x.invoice_id, 1, x.draft, NULL, x.history, NOW() FROM jsonb_to_recordset($1::jsonb) AS x(invoice_id TEXT, draft JSONB, history JSONB) ON CONFLICT (invoice_id) DO NOTHING RETURNING invoice_id",
+        [JSON.stringify(records)],
+      );
+      assigned += written.rowCount ?? 0;
+    }
+    return {
+      supplierCount: configured.size,
+      matchingSupplierInvoices: plan.matchingSupplierInvoices,
+      assigned,
+      skippedExisting: plan.skippedExisting + (plan.candidates.length - assigned),
+      skippedDuplicate: plan.skippedDuplicate,
+      skippedInvalid: plan.skippedInvalid,
     };
   }, pool);
 }
