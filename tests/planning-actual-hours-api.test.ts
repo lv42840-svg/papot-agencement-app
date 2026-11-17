@@ -11,8 +11,7 @@ describe("planning actual-hours API", () => {
     expect(routeSource).toContain(
       'requireSpecialPermission(context.user, "planning.enter_actual_hours")',
     );
-    expect(routeSource).toContain(
-      'if (!isPlanningWeekCurrentOrPast(input.week)) throw new Error("PLANNING_ACTUAL_HOURS_WEEK_IN_FUTURE")',
-    );
+    expect(routeSource).toContain("if (!isPlanningWeekCurrentOrPast(input.week))");
+    expect(routeSource).toContain('throw new Error("PLANNING_ACTUAL_HOURS_WEEK_IN_FUTURE")');
   });
 });
