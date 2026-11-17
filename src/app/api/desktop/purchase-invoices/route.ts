@@ -105,12 +105,14 @@ export async function GET() {
     if (isLocalStorageMode()) {
       return json({
         invoices: [],
+        validatedInvoices: [],
         suppliers: [],
         chantiers: [],
         orders: [],
         orderBalances: {},
         lastImportedAt: null,
         truncated: false,
+        validatedTruncated: false,
         importEnabled: false,
         fgSupplierCount: 0,
         canWrite: context.moduleAccess.canWrite,

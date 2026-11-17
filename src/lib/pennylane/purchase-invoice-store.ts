@@ -92,6 +92,8 @@ function duplicateKey(source: InvoiceSource): string | null {
 }
 
 export type PurchaseInvoiceListItem = InvoiceSource & {
+  /** false pour une facture historisée mais plus présente dans le dernier import Pennylane. */
+  availableInPennylane: boolean;
   workflow: ReturnType<typeof invoiceWorkflowState>;
   state: InvoiceAllocationState | null;
   duplicateIds: string[];
@@ -100,11 +102,14 @@ export type PurchaseInvoiceListItem = InvoiceSource & {
     reference: string;
     amountHtCents: number;
     chantierName: string;
+    clientName: string;
+    createdAt: string;
   }>;
 };
 
 export type PurchaseInvoiceWorkspaceData = {
   invoices: PurchaseInvoiceListItem[];
+  validatedInvoices: PurchaseInvoiceListItem[];
   suppliers: Array<{ id: string; name: string }>;
   chantiers: Array<{ id: string; name: string; status: string }>;
   orders: PurchaseOrder[];
@@ -114,6 +119,7 @@ export type PurchaseInvoiceWorkspaceData = {
   >;
   lastImportedAt: string | null;
   truncated: boolean;
+  validatedTruncated: boolean;
   importEnabled: boolean;
   fgSupplierCount: number;
 };
@@ -122,25 +128,43 @@ export async function readPurchaseInvoiceWorkspace(
   pool: Pool = getServerDbPool(),
 ): Promise<PurchaseInvoiceWorkspaceData> {
   await runServerDbMigrations(pool);
-  const [invoiceRows, supplierRows, allocationRows, ordersResult, sitesResult, stateResult] =
-    await Promise.all([
-      pool.query<InvoiceRow>(
-        "SELECT external_id, payload FROM papot_pennylane_staging WHERE resource = 'supplier_invoices' ORDER BY external_id DESC LIMIT 501",
-      ),
-      pool.query<InvoiceRow>(
-        "SELECT external_id, payload FROM papot_pennylane_staging WHERE resource = 'suppliers' ORDER BY external_id LIMIT 20001",
-      ),
-      pool.query<AllocationRow>("SELECT * FROM papot_pennylane_purchase_allocations"),
-      pool.query<{ payload: unknown }>(
-        "SELECT payload FROM papot_purchase_orders_state WHERE scope = 'global'",
-      ),
-      pool.query<{ payload: unknown }>(
-        "SELECT payload FROM papot_chantiers_state WHERE scope = 'global'",
-      ),
-      pool.query<{ synced_at: Date }>(
-        "SELECT synced_at FROM papot_pennylane_sync_state WHERE resource = 'supplier_invoices'",
-      ),
-    ]);
+  const [
+    invoiceRows,
+    validatedRows,
+    supplierRows,
+    allocationRows,
+    ordersResult,
+    sitesResult,
+    stateResult,
+  ] = await Promise.all([
+    pool.query<InvoiceRow>(
+      "SELECT external_id, payload FROM papot_pennylane_staging WHERE resource = 'supplier_invoices' ORDER BY external_id DESC LIMIT 501",
+    ),
+    pool.query<InvoiceRow & { source_current: boolean }>(`
+        SELECT a.invoice_id AS external_id, COALESCE(s.payload, h.payload) AS payload,
+               (s.external_id IS NOT NULL) AS source_current
+        FROM papot_pennylane_purchase_allocations a
+        LEFT JOIN papot_pennylane_staging s
+          ON s.resource = 'supplier_invoices' AND s.external_id = a.invoice_id
+        LEFT JOIN papot_pennylane_supplier_invoice_archive h ON h.invoice_id = a.invoice_id
+        WHERE a.approved IS NOT NULL
+          AND (s.external_id IS NOT NULL OR h.invoice_id IS NOT NULL)
+        ORDER BY a.updated_at DESC LIMIT 501
+      `),
+    pool.query<InvoiceRow>(
+      "SELECT external_id, payload FROM papot_pennylane_staging WHERE resource = 'suppliers' ORDER BY external_id LIMIT 20001",
+    ),
+    pool.query<AllocationRow>("SELECT * FROM papot_pennylane_purchase_allocations"),
+    pool.query<{ payload: unknown }>(
+      "SELECT payload FROM papot_purchase_orders_state WHERE scope = 'global'",
+    ),
+    pool.query<{ payload: unknown }>(
+      "SELECT payload FROM papot_chantiers_state WHERE scope = 'global'",
+    ),
+    pool.query<{ synced_at: Date }>(
+      "SELECT synced_at FROM papot_pennylane_sync_state WHERE resource = 'supplier_invoices'",
+    ),
+  ]);
   const suppliers = supplierRows.rows.slice(0, 20000).map((row) => ({
     id: row.external_id,
     name: str(row.payload.name) || "Fournisseur #" + row.external_id,
@@ -150,9 +174,17 @@ export async function readPurchaseInvoiceWorkspace(
   const purchases = parsePurchaseOrdersPayload(ordersResult.rows[0]?.payload);
   const orders = purchases.orders;
   const sites = parseChantiersPayload(sitesResult.rows[0]?.payload).chantiers;
+  const sitesById = new Map(sites.map((site) => [site.id, site]));
   const sources = invoiceRows.rows.slice(0, 500).map((row) => invoiceSource(row, bySupplierId));
+  const validatedSources = validatedRows.rows.slice(0, 500).map((row) => ({
+    source: invoiceSource(row, bySupplierId),
+    availableInPennylane: row.source_current,
+  }));
   const duplicates = new Map<string, string[]>();
-  for (const item of sources) {
+  const uniqueSources = new Map(
+    [...sources, ...validatedSources.map((row) => row.source)].map((row) => [row.id, row]),
+  );
+  for (const item of uniqueSources.values()) {
     const key = duplicateKey(item);
     if (key) duplicates.set(key, [...(duplicates.get(key) ?? []), item.id]);
   }
@@ -184,11 +216,15 @@ export async function readPurchaseInvoiceWorkspace(
     }),
   );
 
-  const invoices = sources.map((source) => {
+  const toListItem = (
+    source: InvoiceSource,
+    availableInPennylane: boolean,
+  ): PurchaseInvoiceListItem => {
     const state = states.get(source.id) ?? null;
     const key = duplicateKey(source);
     return {
       ...source,
+      availableInPennylane,
       workflow: invoiceWorkflowState(source, state),
       state,
       duplicateIds: key ? (duplicates.get(key) ?? []).filter((id) => id !== source.id) : [],
@@ -205,17 +241,33 @@ export async function readPurchaseInvoiceWorkspace(
           reference: order.reference,
           amountHtCents: order.amountHtCents,
           chantierName: order.chantierName,
+          createdAt: order.createdAt,
+          clientName: [
+            ...new Set(
+              purchaseOrderAllocations(order)
+                .map((allocation) =>
+                  allocation.chantierId
+                    ? (sitesById.get(allocation.chantierId)?.clientName ?? "")
+                    : "",
+                )
+                .filter(Boolean),
+            ),
+          ].join(", "),
         })),
     };
-  });
+  };
   return {
-    invoices,
+    invoices: sources.map((source) => toListItem(source, true)),
+    validatedInvoices: validatedSources.map((row) =>
+      toListItem(row.source, row.availableInPennylane),
+    ),
     suppliers,
     orders,
     orderBalances,
     chantiers: sites.map((site) => ({ id: site.id, name: site.name, status: site.status })),
     lastImportedAt: stateResult.rows[0]?.synced_at.toISOString() ?? null,
     truncated: invoiceRows.rows.length > 500 || supplierRows.rows.length > 20000,
+    validatedTruncated: validatedRows.rows.length > 500,
     importEnabled: process.env.PAPOT_PENNYLANE_ENABLED === "true",
     fgSupplierCount: purchases.supplierPreferences?.length ?? 0,
   };
@@ -498,9 +550,26 @@ export async function readValidatedPurchaseCosts(pool: Pool = getServerDbPool())
     "SELECT 1 FROM papot_pennylane_sync_state WHERE resource = 'supplier_invoices'",
   );
   if (!imported.rows[0]) return { imported: false, byChantier: {}, provisionalByChantier: {} };
-  const result = await pool.query<InvoiceRow & { approved: ApprovedInvoiceAllocation | null }>(
-    "SELECT s.external_id, s.payload, a.approved, a.draft FROM papot_pennylane_staging s LEFT JOIN papot_pennylane_purchase_allocations a ON a.invoice_id = s.external_id WHERE s.resource = 'supplier_invoices'",
-  );
+  // Une facture validée reste dans le suivi même si le nouveau snapshot
+  // Pennylane ne la renvoie plus. La copie courante est toujours prioritaire.
+  const result = await pool.query<
+    InvoiceRow & {
+      approved: ApprovedInvoiceAllocation | null;
+      draft: InvoiceAllocationDraft | null;
+      source_missing: boolean;
+    }
+  >(`
+    SELECT a.invoice_id AS external_id,
+           COALESCE(s.payload, h.payload) AS payload,
+           a.approved, a.draft,
+           (s.external_id IS NULL) AS source_missing
+    FROM papot_pennylane_purchase_allocations a
+    LEFT JOIN papot_pennylane_staging s
+      ON s.resource = 'supplier_invoices' AND s.external_id = a.invoice_id
+    LEFT JOIN papot_pennylane_supplier_invoice_archive h
+      ON h.invoice_id = a.invoice_id
+    WHERE a.approved IS NOT NULL AND (s.external_id IS NOT NULL OR h.invoice_id IS NOT NULL)
+  `);
   const byChantier: Record<string, number> = {};
   const provisionalByChantier: Record<string, boolean> = {};
   for (const row of result.rows) {
@@ -510,12 +579,9 @@ export async function readValidatedPurchaseCosts(pool: Pool = getServerDbPool())
     if (source.accountingStatus !== "complete") continue;
     const calc = calculateInvoiceAllocation(row.approved.draft);
     const provisional =
+      row.source_missing ||
       source.sourceRevision !== row.approved.sourceRevision ||
-      Boolean(
-        (row as typeof row & { draft: InvoiceAllocationDraft | null }).draft &&
-          JSON.stringify((row as typeof row & { draft: InvoiceAllocationDraft | null }).draft) !==
-            JSON.stringify(row.approved.draft),
-      );
+      Boolean(row.draft && JSON.stringify(row.draft) !== JSON.stringify(row.approved.draft));
     for (const allocation of calc.destinations) {
       if (allocation.destination.kind !== "CHANTIER") continue;
       const id = allocation.destination.chantierId!;

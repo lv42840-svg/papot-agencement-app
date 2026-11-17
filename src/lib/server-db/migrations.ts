@@ -38,6 +38,8 @@ const PENNYLANE_CONNECTION_VERSION = 18;
 const PENNYLANE_PURCHASE_ALLOCATION_VERSION = 19;
 const PENNYLANE_PURCHASE_ALLOCATION_NAME = "pennylane_purchase_allocations";
 const PENNYLANE_CLIENT_LINK_VERSION = 20;
+const PENNYLANE_SUPPLIER_INVOICE_ARCHIVE_VERSION = 21;
+const PENNYLANE_SUPPLIER_INVOICE_ARCHIVE_NAME = "pennylane_supplier_invoice_archive";
 const PENNYLANE_CLIENT_LINK_NAME = "pennylane_client_identity";
 const PENNYLANE_CONNECTION_NAME = "pennylane_encrypted_connection";
 const PENNYLANE_STAGING_NAME = "pennylane_readonly_staging";
@@ -566,6 +568,17 @@ async function ensurePennylaneStaging(client: PoolClient): Promise<void> {
   `);
 }
 
+/** Dernière copie connue d'une facture validée, indépendante des imports successifs. */
+async function ensurePennylaneSupplierInvoiceArchive(client: PoolClient): Promise<void> {
+  await client.query(`
+    CREATE TABLE IF NOT EXISTS papot_pennylane_supplier_invoice_archive (
+      invoice_id TEXT PRIMARY KEY,
+      payload JSONB NOT NULL CHECK (jsonb_typeof(payload) = 'object'),
+      last_seen_at TIMESTAMPTZ NOT NULL
+    )
+  `);
+}
+
 async function ensurePennylaneConnection(client: PoolClient): Promise<void> {
   await client.query(`
     CREATE TABLE IF NOT EXISTS papot_pennylane_connection (
@@ -814,6 +827,13 @@ export async function runServerDbMigrations(
       `INSERT INTO papot_schema_migrations (version, name)
        VALUES ($1, $2) ON CONFLICT (version) DO NOTHING`,
       [PENNYLANE_PURCHASE_ALLOCATION_VERSION, PENNYLANE_PURCHASE_ALLOCATION_NAME],
+    );
+
+    await ensurePennylaneSupplierInvoiceArchive(client);
+    await client.query(
+      `INSERT INTO papot_schema_migrations (version, name)
+       VALUES ($1, $2) ON CONFLICT (version) DO NOTHING`,
+      [PENNYLANE_SUPPLIER_INVOICE_ARCHIVE_VERSION, PENNYLANE_SUPPLIER_INVOICE_ARCHIVE_NAME],
     );
 
     await ensurePennylaneClientLinks(client);
