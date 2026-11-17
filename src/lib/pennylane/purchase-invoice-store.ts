@@ -111,6 +111,7 @@ export type PurchaseInvoiceWorkspaceData = {
   lastImportedAt: string | null;
   truncated: boolean;
   importEnabled: boolean;
+  fgSupplierCount: number;
 };
 
 export async function readPurchaseInvoiceWorkspace(
@@ -142,7 +143,8 @@ export async function readPurchaseInvoiceWorkspace(
   }));
   const bySupplierId = new Map(suppliers.map((row) => [row.id, row.name]));
   const states = new Map(allocationRows.rows.map((row) => [row.invoice_id, stateOf(row)]));
-  const orders = parsePurchaseOrdersPayload(ordersResult.rows[0]?.payload).orders;
+  const purchases = parsePurchaseOrdersPayload(ordersResult.rows[0]?.payload);
+  const orders = purchases.orders;
   const sites = parseChantiersPayload(sitesResult.rows[0]?.payload).chantiers;
   const sources = invoiceRows.rows.slice(0, 500).map((row) => invoiceSource(row, bySupplierId));
   const duplicates = new Map<string, string[]>();
@@ -211,6 +213,7 @@ export async function readPurchaseInvoiceWorkspace(
     lastImportedAt: stateResult.rows[0]?.synced_at.toISOString() ?? null,
     truncated: invoiceRows.rows.length > 500 || supplierRows.rows.length > 20000,
     importEnabled: process.env.PAPOT_PENNYLANE_ENABLED === "true",
+    fgSupplierCount: purchases.supplierPreferences?.length ?? 0,
   };
 }
 
