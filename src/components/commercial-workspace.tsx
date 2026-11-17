@@ -1109,7 +1109,7 @@ function StatusSection({
                 <option value="CHIFFRAGE">Chiffrage en cours</option>
                 {canConfirm ? <option value="CONFIRMED">Confirmée</option> : null}
                 <option value="LOST">Perdu</option>
-                </select>
+              </select>
             </Field>
             {followUpDateNeeded ? (
               <Field
@@ -1591,7 +1591,6 @@ function CloseSection({
         >
           Perdu
         </button>
-
       </div>
     </details>
   );

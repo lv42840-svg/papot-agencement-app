@@ -1076,7 +1076,9 @@ function FollowUp({
         nextDate: nextStatus === "LOST" ? undefined : nextDate || undefined,
         closingReason: nextStatus === "LOST" ? closingReason : undefined,
       },
-      nextStatus === "LOST" ? "Relance enregistrée, affaire classée Perdu." : "Relance enregistrée.",
+      nextStatus === "LOST"
+        ? "Relance enregistrée, affaire classée Perdu."
+        : "Relance enregistrée.",
     );
   }
 
@@ -1139,7 +1141,8 @@ function FollowUp({
           disabled={busy || !summary.trim()}
           onClick={() => void saveFollowUp()}
         >
-          <Clock3 size={14} /> {nextStatus === "LOST" ? "Classer comme perdu" : "Enregistrer la relance"}
+          <Clock3 size={14} />{" "}
+          {nextStatus === "LOST" ? "Classer comme perdu" : "Enregistrer la relance"}
         </button>
       ) : null}
       {confirmOpen ? (

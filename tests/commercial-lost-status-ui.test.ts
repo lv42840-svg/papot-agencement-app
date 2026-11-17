@@ -9,10 +9,7 @@ const workspaceV2 = readFileSync(
   new URL("../src/components/commercial-workspace-v2.tsx", import.meta.url),
   "utf8",
 );
-const domain = readFileSync(
-  new URL("../src/lib/commercial/domain.ts", import.meta.url),
-  "utf8",
-);
+const domain = readFileSync(new URL("../src/lib/commercial/domain.ts", import.meta.url), "utf8");
 const route = readFileSync(
   new URL("../src/app/api/desktop/commercial/route.ts", import.meta.url),
   "utf8",
@@ -26,7 +23,7 @@ describe("commercial lost status in the direct status editor", () => {
     );
     expect(editor).toContain('<option value="LOST">Perdu</option>');
     expect(editor).not.toContain('<option value="ABANDONED">');
-    expect(workspace).not.toContain("status: \"ABANDONED\", reason");
+    expect(workspace).not.toContain('status: "ABANDONED", reason');
   });
 
   it("propose Perdu dans les deux menus de la V2 réellement utilisée", () => {
@@ -36,7 +33,7 @@ describe("commercial lost status in the direct status editor", () => {
     );
     expect(options).toContain('"LOST"');
     expect(options).not.toContain('"ABANDONED"');
-    expect(workspaceV2).toContain('COMMERCIAL_FOLLOW_STATUS_OPTIONS.map((value)');
+    expect(workspaceV2).toContain("COMMERCIAL_FOLLOW_STATUS_OPTIONS.map((value)");
     expect(workspaceV2.split("COMMERCIAL_FOLLOW_STATUS_OPTIONS.map((value)").length - 1).toBe(2);
     expect(workspaceV2).toContain('if (status === "LOST")');
     expect(workspaceV2).toContain('action: "close"');
