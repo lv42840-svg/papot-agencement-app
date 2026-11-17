@@ -163,7 +163,7 @@ describeIfPostgres("Pennylane purchase invoice workflow in isolated PostgreSQL",
       writePurchaseInvoiceAllocation("VALIDATE", id, 2, revision, draft(), "Nadia", pool),
     ).rejects.toThrow("INVOICE_SOURCE_CHANGED");
   });
-  it("pré-affecte toutes les factures FG une fois sans modifier les validations ni les montants", async () => {
+  it("valide immédiatement les FG éligibles dans PAPOT une seule fois, même avant Pennylane", async () => {
     const { parsePurchaseOrdersPayload } = await import("../src/lib/purchases/domain");
     const saved = await pool.query<{ payload: unknown }>(
       "SELECT payload FROM papot_purchase_orders_state WHERE scope = 'global'",
@@ -200,7 +200,7 @@ describeIfPostgres("Pennylane purchase invoice workflow in isolated PostgreSQL",
       const read = await pool.query<{
         version: number;
         draft: InvoiceAllocationDraft;
-        approved: unknown;
+        approved: { validatedBy: string; amountHtCents: number; sourceRevision: string } | null;
         history: Array<{ action: string; actor: string }>;
       }>(
         "SELECT version, draft, approved, history FROM papot_pennylane_purchase_allocations WHERE invoice_id=$1",
@@ -212,8 +212,15 @@ describeIfPostgres("Pennylane purchase invoice workflow in isolated PostgreSQL",
         chantierId: null,
       });
       expect(read.rows[0].draft.rows[0].amountHtCents).toBe(4915);
-      expect(read.rows[0].approved).toBeNull();
-      expect(read.rows[0].history[0]).toMatchObject({ actor: "Lucien", action: "SAVE" });
+      expect(read.rows[0].approved).toMatchObject({
+        validatedBy: "Lucien",
+        amountHtCents: 4915,
+      });
+      const imported = await readPurchaseInvoiceWorkspace(pool);
+      expect(imported.invoices.find((item) => item.id === otherId)?.workflow).toBe(
+        "AWAITING_PENNYLANE",
+      );
+      expect(read.rows[0].history[0]).toMatchObject({ actor: "Lucien", action: "VALIDATE" });
       const second = await autoAllocateImportedGeneralExpensesInvoices("Nadia", pool);
       expect(second.assigned).toBe(0);
       expect(second.skippedExisting).toBeGreaterThanOrEqual(2);
@@ -231,6 +238,81 @@ describeIfPostgres("Pennylane purchase invoice workflow in isolated PostgreSQL",
         "DELETE FROM papot_pennylane_staging WHERE resource='supplier_invoices' AND external_id=$1",
         [otherId],
       );
+      await pool.query(
+        "UPDATE papot_purchase_orders_state SET payload=$1::jsonb WHERE scope='global'",
+        [JSON.stringify(original)],
+      );
+    }
+  });
+  it("ne valide jamais automatiquement une facture d'un fournisseur FG ayant un BC chantier à rapprocher", async () => {
+    const { addPurchaseOrder, parsePurchaseOrdersPayload } = await import(
+      "../src/lib/purchases/domain"
+    );
+    const thirdId = "987654321015";
+    const otherSupplier = "987654321016";
+    const chantierId = "77777777-7777-4777-8777-777777777777";
+    const original = (
+      await pool.query<{ payload: unknown }>(
+        "SELECT payload FROM papot_purchase_orders_state WHERE scope = 'global'",
+      )
+    ).rows[0]?.payload;
+    const purchase = addPurchaseOrder(
+      parsePurchaseOrdersPayload(original),
+      "88888888-8888-4888-8888-888888888888",
+      {
+        mode: "QUICK",
+        allocations: [{ chantierId, destinationType: "CHANTIER", amountHtCents: 2500 }],
+        supplierName: "Fournisseur chantiers",
+        supplierPennylaneId: otherSupplier,
+        description: "BC à rapprocher manuellement",
+      },
+      new Map([[chantierId, "Chantier essai"]]),
+      "Lucien",
+    );
+    await pool.query(
+      "UPDATE papot_purchase_orders_state SET payload=$1::jsonb WHERE scope='global'",
+      [
+        JSON.stringify({
+          ...purchase,
+          supplierPreferences: [
+            { supplierPennylaneId: otherSupplier, defaultDestination: "GENERAL_EXPENSES" },
+          ],
+        }),
+      ],
+    );
+    try {
+      await pool.query(
+        "INSERT INTO papot_pennylane_staging (resource, external_id, payload, synced_at) VALUES ('supplier_invoices',$1,$2::jsonb,NOW())",
+        [
+          thirdId,
+          JSON.stringify({
+            ...basePayload,
+            id: Number(thirdId),
+            supplier: { id: Number(otherSupplier) },
+            invoice_number: "FC-CHANTIER-INCERTAIN",
+            currency_amount_before_tax: "25.00",
+          }),
+        ],
+      );
+      const batch = await autoAllocateImportedGeneralExpensesInvoices(
+        "PAPOT · synchronisation",
+        pool,
+      );
+      expect(batch.skippedChantierOrder).toBe(1);
+      expect(batch.assigned).toBe(0);
+      const state = await pool.query(
+        "SELECT approved FROM papot_pennylane_purchase_allocations WHERE invoice_id=$1",
+        [thirdId],
+      );
+      expect(state.rows).toHaveLength(0);
+    } finally {
+      await pool.query(
+        "DELETE FROM papot_pennylane_staging WHERE resource='supplier_invoices' AND external_id=$1",
+        [thirdId],
+      );
+      await pool.query("DELETE FROM papot_pennylane_purchase_allocations WHERE invoice_id=$1", [
+        thirdId,
+      ]);
       await pool.query(
         "UPDATE papot_purchase_orders_state SET payload=$1::jsonb WHERE scope='global'",
         [JSON.stringify(original)],

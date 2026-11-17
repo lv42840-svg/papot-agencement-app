@@ -205,53 +205,6 @@ export function PurchaseOrdersWorkspace({ chantierId }: { chantierId?: string })
     );
     setError("");
   }
-  async function autoAssignFgInvoices() {
-    if (!snapshot?.canWrite || busy || !snapshot.payload.supplierPreferences?.length) return;
-    if (
-      !window.confirm(
-        "Actualiser Pennylane et pré-affecter toutes les factures non traitées des fournisseurs FG ? " +
-          "Les factures déjà affectées et les doublons seront préservés. " +
-          "Il restera à valider les affectations dans PAPOT.",
-      )
-    )
-      return;
-    setBusy(true);
-    setError("");
-    setNotice("");
-    try {
-      const response = await fetch("/api/desktop/purchase-invoices", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        cache: "no-store",
-        body: JSON.stringify({ action: "AUTO_ASSIGN_FG" }),
-      });
-      const body = (await response.json()) as {
-        result?: {
-          assigned: number;
-          supplierCount: number;
-          matchingSupplierInvoices: number;
-          skippedExisting: number;
-          skippedDuplicate: number;
-          skippedInvalid: number;
-        };
-        error?: string;
-      };
-      if (!response.ok || !body.result) {
-        throw new Error(body.error ?? "Affectation des factures FG impossible.");
-      }
-      const result = body.result;
-      setNotice(
-        `${result.assigned} facture(s) pré-affectée(s) aux frais généraux parmi ${result.matchingSupplierInvoices} facture(s) des ${result.supplierCount} fournisseurs FG. ` +
-          `${result.skippedExisting} déjà traitée(s), ${result.skippedDuplicate} doublon(s), ${result.skippedInvalid} facture(s) à vérifier. ` +
-          "Aucune validation financière automatique. Ouvre Factures fournisseurs pour contrôler.",
-      );
-    } catch (cause) {
-      setError(messageFor(cause instanceof Error ? cause.message : "INVOICE_ERROR"));
-    } finally {
-      setBusy(false);
-    }
-  }
-
   async function refreshSuppliers() {
     if (!snapshot?.canWrite || busy) return;
     setBusy(true);
@@ -472,15 +425,6 @@ export function PurchaseOrdersWorkspace({ chantierId }: { chantierId?: string })
             }}
           >
             Fournisseurs · Frais généraux
-          </button>
-          <button
-            type="button"
-            className="secondaryButton"
-            disabled={!snapshot?.canWrite || busy || !snapshot?.payload.supplierPreferences?.length}
-            title="Actualise Pennylane et crée des brouillons FG, sans validation financière"
-            onClick={() => void autoAssignFgInvoices()}
-          >
-            Affecter les factures des fournisseurs FG
           </button>
         </div>
       </div>

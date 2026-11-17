@@ -14,6 +14,22 @@ import type { PurchaseInvoiceWorkspaceData } from "@/lib/pennylane/purchase-invo
 
 type ResponseBody = PurchaseInvoiceWorkspaceData & { canWrite: boolean; error?: string };
 type Line = { id: string; label: string; amountHtCents: number | null };
+type FgAssignmentResult = {
+  assigned: number;
+  supplierCount: number;
+  matchingSupplierInvoices: number;
+  skippedExisting: number;
+  skippedChantierOrder: number;
+  skippedDuplicate: number;
+  skippedInvalid: number;
+};
+function fgAssignmentSummary(result: FgAssignmentResult): string {
+  return (
+    `${result.assigned} facture(s) validée(s) en frais généraux dans PAPOT sur ${result.matchingSupplierInvoices} facture(s) de ${result.supplierCount} fournisseur(s) FG. ` +
+    `${result.skippedExisting} déjà affectée(s), ${result.skippedChantierOrder} rapprochement(s) BC chantier/SAV à vérifier, ${result.skippedDuplicate} doublon(s), ${result.skippedInvalid} autre(s) anomalie(s). ` +
+    "Les factures non validées dans Pennylane restent provisoires."
+  );
+}
 
 const money = (value: number | null) =>
   value === null
@@ -178,14 +194,14 @@ export function PurchaseInvoicesWorkspace() {
     }));
     setNotice("Répartition du BC reprise. Vérifie les montants et les éventuels frais.");
   }
-  async function mutate(action: "SAVE" | "VALIDATE" | "REFRESH") {
+  async function mutate(action: "SAVE" | "VALIDATE" | "REFRESH" | "AUTO_ASSIGN_FG") {
     if (busy) return;
     setBusy(true);
     setError("");
     setNotice("");
     try {
       const body =
-        action === "REFRESH"
+        action === "REFRESH" || action === "AUTO_ASSIGN_FG"
           ? { action }
           : {
               action,
@@ -200,12 +216,19 @@ export function PurchaseInvoicesWorkspace() {
         cache: "no-store",
         body: JSON.stringify(body),
       });
-      const result = (await response.json()) as { error?: string };
+      const result = (await response.json()) as {
+        error?: string;
+        result?: FgAssignmentResult;
+        refreshed?: { generalExpenses: FgAssignmentResult };
+      };
       if (!response.ok) throw new Error(result.error ?? "INVOICE_SAVE_FAILED");
       await load();
       setNotice(
-        action === "REFRESH"
-          ? "Les données Pennylane ont été actualisées."
+        action === "REFRESH" || action === "AUTO_ASSIGN_FG"
+          ? (action === "REFRESH" ? "Pennylane actualisé. " : "Rattrapage FG terminé. ") +
+              (result.result || result.refreshed?.generalExpenses
+                ? fgAssignmentSummary(result.result ?? result.refreshed!.generalExpenses)
+                : "Aucune affectation automatique à signaler.")
           : action === "SAVE"
             ? "Brouillon enregistré. L'affectation peut être reprise plus tard."
             : "Affectation PAPOT validée. Le coût réel attend aussi la validation comptable Pennylane.",
@@ -244,6 +267,24 @@ export function PurchaseInvoicesWorkspace() {
           >
             Actualiser Pennylane
           </button>
+          <button
+            type="button"
+            className="primaryButton"
+            disabled={busy || !data?.canWrite || !data?.importEnabled || !data?.fgSupplierCount}
+            title="Rattraper les factures des fournisseurs FG et valider leur affectation dans PAPOT"
+            onClick={() => {
+              if (
+                window.confirm(
+                  "Actualiser Pennylane et valider dans PAPOT les factures non affectées des fournisseurs FG ? " +
+                    "Les factures avec BC chantier/SAV possible et les affectations existantes ne seront pas modifiées.",
+                )
+              ) {
+                void mutate("AUTO_ASSIGN_FG");
+              }
+            }}
+          >
+            Affecter les factures FG
+          </button>
         </div>
       </header>
       {error ? (
@@ -255,6 +296,12 @@ export function PurchaseInvoicesWorkspace() {
         <p role="status" style={{ color: "#256c49" }}>
           {notice}
         </p>
+      ) : null}
+      {data?.canWrite && data?.importEnabled && data.fgSupplierCount === 0 ? (
+        <small>
+          Aucun fournisseur programmé FG. Configure-les dans Bons de commande → Fournisseurs · Frais
+          généraux.
+        </small>
       ) : null}
       <p style={{ fontSize: 13, color: "#615976" }}>
         Dernier import :{" "}

@@ -26,20 +26,34 @@ describe("retours Achats : recherche de chantiers et affectation fournisseur FG"
     expect(picker).toContain('role="status"');
   });
 
-  it("propose un seul clic pour actualiser et pré-affecter les factures FG sans validation", () => {
+  it("affiche le bouton FG dans Factures fournisseurs seulement", () => {
     const creation = source("src/components/purchase-orders-workspace.tsx");
-    const route = source("src/app/api/desktop/purchase-invoices/route.ts");
+    const invoices = source("src/components/purchase-invoices-workspace.tsx");
+    expect(creation).not.toContain("AUTO_ASSIGN_FG");
+    expect(creation).not.toContain("Affecter les factures FG");
+    expect(invoices).toContain("Affecter les factures FG");
+    expect(invoices).toContain('void mutate("AUTO_ASSIGN_FG")');
+    expect(invoices).toContain("fgSupplierCount");
+  });
+
+  it("actualise, approuve dans PAPOT et préserve l'indépendance comptable", () => {
+    const invoiceRoute = source("src/app/api/desktop/purchase-invoices/route.ts");
+    const sync = source("src/lib/pennylane/sync.ts");
+    const settingsRoute = source("src/app/api/desktop/pennylane/route.ts");
     const store = source("src/lib/pennylane/purchase-invoice-store.ts");
-    expect(creation).toContain("Affecter les factures des fournisseurs FG");
-    expect(creation).toContain("AUTO_ASSIGN_FG");
-    expect(creation).toContain("window.confirm(");
-    expect(route).toContain('requireModuleRequestContext("purchases", "WRITE")');
-    expect(route).toContain("sameOrigin(request)");
-    expect(route).toContain("await synchronizePennylane()");
-    expect(route).toContain("autoAllocateImportedGeneralExpensesInvoices");
+    expect(invoiceRoute).toContain('requireModuleRequestContext("purchases", "WRITE")');
+    expect(invoiceRoute).toContain("sameOrigin(request)");
+    expect(invoiceRoute).toContain('action === "AUTO_ASSIGN_FG"');
+    expect(invoiceRoute).toContain("refreshed.generalExpenses");
+    expect(sync).toContain("autoAllocateImportedGeneralExpensesInvoices(actor)");
+    expect(settingsRoute).toContain("synchronizePennylane(context.user.displayName)");
+    expect(store).toContain("purchaseOrderAllocations(order)");
+    expect(store).toContain("possibleChantierOrder");
     expect(store).toContain("ON CONFLICT (invoice_id) DO NOTHING");
     expect(store).toContain("pg_advisory_xact_lock");
-    expect(store).toContain("approved, history, updated_at) SELECT x.invoice_id, 1, x.draft, NULL");
+    expect(store).toContain('action: "VALIDATE"');
+    expect(store).toContain("validatedBy: actor");
+    expect(store).not.toContain("x.draft, NULL, x.history");
     expect(
       store.slice(
         store.indexOf("export async function autoAllocateImportedGeneralExpensesInvoices"),

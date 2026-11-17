@@ -11,7 +11,6 @@ import { invoiceAllocationDraftSchema } from "@/lib/pennylane/purchase-allocatio
 import {
   readPurchaseInvoiceWorkspace,
   writePurchaseInvoiceAllocation,
-  autoAllocateImportedGeneralExpensesInvoices,
 } from "@/lib/pennylane/purchase-invoice-store";
 
 export const runtime = "nodejs";
@@ -113,6 +112,7 @@ export async function GET() {
         lastImportedAt: null,
         truncated: false,
         importEnabled: false,
+        fgSupplierCount: 0,
         canWrite: context.moduleAccess.canWrite,
       });
     }
@@ -143,7 +143,7 @@ export async function POST(request: Request) {
     ) {
       if (!pennylaneEnabled()) throw new Error("PENNYLANE_DISABLED");
       // GET-only upstream requests, published atomically in staging.
-      return json({ refreshed: await synchronizePennylane() });
+      return json({ refreshed: await synchronizePennylane(context.user.displayName) });
     }
     if (
       body &&
@@ -155,9 +155,8 @@ export async function POST(request: Request) {
       if (!pennylaneEnabled()) throw new Error("PENNYLANE_DISABLED");
       // First refresh the complete provider snapshot (GET only); on failure no
       // PAPOT allocation is modified.
-      await synchronizePennylane();
-      const result = await autoAllocateImportedGeneralExpensesInvoices(context.user.displayName);
-      return json({ result });
+      const refreshed = await synchronizePennylane(context.user.displayName);
+      return json({ result: refreshed.generalExpenses });
     }
     const input = changeSchema.parse(body);
     const state = await writePurchaseInvoiceAllocation(

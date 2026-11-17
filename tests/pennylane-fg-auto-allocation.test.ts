@@ -23,8 +23,8 @@ const row = (
   alreadyAllocated = false,
 ): InvoiceForGeneralExpenses => ({ source: source(id, overrides), alreadyAllocated });
 
-describe("pré-affectation en lot des fournisseurs frais généraux", () => {
-  it("crée des brouillons FG exacts sans validation PAPOT ni rapprochement BC", () => {
+describe("affectation FG validée en lot pour les fournisseurs paramétrés", () => {
+  it("prépare des montants exacts validables PAPOT sans rapprochement BC", () => {
     const result = planGeneralExpensesAllocations(
       [row("101"), row("102", { supplierId: "99" }), row("103", { accountingStatus: "pending" })],
       new Set(["42"]),
@@ -42,7 +42,9 @@ describe("pré-affectation en lot des fournisseurs frais généraux", () => {
     ]);
     expect(result.candidates[0].draft.orderLinks).toEqual([]);
     expect(result.candidates[0].draft.charges).toEqual([]);
-    expect(result.candidates[0].draft.note).toContain("à contrôler et valider");
+    expect(result.candidates[0].draft.note).toContain("validée dans PAPOT");
+    expect(result.candidates[0].amountHtCents).toBe(19850);
+    expect(result.candidates[0].sourceRevision).toBe("revision-101");
   });
 
   it("n'écrase jamais un brouillon ou une affectation antérieure", () => {
@@ -78,6 +80,19 @@ describe("pré-affectation en lot des fournisseurs frais généraux", () => {
     );
     expect(result.skippedDuplicate).toBe(2);
     expect(result.candidates.map((item) => item.invoiceId)).toEqual(["103"]);
+  });
+
+  it("laisse les factures avec un BC chantier/SAV potentiel à vérifier, sans affectation FG", () => {
+    const result = planGeneralExpensesAllocations(
+      [
+        { ...row("101"), possibleChantierOrder: true },
+        { ...row("102"), possibleChantierOrder: false },
+      ],
+      new Set(["42"]),
+    );
+    expect(result.candidates.map((item) => item.invoiceId)).toEqual(["102"]);
+    expect(result.skippedChantierOrder).toBe(1);
+    expect(result.matchingSupplierInvoices).toBe(2);
   });
 
   it("ignore les préférences vides, même lorsque des factures sont importées", () => {
