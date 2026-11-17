@@ -80,6 +80,7 @@ export async function GET() {
         id: site.id,
         name: site.name,
         clientName: site.clientName,
+        reference: site.reference,
         status: site.status,
       })),
       canWrite: context.moduleAccess.canWrite,
