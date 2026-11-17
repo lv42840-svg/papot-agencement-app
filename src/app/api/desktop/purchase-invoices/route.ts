@@ -112,6 +112,7 @@ export async function GET() {
         lastImportedAt: null,
         truncated: false,
         importEnabled: false,
+        fgSupplierCount: 0,
         canWrite: context.moduleAccess.canWrite,
       });
     }
