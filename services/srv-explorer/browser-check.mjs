@@ -19,6 +19,26 @@ const close = (server) =>
 await mkdir(`${root}/Chantiers`);
 await mkdir(`${root}/Documents communs`);
 await writeFile(`${root}/Chantiers/notice.txt`, "Document de test PAPOT");
+const pdfObjects = [
+  "<< /Type /Catalog /Pages 2 0 R >>",
+  "<< /Type /Pages /Kids [3 0 R] /Count 1 >>",
+  "<< /Type /Page /Parent 2 0 R /MediaBox [0 0 300 200] /Resources << /Font << /F1 4 0 R >> >> /Contents 5 0 R >>",
+  "<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica >>",
+];
+const pdfText = "BT /F1 20 Tf 25 100 Td (PAPOT - Plan de test) Tj ET";
+pdfObjects.push(`<< /Length ${pdfText.length} >>\nstream\n${pdfText}\nendstream`);
+let pdf = "%PDF-1.4\n";
+const offsets = [0];
+for (const [index, object] of pdfObjects.entries()) {
+  offsets.push(pdf.length);
+  pdf += `${index + 1} 0 obj\n${object}\nendobj\n`;
+}
+const xref = pdf.length;
+pdf += `xref\n0 6\n0000000000 65535 f \n${offsets
+  .slice(1)
+  .map((offset) => `${String(offset).padStart(10, "0")} 00000 n \n`)
+  .join("")}trailer\n<< /Size 6 /Root 1 0 R >>\nstartxref\n${xref}\n%%EOF\n`;
+await writeFile(`${root}/plan.pdf`, pdf);
 await writeFile(
   `${root}/photo.png`,
   Buffer.from(
@@ -90,6 +110,15 @@ try {
     const image = document.querySelector("#preview-content img");
     return image?.complete && image.naturalWidth > 0;
   });
+  await page.getByRole("button", { name: "Fermer l’aperçu" }).click();
+  const pdfResponse = page.waitForResponse(
+    (response) => response.url().includes("path=plan.pdf") && response.url().includes("preview=1"),
+  );
+  await page.getByRole("button", { name: "plan.pdf", exact: true }).click();
+  assert.equal((await pdfResponse).headers()["content-type"], "application/pdf");
+  assert.equal(await page.locator("#preview-content iframe").getAttribute("sandbox"), null);
+  // Headless Shell has no native PDF renderer: validate the response and frame.
+  await page.locator("#preview-content iframe").waitFor({ state: "visible" });
   await page.getByRole("button", { name: "Fermer l’aperçu" }).click();
   await page.getByRole("button", { name: "Chantiers", exact: true }).click();
   await page.getByRole("button", { name: "notice.txt", exact: true }).waitFor();
