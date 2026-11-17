@@ -117,7 +117,7 @@ export function PurchaseOrdersWorkspace({ chantierId }: { chantierId?: string })
       .includes(siteQuery.trim().toLocaleLowerCase("fr-FR")),
   );
   const destinations = [
-    ...sites.map((site) => ({ id: site.id, label: `${site.name} · ${site.clientName ?? ""}` })),
+    ...sites.map((site) => ({ id: site.id, label: [site.reference, site.name, site.clientName].filter(Boolean).join(" · ") })),
     { id: "SAV", label: "SAV (hors chantier)" },
     { id: "GENERAL_EXPENSES", label: "Frais généraux (hors chantier)" },
   ];
