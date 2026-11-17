@@ -371,7 +371,11 @@ export function PurchaseOrderEditWorkspace({ orderId }: { orderId: string }) {
                           ),
                         )
                       }
-                    />
+                    onBlur={() => setAllocations((items) =>
+                        items.map((item) => item.id === row.id
+                          ? { ...item, amount: numericExpressionInput(item.amount, 2) } : item)
+                      )}
+                      />
                   </label>
                   <button
                     className="secondaryButton"
@@ -464,6 +468,12 @@ export function PurchaseOrderEditWorkspace({ orderId }: { orderId: string }) {
                             ),
                           )
                         }
+                        onBlur={() => {
+                          if (field === "unit") return;
+                          setLines((list) => list.map((item) => item.id === line.id
+                            ? { ...item, [field]: numericExpressionInput(item[field], field === "quantity" ? 6 : 2, field === "quantity" ? 0.000001 : 0) }
+                            : item));
+                        }}
                       />
                     </label>
                   ))}
