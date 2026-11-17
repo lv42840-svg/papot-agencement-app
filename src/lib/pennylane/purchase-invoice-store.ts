@@ -351,20 +351,6 @@ export type GeneralExpensesAutoAllocationResult = {
   skippedInvalid: number;
 };
 
-/** Identifiant Pennylane prioritaire ; vieux BC sans ID : nom fournisseur exact normalisé. */
-function purchaseOrderMayBelongToInvoiceSupplier(
-  source: InvoiceSource,
-  order: PurchaseOrder,
-): boolean {
-  if (order.supplierPennylaneId) {
-    return order.supplierPennylaneId === source.supplierId;
-  }
-  return (
-    source.supplierName !== "Fournisseur non identifié" &&
-    supplierKey(order.supplierName) === supplierKey(source.supplierName)
-  );
-}
-
 /**
  * Valide immédiatement dans PAPOT les factures sûres des fournisseurs FG.
  * La validation comptable Pennylane est indépendante : une facture non comptabilisée
@@ -427,15 +413,24 @@ export async function autoAllocateImportedGeneralExpensesInvoices(
           (destination) => (destination.destinationType ?? "CHANTIER") !== "GENERAL_EXPENSES",
         ),
     );
+    const committedByPennylaneId = new Set(
+      relevantOrders.map((order) => order.supplierPennylaneId).filter((id): id is string => !!id),
+    );
+    const committedLegacyNames = new Set(
+      relevantOrders
+        .filter((order) => !order.supplierPennylaneId)
+        .map((order) => supplierKey(order.supplierName)),
+    );
     const plan = planGeneralExpensesAllocations(
       result.rows.map((row) => {
         const source = invoiceSource(row, supplierNames);
         return {
           source,
           alreadyAllocated: row.stored_invoice_id !== null,
-          possibleChantierOrder: relevantOrders.some((order) =>
-            purchaseOrderMayBelongToInvoiceSupplier(source, order),
-          ),
+          possibleChantierOrder:
+            Boolean(source.supplierId && committedByPennylaneId.has(source.supplierId)) ||
+            (source.supplierName !== "Fournisseur non identifié" &&
+              committedLegacyNames.has(supplierKey(source.supplierName))),
         };
       }),
       configured,
