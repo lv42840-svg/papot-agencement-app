@@ -82,6 +82,7 @@ export function PurchaseOrdersWorkspace({ chantierId }: { chantierId?: string })
   const [extraDestinations, setExtraDestinations] = useState<string[]>([]);
   const [supplierName, setSupplierName] = useState("");
   const [supplierPennylaneId, setSupplierPennylaneId] = useState("");
+  const [preferencesOpen, setPreferencesOpen] = useState(false);
   const [mode, setMode] = useState<"QUICK" | "DETAILED">("QUICK");
   const [description, setDescription] = useState("");
   const [allocations, setAllocations] = useState<QuickAllocation[]>([
@@ -191,6 +192,31 @@ export function PurchaseOrdersWorkspace({ chantierId }: { chantierId?: string })
       setError(
         messageFor(cause instanceof Error ? cause.message : "PURCHASE_SUPPLIER_REFRESH_FAILED"),
       );
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  async function setSupplierPreference(supplierId: string, defaultGeneralExpenses: boolean) {
+    if (!snapshot?.canWrite || busy) return;
+    setBusy(true);
+    setError("");
+    try {
+      const response = await fetch("/api/desktop/purchases", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          action: "SET_SUPPLIER_PREFERENCE",
+          supplierPennylaneId: supplierId,
+          defaultGeneralExpenses,
+        }),
+      });
+      const result = (await response.json()) as { payload?: PurchaseOrdersPayload; error?: string };
+      if (!response.ok || !result.payload) throw new Error(result.error ?? "Réglage impossible");
+      setSnapshot((old) => old ? { ...old, payload: result.payload! } : old);
+      setNotice("Préférence fournisseur enregistrée dans PAPOT.");
+    } catch (cause) {
+      setError(messageFor(cause instanceof Error ? cause.message : "Réglage impossible"));
     } finally {
       setBusy(false);
     }
@@ -393,6 +419,13 @@ export function PurchaseOrdersWorkspace({ chantierId }: { chantierId?: string })
                     onChange={(event) => {
                       const id = event.target.value;
                       setSupplierPennylaneId(id);
+                      if (snapshot.payload.supplierPreferences?.some((pref) =>
+                        pref.supplierPennylaneId === id && pref.defaultDestination === "GENERAL_EXPENSES"
+                      )) {
+                        setMode("QUICK");
+                        setAllocations([newAllocation("GENERAL_EXPENSES")]);
+                        setNotice("Fournisseur FG : frais généraux proposés par défaut. Tu peux changer la destination pour une exception.");
+                      }
                       setSupplierName(
                         snapshot.supplierCatalog?.suppliers.find((item) => item.id === id)?.name ??
                           "",
@@ -449,6 +482,30 @@ export function PurchaseOrdersWorkspace({ chantierId }: { chantierId?: string })
                 La récupération exige la clé Pennylane et l&apos;autorisation d&apos;import serveur.
               </small>
             </div>
+            {snapshot.supplierCatalog?.synced ? (
+              <div style={{ display: "grid", gap: 8 }}>
+                <button type="button" className="secondaryButton"
+                  aria-expanded={preferencesOpen}
+                  onClick={() => setPreferencesOpen((open) => !open)}>
+                  Paramétrer les fournisseurs affectés par défaut aux frais généraux
+                </button>
+                {preferencesOpen ? (
+                  <div style={{ maxHeight: 300, overflowY: "auto", padding: 12, border: "1px solid #ddd" }}>
+                    <p>Préférence PAPOT uniquement. Les fiches fournisseurs restent gérées dans Pennylane.</p>
+                    {snapshot.supplierCatalog.suppliers.map((item) => (
+                      <label key={item.id} style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 6 }}>
+                        <input type="checkbox" aria-label={`Affectation FG par défaut pour ${item.name}`}
+                          checked={Boolean(snapshot.payload.supplierPreferences?.some((pref) =>
+                            pref.supplierPennylaneId === item.id))}
+                          disabled={busy || !snapshot.canWrite}
+                          onChange={(event) => void setSupplierPreference(item.id, event.target.checked)} />
+                        {item.name}
+                      </label>
+                    ))}
+                  </div>
+                ) : null}
+              </div>
+            ) : null}
             <div style={{ display: "flex", flexWrap: "wrap", gap: 8 }}>
               <button
                 type="button"
