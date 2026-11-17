@@ -1,0 +1,38 @@
+name: SRV explorer
+on:
+  pull_request:
+    paths:
+      - "services/srv-explorer/**"
+      - "deploy/srv-explorer/**"
+      - "src/app/api/auth/identity/**"
+      - ".github/workflows/srv-explorer.yml"
+  push:
+    branches: [main]
+    paths:
+      - "services/srv-explorer/**"
+      - "deploy/srv-explorer/**"
+      - "src/app/api/auth/identity/**"
+      - ".github/workflows/srv-explorer.yml"
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - run: node --test services/srv-explorer/checks.mjs
+      - run: node --check services/srv-explorer/public/app.js
+      - run: bash -n deploy/srv-explorer/prepare.sh
+      - run: docker build -t papot-srv-explorer-test services/srv-explorer
+  browser:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - run: npx playwright install --with-deps chromium
+      - run: node services/srv-explorer/browser-check.mjs
