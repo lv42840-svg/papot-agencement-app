@@ -67,9 +67,7 @@ export function PennylaneSupplierPicker({
           </option>
         ))}
       </select>
-      {matches.length === 0 && search.trim() ? (
-        <small>Aucun fournisseur trouvé. Vérifie Pennylane ou efface le filtre.</small>
-      ) : selectedSupplier ? (
+      {selectedSupplier ? (
         <div
           role="status"
           aria-live="polite"
@@ -87,6 +85,9 @@ export function PennylaneSupplierPicker({
       ) : (
         <small>{matches.length} fournisseur(s) dans la liste.</small>
       )}
+      {matches.length === 0 && search.trim() ? (
+        <small>Aucun fournisseur trouvé pour ce filtre. Tu peux effacer la recherche.</small>
+      ) : null}
     </div>
   );
 }
