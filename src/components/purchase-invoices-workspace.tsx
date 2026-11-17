@@ -24,11 +24,12 @@ type FgAssignmentResult = {
   skippedInvalid: number;
 };
 function fgAssignmentSummary(result: FgAssignmentResult): string {
-  return `${result.assigned} facture(s) validée(s) en frais généraux dans PAPOT sur ${result.matchingSupplierInvoices} facture(s) de ${result.supplierCount} fournisseur(s) FG. ` +
+  return (
+    `${result.assigned} facture(s) validée(s) en frais généraux dans PAPOT sur ${result.matchingSupplierInvoices} facture(s) de ${result.supplierCount} fournisseur(s) FG. ` +
     `${result.skippedExisting} déjà affectée(s), ${result.skippedChantierOrder} rapprochement(s) BC chantier/SAV à vérifier, ${result.skippedDuplicate} doublon(s), ${result.skippedInvalid} autre(s) anomalie(s). ` +
-    "Les factures non validées dans Pennylane restent provisoires.";
+    "Les factures non validées dans Pennylane restent provisoires."
+  );
 }
-
 
 const money = (value: number | null) =>
   value === null
@@ -226,7 +227,7 @@ export function PurchaseInvoicesWorkspace() {
         action === "REFRESH" || action === "AUTO_ASSIGN_FG"
           ? (action === "REFRESH" ? "Pennylane actualisé. " : "Rattrapage FG terminé. ") +
               (result.result || result.refreshed?.generalExpenses
-                ? fgAssignmentSummary((result.result ?? result.refreshed!.generalExpenses))
+                ? fgAssignmentSummary(result.result ?? result.refreshed!.generalExpenses)
                 : "Aucune affectation automatique à signaler.")
           : action === "SAVE"
             ? "Brouillon enregistré. L'affectation peut être reprise plus tard."
@@ -272,10 +273,12 @@ export function PurchaseInvoicesWorkspace() {
             disabled={busy || !data?.canWrite || !data?.importEnabled || !data?.fgSupplierCount}
             title="Rattraper les factures des fournisseurs FG et valider leur affectation dans PAPOT"
             onClick={() => {
-              if (window.confirm(
-                "Actualiser Pennylane et valider dans PAPOT les factures non affectées des fournisseurs FG ? " +
-                "Les factures avec BC chantier/SAV possible et les affectations existantes ne seront pas modifiées.",
-              )) {
+              if (
+                window.confirm(
+                  "Actualiser Pennylane et valider dans PAPOT les factures non affectées des fournisseurs FG ? " +
+                    "Les factures avec BC chantier/SAV possible et les affectations existantes ne seront pas modifiées.",
+                )
+              ) {
                 void mutate("AUTO_ASSIGN_FG");
               }
             }}
@@ -296,7 +299,8 @@ export function PurchaseInvoicesWorkspace() {
       ) : null}
       {data?.canWrite && data?.importEnabled && data.fgSupplierCount === 0 ? (
         <small>
-          Aucun fournisseur programmé FG. Configure-les dans Bons de commande → Fournisseurs · Frais généraux.
+          Aucun fournisseur programmé FG. Configure-les dans Bons de commande → Fournisseurs · Frais
+          généraux.
         </small>
       ) : null}
       <p style={{ fontSize: 13, color: "#615976" }}>

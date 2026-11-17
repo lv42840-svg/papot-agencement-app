@@ -4,7 +4,11 @@ import type { Pool, PoolClient } from "pg";
 import { getServerDbPool } from "@/lib/server-db/pool";
 import { runServerDbMigrations } from "@/lib/server-db/migrations";
 import { withServerDbTransaction } from "@/lib/server-db/transaction";
-import { parsePurchaseOrdersPayload, purchaseOrderAllocations, type PurchaseOrder } from "@/lib/purchases/domain";
+import {
+  parsePurchaseOrdersPayload,
+  purchaseOrderAllocations,
+  type PurchaseOrder,
+} from "@/lib/purchases/domain";
 import { parseChantiersPayload } from "@/lib/chantiers/domain";
 import { planGeneralExpensesAllocations } from "./general-expenses-auto-allocation";
 import {
@@ -355,7 +359,7 @@ export type GeneralExpensesAutoAllocationResult = {
  * Valide immédiatement dans PAPOT les factures sûres des fournisseurs FG.
  * La validation comptable Pennylane est indépendante : une facture non comptabilisée
  * restera AWAITING_PENNYLANE et ne deviendra pas un coût réel.
- * 
+ *
  * Ne modifie jamais une ligne d'affectation existante. Si un BC engagé du même
  * fournisseur comporte un chantier (ou le SAV), le rapprochement est incertain :
  * la facture reste sans affectation automatique, à examiner manuellement.
@@ -452,16 +456,18 @@ export async function autoAllocateImportedGeneralExpensesInvoices(
           invoice_id: item.invoiceId,
           draft: item.draft,
           approved,
-          history: [{
-            at: now,
-            actor,
-            action: "VALIDATE",
-            version: 1,
-            previousDraft: null,
-            previousApproved: null,
-            newDraft: item.draft,
-            newApproved: approved,
-          }],
+          history: [
+            {
+              at: now,
+              actor,
+              action: "VALIDATE",
+              version: 1,
+              previousDraft: null,
+              previousApproved: null,
+              newDraft: item.draft,
+              newApproved: approved,
+            },
+          ],
         };
       });
       const written = await client.query<{ invoice_id: string }>(

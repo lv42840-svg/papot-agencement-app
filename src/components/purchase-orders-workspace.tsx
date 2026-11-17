@@ -426,7 +426,6 @@ export function PurchaseOrdersWorkspace({ chantierId }: { chantierId?: string })
           >
             Fournisseurs · Frais généraux
           </button>
-
         </div>
       </div>
       {error ? (

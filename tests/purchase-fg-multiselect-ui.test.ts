@@ -55,7 +55,9 @@ describe("retours Achats : recherche de chantiers et affectation fournisseur FG"
     expect(store).toContain("validatedBy: actor");
     expect(store).not.toContain("x.draft, NULL, x.history");
     expect(
-      store.slice(store.indexOf("export async function autoAllocateImportedGeneralExpensesInvoices")),
+      store.slice(
+        store.indexOf("export async function autoAllocateImportedGeneralExpensesInvoices"),
+      ),
     ).not.toContain("LIMIT 501");
   });
 });

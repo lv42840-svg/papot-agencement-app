@@ -83,10 +83,13 @@ describe("affectation FG validée en lot pour les fournisseurs paramétrés", ()
   });
 
   it("laisse les factures avec un BC chantier/SAV potentiel à vérifier, sans affectation FG", () => {
-    const result = planGeneralExpensesAllocations([
-      { ...row("101"), possibleChantierOrder: true },
-      { ...row("102"), possibleChantierOrder: false },
-    ], new Set(["42"]));
+    const result = planGeneralExpensesAllocations(
+      [
+        { ...row("101"), possibleChantierOrder: true },
+        { ...row("102"), possibleChantierOrder: false },
+      ],
+      new Set(["42"]),
+    );
     expect(result.candidates.map((item) => item.invoiceId)).toEqual(["102"]);
     expect(result.skippedChantierOrder).toBe(1);
     expect(result.matchingSupplierInvoices).toBe(2);
