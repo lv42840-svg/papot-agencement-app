@@ -100,6 +100,8 @@ export type PurchaseInvoiceListItem = InvoiceSource & {
     reference: string;
     amountHtCents: number;
     chantierName: string;
+    clientName: string;
+    createdAt: string;
   }>;
 };
 
@@ -150,6 +152,7 @@ export async function readPurchaseInvoiceWorkspace(
   const purchases = parsePurchaseOrdersPayload(ordersResult.rows[0]?.payload);
   const orders = purchases.orders;
   const sites = parseChantiersPayload(sitesResult.rows[0]?.payload).chantiers;
+  const sitesById = new Map(sites.map((site) => [site.id, site]));
   const sources = invoiceRows.rows.slice(0, 500).map((row) => invoiceSource(row, bySupplierId));
   const duplicates = new Map<string, string[]>();
   for (const item of sources) {
@@ -205,6 +208,18 @@ export async function readPurchaseInvoiceWorkspace(
           reference: order.reference,
           amountHtCents: order.amountHtCents,
           chantierName: order.chantierName,
+          createdAt: order.createdAt,
+          clientName: [
+            ...new Set(
+              purchaseOrderAllocations(order)
+                .map((allocation) =>
+                  allocation.chantierId
+                    ? (sitesById.get(allocation.chantierId)?.clientName ?? "")
+                    : "",
+                )
+                .filter(Boolean),
+            ),
+          ].join(", "),
         })),
     };
   });
