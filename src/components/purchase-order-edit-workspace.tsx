@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 import { PennylaneSupplierPicker } from "@/components/pennylane-supplier-picker";
+import { PurchaseDestinationMultiPicker } from "@/components/purchase-destination-multi-picker";
 import { evaluateNumericExpression, numericExpressionInput } from "@/lib/numeric-expression";
 import { useEffect, useMemo, useState } from "react";
 import type {
@@ -109,7 +110,11 @@ export function PurchaseOrderEditWorkspace({ orderId }: { orderId: string }) {
 
   const sites = data?.chantiers ?? [];
   const destinations = [
-    ...sites.map((site) => ({ id: site.id, name: site.name, active: site.status === "ACTIVE" })),
+    ...sites.map((site) => ({
+      id: site.id,
+      name: [...new Set([site.reference, site.name, site.clientName].filter(Boolean))].join(" · "),
+      active: site.status === "ACTIVE",
+    })),
     { id: "SAV", name: "SAV (hors chantier)", active: true },
     { id: "GENERAL_EXPENSES", name: "Frais généraux (hors chantier)", active: true },
   ];
@@ -415,42 +420,21 @@ export function PurchaseOrderEditWorkspace({ orderId }: { orderId: string }) {
                   </button>
                 </div>
               ))}
-              <div style={{ display: "flex", flexWrap: "wrap", gap: 8 }}>
-                {filteredDestinations
-                  .filter(
-                    (item) => item.active && !allocations.some((row) => row.chantierId === item.id),
-                  )
-                  .slice(0, 25)
-                  .map((item) => (
-                    <label key={item.id} style={{ display: "flex", alignItems: "center", gap: 5 }}>
-                      <input
-                        type="checkbox"
-                        aria-label={`Ajouter ${item.name}`}
-                        checked={extraDestinations.includes(item.id)}
-                        disabled={readOnly || busy}
-                        onChange={(event) =>
-                          setExtraDestinations((old) =>
-                            event.target.checked
-                              ? [...new Set([...old, item.id])]
-                              : old.filter((id) => id !== item.id),
-                          )
-                        }
-                      />
-                      {item.name}
-                    </label>
-                  ))}
-              </div>
+              <PurchaseDestinationMultiPicker
+                label="Chantiers ou destinations à ajouter au BC"
+                options={filteredDestinations
+                  .filter((item) => item.active && !allocations.some((row) => row.chantierId === item.id))
+                  .map((item) => ({ id: item.id, label: item.name }))}
+                selectedIds={extraDestinations}
+                onChange={setExtraDestinations}
+                disabled={readOnly || busy || allocations.length >= 100}
+              />
               <button
                 type="button"
                 className="secondaryButton"
-                disabled={readOnly || busy || allocations.length >= 100}
+                disabled={readOnly || busy || allocations.length >= 100 || extraDestinations.length === 0}
                 onClick={() => {
-                  const candidate = filteredDestinations.find(
-                    (item) => item.active && !allocations.some((row) => row.chantierId === item.id),
-                  );
-                  const ids = (
-                    extraDestinations.length ? extraDestinations : candidate ? [candidate.id] : []
-                  ).filter(
+                  const ids = extraDestinations.filter(
                     (id) =>
                       destinations.some((x) => x.active && x.id === id) &&
                       !allocations.some((row) => row.chantierId === id),
@@ -466,7 +450,7 @@ export function PurchaseOrderEditWorkspace({ orderId }: { orderId: string }) {
                   setExtraDestinations([]);
                 }}
               >
-                Ajouter les destinations sélectionnées ({extraDestinations.length || 1})
+                Ajouter les destinations sélectionnées ({extraDestinations.length})
               </button>
             </div>
           ) : (
