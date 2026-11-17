@@ -133,6 +133,7 @@ export function GrandPlanningWorkspace({
   const [absenceUserId, setAbsenceUserId] = useState("");
   const [absenceType, setAbsenceType] = useState<PlanningAbsence["type"]>("VACATION");
   const [absenceDate, setAbsenceDate] = useState(`${initialYear}-01-01`);
+  const [absenceEndDate, setAbsenceEndDate] = useState(`${initialYear}-01-01`);
   // null uses the hours scheduled for the selected person and date.
   const [absenceHours, setAbsenceHours] = useState<string | null>(null);
   const [absenceWeek, setAbsenceWeek] = useState(`${initialYear}-W01`);
@@ -547,6 +548,28 @@ export function GrandPlanningWorkspace({
         hours,
       },
       "Absence enregistrée.",
+    );
+    if (saved) {
+      setAbsenceEditId(null);
+      setAbsenceHours(null);
+    }
+  }
+
+  async function saveAbsenceRange() {
+    if (!snapshot?.capabilities.canManageSchedules || !absenceUserId) return;
+    if (absenceEndDate < absenceDate) {
+      setMessage("La date de fin doit suivre la date de début.");
+      return;
+    }
+    const saved = await postPlanningMutation(
+      {
+        action: "setAbsenceRange",
+        userId: absenceUserId,
+        type: absenceType,
+        startDate: absenceDate,
+        endDate: absenceEndDate,
+      },
+      "Plage d’absence enregistrée selon l’horaire théorique (hors jours fériés et repos).",
     );
     if (saved) {
       setAbsenceEditId(null);
@@ -1310,6 +1333,38 @@ export function GrandPlanningWorkspace({
                 ) : null}
               </div>
 
+              <div className="planningFullWeekForm">
+                <label>
+                  Absence du
+                  <input
+                    type="date"
+                    value={absenceDate}
+                    disabled={!snapshot.capabilities.canManageSchedules}
+                    onChange={(event) => {
+                      setAbsenceDate(event.target.value);
+                      setAbsenceHours(null);
+                    }}
+                  />
+                </label>
+                <label>
+                  Au (inclus)
+                  <input
+                    type="date"
+                    value={absenceEndDate}
+                    min={absenceDate}
+                    disabled={!snapshot.capabilities.canManageSchedules}
+                    onChange={(event) => setAbsenceEndDate(event.target.value)}
+                  />
+                </label>
+                <button
+                  type="button"
+                  className="secondaryButton"
+                  disabled={!snapshot.capabilities.canManageSchedules || savingKey === "planning-mutation"}
+                  onClick={() => void saveAbsenceRange()}
+                >
+                  Enregistrer la période d’absence
+                </button>
+              </div>
               <div className="planningFullWeekForm">
                 <label>
                   Semaine complète
