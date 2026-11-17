@@ -505,6 +505,13 @@ export function ActualHoursWorkspace() {
                                 [keyFor(chantier.id, activity)]: event.target.value,
                               }))
                             }
+                            onBlur={() => setDrafts((current) => {
+                              const key = keyFor(chantier.id, activity);
+                              return current[key] === undefined ? current : {
+                                ...current,
+                                [key]: numericExpressionInput(current[key], 2, 0, 168),
+                              };
+                            })}
                             onKeyDown={(event) => {
                               if (event.key === "Enter") {
                                 event.preventDefault();
@@ -632,6 +639,10 @@ export function ActualHoursWorkspace() {
                           [entry.code]: event.target.value,
                         }))
                       }
+                      onBlur={() => setIndirectDrafts((old) => ({
+                        ...old,
+                        [entry.code]: numericExpressionInput(indirectValue(entry.code), 2, 0, 168),
+                      }))}
                       onKeyDown={(event) => {
                         if (event.key === "Enter") {
                           event.preventDefault();
