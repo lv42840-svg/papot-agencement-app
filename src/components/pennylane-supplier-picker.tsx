@@ -34,7 +34,8 @@ export function PennylaneSupplierPicker({
     () => [
       ...matches,
       ...suppliers.filter(
-        (supplier) => supplier.id === selectedId && !matches.some((item) => item.id === supplier.id),
+        (supplier) =>
+          supplier.id === selectedId && !matches.some((item) => item.id === supplier.id),
       ),
     ],
     [matches, selectedId, suppliers],

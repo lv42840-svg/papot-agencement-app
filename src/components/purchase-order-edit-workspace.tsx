@@ -309,7 +309,9 @@ export function PurchaseOrderEditWorkspace({ orderId }: { orderId: string }) {
                 disabled={readOnly || busy}
                 onChange={(id) => {
                   setSupplierPennylaneId(id);
-                  setSupplier(data.supplierCatalog?.suppliers.find((item) => item.id === id)?.name ?? "");
+                  setSupplier(
+                    data.supplierCatalog?.suppliers.find((item) => item.id === id)?.name ?? "",
+                  );
                 }}
               />
             ) : (

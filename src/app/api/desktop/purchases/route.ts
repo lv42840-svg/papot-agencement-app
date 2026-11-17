@@ -118,8 +118,10 @@ export async function POST(request: Request) {
       if (!catalog.synced) throw new Error("PURCHASE_SUPPLIER_PENNYLANE_REQUIRED");
       const allowed = new Set(catalog.suppliers.map((supplier) => supplier.id));
       const requested = new Set(input.supplierPennylaneIds);
-      if (requested.size !== input.supplierPennylaneIds.length ||
-          input.supplierPennylaneIds.some((id) => !allowed.has(id))) {
+      if (
+        requested.size !== input.supplierPennylaneIds.length ||
+        input.supplierPennylaneIds.some((id) => !allowed.has(id))
+      ) {
         throw new Error("PURCHASE_SUPPLIER_PENNYLANE_REQUIRED");
       }
       const payload = await createPurchaseOrdersRepository().mutate((current) => ({

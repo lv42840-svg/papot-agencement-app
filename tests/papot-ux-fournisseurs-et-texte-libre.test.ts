@@ -27,8 +27,12 @@ describe("retour terrain : achats et texte libre", () => {
     expect(picker).toContain('type="search"');
     expect(picker).toContain("visibleSuppliers");
     expect(picker).toContain("selectedId");
-    expect(source("src/components/purchase-orders-workspace.tsx")).toContain("PennylaneSupplierPicker");
-    expect(source("src/components/purchase-order-edit-workspace.tsx")).toContain("PennylaneSupplierPicker");
+    expect(source("src/components/purchase-orders-workspace.tsx")).toContain(
+      "PennylaneSupplierPicker",
+    );
+    expect(source("src/components/purchase-order-edit-workspace.tsx")).toContain(
+      "PennylaneSupplierPicker",
+    );
   });
 
   it("enregistre plusieurs préférences fournisseur en une opération sécurisée", () => {
@@ -50,7 +54,9 @@ describe("retour terrain : achats et texte libre", () => {
     const layer = source("src/components/quote-rich-text-layer.tsx");
     const persistence = source("src/lib/quotes/rich-text-mutation.ts");
     expect(form).toContain("quoteCommentEditing");
-    expect(wrapper).toContain('type RichEditableKind = "SECTION" | "SUBSECTION" | "LINE" | "COMMENT"');
+    expect(wrapper).toContain(
+      'type RichEditableKind = "SECTION" | "SUBSECTION" | "LINE" | "COMMENT"',
+    );
     expect(wrapper).toContain(".quoteCommentEditing textarea");
     expect(wrapper).toContain("quoteRichInlineHost");
     expect(layer).toContain(".quoteCommentText");
