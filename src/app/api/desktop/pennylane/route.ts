@@ -77,7 +77,7 @@ export async function POST(request: Request) {
     ) {
       return json({ error: "INVALID_REQUEST" }, 400);
     }
-    return json({ result: await synchronizePennylane() });
+    return json({ result: await synchronizePennylane(context.user.displayName) });
   } catch (error) {
     return failure(error);
   }
