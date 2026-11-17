@@ -11,7 +11,8 @@ import {
   writePurchaseInvoiceAllocation,
   autoAllocateImportedGeneralExpensesInvoices,
 } from "../src/lib/pennylane/purchase-invoice-store";
-import type { InvoiceAllocationDraft } from "../src/lib/pennylane/purchase-allocations";
+import { sourceRevision, type InvoiceAllocationDraft } from "../src/lib/pennylane/purchase-allocations";
+import { publishPennylaneSnapshots } from "../src/lib/pennylane/store";
 
 const describeIfPostgres = process.env.PAPOT_DATABASE_URL ? describe : describe.skip;
 const id = "987654321012";
@@ -71,6 +72,10 @@ describeIfPostgres("Pennylane purchase invoice workflow in isolated PostgreSQL",
     await pool.query(
       "DELETE FROM papot_pennylane_purchase_allocations WHERE invoice_id IN ($1, $2)",
       [id, otherId],
+    );
+    await pool.query(
+      "DELETE FROM papot_pennylane_supplier_invoice_archive WHERE invoice_id IN ($1, $2, $3)",
+      [id, otherId, "987654321017"],
     );
     await pool.query("DELETE FROM papot_pennylane_staging WHERE external_id IN ($1, $2, $3)", [
       id,
@@ -319,4 +324,84 @@ describeIfPostgres("Pennylane purchase invoice workflow in isolated PostgreSQL",
       );
     }
   });
+  it("conserve le coût d'une facture validée après disparition de la liste Pennylane, sans doublon", async () => {
+    const archivedId = "987654321017";
+    const chantierId = "99999999-9999-4999-8999-999999999999";
+    const payload = {
+      ...basePayload,
+      id: Number(archivedId),
+      invoice_number: "TEST-HISTORIQUE-CHANTIER",
+    };
+    const allocation: InvoiceAllocationDraft = {
+      ...draft(),
+      rows: [
+        {
+          ...draft().rows[0],
+          destination: { kind: "CHANTIER", chantierId },
+        },
+      ],
+    };
+    const approved = {
+      draft: allocation,
+      amountHtCents: 10000,
+      sourceRevision: sourceRevision({
+        invoiceNumber: payload.invoice_number,
+        supplierId: supplier,
+        amountHtCents: 10000,
+        invoiceDate: payload.date,
+        filename: payload.filename,
+      }),
+      validatedAt: new Date().toISOString(),
+      validatedBy: "Nadia",
+    };
+    await pool.query(
+      "INSERT INTO papot_pennylane_staging (resource, external_id, payload, synced_at) VALUES ('supplier_invoices', $1, $2::jsonb, NOW())",
+      [archivedId, JSON.stringify(payload)],
+    );
+    await pool.query(
+      "INSERT INTO papot_pennylane_purchase_allocations (invoice_id, version, draft, approved, history) VALUES ($1, 1, $2::jsonb, $3::jsonb, '[]'::jsonb)",
+      [archivedId, JSON.stringify(allocation), JSON.stringify(approved)],
+    );
+    try {
+      const before = await readValidatedPurchaseCosts(pool);
+      expect(before.byChantier[chantierId]).toBe(10000);
+      expect(before.provisionalByChantier[chantierId]).toBe(false);
+
+      await publishPennylaneSnapshots(
+        "PAPOT LIBERAL",
+        { suppliers: [], supplier_invoices: [], customers: [], customer_invoices: [] },
+        pool,
+      );
+      const source = await pool.query(
+        "SELECT external_id FROM papot_pennylane_staging WHERE resource='supplier_invoices' AND external_id=$1",
+        [archivedId],
+      );
+      expect(source.rows).toHaveLength(0);
+      const archive = await pool.query(
+        "SELECT payload FROM papot_pennylane_supplier_invoice_archive WHERE invoice_id=$1",
+        [archivedId],
+      );
+      expect(archive.rows).toHaveLength(1);
+
+      const after = await readValidatedPurchaseCosts(pool);
+      expect(after.byChantier[chantierId]).toBe(10000);
+      expect(after.provisionalByChantier[chantierId]).toBe(true);
+      const workspace = await readPurchaseInvoiceWorkspace(pool);
+      expect(workspace.validatedInvoices.find((row) => row.id === archivedId)).toMatchObject({
+        availableInPennylane: false,
+        workflow: "VALIDATED",
+      });
+
+      await publishPennylaneSnapshots(
+        "PAPOT LIBERAL",
+        { suppliers: [], supplier_invoices: [], customers: [], customer_invoices: [] },
+        pool,
+      );
+      expect((await readValidatedPurchaseCosts(pool)).byChantier[chantierId]).toBe(10000);
+    } finally {
+      await pool.query("DELETE FROM papot_pennylane_purchase_allocations WHERE invoice_id=$1", [archivedId]);
+      await pool.query("DELETE FROM papot_pennylane_supplier_invoice_archive WHERE invoice_id=$1", [archivedId]);
+    }
+  });
+
 });
