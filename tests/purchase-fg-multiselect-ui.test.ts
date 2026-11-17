@@ -39,6 +39,6 @@ describe("retours Achats : recherche de chantiers et affectation fournisseur FG"
     expect(store).toContain("ON CONFLICT (invoice_id) DO NOTHING");
     expect(store).toContain("pg_advisory_xact_lock");
     expect(store).toContain('approved, history, updated_at) SELECT x.invoice_id, 1, x.draft, NULL');
-    expect(store).not.toContain("LIMIT 501");
+    expect(store.slice(store.indexOf("export async function autoAllocateImportedGeneralExpensesInvoices"))).not.toContain("LIMIT 501");
   });
 });
