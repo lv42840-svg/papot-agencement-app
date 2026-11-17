@@ -2316,6 +2316,7 @@ export function QuoteStructuredLinesEditor({
                 ) : null}
               </div>
             </div>
+          );
         })}
         {headingEditor && !headingEditor.itemId ? renderHeadingEditor(headingEditor) : null}
         {commentEditor && !commentEditor.itemId ? renderCommentEditor() : null}
