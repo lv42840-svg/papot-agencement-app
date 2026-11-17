@@ -1,6 +1,7 @@
 "use client";
 
 import Link from "next/link";
+import { evaluateNumericExpression, numericExpressionInput } from "@/lib/numeric-expression";
 import { useEffect, useMemo, useState } from "react";
 import type {
   PurchaseOrder,
@@ -31,17 +32,11 @@ const euros = (value: number) =>
   (value / 100).toLocaleString("fr-FR", { style: "currency", currency: "EUR" });
 const amountText = (cents: number) => (cents / 100).toFixed(2).replace(".", ",");
 const parseAmount = (text: string) => {
-  const value = text.trim().replace(",", ".");
-  if (!/^\d+(?:\.\d{1,2})?$/.test(value)) return null;
-  const cents = Math.round(Number(value) * 100);
-  return Number.isSafeInteger(cents) && cents >= 0 ? cents : null;
+  const number = evaluateNumericExpression(text, 2, 0, 1_000_000_000);
+  return number === null ? null : Math.round(number * 100);
 };
-const parseQuantity = (text: string) => {
-  const value = text.trim().replace(",", ".");
-  if (!/^\d+(?:\.\d{1,6})?$/.test(value)) return null;
-  const number = Number(value);
-  return Number.isFinite(number) && number > 0 && number <= 1_000_000 ? number : null;
-};
+const parseQuantity = (text: string) =>
+  evaluateNumericExpression(text, 6, 0.000001, 1_000_000);
 
 export function PurchaseOrderEditWorkspace({ orderId }: { orderId: string }) {
   const [data, setData] = useState<Snapshot | null>(null);
