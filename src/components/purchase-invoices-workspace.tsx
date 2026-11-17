@@ -1,6 +1,7 @@
 "use client";
 
 import Link from "next/link";
+import { CalculatedAmountInput } from "@/components/calculated-amount-input";
 import { useEffect, useMemo, useState } from "react";
 import { purchaseOrderAllocations, type PurchaseOrder } from "@/lib/purchases/domain";
 import {
@@ -13,7 +14,6 @@ import {
 import type { PurchaseInvoiceWorkspaceData } from "@/lib/pennylane/purchase-invoice-store";
 
 type ResponseBody = PurchaseInvoiceWorkspaceData & { canWrite: boolean; error?: string };
-type Line = { id: string; label: string; amountHtCents: number | null };
 type FgAssignmentResult = {
   assigned: number;
   supplierCount: number;
@@ -35,10 +35,13 @@ const money = (value: number | null) =>
   value === null
     ? "Indisponible"
     : (value / 100).toLocaleString("fr-FR", { style: "currency", currency: "EUR" });
-const numberValue = (value: number) => value / 100;
-function fromInput(value: string) {
-  const n = Number(value.replace(",", "."));
-  return Number.isFinite(n) ? Math.round(n * 100) : 0;
+function asGlobalDraft(value: InvoiceAllocationDraft): InvoiceAllocationDraft {
+  if (value.mode === "GLOBAL") return value;
+  return {
+    ...value,
+    mode: "GLOBAL",
+    rows: value.rows.map((row) => ({ ...row, sourceLineId: null })),
+  };
 }
 function emptyDraft(): InvoiceAllocationDraft {
   return { mode: "GLOBAL", rows: [], charges: [], orderLinks: [], note: "" };
@@ -68,10 +71,13 @@ function description(code: string) {
 export function PurchaseInvoicesWorkspace() {
   const [data, setData] = useState<ResponseBody | null>(null);
   const [selectedId, setSelectedId] = useState("");
+  const [invoiceTab, setInvoiceTab] = useState<"ALL" | "APPROVED">("ALL");
   const [draft, setDraft] = useState<InvoiceAllocationDraft>(emptyDraft);
-  const [lines, setLines] = useState<Line[]>([]);
   const [busy, setBusy] = useState(false);
   const [search, setSearch] = useState("");
+  const [orderSearch, setOrderSearch] = useState("");
+  const [orderFrom, setOrderFrom] = useState("");
+  const [orderTo, setOrderTo] = useState("");
   const [notice, setNotice] = useState("");
   const [error, setError] = useState("");
 
@@ -88,19 +94,33 @@ export function PurchaseInvoicesWorkspace() {
     void load().catch(() => setError("Impossible de charger les factures fournisseurs."));
   }, []);
 
-  const selected = data?.invoices.find((item) => item.id === selectedId) ?? null;
+  const visibleInvoices = (data?.invoices ?? []).filter(
+    (invoice) =>
+      (invoiceTab === "ALL" || Boolean(invoice.state?.approved)) &&
+      [invoice.supplierName, invoice.invoiceNumber, invoice.invoiceDate ?? ""]
+        .join(" ")
+        .toLocaleLowerCase("fr-FR")
+        .includes(search.toLocaleLowerCase("fr-FR")),
+  );
+  const selected =
+    visibleInvoices.find((item) => item.id === selectedId) ?? visibleInvoices[0] ?? null;
+
   useEffect(() => {
-    setDraft(selected?.state?.draft ?? emptyDraft());
-    setLines([]);
-    if (!selected) return;
-    void fetch("/api/desktop/purchase-invoices/" + selected.id, { cache: "no-store" })
-      .then(async (response) => {
-        if (!response.ok) throw new Error("LINES_UNAVAILABLE");
-        return response.json() as Promise<{ lines: Line[] }>;
-      })
-      .then((body) => setLines(body.lines))
-      .catch(() => setLines([]));
+    const current = selected?.state?.draft ?? selected?.state?.approved?.draft ?? emptyDraft();
+    setDraft(asGlobalDraft(current));
   }, [selected?.id, selected?.state?.version]);
+
+  const visibleProposedOrders = (selected?.proposedOrders ?? []).filter((order) => {
+    const text = [order.reference, order.chantierName, order.clientName]
+      .join(" ")
+      .toLocaleLowerCase("fr-FR");
+    const date = order.createdAt.slice(0, 10);
+    return (
+      text.includes(orderSearch.trim().toLocaleLowerCase("fr-FR")) &&
+      (!orderFrom || date >= orderFrom) &&
+      (!orderTo || date <= orderTo)
+    );
+  });
 
   const destinationOptions = [
     ...(data?.chantiers ?? []).map((site) => ({
@@ -121,14 +141,7 @@ export function PurchaseInvoicesWorkspace() {
     selected?.amountHtCents !== null &&
     calculation !== null &&
     calculation.destinations.length > 0 &&
-    calculation.totalHtCents === selected?.amountHtCents &&
-    (draft.mode === "GLOBAL" || draft.rows.every((row) => row.sourceLineId !== null));
-  const visibleInvoices = (data?.invoices ?? []).filter((invoice) =>
-    [invoice.supplierName, invoice.invoiceNumber, invoice.invoiceDate ?? ""]
-      .join(" ")
-      .toLocaleLowerCase("fr-FR")
-      .includes(search.toLocaleLowerCase("fr-FR")),
-  );
+    calculation.totalHtCents === selected?.amountHtCents;
 
   function editRow(id: string, update: Partial<InvoiceAllocationDraft["rows"][number]>) {
     setDraft((current) => ({
@@ -311,6 +324,28 @@ export function PurchaseInvoicesWorkspace() {
           : ""}
         {data?.truncated ? " Liste limitée à 500 factures : prévoir une recherche paginée." : ""}
       </p>
+      {data?.invoices.length ? (
+        <div role="tablist" aria-label="Vue des factures fournisseurs" style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
+          <button
+            type="button"
+            role="tab"
+            aria-selected={invoiceTab === "ALL"}
+            className={invoiceTab === "ALL" ? "primaryButton" : "secondaryButton"}
+            onClick={() => { setInvoiceTab("ALL"); setSelectedId(""); }}
+          >
+            Toutes les factures ({data.invoices.length})
+          </button>
+          <button
+            type="button"
+            role="tab"
+            aria-selected={invoiceTab === "APPROVED"}
+            className={invoiceTab === "APPROVED" ? "primaryButton" : "secondaryButton"}
+            onClick={() => { setInvoiceTab("APPROVED"); setSelectedId(""); }}
+          >
+            Factures validées ({data.invoices.filter((invoice) => Boolean(invoice.state?.approved)).length})
+          </button>
+        </div>
+      ) : null}
       {!data ? (
         <p>Chargement…</p>
       ) : data.invoices.length === 0 ? (
@@ -344,13 +379,16 @@ export function PurchaseInvoicesWorkspace() {
               minWidth: 215,
             }}
           >
-            <h2>Factures ({visibleInvoices.length})</h2>
+            <h2>{invoiceTab === "ALL" ? "Toutes les factures" : "Factures validées"} ({visibleInvoices.length})</h2>
             <input
               aria-label="Rechercher une facture"
               placeholder="Fournisseur, numéro, date…"
               value={search}
               onChange={(event) => setSearch(event.target.value)}
             />
+            {visibleInvoices.length === 0 ? (
+              <p style={{ fontSize: 13 }}>Aucune facture dans cette vue.</p>
+            ) : null}
             <div style={{ maxHeight: "75vh", overflow: "auto", display: "grid", gap: 6 }}>
               {visibleInvoices.map((invoice) => (
                 <button
@@ -363,8 +401,8 @@ export function PurchaseInvoicesWorkspace() {
                   }}
                   style={{
                     textAlign: "left",
-                    background: selectedId === invoice.id ? "#eee8fb" : "#faf9fd",
-                    border: selectedId === invoice.id ? "1px solid #a999e4" : "1px solid #e6e0ef",
+                    background: selected?.id === invoice.id ? "#eee8fb" : "#faf9fd",
+                    border: selected?.id === invoice.id ? "1px solid #a999e4" : "1px solid #e6e0ef",
                     borderRadius: 8,
                     padding: 10,
                     cursor: "pointer",
