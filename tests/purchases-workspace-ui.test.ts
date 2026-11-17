@@ -8,7 +8,9 @@ describe("écran Bons de commande", () => {
     expect(ui).toContain("BC détaillé · Articles");
     expect(ui).toContain("Fournisseur du BC");
     expect(ui).toContain("Répartition du BC par chantier");
-    expect(ui).toContain("Ajouter un chantier");
+    expect(ui).toContain("Ajouter les destinations sélectionnées");
+    expect(ui).toContain("Filtrer les destinations du BC");
+    expect(ui).toContain("supplierPreferences");
     expect(ui).toContain("Montant HT ligne chantier");
     expect(ui).toContain("allocations: entries.map");
     expect(ui).toContain("order.allocations.map");
