@@ -20,7 +20,8 @@ describe("retours Achats : recherche de chantiers et affectation fournisseur FG"
 
   it("met le fournisseur sélectionné en gros caractères gras", () => {
     const picker = source("src/components/pennylane-supplier-picker.tsx");
-    expect(picker).toContain("Fournisseur sélectionné : <strong");
+    expect(picker).toContain("Fournisseur sélectionné :");
+    expect(picker).toContain("<strong style={{ fontWeight: 800 }}>");
     expect(picker).toContain("fontWeight: 800");
     expect(picker).toContain('role="status"');
   });
