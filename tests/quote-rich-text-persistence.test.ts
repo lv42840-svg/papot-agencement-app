@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { createQuoteVersion } from "../src/lib/quotes/lifecycle";
-import { quoteRichTextFromPlainText, quoteRichTextToPlainText } from "../src/lib/quotes/rich-text";
+import { applyQuoteRichTextStyle, quoteRichTextFromPlainText, quoteRichTextToPlainText } from "../src/lib/quotes/rich-text";
 import { applyQuoteRichTextUpdate } from "../src/lib/quotes/rich-text-mutation";
 import { parseNativeQuotesPayload } from "../src/lib/quotes/store";
 
@@ -94,4 +94,45 @@ describe("quote rich-text line-break persistence", () => {
       expectedText,
     );
   });
+  it("conserve la palette et les sauts de ligne du texte libre dans le devis et sa version suivante", () => {
+    const commentId = "66666666-6666-4666-8666-666666666666";
+    const source = draft();
+    const firstQuote = source.quotes[0];
+    const withComment = parseNativeQuotesPayload({
+      ...source,
+      quotes: [{
+        ...firstQuote,
+        model: {
+          ...firstQuote.model,
+          items: [
+            ...firstQuote.model.items,
+            { id: commentId, kind: "COMMENT", parentId: null, text: "Conditions de pose", presentation: { photos: [] } },
+          ],
+        },
+      }],
+    });
+    const text = "Conditions de pose\nÀ confirmer au relevé";
+    const richText = applyQuoteRichTextStyle(
+      quoteRichTextFromPlainText(text),
+      0,
+      "Conditions de pose".length,
+      { bold: true, textColor: "#6554b5", fontSizePx: 18 },
+    );
+    const result = applyQuoteRichTextUpdate(withComment, {
+      quoteId: QUOTE_ID, itemId: commentId, text, richText,
+    }, actor);
+    const saved = result.quotes[0].model.items.find((item) => item.id === commentId);
+    expect(saved?.kind).toBe("COMMENT");
+    if (!saved || saved.kind !== "COMMENT") throw new Error("TEST_COMMENT_NOT_FOUND");
+    expect(saved.text).toBe(text);
+    expect(saved.presentation?.richText?.runs[0].style).toMatchObject({
+      bold: true, textColor: "#6554b5", fontSizePx: 18,
+    });
+    const versioned = createQuoteVersion(result, QUOTE_ID, actor);
+    const copied = versioned.payload.quotes.find((quote) => quote.id === versioned.focusQuoteId)
+      ?.model.items.find((item) => item.id === commentId);
+    expect(copied?.presentation?.richText?.runs[0].style.textColor).toBe("#6554b5");
+    expect(copied?.kind).toBe("COMMENT");
+  });
+
 });
