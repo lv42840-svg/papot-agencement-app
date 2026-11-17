@@ -1,0 +1,37 @@
+services:
+  srv-explorer:
+    build:
+      context: ../../services/srv-explorer
+    container_name: papot-srv-explorer
+    restart: unless-stopped
+    # The two existing applications only expose their ports on the host loopback.
+    # The explorer also binds exclusively to 127.0.0.1, not the public interface.
+    network_mode: host
+    env_file:
+      - .env
+    user: "${SRV_UID:-1000}:${SRV_GID:-1000}"
+    read_only: true
+    cap_drop:
+      - ALL
+    security_opt:
+      - no-new-privileges:true
+    volumes:
+      - type: bind
+        source: /srv
+        target: /data
+        bind:
+          create_host_path: false
+    mem_limit: 256m
+    pids_limit: 64
+    healthcheck:
+      test:
+        [
+          "CMD",
+          "node",
+          "-e",
+          "fetch('http://127.0.0.1:3003/health').then(r=>{if(!r.ok)process.exit(1)}).catch(()=>process.exit(1))",
+        ]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 10s
