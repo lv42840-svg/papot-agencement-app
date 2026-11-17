@@ -80,7 +80,8 @@ export function PennylaneSupplierPicker({
             fontSize: 15,
           }}
         >
-          Fournisseur sélectionné : <strong style={{ fontWeight: 800 }}>{selectedSupplier.name}</strong>
+          Fournisseur sélectionné :{" "}
+          <strong style={{ fontWeight: 800 }}>{selectedSupplier.name}</strong>
         </div>
       ) : (
         <small>{matches.length} fournisseur(s) dans la liste.</small>

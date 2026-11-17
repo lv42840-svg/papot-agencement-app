@@ -20,7 +20,7 @@ describe("retours Achats : recherche de chantiers et affectation fournisseur FG"
 
   it("met le fournisseur sélectionné en gros caractères gras", () => {
     const picker = source("src/components/pennylane-supplier-picker.tsx");
-    expect(picker).toContain('Fournisseur sélectionné : <strong');
+    expect(picker).toContain("Fournisseur sélectionné : <strong");
     expect(picker).toContain("fontWeight: 800");
     expect(picker).toContain('role="status"');
   });
@@ -38,7 +38,11 @@ describe("retours Achats : recherche de chantiers et affectation fournisseur FG"
     expect(route).toContain("autoAllocateImportedGeneralExpensesInvoices");
     expect(store).toContain("ON CONFLICT (invoice_id) DO NOTHING");
     expect(store).toContain("pg_advisory_xact_lock");
-    expect(store).toContain('approved, history, updated_at) SELECT x.invoice_id, 1, x.draft, NULL');
-    expect(store.slice(store.indexOf("export async function autoAllocateImportedGeneralExpensesInvoices"))).not.toContain("LIMIT 501");
+    expect(store).toContain("approved, history, updated_at) SELECT x.invoice_id, 1, x.draft, NULL");
+    expect(
+      store.slice(
+        store.indexOf("export async function autoAllocateImportedGeneralExpensesInvoices"),
+      ),
+    ).not.toContain("LIMIT 501");
   });
 });

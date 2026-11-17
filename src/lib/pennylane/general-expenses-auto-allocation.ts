@@ -22,11 +22,7 @@ export type GeneralExpensesPlan = {
 function duplicateInvoiceKey(source: InvoiceSource): string | null {
   if (!source.supplierId || !source.invoiceNumber.trim() || source.amountHtCents === null)
     return null;
-  return [
-    source.supplierId,
-    supplierKey(source.invoiceNumber),
-    source.amountHtCents,
-  ].join(":");
+  return [source.supplierId, supplierKey(source.invoiceNumber), source.amountHtCents].join(":");
 }
 
 /**

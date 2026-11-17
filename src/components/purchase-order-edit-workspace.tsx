@@ -423,7 +423,9 @@ export function PurchaseOrderEditWorkspace({ orderId }: { orderId: string }) {
               <PurchaseDestinationMultiPicker
                 label="Chantiers ou destinations à ajouter au BC"
                 options={filteredDestinations
-                  .filter((item) => item.active && !allocations.some((row) => row.chantierId === item.id))
+                  .filter(
+                    (item) => item.active && !allocations.some((row) => row.chantierId === item.id),
+                  )
                   .map((item) => ({ id: item.id, label: item.name }))}
                 selectedIds={extraDestinations}
                 onChange={setExtraDestinations}
@@ -432,7 +434,9 @@ export function PurchaseOrderEditWorkspace({ orderId }: { orderId: string }) {
               <button
                 type="button"
                 className="secondaryButton"
-                disabled={readOnly || busy || allocations.length >= 100 || extraDestinations.length === 0}
+                disabled={
+                  readOnly || busy || allocations.length >= 100 || extraDestinations.length === 0
+                }
                 onClick={() => {
                   const ids = extraDestinations.filter(
                     (id) =>

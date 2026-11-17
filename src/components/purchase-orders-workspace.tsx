@@ -125,9 +125,7 @@ export function PurchaseOrdersWorkspace({ chantierId }: { chantierId?: string })
   const destinations = [
     ...sites.map((site) => ({
       id: site.id,
-      label: [...new Set([site.reference, site.name, site.clientName].filter(Boolean))].join(
-        " · ",
-      ),
+      label: [...new Set([site.reference, site.name, site.clientName].filter(Boolean))].join(" · "),
     })),
     { id: "SAV", label: "SAV (hors chantier)" },
     { id: "GENERAL_EXPENSES", label: "Frais généraux (hors chantier)" },
@@ -208,12 +206,15 @@ export function PurchaseOrdersWorkspace({ chantierId }: { chantierId?: string })
     setError("");
   }
   async function autoAssignFgInvoices() {
-    if (!snapshot?.canWrite || busy || !(snapshot.payload.supplierPreferences?.length)) return;
-    if (!window.confirm(
-      "Actualiser Pennylane et pré-affecter toutes les factures non traitées des fournisseurs FG ? " +
-      "Les factures déjà affectées et les doublons seront préservés. " +
-      "Il restera à valider les affectations dans PAPOT.",
-    )) return;
+    if (!snapshot?.canWrite || busy || !snapshot.payload.supplierPreferences?.length) return;
+    if (
+      !window.confirm(
+        "Actualiser Pennylane et pré-affecter toutes les factures non traitées des fournisseurs FG ? " +
+          "Les factures déjà affectées et les doublons seront préservés. " +
+          "Il restera à valider les affectations dans PAPOT.",
+      )
+    )
+      return;
     setBusy(true);
     setError("");
     setNotice("");
@@ -241,8 +242,8 @@ export function PurchaseOrdersWorkspace({ chantierId }: { chantierId?: string })
       const result = body.result;
       setNotice(
         `${result.assigned} facture(s) pré-affectée(s) aux frais généraux parmi ${result.matchingSupplierInvoices} facture(s) des ${result.supplierCount} fournisseurs FG. ` +
-        `${result.skippedExisting} déjà traitée(s), ${result.skippedDuplicate} doublon(s), ${result.skippedInvalid} facture(s) à vérifier. ` +
-        "Aucune validation financière automatique. Ouvre Factures fournisseurs pour contrôler.",
+          `${result.skippedExisting} déjà traitée(s), ${result.skippedDuplicate} doublon(s), ${result.skippedInvalid} facture(s) à vérifier. ` +
+          "Aucune validation financière automatique. Ouvre Factures fournisseurs pour contrôler.",
       );
     } catch (cause) {
       setError(messageFor(cause instanceof Error ? cause.message : "INVOICE_ERROR"));
@@ -475,11 +476,7 @@ export function PurchaseOrdersWorkspace({ chantierId }: { chantierId?: string })
           <button
             type="button"
             className="secondaryButton"
-            disabled={
-              !snapshot?.canWrite ||
-              busy ||
-              !(snapshot?.payload.supplierPreferences?.length)
-            }
+            disabled={!snapshot?.canWrite || busy || !snapshot?.payload.supplierPreferences?.length}
             title="Actualise Pennylane et crée des brouillons FG, sans validation financière"
             onClick={() => void autoAssignFgInvoices()}
           >
@@ -844,8 +841,7 @@ export function PurchaseOrdersWorkspace({ chantierId }: { chantierId?: string })
                 <PurchaseDestinationMultiPicker
                   label="Chantiers ou destinations à ajouter au BC"
                   options={filteredDestinations.filter(
-                    (item) =>
-                      !allocations.some((row) => (row.chantierId || selected) === item.id),
+                    (item) => !allocations.some((row) => (row.chantierId || selected) === item.id),
                   )}
                   selectedIds={extraDestinations}
                   onChange={setExtraDestinations}
@@ -854,7 +850,12 @@ export function PurchaseOrdersWorkspace({ chantierId }: { chantierId?: string })
                 <button
                   type="button"
                   className="secondaryButton"
-                  disabled={busy || !snapshot.canWrite || allocations.length >= 100 || extraDestinations.length === 0}
+                  disabled={
+                    busy ||
+                    !snapshot.canWrite ||
+                    allocations.length >= 100 ||
+                    extraDestinations.length === 0
+                  }
                   onClick={() => {
                     const ids = extraDestinations.filter(
                       (id) =>

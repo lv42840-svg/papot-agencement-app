@@ -17,8 +17,11 @@ const source = (id: string, overrides: Partial<InvoiceSource> = {}): InvoiceSour
   sourceRevision: "revision-" + id,
   ...overrides,
 });
-const row = (id: string, overrides: Partial<InvoiceSource> = {}, alreadyAllocated = false): InvoiceForGeneralExpenses =>
-  ({ source: source(id, overrides), alreadyAllocated });
+const row = (
+  id: string,
+  overrides: Partial<InvoiceSource> = {},
+  alreadyAllocated = false,
+): InvoiceForGeneralExpenses => ({ source: source(id, overrides), alreadyAllocated });
 
 describe("pré-affectation en lot des fournisseurs frais généraux", () => {
   it("crée des brouillons FG exacts sans validation PAPOT ni rapprochement BC", () => {
@@ -29,12 +32,14 @@ describe("pré-affectation en lot des fournisseurs frais généraux", () => {
     );
     expect(result.matchingSupplierInvoices).toBe(2);
     expect(result.candidates).toHaveLength(2);
-    expect(result.candidates[0].draft.rows).toEqual([{
-      id: "11111111-1111-4111-8111-111111111111",
-      sourceLineId: null,
-      destination: { kind: "GENERAL_EXPENSES", chantierId: null },
-      amountHtCents: 19850,
-    }]);
+    expect(result.candidates[0].draft.rows).toEqual([
+      {
+        id: "11111111-1111-4111-8111-111111111111",
+        sourceLineId: null,
+        destination: { kind: "GENERAL_EXPENSES", chantierId: null },
+        amountHtCents: 19850,
+      },
+    ]);
     expect(result.candidates[0].draft.orderLinks).toEqual([]);
     expect(result.candidates[0].draft.charges).toEqual([]);
     expect(result.candidates[0].draft.note).toContain("à contrôler et valider");
@@ -47,24 +52,30 @@ describe("pré-affectation en lot des fournisseurs frais généraux", () => {
   });
 
   it("ignore les avoirs, montants nuls, devises sans EUR et fournisseurs inconnus", () => {
-    const result = planGeneralExpensesAllocations([
-      row("1", { amountHtCents: -100 }),
-      row("2", { amountHtCents: 0 }),
-      row("3", { amountHtCents: null }),
-      row("4", { supplierId: null }),
-      row("5", { invoiceNumber: "" }),
-    ], new Set(["42"]));
+    const result = planGeneralExpensesAllocations(
+      [
+        row("1", { amountHtCents: -100 }),
+        row("2", { amountHtCents: 0 }),
+        row("3", { amountHtCents: null }),
+        row("4", { supplierId: null }),
+        row("5", { invoiceNumber: "" }),
+      ],
+      new Set(["42"]),
+    );
     expect(result.candidates).toHaveLength(0);
     expect(result.skippedInvalid).toBe(4);
     expect(result.matchingSupplierInvoices).toBe(4);
   });
 
   it("écarte tous les doublons de facture pour éviter une double ventilation", () => {
-    const result = planGeneralExpensesAllocations([
-      row("101", { invoiceNumber: "FC-1", amountHtCents: 10000 }),
-      row("102", { invoiceNumber: "FC-1", amountHtCents: 10000 }),
-      row("103"),
-    ], new Set(["42"]));
+    const result = planGeneralExpensesAllocations(
+      [
+        row("101", { invoiceNumber: "FC-1", amountHtCents: 10000 }),
+        row("102", { invoiceNumber: "FC-1", amountHtCents: 10000 }),
+        row("103"),
+      ],
+      new Set(["42"]),
+    );
     expect(result.skippedDuplicate).toBe(2);
     expect(result.candidates.map((item) => item.invoiceId)).toEqual(["103"]);
   });

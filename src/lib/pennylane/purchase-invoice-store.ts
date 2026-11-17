@@ -338,7 +338,6 @@ export async function writePurchaseInvoiceAllocation(
   }, pool);
 }
 
-
 export type GeneralExpensesAutoAllocationResult = {
   supplierCount: number;
   matchingSupplierInvoices: number;
@@ -393,16 +392,18 @@ export async function autoAllocateImportedGeneralExpensesInvoices(
       const records = plan.candidates.slice(index, index + 200).map((item) => ({
         invoice_id: item.invoiceId,
         draft: item.draft,
-        history: [{
-          at: now,
-          actor,
-          action: "SAVE",
-          version: 1,
-          previousDraft: null,
-          previousApproved: null,
-          newDraft: item.draft,
-          newApproved: null,
-        }],
+        history: [
+          {
+            at: now,
+            actor,
+            action: "SAVE",
+            version: 1,
+            previousDraft: null,
+            previousApproved: null,
+            newDraft: item.draft,
+            newApproved: null,
+          },
+        ],
       }));
       const written = await client.query<{ invoice_id: string }>(
         "INSERT INTO papot_pennylane_purchase_allocations (invoice_id, version, draft, approved, history, updated_at) SELECT x.invoice_id, 1, x.draft, NULL, x.history, NOW() FROM jsonb_to_recordset($1::jsonb) AS x(invoice_id TEXT, draft JSONB, history JSONB) ON CONFLICT (invoice_id) DO NOTHING RETURNING invoice_id",

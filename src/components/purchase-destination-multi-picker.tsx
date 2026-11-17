@@ -40,8 +40,8 @@ export function PurchaseDestinationMultiPicker({
       </label>
       {options.length === 0 ? <small>Aucune destination pour ce filtre.</small> : null}
       <small>
-        {selectedIds.length} destination(s) sélectionnée(s). Ctrl ou Maj pour plusieurs choix.
-        La recherche ne retire pas les choix déjà effectués.
+        {selectedIds.length} destination(s) sélectionnée(s). Ctrl ou Maj pour plusieurs choix. La
+        recherche ne retire pas les choix déjà effectués.
       </small>
     </div>
   );
