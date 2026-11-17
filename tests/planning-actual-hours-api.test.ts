@@ -7,12 +7,12 @@ const routeSource = readFileSync(
 );
 
 describe("planning actual-hours API", () => {
-  it("requires the actual-hours permission and a past week", () => {
+  it("requires the actual-hours permission for current and past weeks", () => {
     expect(routeSource).toContain(
       'requireSpecialPermission(context.user, "planning.enter_actual_hours")',
     );
     expect(routeSource).toContain(
-      'if (!isPlanningWeekPast(input.week)) throw new Error("PLANNING_ACTUAL_HOURS_WEEK_NOT_PAST")',
+      'if (!isPlanningWeekCurrentOrPast(input.week)) throw new Error("PLANNING_ACTUAL_HOURS_WEEK_IN_FUTURE")',
     );
   });
 });
