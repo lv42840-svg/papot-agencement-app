@@ -544,9 +544,7 @@ function assertPayrollNotPrepared(payrollPayload, selectedHours) {
   if (selectedHours.length === 0) return;
   const month = (payrollPayload?.months ?? []).find((row) => row.month === "2026-10");
   if (!month) return;
-  const weeksToRemove = new Set(
-    selectedHours.map((entry) => entry.userId + ":" + entry.week),
-  );
+  const weeksToRemove = new Set(selectedHours.map((entry) => entry.userId + ":" + entry.week));
   // A validated monthly payroll may be retained when its frozen versions
   // explicitly used CONTRACT hours for the three test entries. In that case
   // the 30 test hours were not included in the payroll figures.

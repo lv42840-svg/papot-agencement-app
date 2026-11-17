@@ -254,42 +254,53 @@ describe("one-off cancelled site cleanup", () => {
     // October was validated as a test, but W41 used contractual hours,
     // not the 30 actual hours from the two cancelled test chantiers.
     const preparedOctober = {
-      months: [{
-        month: "2026-10",
-        status: "PREPARED",
-        validatedWeeks: [] as string[],
-        eventLog: [{ action: "validate", at: "2026-11-09T16:12:17.477Z" }],
-        versions: [{
-          number: 1,
-          summary: { rows: [
-            { personId: id, weeks: [
-              { week: "2026-W41", source: "CONTRACT", hours: 35 },
-              { week: "2026-W42", source: "REAL", hours: 40 },
-            ] },
-          ] },
-        }],
-      }],
+      months: [
+        {
+          month: "2026-10",
+          status: "PREPARED",
+          validatedWeeks: [] as string[],
+          eventLog: [{ action: "validate", at: "2026-11-09T16:12:17.477Z" }],
+          versions: [
+            {
+              number: 1,
+              summary: {
+                rows: [
+                  {
+                    personId: id,
+                    weeks: [
+                      { week: "2026-W41", source: "CONTRACT", hours: 35 },
+                      { week: "2026-W42", source: "REAL", hours: 40 },
+                    ],
+                  },
+                ],
+              },
+            },
+          ],
+        },
+      ],
     };
-    expect(() => assertPayrollNotPrepared(
-      preparedOctober, plan.scope.testHoursToRemove,
-    )).not.toThrow();
+    expect(() =>
+      assertPayrollNotPrepared(preparedOctober, plan.scope.testHoursToRemove),
+    ).not.toThrow();
 
     const withRealTestHours = structuredClone(preparedOctober);
     withRealTestHours.months[0].versions[0].summary.rows[0].weeks[0].source = "REAL";
-    expect(() => assertPayrollNotPrepared(
-      withRealTestHours, plan.scope.testHoursToRemove,
-    )).toThrow("PAYROLL_TEST_HOURS_USED_IN_VERSION");
+    expect(() => assertPayrollNotPrepared(withRealTestHours, plan.scope.testHoursToRemove)).toThrow(
+      "PAYROLL_TEST_HOURS_USED_IN_VERSION",
+    );
 
     const withValidatedTestWeek = structuredClone(preparedOctober);
     withValidatedTestWeek.months[0].validatedWeeks = [id + ":2026-W41"];
-    expect(() => assertPayrollNotPrepared(
-      withValidatedTestWeek, plan.scope.testHoursToRemove,
-    )).toThrow("PAYROLL_TEST_WEEK_VALIDATED");
+    expect(() =>
+      assertPayrollNotPrepared(withValidatedTestWeek, plan.scope.testHoursToRemove),
+    ).toThrow("PAYROLL_TEST_WEEK_VALIDATED");
 
-    expect(() => assertPayrollNotPrepared(
-      { months: [{ month: "2026-10", status: "PREPARED", versions: [{}] }] },
-      plan.scope.testHoursToRemove,
-    )).toThrow("PAYROLL_SNAPSHOT_INCOMPLETE");
+    expect(() =>
+      assertPayrollNotPrepared(
+        { months: [{ month: "2026-10", status: "PREPARED", versions: [{}] }] },
+        plan.scope.testHoursToRemove,
+      ),
+    ).toThrow("PAYROLL_SNAPSHOT_INCOMPLETE");
     payloads.planning.payrollWeekConfirmations = { [id + ":2026-W41"]: "confirmed" };
     expect(() => planFor(states, clients)).toThrow("PAYROLL_WEEK_CONFIRMED");
     payloads.planning.payrollWeekConfirmations = {};
