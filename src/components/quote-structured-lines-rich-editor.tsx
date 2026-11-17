@@ -22,7 +22,7 @@ type Props = {
   headerActions?: ReactNode;
 };
 
-type RichEditableKind = "SECTION" | "SUBSECTION" | "LINE";
+type RichEditableKind = "SECTION" | "SUBSECTION" | "LINE" | "COMMENT";
 
 type RichSession = {
   key: string;
@@ -46,6 +46,7 @@ type RichSaveResponse = {
 function itemText(item: QuoteItem): string | null {
   if (item.kind === "SECTION" || item.kind === "SUBSECTION") return item.title;
   if (item.kind === "LINE") return item.description;
+  if (item.kind === "COMMENT") return item.text;
   return null;
 }
 
@@ -78,15 +79,18 @@ function plainTextForNativeInput(value: string): string {
   return value.replace(/\r\n?|\n/g, " ");
 }
 
-function setNativeInputValue(input: HTMLInputElement, value: string) {
-  const setter = Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, "value")?.set;
-  const nativeValue = plainTextForNativeInput(value);
+function setNativeInputValue(input: HTMLInputElement | HTMLTextAreaElement, value: string) {
+  const isTextArea = input instanceof HTMLTextAreaElement;
+  const prototype = isTextArea ? HTMLTextAreaElement.prototype : HTMLInputElement.prototype;
+  const setter = Object.getOwnPropertyDescriptor(prototype, "value")?.set;
+  const nativeValue = isTextArea ? value.replace(/\r\n?/g, "\n") : plainTextForNativeInput(value);
   if (setter) setter.call(input, nativeValue);
   else input.value = nativeValue;
   input.dispatchEvent(new Event("input", { bubbles: true }));
 }
 
-function editableKind(input: HTMLInputElement): RichEditableKind | null {
+function editableKind(input: HTMLInputElement | HTMLTextAreaElement): RichEditableKind | null {
+  if (input.closest(".quoteCommentEditing")) return "COMMENT";
   if (input.closest(".quoteOuvrageEditing")) return "LINE";
   if (!input.closest(".quoteHeadingEditing")) return null;
   return input.placeholder === "Sous-titre" ? "SUBSECTION" : "SECTION";
@@ -98,7 +102,7 @@ function itemMatchesKind(item: QuoteItem, kind: RichEditableKind): boolean {
 
 export function QuoteStructuredLinesRichEditor({ quote, canWrite, onSaved, headerActions }: Props) {
   const rootRef = useRef<HTMLDivElement>(null);
-  const activeInputRef = useRef<HTMLInputElement | null>(null);
+  const activeInputRef = useRef<HTMLInputElement | HTMLTextAreaElement | null>(null);
   const activeHostRef = useRef<HTMLDivElement | null>(null);
   const sessionRef = useRef<RichSession | null>(null);
   const pendingSaveRef = useRef<PendingRichSave | null>(null);
@@ -135,8 +139,8 @@ export function QuoteStructuredLinesRichEditor({ quote, canWrite, onSaved, heade
     };
 
     const findEditingInput = () =>
-      root.querySelector<HTMLInputElement>(
-        ".quoteHeadingEditing .quoteDescriptionInput, .quoteOuvrageEditing .quoteDescriptionInput",
+      root.querySelector<HTMLInputElement | HTMLTextAreaElement>(
+        '.quoteHeadingEditing .quoteDescriptionInput, .quoteOuvrageEditing .quoteDescriptionInput, .quoteCommentEditing textarea[aria-label="Texte libre du devis"]',
       );
 
     const connect = () => {
@@ -186,7 +190,7 @@ export function QuoteStructuredLinesRichEditor({ quote, canWrite, onSaved, heade
     const rememberPendingSave = (event: Event) => {
       const form = event.target;
       if (!(form instanceof HTMLFormElement)) return;
-      if (!form.matches(".quoteHeadingEditing, .quoteOuvrageEditing")) return;
+      if (!form.matches(".quoteHeadingEditing, .quoteOuvrageEditing, .quoteCommentEditing")) return;
       const current = sessionRef.current;
       if (!current) return;
       pendingSaveRef.current = {
@@ -293,8 +297,14 @@ export function QuoteStructuredLinesRichEditor({ quote, canWrite, onSaved, heade
             <QuoteRichTextEditor
               value={session.richText}
               onChange={changeRichText}
-              ariaLabel={session.kind === "LINE" ? "Désignation de l’ouvrage" : "Texte du titre"}
-              maxLength={session.kind === "LINE" ? 4000 : 500}
+              ariaLabel={
+                session.kind === "COMMENT"
+                  ? "Texte libre du devis"
+                  : session.kind === "LINE"
+                    ? "Désignation de l’ouvrage"
+                    : "Texte du titre"
+              }
+              maxLength={session.kind === "LINE" || session.kind === "COMMENT" ? 4000 : 500}
             />,
             activeHost,
           )
