@@ -427,7 +427,7 @@ export function PurchaseOrderEditWorkspace({ orderId }: { orderId: string }) {
                     id: crypto.randomUUID(), chantierId: id, amount: "",
                   }))]);
                   setExtraDestinations([]);
-                }>
+                }}>
                 Ajouter les destinations sélectionnées ({extraDestinations.length || 1})
               </button>
             </div>
