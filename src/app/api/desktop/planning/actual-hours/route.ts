@@ -20,7 +20,7 @@ import {
 import { createPlanningRepository } from "@/lib/planning/create-repository";
 import { scheduledChantiersByPerson } from "@/lib/planning/actual-hours-suggestions";
 import { effectivePlanningPeople } from "@/lib/planning/personnel";
-import { isPlanningWeekPast } from "@/lib/planning/time-markers";
+import { isPlanningWeekPast, isPlanningWeekCurrentOrPast } from "@/lib/planning/time-markers";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -133,7 +133,7 @@ async function snapshot(
     ),
     editRevisions: planning.editRevisions ?? {},
     editHistory: (planning.editHistory ?? []).filter((entry) => entry.key.includes(week)),
-    editable: context.moduleAccess.canWrite && canEnter && isPlanningWeekPast(week),
+    editable: context.moduleAccess.canWrite && canEnter && isPlanningWeekCurrentOrPast(week),
     weekIsPast: isPlanningWeekPast(week),
     people: personnel,
     chantiers: chantierRows,
@@ -187,7 +187,7 @@ export async function POST(request: Request) {
       raw?.action === "saveIndirectHoursRow"
         ? indirectHoursRowSchema.parse(raw)
         : actualHoursRowSchema.parse(raw);
-    if (!isPlanningWeekPast(input.week)) throw new Error("PLANNING_ACTUAL_HOURS_WEEK_NOT_PAST");
+    if (!isPlanningWeekCurrentOrPast(input.week)) throw new Error("PLANNING_ACTUAL_HOURS_WEEK_IN_FUTURE");
 
     const [chantiers, auth] = await Promise.all([
       createChantiersRepository(context).load(),
