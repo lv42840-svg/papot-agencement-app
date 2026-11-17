@@ -86,15 +86,18 @@ export function PurchaseInvoicesWorkspace() {
     const body = (await response.json()) as ResponseBody;
     if (!response.ok) throw new Error(body.error ?? "INVOICE_LOAD_FAILED");
     setData(body);
-    setSelectedId((id) =>
-      body.invoices.some((item) => item.id === id) ? id : (body.invoices[0]?.id ?? ""),
-    );
+    setSelectedId((id) => {
+      const current = invoiceTab === "APPROVED" ? body.validatedInvoices : body.invoices;
+      return current.some((item) => item.id === id) ? id : (current[0]?.id ?? "");
+    });
   }
   useEffect(() => {
     void load().catch(() => setError("Impossible de charger les factures fournisseurs."));
   }, []);
 
-  const visibleInvoices = (data?.invoices ?? []).filter(
+  const currentTabInvoices =
+    invoiceTab === "APPROVED" ? (data?.validatedInvoices ?? []) : (data?.invoices ?? []);
+  const visibleInvoices = currentTabInvoices.filter(
     (invoice) =>
       (invoiceTab === "ALL" || Boolean(invoice.state?.approved)) &&
       [invoice.supplierName, invoice.invoiceNumber, invoice.invoiceDate ?? ""]
@@ -104,6 +107,7 @@ export function PurchaseInvoicesWorkspace() {
   );
   const selected =
     visibleInvoices.find((item) => item.id === selectedId) ?? visibleInvoices[0] ?? null;
+  const canEditSelected = Boolean(data?.canWrite && selected?.availableInPennylane);
 
   useEffect(() => {
     const current = selected?.state?.draft ?? selected?.state?.approved?.draft ?? emptyDraft();
@@ -322,9 +326,14 @@ export function PurchaseInvoicesWorkspace() {
         {!data?.importEnabled
           ? " Synchronisation désactivée : activation serveur nécessaire après tests de la clé."
           : ""}
-        {data?.truncated ? " Liste limitée à 500 factures : prévoir une recherche paginée." : ""}
+        {data?.truncated && invoiceTab === "ALL"
+          ? " Affichage des 500 dernières factures (les coûts validés restent conservés)."
+          : ""}
+        {data?.validatedTruncated && invoiceTab === "APPROVED"
+          ? " Affichage limité aux 500 affectations validées les plus récentes."
+          : ""}
       </p>
-      {data?.invoices.length ? (
+      {data && (data.invoices.length > 0 || data.validatedInvoices.length > 0) ? (
         <div role="tablist" aria-label="Vue des factures fournisseurs" style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
           <button
             type="button"
@@ -342,13 +351,13 @@ export function PurchaseInvoicesWorkspace() {
             className={invoiceTab === "APPROVED" ? "primaryButton" : "secondaryButton"}
             onClick={() => { setInvoiceTab("APPROVED"); setSelectedId(""); }}
           >
-            Factures validées ({data.invoices.filter((invoice) => Boolean(invoice.state?.approved)).length})
+            Factures validées ({data.validatedInvoices.length})
           </button>
         </div>
       ) : null}
       {!data ? (
         <p>Chargement…</p>
-      ) : data.invoices.length === 0 ? (
+      ) : data.invoices.length === 0 && data.validatedInvoices.length === 0 ? (
         <section style={{ background: "white", padding: 24, borderRadius: 12 }}>
           <h2>Aucune facture importée</h2>
           <p>
@@ -425,6 +434,7 @@ export function PurchaseInvoicesWorkspace() {
                             ? "Brouillon"
                             : "À affecter"}
                     {invoice.duplicateIds.length ? " · Doublon suspect" : ""}
+                    {!invoice.availableInPennylane ? " · Historique PAPOT" : ""}
                   </small>
                 </button>
               ))}
@@ -450,13 +460,20 @@ export function PurchaseInvoicesWorkspace() {
                   <strong>{money(selected.amountHtCents)} HT</strong> · Pennylane :{" "}
                   {selected.accountingStatus}
                 </div>
+                {!selected.availableInPennylane ? (
+                  <p role="status" style={{ color: "#8a5d26" }}>
+                    Facture historisée dans PAPOT, absente du dernier import Pennylane.
+                    Son coût est conservé dans le suivi du chantier comme provisoire.
+                    Cette affectation est en lecture seule.
+                  </p>
+                ) : null}
                 {selected.duplicateIds.length ? (
                   <p style={{ color: "#a43a26" }}>
                     Doublon potentiel avec la facture {selected.duplicateIds.join(", ")}. La
                     validation est bloquée jusqu&apos;à résolution.
                   </p>
                 ) : null}
-                {selected.hasPdf ? (
+                {selected.hasPdf && selected.availableInPennylane ? (
                   <>
                     <a
                       href={"/api/desktop/purchase-invoices/" + selected.id + "/pdf"}
@@ -497,7 +514,7 @@ export function PurchaseInvoicesWorkspace() {
               minWidth: 355,
             }}
           >
-            <h2>Affectation Nadia</h2>
+            <h2>Affectation PAPOT</h2>
             {selected ? (
               <>
                 <p style={{ fontSize: 13 }}>Répartition globale HT, par chantier, SAV ou frais généraux.</p>
@@ -569,7 +586,7 @@ export function PurchaseInvoicesWorkspace() {
                             <CalculatedAmountInput
                               label="Part rapprochée HT (€)"
                               valueCents={link.appliedHtCents}
-                              disabled={busy || !data.canWrite}
+                              disabled={busy || !canEditSelected}
                               onCommit={(amountCents) =>
                                 setDraft((current) => ({
                                   ...current,
@@ -580,12 +597,13 @@ export function PurchaseInvoicesWorkspace() {
                                   ),
                                 }))
                               }
-                            />                         </label>
+                            />
+                          </label>
                           <label>
                             <input
                               type="checkbox"
                               checked={link.settle}
-                              disabled={busy || !data.canWrite}
+                              disabled={busy || !canEditSelected}
                               onChange={(event) =>
                                 setDraft((current) => ({
                                   ...current,
@@ -621,7 +639,7 @@ export function PurchaseInvoicesWorkspace() {
                           type="button"
                           disabled={
                             busy ||
-                            !data.canWrite ||
+                            !canEditSelected ||
                             !order ||
                             Boolean(data.orderBalances[proposal.id]?.settled)
                           }
@@ -654,7 +672,7 @@ export function PurchaseInvoicesWorkspace() {
                             ? (row.destination.chantierId ?? "")
                             : row.destination.kind
                         }
-                        disabled={busy || !data.canWrite}
+                        disabled={busy || !canEditSelected}
                         onChange={(event) =>
                           editRow(row.id, { destination: rowDestination(event.target.value) })
                         }
@@ -672,7 +690,7 @@ export function PurchaseInvoicesWorkspace() {
                         label="Montant achats HT (€)"
                         valueCents={row.amountHtCents}
                         allowNegative
-                        disabled={busy || !data.canWrite}
+                        disabled={busy || !canEditSelected}
                         onCommit={(amountCents) => editRow(row.id, { amountHtCents: amountCents })}
                       />
                     </label>
@@ -682,7 +700,7 @@ export function PurchaseInvoicesWorkspace() {
                       <button
                         type="button"
                         className="secondaryButton"
-                        disabled={busy || !data.canWrite}
+                        disabled={busy || !canEditSelected}
                         onClick={() => {
                           const chargesHtCents = draft.charges.reduce(
                             (sum, charge) => sum + charge.amountHtCents,
@@ -702,7 +720,7 @@ export function PurchaseInvoicesWorkspace() {
                     <button
                       className="secondaryButton"
                       type="button"
-                      disabled={busy || !data.canWrite}
+                      disabled={busy || !canEditSelected}
                       onClick={() =>
                         setDraft((current) => ({
                           ...current,
@@ -717,7 +735,7 @@ export function PurchaseInvoicesWorkspace() {
                 <button
                   type="button"
                   className="secondaryButton"
-                  disabled={busy || !data.canWrite}
+                  disabled={busy || !canEditSelected}
                   onClick={addRow}
                 >
                   + Ajouter un chantier / SAV / frais généraux
@@ -739,7 +757,7 @@ export function PurchaseInvoicesWorkspace() {
                       <input
                         value={charge.label}
                         maxLength={180}
-                        disabled={busy || !data.canWrite}
+                        disabled={busy || !canEditSelected}
                         onChange={(event) =>
                           setDraft((current) => ({
                             ...current,
@@ -756,7 +774,7 @@ export function PurchaseInvoicesWorkspace() {
                         label="Montant HT des frais ou remises (€)"
                         valueCents={charge.amountHtCents}
                         allowNegative
-                        disabled={busy || !data.canWrite}
+                        disabled={busy || !canEditSelected}
                         onCommit={(amountCents) =>
                           setDraft((current) => ({
                             ...current,
@@ -772,7 +790,7 @@ export function PurchaseInvoicesWorkspace() {
                     <label>
                       Répartir au prorata sur
                       <select
-                        disabled={busy || !data.canWrite}
+                        disabled={busy || !canEditSelected}
                         value={charge.destinationKeys[0] ?? ""}
                         onChange={(event) =>
                           setDraft((current) => ({
@@ -808,7 +826,7 @@ export function PurchaseInvoicesWorkspace() {
                     <button
                       type="button"
                       className="secondaryButton"
-                      disabled={busy || !data.canWrite}
+                      disabled={busy || !canEditSelected}
                       onClick={() =>
                         setDraft((current) => ({
                           ...current,
@@ -823,7 +841,7 @@ export function PurchaseInvoicesWorkspace() {
                 <button
                   type="button"
                   className="secondaryButton"
-                  disabled={busy || !data.canWrite}
+                  disabled={busy || !canEditSelected}
                   onClick={() =>
                     setDraft((current) => ({
                       ...current,
@@ -847,7 +865,7 @@ export function PurchaseInvoicesWorkspace() {
                     value={draft.note}
                     rows={2}
                     maxLength={2000}
-                    disabled={busy || !data.canWrite}
+                    disabled={busy || !canEditSelected}
                     onChange={(event) =>
                       setDraft((current) => ({ ...current, note: event.target.value }))
                     }
@@ -907,7 +925,7 @@ export function PurchaseInvoicesWorkspace() {
                   <button
                     type="button"
                     className="secondaryButton"
-                    disabled={busy || !data.canWrite}
+                    disabled={busy || !canEditSelected}
                     onClick={() => void mutate("SAVE")}
                   >
                     Enregistrer le brouillon
@@ -916,7 +934,7 @@ export function PurchaseInvoicesWorkspace() {
                     type="button"
                     className="primaryButton"
                     disabled={
-                      busy || !data.canWrite || !complete || selected.duplicateIds.length > 0
+                      busy || !canEditSelected || !complete || selected.duplicateIds.length > 0
                     }
                     onClick={() => void mutate("VALIDATE")}
                   >
