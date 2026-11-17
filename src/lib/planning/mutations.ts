@@ -112,6 +112,13 @@ export const planningMutationSchema = z.discriminatedUnion("action", [
     hours: z.number().finite().positive().max(24),
   }),
   z.object({
+    action: z.literal("setAbsenceRange"),
+    userId: z.string().uuid(),
+    type: planningAbsenceTypeSchema,
+    startDate: z.string().regex(/^\d{4}-\d{2}-\d{2}$/),
+    endDate: z.string().regex(/^\d{4}-\d{2}-\d{2}$/),
+  }),
+  z.object({
     action: z.literal("setFullWeekAbsence"),
     userId: z.string().uuid(),
     type: planningAbsenceTypeSchema,
@@ -149,6 +156,7 @@ export type PlanningPersonCapacityMutation = Extract<
   { action: "setPersonCapacity" }
 >;
 export type PlanningAbsenceMutation = Extract<PlanningMutation, { action: "setAbsence" }>;
+export type PlanningAbsenceRangeMutation = Extract<PlanningMutation, { action: "setAbsenceRange" }>;
 export type PlanningFullWeekAbsenceMutation = Extract<
   PlanningMutation,
   { action: "setFullWeekAbsence" }
@@ -551,6 +559,64 @@ export function applyPlanningAbsenceMutation(
   if (index >= 0) payload.absences[index] = next;
   else payload.absences.push(next);
 
+  return parsePlanningPayload(payload);
+}
+
+/** Enregistre une plage calendaire incluse, sans doublon ni heures de jours fériés. */
+export function applyPlanningAbsenceRangeMutation(
+  source: PlanningPayload,
+  input: PlanningAbsenceRangeMutation,
+  activeUserIds: ReadonlySet<string>,
+): PlanningPayload {
+  if (!activeUserIds.has(input.userId)) throw new Error("PLANNING_USER_NOT_ACTIVE");
+  const date = (value: string) => {
+    const parsed = new Date(value + "T12:00:00Z");
+    if (!Number.isFinite(parsed.getTime()) || parsed.toISOString().slice(0, 10) !== value)
+      throw new Error("PLANNING_ABSENCE_DATE_INVALID");
+    return parsed;
+  };
+  const start = date(input.startDate);
+  const end = date(input.endDate);
+  const days = Math.round((end.getTime() - start.getTime()) / 86_400_000) + 1;
+  if (days < 1 || days > 366) throw new Error("PLANNING_ABSENCE_RANGE_INVALID");
+  const payload = structuredClone(parsePlanningPayload(source));
+  const schedule = effectiveSchedule(payload, input.userId);
+  const affectedDates = new Set<string>();
+  const replacement = [];
+  const existing = new Map(
+    payload.absences.filter((row) => row.userId === input.userId).map((row) => [row.date, row]),
+  );
+  for (let index = 0; index < days; index += 1) {
+    const day = new Date(start);
+    day.setUTCDate(start.getUTCDate() + index);
+    const dayId = day.toISOString().slice(0, 10);
+    affectedDates.add(dayId);
+    const hours = scheduleHoursForDate(schedule, day);
+    if (hours > 0)
+      replacement.push({
+        id: existing.get(dayId)?.id ?? crypto.randomUUID(),
+        userId: input.userId,
+        type: input.type,
+        date: dayId,
+        hours,
+      });
+  }
+  const touchedGroups = new Set(
+    payload.absences
+      .filter((row) => row.userId === input.userId && affectedDates.has(row.date))
+      .map((row) => row.weekGroupId)
+      .filter((value): value is string => !!value),
+  );
+  payload.absences = [
+    ...payload.absences
+      .filter((row) => row.userId !== input.userId || !affectedDates.has(row.date))
+      .map((row) =>
+        row.weekGroupId && touchedGroups.has(row.weekGroupId)
+          ? { ...row, weekGroupId: undefined }
+          : row,
+      ),
+    ...replacement,
+  ];
   return parsePlanningPayload(payload);
 }
 

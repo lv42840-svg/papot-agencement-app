@@ -1,4 +1,4 @@
-import type { QuoteItem, QuoteLine, QuoteSection, QuoteSubsection } from "./model";
+import type { QuoteComment, QuoteItem, QuoteLine, QuoteSection, QuoteSubsection } from "./model";
 
 export type QuoteItemPlacement = "BEFORE" | "AFTER" | "INSIDE";
 
@@ -36,13 +36,20 @@ function sourceBlockEnd(items: QuoteItem[], startIndex: number): number {
   return startIndex + 1;
 }
 
-function isDraggableItem(item: QuoteItem): item is QuoteLine | QuoteSection | QuoteSubsection {
-  return item.kind === "LINE" || item.kind === "SECTION" || item.kind === "SUBSECTION";
+function isDraggableItem(
+  item: QuoteItem,
+): item is QuoteLine | QuoteComment | QuoteSection | QuoteSubsection {
+  return (
+    item.kind === "LINE" ||
+    item.kind === "COMMENT" ||
+    item.kind === "SECTION" ||
+    item.kind === "SUBSECTION"
+  );
 }
 
 function reparentSourceBlock(
   block: QuoteItem[],
-  source: QuoteLine | QuoteSection | QuoteSubsection,
+  source: QuoteLine | QuoteComment | QuoteSection | QuoteSubsection,
   parentId: string | null | undefined,
 ): QuoteItem[] {
   if (parentId === undefined || source.kind === "SECTION") return block;
@@ -53,7 +60,7 @@ function reparentSourceBlock(
       if (parentId === null) throw new Error("QUOTE_ITEM_REORDER_BLOCKED");
       return { ...item, parentId };
     }
-    if (item.kind === "LINE") return { ...item, parentId };
+    if (item.kind === "LINE" || item.kind === "COMMENT") return { ...item, parentId };
     return item;
   });
 }
@@ -105,7 +112,7 @@ export function reorderQuoteItems(
     if (target.kind === "SECTION" || target.kind === "SUBSECTION") {
       if (placement !== "INSIDE") throw new Error("QUOTE_ITEM_REORDER_BLOCKED");
       nextParentId = target.id;
-    } else if (target.kind === "LINE") {
+    } else if (target.kind === "LINE" || target.kind === "COMMENT") {
       if (placement === "INSIDE") throw new Error("QUOTE_ITEM_REORDER_BLOCKED");
       nextParentId = target.parentId;
     } else {
@@ -139,7 +146,7 @@ export function reorderQuoteItems(
     insertionIndex = sectionBlockEnd(remaining, remainingTargetIndex);
   } else if (remainingTarget.kind === "SUBSECTION") {
     insertionIndex = subsectionBlockEnd(remaining, remainingTargetIndex);
-  } else if (remainingTarget.kind === "LINE") {
+  } else if (remainingTarget.kind === "LINE" || remainingTarget.kind === "COMMENT") {
     insertionIndex = placement === "BEFORE" ? remainingTargetIndex : remainingTargetIndex + 1;
   } else {
     throw new Error("QUOTE_ITEM_REORDER_BLOCKED");

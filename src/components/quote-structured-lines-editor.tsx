@@ -43,6 +43,7 @@ import {
   calculateQuoteOuvrageUnitCostCents,
   quoteOuvrageComponentCostPriceCents,
   type QuoteItem,
+  type QuoteComment,
   type QuoteLine,
   type QuoteOuvrageComponent,
   type QuoteSection,
@@ -422,6 +423,11 @@ export function QuoteStructuredLinesEditor({
   const [ouvragePricingDriver, setOuvragePricingDriver] =
     useState<QuotePricingDriver>("SALE_PRICE");
   const [headingEditor, setHeadingEditor] = useState<HeadingEditor>(null);
+  const [commentEditor, setCommentEditor] = useState<{
+    itemId?: string;
+    parentId: string | null;
+    text: string;
+  } | null>(null);
   const [saving, setSaving] = useState(false);
   const [duplicatingLineId, setDuplicatingLineId] = useState<string | null>(null);
   const [duplicatingHeadingId, setDuplicatingHeadingId] = useState<string | null>(null);
@@ -669,6 +675,50 @@ export function QuoteStructuredLinesEditor({
     });
   }
 
+  function openNewComment() {
+    if (!editable || formOpen || headingEditor || commentEditor) return;
+    setCommentEditor({ parentId: currentInsertionParentId(items), text: "" });
+    setError("");
+  }
+
+  function openEditComment(item: QuoteComment) {
+    if (!editable || formOpen || headingEditor || commentEditor) return;
+    setCommentEditor({ itemId: item.id, parentId: item.parentId, text: item.text });
+    setError("");
+  }
+
+  async function saveComment(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    if (!quote || !commentEditor || !editable || saving) return;
+    setSaving(true);
+    setError("");
+    try {
+      const response = await fetch("/api/desktop/quotes", {
+        method: "POST",
+        headers: { "Content-Type": "application/json", ...quoteRevisionHeaders(quote.updatedAt) },
+        body: JSON.stringify({
+          action: "upsertComment",
+          quoteId: quote.id,
+          itemId: commentEditor.itemId,
+          parentId: commentEditor.parentId,
+          text: commentEditor.text,
+        }),
+      });
+      const result = (await response.json()) as QuotesApiResponse;
+      if (!response.ok || !result.payload) {
+        setError(lineErrorLabel(result.error ?? "QUOTES_MUTATION_FAILED"));
+        return;
+      }
+      onSaved(result.payload);
+      setNotice(commentEditor.itemId ? "Texte libre modifié." : "Texte libre ajouté au devis.");
+      setCommentEditor(null);
+    } catch {
+      setError("Le texte libre n’a pas pu être enregistré.");
+    } finally {
+      setSaving(false);
+    }
+  }
+
   function openEditHeading(item: QuoteSection | QuoteSubsection) {
     if (!editable || formOpen) return;
     setError("");
@@ -680,7 +730,7 @@ export function QuoteStructuredLinesEditor({
     });
   }
 
-  async function deleteItem(item: QuoteLine | QuoteSection | QuoteSubsection) {
+  async function deleteItem(item: QuoteLine | QuoteSection | QuoteSubsection | QuoteComment) {
     if (
       !quote ||
       !editable ||
@@ -688,7 +738,8 @@ export function QuoteStructuredLinesEditor({
       duplicatingHeadingId ||
       duplicatingLineId ||
       formOpen ||
-      headingEditor
+      headingEditor ||
+      commentEditor
     ) {
       return;
     }
@@ -696,9 +747,11 @@ export function QuoteStructuredLinesEditor({
     const label =
       item.kind === "LINE"
         ? "cet ouvrage"
-        : item.kind === "SECTION"
-          ? "ce titre et tout son contenu"
-          : "ce sous-titre et tout son contenu";
+        : item.kind === "COMMENT"
+          ? "ce texte libre"
+          : item.kind === "SECTION"
+            ? "ce titre et tout son contenu"
+            : "ce sous-titre et tout son contenu";
     if (!window.confirm(`Supprimer ${label} ?`)) return;
 
     setDeletingItemId(item.id);
@@ -726,9 +779,11 @@ export function QuoteStructuredLinesEditor({
       setNotice(
         item.kind === "LINE"
           ? "Ouvrage supprimé."
-          : item.kind === "SECTION"
-            ? "Titre supprimé avec son contenu."
-            : "Sous-titre supprimé avec son contenu.",
+          : item.kind === "COMMENT"
+            ? "Texte libre supprimé."
+            : item.kind === "SECTION"
+              ? "Titre supprimé avec son contenu."
+              : "Sous-titre supprimé avec son contenu.",
       );
     } catch {
       setError("La suppression n’a pas pu être enregistrée.");
@@ -743,7 +798,7 @@ export function QuoteStructuredLinesEditor({
   ): QuoteItemPlacement | null {
     if (!draggingItemId || draggingItemId === target.id) return null;
     const source = items.find((item) => item.id === draggingItemId);
-    if (!source || source.kind === "COMMENT") return null;
+    if (!source) return null;
 
     if (source.kind === "SECTION") {
       if (target.kind !== "SECTION") return null;
@@ -759,20 +814,21 @@ export function QuoteStructuredLinesEditor({
     }
 
     if (target.kind === "SECTION" || target.kind === "SUBSECTION") return "INSIDE";
-    if (target.kind !== "LINE") return null;
+    if (target.kind !== "LINE" && target.kind !== "COMMENT") return null;
     const bounds = event.currentTarget.getBoundingClientRect();
     return event.clientY < bounds.top + bounds.height / 2 ? "BEFORE" : "AFTER";
   }
 
   function startItemDrag(
     event: DragEvent<HTMLElement>,
-    item: QuoteLine | QuoteSection | QuoteSubsection,
+    item: QuoteLine | QuoteSection | QuoteSubsection | QuoteComment,
   ) {
     const origin = event.target as HTMLElement;
     if (
       !editable ||
       formOpen ||
       headingEditor ||
+      commentEditor ||
       deletingItemId ||
       reorderingItemId ||
       origin.closest("button, input, textarea, select")
@@ -806,7 +862,7 @@ export function QuoteStructuredLinesEditor({
   async function reorderItem(itemId: string, target: QuoteItem, placement: QuoteItemPlacement) {
     if (!quote || !editable || reorderingItemId || itemId === target.id) return;
     const source = items.find((item) => item.id === itemId);
-    if (!source || source.kind === "COMMENT") return;
+    if (!source) return;
 
     setReorderingItemId(itemId);
     setError("");
@@ -2117,6 +2173,55 @@ export function QuoteStructuredLinesEditor({
     );
   }
 
+  function renderCommentEditor(number = "+") {
+    if (!commentEditor) return null;
+    return (
+      <form
+        className="quoteMainRow quoteCommentRow"
+        onSubmit={saveComment}
+        key={commentEditor.itemId ?? "new-comment"}
+      >
+        <span className="quoteNumber">{number}</span>
+        <textarea
+          autoFocus
+          required
+          maxLength={4000}
+          rows={3}
+          aria-label="Texte libre du devis"
+          style={{ minWidth: 260, width: "100%", resize: "vertical" }}
+          value={commentEditor.text}
+          onChange={(event) =>
+            setCommentEditor((old) => (old ? { ...old, text: event.target.value } : old))
+          }
+        />
+        <span />
+        <span />
+        <span />
+        <span />
+        <span />
+        <div className="quoteRowActions">
+          <button
+            type="submit"
+            className="miniActionButton quoteSaveButton"
+            disabled={saving || !commentEditor.text.trim()}
+            aria-label="Enregistrer le texte libre"
+          >
+            <Check size={14} aria-hidden="true" />
+          </button>
+          <button
+            type="button"
+            className="miniActionButton"
+            disabled={saving}
+            aria-label="Annuler le texte libre"
+            onClick={() => setCommentEditor(null)}
+          >
+            <X size={14} aria-hidden="true" />
+          </button>
+        </div>
+      </form>
+    );
+  }
+
   function renderHeadingEditor(editor: NonNullable<HeadingEditor>, number = "+") {
     return (
       <form
@@ -2208,20 +2313,61 @@ export function QuoteStructuredLinesEditor({
             return formOpen && editingLineId === item.id
               ? renderEditingOuvrage(item.id)
               : renderReadOuvrage(item);
+          if (commentEditor?.itemId === item.id)
+            return renderCommentEditor(numbers.get(item.id) ?? "—");
           return (
-            <div className="quoteMainRow quoteCommentRow" key={item.id}>
+            <div
+              className={`quoteMainRow quoteCommentRow quoteDraggableItem${dropClass(item.id)}`}
+              key={item.id}
+              draggable={editable && !formOpen && headingEditor === null && commentEditor === null}
+              onDragStart={(event) => startItemDrag(event, item)}
+              onDragOver={(event) => dragItemOver(event, item)}
+              onDrop={(event) => dropItem(event, item)}
+              onDragEnd={finishItemDrag}
+            >
               <span className="quoteNumber">{numbers.get(item.id) ?? "—"}</span>
-              <span>{item.text}</span>
+              <span
+                style={{
+                  whiteSpace: "pre-wrap",
+                  ...quoteItemTextStyleToCss(item.presentation?.textStyle),
+                }}
+              >
+                {item.text}
+              </span>
               <span />
               <span />
               <span />
               <span />
               <span />
-              <span />
+              <div className="quoteRowActions">
+                {editable ? (
+                  <>
+                    <button
+                      type="button"
+                      className="iconButton"
+                      aria-label="Modifier le texte libre"
+                      disabled={formOpen || Boolean(headingEditor) || Boolean(commentEditor)}
+                      onClick={() => openEditComment(item)}
+                    >
+                      <Pencil size={14} aria-hidden="true" />
+                    </button>
+                    <button
+                      type="button"
+                      className="iconButton quoteDeleteItemButton"
+                      aria-label="Supprimer le texte libre"
+                      disabled={deletingItemId !== null || Boolean(commentEditor)}
+                      onClick={() => void deleteItem(item)}
+                    >
+                      <Trash2 size={14} aria-hidden="true" />
+                    </button>
+                  </>
+                ) : null}
+              </div>
             </div>
           );
         })}
         {headingEditor && !headingEditor.itemId ? renderHeadingEditor(headingEditor) : null}
+        {commentEditor && !commentEditor.itemId ? renderCommentEditor() : null}
         {formOpen && editingLineId === null ? renderEditingOuvrage("new-ouvrage") : null}
         {editable ? (
           <div className="quoteMainRow quoteAddRow">
@@ -2247,6 +2393,13 @@ export function QuoteStructuredLinesEditor({
                 disabled={!lastSection || formOpen || headingEditor !== null}
               >
                 <Plus size={13} aria-hidden="true" /> Sous-titre
+              </button>
+              <button
+                type="button"
+                onClick={openNewComment}
+                disabled={formOpen || headingEditor !== null || commentEditor !== null}
+              >
+                <Plus size={13} aria-hidden="true" /> Texte libre
               </button>
             </div>
             <span />

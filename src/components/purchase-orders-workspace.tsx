@@ -1,21 +1,22 @@
 "use client";
 
 import Link from "next/link";
+import { evaluateNumericExpression, numericExpressionInput } from "@/lib/numeric-expression";
 import { useEffect, useMemo, useRef, useState } from "react";
 import type {
   PurchaseOrderInput,
   PurchaseOrderLine,
   PurchaseOrdersPayload,
 } from "@/lib/purchases/domain";
-import {
-  committedPurchaseTotal,
-  committedPurchaseDestinationTotal,
-  committedPurchasesByDestination,
-  purchaseAllocationFromSelection,
-  purchaseDestinationKey,
-} from "@/lib/purchases/domain";
+import { purchaseAllocationFromSelection, purchaseDestinationKey } from "@/lib/purchases/domain";
 
-type Site = { id: string; name: string; clientName: string; status: string };
+type Site = {
+  id: string;
+  name: string;
+  clientName: string;
+  reference?: string | null;
+  status: string;
+};
 type Snapshot = {
   payload: PurchaseOrdersPayload;
   chantiers: Site[];
@@ -50,16 +51,13 @@ const newLine = (): EditableLine => ({
   unitPrice: "",
 });
 function moneyCents(raw: string): number | null {
-  const value = raw.trim().replace(",", ".");
-  if (!/^\d+(?:\.\d{1,2})?$/.test(value)) return null;
-  const cents = Math.round(Number(value) * 100);
-  return Number.isSafeInteger(cents) && cents >= 0 && cents <= 100_000_000_000 ? cents : null;
+  const value = evaluateNumericExpression(raw, 2, 0, 1_000_000_000);
+  if (value === null) return null;
+  const cents = Math.round(value * 100);
+  return Number.isSafeInteger(cents) ? cents : null;
 }
 function positiveQuantity(raw: string): number | null {
-  const value = raw.trim().replace(",", ".");
-  if (!/^\d+(?:\.\d{1,6})?$/.test(value)) return null;
-  const n = Number(value);
-  return Number.isFinite(n) && n > 0 && n <= 1_000_000 ? n : null;
+  return evaluateNumericExpression(raw, 6, 0.000001, 1_000_000);
 }
 const messageFor = (code: string) => {
   const messages: Record<string, string> = {
@@ -82,8 +80,12 @@ export function PurchaseOrdersWorkspace({ chantierId }: { chantierId?: string })
   const [notice, setNotice] = useState("");
   const [error, setError] = useState("");
   const [siteId, setSiteId] = useState(chantierId ?? "");
+  const [siteQuery, setSiteQuery] = useState("");
+  const [destinationQuery, setDestinationQuery] = useState("");
+  const [extraDestinations, setExtraDestinations] = useState<string[]>([]);
   const [supplierName, setSupplierName] = useState("");
   const [supplierPennylaneId, setSupplierPennylaneId] = useState("");
+  const [preferencesOpen, setPreferencesOpen] = useState(false);
   const [mode, setMode] = useState<"QUICK" | "DETAILED">("QUICK");
   const [description, setDescription] = useState("");
   const [allocations, setAllocations] = useState<QuickAllocation[]>([
@@ -107,11 +109,26 @@ export function PurchaseOrdersWorkspace({ chantierId }: { chantierId?: string })
 
   const allSites = snapshot?.chantiers ?? [];
   const sites = allSites.filter((site) => site.status === "ACTIVE");
+  const matchingSites = sites.filter((site) =>
+    [site.name, site.clientName, site.reference]
+      .filter(Boolean)
+      .join(" ")
+      .toLocaleLowerCase("fr-FR")
+      .includes(siteQuery.trim().toLocaleLowerCase("fr-FR")),
+  );
   const destinations = [
-    ...sites.map((site) => ({ id: site.id, label: `${site.name} · ${site.clientName ?? ""}` })),
+    ...sites.map((site) => ({
+      id: site.id,
+      label: [site.reference, site.name, site.clientName].filter(Boolean).join(" · "),
+    })),
     { id: "SAV", label: "SAV (hors chantier)" },
     { id: "GENERAL_EXPENSES", label: "Frais généraux (hors chantier)" },
   ];
+  const filteredDestinations = destinations.filter((item) =>
+    item.label
+      .toLocaleLowerCase("fr-FR")
+      .includes(destinationQuery.trim().toLocaleLowerCase("fr-FR")),
+  );
   const selected =
     sites.find((site) => site.id === siteId)?.id ??
     sites.find((site) => site.id === chantierId)?.id ??
@@ -124,7 +141,6 @@ export function PurchaseOrdersWorkspace({ chantierId }: { chantierId?: string })
       ),
     [snapshot],
   );
-  const commitmentTotals = snapshot ? committedPurchasesByDestination(snapshot.payload) : null;
   const linePreview = lines.map((line) => {
     const qty = positiveQuantity(line.quantity);
     const price = moneyCents(line.unitPrice);
@@ -162,7 +178,6 @@ export function PurchaseOrdersWorkspace({ chantierId }: { chantierId?: string })
         .includes(search.trim().toLocaleLowerCase("fr-FR")),
     )
     .sort((a, b) => b.createdAt.localeCompare(a.createdAt));
-  const committed = snapshot ? committedPurchaseTotal(snapshot.payload, selected) : 0;
 
   function patchLine(id: string, key: keyof EditableLine, value: string) {
     setLines((current) =>
@@ -188,6 +203,31 @@ export function PurchaseOrdersWorkspace({ chantierId }: { chantierId?: string })
       setError(
         messageFor(cause instanceof Error ? cause.message : "PURCHASE_SUPPLIER_REFRESH_FAILED"),
       );
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  async function setSupplierPreference(supplierId: string, defaultGeneralExpenses: boolean) {
+    if (!snapshot?.canWrite || busy) return;
+    setBusy(true);
+    setError("");
+    try {
+      const response = await fetch("/api/desktop/purchases", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          action: "SET_SUPPLIER_PREFERENCE",
+          supplierPennylaneId: supplierId,
+          defaultGeneralExpenses,
+        }),
+      });
+      const result = (await response.json()) as { payload?: PurchaseOrdersPayload; error?: string };
+      if (!response.ok || !result.payload) throw new Error(result.error ?? "Réglage impossible");
+      setSnapshot((old) => (old ? { ...old, payload: result.payload! } : old));
+      setNotice("Préférence fournisseur enregistrée dans PAPOT.");
+    } catch (cause) {
+      setError(messageFor(cause instanceof Error ? cause.message : "Réglage impossible"));
     } finally {
       setBusy(false);
     }
@@ -342,20 +382,6 @@ export function PurchaseOrdersWorkspace({ chantierId }: { chantierId?: string })
           {notice}
         </p>
       ) : null}
-      {commitmentTotals ? (
-        <section style={{ background: "white", borderRadius: 12, padding: 18 }}>
-          <h2>Engagements actuels HT · toutes dates</h2>
-          <p>
-            Chantiers : <strong>{euro(commitmentTotals.chantierCents)}</strong> · SAV :{" "}
-            <strong>{euro(commitmentTotals.savCents)}</strong> · Frais généraux :{" "}
-            <strong>{euro(commitmentTotals.generalExpensesCents)}</strong>
-          </p>
-          <p>
-            Total unique : <strong>{euro(commitmentTotals.totalCents)}</strong>
-          </p>
-          <small>Ces engagements ne sont ni les factures du mois, ni un résultat réel.</small>
-        </section>
-      ) : null}
       {!snapshot ? (
         <p>Chargement des chantiers et des commandes…</p>
       ) : (
@@ -374,6 +400,13 @@ export function PurchaseOrdersWorkspace({ chantierId }: { chantierId?: string })
               {mode === "DETAILED" ? (
                 <label style={{ display: "grid", gap: 5 }}>
                   Chantier *
+                  <input
+                    type="search"
+                    aria-label="Rechercher un chantier pour le BC détaillé"
+                    placeholder="Filtrer par chantier, client ou référence"
+                    value={siteQuery}
+                    onChange={(event) => setSiteQuery(event.target.value)}
+                  />
                   <select
                     value={selected}
                     disabled={busy || !snapshot.canWrite}
@@ -383,11 +416,17 @@ export function PurchaseOrdersWorkspace({ chantierId }: { chantierId?: string })
                     }}
                   >
                     {sites.length === 0 ? <option value="">Aucun chantier actif</option> : null}
-                    {sites.map((site) => (
-                      <option key={site.id} value={site.id}>
-                        {site.name} · {site.clientName}
-                      </option>
-                    ))}
+                    {sites
+                      .filter(
+                        (site) =>
+                          matchingSites.some((match) => match.id === site.id) ||
+                          site.id === selected,
+                      )
+                      .map((site) => (
+                        <option key={site.id} value={site.id}>
+                          {site.name} · {site.clientName}
+                        </option>
+                      ))}
                   </select>
                 </label>
               ) : null}
@@ -401,6 +440,19 @@ export function PurchaseOrdersWorkspace({ chantierId }: { chantierId?: string })
                     onChange={(event) => {
                       const id = event.target.value;
                       setSupplierPennylaneId(id);
+                      if (
+                        snapshot.payload.supplierPreferences?.some(
+                          (pref) =>
+                            pref.supplierPennylaneId === id &&
+                            pref.defaultDestination === "GENERAL_EXPENSES",
+                        )
+                      ) {
+                        setMode("QUICK");
+                        setAllocations([newAllocation("GENERAL_EXPENSES")]);
+                        setNotice(
+                          "Fournisseur FG : frais généraux proposés par défaut. Tu peux changer la destination pour une exception.",
+                        );
+                      }
                       setSupplierName(
                         snapshot.supplierCatalog?.suppliers.find((item) => item.id === id)?.name ??
                           "",
@@ -457,6 +509,54 @@ export function PurchaseOrdersWorkspace({ chantierId }: { chantierId?: string })
                 La récupération exige la clé Pennylane et l&apos;autorisation d&apos;import serveur.
               </small>
             </div>
+            {snapshot.supplierCatalog?.synced ? (
+              <div style={{ display: "grid", gap: 8 }}>
+                <button
+                  type="button"
+                  className="secondaryButton"
+                  aria-expanded={preferencesOpen}
+                  onClick={() => setPreferencesOpen((open) => !open)}
+                >
+                  Paramétrer les fournisseurs affectés par défaut aux frais généraux
+                </button>
+                {preferencesOpen ? (
+                  <div
+                    style={{
+                      maxHeight: 300,
+                      overflowY: "auto",
+                      padding: 12,
+                      border: "1px solid #ddd",
+                    }}
+                  >
+                    <p>
+                      Préférence PAPOT uniquement. Les fiches fournisseurs restent gérées dans
+                      Pennylane.
+                    </p>
+                    {snapshot.supplierCatalog.suppliers.map((item) => (
+                      <label
+                        key={item.id}
+                        style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 6 }}
+                      >
+                        <input
+                          type="checkbox"
+                          aria-label={`Affectation FG par défaut pour ${item.name}`}
+                          checked={Boolean(
+                            snapshot.payload.supplierPreferences?.some(
+                              (pref) => pref.supplierPennylaneId === item.id,
+                            ),
+                          )}
+                          disabled={busy || !snapshot.canWrite}
+                          onChange={(event) =>
+                            void setSupplierPreference(item.id, event.target.checked)
+                          }
+                        />
+                        {item.name}
+                      </label>
+                    ))}
+                  </div>
+                ) : null}
+              </div>
+            ) : null}
             <div style={{ display: "flex", flexWrap: "wrap", gap: 8 }}>
               <button
                 type="button"
@@ -490,13 +590,19 @@ export function PurchaseOrdersWorkspace({ chantierId }: { chantierId?: string })
             {mode === "QUICK" ? (
               <div style={{ display: "grid", gap: 10 }}>
                 <strong>Répartition du BC par chantier, SAV ou frais généraux</strong>
+                <input
+                  type="search"
+                  aria-label="Filtrer les destinations du BC"
+                  placeholder="Filtrer les chantiers par nom, client ou référence"
+                  value={destinationQuery}
+                  onChange={(event) => setDestinationQuery(event.target.value)}
+                />
                 <div style={{ overflowX: "auto" }}>
                   <table style={{ width: "100%", minWidth: 630, borderCollapse: "collapse" }}>
                     <thead>
                       <tr style={{ textAlign: "left", borderBottom: "1px solid #ddd" }}>
                         <th>Destination</th>
                         <th>Montant HT (€)</th>
-                        <th>Déjà engagé HT</th>
                         <th />
                       </tr>
                     </thead>
@@ -529,11 +635,17 @@ export function PurchaseOrdersWorkspace({ chantierId }: { chantierId?: string })
                                     Chantier indisponible : choisir une destination
                                   </option>
                                 ) : null}
-                                {destinations.map((item) => (
-                                  <option key={item.id} value={item.id}>
-                                    {item.label}
-                                  </option>
-                                ))}
+                                {destinations
+                                  .filter(
+                                    (item) =>
+                                      item.id === selectedDestination ||
+                                      filteredDestinations.some((match) => match.id === item.id),
+                                  )
+                                  .map((item) => (
+                                    <option key={item.id} value={item.id}>
+                                      {item.label}
+                                    </option>
+                                  ))}
                               </select>
                             </td>
                             <td>
@@ -553,16 +665,20 @@ export function PurchaseOrdersWorkspace({ chantierId }: { chantierId?: string })
                                   );
                                   setError("");
                                 }}
+                                onBlur={() =>
+                                  setAllocations((current) =>
+                                    current.map((item) =>
+                                      item.id === row.id
+                                        ? {
+                                            ...item,
+                                            amount: numericExpressionInput(item.amount, 2),
+                                          }
+                                        : item,
+                                    ),
+                                  )
+                                }
                                 style={{ width: 135 }}
                               />
-                            </td>
-                            <td>
-                              {euro(
-                                committedPurchaseDestinationTotal(
-                                  snapshot.payload,
-                                  selectedDestination,
-                                ),
-                              )}
                             </td>
                             <td>
                               <button
@@ -584,20 +700,60 @@ export function PurchaseOrdersWorkspace({ chantierId }: { chantierId?: string })
                     </tbody>
                   </table>
                 </div>
+                <div style={{ display: "flex", flexWrap: "wrap", gap: 8 }}>
+                  {filteredDestinations
+                    .filter(
+                      (item) =>
+                        !allocations.some((row) => (row.chantierId || selected) === item.id),
+                    )
+                    .slice(0, 25)
+                    .map((item) => (
+                      <label
+                        key={item.id}
+                        style={{ display: "flex", gap: 5, alignItems: "center" }}
+                      >
+                        <input
+                          type="checkbox"
+                          aria-label={`Ajouter ${item.label}`}
+                          checked={extraDestinations.includes(item.id)}
+                          disabled={busy || !snapshot.canWrite}
+                          onChange={(event) =>
+                            setExtraDestinations((old) =>
+                              event.target.checked
+                                ? [...new Set([...old, item.id])]
+                                : old.filter((id) => id !== item.id),
+                            )
+                          }
+                        />
+                        {item.label}
+                      </label>
+                    ))}
+                </div>
                 <button
                   type="button"
                   className="secondaryButton"
                   disabled={busy || !snapshot.canWrite || allocations.length >= 100}
                   onClick={() => {
-                    const firstUnused = destinations.find(
-                      (item) => !allocations.some((a) => (a.chantierId || selected) === item.id),
+                    const toAdd = extraDestinations.filter(
+                      (id) =>
+                        destinations.some((item) => item.id === id) &&
+                        !allocations.some((row) => (row.chantierId || selected) === id),
                     );
-                    if (firstUnused)
-                      setAllocations((current) => [...current, newAllocation(firstUnused.id)]);
-                    else setError("Toutes les destinations disponibles sont déjà sélectionnées.");
+                    const defaultNext = filteredDestinations.find(
+                      (item) =>
+                        !allocations.some((row) => (row.chantierId || selected) === item.id),
+                    );
+                    const ids = toAdd.length ? toAdd : defaultNext ? [defaultNext.id] : [];
+                    if (ids.length)
+                      setAllocations((current) => [
+                        ...current,
+                        ...ids.slice(0, 100 - current.length).map((id) => newAllocation(id)),
+                      ]);
+                    else setError("Toutes les destinations proposées sont déjà sélectionnées.");
+                    setExtraDestinations([]);
                   }}
                 >
-                  Ajouter un chantier / SAV / frais généraux
+                  Ajouter les destinations sélectionnées ({extraDestinations.length || 1})
                 </button>
               </div>
             ) : (
@@ -632,6 +788,13 @@ export function PurchaseOrdersWorkspace({ chantierId }: { chantierId?: string })
                             value={line.quantity}
                             disabled={busy || !snapshot.canWrite}
                             onChange={(e) => patchLine(line.id, "quantity", e.target.value)}
+                            onBlur={() =>
+                              patchLine(
+                                line.id,
+                                "quantity",
+                                numericExpressionInput(line.quantity, 6, 0.000001, 1_000_000),
+                              )
+                            }
                             style={{ width: 80 }}
                           />
                         </td>
@@ -651,6 +814,13 @@ export function PurchaseOrdersWorkspace({ chantierId }: { chantierId?: string })
                             value={line.unitPrice}
                             disabled={busy || !snapshot.canWrite}
                             onChange={(e) => patchLine(line.id, "unitPrice", e.target.value)}
+                            onBlur={() =>
+                              patchLine(
+                                line.id,
+                                "unitPrice",
+                                numericExpressionInput(line.unitPrice, 2),
+                              )
+                            }
                             style={{ width: 110 }}
                           />
                         </td>
@@ -694,11 +864,7 @@ export function PurchaseOrdersWorkspace({ chantierId }: { chantierId?: string })
             >
               <div>
                 <strong>Total du BC : {preview === null ? "À renseigner" : euro(preview)}</strong>
-                {mode === "DETAILED" ? (
-                  <div>Déjà engagé sur ce chantier : {euro(committed)}</div>
-                ) : (
-                  <div>Le montant global sera ventilé une seule fois entre les destinations.</div>
-                )}
+                <div>Les montants sont engagés une seule fois selon les destinations.</div>
               </div>
               <button
                 type="button"

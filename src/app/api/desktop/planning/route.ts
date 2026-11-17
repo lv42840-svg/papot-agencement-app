@@ -20,9 +20,13 @@ import {
   PLANNING_ABSENCE_TYPE_LABELS,
   planningYearWeekIdsRange,
 } from "@/lib/planning/domain";
-import { assertPlanningWeekEditable, isPlanningWeekPast } from "@/lib/planning/time-markers";
+import {
+  assertPlanningWeekEditable,
+  isPlanningWeekCurrentOrPast,
+} from "@/lib/planning/time-markers";
 import {
   applyPlanningAbsenceMutation,
+  applyPlanningAbsenceRangeMutation,
   applyPlanningActualHoursMutation,
   applyPlanningChantierOrderMutation,
   applyPlanningDeleteAbsenceMutation,
@@ -228,7 +232,8 @@ export async function POST(request: Request) {
       );
     } else if (input.action === "setActualHours") {
       await requireSpecialPermission(context.user, "planning.enter_actual_hours");
-      if (!isPlanningWeekPast(input.week)) throw new Error("PLANNING_ACTUAL_HOURS_WEEK_NOT_PAST");
+      if (!isPlanningWeekCurrentOrPast(input.week))
+        throw new Error("PLANNING_ACTUAL_HOURS_WEEK_IN_FUTURE");
       const [chantiers, auth] = await Promise.all([
         createChantiersRepository(context).load(),
         readAuthPayload(),
@@ -344,6 +349,14 @@ export async function POST(request: Request) {
       } else if (input.action === "setAbsence") {
         await planningRepository.mutate((payload) =>
           applyPlanningAbsenceMutation(
+            payload,
+            input,
+            new Set(effectivePlanningPeople(payload, auth.users).map((person) => person.userId)),
+          ),
+        );
+      } else if (input.action === "setAbsenceRange") {
+        await planningRepository.mutate((payload) =>
+          applyPlanningAbsenceRangeMutation(
             payload,
             input,
             new Set(effectivePlanningPeople(payload, auth.users).map((person) => person.userId)),

@@ -8,9 +8,8 @@ const routeSource = readFileSync(
 
 describe("planning API past-week lock", () => {
   it("guards both firm and provisional weekly mutations server-side", () => {
-    expect(routeSource).toContain(
-      'import { assertPlanningWeekEditable, isPlanningWeekPast } from "@/lib/planning/time-markers";',
-    );
+    expect(routeSource).toContain("assertPlanningWeekEditable");
+    expect(routeSource).toContain("isPlanningWeekCurrentOrPast");
     expect(routeSource.split("assertPlanningWeekEditable(input.week);")).toHaveLength(3);
   });
 });

@@ -4,6 +4,7 @@ import { EditHistory, type EditEvent } from "./edit-history";
 
 import Link from "next/link";
 import { EDIT_CONFLICT_MESSAGE } from "@/lib/edit-history";
+import { evaluateNumericExpression, numericExpressionInput } from "@/lib/numeric-expression";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { isoWeekKey, isoWeekMonday, weekDateRangeLabel } from "@/lib/planning/time-markers";
 
@@ -19,6 +20,7 @@ type Chantier = {
   id: string;
   name: string;
   reference: string | null;
+  clientName: string | null;
   status: string;
   plannedHours: Hours;
   actualHours: Hours;
@@ -61,8 +63,8 @@ function relativeWeek(week: string, offset: number): string {
   );
 }
 
-function lastCompletedWeek() {
-  return relativeWeek(isoWeekKey(new Date()), -1);
+function defaultActualHoursWeek() {
+  return isoWeekKey(new Date());
 }
 
 const formatHours = (hours: number) =>
@@ -71,22 +73,19 @@ const formatHours = (hours: number) =>
   }).format(hours);
 const inputHours = (hours: number) => (hours === 0 ? "" : String(hours).replace(".", ","));
 function parseHours(value: string): number | null {
-  const raw = value.trim().replace(",", ".");
-  if (!raw) return 0;
-  if (!/^(?:\d{1,3})(?:\.\d{1,2})?$/.test(raw)) return null;
-  const parsed = Number(raw);
-  return Number.isFinite(parsed) && parsed >= 0 && parsed <= 168 ? parsed : null;
+  return value.trim() ? evaluateNumericExpression(value, 2, 0, 168) : 0;
 }
 
 const keyFor = (chantierId: string, activity: Activity) => chantierId + ":" + activity;
 const ACTIVITIES = ["BE", "WORKSHOP", "INSTALL"] as const;
 
 export function ActualHoursWorkspace() {
-  const [week, setWeek] = useState(lastCompletedWeek);
+  const [week, setWeek] = useState(defaultActualHoursWeek);
   const [data, setData] = useState<HoursSnapshot | null>(null);
   const [personId, setPersonId] = useState("");
   const [extraIds, setExtraIds] = useState<string[]>([]);
-  const [extraChoice, setExtraChoice] = useState("");
+  const [extraChoices, setExtraChoices] = useState<string[]>([]);
+  const [chantierSearch, setChantierSearch] = useState("");
   const [showAdd, setShowAdd] = useState(false);
   const [drafts, setDrafts] = useState<Record<string, string>>({});
   const [indirectDrafts, setIndirectDrafts] = useState<Partial<Record<IndirectCategory, string>>>(
@@ -115,7 +114,8 @@ export function ActualHoursWorkspace() {
         json.people.some((person) => person.id === old) ? old : (json.people[0]?.id ?? ""),
       );
       setExtraIds([]);
-      setExtraChoice("");
+      setExtraChoices([]);
+      setChantierSearch("");
       setShowAdd(false);
       setError("");
     } catch (cause) {
@@ -147,6 +147,21 @@ export function ActualHoursWorkspace() {
     data?.chantiers.filter((chantier) => visibleIds.has(chantier.id)) ?? [];
   const availableChantiers =
     data?.chantiers.filter((chantier) => !visibleIds.has(chantier.id)) ?? [];
+  const filteredAvailableChantiers = availableChantiers.filter((chantier) =>
+    [chantier.reference, chantier.name, chantier.clientName]
+      .filter(Boolean)
+      .join(" ")
+      .normalize("NFD")
+      .replace(/[\u0300-\u036f]/g, "")
+      .toLocaleLowerCase("fr-FR")
+      .includes(
+        chantierSearch
+          .trim()
+          .normalize("NFD")
+          .replace(/[\u0300-\u036f]/g, "")
+          .toLocaleLowerCase("fr-FR"),
+      ),
+  );
   const savedHours = useMemo(() => {
     const found = new Map<string, number>();
     for (const entry of data?.records ?? []) {
@@ -197,15 +212,18 @@ export function ActualHoursWorkspace() {
     setDrafts({});
     setIndirectDrafts({});
     setExtraIds([]);
-    setExtraChoice("");
+    setExtraChoices([]);
+    setChantierSearch("");
     setShowAdd(false);
     setMessage("");
   }
 
-  function addChantier() {
-    if (!extraChoice || visibleIds.has(extraChoice)) return;
-    setExtraIds((previous) => [...previous, extraChoice]);
-    setExtraChoice("");
+  function addChantiers() {
+    const toAdd = extraChoices.filter((id) => !visibleIds.has(id));
+    if (!toAdd.length) return;
+    setExtraIds((previous) => [...new Set([...previous, ...toAdd])]);
+    setExtraChoices([]);
+    setChantierSearch("");
     setShowAdd(false);
   }
 
@@ -388,7 +406,7 @@ export function ActualHoursWorkspace() {
           </select>
         </label>
         <label>
-          2 · Semaine écoulée
+          2 · Semaine de saisie
           <div className="actualHoursWeekControls">
             <button
               type="button"
@@ -410,7 +428,7 @@ export function ActualHoursWorkspace() {
             <button
               type="button"
               className="secondaryButton"
-              disabled={saving !== null || relativeWeek(week, 1) >= isoWeekKey(new Date())}
+              disabled={saving !== null || relativeWeek(week, 1) > isoWeekKey(new Date())}
               onClick={() => setWeek(relativeWeek(week, 1))}
             >
               →
@@ -434,11 +452,11 @@ export function ActualHoursWorkspace() {
         <>
           {!data.weekIsPast ? (
             <p className="actualHoursNotice">
-              Cette semaine n&apos;est pas terminée. Choisis une semaine écoulée pour saisir les
-              heures réelles.
+              Saisie provisoire de la semaine en cours. Les heures peuvent être corrigées, mais la
+              validation pour la paie ne sera disponible qu&apos;une fois la semaine terminée.
             </p>
           ) : null}
-          {data.weekIsPast && !data.editable ? (
+          {!data.editable ? (
             <p className="actualHoursNotice">
               Lecture seule : le droit « Saisir les heures passées » est requis.
             </p>
@@ -508,6 +526,17 @@ export function ActualHoursWorkspace() {
                                 [keyFor(chantier.id, activity)]: event.target.value,
                               }))
                             }
+                            onBlur={() =>
+                              setDrafts((current) => {
+                                const key = keyFor(chantier.id, activity);
+                                return current[key] === undefined
+                                  ? current
+                                  : {
+                                      ...current,
+                                      [key]: numericExpressionInput(current[key], 2, 0, 168),
+                                    };
+                              })
+                            }
                             onKeyDown={(event) => {
                               if (event.key === "Enter") {
                                 event.preventDefault();
@@ -571,45 +600,78 @@ export function ActualHoursWorkspace() {
                 disabled={!data.editable || saving !== null || availableChantiers.length === 0}
                 onClick={() => setShowAdd(true)}
               >
-                + Ajouter un chantier
+                + Ajouter un ou plusieurs chantiers
               </button>
             ) : (
-              <>
+              <div style={{ display: "grid", gap: 8, width: "100%", maxWidth: 620 }}>
                 <label>
-                  Chantier supplémentaire
+                  Rechercher par chantier, référence ou client
+                  <input
+                    type="search"
+                    aria-label="Filtrer les chantiers à ajouter"
+                    placeholder="Tape une partie du nom ou de la référence"
+                    value={chantierSearch}
+                    onChange={(event) => setChantierSearch(event.target.value)}
+                  />
+                </label>
+                <label>
+                  Chantiers à ajouter (plusieurs choix possibles)
                   <select
-                    aria-label="Chantier à ajouter"
-                    value={extraChoice}
-                    onChange={(event) => setExtraChoice(event.target.value)}
+                    multiple
+                    size={Math.min(7, Math.max(3, filteredAvailableChantiers.length))}
+                    aria-label="Chantiers à ajouter"
+                    value={extraChoices}
+                    onChange={(event) => {
+                      const selected = Array.from(
+                        event.currentTarget.selectedOptions,
+                        (option) => option.value,
+                      );
+                      setExtraChoices((old) => [
+                        ...new Set([
+                          ...old.filter(
+                            (id) =>
+                              !filteredAvailableChantiers.some((chantier) => chantier.id === id),
+                          ),
+                          ...selected,
+                        ]),
+                      ]);
+                    }}
                   >
-                    <option value="">Choisir un chantier…</option>
-                    {availableChantiers.map((chantier) => (
+                    {filteredAvailableChantiers.map((chantier) => (
                       <option key={chantier.id} value={chantier.id}>
-                        {chantier.reference ? chantier.reference + " · " : ""}
-                        {chantier.name}
+                        {[chantier.reference, chantier.name, chantier.clientName]
+                          .filter(Boolean)
+                          .join(" · ")}
                       </option>
                     ))}
                   </select>
                 </label>
-                <button
-                  type="button"
-                  className="secondaryButton"
-                  disabled={!extraChoice}
-                  onClick={addChantier}
-                >
-                  Ajouter
-                </button>
-                <button
-                  type="button"
-                  className="secondaryButton"
-                  onClick={() => {
-                    setExtraChoice("");
-                    setShowAdd(false);
-                  }}
-                >
-                  Annuler
-                </button>
-              </>
+                <small>
+                  {extraChoices.length} chantier(s) sélectionné(s). Utilise Ctrl ou Maj sur
+                  ordinateur.
+                </small>
+                <div style={{ display: "flex", gap: 8 }}>
+                  <button
+                    type="button"
+                    className="secondaryButton"
+                    disabled={!extraChoices.length}
+                    onClick={addChantiers}
+                  >
+                    Ajouter {extraChoices.length} chantier(s)
+                  </button>
+                  <button
+                    type="button"
+                    className="secondaryButton"
+                    onClick={() => {
+                      setExtraChoices([]);
+                      setChantierSearch("");
+                      setShowAdd(false);
+                    }}
+                  >
+                    Annuler
+                  </button>
+                </div>
+              </div>
             )}
           </div>
           <section className="actualHoursIndirectPanel" aria-label="Heures hors chantier">
@@ -633,6 +695,17 @@ export function ActualHoursWorkspace() {
                         setIndirectDrafts((old) => ({
                           ...old,
                           [entry.code]: event.target.value,
+                        }))
+                      }
+                      onBlur={() =>
+                        setIndirectDrafts((old) => ({
+                          ...old,
+                          [entry.code]: numericExpressionInput(
+                            indirectValue(entry.code),
+                            2,
+                            0,
+                            168,
+                          ),
                         }))
                       }
                       onKeyDown={(event) => {
@@ -683,7 +756,7 @@ export function ActualHoursWorkspace() {
       ) : null}
 
       {data ? <EditHistory events={data.editHistory ?? []} people={data.people} /> : null}
-      {data?.editable && personId ? (
+      {data?.editable && data.weekIsPast && personId ? (
         <button
           type="button"
           className="secondaryButton"
