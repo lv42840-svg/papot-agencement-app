@@ -21,6 +21,7 @@ export type QuoteRichTextUpdate = {
 function itemText(item: QuoteItem): string | null {
   if (item.kind === "SECTION" || item.kind === "SUBSECTION") return item.title;
   if (item.kind === "LINE") return item.description;
+  if (item.kind === "COMMENT") return item.text;
   return null;
 }
 
@@ -50,6 +51,9 @@ function withUpdatedText(item: QuoteItem, text: string, richText: QuoteRichText)
   if (item.kind === "LINE") {
     return { ...item, description: text, presentation };
   }
+  if (item.kind === "COMMENT") {
+    return { ...item, text, presentation };
+  }
   throw new Error("QUOTE_RICH_TEXT_ITEM_UNSUPPORTED");
 }
 
@@ -74,7 +78,7 @@ export function applyQuoteRichTextUpdate(
   }
 
   const text = normalizeLineEndings(input.text).trim();
-  const maxLength = item.kind === "LINE" ? 4000 : 500;
+  const maxLength = item.kind === "LINE" || item.kind === "COMMENT" ? 4000 : 500;
   if (!text || text.length > maxLength) {
     throw new Error("QUOTE_RICH_TEXT_INVALID");
   }
