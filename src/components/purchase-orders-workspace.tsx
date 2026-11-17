@@ -1,6 +1,7 @@
 "use client";
 
 import Link from "next/link";
+import { PennylaneSupplierPicker } from "@/components/pennylane-supplier-picker";
 import { evaluateNumericExpression, numericExpressionInput } from "@/lib/numeric-expression";
 import { useEffect, useMemo, useRef, useState } from "react";
 import type {
@@ -86,6 +87,8 @@ export function PurchaseOrdersWorkspace({ chantierId }: { chantierId?: string })
   const [supplierName, setSupplierName] = useState("");
   const [supplierPennylaneId, setSupplierPennylaneId] = useState("");
   const [preferencesOpen, setPreferencesOpen] = useState(false);
+  const [preferenceSearch, setPreferenceSearch] = useState("");
+  const [preferenceDraft, setPreferenceDraft] = useState<string[]>([]);
   const [mode, setMode] = useState<"QUICK" | "DETAILED">("QUICK");
   const [description, setDescription] = useState("");
   const [allocations, setAllocations] = useState<QuickAllocation[]>([
@@ -134,6 +137,20 @@ export function PurchaseOrdersWorkspace({ chantierId }: { chantierId?: string })
     sites.find((site) => site.id === chantierId)?.id ??
     sites[0]?.id ??
     "";
+  const preferenceSuppliers = snapshot?.supplierCatalog?.suppliers ?? [];
+  const filteredPreferenceSuppliers = preferenceSuppliers.filter((supplier) =>
+    supplier.name
+      .normalize("NFD")
+      .replace(/[\u0300-\u036f]/g, "")
+      .toLocaleLowerCase("fr-FR")
+      .includes(
+        preferenceSearch
+          .trim()
+          .normalize("NFD")
+          .replace(/[\u0300-\u036f]/g, "")
+          .toLocaleLowerCase("fr-FR"),
+      ),
+  );
   const suppliers = useMemo(
     () =>
       [...new Set((snapshot?.payload.orders ?? []).map((order) => order.supplierName))].sort(
@@ -208,8 +225,14 @@ export function PurchaseOrdersWorkspace({ chantierId }: { chantierId?: string })
     }
   }
 
-  async function setSupplierPreference(supplierId: string, defaultGeneralExpenses: boolean) {
-    if (!snapshot?.canWrite || busy) return;
+  async function saveSupplierPreferences() {
+    if (!snapshot?.canWrite || !snapshot.supplierCatalog?.synced || busy) return;
+    if (
+      preferenceDraft.length === 0 &&
+      (snapshot.payload.supplierPreferences?.length ?? 0) > 0 &&
+      !window.confirm("Retirer tous les fournisseurs des frais généraux par défaut ?")
+    )
+      return;
     setBusy(true);
     setError("");
     try {
@@ -217,17 +240,19 @@ export function PurchaseOrdersWorkspace({ chantierId }: { chantierId?: string })
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          action: "SET_SUPPLIER_PREFERENCE",
-          supplierPennylaneId: supplierId,
-          defaultGeneralExpenses,
+          action: "SET_SUPPLIER_PREFERENCES",
+          supplierPennylaneIds: preferenceDraft,
         }),
       });
       const result = (await response.json()) as { payload?: PurchaseOrdersPayload; error?: string };
-      if (!response.ok || !result.payload) throw new Error(result.error ?? "Réglage impossible");
+      if (!response.ok || !result.payload) {
+        throw new Error(result.error ?? "Préférences non enregistrées.");
+      }
       setSnapshot((old) => (old ? { ...old, payload: result.payload! } : old));
-      setNotice("Préférence fournisseur enregistrée dans PAPOT.");
+      setPreferencesOpen(false);
+      setNotice("Affectations par défaut aux frais généraux enregistrées.");
     } catch (cause) {
-      setError(messageFor(cause instanceof Error ? cause.message : "Réglage impossible"));
+      setError(messageFor(cause instanceof Error ? cause.message : "Enregistrement impossible."));
     } finally {
       setBusy(false);
     }
@@ -362,15 +387,43 @@ export function PurchaseOrdersWorkspace({ chantierId }: { chantierId?: string })
 
   return (
     <main style={{ padding: 22, display: "grid", gap: 18, maxWidth: 1480, margin: "0 auto" }}>
-      <div>
+      <div style={{ display: "grid", gap: 10 }}>
         <h1>Achats · Bons de commande</h1>
-        <Link href="/achats/factures" className="secondaryButton">
-          Factures fournisseurs · Pennylane
-        </Link>
-        <p>
-          Un BC enregistré est un <strong>coût engagé HT</strong>. Il ne crée ni facture
-          fournisseur, ni coût réel validé, ni envoi automatique. Rapprochement Pennylane à venir.
-        </p>
+        <div style={{ display: "flex", flexWrap: "wrap", gap: 8, alignItems: "center" }}>
+          <Link href="/achats/factures" className="secondaryButton">
+            Factures fournisseurs · Pennylane
+          </Link>
+          <button
+            type="button"
+            className="secondaryButton"
+            disabled={!snapshot?.canWrite || busy}
+            onClick={() => void refreshSuppliers()}
+          >
+            Actualiser les fournisseurs
+          </button>
+          <button
+            type="button"
+            className="secondaryButton"
+            aria-expanded={preferencesOpen}
+            disabled={!snapshot?.canWrite || !snapshot?.supplierCatalog?.synced || busy}
+            onClick={() => {
+              if (!preferencesOpen) {
+                const allowed = new Set(
+                  snapshot?.supplierCatalog?.suppliers.map((item) => item.id) ?? [],
+                );
+                setPreferenceDraft(
+                  (snapshot?.payload.supplierPreferences ?? [])
+                    .map((item) => item.supplierPennylaneId)
+                    .filter((id) => allowed.has(id)),
+                );
+                setPreferenceSearch("");
+              }
+              setPreferencesOpen((open) => !open);
+            }}
+          >
+            Fournisseurs · Frais généraux
+          </button>
+        </div>
       </div>
       {error ? (
         <p role="alert" style={{ color: "#b33138" }}>
@@ -381,6 +434,102 @@ export function PurchaseOrdersWorkspace({ chantierId }: { chantierId?: string })
         <p role="status" style={{ color: "#327550" }}>
           {notice}
         </p>
+      ) : null}
+      {preferencesOpen && snapshot?.supplierCatalog?.synced ? (
+        <section
+          aria-label="Fournisseurs par défaut en frais généraux"
+          style={{
+            background: "white",
+            padding: 18,
+            borderRadius: 12,
+            display: "grid",
+            gap: 10,
+            maxWidth: 760,
+          }}
+        >
+          <h2>Fournisseurs affectés par défaut aux frais généraux</h2>
+          <label style={{ display: "grid", gap: 5 }}>
+            Rechercher des fournisseurs
+            <input
+              type="search"
+              aria-label="Filtrer les fournisseurs pour frais généraux"
+              placeholder="Tape un nom pour filtrer…"
+              value={preferenceSearch}
+              onChange={(event) => setPreferenceSearch(event.target.value)}
+            />
+          </label>
+          <label style={{ display: "grid", gap: 5 }}>
+            Fournisseurs à affecter (sélection multiple)
+            <select
+              multiple
+              size={Math.min(8, Math.max(3, filteredPreferenceSuppliers.length))}
+              aria-label="Fournisseurs affectés par défaut aux frais généraux"
+              value={preferenceDraft}
+              disabled={busy || !snapshot.canWrite}
+              onChange={(event) => {
+                const visible = new Set(filteredPreferenceSuppliers.map((item) => item.id));
+                const selected = Array.from(
+                  event.currentTarget.selectedOptions,
+                  (option) => option.value,
+                );
+                setPreferenceDraft((old) => [
+                  ...new Set([...old.filter((id) => !visible.has(id)), ...selected]),
+                ]);
+              }}
+            >
+              {filteredPreferenceSuppliers.map((item) => (
+                <option key={item.id} value={item.id}>
+                  {item.name}
+                </option>
+              ))}
+            </select>
+          </label>
+          <small>
+            {preferenceDraft.length} fournisseur(s) sélectionné(s). Ctrl/Maj pour en choisir
+            plusieurs. Les fournisseurs hors du filtre restent sélectionnés.
+          </small>
+          <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
+            <button
+              type="button"
+              className="secondaryButton"
+              disabled={busy || !snapshot.canWrite || !preferenceSearch.trim()}
+              onClick={() =>
+                setPreferenceDraft((old) => [
+                  ...new Set([...old, ...filteredPreferenceSuppliers.map((item) => item.id)]),
+                ])
+              }
+            >
+              Ajouter les fournisseurs filtrés
+            </button>
+            <button
+              type="button"
+              className="secondaryButton"
+              disabled={busy || !snapshot.canWrite}
+              onClick={() => {
+                const visible = new Set(filteredPreferenceSuppliers.map((item) => item.id));
+                setPreferenceDraft((old) => old.filter((id) => !visible.has(id)));
+              }}
+            >
+              Retirer ceux du filtre
+            </button>
+            <button
+              type="button"
+              className="primaryButton"
+              disabled={busy || !snapshot.canWrite}
+              onClick={() => void saveSupplierPreferences()}
+            >
+              Enregistrer les préférences
+            </button>
+            <button
+              type="button"
+              className="secondaryButton"
+              disabled={busy}
+              onClick={() => setPreferencesOpen(false)}
+            >
+              Annuler
+            </button>
+          </div>
+        </section>
       ) : null}
       {!snapshot ? (
         <p>Chargement des chantiers et des commandes…</p>
@@ -430,16 +579,20 @@ export function PurchaseOrdersWorkspace({ chantierId }: { chantierId?: string })
                   </select>
                 </label>
               ) : null}
-              <label style={{ display: "grid", gap: 5 }}>
-                Fournisseur *
+              <div style={{ display: "grid", gap: 5 }}>
+                <strong>Fournisseur *</strong>
                 {snapshot.supplierCatalog?.synced ? (
-                  <select
-                    aria-label="Fournisseur du BC"
-                    value={supplierPennylaneId}
+                  <PennylaneSupplierPicker
+                    suppliers={snapshot.supplierCatalog.suppliers}
+                    selectedId={supplierPennylaneId}
+                    label="Fournisseur du BC"
                     disabled={busy || !snapshot.canWrite}
-                    onChange={(event) => {
-                      const id = event.target.value;
+                    onChange={(id) => {
                       setSupplierPennylaneId(id);
+                      setSupplierName(
+                        snapshot.supplierCatalog?.suppliers.find((item) => item.id === id)?.name ??
+                          "",
+                      );
                       if (
                         snapshot.payload.supplierPreferences?.some(
                           (pref) =>
@@ -450,23 +603,12 @@ export function PurchaseOrdersWorkspace({ chantierId }: { chantierId?: string })
                         setMode("QUICK");
                         setAllocations([newAllocation("GENERAL_EXPENSES")]);
                         setNotice(
-                          "Fournisseur FG : frais généraux proposés par défaut. Tu peux changer la destination pour une exception.",
+                          "Frais généraux proposés par défaut. Tu peux choisir un chantier exceptionnellement.",
                         );
                       }
-                      setSupplierName(
-                        snapshot.supplierCatalog?.suppliers.find((item) => item.id === id)?.name ??
-                          "",
-                      );
                       setError("");
                     }}
-                  >
-                    <option value="">Sélectionner dans Pennylane</option>
-                    {snapshot.supplierCatalog.suppliers.map((item) => (
-                      <option key={item.id} value={item.id}>
-                        {item.name}
-                      </option>
-                    ))}
-                  </select>
+                  />
                 ) : (
                   <>
                     <input
@@ -488,75 +630,12 @@ export function PurchaseOrdersWorkspace({ chantierId }: { chantierId?: string })
                     </datalist>
                   </>
                 )}
-              </label>
+              </div>
             </div>
             <small>
-              {snapshot.supplierCatalog?.synced
-                ? "Fournisseur absent ? Crée-le dans Pennylane puis clique sur Actualiser."
-                : "Liste Pennylane non synchronisée : les anciens noms des BC restent provisoirement utilisables."}
+              Fournisseur introuvable ? Crée-le dans Pennylane, puis clique sur « Actualiser les
+              fournisseurs ».
             </small>
-            <div>
-              <button
-                type="button"
-                className="secondaryButton"
-                disabled={busy || !snapshot.canWrite || !snapshot.supplierCatalog}
-                onClick={() => void refreshSuppliers()}
-              >
-                Actualiser les fournisseurs
-              </button>
-              <small>
-                {" "}
-                La récupération exige la clé Pennylane et l&apos;autorisation d&apos;import serveur.
-              </small>
-            </div>
-            {snapshot.supplierCatalog?.synced ? (
-              <div style={{ display: "grid", gap: 8 }}>
-                <button
-                  type="button"
-                  className="secondaryButton"
-                  aria-expanded={preferencesOpen}
-                  onClick={() => setPreferencesOpen((open) => !open)}
-                >
-                  Paramétrer les fournisseurs affectés par défaut aux frais généraux
-                </button>
-                {preferencesOpen ? (
-                  <div
-                    style={{
-                      maxHeight: 300,
-                      overflowY: "auto",
-                      padding: 12,
-                      border: "1px solid #ddd",
-                    }}
-                  >
-                    <p>
-                      Préférence PAPOT uniquement. Les fiches fournisseurs restent gérées dans
-                      Pennylane.
-                    </p>
-                    {snapshot.supplierCatalog.suppliers.map((item) => (
-                      <label
-                        key={item.id}
-                        style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 6 }}
-                      >
-                        <input
-                          type="checkbox"
-                          aria-label={`Affectation FG par défaut pour ${item.name}`}
-                          checked={Boolean(
-                            snapshot.payload.supplierPreferences?.some(
-                              (pref) => pref.supplierPennylaneId === item.id,
-                            ),
-                          )}
-                          disabled={busy || !snapshot.canWrite}
-                          onChange={(event) =>
-                            void setSupplierPreference(item.id, event.target.checked)
-                          }
-                        />
-                        {item.name}
-                      </label>
-                    ))}
-                  </div>
-                ) : null}
-              </div>
-            ) : null}
             <div style={{ display: "flex", flexWrap: "wrap", gap: 8 }}>
               <button
                 type="button"

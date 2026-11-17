@@ -2177,7 +2177,7 @@ export function QuoteStructuredLinesEditor({
     if (!commentEditor) return null;
     return (
       <form
-        className="quoteMainRow quoteCommentRow"
+        className="quoteMainRow quoteCommentRow quoteCommentEditing"
         onSubmit={saveComment}
         key={commentEditor.itemId ?? "new-comment"}
       >
@@ -2327,6 +2327,7 @@ export function QuoteStructuredLinesEditor({
             >
               <span className="quoteNumber">{numbers.get(item.id) ?? "—"}</span>
               <span
+                className="quoteCommentText"
                 style={{
                   whiteSpace: "pre-wrap",
                   ...quoteItemTextStyleToCss(item.presentation?.textStyle),

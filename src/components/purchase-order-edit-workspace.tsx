@@ -1,6 +1,7 @@
 "use client";
 
 import Link from "next/link";
+import { PennylaneSupplierPicker } from "@/components/pennylane-supplier-picker";
 import { evaluateNumericExpression, numericExpressionInput } from "@/lib/numeric-expression";
 import { useEffect, useMemo, useState } from "react";
 import type {
@@ -301,24 +302,18 @@ export function PurchaseOrderEditWorkspace({ orderId }: { orderId: string }) {
           <label style={{ display: "grid", gap: 5 }}>
             Fournisseur
             {data?.supplierCatalog?.synced ? (
-              <select
-                value={supplierPennylaneId}
+              <PennylaneSupplierPicker
+                suppliers={data.supplierCatalog.suppliers}
+                selectedId={supplierPennylaneId}
+                label="Fournisseur du BC"
                 disabled={readOnly || busy}
-                onChange={(event) => {
-                  const id = event.target.value;
+                onChange={(id) => {
                   setSupplierPennylaneId(id);
                   setSupplier(
                     data.supplierCatalog?.suppliers.find((item) => item.id === id)?.name ?? "",
                   );
                 }}
-              >
-                <option value="">Choisir un fournisseur Pennylane</option>
-                {data?.supplierCatalog?.suppliers.map((item) => (
-                  <option key={item.id} value={item.id}>
-                    {item.name}
-                  </option>
-                ))}
-              </select>
+              />
             ) : (
               <>
                 <input
