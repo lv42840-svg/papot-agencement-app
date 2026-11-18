@@ -4,6 +4,7 @@ import {
   calculateInvoiceAllocation,
   euroToCents,
   invoiceWorkflowState,
+  invoiceNeedsPapotValidation,
   sourceRevision,
   type InvoiceAllocationDraft,
   type InvoiceSource,
@@ -93,6 +94,14 @@ describe("Ventilation des factures fournisseurs", () => {
       },
     ];
     expect(() => calculateInvoiceAllocation(value)).toThrow("INVOICE_CHARGE_NO_DESTINATION");
+  });
+
+  it("classe les factures PAPOT à valider sans inclure les attentes comptables", () => {
+    expect(invoiceNeedsPapotValidation("TO_ALLOCATE")).toBe(true);
+    expect(invoiceNeedsPapotValidation("DRAFT")).toBe(true);
+    expect(invoiceNeedsPapotValidation("REVALIDATION")).toBe(true);
+    expect(invoiceNeedsPapotValidation("AWAITING_PENNYLANE")).toBe(false);
+    expect(invoiceNeedsPapotValidation("VALIDATED")).toBe(false);
   });
 
   it("ne confond pas un changement de statut comptable avec un changement de prix", () => {
