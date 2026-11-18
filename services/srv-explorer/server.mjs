@@ -13,6 +13,11 @@ import {
   previewType,
   byteRange,
 } from "./files.mjs";
+import { directory, segments } from "./files.mjs";
+import {
+  accountKey, owner, canRead, canWrite, canBrowse, rulesFor,
+  readAccess, registerIdentity, replaceRules, validateRules,
+} from "./access.mjs";
 
 const COOKIE = "__Host-papot_srv";
 const MAX_AGE = 12 * 60 * 60;
@@ -52,11 +57,24 @@ export function configFromEnv(env = process.env) {
       throw new Error("Serveur de connexion invalide.");
     if (!/^[A-Za-z0-9_-]+$/.test(source.cookie)) throw new Error("Nom de cookie invalide.");
   }
+  // Owner is pinned to an immutable account ID, never a freely typed login name.
+  const ownerSource = env.SRV_ADMIN_SOURCE || "agencement";
+  const ownerId = env.SRV_ADMIN_USER_ID || "";
+  if (!["agencement", "concept"].includes(ownerSource) ||
+      !/^[A-Za-z0-9._:-]{1,160}$/.test(ownerId))
+    throw new Error("Configurer SRV_ADMIN_SOURCE et SRV_ADMIN_USER_ID avant démarrage.");
+  const accessFile = env.SRV_ACCESS_FILE || "/state/access.json";
+  if (!accessFile.startsWith("/state/") || accessFile.includes("..") ||
+      !/^\/state\/[a-zA-Z0-9._-]+\.json$/.test(accessFile))
+    throw new Error("Le fichier des autorisations doit résider dans /state.");
   const maxUpload = Number(env.SRV_MAX_UPLOAD_BYTES || 536870912);
   if (!Number.isSafeInteger(maxUpload) || maxUpload < 1)
     throw new Error("Limite de dépôt invalide.");
   return {
     root: env.SRV_ROOT || "/data",
+    accessFile,
+    ownerSource,
+    ownerId,
     origin,
     key: Buffer.from(env.SRV_SESSION_KEY, "hex"),
     sources,
@@ -157,6 +175,7 @@ export function createExplorer(config) {
     if (typeof user.id !== "string" || typeof user.username !== "string")
       throw new HttpError(503, "Réponse de connexion invalide.");
     return {
+      id: user.id,
       username: user.username,
       displayName: user.displayName || user.username,
       source: session.source,
@@ -246,8 +265,9 @@ export function createExplorer(config) {
             "Cookie de connexion absent ou invalide. Vérifiez la configuration.",
           );
         const user = await identity(session);
+        await registerIdentity(config.accessFile, user);
         response.setHeader("Set-Cookie", cookie(seal(session, config.key)));
-        return json(response, 200, { user, maxUpload: config.maxUpload });
+        return json(response, 200, { user: { ...user, isAdmin: owner(config, user) }, maxUpload: config.maxUpload });
       }
       const rawCookie = (request.headers.cookie || "")
         .split(";")
@@ -267,19 +287,74 @@ export function createExplorer(config) {
         return json(response, 200, { ok: true });
       }
       if (!session) throw new HttpError(401, "Connectez-vous avec votre compte PAPOT.");
-      const user = await identity(session); // Re-check active account and revocation on every operation.
+      const user = await identity(session); // Every request re-checks revocation.
+      await registerIdentity(config.accessFile, user);
+      const isAdmin = owner(config, user);
       if (url.pathname === "/api/me" && method === "GET")
-        return json(response, 200, { user, maxUpload: config.maxUpload });
+        return json(response, 200, { user: { ...user, isAdmin }, maxUpload: config.maxUpload });
+
+      if (url.pathname.startsWith("/api/admin/")) {
+        if (!isAdmin) throw new HttpError(403, "Accès administrateur uniquement.");
+        if (url.pathname === "/api/admin/access" && method === "GET") {
+          const acl = await readAccess(config.accessFile);
+          return json(response, 200, {
+            revision: acl.revision,
+            users: Object.entries(acl.users)
+              .filter(([key]) => key !== accountKey(user))
+              .map(([key, value]) => ({ key, ...value }))
+              .sort((a, b) => a.displayName.localeCompare(b.displayName, "fr")),
+            grants: acl.grants,
+          });
+        }
+        if (url.pathname === "/api/admin/directories" && method === "GET") {
+          const path = url.searchParams.get("path") || "";
+          const data = await listFiles(config.root, path);
+          return json(response, 200, {
+            path, entries: data.entries.filter((item) => item.directory),
+            truncated: data.truncated,
+          });
+        }
+        if (url.pathname === "/api/admin/access" && method === "POST") {
+          const data = await readJson(request);
+          if (!data || typeof data.key !== "string" || !data.key ||
+              !Array.isArray(data.rules))
+            throw new HttpError(400, "Autorisations invalides.");
+          const rules = validateRules(data.rules);
+          // Only actual, accessible directories can be granted.
+          for (const rule of rules) {
+            const handle = await directory(config.root, segments(rule.path));
+            await handle.close();
+          }
+          const result = await replaceRules(config.accessFile, data.key, data.revision, rules);
+          return json(response, 200, result);
+        }
+        throw new HttpError(404, "Page introuvable.");
+      }
+
+      const acl = isAdmin ? null : await readAccess(config.accessFile);
+      const rules = acl ? rulesFor(acl, user) : [];
       const path = url.searchParams.get("path") || "";
-      if (url.pathname === "/api/files" && method === "GET")
-        return json(response, 200, await listFiles(config.root, path));
+      if (url.pathname === "/api/files" && method === "GET") {
+        if (!isAdmin && !canBrowse(rules, path))
+          throw new HttpError(403, "Accès à ce dossier non autorisé.");
+        const data = await listFiles(config.root, path);
+        if (!isAdmin) data.entries = data.entries.filter((item) => {
+          const child = [path, item.name].filter(Boolean).join("/");
+          return item.directory ? canBrowse(rules, child) : canRead(rules, child);
+        });
+        return json(response, 200, data);
+      }
       if (url.pathname === "/api/folders" && method === "POST") {
+        if (!isAdmin && !canWrite(rules, path))
+          throw new HttpError(403, "Création de dossier non autorisée.");
         const data = await readJson(request);
         if (!data || typeof data.name !== "string") throw new HttpError(400, "Nom invalide.");
         await createFolder(config.root, path, data.name);
         return json(response, 201, { ok: true });
       }
       if (url.pathname === "/api/upload" && method === "PUT") {
+        if (!isAdmin && !canWrite(rules, path))
+          throw new HttpError(403, "Dépôt non autorisé.");
         const length = Number(request.headers["content-length"]);
         if (!Number.isSafeInteger(length) || length < 0)
           throw new HttpError(411, "Taille du fichier requise.");
@@ -294,6 +369,8 @@ export function createExplorer(config) {
         return json(response, 201, { ok: true });
       }
       if (url.pathname === "/api/file" && ["GET", "HEAD"].includes(method)) {
+        if (!isAdmin && !canRead(rules, path))
+          throw new HttpError(403, "Lecture du document non autorisée.");
         const { handle, stat, name } = await openFile(config.root, path);
         try {
           const type = previewType(name);
