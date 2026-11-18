@@ -435,7 +435,6 @@ function changeAcl(path, right, checked) {
   if (
     path === "" &&
     checked &&
-    right === "read" &&
     !window.confirm(
       "Autoriser tout le serveur à cet utilisateur, y compris les dossiers sensibles ?",
     )
