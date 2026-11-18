@@ -11,7 +11,8 @@ export default async function PurchaseInvoicesPage({
 }) {
   await requireModuleRequestContext("purchases", "READ");
   const params = await searchParams;
-  const initialTab = params.tab === "pending" ? "PENDING" : params.tab === "approved" ? "APPROVED" : "ALL";
+  const initialTab =
+    params.tab === "pending" ? "PENDING" : params.tab === "approved" ? "APPROVED" : "ALL";
   return (
     <DesktopAppShell>
       <PurchaseInvoicesWorkspace initialTab={initialTab} />

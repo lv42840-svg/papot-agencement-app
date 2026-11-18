@@ -65,7 +65,8 @@ function description(code: string) {
     INVOICE_CHANTIER_NOT_FOUND: "Un chantier de cette ventilation n'existe plus.",
     INVOICE_ORDER_NOT_FOUND: "Un bon de commande sélectionné n'est plus disponible.",
     PENNYLANE_DISABLED: "L'import Pennylane n'est pas encore activé sur le serveur.",
-    PENNYLANE_SYNC_IN_PROGRESS: "Une actualisation Pennylane est déjà en cours. Réessaie après sa fin.",
+    PENNYLANE_SYNC_IN_PROGRESS:
+      "Une actualisation Pennylane est déjà en cours. Réessaie après sa fin.",
   };
   return text[code] ?? "Opération impossible (" + code + ").";
 }

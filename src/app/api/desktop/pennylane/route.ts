@@ -42,12 +42,12 @@ function failure(error: unknown) {
     (safeCode === "PENNYLANE_SYNC_IN_PROGRESS"
       ? 409
       : safeCode === "PENNYLANE_DISABLED" || safeCode === "PENNYLANE_NOT_CONFIGURED"
-      ? 503
-      : safeCode === "PENNYLANE_SCOPE_FORBIDDEN"
-        ? 424
-        : safeCode === "PENNYLANE_COMPANY_MISMATCH"
-          ? 409
-          : 502);
+        ? 503
+        : safeCode === "PENNYLANE_SCOPE_FORBIDDEN"
+          ? 424
+          : safeCode === "PENNYLANE_COMPANY_MISMATCH"
+            ? 409
+            : 502);
   return json({ error: safeCode }, status);
 }
 

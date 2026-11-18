@@ -33,7 +33,7 @@ describe("accueil : factures fournisseurs à valider", () => {
     expect(page).toContain('params.tab === "pending" ? "PENDING"');
     expect(page).toContain("<PurchaseInvoicesWorkspace initialTab={initialTab} />");
     expect(workspace).toContain("initialTab?:");
-    expect(workspace).toContain("useState<\"ALL\" | \"PENDING\" | \"APPROVED\">(initialTab)");
+    expect(workspace).toContain('useState<"ALL" | "PENDING" | "APPROVED">(initialTab)');
     expect(workspace).toContain("Actualiser Pennylane");
   });
 });

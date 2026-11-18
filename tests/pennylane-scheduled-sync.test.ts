@@ -33,7 +33,10 @@ describe("synchronisation Pennylane programmée, sécurisée et sans doublon", (
 
   it("prévoit deux passages quotidiens à l'heure Europe/Paris", () => {
     const timer = readFileSync("deploy/agencement-web/systemd/papot-pennylane-sync.timer", "utf8");
-    const service = readFileSync("deploy/agencement-web/systemd/papot-pennylane-sync.service", "utf8");
+    const service = readFileSync(
+      "deploy/agencement-web/systemd/papot-pennylane-sync.service",
+      "utf8",
+    );
     expect(timer).toContain("OnCalendar=*-*-* 06,12:00:00 Europe/Paris");
     expect(timer).toContain("Persistent=true");
     const installer = readFileSync("deploy/agencement-web/install-pennylane-sync.sh", "utf8");

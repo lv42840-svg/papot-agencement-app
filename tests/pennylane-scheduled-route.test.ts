@@ -56,15 +56,11 @@ describe("tâche interne Pennylane", () => {
       counts: { suppliers: 3, supplier_invoices: 10, customers: 4, customer_invoices: 8 },
       generalExpensesAssigned: 3,
     });
-    expect(synchronizePennylane).toHaveBeenCalledWith(
-      "PAPOT · synchronisation programmée",
-    );
+    expect(synchronizePennylane).toHaveBeenCalledWith("PAPOT · synchronisation programmée");
   });
 
   it("refuse le chevauchement et dissimule les erreurs internes", async () => {
-    vi.mocked(synchronizePennylane).mockRejectedValueOnce(
-      new Error("PENNYLANE_SYNC_IN_PROGRESS"),
-    );
+    vi.mocked(synchronizePennylane).mockRejectedValueOnce(new Error("PENNYLANE_SYNC_IN_PROGRESS"));
     const busy = await invoke("Bearer " + token);
     expect(busy.status).toBe(409);
     expect((await busy.json()).error).toBe("PENNYLANE_SYNC_IN_PROGRESS");

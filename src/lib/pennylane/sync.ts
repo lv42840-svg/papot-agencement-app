@@ -57,7 +57,9 @@ export async function synchronizePennylane(
     await publishPennylaneSnapshots(companyName, records);
 
     // Automatic FG allocation is the same whether the import was scheduled or manual.
-    const { autoAllocateImportedGeneralExpensesInvoices } = await import("./purchase-invoice-store");
+    const { autoAllocateImportedGeneralExpensesInvoices } = await import(
+      "./purchase-invoice-store"
+    );
     const generalExpenses = await autoAllocateImportedGeneralExpensesInvoices(actor);
     return {
       generalExpenses,
