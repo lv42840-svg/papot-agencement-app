@@ -66,6 +66,8 @@ export function canWrite(rules, path) {
 // Let users traverse ancestors of explicitly allowed subfolders, never sibling data.
 export function canBrowse(rules, path) {
   const value = segments(path).join("/");
+  // Everyone can open the root, but only permitted children are ever listed.
+  if (value === "") return true;
   if (canRead(rules, value)) return true;
   const prefix = value ? `${value}/` : "";
   return rules.some((rule) =>
