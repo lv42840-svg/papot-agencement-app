@@ -40,6 +40,7 @@ describe("synchronisation Pennylane programmée, sécurisée et sans doublon", (
     expect(installer).toContain("http://127.0.0.1:3002/api/internal/pennylane/sync");
     expect(service).toContain("pennylane-sync.curl");
     expect(installer).not.toContain("PENNYLANE_API_TOKEN");
-    expect(installer).toContain("systemctl enable --now papot-pennylane-sync.timer");
+    expect(installer).toContain("systemctl enable papot-pennylane-sync.timer");
+    expect(installer).toContain("systemctl start papot-pennylane-sync.timer");
   });
 });
