@@ -36,7 +36,10 @@ describe("synchronisation Pennylane programmée, sécurisée et sans doublon", (
     const service = readFileSync("deploy/agencement-web/systemd/papot-pennylane-sync.service", "utf8");
     expect(timer).toContain("OnCalendar=*-*-* 06,12:00:00 Europe/Paris");
     expect(timer).toContain("Persistent=true");
-    expect(service).toContain("127.0.0.1");
+    const installer = readFileSync("deploy/agencement-web/install-pennylane-sync.sh", "utf8");
+    expect(installer).toContain("http://127.0.0.1:3002/api/internal/pennylane/sync");
     expect(service).toContain("pennylane-sync.curl");
+    expect(installer).not.toContain("PENNYLANE_API_TOKEN");
+    expect(installer).toContain("systemctl enable --now papot-pennylane-sync.timer");
   });
 });
