@@ -63,11 +63,20 @@ export function CheckboxChoiceList({
               borderRadius: 6,
               background: chosen.has(option.id) ? "#f1eafa" : "transparent",
               cursor: disabled || option.disabled ? "default" : "pointer",
+              minWidth: 0,
             }}
           >
             <input
               type="checkbox"
               aria-label={option.label}
+              style={{
+                width: 18,
+                height: 18,
+                minHeight: 18,
+                padding: 0,
+                flexShrink: 0,
+                accentColor: "#7558b3",
+              }}
               checked={chosen.has(option.id)}
               disabled={disabled || option.disabled}
               onChange={(event) => toggle(option.id, event.target.checked)}
