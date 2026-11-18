@@ -6,7 +6,7 @@ import {
   uncheckVisibleChoices,
 } from "@/lib/ui/checkbox-selection";
 
-export type CheckboxChoice = { id: string; label: string };
+export type CheckboxChoice = { id: string; label: string; disabled?: boolean };
 
 /** Un clic par choix, sans Ctrl. Les éléments masqués par un filtre restent sélectionnés. */
 export function CheckboxChoiceList({
@@ -28,7 +28,8 @@ export function CheckboxChoiceList({
   emptyMessage?: string;
   maxHeight?: number;
 }) {
-  const visibleIds = new Set(options.map((option) => option.id));
+  const selectableOptions = options.filter((option) => !option.disabled);
+  const visibleIds = new Set(selectableOptions.map((option) => option.id));
   const chosen = new Set(selectedIds);
 
   function toggle(id: string, checked: boolean) {
@@ -61,14 +62,14 @@ export function CheckboxChoiceList({
               padding: "7px 9px",
               borderRadius: 6,
               background: chosen.has(option.id) ? "#f1eafa" : "transparent",
-              cursor: disabled ? "default" : "pointer",
+              cursor: disabled || option.disabled ? "default" : "pointer",
             }}
           >
             <input
               type="checkbox"
               aria-label={option.label}
               checked={chosen.has(option.id)}
-              disabled={disabled}
+              disabled={disabled || option.disabled}
               onChange={(event) => toggle(option.id, event.target.checked)}
             />
             <span style={{ fontSize: 14 }}>{option.label}</span>
@@ -84,7 +85,7 @@ export function CheckboxChoiceList({
           <button
             type="button"
             className="secondaryButton"
-            disabled={disabled || options.length === 0 || options.every((option) => chosen.has(option.id))}
+            disabled={disabled || selectableOptions.length === 0 || selectableOptions.every((option) => chosen.has(option.id))}
             onClick={() => onChange(checkVisibleChoices(selectedIds, [...visibleIds]))}
           >
             Tout cocher (résultats visibles)
@@ -92,7 +93,7 @@ export function CheckboxChoiceList({
           <button
             type="button"
             className="secondaryButton"
-            disabled={disabled || !options.some((option) => chosen.has(option.id))}
+            disabled={disabled || !selectableOptions.some((option) => chosen.has(option.id))}
             onClick={() => onChange(uncheckVisibleChoices(selectedIds, [...visibleIds]))}
           >
             Tout décocher (résultats visibles)
