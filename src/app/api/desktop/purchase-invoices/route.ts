@@ -66,6 +66,7 @@ function errorResponse(error: unknown) {
     "PENNYLANE_SCOPE_FORBIDDEN",
     "PENNYLANE_NETWORK_ERROR",
     "PENNYLANE_COMPANY_MISMATCH",
+    "PENNYLANE_SYNC_IN_PROGRESS",
   ].includes(code)
     ? code
     : "INVOICE_ERROR";
@@ -75,7 +76,10 @@ function errorResponse(error: unknown) {
     safe === "INVOICE_ORDER_NOT_FOUND" ||
     safe === "INVOICE_CHANTIER_NOT_FOUND"
       ? 404
-      : safe.includes("CONFLICT") || safe.includes("CHANGED") || safe.includes("DUPLICATE")
+      : safe === "PENNYLANE_SYNC_IN_PROGRESS" ||
+          safe.includes("CONFLICT") ||
+          safe.includes("CHANGED") ||
+          safe.includes("DUPLICATE")
         ? 409
         : safe === "PENNYLANE_DISABLED" || safe === "PENNYLANE_NOT_CONFIGURED"
           ? 503

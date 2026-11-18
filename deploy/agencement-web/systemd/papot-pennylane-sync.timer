@@ -1,0 +1,12 @@
+[Unit]
+Description=PAPOT AGENCEMENT - Actualisation Pennylane à 6 h et 12 h (France)
+
+[Timer]
+# Le fuseau est explicite : l'heure reste française été comme hiver.
+OnCalendar=*-*-* 06,12:00:00 Europe/Paris
+AccuracySec=1min
+Persistent=true
+Unit=papot-pennylane-sync.service
+
+[Install]
+WantedBy=timers.target

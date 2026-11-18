@@ -29,28 +29,47 @@ export async function preparePennylaneSnapshot(
   return { companyName, records };
 }
 
+/**
+ * Manual and scheduled refresh share a session-level PostgreSQL lock. The
+ * connection is discarded after the import to guarantee the lock is released,
+ * even if the upstream API fails or a worker is interrupted.
+ */
 export async function synchronizePennylane(
   actor = "PAPOT · synchronisation Pennylane",
 ): Promise<PennylaneSyncResult> {
-  // Production imports use only the encrypted token saved by an administrator.
-  // The legacy environment-token interface is retained for mock-only unit tests.
-  const { readPennylaneStoredConfig } = await import("./connection");
-  const stored = await readPennylaneStoredConfig();
-  const { companyName, records } = await preparePennylaneSnapshot({
-    PAPOT_PENNYLANE_ENABLED: process.env.PAPOT_PENNYLANE_ENABLED,
-    PAPOT_PENNYLANE_API_TOKEN: stored.token,
-    PAPOT_PENNYLANE_EXPECTED_COMPANY: stored.expectedCompany,
-  });
-  await publishPennylaneSnapshots(companyName, records);
-  // Après chaque import, appliquer les fournisseurs FG sans toucher à Pennylane.
-  // Import dynamique : les tests du client GET restent indépendants du serveur DB.
-  const { autoAllocateImportedGeneralExpensesInvoices } = await import("./purchase-invoice-store");
-  const generalExpenses = await autoAllocateImportedGeneralExpensesInvoices(actor);
-  return {
-    generalExpenses,
-    companyName,
-    counts: Object.fromEntries(
-      PENNYLANE_RESOURCES.map((resource) => [resource, records[resource].length]),
-    ) as Record<PennylaneResource, number>,
-  };
+  const { getServerDbPool } = await import("@/lib/server-db/pool");
+  const lockClient = await getServerDbPool().connect();
+  try {
+    const result = await lockClient.query<{ acquired: boolean }>(
+      "SELECT pg_try_advisory_lock($1::bigint) AS acquired",
+      ["7332170416238559"],
+    );
+    if (!result.rows[0]?.acquired) throw new Error("PENNYLANE_SYNC_IN_PROGRESS");
+
+    // GET-only upstream access. The encrypted provider token stays in PostgreSQL.
+    const { readPennylaneStoredConfig } = await import("./connection");
+    const stored = await readPennylaneStoredConfig();
+    const { companyName, records } = await preparePennylaneSnapshot({
+      PAPOT_PENNYLANE_ENABLED: process.env.PAPOT_PENNYLANE_ENABLED,
+      PAPOT_PENNYLANE_API_TOKEN: stored.token,
+      PAPOT_PENNYLANE_EXPECTED_COMPANY: stored.expectedCompany,
+    });
+    await publishPennylaneSnapshots(companyName, records);
+
+    // Automatic FG allocation is the same whether the import was scheduled or manual.
+    const { autoAllocateImportedGeneralExpensesInvoices } = await import(
+      "./purchase-invoice-store"
+    );
+    const generalExpenses = await autoAllocateImportedGeneralExpensesInvoices(actor);
+    return {
+      generalExpenses,
+      companyName,
+      counts: Object.fromEntries(
+        PENNYLANE_RESOURCES.map((resource) => [resource, records[resource].length]),
+      ) as Record<PennylaneResource, number>,
+    };
+  } finally {
+    // Ending this session releases the advisory lock without depending on a second SQL call.
+    lockClient.release(true);
+  }
 }
