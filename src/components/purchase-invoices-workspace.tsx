@@ -527,8 +527,8 @@ export function PurchaseInvoicesWorkspace({
                   <div style={{ color: "#a43a26", display: "grid", gap: 10 }}>
                     <p>
                       Même fournisseur et même numéro de facture que :{" "}
-                      {selected.duplicateIds.join(", ")}. Vérifie les PDF avant validation :
-                      il peut s&apos;agir d&apos;une véritable facture en double.
+                      {selected.duplicateIds.join(", ")}. Vérifie les PDF avant validation : il peut
+                      s&apos;agir d&apos;une véritable facture en double.
                     </p>
                     <label style={{ display: "flex", alignItems: "center", gap: 8 }}>
                       <input

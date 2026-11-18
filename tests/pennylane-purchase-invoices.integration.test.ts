@@ -199,7 +199,9 @@ describeIfPostgres("Pennylane purchase invoice workflow in isolated PostgreSQL",
       expect(result.approved?.amountHtCents).toBe(10100);
       expect(result.approved?.duplicateOverrideReason).toBeUndefined();
     } finally {
-      await pool.query("DELETE FROM papot_pennylane_purchase_allocations WHERE invoice_id=$1", [otherId]);
+      await pool.query("DELETE FROM papot_pennylane_purchase_allocations WHERE invoice_id=$1", [
+        otherId,
+      ]);
       await pool.query("DELETE FROM papot_pennylane_staging WHERE external_id=$1", [otherId]);
     }
   });
@@ -225,18 +227,37 @@ describeIfPostgres("Pennylane purchase invoice workflow in isolated PostgreSQL",
       };
       await expect(
         writePurchaseInvoiceAllocation(
-          "VALIDATE", otherId, 0, candidate.sourceRevision, allocated, "Nadia", pool,
+          "VALIDATE",
+          otherId,
+          0,
+          candidate.sourceRevision,
+          allocated,
+          "Nadia",
+          pool,
         ),
       ).rejects.toThrow("INVOICE_POSSIBLE_DUPLICATE");
       await expect(
         writePurchaseInvoiceAllocation(
-          "VALIDATE", otherId, 0, candidate.sourceRevision, allocated, "Nadia", pool,
+          "VALIDATE",
+          otherId,
+          0,
+          candidate.sourceRevision,
+          allocated,
+          "Nadia",
+          pool,
           "trop court",
         ),
       ).rejects.toThrow("INVOICE_POSSIBLE_DUPLICATE");
       const reason = "Factures comparées : livraisons réellement différentes";
       const accepted = await writePurchaseInvoiceAllocation(
-        "VALIDATE", otherId, 0, candidate.sourceRevision, allocated, "Nadia", pool, reason,
+        "VALIDATE",
+        otherId,
+        0,
+        candidate.sourceRevision,
+        allocated,
+        "Nadia",
+        pool,
+        reason,
       );
       expect(accepted.approved?.duplicateOverrideReason).toBe(reason);
       expect(accepted.history[0].duplicateOverrideReason).toBe(reason);
@@ -246,7 +267,9 @@ describeIfPostgres("Pennylane purchase invoice workflow in isolated PostgreSQL",
       );
       expect(record.rows[0].history[0].duplicateOverrideReason).toBe(reason);
     } finally {
-      await pool.query("DELETE FROM papot_pennylane_purchase_allocations WHERE invoice_id=$1", [otherId]);
+      await pool.query("DELETE FROM papot_pennylane_purchase_allocations WHERE invoice_id=$1", [
+        otherId,
+      ]);
       await pool.query("DELETE FROM papot_pennylane_staging WHERE external_id=$1", [otherId]);
     }
   });

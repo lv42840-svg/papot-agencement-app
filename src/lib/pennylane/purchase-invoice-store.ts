@@ -407,10 +407,13 @@ export async function writePurchaseInvoiceAllocation(
           "SELECT external_id, payload FROM papot_pennylane_staging WHERE resource = 'supplier_invoices' AND external_id <> $1",
           [invoiceId],
         );
-        const duplicateExists = siblings.rows.some((row) =>
-          duplicateKey(invoiceSource(row, new Map())) === duplicateKey(source),
+        const duplicateExists = siblings.rows.some(
+          (row) => duplicateKey(invoiceSource(row, new Map())) === duplicateKey(source),
         );
-        if (duplicateExists && (!duplicateOverrideReason || duplicateOverrideReason.trim().length < 15)) {
+        if (
+          duplicateExists &&
+          (!duplicateOverrideReason || duplicateOverrideReason.trim().length < 15)
+        ) {
           throw new Error("INVOICE_POSSIBLE_DUPLICATE");
         }
       }
