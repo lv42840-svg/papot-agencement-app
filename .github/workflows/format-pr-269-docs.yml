@@ -1,0 +1,29 @@
+name: Format PR 269 documentation temporary
+on:
+  push:
+    branches:
+      - feat/accueil-factures-a-valider-sync-6h-12h-20261118
+permissions:
+  contents: write
+jobs:
+  format:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.ref }}
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          cache: npm
+      - run: npm ci
+      - run: npx prettier --write deploy/agencement-web/README.md docs/pennylane-purchase-invoices.md tests/pennylane-scheduled-sync.test.ts
+      - name: Commit formatting
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add deploy/agencement-web/README.md docs/pennylane-purchase-invoices.md tests/pennylane-scheduled-sync.test.ts
+          if ! git diff --cached --quiet; then
+            git commit -m "style: formater documentation timer Pennylane"
+            git push origin HEAD:${{ github.ref_name }}
+          fi
