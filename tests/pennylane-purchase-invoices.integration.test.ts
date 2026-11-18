@@ -172,6 +172,108 @@ describeIfPostgres("Pennylane purchase invoice workflow in isolated PostgreSQL",
       writePurchaseInvoiceAllocation("VALIDATE", id, 2, revision, draft(), "Nadia", pool),
     ).rejects.toThrow("INVOICE_SOURCE_CHANGED");
   });
+  it("accepte deux factures du même montant si leurs numéros sont distincts", async () => {
+    const payload = {
+      ...basePayload,
+      id: Number(otherId),
+      invoice_number: "AUTRE-FACTURE-VALIDABLE",
+      currency_amount_before_tax: "101.00",
+    };
+    await pool.query(
+      "INSERT INTO papot_pennylane_staging (resource, external_id, payload, synced_at) VALUES ('supplier_invoices',$1,$2::jsonb,NOW())",
+      [otherId, JSON.stringify(payload)],
+    );
+    try {
+      const workspace = await readPurchaseInvoiceWorkspace(pool);
+      const candidate = workspace.invoices.find((item) => item.id === otherId)!;
+      expect(candidate.duplicateIds).toEqual([]);
+      const result = await writePurchaseInvoiceAllocation(
+        "VALIDATE",
+        otherId,
+        0,
+        candidate.sourceRevision,
+        { ...draft(), rows: draft().rows.map((row) => ({ ...row, amountHtCents: 10100 })) },
+        "Nadia",
+        pool,
+      );
+      expect(result.approved?.amountHtCents).toBe(10100);
+      expect(result.approved?.duplicateOverrideReason).toBeUndefined();
+    } finally {
+      await pool.query("DELETE FROM papot_pennylane_purchase_allocations WHERE invoice_id=$1", [
+        otherId,
+      ]);
+      await pool.query("DELETE FROM papot_pennylane_staging WHERE external_id=$1", [otherId]);
+    }
+  });
+
+  it("bloque le même numéro malgré un montant différent, sauf exception motivée et auditée", async () => {
+    const payload = {
+      ...basePayload,
+      id: Number(otherId),
+      currency_amount_before_tax: "99.00",
+      invoice_number: basePayload.invoice_number,
+    };
+    await pool.query(
+      "INSERT INTO papot_pennylane_staging (resource, external_id, payload, synced_at) VALUES ('supplier_invoices',$1,$2::jsonb,NOW())",
+      [otherId, JSON.stringify(payload)],
+    );
+    try {
+      const workspace = await readPurchaseInvoiceWorkspace(pool);
+      const candidate = workspace.invoices.find((item) => item.id === otherId)!;
+      expect(candidate.duplicateIds).toContain(id);
+      const allocated = {
+        ...draft(),
+        rows: draft().rows.map((row) => ({ ...row, amountHtCents: 9900 })),
+      };
+      await expect(
+        writePurchaseInvoiceAllocation(
+          "VALIDATE",
+          otherId,
+          0,
+          candidate.sourceRevision,
+          allocated,
+          "Nadia",
+          pool,
+        ),
+      ).rejects.toThrow("INVOICE_POSSIBLE_DUPLICATE");
+      await expect(
+        writePurchaseInvoiceAllocation(
+          "VALIDATE",
+          otherId,
+          0,
+          candidate.sourceRevision,
+          allocated,
+          "Nadia",
+          pool,
+          "trop court",
+        ),
+      ).rejects.toThrow("INVOICE_POSSIBLE_DUPLICATE");
+      const reason = "Factures comparées : livraisons réellement différentes";
+      const accepted = await writePurchaseInvoiceAllocation(
+        "VALIDATE",
+        otherId,
+        0,
+        candidate.sourceRevision,
+        allocated,
+        "Nadia",
+        pool,
+        reason,
+      );
+      expect(accepted.approved?.duplicateOverrideReason).toBe(reason);
+      expect(accepted.history[0].duplicateOverrideReason).toBe(reason);
+      const record = await pool.query<{ history: Array<{ duplicateOverrideReason: string }> }>(
+        "SELECT history FROM papot_pennylane_purchase_allocations WHERE invoice_id=$1",
+        [otherId],
+      );
+      expect(record.rows[0].history[0].duplicateOverrideReason).toBe(reason);
+    } finally {
+      await pool.query("DELETE FROM papot_pennylane_purchase_allocations WHERE invoice_id=$1", [
+        otherId,
+      ]);
+      await pool.query("DELETE FROM papot_pennylane_staging WHERE external_id=$1", [otherId]);
+    }
+  });
+
   it("valide immédiatement les FG éligibles dans PAPOT une seule fois, même avant Pennylane", async () => {
     const { parsePurchaseOrdersPayload } = await import("../src/lib/purchases/domain");
     const saved = await pool.query<{ payload: unknown }>(

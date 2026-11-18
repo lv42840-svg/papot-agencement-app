@@ -23,6 +23,7 @@ const changeSchema = z
     expectedVersion: z.number().int().min(0),
     expectedRevision: z.string().min(1).max(500),
     draft: invoiceAllocationDraftSchema,
+    duplicateOverrideReason: z.string().trim().min(15).max(1000).optional(),
   })
   .strict();
 
@@ -172,6 +173,8 @@ export async function POST(request: Request) {
       input.expectedRevision,
       input.draft,
       context.user.displayName,
+      undefined,
+      input.duplicateOverrideReason,
     );
     return json({ state });
   } catch (error) {

@@ -86,10 +86,10 @@ function stateOf(row: AllocationRow | undefined): InvoiceAllocationState | null 
     : null;
 }
 
+/** Le contrôle utilise le fournisseur et la référence, jamais le montant répété. */
 function duplicateKey(source: InvoiceSource): string | null {
-  return source.supplierId && source.invoiceNumber.trim() && source.amountHtCents !== null
-    ? [source.supplierId, supplierKey(source.invoiceNumber), source.amountHtCents].join(":")
-    : null;
+  const normalized = supplierKey(source.invoiceNumber);
+  return source.supplierId && normalized ? [source.supplierId, normalized].join(":") : null;
 }
 
 export type PurchaseInvoiceListItem = InvoiceSource & {
@@ -357,6 +357,7 @@ export async function writePurchaseInvoiceAllocation(
   submitted: InvoiceAllocationDraft,
   actor: string,
   pool: Pool = getServerDbPool(),
+  duplicateOverrideReason?: string,
 ): Promise<InvoiceAllocationState> {
   await runServerDbMigrations(pool);
   const draft = invoiceAllocationDraftSchema.parse(submitted);
@@ -401,16 +402,19 @@ export async function writePurchaseInvoiceAllocation(
     if (action === "VALIDATE") {
       if (source.amountHtCents === null) throw new Error("INVOICE_AMOUNT_INVALID");
       assertInvoiceComplete(draft, source.amountHtCents);
-      if (source.supplierId && source.invoiceNumber.trim()) {
+      if (duplicateKey(source)) {
         const siblings = await client.query<InvoiceRow>(
           "SELECT external_id, payload FROM papot_pennylane_staging WHERE resource = 'supplier_invoices' AND external_id <> $1",
           [invoiceId],
         );
-        for (const row of siblings.rows) {
-          const other = invoiceSource(row, new Map());
-          if (duplicateKey(other) === duplicateKey(source)) {
-            throw new Error("INVOICE_POSSIBLE_DUPLICATE");
-          }
+        const duplicateExists = siblings.rows.some(
+          (row) => duplicateKey(invoiceSource(row, new Map())) === duplicateKey(source),
+        );
+        if (
+          duplicateExists &&
+          (!duplicateOverrideReason || duplicateOverrideReason.trim().length < 15)
+        ) {
+          throw new Error("INVOICE_POSSIBLE_DUPLICATE");
         }
       }
       approved = {
@@ -419,6 +423,9 @@ export async function writePurchaseInvoiceAllocation(
         sourceRevision: source.sourceRevision,
         validatedAt: new Date().toISOString(),
         validatedBy: actor,
+        ...(duplicateOverrideReason?.trim()
+          ? { duplicateOverrideReason: duplicateOverrideReason.trim() }
+          : {}),
       };
     }
     const now = new Date().toISOString();
@@ -430,6 +437,9 @@ export async function writePurchaseInvoiceAllocation(
         actor,
         action,
         version: nextVersion,
+        ...(action === "VALIDATE" && duplicateOverrideReason?.trim()
+          ? { duplicateOverrideReason: duplicateOverrideReason.trim() }
+          : {}),
         // The full prior state is retained for audit, never overwritten.
         previousDraft: previous?.draft ?? null,
         previousApproved: previous?.approved ?? null,

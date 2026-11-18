@@ -212,6 +212,8 @@ export type ApprovedInvoiceAllocation = {
   sourceRevision: string;
   validatedAt: string;
   validatedBy: string;
+  /** Justification écrite pour une exception de doublon de numéro confirmée par un humain. */
+  duplicateOverrideReason?: string;
 };
 
 export type InvoiceAllocationState = {
@@ -224,6 +226,7 @@ export type InvoiceAllocationState = {
     actor: string;
     action: "SAVE" | "VALIDATE";
     version: number;
+    duplicateOverrideReason?: string;
   }>;
   updatedAt: string;
 };
