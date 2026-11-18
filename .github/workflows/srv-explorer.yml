@@ -24,6 +24,7 @@ jobs:
       - run: node --test services/srv-explorer/checks.mjs
       - run: node --check services/srv-explorer/public/app.js
       - run: bash -n deploy/srv-explorer/prepare.sh
+      - run: bash -n deploy/srv-explorer/backup-config.sh
       - run: docker build -t papot-srv-explorer-test services/srv-explorer
   browser:
     runs-on: ubuntu-24.04
