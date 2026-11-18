@@ -1,0 +1,14 @@
+[Unit]
+Description=PAPOT AGENCEMENT - Synchronisation Pennylane automatique
+Wants=network-online.target
+After=network-online.target docker.service
+
+[Service]
+Type=oneshot
+# Le jeton est dans un fichier curl root-only, jamais dans les arguments du processus.
+ExecStart=/usr/bin/curl --fail-with-body --silent --show-error --max-time 1800 --config /etc/papot-agencement/pennylane-sync.curl
+TimeoutStartSec=31min
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectHome=true
+ProtectSystem=strict
