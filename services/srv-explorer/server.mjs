@@ -4,6 +4,7 @@ import { isIP } from "node:net";
 import { readFile } from "node:fs/promises";
 import { pipeline } from "node:stream/promises";
 import { pathToFileURL } from "node:url";
+import { isAbsolute, resolve, sep } from "node:path";
 import {
   HttpError,
   listFiles,
@@ -64,14 +65,15 @@ export function configFromEnv(env = process.env) {
       !/^[A-Za-z0-9._:-]{1,160}$/.test(ownerId))
     throw new Error("Configurer SRV_ADMIN_SOURCE et SRV_ADMIN_USER_ID avant démarrage.");
   const accessFile = env.SRV_ACCESS_FILE || "/state/access.json";
-  if (!accessFile.startsWith("/state/") || accessFile.includes("..") ||
-      !/^\/state\/[a-zA-Z0-9._-]+\.json$/.test(accessFile))
-    throw new Error("Le fichier des autorisations doit résider dans /state.");
+  const root = env.SRV_ROOT || "/data";
+  if (!isAbsolute(accessFile) || !/\/[a-zA-Z0-9._-]+\.json$/.test(accessFile) ||
+      resolve(accessFile).startsWith(resolve(root) + sep))
+    throw new Error("Les autorisations doivent être stockées en dehors des documents.");
   const maxUpload = Number(env.SRV_MAX_UPLOAD_BYTES || 536870912);
   if (!Number.isSafeInteger(maxUpload) || maxUpload < 1)
     throw new Error("Limite de dépôt invalide.");
   return {
-    root: env.SRV_ROOT || "/data",
+    root,
     accessFile,
     ownerSource,
     ownerId,
@@ -121,13 +123,13 @@ function json(response, status, data, headers = {}) {
   response.writeHead(status, { "Content-Type": "application/json; charset=utf-8", ...headers });
   response.end(JSON.stringify(data));
 }
-async function readJson(request) {
+async function readJson(request, limit = 8192) {
   if (!request.headers["content-type"]?.startsWith("application/json"))
     throw new HttpError(415, "Format de requête invalide.");
   let body = "";
   for await (const chunk of request) {
     body += chunk;
-    if (Buffer.byteLength(body) > 8192) throw new HttpError(413, "Requête trop volumineuse.");
+    if (Buffer.byteLength(body) > limit) throw new HttpError(413, "Requête trop volumineuse.");
   }
   try {
     return JSON.parse(body);
@@ -315,7 +317,7 @@ export function createExplorer(config) {
           });
         }
         if (url.pathname === "/api/admin/access" && method === "POST") {
-          const data = await readJson(request);
+          const data = await readJson(request, 131072);
           if (!data || typeof data.key !== "string" || !data.key ||
               !Array.isArray(data.rules))
             throw new HttpError(400, "Autorisations invalides.");
@@ -342,6 +344,7 @@ export function createExplorer(config) {
           const child = [path, item.name].filter(Boolean).join("/");
           return item.directory ? canBrowse(rules, child) : canRead(rules, child);
         });
+        data.canWrite = isAdmin || canWrite(rules, path);
         return json(response, 200, data);
       }
       if (url.pathname === "/api/folders" && method === "POST") {
