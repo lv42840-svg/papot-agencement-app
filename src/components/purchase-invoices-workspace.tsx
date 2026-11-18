@@ -371,7 +371,11 @@ export function PurchaseInvoicesWorkspace() {
             }}
           >
             Factures à valider (
-            {data.invoices.filter((invoice) => invoiceNeedsPapotValidation(invoice.workflow)).length})
+            {
+              data.invoices.filter((invoice) => invoiceNeedsPapotValidation(invoice.workflow))
+                .length
+            }
+            )
           </button>
           <button
             type="button"
@@ -425,8 +429,8 @@ export function PurchaseInvoicesWorkspace() {
                 ? "Toutes les factures"
                 : invoiceTab === "PENDING"
                   ? "Factures à valider"
-                  : "Factures validées"} (
-              {visibleInvoices.length})
+                  : "Factures validées"}{" "}
+              ({visibleInvoices.length})
             </h2>
             <input
               aria-label="Rechercher une facture"
