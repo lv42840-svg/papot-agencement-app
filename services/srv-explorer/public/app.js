@@ -6,7 +6,14 @@ let currentPath = "",
   uploading = false,
   loadVersion = 0,
   previewEntries = [],
-  previewIndex = 0;
+  previewIndex = 0,
+  canDeposit = false,
+  isAdmin = false,
+  aclRevision = 0,
+  aclSelectedKey = "",
+  aclUsers = [],
+  aclGrants = {},
+  aclRules = new Map();
 const previewable = (name) => /\.(pdf|jpe?g|png|gif|webp|txt)$/i.test(name);
 const filePath = (name) => [currentPath, name].filter(Boolean).join("/");
 const fileUrl = (path, preview = false) =>
@@ -25,7 +32,11 @@ function loggedOut() {
   loadVersion++;
   $("login").hidden = false;
   $("explorer").hidden = true;
+  $("permissions").hidden = true;
+  $("view-tabs").hidden = true;
+  $("admin-tab").hidden = true;
   $("account").hidden = true;
+  isAdmin = false;
   entries = [];
   $("files").replaceChildren();
   $("preview-dialog").close();
@@ -50,7 +61,13 @@ async function api(url, options = {}) {
 function loggedIn(data) {
   $("login").hidden = true;
   $("explorer").hidden = false;
+  $("permissions").hidden = true;
+  $("view-tabs").hidden = false;
   $("account").hidden = false;
+  isAdmin = data.user.isAdmin === true;
+  $("admin-tab").hidden = !isAdmin;
+  $("explorer-tab").classList.add("tab-active");
+  $("admin-tab").classList.remove("tab-active");
   $("user-name").textContent = data.user.displayName;
   maxUpload = data.maxUpload;
 }
@@ -136,6 +153,9 @@ async function navigate(path, updateHash = true) {
     if (version !== loadVersion) return;
     currentPath = path;
     entries = data.entries;
+    canDeposit = data.canWrite === true;
+    $("new-folder").hidden = !canDeposit;
+    $("upload-button").hidden = !canDeposit;
     $("search").value = "";
     if (updateHash) history.replaceState(null, "", `#${encodeURIComponent(path)}`);
     breadcrumbs();
@@ -224,7 +244,7 @@ $("dropzone").addEventListener("drop", (event) => {
   uploadFiles([...event.dataTransfer.files]);
 });
 async function uploadFiles(files) {
-  if (uploading || !files.length) return;
+  if (uploading || !files.length || !canDeposit) return;
   uploading = true;
   $("upload-button").disabled = true;
   $("new-folder").disabled = true;
@@ -335,6 +355,191 @@ $("preview-dialog").addEventListener("keydown", (event) => {
   if (event.key === "ArrowLeft") $("previous").click();
   if (event.key === "ArrowRight") $("next").click();
 });
+
+// Folder ACL editor. No permissions are trusted from this page: the API enforces every action.
+function showTab(tab) {
+  if (uploading) return;
+  $("explorer").hidden = tab !== "explorer";
+  $("permissions").hidden = tab !== "permissions";
+  $("explorer-tab").classList.toggle("tab-active", tab === "explorer");
+  $("admin-tab").classList.toggle("tab-active", tab === "permissions");
+  status("");
+}
+$("explorer-tab").addEventListener("click", () => showTab("explorer"));
+$("admin-tab").addEventListener("click", async () => {
+  if (!isAdmin) return;
+  showTab("permissions");
+  try {
+    await loadAcl();
+  } catch (error) {
+    $("acl-feedback").textContent = error.message;
+  }
+});
+async function loadAcl() {
+  const data = await api("/api/admin/access");
+  aclRevision = data.revision;
+  aclUsers = data.users;
+  aclGrants = data.grants;
+  const selection = $("acl-user");
+  selection.replaceChildren();
+  for (const user of aclUsers) {
+    const option = document.createElement("option");
+    option.value = user.key;
+    option.textContent = `${user.displayName} · ${user.source === "concept" ? "Concept" : "Agencement"} (${user.username})`;
+    selection.append(option);
+  }
+  aclSelectedKey = aclUsers.some((user) => user.key === aclSelectedKey)
+    ? aclSelectedKey : (aclUsers[0]?.key || "");
+  selection.value = aclSelectedKey;
+  $("acl-save").disabled = !aclSelectedKey;
+  $("acl-help").textContent = aclSelectedKey
+    ? "Dépliez les dossiers, cochez Lecture et/ou Dépôt, puis enregistrez."
+    : "Aucun autre utilisateur connu. Un collaborateur doit d’abord se connecter une fois à PAPOT SRV.";
+  setEditorRules();
+}
+function setEditorRules() {
+  aclRules = new Map((aclGrants[aclSelectedKey] || []).map((rule) => [rule.path, { ...rule }]));
+  $("acl-feedback").textContent = "";
+  renderAclTree();
+}
+$("acl-user").addEventListener("change", () => {
+  aclSelectedKey = $("acl-user").value;
+  setEditorRules();
+});
+function effectiveAcl(path) {
+  let selected = { read: false, write: false }, longest = -1;
+  for (const rule of aclRules.values()) {
+    if (
+      (rule.path === "" || path === rule.path || path.startsWith(`${rule.path}/`)) &&
+      rule.path.length > longest
+    ) {
+      selected = rule;
+      longest = rule.path.length;
+    }
+  }
+  return selected;
+}
+function refreshAclChecks() {
+  for (const row of $("acl-tree").querySelectorAll("[data-acl-path]")) {
+    const path = row.dataset.aclPath;
+    const current = effectiveAcl(path);
+    row.querySelector("[data-right=read]").checked = current.read;
+    row.querySelector("[data-right=write]").checked = current.write;
+    row.classList.toggle("acl-explicit", aclRules.has(path));
+  }
+}
+function changeAcl(path, right, checked) {
+  if (!aclSelectedKey) return;
+  if (path === "" && checked && right === "read" &&
+      !window.confirm("Autoriser tout le serveur à cet utilisateur, y compris les dossiers sensibles ?"))
+    return refreshAclChecks();
+  const rule = { path, ...effectiveAcl(path) };
+  if (right === "read") {
+    rule.read = checked;
+    if (!checked) rule.write = false;
+  } else {
+    rule.write = checked;
+    if (checked) rule.read = true;
+  }
+  aclRules.set(path, rule);
+  refreshAclChecks();
+  $("acl-feedback").textContent = "Modifications non enregistrées.";
+}
+function aclNode(path, label) {
+  const block = document.createElement("div");
+  block.className = "acl-node";
+  const row = document.createElement("div");
+  row.className = "acl-node-row";
+  row.dataset.aclPath = path;
+  const toggle = document.createElement("button");
+  toggle.type = "button";
+  toggle.className = "acl-expand";
+  toggle.textContent = "▸";
+  toggle.setAttribute("aria-label", `Déplier ${label}`);
+  const title = document.createElement("span");
+  title.className = "acl-name";
+  title.textContent = label;
+  const checks = document.createElement("div");
+  checks.className = "acl-checks";
+  for (const right of ["read", "write"]) {
+    const input = document.createElement("input");
+    input.type = "checkbox";
+    input.dataset.right = right;
+    input.setAttribute("aria-label", `${right === "read" ? "Lecture" : "Dépôt"} : ${label}`);
+    input.addEventListener("change", () => changeAcl(path, right, input.checked));
+    checks.append(input);
+  }
+  row.append(toggle, title, checks);
+  const children = document.createElement("div");
+  children.className = "acl-children";
+  children.hidden = true;
+  let loaded = false;
+  toggle.addEventListener("click", async () => {
+    if (!children.hidden) {
+      children.hidden = true;
+      toggle.textContent = "▸";
+      return;
+    }
+    toggle.disabled = true;
+    try {
+      if (!loaded) {
+        const data = await api(`/api/admin/directories?${new URLSearchParams({ path })}`);
+        children.replaceChildren();
+        for (const item of data.entries) {
+          const childPath = [path, item.name].filter(Boolean).join("/");
+          children.append(aclNode(childPath, item.name));
+        }
+        if (data.truncated) {
+          const note = document.createElement("p");
+          note.textContent = "Liste limitée à 5 000 éléments. Réduisez le nombre de dossiers.";
+          children.append(note);
+        }
+        loaded = true;
+      }
+      children.hidden = false;
+      toggle.textContent = "▾";
+      refreshAclChecks();
+    } catch (error) {
+      $("acl-feedback").textContent = error.message;
+    } finally {
+      toggle.disabled = false;
+    }
+  });
+  block.append(row, children);
+  return block;
+}
+function renderAclTree() {
+  $("acl-tree").replaceChildren();
+  if (!aclSelectedKey) return;
+  $("acl-tree").append(aclNode("", "Serveur / srv"));
+  refreshAclChecks();
+  // Open only the first level, keeping deep trees responsive even with thousands of folders.
+  $("acl-tree").querySelector(".acl-expand").click();
+}
+$("acl-save").addEventListener("click", async () => {
+  if (!aclSelectedKey) return;
+  const button = $("acl-save");
+  button.disabled = true;
+  try {
+    const payload = {
+      key: aclSelectedKey,
+      revision: aclRevision,
+      rules: [...aclRules.values()],
+    };
+    const result = await api("/api/admin/access", {
+      method: "POST",
+      body: JSON.stringify(payload),
+    });
+    aclRevision = result.revision;
+    aclGrants[aclSelectedKey] = result.rules;
+    $("acl-feedback").textContent = "Autorisations enregistrées. Application immédiate.";
+  } catch (error) {
+    $("acl-feedback").textContent = error.message;
+  } finally {
+    button.disabled = false;
+  }
+});
+
 window.addEventListener("hashchange", () => {
   if (!$("explorer").hidden) {
     try {
