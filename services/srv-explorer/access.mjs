@@ -1,21 +1,23 @@
 import { randomUUID } from "node:crypto";
-import { open, readFile, rename, unlink } from "node:fs/promises";
-import { dirname } from "node:path";
+import { constants } from "node:fs";
+import { open, rename, unlink } from "node:fs/promises";
 import { HttpError, segments } from "./files.mjs";
 
-// ACL state stays outside /srv, so it cannot be browsed or uploaded via the explorer.
-const emptyState = () => ({ format: 1, revision: 0, ownerKey: null, users: {}, grants: {} });
+// The ACL file must be on a dedicated persistent mount OUTSIDE the explorer's /srv tree.
+const emptyState = () => ({ format: 1, revision: 0, users: {}, grants: {} });
 const queues = new Map();
 
 export function accountKey(user) {
   if (
     !["agencement", "concept"].includes(user?.source) ||
-    typeof user?.id !== "string" ||
+    typeof user.id !== "string" ||
     !/^[A-Za-z0-9._:-]{1,160}$/.test(user.id)
-  ) {
-    throw new HttpError(503, "Identité utilisateur invalide.");
-  }
+  ) throw new HttpError(503, "Identité utilisateur invalide.");
   return `${user.source}:${user.id}`;
+}
+
+export function owner(config, user) {
+  return !!config.ownerId && config.ownerSource === user.source && config.ownerId === user.id;
 }
 
 export function validateRules(input) {
@@ -61,7 +63,7 @@ export function canWrite(rules, path) {
   return result.read && result.write;
 }
 
-// A user can reach an allowed nested folder without seeing siblings or parent files.
+// Let users traverse ancestors of explicitly allowed subfolders, never sibling data.
 export function canBrowse(rules, path) {
   const value = segments(path).join("/");
   if (canRead(rules, value)) return true;
@@ -80,8 +82,7 @@ function validState(state) {
     !state || state.format !== 1 || !Number.isSafeInteger(state.revision) ||
     state.revision < 0 || !state.users || Array.isArray(state.users) ||
     typeof state.users !== "object" || !state.grants ||
-    Array.isArray(state.grants) || typeof state.grants !== "object" ||
-    (state.ownerKey !== null && typeof state.ownerKey !== "string")
+    Array.isArray(state.grants) || typeof state.grants !== "object"
   ) throw new Error("Invalid ACL state");
   for (const [key, user] of Object.entries(state.users)) {
     if (
@@ -100,13 +101,17 @@ function validState(state) {
 }
 
 export async function readAccess(file) {
+  let handle;
   try {
-    const content = await readFile(file, "utf8");
-    if (content.length > 1048576) throw new Error("ACL too large");
-    return validState(JSON.parse(content));
+    handle = await open(file, constants.O_RDONLY | constants.O_NOFOLLOW);
+    const stats = await handle.stat();
+    if (stats.size > 1048576) throw new Error("ACL too large");
+    return validState(JSON.parse(await handle.readFile("utf8")));
   } catch (error) {
     if (error.code === "ENOENT") return emptyState();
     throw new HttpError(503, "Les autorisations sont momentanément indisponibles.");
+  } finally {
+    await handle?.close().catch(() => {});
   }
 }
 
@@ -144,41 +149,27 @@ function mutateAccess(file, action) {
   return next;
 }
 
-export async function registerIdentity(file, user, ownerSource, ownerUsername) {
+export async function registerIdentity(file, user) {
   const key = accountKey(user);
   return mutateAccess(file, async (state) => {
     const previous = state.users[key];
-    let changed = false;
     if (
-      !previous || previous.username !== user.username ||
-      previous.displayName !== user.displayName
-    ) {
-      state.users[key] = {
-        id: user.id, source: user.source, username: user.username, displayName: user.displayName,
-      };
-      changed = true;
-    }
-    // Bind the administrator to an immutable account ID on their first verified login.
-    if (
-      !state.ownerKey && user.source === ownerSource &&
-      user.username.toLowerCase() === ownerUsername.toLowerCase()
-    ) {
-      state.ownerKey = key;
-      changed = true;
-    }
-    return { changed, value: { owner: state.ownerKey === key } };
+      previous && previous.username === user.username &&
+      previous.displayName === user.displayName
+    ) return { changed: false, value: undefined };
+    state.users[key] = {
+      id: user.id, source: user.source,
+      username: user.username, displayName: user.displayName,
+    };
+    return { changed: true, value: undefined };
   });
-}
-
-export function isOwner(state, user) {
-  return !!state.ownerKey && state.ownerKey === accountKey(user);
 }
 
 export async function replaceRules(file, key, revision, input) {
   const rules = validateRules(input);
   return mutateAccess(file, async (state) => {
-    if (!state.users[key] || key === state.ownerKey)
-      throw new HttpError(400, "Compte invalide ou protégé.");
+    if (!state.users[key])
+      throw new HttpError(400, "Compte inconnu.");
     if (!Number.isSafeInteger(revision) || state.revision !== revision)
       throw new HttpError(409, "Les autorisations ont changé. Actualisez avant d'enregistrer.");
     state.grants[key] = rules;
