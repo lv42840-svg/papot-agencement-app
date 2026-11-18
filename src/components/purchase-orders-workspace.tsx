@@ -9,9 +9,10 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import type {
   PurchaseOrderInput,
   PurchaseOrderLine,
+  PurchaseOrder,
   PurchaseOrdersPayload,
 } from "@/lib/purchases/domain";
-import { purchaseAllocationFromSelection, purchaseDestinationKey } from "@/lib/purchases/domain";
+import { purchaseAllocationFromSelection, purchaseDestinationKey, purchaseOrderAllocations } from "@/lib/purchases/domain";
 
 type Site = {
   id: string;
@@ -181,7 +182,29 @@ export function PurchaseOrdersWorkspace({ chantierId }: { chantierId?: string })
       : null;
   const preview = mode === "QUICK" ? quickTotal : detailedTotal;
   const all = snapshot?.payload.orders ?? [];
+  const clientByChantier = new Map(allSites.map((site) => [site.id, site.clientName]));
+  const orderClients = (order: PurchaseOrder) =>
+    [...new Set(
+      purchaseOrderAllocations(order)
+        .map((row) => clientByChantier.get(row.chantierId ?? ""))
+        .filter((name): name is string => Boolean(name?.trim())),
+    )];
+  const orderClientNames = [...new Set(all.flatMap(orderClients))].sort((a, b) =>
+    a.localeCompare(b, "fr-FR"),
+  );
+  const filteredOrderClients = orderClientNames.filter((name) =>
+    name.toLocaleLowerCase("fr-FR").includes(clientFilterSearch.trim().toLocaleLowerCase("fr-FR")),
+  );
+  const filteredOrderSuppliers = suppliers.filter((name) =>
+    name.toLocaleLowerCase("fr-FR").includes(supplierFilterSearch.trim().toLocaleLowerCase("fr-FR")),
+  );
   const visible = all
+    .filter(
+      (order) =>
+        (supplierFilterNames.length === 0 || supplierFilterNames.includes(order.supplierName)) &&
+        (clientFilterNames.length === 0 ||
+          orderClients(order).some((client) => clientFilterNames.includes(client))),
+    )
     .filter(
       (order) =>
         siteFilter === "ALL" ||
@@ -932,6 +955,55 @@ export function PurchaseOrdersWorkspace({ chantierId }: { chantierId?: string })
                 Actualiser
               </button>
             </div>
+            <details>
+              <summary style={{ cursor: "pointer", fontWeight: 600 }}>
+                Filtres clients et fournisseurs
+                {clientFilterNames.length + supplierFilterNames.length > 0
+                  ? ` (${clientFilterNames.length + supplierFilterNames.length} cochés)`
+                  : ""}
+              </summary>
+              <div
+                style={{
+                  display: "grid",
+                  gridTemplateColumns: "repeat(auto-fit, minmax(260px, 1fr))",
+                  gap: 14,
+                  marginTop: 12,
+                }}
+              >
+                <div style={{ display: "grid", gap: 6, alignContent: "start" }}>
+                  <strong>Clients des commandes</strong>
+                  <input
+                    type="search"
+                    aria-label="Filtrer les clients des commandes"
+                    placeholder="Tape le nom du client…"
+                    value={clientFilterSearch}
+                    onChange={(event) => setClientFilterSearch(event.target.value)}
+                  />
+                  <CheckboxChoiceList
+                    label="Clients des commandes"
+                    options={filteredOrderClients.map((name) => ({ id: name, label: name }))}
+                    selectedIds={clientFilterNames}
+                    onChange={setClientFilterNames}
+                  />
+                </div>
+                <div style={{ display: "grid", gap: 6, alignContent: "start" }}>
+                  <strong>Fournisseurs des commandes</strong>
+                  <input
+                    type="search"
+                    aria-label="Filtrer les fournisseurs des commandes"
+                    placeholder="Tape le nom du fournisseur…"
+                    value={supplierFilterSearch}
+                    onChange={(event) => setSupplierFilterSearch(event.target.value)}
+                  />
+                  <CheckboxChoiceList
+                    label="Fournisseurs des commandes"
+                    options={filteredOrderSuppliers.map((name) => ({ id: name, label: name }))}
+                    selectedIds={supplierFilterNames}
+                    onChange={setSupplierFilterNames}
+                  />
+                </div>
+              </div>
+            </details>
             <div style={{ overflowX: "auto" }}>
               <table style={{ width: "100%", minWidth: 920, borderCollapse: "collapse" }}>
                 <thead>
