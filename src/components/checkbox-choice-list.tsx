@@ -1,5 +1,11 @@
 "use client";
 
+import {
+  toggleCheckboxChoice,
+  checkVisibleChoices,
+  uncheckVisibleChoices,
+} from "@/lib/ui/checkbox-selection";
+
 export type CheckboxChoice = { id: string; label: string };
 
 /** Un clic par choix, sans Ctrl. Les éléments masqués par un filtre restent sélectionnés. */
@@ -26,15 +32,7 @@ export function CheckboxChoiceList({
   const chosen = new Set(selectedIds);
 
   function toggle(id: string, checked: boolean) {
-    if (!multiple) {
-      onChange(checked ? [id] : []);
-      return;
-    }
-    onChange(
-      checked
-        ? [...new Set([...selectedIds, id])]
-        : selectedIds.filter((selected) => selected !== id),
-    );
+    onChange(toggleCheckboxChoice(selectedIds, id, checked, multiple));
   }
 
   return (
@@ -87,7 +85,7 @@ export function CheckboxChoiceList({
             type="button"
             className="secondaryButton"
             disabled={disabled || options.length === 0 || options.every((option) => chosen.has(option.id))}
-            onClick={() => onChange([...new Set([...selectedIds, ...visibleIds])])}
+            onClick={() => onChange(checkVisibleChoices(selectedIds, [...visibleIds]))}
           >
             Tout cocher (résultats visibles)
           </button>
@@ -95,7 +93,7 @@ export function CheckboxChoiceList({
             type="button"
             className="secondaryButton"
             disabled={disabled || !options.some((option) => chosen.has(option.id))}
-            onClick={() => onChange(selectedIds.filter((id) => !visibleIds.has(id)))}
+            onClick={() => onChange(uncheckVisibleChoices(selectedIds, [...visibleIds]))}
           >
             Tout décocher (résultats visibles)
           </button>
