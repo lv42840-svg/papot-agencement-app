@@ -51,6 +51,38 @@ par défaut, y compris pour les documents accessibles par URL directe.
    sauvegarde vérifiée. Sinon, le service refusera de démarrer, ce qui évite
    une configuration par défaut trop permissive.
 
+## Sauvegarde quotidienne des paramètres
+
+La configuration `deploy/srv-explorer/.env` et le dossier d'autorisations
+`/opt/papot/srv-explorer/state` sont copiés vers Nextcloud en clair chaque jour
+à 06h15 heure française, **si le timer est installé et activé**. Cette sauvegarde
+est indépendante de la sauvegarde des documents et des bases PostgreSQL à 03h30.
+
+Les fichiers sont rangés sous
+`61_PAPOT_Production/BACKUP_VPS_PAPOT/CONFIGURATION_SRV/auto/<horodatage>/`
+avec un marqueur `complete.txt` écrit seulement après vérification.
+Le script utilise `--immutable` pour le fichier d'environnement et ne
+supprime aucune sauvegarde distante. Les sauvegardes dans `/auto` s'accumulent
+jusqu'à la mise en place d'une politique de rotation validée.
+
+### Installation (après la fusion et la préparation du VPS)
+
+```bash
+cd ~/papot-agencement-app
+sudo install -o root -g root -m 644 deploy/srv-explorer/systemd/papot-srv-config-backup.service /etc/systemd/system/
+sudo install -o root -g root -m 644 deploy/srv-explorer/systemd/papot-srv-config-backup.timer /etc/systemd/system/
+sudo systemctl daemon-reload
+sudo systemctl enable --now papot-srv-config-backup.timer
+sudo systemctl start papot-srv-config-backup.service
+sudo systemctl show papot-srv-config-backup.service -p Result -p ExecMainStatus
+sudo journalctl -u papot-srv-config-backup.service -n 20 --no-pager
+```
+
+Vérifier le statut de `papot-backup-rclone-v2.timer` séparément : ce nouveau timer
+ne le modifie pas. Le fichier `srv.env.txt` contient la clé de session SRV :
+**ne jamais partager le répertoire Nextcloud**, ni publier les URL, ni afficher
+son contenu dans les journaux.
+
 ## Fonctionnalités
 
 - Dossiers, fil d’Ariane, filtre par nom dans le dossier courant.
