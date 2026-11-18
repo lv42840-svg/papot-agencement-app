@@ -1,6 +1,7 @@
 "use client";
 
 import { useMemo, useState } from "react";
+import { CheckboxChoiceList } from "@/components/checkbox-choice-list";
 
 export type PennylaneSupplierChoice = { id: string; name: string };
 
@@ -52,21 +53,18 @@ export function PennylaneSupplierPicker({
         disabled={disabled}
         onChange={(event) => setSearch(event.target.value)}
       />
-      <select
-        aria-label={label}
-        size={Math.min(7, Math.max(3, visibleSuppliers.length + 1))}
-        value={selectedId}
+      <CheckboxChoiceList
+        label={label}
+        options={visibleSuppliers.map((supplier) => ({
+          id: supplier.id,
+          label: supplier.name,
+        }))}
+        selectedIds={selectedId ? [selectedId] : []}
+        onChange={(ids) => onChange(ids[0] ?? "")}
         disabled={disabled}
-        onChange={(event) => onChange(event.target.value)}
-        style={{ width: "100%" }}
-      >
-        <option value="">Choisir un fournisseur…</option>
-        {visibleSuppliers.map((supplier) => (
-          <option key={supplier.id} value={supplier.id}>
-            {supplier.name}
-          </option>
-        ))}
-      </select>
+        multiple={false}
+        emptyMessage="Aucun fournisseur trouvé. Efface ou modifie la recherche."
+      />
       {selectedSupplier ? (
         <div
           role="status"

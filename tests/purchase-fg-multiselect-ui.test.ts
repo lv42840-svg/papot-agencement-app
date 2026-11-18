@@ -4,14 +4,16 @@ import { describe, expect, it } from "vitest";
 const source = (path: string) => readFileSync(path, "utf8");
 
 describe("retours Achats : recherche de chantiers et affectation fournisseur FG", () => {
-  it("remplace les dizaines de cases chantiers par la multi-sélection filtrée des Heures", () => {
+  it("utilise des cases cochées pour les destinations BC avec le filtre par nom", () => {
     const picker = source("src/components/purchase-destination-multi-picker.tsx");
     const creation = source("src/components/purchase-orders-workspace.tsx");
     const edition = source("src/components/purchase-order-edit-workspace.tsx");
-    expect(picker).toContain("multiple");
-    expect(picker).toContain("selectedOptions");
-    expect(picker).toContain("selectedIds.filter");
-    expect(picker).toContain("Ctrl ou Maj");
+    expect(picker).toContain("<CheckboxChoiceList");
+    expect(picker).toContain("selectedIds={selectedIds}");
+    expect(picker).toContain("options={options}");
+    expect(picker).not.toContain("selectedOptions");
+    expect(picker).not.toContain("Ctrl ou Maj");
+    expect(creation).toContain('aria-label="Filtrer les destinations du BC"');
     expect(creation).toContain("<PurchaseDestinationMultiPicker");
     expect(edition).toContain("<PurchaseDestinationMultiPicker");
     expect(creation).not.toContain("aria-label={`Ajouter ${item.label}`}");

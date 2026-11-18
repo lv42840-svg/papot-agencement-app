@@ -2,15 +2,21 @@
 
 import Link from "next/link";
 import { PennylaneSupplierPicker } from "@/components/pennylane-supplier-picker";
+import { CheckboxChoiceList } from "@/components/checkbox-choice-list";
 import { PurchaseDestinationMultiPicker } from "@/components/purchase-destination-multi-picker";
 import { evaluateNumericExpression, numericExpressionInput } from "@/lib/numeric-expression";
 import { useEffect, useMemo, useRef, useState } from "react";
 import type {
   PurchaseOrderInput,
   PurchaseOrderLine,
+  PurchaseOrder,
   PurchaseOrdersPayload,
 } from "@/lib/purchases/domain";
-import { purchaseAllocationFromSelection, purchaseDestinationKey } from "@/lib/purchases/domain";
+import {
+  purchaseAllocationFromSelection,
+  purchaseDestinationKey,
+  purchaseOrderAllocations,
+} from "@/lib/purchases/domain";
 
 type Site = {
   id: string;
@@ -91,6 +97,10 @@ export function PurchaseOrdersWorkspace({ chantierId }: { chantierId?: string })
   const [supplierPennylaneId, setSupplierPennylaneId] = useState("");
   const [preferencesOpen, setPreferencesOpen] = useState(false);
   const [preferenceSearch, setPreferenceSearch] = useState("");
+  const [clientFilterSearch, setClientFilterSearch] = useState("");
+  const [supplierFilterSearch, setSupplierFilterSearch] = useState("");
+  const [clientFilterNames, setClientFilterNames] = useState<string[]>([]);
+  const [supplierFilterNames, setSupplierFilterNames] = useState<string[]>([]);
   const [preferenceDraft, setPreferenceDraft] = useState<string[]>([]);
   const [mode, setMode] = useState<"QUICK" | "DETAILED">("QUICK");
   const [description, setDescription] = useState("");
@@ -176,7 +186,32 @@ export function PurchaseOrdersWorkspace({ chantierId }: { chantierId?: string })
       : null;
   const preview = mode === "QUICK" ? quickTotal : detailedTotal;
   const all = snapshot?.payload.orders ?? [];
+  const clientByChantier = new Map(allSites.map((site) => [site.id, site.clientName]));
+  const orderClients = (order: PurchaseOrder) => [
+    ...new Set(
+      purchaseOrderAllocations(order)
+        .map((row) => clientByChantier.get(row.chantierId ?? ""))
+        .filter((name): name is string => Boolean(name?.trim())),
+    ),
+  ];
+  const orderClientNames = [...new Set(all.flatMap(orderClients))].sort((a, b) =>
+    a.localeCompare(b, "fr-FR"),
+  );
+  const filteredOrderClients = orderClientNames.filter((name) =>
+    name.toLocaleLowerCase("fr-FR").includes(clientFilterSearch.trim().toLocaleLowerCase("fr-FR")),
+  );
+  const filteredOrderSuppliers = suppliers.filter((name) =>
+    name
+      .toLocaleLowerCase("fr-FR")
+      .includes(supplierFilterSearch.trim().toLocaleLowerCase("fr-FR")),
+  );
   const visible = all
+    .filter(
+      (order) =>
+        (supplierFilterNames.length === 0 || supplierFilterNames.includes(order.supplierName)) &&
+        (clientFilterNames.length === 0 ||
+          orderClients(order).some((client) => clientFilterNames.includes(client))),
+    )
     .filter(
       (order) =>
         siteFilter === "ALL" ||
@@ -461,60 +496,14 @@ export function PurchaseOrdersWorkspace({ chantierId }: { chantierId?: string })
               onChange={(event) => setPreferenceSearch(event.target.value)}
             />
           </label>
-          <label style={{ display: "grid", gap: 5 }}>
-            Fournisseurs à affecter (sélection multiple)
-            <select
-              multiple
-              size={Math.min(8, Math.max(3, filteredPreferenceSuppliers.length))}
-              aria-label="Fournisseurs affectés par défaut aux frais généraux"
-              value={preferenceDraft}
-              disabled={busy || !snapshot.canWrite}
-              onChange={(event) => {
-                const visible = new Set(filteredPreferenceSuppliers.map((item) => item.id));
-                const selected = Array.from(
-                  event.currentTarget.selectedOptions,
-                  (option) => option.value,
-                );
-                setPreferenceDraft((old) => [
-                  ...new Set([...old.filter((id) => !visible.has(id)), ...selected]),
-                ]);
-              }}
-            >
-              {filteredPreferenceSuppliers.map((item) => (
-                <option key={item.id} value={item.id}>
-                  {item.name}
-                </option>
-              ))}
-            </select>
-          </label>
-          <small>
-            {preferenceDraft.length} fournisseur(s) sélectionné(s). Ctrl/Maj pour en choisir
-            plusieurs. Les fournisseurs hors du filtre restent sélectionnés.
-          </small>
+          <CheckboxChoiceList
+            label="Fournisseurs affectés par défaut aux frais généraux"
+            options={filteredPreferenceSuppliers.map((item) => ({ id: item.id, label: item.name }))}
+            selectedIds={preferenceDraft}
+            onChange={setPreferenceDraft}
+            disabled={busy || !snapshot.canWrite}
+          />
           <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
-            <button
-              type="button"
-              className="secondaryButton"
-              disabled={busy || !snapshot.canWrite || !preferenceSearch.trim()}
-              onClick={() =>
-                setPreferenceDraft((old) => [
-                  ...new Set([...old, ...filteredPreferenceSuppliers.map((item) => item.id)]),
-                ])
-              }
-            >
-              Ajouter les fournisseurs filtrés
-            </button>
-            <button
-              type="button"
-              className="secondaryButton"
-              disabled={busy || !snapshot.canWrite}
-              onClick={() => {
-                const visible = new Set(filteredPreferenceSuppliers.map((item) => item.id));
-                setPreferenceDraft((old) => old.filter((id) => !visible.has(id)));
-              }}
-            >
-              Retirer ceux du filtre
-            </button>
             <button
               type="button"
               className="primaryButton"
@@ -550,8 +539,8 @@ export function PurchaseOrdersWorkspace({ chantierId }: { chantierId?: string })
               }}
             >
               {mode === "DETAILED" ? (
-                <label style={{ display: "grid", gap: 5 }}>
-                  Chantier *
+                <div style={{ display: "grid", gap: 5 }}>
+                  <strong>Chantier / client *</strong>
                   <input
                     type="search"
                     aria-label="Rechercher un chantier pour le BC détaillé"
@@ -559,28 +548,29 @@ export function PurchaseOrdersWorkspace({ chantierId }: { chantierId?: string })
                     value={siteQuery}
                     onChange={(event) => setSiteQuery(event.target.value)}
                   />
-                  <select
-                    value={selected}
-                    disabled={busy || !snapshot.canWrite}
-                    onChange={(e) => {
-                      setSiteId(e.target.value);
-                      setError("");
-                    }}
-                  >
-                    {sites.length === 0 ? <option value="">Aucun chantier actif</option> : null}
-                    {sites
+                  <CheckboxChoiceList
+                    label="Chantier du BC détaillé (choix unique)"
+                    options={sites
                       .filter(
                         (site) =>
                           matchingSites.some((match) => match.id === site.id) ||
                           site.id === selected,
                       )
-                      .map((site) => (
-                        <option key={site.id} value={site.id}>
-                          {site.name} · {site.clientName}
-                        </option>
-                      ))}
-                  </select>
-                </label>
+                      .map((site) => ({
+                        id: site.id,
+                        label: [site.reference, site.name, site.clientName]
+                          .filter(Boolean)
+                          .join(" · "),
+                      }))}
+                    selectedIds={selected ? [selected] : []}
+                    multiple={false}
+                    disabled={busy || !snapshot.canWrite}
+                    onChange={(ids) => {
+                      setSiteId(ids[0] ?? selected);
+                      setError("");
+                    }}
+                  />
+                </div>
               ) : null}
               <div style={{ display: "grid", gap: 5 }}>
                 <strong>Fournisseur *</strong>
@@ -973,6 +963,55 @@ export function PurchaseOrdersWorkspace({ chantierId }: { chantierId?: string })
                 Actualiser
               </button>
             </div>
+            <details>
+              <summary style={{ cursor: "pointer", fontWeight: 600 }}>
+                Filtres clients et fournisseurs
+                {clientFilterNames.length + supplierFilterNames.length > 0
+                  ? ` (${clientFilterNames.length + supplierFilterNames.length} cochés)`
+                  : ""}
+              </summary>
+              <div
+                style={{
+                  display: "grid",
+                  gridTemplateColumns: "repeat(auto-fit, minmax(260px, 1fr))",
+                  gap: 14,
+                  marginTop: 12,
+                }}
+              >
+                <div style={{ display: "grid", gap: 6, alignContent: "start" }}>
+                  <strong>Clients des commandes</strong>
+                  <input
+                    type="search"
+                    aria-label="Filtrer les clients des commandes"
+                    placeholder="Tape le nom du client…"
+                    value={clientFilterSearch}
+                    onChange={(event) => setClientFilterSearch(event.target.value)}
+                  />
+                  <CheckboxChoiceList
+                    label="Clients des commandes"
+                    options={filteredOrderClients.map((name) => ({ id: name, label: name }))}
+                    selectedIds={clientFilterNames}
+                    onChange={setClientFilterNames}
+                  />
+                </div>
+                <div style={{ display: "grid", gap: 6, alignContent: "start" }}>
+                  <strong>Fournisseurs des commandes</strong>
+                  <input
+                    type="search"
+                    aria-label="Filtrer les fournisseurs des commandes"
+                    placeholder="Tape le nom du fournisseur…"
+                    value={supplierFilterSearch}
+                    onChange={(event) => setSupplierFilterSearch(event.target.value)}
+                  />
+                  <CheckboxChoiceList
+                    label="Fournisseurs des commandes"
+                    options={filteredOrderSuppliers.map((name) => ({ id: name, label: name }))}
+                    selectedIds={supplierFilterNames}
+                    onChange={setSupplierFilterNames}
+                  />
+                </div>
+              </div>
+            </details>
             <div style={{ overflowX: "auto" }}>
               <table style={{ width: "100%", minWidth: 920, borderCollapse: "collapse" }}>
                 <thead>
