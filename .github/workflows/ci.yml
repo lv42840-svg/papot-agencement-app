@@ -17,6 +17,7 @@ jobs:
       - run: npm ci
       - run: npm run lint
       - run: npm run typecheck
+      - run: sh -n deploy/agencement-web/install-pennylane-sync.sh
       - run: npm test
       - run: npm run build
       - run: npm run format:check
