@@ -244,3 +244,10 @@ export function invoiceWorkflowState(
   }
   return state.draft ? "DRAFT" : "TO_ALLOCATE";
 }
+
+/** Validation d'affectation PAPOT, indépendante de la validation comptable Pennylane. */
+export function invoiceNeedsPapotValidation(
+  workflow: ReturnType<typeof invoiceWorkflowState>,
+): boolean {
+  return workflow === "TO_ALLOCATE" || workflow === "DRAFT" || workflow === "REVALIDATION";
+}
