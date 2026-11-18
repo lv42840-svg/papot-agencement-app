@@ -87,6 +87,8 @@ export function PurchaseInvoicesWorkspace({
   const [orderTo, setOrderTo] = useState("");
   const [notice, setNotice] = useState("");
   const [error, setError] = useState("");
+  const [duplicateReason, setDuplicateReason] = useState("");
+  const [duplicateConfirmed, setDuplicateConfirmed] = useState(false);
 
   async function load() {
     const response = await fetch("/api/desktop/purchase-invoices", { cache: "no-store" });
@@ -127,6 +129,8 @@ export function PurchaseInvoicesWorkspace({
   useEffect(() => {
     const current = selected?.state?.draft ?? selected?.state?.approved?.draft ?? emptyDraft();
     setDraft(asGlobalDraft(current));
+    setDuplicateReason("");
+    setDuplicateConfirmed(false);
   }, [selected?.id, selected?.state?.version]);
 
   const visibleProposedOrders = (selected?.proposedOrders ?? []).filter((order) => {
@@ -241,6 +245,9 @@ export function PurchaseInvoicesWorkspace({
               expectedVersion: selected?.state?.version ?? 0,
               expectedRevision: selected?.sourceRevision,
               draft,
+              ...(action === "VALIDATE" && selected?.duplicateIds.length && duplicateConfirmed
+                ? { duplicateOverrideReason: duplicateReason.trim() }
+                : {}),
             };
       const response = await fetch("/api/desktop/purchase-invoices", {
         method: "POST",
@@ -517,10 +524,36 @@ export function PurchaseInvoicesWorkspace({
                   </p>
                 ) : null}
                 {selected.duplicateIds.length ? (
-                  <p style={{ color: "#a43a26" }}>
-                    Doublon potentiel avec la facture {selected.duplicateIds.join(", ")}. La
-                    validation est bloquée jusqu&apos;à résolution.
-                  </p>
+                  <div style={{ color: "#a43a26", display: "grid", gap: 10 }}>
+                    <p>
+                      Même fournisseur et même numéro de facture que :{" "}
+                      {selected.duplicateIds.join(", ")}. Vérifie les PDF avant validation :
+                      il peut s&apos;agir d&apos;une véritable facture en double.
+                    </p>
+                    <label style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                      <input
+                        type="checkbox"
+                        checked={duplicateConfirmed}
+                        disabled={busy || !canEditSelected}
+                        onChange={(event) => setDuplicateConfirmed(event.target.checked)}
+                      />
+                      J&apos;ai comparé les factures : ce sont des achats distincts.
+                    </label>
+                    {duplicateConfirmed ? (
+                      <label style={{ display: "grid", gap: 4 }}>
+                        Motif obligatoire de l&apos;exception (15 caractères minimum)
+                        <textarea
+                          aria-label="Justification de facture avec numéro en doublon"
+                          value={duplicateReason}
+                          maxLength={1000}
+                          rows={3}
+                          disabled={busy || !canEditSelected}
+                          onChange={(event) => setDuplicateReason(event.target.value)}
+                          placeholder="Ex. Même référence imprimée, mais livraison du 3 novembre distincte"
+                        />
+                      </label>
+                    ) : null}
+                  </div>
                 ) : null}
                 {selected.hasPdf && selected.availableInPennylane ? (
                   <>
@@ -961,6 +994,9 @@ export function PurchaseInvoicesWorkspace({
                         <li key={event.version + "-" + index}>
                           {new Date(event.at).toLocaleString("fr-FR")} · {event.actor} ·
                           {event.action === "VALIDATE" ? " Validation" : " Brouillon"}
+                          {event.duplicateOverrideReason ? (
+                            <small> · Exception doublon : {event.duplicateOverrideReason}</small>
+                          ) : null}
                         </li>
                       ))}
                     </ul>
@@ -985,7 +1021,11 @@ export function PurchaseInvoicesWorkspace({
                     type="button"
                     className="primaryButton"
                     disabled={
-                      busy || !canEditSelected || !complete || selected.duplicateIds.length > 0
+                      busy ||
+                      !canEditSelected ||
+                      !complete ||
+                      (selected.duplicateIds.length > 0 &&
+                        (!duplicateConfirmed || duplicateReason.trim().length < 15))
                     }
                     onClick={() => void mutate("VALIDATE")}
                   >
