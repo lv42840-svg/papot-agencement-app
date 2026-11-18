@@ -32,13 +32,16 @@ function failure(error: unknown) {
     "PENNYLANE_CURSOR_INVALID",
     "PENNYLANE_PAGE_LIMIT",
     "PENNYLANE_RECORD_LIMIT",
+    "PENNYLANE_SYNC_IN_PROGRESS",
     "PENNYLANE_ITEM_ID_INVALID",
     "PENNYLANE_HTTP_ERROR",
   ];
   const safeCode = allowed.includes(code) ? code : "PENNYLANE_SYNC_FAILED";
   const status =
     desktopRequestErrorStatus(safeCode) ??
-    (safeCode === "PENNYLANE_DISABLED" || safeCode === "PENNYLANE_NOT_CONFIGURED"
+    (safeCode === "PENNYLANE_SYNC_IN_PROGRESS"
+      ? 409
+      : safeCode === "PENNYLANE_DISABLED" || safeCode === "PENNYLANE_NOT_CONFIGURED"
       ? 503
       : safeCode === "PENNYLANE_SCOPE_FORBIDDEN"
         ? 424
