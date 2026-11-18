@@ -54,7 +54,7 @@ par défaut, y compris pour les documents accessibles par URL directe.
 ## Sauvegarde quotidienne des paramètres
 
 La configuration `deploy/srv-explorer/.env` et le dossier d'autorisations
-`/opt/papot/srv-explorer/state` sont copiés vers Nextcloud en clair chaque jour
+`/opt/papot/srv-explorer/state` sont copiés vers stockage distant en clair chaque jour
 à 06h15 heure française, **si le timer est installé et activé**. Cette sauvegarde
 est indépendante de la sauvegarde des documents et des bases PostgreSQL à 03h30.
 
@@ -80,7 +80,7 @@ sudo journalctl -u papot-srv-config-backup.service -n 20 --no-pager
 
 Vérifier le statut de `papot-backup-rclone-v2.timer` séparément : ce nouveau timer
 ne le modifie pas. Le fichier `srv.env.txt` contient la clé de session SRV :
-**ne jamais partager le répertoire Nextcloud**, ni publier les URL, ni afficher
+**ne jamais partager le répertoire stockage distant**, ni publier les URL, ni afficher
 son contenu dans les journaux.
 
 ## Fonctionnalités
