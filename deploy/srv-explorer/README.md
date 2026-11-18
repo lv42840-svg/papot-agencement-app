@@ -1,8 +1,54 @@
 # Explorateur partagé PAPOT
 
-Explorateur dédié à `https://srv.papot.app`, pour tous les utilisateurs actifs
-d’Agencement et de Concept. Le choix de l’application sert uniquement à vérifier
-les identifiants ; tous les comptes voient la même racine `/srv`.
+Explorateur dédié à `https://srv.papot.app` pour les comptes des deux
+applications. L'administrateur de PAPOT SRV choisit les droits de chaque compte
+par dossier et sous-dossier dans l'onglet **Paramètres**. Les droits sont refusés
+par défaut, y compris pour les documents accessibles par URL directe.
+
+## Accès et administration
+
+- **Administrateur unique** : une identité précise `SRV_ADMIN_SOURCE` +
+  `SRV_ADMIN_USER_ID` (ID immuable délivré par l'application d'origine).
+  L'onglet Paramètres n'existe que pour cette identité. Le serveur vérifie
+  aussi ce droit pour chaque API d'administration.
+- **Comptes** : l'onglet liste les utilisateurs qui se sont déjà connectés
+  à SRV. Un collaborateur doit se connecter une première fois pour apparaître
+  dans la sélection. Il ne voit rien avant l'attribution de droits.
+- **Droits** : Lecture pour parcourir/voir/télécharger, Dépôt pour créer un dossier
+  ou ajouter un fichier. Le sous-dossier hérite du parent sauf règle explicite
+  plus précise ; le refus est également possible. On peut n'autoriser qu'un
+  sous-dossier au sein d'une arborescence refusée.
+- Chaque appel d'API liste, télécharge, prévisualise ou dépose avec les droits
+  en vigueur. La révocation d'un droit bloque les requêtes suivantes.
+- **Persistance** : `/opt/papot/srv-explorer/state` (monté en `/state`) ne
+  réside pas dans `/srv` ; il n'est pas exposé par l'explorateur. À intégrer
+  aux sauvegardes du VPS ainsi que l'environnement Docker, de façon protégée.
+- Pas de chmod/chown récursif des répertoires de travail. Les permissions
+  Linux continuent à s'appliquer indépendamment des règles de SRV.
+- Un seul processus SRV doit écrire ce fichier ; pas de réplication concurrente.
+
+### Prérequis AVANT le premier déploiement avec les droits par dossier
+
+1. Relever **sans communiquer d'identifiants ni de cookies** l'ID du compte
+   administrateur choisi (via une réponse authentifiée `/api/auth/identity`
+   de son application). Ne pas prendre le nom affiché pour un identifiant stable.
+2. Dans `deploy/srv-explorer/.env`, conserver la clé de session existante
+   et ajouter `SRV_ADMIN_SOURCE=agencement` (ou `concept`) et
+   `SRV_ADMIN_USER_ID=<id exact>`. Ne jamais partager `.env`.
+3. Préparer le dossier de règles, sans toucher aux permissions existantes :
+
+   ```bash
+   sudo install -d -o 1000 -g 1000 -m 700 /opt/papot/srv-explorer/state
+   ```
+
+   Si `SRV_UID`/`SRV_GID` diffèrent de 1000, utiliser ces valeurs et
+   vérifier que le dossier est accessible en écriture depuis le conteneur.
+4. Sauvegarder également ce nouveau dossier de règles hors du VPS,
+   avec les volumes existants. Avant la bascule, conserver un rollback
+   `Dockerfile`/compose/image et tester les accès avec des comptes non-admin.
+5. Ne déployer le nouveau conteneur **qu'après** la préparation et une
+   sauvegarde vérifiée. Sinon, le service refusera de démarrer, ce qui évite
+   une configuration par défaut trop permissive.
 
 ## Fonctionnalités
 
@@ -77,9 +123,11 @@ habituels dans l’explorateur.
 
 L’explorateur respecte les permissions Linux de son utilisateur. Les fichiers et
 dossiers masqués (noms commençant par un point, dont `.env` et `.ssh`) et les liens
-symboliques ne sont pas exposés. Les fichiers réguliers non masqués lisibles sous
-`/srv` sont accessibles à **tous** les comptes des deux applications ; déplacer
-les sauvegardes sensibles hors de cet espace partagé si elles s’y trouvent.
+symboliques ne sont pas exposés. Les fichiers réguliers non masqués dans `/srv` sont exposés **seulement aux
+comptes explicitement autorisés** par les règles de SRV. Les chemins directs
+sont aussi soumis au contrôle. En revanche, le processus SRV possède toujours
+des permissions Linux étendues : ses ACL applicatives ne remplacent pas une
+isolation des volumes ou un contrôle indépendant des données confidentielles.
 Les traversées de dossiers utilisent des descripteurs Linux et `O_NOFOLLOW` pour
 empêcher les échappements par liens et les courses au changement de chemin.
 Les dépôts sont publiés atomiquement sans écrasement, après transfert complet.
