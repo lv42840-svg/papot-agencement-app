@@ -20,10 +20,7 @@ if [[ ! -e deploy/srv-explorer/.env ]]; then
 fi
 
 # Require explicit owner configuration and persistent ACL storage before any rebuild.
-if ! grep -Eq '^SRV_ADMIN_USER_ID=[A-Za-z0-9._:-]{1,160}
-docker compose -f deploy/srv-explorer/docker-compose.yml up -d --build --wait
-echo "Explorateur démarré sur 127.0.0.1:3003. Configurez le DNS et Caddy selon deploy/srv-explorer/README.md."
- deploy/srv-explorer/.env; then
+if ! grep -Eq '^SRV_ADMIN_USER_ID=[A-Za-z0-9._:-]{1,160}$' deploy/srv-explorer/.env; then
   echo "Ajoutez SRV_ADMIN_USER_ID dans deploy/srv-explorer/.env avant le déploiement." >&2
   exit 1
 fi
