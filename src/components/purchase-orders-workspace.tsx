@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 import { PennylaneSupplierPicker } from "@/components/pennylane-supplier-picker";
+import { CheckboxChoiceList } from "@/components/checkbox-choice-list";
 import { PurchaseDestinationMultiPicker } from "@/components/purchase-destination-multi-picker";
 import { evaluateNumericExpression, numericExpressionInput } from "@/lib/numeric-expression";
 import { useEffect, useMemo, useRef, useState } from "react";
@@ -91,6 +92,10 @@ export function PurchaseOrdersWorkspace({ chantierId }: { chantierId?: string })
   const [supplierPennylaneId, setSupplierPennylaneId] = useState("");
   const [preferencesOpen, setPreferencesOpen] = useState(false);
   const [preferenceSearch, setPreferenceSearch] = useState("");
+  const [clientFilterSearch, setClientFilterSearch] = useState("");
+  const [supplierFilterSearch, setSupplierFilterSearch] = useState("");
+  const [clientFilterNames, setClientFilterNames] = useState<string[]>([]);
+  const [supplierFilterNames, setSupplierFilterNames] = useState<string[]>([]);
   const [preferenceDraft, setPreferenceDraft] = useState<string[]>([]);
   const [mode, setMode] = useState<"QUICK" | "DETAILED">("QUICK");
   const [description, setDescription] = useState("");
@@ -461,60 +466,14 @@ export function PurchaseOrdersWorkspace({ chantierId }: { chantierId?: string })
               onChange={(event) => setPreferenceSearch(event.target.value)}
             />
           </label>
-          <label style={{ display: "grid", gap: 5 }}>
-            Fournisseurs à affecter (sélection multiple)
-            <select
-              multiple
-              size={Math.min(8, Math.max(3, filteredPreferenceSuppliers.length))}
-              aria-label="Fournisseurs affectés par défaut aux frais généraux"
-              value={preferenceDraft}
-              disabled={busy || !snapshot.canWrite}
-              onChange={(event) => {
-                const visible = new Set(filteredPreferenceSuppliers.map((item) => item.id));
-                const selected = Array.from(
-                  event.currentTarget.selectedOptions,
-                  (option) => option.value,
-                );
-                setPreferenceDraft((old) => [
-                  ...new Set([...old.filter((id) => !visible.has(id)), ...selected]),
-                ]);
-              }}
-            >
-              {filteredPreferenceSuppliers.map((item) => (
-                <option key={item.id} value={item.id}>
-                  {item.name}
-                </option>
-              ))}
-            </select>
-          </label>
-          <small>
-            {preferenceDraft.length} fournisseur(s) sélectionné(s). Ctrl/Maj pour en choisir
-            plusieurs. Les fournisseurs hors du filtre restent sélectionnés.
-          </small>
+          <CheckboxChoiceList
+            label="Fournisseurs affectés par défaut aux frais généraux"
+            options={filteredPreferenceSuppliers.map((item) => ({ id: item.id, label: item.name }))}
+            selectedIds={preferenceDraft}
+            onChange={setPreferenceDraft}
+            disabled={busy || !snapshot.canWrite}
+          />
           <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
-            <button
-              type="button"
-              className="secondaryButton"
-              disabled={busy || !snapshot.canWrite || !preferenceSearch.trim()}
-              onClick={() =>
-                setPreferenceDraft((old) => [
-                  ...new Set([...old, ...filteredPreferenceSuppliers.map((item) => item.id)]),
-                ])
-              }
-            >
-              Ajouter les fournisseurs filtrés
-            </button>
-            <button
-              type="button"
-              className="secondaryButton"
-              disabled={busy || !snapshot.canWrite}
-              onClick={() => {
-                const visible = new Set(filteredPreferenceSuppliers.map((item) => item.id));
-                setPreferenceDraft((old) => old.filter((id) => !visible.has(id)));
-              }}
-            >
-              Retirer ceux du filtre
-            </button>
             <button
               type="button"
               className="primaryButton"
