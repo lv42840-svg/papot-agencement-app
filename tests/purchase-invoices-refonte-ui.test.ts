@@ -18,6 +18,17 @@ describe("refonte de l'onglet Factures fournisseurs", () => {
     expect(store).toContain("ORDER BY external_id DESC LIMIT 501");
   });
 
+  it("présente une vue À valider avec les factures non approuvées ou à revalider", () => {
+    const workspace = source("src/components/purchase-invoices-workspace.tsx");
+    expect(workspace).toContain('useState<"ALL" | "PENDING" | "APPROVED">');
+    expect(workspace).toContain('setInvoiceTab("PENDING")');
+    expect(workspace).toContain('aria-selected={invoiceTab === "PENDING"}');
+    expect(workspace).toContain("Factures à valider");
+    expect(workspace).toContain("invoiceNeedsPapotValidation(invoice.workflow)");
+    expect(workspace).toContain('invoiceTab === "APPROVED"');
+    expect(workspace).toContain("data.validatedInvoices");
+  });
+
   it("filtre les BC liés par date et client, et affiche la date d'émission du BC", () => {
     const workspace = source("src/components/purchase-invoices-workspace.tsx");
     const store = source("src/lib/pennylane/purchase-invoice-store.ts");
