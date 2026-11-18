@@ -16,6 +16,7 @@ import {
   calculateInvoiceAllocation,
   euroToCents,
   invoiceWorkflowState,
+  invoiceNeedsPapotValidation,
   sourceRevision,
   supplierKey,
   type InvoiceAllocationDraft,
@@ -106,6 +107,66 @@ export type PurchaseInvoiceListItem = InvoiceSource & {
     createdAt: string;
   }>;
 };
+
+export type PendingPurchaseInvoiceSummary = {
+  imported: boolean;
+  pending: number;
+  checked: number;
+  truncated: boolean;
+  lastImportedAt: string | null;
+};
+
+/**
+ * Dashboard counter: exactly the same last 500 invoices as the "À valider" tab.
+ * Does not scan purchase orders, clients or unrelated financial records.
+ */
+export async function readPendingPurchaseInvoiceSummary(
+  pool: Pool = getServerDbPool(),
+): Promise<PendingPurchaseInvoiceSummary> {
+  await runServerDbMigrations(pool);
+  const imported = await pool.query<{ synced_at: Date }>(
+    "SELECT synced_at FROM papot_pennylane_sync_state WHERE resource = 'supplier_invoices'",
+  );
+  const lastImportedAt = imported.rows[0]?.synced_at.toISOString() ?? null;
+  if (!lastImportedAt) {
+    return { imported: false, pending: 0, checked: 0, truncated: false, lastImportedAt: null };
+  }
+  const rows = await pool.query<
+    InvoiceRow & {
+      draft: InvoiceAllocationDraft | null;
+      approved: ApprovedInvoiceAllocation | null;
+    }
+  >(`
+    SELECT s.external_id, s.payload, a.draft, a.approved
+    FROM (
+      SELECT external_id, payload FROM papot_pennylane_staging
+      WHERE resource = 'supplier_invoices'
+      ORDER BY external_id DESC LIMIT 501
+    ) s
+    LEFT JOIN papot_pennylane_purchase_allocations a ON a.invoice_id = s.external_id
+    ORDER BY s.external_id DESC
+  `);
+  const latest = rows.rows.slice(0, 500);
+  const pending = latest.reduce((count, row) => {
+    const source = invoiceSource(row, new Map());
+    const status = invoiceWorkflowState(source, {
+      invoiceId: row.external_id,
+      version: 1,
+      draft: row.draft,
+      approved: row.approved,
+      history: [],
+      updatedAt: lastImportedAt,
+    });
+    return count + (invoiceNeedsPapotValidation(status) ? 1 : 0);
+  }, 0);
+  return {
+    imported: true,
+    pending,
+    checked: latest.length,
+    truncated: rows.rows.length > 500,
+    lastImportedAt,
+  };
+}
 
 export type PurchaseInvoiceWorkspaceData = {
   invoices: PurchaseInvoiceListItem[];
