@@ -1,9 +1,13 @@
 agencement.papot.app {
     encode zstd gzip
-    # Endpoint planifié accessible en local seulement ; refus côté HTTPS public.
+    # Deux routes exclusives : l'API cron ne doit jamais être proxifiée sur HTTPS public.
     @internalApi path /api/internal/*
-    respond @internalApi 404
-    reverse_proxy 127.0.0.1:3002 {
-        header_up X-Papot-Client-IP {remote_host}
+    handle @internalApi {
+        respond 404
+    }
+    handle {
+        reverse_proxy 127.0.0.1:3002 {
+            header_up X-Papot-Client-IP {remote_host}
+        }
     }
 }
