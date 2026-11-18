@@ -1,0 +1,11 @@
+[Unit]
+Description=PAPOT SRV - copie quotidienne des parametres sur Nextcloud
+Wants=network-online.target
+After=network-online.target
+
+[Service]
+Type=oneshot
+User=root
+UMask=0077
+ExecStart=/usr/bin/flock -n /run/lock/papot-srv-config-backup.lock /bin/bash /home/ubuntu/papot-agencement-app/deploy/srv-explorer/backup-config.sh
+TimeoutStartSec=15min

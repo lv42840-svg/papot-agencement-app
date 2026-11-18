@@ -7,6 +7,7 @@ import { chromium } from "@playwright/test";
 import { createExplorer, configFromEnv } from "./server.mjs";
 
 const root = await mkdtemp(`${tmpdir()}/papot-browser-`);
+const aclRoot = await mkdtemp(`${tmpdir()}/papot-browser-acl-`);
 const listen = (server) =>
   new Promise((resolve) =>
     server.listen(0, "127.0.0.1", () => resolve(`http://127.0.0.1:${server.address().port}`)),
@@ -67,6 +68,9 @@ const server = createExplorer(
   configFromEnv({
     SRV_SESSION_KEY: randomBytes(32).toString("hex"),
     SRV_ROOT: root,
+    SRV_ADMIN_SOURCE: "agencement",
+    SRV_ADMIN_USER_ID: "u1",
+    SRV_ACCESS_FILE: `${aclRoot}/access.json`,
     SRV_AGENCEMENT_URL: upstream,
     SRV_CONCEPT_URL: upstream,
   }),
@@ -105,6 +109,9 @@ try {
   await page.locator("#password").fill("fixture-only");
   await page.getByRole("button", { name: "Ouvrir l’explorateur" }).click();
   await page.getByRole("button", { name: "Chantiers", exact: true }).waitFor();
+  await page.getByRole("button", { name: "Paramètres", exact: true }).click();
+  await page.getByRole("heading", { name: "Paramètres des accès" }).waitFor();
+  await page.getByRole("button", { name: "Explorateur", exact: true }).click();
   await page.getByRole("button", { name: "photo.png", exact: true }).click();
   await page.waitForFunction(() => {
     const image = document.querySelector("#preview-content img");
@@ -148,7 +155,8 @@ try {
   await page.locator("#source").selectOption("concept");
   await page.locator("#password").fill("fixture-only");
   await page.getByRole("button", { name: "Ouvrir l’explorateur" }).click();
-  await page.getByRole("button", { name: "Chantiers", exact: true }).waitFor();
+  await page.locator("#empty").waitFor({ state: "visible" });
+  assert.equal(await page.getByRole("button", { name: "Paramètres", exact: true }).count(), 0);
   assert.deepEqual(errors, []);
   console.log(
     "Browser checks passed: both logins, image preview, navigation, upload, folder creation, filtering, logout, mobile layout.",
@@ -158,4 +166,5 @@ try {
   await close(server);
   await close(identityServer);
   await rm(root, { recursive: true, force: true });
+  await rm(aclRoot, { recursive: true, force: true });
 }

@@ -1,0 +1,10 @@
+[Unit]
+Description=PAPOT SRV - sauvegarde automatique des parametres a 06h15
+
+[Timer]
+OnCalendar=*-*-* 06:15:00 Europe/Paris
+Persistent=true
+Unit=papot-srv-config-backup.service
+
+[Install]
+WantedBy=timers.target

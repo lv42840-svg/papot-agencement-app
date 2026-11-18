@@ -9,12 +9,12 @@ import { createExplorer, configFromEnv, seal, unseal } from "./server.mjs";
 import { uploadFile, byteRange } from "./files.mjs";
 
 const origin = "https://srv.papot.app";
-let root, outside, server, upstream, base, config, sessionCookie;
+let root, outside, server, upstream, base, config, sessionCookie, accessRoot;
 let active = true,
   unavailable = false,
   loginStatus = 200,
   clientIpSeen;
-const tokens = new Set();
+const tokens = new Map();
 const listen = (server) =>
   new Promise((resolve) =>
     server.listen(0, "127.0.0.1", () => resolve(`http://127.0.0.1:${server.address().port}`)),
@@ -30,11 +30,11 @@ async function call(path, options = {}) {
     headers: { Origin: origin, Cookie: sessionCookie || "", ...options.headers },
   });
 }
-async function login(source = "agencement") {
+async function login(source = "agencement", username = "lucien") {
   const response = await call("/api/login", {
     method: "POST",
     headers: { "Content-Type": "application/json", "X-Papot-Client-IP": "192.0.2.15" },
-    body: JSON.stringify({ source, username: "lucien", password: "test-only-password" }),
+    body: JSON.stringify({ source, username, password: "test-only-password" }),
   });
   if (response.ok) sessionCookie = response.headers.get("set-cookie").split(";")[0];
   return response;
@@ -42,7 +42,12 @@ async function login(source = "agencement") {
 before(async () => {
   root = await mkdtemp(`${tmpdir()}/papot-srv-`);
   outside = await mkdtemp(`${tmpdir()}/papot-outside-`);
+  accessRoot = await mkdtemp(`${tmpdir()}/papot-access-`);
   await mkdir(`${root}/Chantiers`);
+  await mkdir(`${root}/Chantiers/Interdit`);
+  await mkdir(`${root}/Chantiers/Interdit/Autorise`);
+  await writeFile(`${root}/Chantiers/Interdit/secret.txt`, "confidentiel");
+  await writeFile(`${root}/Chantiers/Interdit/Autorise/lire.txt`, "autorise");
   await writeFile(`${root}/Chantiers/plan.pdf`, "%PDF-1.4 test");
   await writeFile(`${root}/photo été.jpg`, "image");
   await writeFile(`${root}/.env`, "secret");
@@ -61,12 +66,16 @@ before(async () => {
       let raw = "";
       for await (const chunk of req) raw += chunk;
       const { username, password } = JSON.parse(raw);
-      if (loginStatus !== 200 || username !== "lucien" || password !== "test-only-password") {
+      if (
+        loginStatus !== 200 ||
+        !["lucien", "collegue"].includes(username) ||
+        password !== "test-only-password"
+      ) {
         res.writeHead(loginStatus === 200 ? 401 : loginStatus, { "Retry-After": "900" });
         return res.end("{}");
       }
       const token = randomBytes(32).toString("hex");
-      tokens.add(token);
+      tokens.set(token, username);
       res.setHeader("Set-Cookie", [
         `papot_session=${token}; HttpOnly; Secure; Path=/`,
         `papot_concept_session=${token}; HttpOnly; Secure; Path=/`,
@@ -78,8 +87,16 @@ before(async () => {
       tokens.delete(token);
       return res.end('{"ok":true}');
     }
-    if (req.url === "/api/auth/identity" && active && tokens.has(token))
-      return res.end('{"id":"user-1","username":"lucien","displayName":"Lucien"}');
+    if (req.url === "/api/auth/identity" && active && tokens.has(token)) {
+      const username = tokens.get(token);
+      return res.end(
+        JSON.stringify({
+          id: username === "lucien" ? "user-1" : "user-2",
+          username,
+          displayName: username === "lucien" ? "Lucien" : "Collègue",
+        }),
+      );
+    }
     res.writeHead(401);
     res.end("{}");
   });
@@ -90,6 +107,9 @@ before(async () => {
     SRV_AGENCEMENT_URL: upstreamUrl,
     SRV_CONCEPT_URL: upstreamUrl,
     SRV_MAX_UPLOAD_BYTES: "1024",
+    SRV_ADMIN_SOURCE: "agencement",
+    SRV_ADMIN_USER_ID: "user-1",
+    SRV_ACCESS_FILE: `${accessRoot}/permissions.json`,
   });
   server = createExplorer(config);
   base = await listen(server);
@@ -99,6 +119,7 @@ after(async () => {
   await close(upstream);
   await rm(root, { recursive: true, force: true });
   await rm(outside, { recursive: true, force: true });
+  await rm(accessRoot, { recursive: true, force: true });
 });
 
 test("anonymous clients cannot list, preview or upload files", async () => {
@@ -118,6 +139,7 @@ test("login reuses both apps, encrypts the session and preserves proxy client IP
     assert.equal((await call("/api/files")).status, 200);
   }
   assert.equal(clientIpSeen, "192.0.2.15");
+  await login("agencement"); // Other tests use the explicitly configured owner.
 });
 test("CSRF and invalid source are rejected before upstream authentication", async () => {
   assert.equal(
@@ -248,6 +270,128 @@ test("interrupted/oversized streams never publish partial files", async () => {
       !names.some((name) => name.startsWith(".papot-upload-")),
   );
 });
+
+test("unknown users are denied by default, including direct URLs and writes", async () => {
+  await login("agencement", "collegue");
+  const rootResponse = await call("/api/files");
+  assert.equal(rootResponse.status, 200);
+  assert.deepEqual((await rootResponse.json()).entries, []);
+  assert.equal((await call("/api/file?path=Chantiers/plan.pdf")).status, 403);
+  assert.equal((await call("/api/admin/access")).status, 403);
+  assert.equal((await call("/api/admin/directories")).status, 403);
+  assert.equal(
+    (
+      await call("/api/folders", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ name: "non" }),
+      })
+    ).status,
+    403,
+  );
+  assert.equal(
+    (
+      await call("/api/upload?path=Chantiers&name=refus.txt", {
+        method: "PUT",
+        body: "x",
+      })
+    ).status,
+    403,
+  );
+  await login("agencement");
+});
+
+test("owner grants, inherits, overrides and revokes folder access", async () => {
+  await login("agencement");
+  const adminData = await (await call("/api/admin/access")).json();
+  const key = "agencement:user-2";
+  assert.ok(adminData.users.some((u) => u.key === key));
+  const save = async (revision, rules) =>
+    call("/api/admin/access", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ key, revision, rules }),
+    });
+  let response = await save(adminData.revision, [
+    { path: "Chantiers", read: true, write: false },
+    { path: "Chantiers/Interdit", read: false, write: false },
+    { path: "Chantiers/Interdit/Autorise", read: true, write: false },
+  ]);
+  assert.equal(response.status, 200);
+  let revision = (await response.json()).revision;
+  assert.equal((await save(adminData.revision, [])).status, 409);
+  assert.equal((await call("/api/admin/directories?path=Chantiers")).status, 200);
+  await login("agencement", "collegue");
+  let data = await (await call("/api/files")).json();
+  assert.deepEqual(
+    data.entries.map((e) => e.name),
+    ["Chantiers"],
+  );
+  data = await (await call("/api/files?path=Chantiers")).json();
+  assert.equal(data.canWrite, false);
+  assert.deepEqual(
+    data.entries.map((e) => e.name),
+    ["Interdit", "plan.pdf"],
+  );
+  assert.equal((await call("/api/file?path=Chantiers/plan.pdf")).status, 200);
+  assert.equal((await call("/api/file?path=Chantiers/Interdit/secret.txt")).status, 403);
+  data = await (await call("/api/files?path=Chantiers/Interdit")).json();
+  assert.deepEqual(
+    data.entries.map((e) => e.name),
+    ["Autorise"],
+  );
+  assert.equal((await call("/api/file?path=Chantiers/Interdit/Autorise/lire.txt")).status, 200);
+  assert.equal(
+    (
+      await call("/api/upload?path=Chantiers&name=refus.txt", {
+        method: "PUT",
+        body: "x",
+      })
+    ).status,
+    403,
+  );
+  await login("agencement");
+  response = await save(revision, [{ path: "Chantiers", read: true, write: true }]);
+  assert.equal(response.status, 200);
+  revision = (await response.json()).revision;
+  await login("agencement", "collegue");
+  assert.equal(
+    (
+      await call("/api/folders?path=Chantiers", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ name: "Devis" }),
+      })
+    ).status,
+    201,
+  );
+  assert.equal(
+    (
+      await call("/api/upload?path=Chantiers&name=ajout.txt", {
+        method: "PUT",
+        body: "autorise",
+      })
+    ).status,
+    201,
+  );
+  assert.equal(await readFile(`${root}/Chantiers/ajout.txt`, "utf8"), "autorise");
+  await login("agencement");
+  response = await save(revision, [{ path: "Chantiers", read: false, write: false }]);
+  assert.equal(response.status, 200);
+  await login("agencement", "collegue");
+  assert.equal((await call("/api/file?path=Chantiers/ajout.txt")).status, 403);
+  assert.equal((await call("/api/files?path=Chantiers")).status, 403);
+  await login("agencement");
+});
+
+test("the source and user id both matter for owner privileges", async () => {
+  await login("concept");
+  assert.equal((await call("/api/admin/access")).status, 403);
+  assert.equal((await call("/api/files")).status, 200);
+  assert.deepEqual((await (await call("/api/files")).json()).entries, []);
+  await login("agencement");
+});
+
 test("disabled accounts and unavailable identity provider fail closed", async () => {
   active = false;
   assert.equal((await call("/api/files")).status, 401);
