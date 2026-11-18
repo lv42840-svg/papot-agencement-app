@@ -61,7 +61,8 @@ chmod 600 "$curl_config"
 install -m 644 "$unit_dir/papot-pennylane-sync.service" /etc/systemd/system/papot-pennylane-sync.service
 install -m 644 "$unit_dir/papot-pennylane-sync.timer" /etc/systemd/system/papot-pennylane-sync.timer
 systemctl daemon-reload
-systemctl enable --now papot-pennylane-sync.timer
-echo "Minuterie installée (06:00 et 12:00 Europe/Paris)."
-echo "Redémarrer maintenant le conteneur AGENCEMENT pour charger la clé interne."
-systemctl list-timers papot-pennylane-sync.timer --no-pager
+systemctl enable papot-pennylane-sync.timer
+echo "Minuterie configurée (06:00 et 12:00 Europe/Paris) mais non démarrée."
+echo "1. Redémarrer le conteneur AGENCEMENT pour charger la clé interne."
+echo "2. Après un contrôle health réussi, démarrer : sudo systemctl start papot-pennylane-sync.timer"
+echo "3. Vérifier : sudo systemctl list-timers papot-pennylane-sync.timer --no-pager"
