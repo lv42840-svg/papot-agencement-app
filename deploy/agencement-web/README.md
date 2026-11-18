@@ -75,6 +75,17 @@ non accessible aux autres utilisateurs. Le jeton n'est pas passé en argument de
 et n'est jamais renvoyé par l'API. Le déclencheur n'a pas besoin de session utilisateur
 et écoute sur `http://127.0.0.1:3002` depuis l'hôte, pas via le domaine public.
 
+Le bloc Caddy `deploy/agencement-web/Caddyfile.snippet` a été mis à jour :
+`/api/internal/*` renvoie 404 depuis le domaine public, tandis que le
+minuteur continue d'accéder directement à `127.0.0.1:3002`. Si le
+`/etc/caddy/Caddyfile` du VPS est déjà installé, **reprendre cette règle**
+dans son bloc `agencement.papot.app`, puis valider et recharger :
+
+```bash
+sudo caddy validate --config /etc/caddy/Caddyfile
+sudo systemctl reload caddy
+```
+
 Le script enregistre l'unité `systemd` mais **ne démarre pas le timer avant la reconstruction
 du conteneur**, pour éviter une tâche planifiée contre une ancienne version. Une fois le
 conteneur sain, l'activation par la commande ci-dessus suffit. Le fuseau horaire du minuteur
