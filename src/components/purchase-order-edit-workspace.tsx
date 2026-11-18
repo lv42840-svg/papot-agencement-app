@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 import { PennylaneSupplierPicker } from "@/components/pennylane-supplier-picker";
+import { CheckboxChoiceList } from "@/components/checkbox-choice-list";
 import { PurchaseDestinationMultiPicker } from "@/components/purchase-destination-multi-picker";
 import { evaluateNumericExpression, numericExpressionInput } from "@/lib/numeric-expression";
 import { useEffect, useMemo, useState } from "react";
@@ -459,8 +460,8 @@ export function PurchaseOrderEditWorkspace({ orderId }: { orderId: string }) {
             </div>
           ) : (
             <div style={{ display: "grid", gap: 12 }}>
-              <label>
-                Chantier
+              <div style={{ display: "grid", gap: 7 }}>
+                <strong>Chantier / client</strong>
                 <input
                   type="search"
                   aria-label="Filtrer les chantiers dans le BC détaillé"
@@ -468,27 +469,25 @@ export function PurchaseOrderEditWorkspace({ orderId }: { orderId: string }) {
                   onChange={(event) => setSiteSearch(event.target.value)}
                   placeholder="Nom, référence, client..."
                 />
-                <select
-                  value={siteId}
-                  disabled={readOnly || busy}
-                  onChange={(event) => setSiteId(event.target.value)}
-                >
-                  {sites
+                <CheckboxChoiceList
+                  label="Chantier du BC à modifier (choix unique)"
+                  options={sites
                     .filter(
                       (site) =>
                         site.id === siteId || filteredSites.some((item) => item.id === site.id),
                     )
-                    .map((site) => (
-                      <option
-                        key={site.id}
-                        value={site.id}
-                        disabled={site.status !== "ACTIVE" && site.id !== siteId}
-                      >
-                        {site.name}
-                      </option>
-                    ))}
-                </select>
-              </label>
+                    .map((site) => ({
+                      id: site.id,
+                      label: [site.reference, site.name, site.clientName].filter(Boolean).join(" · ") +
+                        (site.status === "ACTIVE" ? "" : " (fermé / annulé)"),
+                      disabled: site.status !== "ACTIVE" && site.id !== siteId,
+                    }))}
+                  selectedIds={siteId ? [siteId] : []}
+                  multiple={false}
+                  disabled={readOnly || busy}
+                  onChange={(ids) => setSiteId(ids[0] ?? siteId)}
+                />
+              </div>
               <h2>Articles</h2>
               {lines.map((line, index) => (
                 <div
