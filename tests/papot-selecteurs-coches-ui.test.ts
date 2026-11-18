@@ -37,6 +37,17 @@ describe("sélecteurs à coches et recherche PAPOT", () => {
     expect(edit).toContain("<PennylaneSupplierPicker");
   });
 
+  it("la recherche client permet un chantier unique à la création et à la modification d'un BC", () => {
+    const creation = ui("src/components/purchase-orders-workspace.tsx");
+    const modification = ui("src/components/purchase-order-edit-workspace.tsx");
+    expect(creation).toContain('label="Chantier du BC détaillé (choix unique)"');
+    expect(creation).toContain('aria-label="Rechercher un chantier pour le BC détaillé"');
+    expect(creation).toContain("selectedIds={selected ? [selected] : []}");
+    expect(modification).toContain('label="Chantier du BC à modifier (choix unique)"');
+    expect(modification).toContain("disabled: site.status !== \"ACTIVE\" && site.id !== siteId");
+    expect(modification).toContain('aria-label="Filtrer les chantiers dans le BC détaillé"');
+  });
+
   it("destination multiple d'un BC : cases à cocher, filtre de nom conservé", () => {
     const component = ui("src/components/purchase-destination-multi-picker.tsx");
     const purchases = ui("src/components/purchase-orders-workspace.tsx");
