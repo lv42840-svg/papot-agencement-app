@@ -43,6 +43,7 @@ par défaut, y compris pour les documents accessibles par URL directe.
 
    Si `SRV_UID`/`SRV_GID` diffèrent de 1000, utiliser ces valeurs et
    vérifier que le dossier est accessible en écriture depuis le conteneur.
+
 4. Sauvegarder également ce nouveau dossier de règles hors du VPS,
    avec les volumes existants. Avant la bascule, conserver un rollback
    `Dockerfile`/compose/image et tester les accès avec des comptes non-admin.

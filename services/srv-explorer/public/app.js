@@ -389,7 +389,8 @@ async function loadAcl() {
     selection.append(option);
   }
   aclSelectedKey = aclUsers.some((user) => user.key === aclSelectedKey)
-    ? aclSelectedKey : (aclUsers[0]?.key || "");
+    ? aclSelectedKey
+    : aclUsers[0]?.key || "";
   selection.value = aclSelectedKey;
   $("acl-save").disabled = !aclSelectedKey;
   $("acl-help").textContent = aclSelectedKey
@@ -407,7 +408,8 @@ $("acl-user").addEventListener("change", () => {
   setEditorRules();
 });
 function effectiveAcl(path) {
-  let selected = { read: false, write: false }, longest = -1;
+  let selected = { read: false, write: false },
+    longest = -1;
   for (const rule of aclRules.values()) {
     if (
       (rule.path === "" || path === rule.path || path.startsWith(`${rule.path}/`)) &&
@@ -430,8 +432,14 @@ function refreshAclChecks() {
 }
 function changeAcl(path, right, checked) {
   if (!aclSelectedKey) return;
-  if (path === "" && checked && right === "read" &&
-      !window.confirm("Autoriser tout le serveur à cet utilisateur, y compris les dossiers sensibles ?"))
+  if (
+    path === "" &&
+    checked &&
+    right === "read" &&
+    !window.confirm(
+      "Autoriser tout le serveur à cet utilisateur, y compris les dossiers sensibles ?",
+    )
+  )
     return refreshAclChecks();
   const rule = { path, ...effectiveAcl(path) };
   if (right === "read") {

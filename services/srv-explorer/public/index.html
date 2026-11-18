@@ -40,7 +40,9 @@
           />
           <button type="submit" class="primary">Ouvrir l’explorateur</button>
         </form>
-        <p class="footnote">Vos accès aux dossiers sont définis par l’administrateur de PAPOT SRV.</p>
+        <p class="footnote">
+          Vos accès aux dossiers sont définis par l’administrateur de PAPOT SRV.
+        </p>
       </section>
       <nav id="view-tabs" class="view-tabs" hidden aria-label="Navigation de PAPOT SRV">
         <button id="explorer-tab" class="tab-active" type="button">Explorateur</button>
@@ -98,17 +100,29 @@
       <section id="permissions" hidden>
         <span class="eyebrow">ADMINISTRATION PAPOT SRV</span>
         <h1>Paramètres des accès</h1>
-        <p class="muted">Choisissez les dossiers accessibles à chaque utilisateur. Les sous-dossiers héritent des droits de leur parent, sauf exception. Un dossier non coché est interdit par défaut.</p>
+        <p class="muted">
+          Choisissez les dossiers accessibles à chaque utilisateur. Les sous-dossiers héritent des
+          droits de leur parent, sauf exception. Un dossier non coché est interdit par défaut.
+        </p>
         <div class="acl-panel">
           <label for="acl-user">Compte utilisateur</label>
           <select id="acl-user" aria-label="Compte utilisateur"></select>
-          <p id="acl-help" class="muted">Les utilisateurs apparaissent après leur première connexion à PAPOT SRV.</p>
+          <p id="acl-help" class="muted">
+            Les utilisateurs apparaissent après leur première connexion à PAPOT SRV.
+          </p>
           <div class="acl-guide">
             <span><strong>Lecture</strong> : voir, prévisualiser et télécharger</span>
             <span><strong>Dépôt</strong> : créer des dossiers et ajouter des fichiers</span>
           </div>
-          <div class="acl-list-header"><strong>Répertoires du serveur</strong><span>Lecture &nbsp;&nbsp; Dépôt</span></div>
-          <div id="acl-tree" class="acl-tree" role="group" aria-label="Arborescence des autorisations"></div>
+          <div class="acl-list-header">
+            <strong>Répertoires du serveur</strong><span>Lecture &nbsp;&nbsp; Dépôt</span>
+          </div>
+          <div
+            id="acl-tree"
+            class="acl-tree"
+            role="group"
+            aria-label="Arborescence des autorisations"
+          ></div>
           <div class="acl-footer">
             <span id="acl-feedback" role="status" aria-live="polite"></span>
             <button id="acl-save" class="primary" type="button">Enregistrer les droits</button>

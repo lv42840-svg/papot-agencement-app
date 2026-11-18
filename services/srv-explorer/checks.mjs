@@ -66,7 +66,11 @@ before(async () => {
       let raw = "";
       for await (const chunk of req) raw += chunk;
       const { username, password } = JSON.parse(raw);
-      if (loginStatus !== 200 || !["lucien", "collegue"].includes(username) || password !== "test-only-password") {
+      if (
+        loginStatus !== 200 ||
+        !["lucien", "collegue"].includes(username) ||
+        password !== "test-only-password"
+      ) {
         res.writeHead(loginStatus === 200 ? 401 : loginStatus, { "Retry-After": "900" });
         return res.end("{}");
       }
@@ -85,11 +89,13 @@ before(async () => {
     }
     if (req.url === "/api/auth/identity" && active && tokens.has(token)) {
       const username = tokens.get(token);
-      return res.end(JSON.stringify({
-        id: username === "lucien" ? "user-1" : "user-2",
-        username,
-        displayName: username === "lucien" ? "Lucien" : "Collègue",
-      }));
+      return res.end(
+        JSON.stringify({
+          id: username === "lucien" ? "user-1" : "user-2",
+          username,
+          displayName: username === "lucien" ? "Lucien" : "Collègue",
+        }),
+      );
     }
     res.writeHead(401);
     res.end("{}");
@@ -273,13 +279,25 @@ test("unknown users are denied by default, including direct URLs and writes", as
   assert.equal((await call("/api/file?path=Chantiers/plan.pdf")).status, 403);
   assert.equal((await call("/api/admin/access")).status, 403);
   assert.equal((await call("/api/admin/directories")).status, 403);
-  assert.equal((await call("/api/folders", {
-    method: "POST", headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ name: "non" }),
-  })).status, 403);
-  assert.equal((await call("/api/upload?path=Chantiers&name=refus.txt", {
-    method: "PUT", body: "x",
-  })).status, 403);
+  assert.equal(
+    (
+      await call("/api/folders", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ name: "non" }),
+      })
+    ).status,
+    403,
+  );
+  assert.equal(
+    (
+      await call("/api/upload?path=Chantiers&name=refus.txt", {
+        method: "PUT",
+        body: "x",
+      })
+    ).status,
+    403,
+  );
   await login("agencement");
 });
 
@@ -288,11 +306,12 @@ test("owner grants, inherits, overrides and revokes folder access", async () => 
   const adminData = await (await call("/api/admin/access")).json();
   const key = "agencement:user-2";
   assert.ok(adminData.users.some((u) => u.key === key));
-  const save = async (revision, rules) => call("/api/admin/access", {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ key, revision, rules }),
-  });
+  const save = async (revision, rules) =>
+    call("/api/admin/access", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ key, revision, rules }),
+    });
   let response = await save(adminData.revision, [
     { path: "Chantiers", read: true, write: false },
     { path: "Chantiers/Interdit", read: false, write: false },
@@ -304,30 +323,57 @@ test("owner grants, inherits, overrides and revokes folder access", async () => 
   assert.equal((await call("/api/admin/directories?path=Chantiers")).status, 200);
   await login("agencement", "collegue");
   let data = await (await call("/api/files")).json();
-  assert.deepEqual(data.entries.map((e) => e.name), ["Chantiers"]);
+  assert.deepEqual(
+    data.entries.map((e) => e.name),
+    ["Chantiers"],
+  );
   data = await (await call("/api/files?path=Chantiers")).json();
   assert.equal(data.canWrite, false);
-  assert.deepEqual(data.entries.map((e) => e.name), ["Interdit", "plan.pdf"]);
+  assert.deepEqual(
+    data.entries.map((e) => e.name),
+    ["Interdit", "plan.pdf"],
+  );
   assert.equal((await call("/api/file?path=Chantiers/plan.pdf")).status, 200);
   assert.equal((await call("/api/file?path=Chantiers/Interdit/secret.txt")).status, 403);
   data = await (await call("/api/files?path=Chantiers/Interdit")).json();
-  assert.deepEqual(data.entries.map((e) => e.name), ["Autorise"]);
+  assert.deepEqual(
+    data.entries.map((e) => e.name),
+    ["Autorise"],
+  );
   assert.equal((await call("/api/file?path=Chantiers/Interdit/Autorise/lire.txt")).status, 200);
-  assert.equal((await call("/api/upload?path=Chantiers&name=refus.txt", {
-    method: "PUT", body: "x",
-  })).status, 403);
+  assert.equal(
+    (
+      await call("/api/upload?path=Chantiers&name=refus.txt", {
+        method: "PUT",
+        body: "x",
+      })
+    ).status,
+    403,
+  );
   await login("agencement");
   response = await save(revision, [{ path: "Chantiers", read: true, write: true }]);
   assert.equal(response.status, 200);
   revision = (await response.json()).revision;
   await login("agencement", "collegue");
-  assert.equal((await call("/api/folders?path=Chantiers", {
-    method: "POST", headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ name: "Devis" }),
-  })).status, 201);
-  assert.equal((await call("/api/upload?path=Chantiers&name=ajout.txt", {
-    method: "PUT", body: "autorise",
-  })).status, 201);
+  assert.equal(
+    (
+      await call("/api/folders?path=Chantiers", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ name: "Devis" }),
+      })
+    ).status,
+    201,
+  );
+  assert.equal(
+    (
+      await call("/api/upload?path=Chantiers&name=ajout.txt", {
+        method: "PUT",
+        body: "autorise",
+      })
+    ).status,
+    201,
+  );
   assert.equal(await readFile(`${root}/Chantiers/ajout.txt`, "utf8"), "autorise");
   await login("agencement");
   response = await save(revision, [{ path: "Chantiers", read: false, write: false }]);
