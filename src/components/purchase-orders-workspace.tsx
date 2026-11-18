@@ -184,11 +184,13 @@ export function PurchaseOrdersWorkspace({ chantierId }: { chantierId?: string })
   const all = snapshot?.payload.orders ?? [];
   const clientByChantier = new Map(allSites.map((site) => [site.id, site.clientName]));
   const orderClients = (order: PurchaseOrder) =>
-    [...new Set(
-      purchaseOrderAllocations(order)
-        .map((row) => clientByChantier.get(row.chantierId ?? ""))
-        .filter((name): name is string => Boolean(name?.trim())),
-    )];
+    [
+      ...new Set(
+        purchaseOrderAllocations(order)
+          .map((row) => clientByChantier.get(row.chantierId ?? ""))
+          .filter((name): name is string => Boolean(name?.trim())),
+      ),
+    ];
   const orderClientNames = [...new Set(all.flatMap(orderClients))].sort((a, b) =>
     a.localeCompare(b, "fr-FR"),
   );
@@ -544,13 +546,16 @@ export function PurchaseOrdersWorkspace({ chantierId }: { chantierId?: string })
                   <CheckboxChoiceList
                     label="Chantier du BC détaillé (choix unique)"
                     options={sites
-                      .filter((site) =>
-                        matchingSites.some((match) => match.id === site.id) ||
-                        site.id === selected,
+                      .filter(
+                        (site) =>
+                          matchingSites.some((match) => match.id === site.id) ||
+                          site.id === selected,
                       )
                       .map((site) => ({
                         id: site.id,
-                        label: [site.reference, site.name, site.clientName].filter(Boolean).join(" · "),
+                        label: [site.reference, site.name, site.clientName]
+                          .filter(Boolean)
+                          .join(" · "),
                       }))}
                     selectedIds={selected ? [selected] : []}
                     multiple={false}
@@ -561,7 +566,142 @@ export function PurchaseOrdersWorkspace({ chantierId }: { chantierId?: string })
                     }}
                   />
                 </div>
-               ) : null}
+              ) : null}
+              <div style={{ display: "grid", gap: 5 }}>
+                <strong>Fournisseur *</strong>
+                {snapshot.supplierCatalog?.synced ? (
+                  <PennylaneSupplierPicker
+                    suppliers={snapshot.supplierCatalog.suppliers}
+                    selectedId={supplierPennylaneId}
+                    label="Fournisseur du BC"
+                    disabled={busy || !snapshot.canWrite}
+                    onChange={(id) => {
+                      setSupplierPennylaneId(id);
+                      setSupplierName(
+                        snapshot.supplierCatalog?.suppliers.find((item) => item.id === id)?.name ??
+                          "",
+                      );
+                      if (
+                        snapshot.payload.supplierPreferences?.some(
+                          (pref) =>
+                            pref.supplierPennylaneId === id &&
+                            pref.defaultDestination === "GENERAL_EXPENSES",
+                        )
+                      ) {
+                        setMode("QUICK");
+                        setAllocations([newAllocation("GENERAL_EXPENSES")]);
+                        setNotice(
+                          "Frais généraux proposés par défaut. Tu peux choisir un chantier exceptionnellement.",
+                        );
+                      }
+                      setError("");
+                    }}
+                  />
+                ) : (
+                  <>
+                    <input
+                      aria-label="Fournisseur du BC"
+                      list="bc-supplier-names"
+                      maxLength={240}
+                      placeholder="Nom du fournisseur"
+                      value={supplierName}
+                      disabled={busy || !snapshot.canWrite}
+                      onChange={(event) => {
+                        setSupplierName(event.target.value);
+                        setError("");
+                      }}
+                    />
+                    <datalist id="bc-supplier-names">
+                      {suppliers.map((supplier) => (
+                        <option key={supplier} value={supplier} />
+                      ))}
+                    </datalist>
+                  </>
+                )}
+              </div>
+            </div>
+            <small>
+              Fournisseur introuvable ? Crée-le dans Pennylane, puis clique sur « Actualiser les
+              fournisseurs ».
+            </small>
+            <div style={{ display: "flex", flexWrap: "wrap", gap: 8 }}>
+              <button
+                type="button"
+                className={mode === "QUICK" ? "primaryButton" : "secondaryButton"}
+                aria-pressed={mode === "QUICK"}
+                disabled={busy}
+                onClick={() => setMode("QUICK")}
+              >
+                BC rapide · Montant global
+              </button>
+              <button
+                type="button"
+                className={mode === "DETAILED" ? "primaryButton" : "secondaryButton"}
+                aria-pressed={mode === "DETAILED"}
+                disabled={busy}
+                onClick={() => setMode("DETAILED")}
+              >
+                BC détaillé · Articles
+              </button>
+            </div>
+            <label style={{ display: "grid", gap: 5 }}>
+              Description générale / remarque (facultative)
+              <textarea
+                value={description}
+                maxLength={2000}
+                rows={2}
+                disabled={busy || !snapshot.canWrite}
+                onChange={(e) => setDescription(e.target.value)}
+              />
+            </label>
+            {mode === "QUICK" ? (
+              <div style={{ display: "grid", gap: 10 }}>
+                <strong>Répartition du BC par chantier, SAV ou frais généraux</strong>
+                <input
+                  type="search"
+                  aria-label="Filtrer les destinations du BC"
+                  placeholder="Filtrer les chantiers par nom, client ou référence"
+                  value={destinationQuery}
+                  onChange={(event) => setDestinationQuery(event.target.value)}
+                />
+                <div style={{ overflowX: "auto" }}>
+                  <table style={{ width: "100%", minWidth: 630, borderCollapse: "collapse" }}>
+                    <thead>
+                      <tr style={{ textAlign: "left", borderBottom: "1px solid #ddd" }}>
+                        <th>Destination</th>
+                        <th>Montant HT (€)</th>
+                        <th />
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {allocations.map((row, i) => {
+                        const selectedDestination = row.chantierId || selected;
+                        return (
+                          <tr key={row.id}>
+                            <td>
+                              <select
+                                aria-label={`Destination du BC rapide ligne ${i + 1}`}
+                                value={selectedDestination}
+                                disabled={busy || !snapshot.canWrite}
+                                onChange={(e) => {
+                                  setAllocations((current) =>
+                                    current.map((item) =>
+                                      item.id === row.id
+                                        ? { ...item, chantierId: e.target.value }
+                                        : item,
+                                    ),
+                                  );
+                                  setError("");
+                                }}
+                                style={{ width: "100%", minWidth: 210 }}
+                              >
+                                <option value="">Choisir une destination</option>
+                                {!destinations.some((item) => item.id === selectedDestination) &&
+                                selectedDestination ? (
+                                  <option value={selectedDestination} disabled>
+                                    Chantier indisponible : choisir une destination
+                                  </option>
+                                ) : null}
                                 {destinations
                                   .filter(
                                     (item) =>
