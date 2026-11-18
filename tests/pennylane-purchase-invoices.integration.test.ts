@@ -7,6 +7,7 @@ import { runServerDbMigrations } from "../src/lib/server-db/migrations";
 import { closeServerDbPool, getServerDbPool } from "../src/lib/server-db/pool";
 import {
   readPurchaseInvoiceWorkspace,
+  readPendingPurchaseInvoiceSummary,
   readValidatedPurchaseCosts,
   writePurchaseInvoiceAllocation,
   autoAllocateImportedGeneralExpensesInvoices,
@@ -327,6 +328,69 @@ describeIfPostgres("Pennylane purchase invoice workflow in isolated PostgreSQL",
       );
     }
   });
+  it("compte les affectations PAPOT à valider, mais pas les validations en attente Pennylane", async () => {
+    const pendingId = "987654321080";
+    const approvedId = "987654321081";
+    const pendingPayload = {
+      ...basePayload,
+      id: Number(pendingId),
+      invoice_number: "TEST-DASHBOARD-PENDING",
+    };
+    const approvedPayload = {
+      ...basePayload,
+      id: Number(approvedId),
+      invoice_number: "TEST-DASHBOARD-APPROVED",
+      accounting_status: "validation_needed",
+    };
+    const approvedDraft = draft();
+    const approval = {
+      draft: approvedDraft,
+      amountHtCents: 10000,
+      sourceRevision: sourceRevision({
+        invoiceNumber: approvedPayload.invoice_number,
+        supplierId: supplier,
+        amountHtCents: 10000,
+        invoiceDate: approvedPayload.date,
+        filename: approvedPayload.filename,
+      }),
+      validatedAt: new Date().toISOString(),
+      validatedBy: "Nadia",
+    };
+    const before = await readPendingPurchaseInvoiceSummary(pool);
+    expect(before.imported).toBe(true);
+    try {
+      await pool.query(
+        "INSERT INTO papot_pennylane_staging (resource, external_id, payload, synced_at) VALUES ('supplier_invoices',$1,$2::jsonb,NOW()),('supplier_invoices',$3,$4::jsonb,NOW())",
+        [pendingId, JSON.stringify(pendingPayload), approvedId, JSON.stringify(approvedPayload)],
+      );
+      const pending = await readPendingPurchaseInvoiceSummary(pool);
+      expect(pending.pending).toBe(before.pending + 2);
+
+      await pool.query(
+        "INSERT INTO papot_pennylane_purchase_allocations (invoice_id, version, draft, approved, history) VALUES ($1,1,$2::jsonb,$3::jsonb,'[]'::jsonb)",
+        [approvedId, JSON.stringify(approvedDraft), JSON.stringify(approval)],
+      );
+      const approved = await readPendingPurchaseInvoiceSummary(pool);
+      expect(approved.pending).toBe(before.pending + 1);
+
+      await pool.query(
+        "UPDATE papot_pennylane_purchase_allocations SET draft=$2::jsonb WHERE invoice_id=$1",
+        [approvedId, JSON.stringify({ ...approvedDraft, note: "À revalider" })],
+      );
+      const needsReview = await readPendingPurchaseInvoiceSummary(pool);
+      expect(needsReview.pending).toBe(before.pending + 2);
+    } finally {
+      await pool.query(
+        "DELETE FROM papot_pennylane_purchase_allocations WHERE invoice_id IN ($1,$2)",
+        [pendingId, approvedId],
+      );
+      await pool.query(
+        "DELETE FROM papot_pennylane_staging WHERE resource='supplier_invoices' AND external_id IN ($1,$2)",
+        [pendingId, approvedId],
+      );
+    }
+  });
+
   it("conserve le coût d'une facture validée après disparition de la liste Pennylane, sans doublon", async () => {
     const archivedId = "987654321017";
     const chantierId = "99999999-9999-4999-8999-999999999999";
