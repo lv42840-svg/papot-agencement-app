@@ -6,9 +6,7 @@ export function toggleCheckboxChoice(
   multiple = true,
 ): string[] {
   if (!multiple) return checked ? [id] : [];
-  return checked
-    ? [...new Set([...selectedIds, id])]
-    : selectedIds.filter((value) => value !== id);
+  return checked ? [...new Set([...selectedIds, id])] : selectedIds.filter((value) => value !== id);
 }
 
 /** Cocher uniquement les résultats visibles, conserver les choix masqués. */

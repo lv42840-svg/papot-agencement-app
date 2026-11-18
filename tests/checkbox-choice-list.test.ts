@@ -11,9 +11,9 @@ describe("cases à cocher filtrables PAPOT", () => {
       "client-caché",
       "client-visible",
     ]);
-    expect(toggleCheckboxChoice(["client-caché", "client-visible"], "client-visible", false)).toEqual([
-      "client-caché",
-    ]);
+    expect(
+      toggleCheckboxChoice(["client-caché", "client-visible"], "client-visible", false),
+    ).toEqual(["client-caché"]);
     expect(toggleCheckboxChoice(["client-caché"], "client-caché", true)).toEqual(["client-caché"]);
   });
 

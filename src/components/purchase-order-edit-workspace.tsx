@@ -478,7 +478,8 @@ export function PurchaseOrderEditWorkspace({ orderId }: { orderId: string }) {
                     )
                     .map((site) => ({
                       id: site.id,
-                      label: [site.reference, site.name, site.clientName].filter(Boolean).join(" · ") +
+                      label:
+                        [site.reference, site.name, site.clientName].filter(Boolean).join(" · ") +
                         (site.status === "ACTIVE" ? "" : " (fermé / annulé)"),
                       disabled: site.status !== "ACTIVE" && site.id !== siteId,
                     }))}

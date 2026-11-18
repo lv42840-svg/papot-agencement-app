@@ -31,7 +31,7 @@ describe("sélecteurs à coches et recherche PAPOT", () => {
     const purchases = ui("src/components/purchase-orders-workspace.tsx");
     const edit = ui("src/components/purchase-order-edit-workspace.tsx");
     expect(picker).toContain('type="search"');
-    expect(picker).toContain('multiple={false}');
+    expect(picker).toContain("multiple={false}");
     expect(picker).toContain("visibleSuppliers");
     expect(purchases).toContain("<PennylaneSupplierPicker");
     expect(edit).toContain("<PennylaneSupplierPicker");
@@ -44,7 +44,7 @@ describe("sélecteurs à coches et recherche PAPOT", () => {
     expect(creation).toContain('aria-label="Rechercher un chantier pour le BC détaillé"');
     expect(creation).toContain("selectedIds={selected ? [selected] : []}");
     expect(modification).toContain('label="Chantier du BC à modifier (choix unique)"');
-    expect(modification).toContain("disabled: site.status !== \"ACTIVE\" && site.id !== siteId");
+    expect(modification).toContain('disabled: site.status !== "ACTIVE" && site.id !== siteId');
     expect(modification).toContain('aria-label="Filtrer les chantiers dans le BC détaillé"');
   });
 

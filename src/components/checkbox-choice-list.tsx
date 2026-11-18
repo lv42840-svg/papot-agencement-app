@@ -94,7 +94,11 @@ export function CheckboxChoiceList({
           <button
             type="button"
             className="secondaryButton"
-            disabled={disabled || selectableOptions.length === 0 || selectableOptions.every((option) => chosen.has(option.id))}
+            disabled={
+              disabled ||
+              selectableOptions.length === 0 ||
+              selectableOptions.every((option) => chosen.has(option.id))
+            }
             onClick={() => onChange(checkVisibleChoices(selectedIds, [...visibleIds]))}
           >
             Tout cocher (résultats visibles)

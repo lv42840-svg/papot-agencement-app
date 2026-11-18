@@ -12,7 +12,11 @@ import type {
   PurchaseOrder,
   PurchaseOrdersPayload,
 } from "@/lib/purchases/domain";
-import { purchaseAllocationFromSelection, purchaseDestinationKey, purchaseOrderAllocations } from "@/lib/purchases/domain";
+import {
+  purchaseAllocationFromSelection,
+  purchaseDestinationKey,
+  purchaseOrderAllocations,
+} from "@/lib/purchases/domain";
 
 type Site = {
   id: string;
@@ -183,14 +187,13 @@ export function PurchaseOrdersWorkspace({ chantierId }: { chantierId?: string })
   const preview = mode === "QUICK" ? quickTotal : detailedTotal;
   const all = snapshot?.payload.orders ?? [];
   const clientByChantier = new Map(allSites.map((site) => [site.id, site.clientName]));
-  const orderClients = (order: PurchaseOrder) =>
-    [
-      ...new Set(
-        purchaseOrderAllocations(order)
-          .map((row) => clientByChantier.get(row.chantierId ?? ""))
-          .filter((name): name is string => Boolean(name?.trim())),
-      ),
-    ];
+  const orderClients = (order: PurchaseOrder) => [
+    ...new Set(
+      purchaseOrderAllocations(order)
+        .map((row) => clientByChantier.get(row.chantierId ?? ""))
+        .filter((name): name is string => Boolean(name?.trim())),
+    ),
+  ];
   const orderClientNames = [...new Set(all.flatMap(orderClients))].sort((a, b) =>
     a.localeCompare(b, "fr-FR"),
   );
@@ -198,7 +201,9 @@ export function PurchaseOrdersWorkspace({ chantierId }: { chantierId?: string })
     name.toLocaleLowerCase("fr-FR").includes(clientFilterSearch.trim().toLocaleLowerCase("fr-FR")),
   );
   const filteredOrderSuppliers = suppliers.filter((name) =>
-    name.toLocaleLowerCase("fr-FR").includes(supplierFilterSearch.trim().toLocaleLowerCase("fr-FR")),
+    name
+      .toLocaleLowerCase("fr-FR")
+      .includes(supplierFilterSearch.trim().toLocaleLowerCase("fr-FR")),
   );
   const visible = all
     .filter(
