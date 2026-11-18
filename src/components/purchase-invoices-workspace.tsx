@@ -69,10 +69,14 @@ function description(code: string) {
   return text[code] ?? "Opération impossible (" + code + ").";
 }
 
-export function PurchaseInvoicesWorkspace() {
+export function PurchaseInvoicesWorkspace({
+  initialTab = "ALL",
+}: {
+  initialTab?: "ALL" | "PENDING" | "APPROVED";
+}) {
   const [data, setData] = useState<ResponseBody | null>(null);
   const [selectedId, setSelectedId] = useState("");
-  const [invoiceTab, setInvoiceTab] = useState<"ALL" | "PENDING" | "APPROVED">("ALL");
+  const [invoiceTab, setInvoiceTab] = useState<"ALL" | "PENDING" | "APPROVED">(initialTab);
   const [draft, setDraft] = useState<InvoiceAllocationDraft>(emptyDraft);
   const [busy, setBusy] = useState(false);
   const [search, setSearch] = useState("");
