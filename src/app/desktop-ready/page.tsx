@@ -3,17 +3,22 @@ import { redirect } from "next/navigation";
 import { BriefcaseBusiness, Camera, Clock3, FolderOpen, Inbox, ListTodo } from "lucide-react";
 import { DashboardChantierStat } from "@/components/dashboard-chantier-stat";
 import { DashboardInvoicedStat } from "@/components/dashboard-invoiced-stat";
+import { DashboardPurchaseInvoicesStat } from "@/components/dashboard-purchase-invoices-stat";
 import { DashboardCommercialStats } from "@/components/dashboard-commercial-stats";
 import { DashboardWeeklyPlanning } from "@/components/dashboard-weekly-planning";
 import { DesktopAppShell } from "@/components/desktop-app-shell";
 import { DashboardTasksPanel } from "@/components/tasks-workspace";
 import { authHasUsers } from "@/lib/auth/store";
+import { requireUser } from "@/lib/auth/session";
+import { hasModuleAccess } from "@/lib/auth/permissions";
 import { currentDashboardPlanningWeek } from "@/lib/planning/dashboard-week";
 
 export const dynamic = "force-dynamic";
 
 export default async function DesktopReadyPage() {
   if (!(await authHasUsers())) redirect("/first-admin");
+  const user = await requireUser();
+  const canReadPurchases = await hasModuleAccess(user.id, "purchases", "READ");
   const currentWeek = currentDashboardPlanningWeek();
 
   return (
@@ -36,6 +41,7 @@ export default async function DesktopReadyPage() {
         <DashboardCommercialStats />
         <DashboardChantierStat />
         <DashboardInvoicedStat />
+        {canReadPurchases ? <DashboardPurchaseInvoicesStat /> : null}
       </section>
 
       <section className="dashboardGrid">
