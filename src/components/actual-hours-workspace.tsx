@@ -6,6 +6,7 @@ import Link from "next/link";
 import { EDIT_CONFLICT_MESSAGE } from "@/lib/edit-history";
 import { evaluateNumericExpression, numericExpressionInput } from "@/lib/numeric-expression";
 import { useCallback, useEffect, useMemo, useState } from "react";
+import { CheckboxChoiceList } from "@/components/checkbox-choice-list";
 import { isoWeekKey, isoWeekMonday, weekDateRangeLabel } from "@/lib/planning/time-markers";
 
 type Activity = "BE" | "WORKSHOP" | "INSTALL";
@@ -614,42 +615,18 @@ export function ActualHoursWorkspace() {
                     onChange={(event) => setChantierSearch(event.target.value)}
                   />
                 </label>
-                <label>
-                  Chantiers à ajouter (plusieurs choix possibles)
-                  <select
-                    multiple
-                    size={Math.min(7, Math.max(3, filteredAvailableChantiers.length))}
-                    aria-label="Chantiers à ajouter"
-                    value={extraChoices}
-                    onChange={(event) => {
-                      const selected = Array.from(
-                        event.currentTarget.selectedOptions,
-                        (option) => option.value,
-                      );
-                      setExtraChoices((old) => [
-                        ...new Set([
-                          ...old.filter(
-                            (id) =>
-                              !filteredAvailableChantiers.some((chantier) => chantier.id === id),
-                          ),
-                          ...selected,
-                        ]),
-                      ]);
-                    }}
-                  >
-                    {filteredAvailableChantiers.map((chantier) => (
-                      <option key={chantier.id} value={chantier.id}>
-                        {[chantier.reference, chantier.name, chantier.clientName]
-                          .filter(Boolean)
-                          .join(" · ")}
-                      </option>
-                    ))}
-                  </select>
-                </label>
-                <small>
-                  {extraChoices.length} chantier(s) sélectionné(s). Utilise Ctrl ou Maj sur
-                  ordinateur.
-                </small>
+                <CheckboxChoiceList
+                  label="Chantiers à ajouter"
+                  options={filteredAvailableChantiers.map((chantier) => ({
+                    id: chantier.id,
+                    label: [chantier.reference, chantier.name, chantier.clientName]
+                      .filter(Boolean)
+                      .join(" · "),
+                  }))}
+                  selectedIds={extraChoices}
+                  onChange={setExtraChoices}
+                  disabled={!data.editable || saving !== null}
+                />
                 <div style={{ display: "flex", gap: 8 }}>
                   <button
                     type="button"
