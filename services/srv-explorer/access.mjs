@@ -196,7 +196,11 @@ export async function registerIdentity(file, user) {
 export async function replaceRules(file, key, revision, input) {
   const rules = validateRules(input);
   return mutateAccess(file, async (state) => {
-    if (!state.users[key]) throw new HttpError(400, "Compte inconnu.");
+    if (
+      !/^(agencement|concept):[A-Za-z0-9._:-]{1,160}$/.test(key) ||
+      !Object.hasOwn(state.users, key)
+    )
+      throw new HttpError(400, "Compte inconnu.");
     if (!Number.isSafeInteger(revision) || state.revision !== revision)
       throw new HttpError(409, "Les autorisations ont changé. Actualisez avant d'enregistrer.");
     state.grants[key] = rules;
