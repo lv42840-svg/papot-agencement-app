@@ -21,6 +21,12 @@ services:
         target: /data
         bind:
           create_host_path: false
+      # Dedicated persistent ACL data, not reachable through /data.
+      - type: bind
+        source: /opt/papot/srv-explorer/state
+        target: /state
+        bind:
+          create_host_path: false
     mem_limit: 256m
     pids_limit: 64
     healthcheck:
