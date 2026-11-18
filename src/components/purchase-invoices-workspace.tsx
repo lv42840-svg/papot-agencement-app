@@ -8,6 +8,7 @@ import {
   calculateInvoiceAllocation,
   distributeCharge,
   destinationKey,
+  invoiceNeedsPapotValidation,
   type InvoiceAllocationDraft,
   type InvoiceDestination,
 } from "@/lib/pennylane/purchase-allocations";
@@ -71,7 +72,7 @@ function description(code: string) {
 export function PurchaseInvoicesWorkspace() {
   const [data, setData] = useState<ResponseBody | null>(null);
   const [selectedId, setSelectedId] = useState("");
-  const [invoiceTab, setInvoiceTab] = useState<"ALL" | "APPROVED">("ALL");
+  const [invoiceTab, setInvoiceTab] = useState<"ALL" | "PENDING" | "APPROVED">("ALL");
   const [draft, setDraft] = useState<InvoiceAllocationDraft>(emptyDraft);
   const [busy, setBusy] = useState(false);
   const [search, setSearch] = useState("");
@@ -87,7 +88,12 @@ export function PurchaseInvoicesWorkspace() {
     if (!response.ok) throw new Error(body.error ?? "INVOICE_LOAD_FAILED");
     setData(body);
     setSelectedId((id) => {
-      const current = invoiceTab === "APPROVED" ? body.validatedInvoices : body.invoices;
+      const current =
+        invoiceTab === "APPROVED"
+          ? body.validatedInvoices
+          : invoiceTab === "PENDING"
+            ? body.invoices.filter((invoice) => invoiceNeedsPapotValidation(invoice.workflow))
+            : body.invoices;
       return current.some((item) => item.id === id) ? id : (current[0]?.id ?? "");
     });
   }
@@ -99,7 +105,10 @@ export function PurchaseInvoicesWorkspace() {
     invoiceTab === "APPROVED" ? (data?.validatedInvoices ?? []) : (data?.invoices ?? []);
   const visibleInvoices = currentTabInvoices.filter(
     (invoice) =>
-      (invoiceTab === "ALL" || Boolean(invoice.state?.approved)) &&
+      (invoiceTab === "ALL" ||
+        (invoiceTab === "PENDING"
+          ? invoiceNeedsPapotValidation(invoice.workflow)
+          : Boolean(invoice.state?.approved))) &&
       [invoice.supplierName, invoice.invoiceNumber, invoice.invoiceDate ?? ""]
         .join(" ")
         .toLocaleLowerCase("fr-FR")
@@ -326,7 +335,7 @@ export function PurchaseInvoicesWorkspace() {
         {!data?.importEnabled
           ? " Synchronisation désactivée : activation serveur nécessaire après tests de la clé."
           : ""}
-        {data?.truncated && invoiceTab === "ALL"
+        {data?.truncated && invoiceTab !== "APPROVED"
           ? " Affichage des 500 dernières factures (les coûts validés restent conservés)."
           : ""}
         {data?.validatedTruncated && invoiceTab === "APPROVED"
@@ -350,6 +359,19 @@ export function PurchaseInvoicesWorkspace() {
             }}
           >
             Toutes les factures ({data.invoices.length})
+          </button>
+          <button
+            type="button"
+            role="tab"
+            aria-selected={invoiceTab === "PENDING"}
+            className={invoiceTab === "PENDING" ? "primaryButton" : "secondaryButton"}
+            onClick={() => {
+              setInvoiceTab("PENDING");
+              setSelectedId("");
+            }}
+          >
+            Factures à valider (
+            {data.invoices.filter((invoice) => invoiceNeedsPapotValidation(invoice.workflow)).length})
           </button>
           <button
             type="button"
@@ -399,7 +421,11 @@ export function PurchaseInvoicesWorkspace() {
             }}
           >
             <h2>
-              {invoiceTab === "ALL" ? "Toutes les factures" : "Factures validées"} (
+              {invoiceTab === "ALL"
+                ? "Toutes les factures"
+                : invoiceTab === "PENDING"
+                  ? "Factures à valider"
+                  : "Factures validées"} (
               {visibleInvoices.length})
             </h2>
             <input
