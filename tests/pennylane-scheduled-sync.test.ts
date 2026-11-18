@@ -47,6 +47,8 @@ describe("synchronisation Pennylane programmée, sécurisée et sans doublon", (
     expect(installer).toContain("systemctl start papot-pennylane-sync.timer");
     const caddy = readFileSync("deploy/agencement-web/Caddyfile.snippet", "utf8");
     expect(caddy).toContain("@internalApi path /api/internal/*");
-    expect(caddy).toContain("respond @internalApi 404");
+    expect(caddy).toContain("handle @internalApi {");
+    expect(caddy).toContain("respond 404");
+    expect(caddy).toContain("handle {");
   });
 });
