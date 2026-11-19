@@ -176,11 +176,97 @@ export const billingExtraSchema = z
   });
 export type BillingExtra = z.infer<typeof billingExtraSchema>;
 
+export const billingVisaRequirementSchema = z.object({
+  chantierId: z.string().uuid(),
+  required: z.boolean(),
+  updatedAt: dateTimeSchema,
+  updatedByName: z.string().trim().min(1).max(160),
+});
+export type BillingVisaRequirement = z.infer<typeof billingVisaRequirementSchema>;
+
+export const billingVisaMethodSchema = z.enum([
+  "EMAIL",
+  "SIGNATURE",
+  "MEETING",
+  "PHONE",
+  "OTHER",
+]);
+export type BillingVisaMethod = z.infer<typeof billingVisaMethodSchema>;
+
+export const billingVisaVersionSchema = z
+  .object({
+    id: z.string().uuid(),
+    draftId: z.string().uuid(),
+    version: z.number().int().positive().max(100),
+    draftUpdatedAt: dateTimeSchema,
+    documentLabel: z.string().trim().min(1).max(240),
+    documentNotes: z.string().max(4000),
+    documentLines: z.array(billingDocumentLineSchema).min(1).max(1000),
+    amountHtCents: centsSchema.positive(),
+    vatCents: centsSchema,
+    totalTtcCents: centsSchema.positive(),
+    submittedTo: z.string().trim().min(1).max(240),
+    submittedNotes: z.string().trim().max(2000),
+    submittedAt: dateTimeSchema,
+    submittedByName: z.string().trim().min(1).max(160),
+    status: z.enum(["SUBMITTED", "ACCEPTED", "PARTIAL", "REFUSED", "WITHDRAWN"]),
+    acceptedHtCents: centsSchema.nullable(),
+    reviewMethod: billingVisaMethodSchema.nullable(),
+    externalContact: z.string().trim().min(1).max(240).nullable(),
+    evidence: z.string().trim().min(1).max(2000).nullable(),
+    reason: z.string().trim().max(2000).nullable(),
+    reviewedAt: dateTimeSchema.nullable(),
+    reviewedByName: z.string().trim().min(1).max(160).nullable(),
+  })
+  .superRefine((visa, ctx) => {
+    const invalid = (message: string) =>
+      ctx.addIssue({ code: z.ZodIssueCode.custom, message });
+    if (visa.status === "SUBMITTED") {
+      if (
+        visa.acceptedHtCents !== null ||
+        visa.reviewMethod !== null ||
+        visa.externalContact !== null ||
+        visa.evidence !== null ||
+        visa.reason !== null ||
+        visa.reviewedAt !== null ||
+        visa.reviewedByName !== null
+      ) invalid("BILLING_VISA_PENDING_FIELDS_INVALID");
+      return;
+    }
+    if (!visa.reviewedAt || !visa.reviewedByName || !visa.reason) {
+      invalid("BILLING_VISA_DECISION_INCOMPLETE");
+      return;
+    }
+    if (visa.status === "WITHDRAWN") {
+      if (
+        visa.acceptedHtCents !== null ||
+        visa.reviewMethod !== null ||
+        visa.externalContact !== null ||
+        visa.evidence !== null
+      ) invalid("BILLING_VISA_WITHDRAWAL_INVALID");
+      return;
+    }
+    if (!visa.reviewMethod || !visa.externalContact || !visa.evidence) {
+      invalid("BILLING_VISA_EVIDENCE_REQUIRED");
+    }
+    if (
+      (visa.status === "ACCEPTED" && visa.acceptedHtCents !== visa.amountHtCents) ||
+      (visa.status === "PARTIAL" &&
+        (visa.acceptedHtCents === null ||
+          visa.acceptedHtCents <= 0 ||
+          visa.acceptedHtCents >= visa.amountHtCents)) ||
+      (visa.status === "REFUSED" && visa.acceptedHtCents !== 0)
+    ) invalid("BILLING_VISA_ACCEPTED_AMOUNT_INVALID");
+  });
+export type BillingVisaVersion = z.infer<typeof billingVisaVersionSchema>;
+
 export const billingPayloadSchema = z.object({
   schemaVersion: z.literal(1),
   drafts: z.array(billingDraftSchema),
   manualMarkets: z.array(billingManualMarketSchema).optional(),
   extras: z.array(billingExtraSchema).optional(),
+  visaRequirements: z.array(billingVisaRequirementSchema).optional(),
+  visaVersions: z.array(billingVisaVersionSchema).optional(),
   invoiceTitles: billingTitlesSchema.optional(),
 });
 export type BillingPayload = z.infer<typeof billingPayloadSchema>;
