@@ -73,28 +73,30 @@ async function createProvisionalClient(
   clients: ClientsRepository,
   actor: Actor,
   displayName: string,
+  details: { siret?: string; addressLine1?: string; postalCode?: string; city?: string } = {},
 ): Promise<ResolvedCommercialClient> {
   const clientId = randomUUID();
   const mutation = await clients.mutate(
     {
       action: "create",
       clientId,
-      type: "AUTRE",
+      type: details.siret ? "ENTREPRISE" : "AUTRE",
       companyName: displayName.trim(),
       firstName: "",
       lastName: "",
-      addressLine1: "",
+      addressLine1: details.addressLine1 ?? "",
       addressLine2: "",
-      postalCode: "",
-      city: "",
+      postalCode: details.postalCode ?? "",
+      city: details.city ?? "",
       phone: "",
       email: "",
-      siret: "",
+      siret: details.siret ?? "",
       paymentTerms: "",
       notes: "",
       contacts: [],
     },
     actor,
+    { source: "commercialProvisional" },
   );
 
   const created = activeClient(mutation.payload, clientId);
@@ -106,6 +108,10 @@ export async function resolveCommercialClient(params: {
   actor: Actor;
   existingClientId?: string;
   newClientName?: string;
+  newClientSiret?: string;
+  newClientAddressLine1?: string;
+  newClientPostalCode?: string;
+  newClientCity?: string;
   currentClientId?: string | null;
 }): Promise<ResolvedCommercialClient> {
   const existingClientId = params.existingClientId?.trim();
@@ -128,7 +134,12 @@ export async function resolveCommercialClient(params: {
     }
   }
 
-  return createProvisionalClient(params.clients, params.actor, newClientName);
+  return createProvisionalClient(params.clients, params.actor, newClientName, {
+    siret: params.newClientSiret,
+    addressLine1: params.newClientAddressLine1,
+    postalCode: params.newClientPostalCode,
+    city: params.newClientCity,
+  });
 }
 
 export async function assertCommercialClientReadyForConfirmation(
