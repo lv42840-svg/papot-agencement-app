@@ -1,3 +1,4 @@
+import { loadSplitState, saveSplitState, laborCollections } from "../server-db/split-state";
 import "server-only";
 
 import { createPlanningRepository } from "@/lib/planning/create-repository";
@@ -48,10 +49,11 @@ export async function readMonthlyLaborCosts(): Promise<MonthlyLaborCostsPayload>
 
   const pool = getServerDbPool();
   await runServerDbMigrations(pool);
-  const result = await pool.query<{ payload: unknown }>(
-    "SELECT payload FROM papot_monthly_labor_costs_state WHERE scope = 'global'",
+  const payload = await withServerDbTransaction(
+    (client) => loadSplitState(client, "papot_monthly_labor_costs_state", laborCollections),
+    pool,
   );
-  return withCurrentHoldingHours(parseMonthlyLaborCostsPayload(result.rows[0]?.payload));
+  return withCurrentHoldingHours(parseMonthlyLaborCostsPayload(payload));
 }
 
 export async function mutateMonthlyLaborCosts(
@@ -67,16 +69,13 @@ export async function mutateMonthlyLaborCosts(
   const pool = getServerDbPool();
   await runServerDbMigrations(pool);
   return withServerDbTransaction(async (client) => {
-    const current = await client.query<{ payload: unknown }>(
-      "SELECT payload FROM papot_monthly_labor_costs_state WHERE scope = 'global' FOR UPDATE",
+    const current = await loadSplitState(
+      client,
+      "papot_monthly_labor_costs_state",
+      laborCollections,
     );
-    const next = parseMonthlyLaborCostsPayload(
-      transform(parseMonthlyLaborCostsPayload(current.rows[0]?.payload)),
-    );
-    await client.query(
-      "UPDATE papot_monthly_labor_costs_state SET payload = $1::jsonb, version = version + 1, updated_at = NOW() WHERE scope = 'global'",
-      [JSON.stringify(next)],
-    );
+    const next = parseMonthlyLaborCostsPayload(transform(parseMonthlyLaborCostsPayload(current)));
+    await saveSplitState(client, "papot_monthly_labor_costs_state", laborCollections, next);
     return next;
   }, pool);
 }

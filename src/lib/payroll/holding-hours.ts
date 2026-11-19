@@ -16,7 +16,9 @@ export function holdingRecordedHoursForMonth(
   ];
   let hours = 0;
   for (const entry of rows) {
-    const part = monthlySharesForWeek(entry.week, schedule).find((s) => s.month === month);
+    const part = monthlySharesForWeek(entry.week, entry.scheduleAtEntry ?? schedule).find(
+      (s) => s.month === month,
+    );
     if (part) hours += entry.hours * part.fraction;
   }
   return Math.round(hours * 100) / 100;
