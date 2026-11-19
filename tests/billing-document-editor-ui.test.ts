@@ -40,7 +40,7 @@ describe("facturation: éditeur identique au parcours devis", () => {
   it("crée depuis le chantier et présente les projets en tableau filtrable", () => {
     const ui = readFileSync("src/components/billing-workspace.tsx", "utf8");
     expect(ui).toContain(
-      'chantierId ? "CHANTIER" : initialTab === "FOLLOWUP" ? "FOLLOWUP" : "PROJECTS"',
+      '(chantierId || quoteId) ? "CHANTIER" : initialTab === "FOLLOWUP" ? "FOLLOWUP" : "PROJECTS"',
     );
     expect(ui).toContain('role="tablist"');
     expect(ui).not.toContain("Nouvelle facture depuis devis");
