@@ -80,8 +80,8 @@ export function ChantierBillingTab({ chantierId }: { chantierId: string }) {
           </p>
           {market.requiresMarketEntry ? (
             <p role="status">
-              Ce chantier n&apos;a pas encore de marché. Ouvre Facturation pour enregistrer
-              un marché simplifié sans devis, sans inventer de montant.
+              Ce chantier n&apos;a pas encore de marché. Ouvre Facturation pour enregistrer un
+              marché simplifié sans devis, sans inventer de montant.
             </p>
           ) : (
             <details>

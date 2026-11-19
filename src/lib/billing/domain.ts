@@ -185,13 +185,7 @@ export const billingVisaRequirementSchema = z.object({
 });
 export type BillingVisaRequirement = z.infer<typeof billingVisaRequirementSchema>;
 
-export const billingVisaMethodSchema = z.enum([
-  "EMAIL",
-  "SIGNATURE",
-  "MEETING",
-  "PHONE",
-  "OTHER",
-]);
+export const billingVisaMethodSchema = z.enum(["EMAIL", "SIGNATURE", "MEETING", "PHONE", "OTHER"]);
 export type BillingVisaMethod = z.infer<typeof billingVisaMethodSchema>;
 
 export const billingVisaVersionSchema = z
@@ -220,8 +214,7 @@ export const billingVisaVersionSchema = z
     reviewedByName: z.string().trim().min(1).max(160).nullable(),
   })
   .superRefine((visa, ctx) => {
-    const invalid = (message: string) =>
-      ctx.addIssue({ code: z.ZodIssueCode.custom, message });
+    const invalid = (message: string) => ctx.addIssue({ code: z.ZodIssueCode.custom, message });
     if (visa.status === "SUBMITTED") {
       if (
         visa.acceptedHtCents !== null ||
@@ -231,7 +224,8 @@ export const billingVisaVersionSchema = z
         visa.reason !== null ||
         visa.reviewedAt !== null ||
         visa.reviewedByName !== null
-      ) invalid("BILLING_VISA_PENDING_FIELDS_INVALID");
+      )
+        invalid("BILLING_VISA_PENDING_FIELDS_INVALID");
       return;
     }
     if (!visa.reviewedAt || !visa.reviewedByName || !visa.reason) {
@@ -244,7 +238,8 @@ export const billingVisaVersionSchema = z
         visa.reviewMethod !== null ||
         visa.externalContact !== null ||
         visa.evidence !== null
-      ) invalid("BILLING_VISA_WITHDRAWAL_INVALID");
+      )
+        invalid("BILLING_VISA_WITHDRAWAL_INVALID");
       return;
     }
     if (!visa.reviewMethod || !visa.externalContact || !visa.evidence) {
@@ -257,7 +252,8 @@ export const billingVisaVersionSchema = z
           visa.acceptedHtCents <= 0 ||
           visa.acceptedHtCents >= visa.amountHtCents)) ||
       (visa.status === "REFUSED" && visa.acceptedHtCents !== 0)
-    ) invalid("BILLING_VISA_ACCEPTED_AMOUNT_INVALID");
+    )
+      invalid("BILLING_VISA_ACCEPTED_AMOUNT_INVALID");
   });
 export type BillingVisaVersion = z.infer<typeof billingVisaVersionSchema>;
 

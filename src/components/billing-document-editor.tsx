@@ -198,7 +198,8 @@ export function BillingDocumentEditor({ draftId }: { draftId: string }) {
       : [];
   const priorHt = priorProjects.reduce((sum, item) => sum + item.amountHtCents, 0);
   const latestVisa = draft && payload ? latestBillingVisa(payload, draft.id) : null;
-  const visaRequired = draft && payload ? visaRequiredForChantier(payload, draft.chantierId) : false;
+  const visaRequired =
+    draft && payload ? visaRequiredForChantier(payload, draft.chantierId) : false;
   const editorCanEdit = canWrite && latestVisa?.status !== "SUBMITTED";
   const visaBlocksApproval =
     latestVisa?.status === "SUBMITTED" ||
@@ -846,8 +847,9 @@ export function BillingDocumentEditor({ draftId }: { draftId: string }) {
           </details>
         ) : null}
         <p className="invoiceHint">
-          Les lignes libres sont intégrées au plafond du marché du chantier. Pour facturer des travaux
-          supplémentaires dépassant le contrat, ajoute un supplément au chantier et enregistre son accord.
+          Les lignes libres sont intégrées au plafond du marché du chantier. Pour facturer des
+          travaux supplémentaires dépassant le contrat, ajoute un supplément au chantier et
+          enregistre son accord.
         </p>
       </section>
 
@@ -889,8 +891,8 @@ export function BillingDocumentEditor({ draftId }: { draftId: string }) {
         <div className="invoiceFooterActions">
           {draft.status === "DRAFT" && visaBlocksApproval && (
             <p role="status">
-              La validation interne attend la décision de visa externe applicable à cette
-              situation, ou une nouvelle présentation après correction.
+              La validation interne attend la décision de visa externe applicable à cette situation,
+              ou une nouvelle présentation après correction.
             </p>
           )}
           {draft.status === "DRAFT" && (

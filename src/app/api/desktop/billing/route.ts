@@ -35,35 +35,43 @@ export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
 const billingMutationSchema = z.discriminatedUnion("action", [
-  z.object({
-    action: z.literal("SET_VISA_REQUIREMENT"),
-    chantierId: z.string().uuid(),
-    required: z.boolean(),
-  }).strict(),
-  z.object({
-    action: z.literal("PRESENT_VISA"),
-    draftId: z.string().uuid(),
-    expectedUpdatedAt: z.string().datetime({ offset: true }),
-    submittedTo: z.string().trim().min(1).max(240),
-    submittedNotes: z.string().trim().max(2000),
-  }).strict(),
-  z.object({
-    action: z.literal("REVIEW_VISA"),
-    draftId: z.string().uuid(),
-    version: z.number().int().positive(),
-    decision: z.enum(["ACCEPTED", "PARTIAL", "REFUSED"]),
-    acceptedHtCents: z.number().int().positive().safe().optional(),
-    reviewMethod: billingVisaMethodSchema,
-    externalContact: z.string().trim().min(1).max(240),
-    evidence: z.string().trim().min(1).max(2000),
-    reason: z.string().trim().min(1).max(2000),
-  }).strict(),
-  z.object({
-    action: z.literal("WITHDRAW_VISA"),
-    draftId: z.string().uuid(),
-    version: z.number().int().positive(),
-    reason: z.string().trim().min(1).max(2000),
-  }).strict(),
+  z
+    .object({
+      action: z.literal("SET_VISA_REQUIREMENT"),
+      chantierId: z.string().uuid(),
+      required: z.boolean(),
+    })
+    .strict(),
+  z
+    .object({
+      action: z.literal("PRESENT_VISA"),
+      draftId: z.string().uuid(),
+      expectedUpdatedAt: z.string().datetime({ offset: true }),
+      submittedTo: z.string().trim().min(1).max(240),
+      submittedNotes: z.string().trim().max(2000),
+    })
+    .strict(),
+  z
+    .object({
+      action: z.literal("REVIEW_VISA"),
+      draftId: z.string().uuid(),
+      version: z.number().int().positive(),
+      decision: z.enum(["ACCEPTED", "PARTIAL", "REFUSED"]),
+      acceptedHtCents: z.number().int().positive().safe().optional(),
+      reviewMethod: billingVisaMethodSchema,
+      externalContact: z.string().trim().min(1).max(240),
+      evidence: z.string().trim().min(1).max(2000),
+      reason: z.string().trim().min(1).max(2000),
+    })
+    .strict(),
+  z
+    .object({
+      action: z.literal("WITHDRAW_VISA"),
+      draftId: z.string().uuid(),
+      version: z.number().int().positive(),
+      reason: z.string().trim().min(1).max(2000),
+    })
+    .strict(),
   z
     .object({
       action: z.literal("ADD_EXTRA"),
@@ -270,9 +278,13 @@ export async function POST(request: Request) {
           drafts.some(
             (draft) => draft.chantierId === input.chantierId && draft.status === "APPROVED",
           )
-        ) throw new Error("BILLING_VISA_RULE_AFTER_APPROVAL");
+        )
+          throw new Error("BILLING_VISA_RULE_AFTER_APPROVAL");
         return setBillingVisaRequirement(
-          current, input.chantierId, input.required, context.user.displayName,
+          current,
+          input.chantierId,
+          input.required,
+          context.user.displayName,
         );
       }
       if (input.action === "PRESENT_VISA") {

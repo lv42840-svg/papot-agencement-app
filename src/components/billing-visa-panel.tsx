@@ -1,11 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import type {
-  BillingDraft,
-  BillingPayload,
-  BillingVisaMethod,
-} from "@/lib/billing/domain";
+import type { BillingDraft, BillingPayload, BillingVisaMethod } from "@/lib/billing/domain";
 import { latestBillingVisa, visaRequiredForChantier } from "@/lib/billing/visa-policy";
 
 const money = (cents: number) =>
@@ -13,9 +9,7 @@ const money = (cents: number) =>
 
 const parseMoney = (value: string) => {
   const normalized = value.replace(/\s/g, "").replace(",", ".");
-  return /^\d+(\.\d{1,2})?$/.test(normalized)
-    ? Math.round(Number(normalized) * 100)
-    : NaN;
+  return /^\d+(\.\d{1,2})?$/.test(normalized) ? Math.round(Number(normalized) * 100) : NaN;
 };
 
 const statusLabels = {
@@ -86,7 +80,9 @@ export function BillingVisaPanel({
 
   function submitVisa() {
     if (dirty || !recipient.trim()) {
-      setError("Enregistre le projet puis indique un destinataire avant de présenter la situation.");
+      setError(
+        "Enregistre le projet puis indique un destinataire avant de présenter la situation.",
+      );
       return;
     }
     void mutate(
@@ -102,7 +98,13 @@ export function BillingVisaPanel({
   }
 
   function reviewVisa() {
-    if (!latest || latest.status !== "SUBMITTED" || !contact.trim() || !evidence.trim() || !reason.trim()) {
+    if (
+      !latest ||
+      latest.status !== "SUBMITTED" ||
+      !contact.trim() ||
+      !evidence.trim() ||
+      !reason.trim()
+    ) {
       setError("Renseigne l'interlocuteur, le justificatif et le motif de la décision.");
       return;
     }
@@ -171,8 +173,16 @@ export function BillingVisaPanel({
         <strong>{latest ? statusLabels[latest.status] : "Aucune version présentée"}</strong>
         {required ? " · visa obligatoire" : " · visa facultatif"}
       </p>
-      {error && <p role="alert" style={{ color: "#a52020" }}>{error}</p>}
-      {notice && <p role="status" style={{ color: "#216f46" }}>{notice}</p>}
+      {error && (
+        <p role="alert" style={{ color: "#a52020" }}>
+          {error}
+        </p>
+      )}
+      {notice && (
+        <p role="status" style={{ color: "#216f46" }}>
+          {notice}
+        </p>
+      )}
 
       {canWrite && draft.status === "DRAFT" && !pending && (
         <div style={{ display: "grid", gap: 10, marginTop: 12 }}>
@@ -195,12 +205,7 @@ export function BillingVisaPanel({
               onChange={(event) => setPresentationNotes(event.target.value)}
             />
           </label>
-          <button
-            type="button"
-            className="secondaryButton"
-            disabled={!canAct}
-            onClick={submitVisa}
-          >
+          <button type="button" className="secondaryButton" disabled={!canAct} onClick={submitVisa}>
             Enregistrer la présentation provisoire
           </button>
           <small>
@@ -242,7 +247,9 @@ export function BillingVisaPanel({
               onChange={(event) => setMethod(event.target.value as BillingVisaMethod)}
             >
               {Object.entries(methodLabels).map(([value, title]) => (
-                <option key={value} value={value}>{title}</option>
+                <option key={value} value={value}>
+                  {title}
+                </option>
               ))}
             </select>
           </label>
@@ -301,7 +308,9 @@ export function BillingVisaPanel({
           >
             Retirer cette présentation
           </button>
-          <p>Les modifications du brouillon sont bloquées tant que cette version attend une décision.</p>
+          <p>
+            Les modifications du brouillon sont bloquées tant que cette version attend une décision.
+          </p>
         </div>
       )}
 
@@ -311,11 +320,13 @@ export function BillingVisaPanel({
       ) : (
         <div style={{ display: "grid", gap: 8 }}>
           {[...versions].reverse().map((version) => (
-            <details key={version.id} style={{ padding: 10, border: "1px solid #ddd", borderRadius: 8 }}>
+            <details
+              key={version.id}
+              style={{ padding: 10, border: "1px solid #ddd", borderRadius: 8 }}
+            >
               <summary>
-                V{version.version} · {statusLabels[version.status]} ·{" "}
-                {money(version.amountHtCents)} HT ·{" "}
-                {new Date(version.submittedAt).toLocaleDateString("fr-FR")}
+                V{version.version} · {statusLabels[version.status]} · {money(version.amountHtCents)}{" "}
+                HT · {new Date(version.submittedAt).toLocaleDateString("fr-FR")}
               </summary>
               <p>
                 Présentée à {version.submittedTo} par {version.submittedByName}.
@@ -333,16 +344,15 @@ export function BillingVisaPanel({
                 </p>
               )}
               <p>
-                Instantané : {version.documentLabel}, {version.documentLines.length} lignes,
-                total {money(version.totalTtcCents)} TTC.
+                Instantané : {version.documentLabel}, {version.documentLines.length} lignes, total{" "}
+                {money(version.totalTtcCents)} TTC.
               </p>
               <details>
                 <summary>Voir les lignes de cette version</summary>
                 <ul>
                   {version.documentLines.map((line) => (
                     <li key={line.id}>
-                      {line.description}{" "}
-                      {line.origin === "TITLE" ? "(titre)" : ""}
+                      {line.description} {line.origin === "TITLE" ? "(titre)" : ""}
                     </li>
                   ))}
                 </ul>

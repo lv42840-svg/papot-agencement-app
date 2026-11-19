@@ -1,11 +1,13 @@
 import { calculateInvoiceDocumentTotals } from "./document-lines";
-import {
-  billingVisaRequirementSchema,
-  billingVisaVersionSchema,
-} from "./domain";
+import { billingVisaRequirementSchema, billingVisaVersionSchema } from "./domain";
 import type { BillingPayload, BillingVisaMethod } from "./domain";
 import { assertBillingVisaEditable, latestBillingVisa } from "./visa-policy";
-export { assertBillingVisaEditable, assertBillingVisaAllowsApproval, latestBillingVisa, visaRequiredForChantier } from "./visa-policy";
+export {
+  assertBillingVisaEditable,
+  assertBillingVisaAllowsApproval,
+  latestBillingVisa,
+  visaRequiredForChantier,
+} from "./visa-policy";
 
 export function setBillingVisaRequirement(
   payload: BillingPayload,
@@ -26,10 +28,7 @@ export function setBillingVisaRequirement(
   });
   return {
     ...payload,
-    visaRequirements: [
-      ...rules.filter((rule) => rule.chantierId !== chantierId),
-      next,
-    ],
+    visaRequirements: [...rules.filter((rule) => rule.chantierId !== chantierId), next],
   };
 }
 
@@ -62,7 +61,8 @@ export function presentBillingVisa(
     totals.amountHtCents !== draft.amountHtCents ||
     totals.vatCents !== draft.vatCents ||
     totals.totalTtcCents !== draft.totalTtcCents
-  ) throw new Error("BILLING_APPROVAL_TOTALS_MISMATCH");
+  )
+    throw new Error("BILLING_APPROVAL_TOTALS_MISMATCH");
 
   const version = billingVisaVersionSchema.parse({
     id: globalThis.crypto.randomUUID(),

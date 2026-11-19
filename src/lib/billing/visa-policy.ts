@@ -36,15 +36,13 @@ export function assertBillingVisaAllowsApproval(
   if (latest?.status === "REFUSED") throw new Error("BILLING_VISA_REFUSED");
   if (
     latest?.status === "ACCEPTED" &&
-    (
-      latest.draftUpdatedAt !== draft.updatedAt ||
+    (latest.draftUpdatedAt !== draft.updatedAt ||
       latest.documentLabel !== draft.label ||
       latest.documentNotes !== draft.notes ||
       latest.amountHtCents !== draft.amountHtCents ||
       latest.vatCents !== draft.vatCents ||
       latest.totalTtcCents !== draft.totalTtcCents ||
-      JSON.stringify(latest.documentLines) !== JSON.stringify(draft.documentLines)
-    )
+      JSON.stringify(latest.documentLines) !== JSON.stringify(draft.documentLines))
   ) {
     throw new Error("BILLING_VISA_STALE");
   }
@@ -52,4 +50,3 @@ export function assertBillingVisaAllowsApproval(
     throw new Error("BILLING_VISA_REQUIRED");
   }
 }
-
