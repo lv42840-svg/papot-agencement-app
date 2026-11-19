@@ -12,6 +12,7 @@ import {
   X,
 } from "lucide-react";
 import Link from "next/link";
+import { CompanyLookup } from "@/components/company-lookup";
 import { useSearchParams } from "next/navigation";
 import { FormEvent, useCallback, useEffect, useMemo, useState } from "react";
 import {
@@ -591,6 +592,23 @@ export function ClientsWorkspace() {
                           required
                         />
                       </label>
+                      <div className="clientsFieldWide">
+                        <CompanyLookup
+                          query={draft.companyName}
+                          disabled={!identityEditable}
+                          onSelect={(company) => {
+                            setDraft((current) => ({
+                              ...current,
+                              type: "ENTREPRISE",
+                              companyName: company.name,
+                              siret: company.siret,
+                              addressLine1: company.addressLine1 || current.addressLine1,
+                              postalCode: company.postalCode || current.postalCode,
+                              city: company.city || current.city,
+                            }));
+                          }}
+                        />
+                      </div>
                       <label className="clientsField">
                         SIRET
                         <input
