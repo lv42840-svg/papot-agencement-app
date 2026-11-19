@@ -1,12 +1,14 @@
 import type { ClientsPayload } from "./domain";
 import type { ClientsActor, ClientsMutation, ClientsMutationResult } from "./mutations";
 
+export type ClientsMutationOptions = { source: "commercialProvisional" };
+
 export interface ClientsRepository {
   load(): Promise<ClientsPayload>;
   mutate(
     input: ClientsMutation,
     actor: ClientsActor,
-    options?: { source: "commercialProvisional" },
+    options?: ClientsMutationOptions,
   ): Promise<ClientsMutationResult>;
 }
 
