@@ -1,0 +1,31 @@
+name: One-time billing provisional PDF formatting
+on:
+  pull_request:
+    paths:
+      - ".github/workflows/billing-provisional-pdf-format-once.yml"
+permissions:
+  contents: write
+jobs:
+  format:
+    if: github.event.pull_request.number == 280 && github.event.pull_request.head.repo.full_name == github.repository && github.head_ref == 'feat/billing-chantier-market-foundation'
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.ref }}
+          persist-credentials: true
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - name: Prettier on the provisional PDF files
+        run: |
+          npx prettier --write src/lib/billing/visa-provisional-pdf.ts src/lib/billing/domain.ts src/lib/billing/visa.ts src/components/billing-visa-panel.tsx src/app/api/desktop/billing/\[draftId\]/visa/\[version\]/pdf/route.ts tests/billing-visa-provisional-pdf.test.ts tests/billing-visa-pdf-download-ui.test.ts tests/billing-visa-pdf.integration.test.ts .github/workflows/ci.yml
+      - name: Commit formatting
+        run: |
+          git add src/lib/billing/visa-provisional-pdf.ts src/lib/billing/domain.ts src/lib/billing/visa.ts src/components/billing-visa-panel.tsx src/app/api/desktop/billing tests/billing-visa-provisional-pdf.test.ts tests/billing-visa-pdf-download-ui.test.ts tests/billing-visa-pdf.integration.test.ts .github/workflows/ci.yml
+          if ! git diff --cached --quiet; then
+            git -c user.name='github-actions[bot]' -c user.email='41898282+github-actions[bot]@users.noreply.github.com' commit -m 'style(billing): format provisional PDF export and tests'
+            git push origin HEAD:feat/billing-chantier-market-foundation
+          fi
