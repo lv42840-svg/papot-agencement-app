@@ -438,3 +438,41 @@ test("Agencement cookie default matches deployment and supports override", () =>
   });
   assert.equal(custom.sources.agencement.cookie, "different_agencement_cookie");
 });
+
+test("health verifies storage readiness and fails safely if ACL state is damaged", async () => {
+  const testRoot = await mkdtemp(`${tmpdir()}/papot-health-root-`);
+  const testAcl = await mkdtemp(`${tmpdir()}/papot-health-acl-`);
+  const aclFile = `${testAcl}/access.json`;
+  const goodAcl = JSON.stringify({ format: 1, revision: 0, users: {}, grants: {} });
+  await writeFile(aclFile, goodAcl);
+  const instance = createExplorer(
+    configFromEnv({
+      SRV_SESSION_KEY: randomBytes(32).toString("hex"),
+      SRV_ROOT: testRoot,
+      SRV_ADMIN_SOURCE: "agencement",
+      SRV_ADMIN_USER_ID: "admin",
+      SRV_ACCESS_FILE: aclFile,
+    }),
+  );
+  const endpoint = await listen(instance);
+  try {
+    let response = await fetch(`${endpoint}/health`);
+    assert.equal(response.status, 200);
+    assert.deepEqual(await response.json(), { ok: true });
+
+    await writeFile(aclFile, "invalid json");
+    response = await fetch(`${endpoint}/health`);
+    assert.equal(response.status, 503);
+    assert.deepEqual(await response.json(), { ok: false });
+
+    await writeFile(aclFile, goodAcl);
+    await rm(testRoot, { recursive: true, force: true });
+    response = await fetch(`${endpoint}/health`);
+    assert.equal(response.status, 503);
+    assert.deepEqual(await response.json(), { ok: false });
+  } finally {
+    await close(instance);
+    await rm(testRoot, { recursive: true, force: true });
+    await rm(testAcl, { recursive: true, force: true });
+  }
+});
