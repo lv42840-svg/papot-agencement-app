@@ -14,9 +14,7 @@ export type InvoiceOuvrageGroup = {
 };
 
 /** The same section/subsection hierarchy as the devis, with totals per ouvrage. */
-export function groupInvoiceOuvrages(
-  lines: readonly BillingDocumentLine[],
-): InvoiceOuvrageGroup[] {
+export function groupInvoiceOuvrages(lines: readonly BillingDocumentLine[]): InvoiceOuvrageGroup[] {
   const groups: InvoiceOuvrageGroup[] = [];
   let current: InvoiceOuvrageGroup | null = null;
   let section: InvoiceOuvrageGroup | null = null;
@@ -80,14 +78,12 @@ export function groupInvoiceOuvrages(
  * A subsection only moves within the current main title.
  * A single prestation never jumps over a heading.
  */
-export function moveInvoiceEditorRow<T extends {
-  origin: string;
-  headingLevel?: "SECTION" | "SUBSECTION";
-}>(
-  rows: readonly T[],
-  index: number,
-  direction: -1 | 1,
-): readonly T[] {
+export function moveInvoiceEditorRow<
+  T extends {
+    origin: string;
+    headingLevel?: "SECTION" | "SUBSECTION";
+  },
+>(rows: readonly T[], index: number, direction: -1 | 1): readonly T[] {
   const row = rows[index];
   if (!row) return rows;
   if (row.origin !== "TITLE") {

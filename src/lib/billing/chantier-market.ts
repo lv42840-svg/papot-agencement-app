@@ -1,10 +1,7 @@
 import type { ChantierRecord } from "@/lib/chantiers/domain";
 import type { BillingDraft, BillingSource, BillingManualMarket } from "./domain";
 
-type ChantierIdentity = Pick<
-  ChantierRecord,
-  "id" | "name" | "number" | "clientName" | "status"
->;
+type ChantierIdentity = Pick<ChantierRecord, "id" | "name" | "number" | "clientName" | "status">;
 
 export type ChantierBillingMarket = {
   chantierId: string;

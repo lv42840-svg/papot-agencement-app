@@ -70,7 +70,8 @@ function followSourceStructure(
 ): BillingDocumentLine[] {
   if (!structure?.length) return rows;
   const bySourceId = new Map(
-    rows.filter((line) => line.origin === "QUOTE" && line.sourceLineId !== null)
+    rows
+      .filter((line) => line.origin === "QUOTE" && line.sourceLineId !== null)
       .map((line) => [line.sourceLineId, line]),
   );
   const used = new Set<string>();
@@ -162,10 +163,7 @@ export function buildInvoiceDocumentLines(
       }, 0);
       // Previous deposit and situation documents may have charged this line already.
       // Prior amounts must be deducted line by line, not spread again across all devis.
-      return Math.max(
-        0,
-        target - Math.max(previousTarget, previousAmounts.get(line.lineId) ?? 0),
-      );
+      return Math.max(0, target - Math.max(previousTarget, previousAmounts.get(line.lineId) ?? 0));
     });
     const allocated = distributeAmounts(matching, group.baseHtCents, weights);
     matching.forEach((source, index) => {

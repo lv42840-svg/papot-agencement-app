@@ -27,10 +27,7 @@ export async function GET() {
       payload.drafts,
       payload.manualMarkets ?? [],
     );
-    return NextResponse.json(
-      { markets },
-      { headers: { "Cache-Control": "no-store" } },
-    );
+    return NextResponse.json({ markets }, { headers: { "Cache-Control": "no-store" } });
   } catch (error) {
     const code = error instanceof Error ? error.message : "BILLING_MARKETS_LOAD_FAILED";
     return NextResponse.json(

@@ -80,8 +80,8 @@ export function ChantierBillingTab({ chantierId }: { chantierId: string }) {
           </p>
           {market.requiresMarketEntry ? (
             <p role="status">
-              Ce chantier n&apos;a pas de devis retenu. La saisie d&apos;un marché sans devis
-              sera ouverte dans une prochaine étape ; aucun montant n&apos;est inventé.
+              Ce chantier n&apos;a pas de devis retenu. La saisie d&apos;un marché sans devis sera
+              ouverte dans une prochaine étape ; aucun montant n&apos;est inventé.
             </p>
           ) : (
             <details>
@@ -97,12 +97,14 @@ export function ChantierBillingTab({ chantierId }: { chantierId: string }) {
           )}
           {market.quoteCount > 1 && (
             <p>
-              Le marché est consolidé ici. La préparation d&apos;une facture unique sur
-              plusieurs devis reste à développer ; le formulaire actuel travaille par devis.
+              Le marché est consolidé ici. La préparation d&apos;une facture unique sur plusieurs
+              devis reste à développer ; le formulaire actuel travaille par devis.
             </p>
           )}
           {market.preparationExceedsContract && (
-            <p role="alert">Les projets préparés dépassent le marché connu : vérification nécessaire.</p>
+            <p role="alert">
+              Les projets préparés dépassent le marché connu : vérification nécessaire.
+            </p>
           )}
         </section>
       )}

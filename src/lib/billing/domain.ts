@@ -164,10 +164,7 @@ export function preparedHtCents(
     .reduce((sum, draft) => sum + draft.amountHtCents, 0);
 }
 
-export function belongsToBillingSource(
-  draft: BillingDraft,
-  source: BillingSource,
-): boolean {
+export function belongsToBillingSource(draft: BillingDraft, source: BillingSource): boolean {
   if (source.sourceMode === "CHANTIER") {
     return Boolean(source.chantierId && draft.chantierId === source.chantierId);
   }
@@ -393,11 +390,7 @@ export function updateBillingDraft(
   }
   if (amountHtCents !== draft.amountHtCents) {
     const draftIndex = payload.drafts.findIndex((item) => item.id === draftId);
-    if (
-      payload.drafts
-        .slice(draftIndex + 1)
-        .some((item) => item.chantierId === draft.chantierId)
-    ) {
+    if (payload.drafts.slice(draftIndex + 1).some((item) => item.chantierId === draft.chantierId)) {
       throw new Error("BILLING_DRAFT_HAS_DEPENDENTS");
     }
   }
@@ -524,11 +517,11 @@ export function updateBillingDocument(
     );
   if (
     (financialChange || progressChanged) &&
-    payload.drafts.slice(index + 1).some(
-      (candidate) =>
-        candidate.chantierId !== null &&
-        candidate.chantierId === draft.chantierId,
-    )
+    payload.drafts
+      .slice(index + 1)
+      .some(
+        (candidate) => candidate.chantierId !== null && candidate.chantierId === draft.chantierId,
+      )
   ) {
     throw new Error("BILLING_DRAFT_HAS_DEPENDENTS");
   }

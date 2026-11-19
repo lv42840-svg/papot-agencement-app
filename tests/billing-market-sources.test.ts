@@ -1,5 +1,9 @@
 import { describe, expect, it } from "vitest";
-import { createBillingDraft, type BillingManualMarket, type BillingSource } from "../src/lib/billing/domain";
+import {
+  createBillingDraft,
+  type BillingManualMarket,
+  type BillingSource,
+} from "../src/lib/billing/domain";
 import { buildChantierMarketSources } from "../src/lib/billing/market-sources";
 import { calculateLineProgress } from "../src/lib/billing/progress";
 import { billingPreparationFollowup } from "../src/lib/billing/preparation-followup";
@@ -27,9 +31,7 @@ const quote = (quoteId: string, lineId: string, amount: number): BillingSource =
   quoteLabel: quoteId,
   contractHtCents: amount,
   contractTaxGroups: [{ ratePercent: 20, baseHtCents: amount }],
-  lines: [
-    { lineId, description: "Ouvrage", amountHtCents: amount, vatRatePercent: 20 },
-  ],
+  lines: [{ lineId, description: "Ouvrage", amountHtCents: amount, vatRatePercent: 20 }],
   structure: [
     { kind: "TITLE", title: "Mobilier" },
     { kind: "LINE", lineId },
@@ -39,11 +41,7 @@ const empty = { schemaVersion: 1 as const, drafts: [] };
 
 describe("moteur marché unique par chantier", () => {
   const market = () =>
-    buildChantierMarketSources(
-      [chantier],
-      [quote(q1, l1, 80_000), quote(q2, l2, 120_000)],
-      [],
-    )[0];
+    buildChantierMarketSources([chantier], [quote(q1, l1, 80_000), quote(q2, l2, 120_000)], [])[0];
 
   it("assemble deux devis sans perdre la provenance des prestations", () => {
     const source = market();

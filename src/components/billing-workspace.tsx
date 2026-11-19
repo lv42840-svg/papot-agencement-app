@@ -91,13 +91,11 @@ export function BillingWorkspace({
     }))
     .sort((a, b) => a.name.localeCompare(b.name, "fr-FR"));
   const linkedChantierId = allSources.find(
-    (source) =>
-      source.sourceQuoteIds?.includes(quoteId ?? "") ||
-      source.quoteId === quoteId,
+    (source) => source.sourceQuoteIds?.includes(quoteId ?? "") || source.quoteId === quoteId,
   )?.chantierId;
   const activeChantierId = chantierChoices.some((site) => site.id === selectedChantier)
     ? selectedChantier
-    : linkedChantierId ?? chantierChoices[0]?.id ?? "";
+    : (linkedChantierId ?? chantierChoices[0]?.id ?? "");
   const sources = allSources.filter((source) => source.chantierId === activeChantierId);
   const active =
     sources.find(
@@ -237,7 +235,9 @@ export function BillingWorkspace({
           BILLING_MARKET_ALREADY_PREPARED:
             "Le marché ne peut plus être modifié après la création d'un projet. Une régularisation devra être enregistrée.",
         };
-        throw new Error(descriptions[result.error ?? ""] ?? result.error ?? "Erreur de facturation");
+        throw new Error(
+          descriptions[result.error ?? ""] ?? result.error ?? "Erreur de facturation",
+        );
       }
       await refresh();
       setNotice(success);
@@ -413,8 +413,8 @@ export function BillingWorkspace({
             <div className="invoiceCard">
               <h3>Chantier sans devis retenu</h3>
               <p>
-                Renseigne un marché simplifié pour préparer une facture. Ce montant constitue
-                une base de travail interne, sans émission officielle.
+                Renseigne un marché simplifié pour préparer une facture. Ce montant constitue une
+                base de travail interne, sans émission officielle.
               </p>
               <label>
                 Désignation des travaux
@@ -455,8 +455,8 @@ export function BillingWorkspace({
               <div>
                 <strong>Marché global du chantier</strong>
                 <p>
-                  {active?.quoteLabel} · {active?.lines?.length ?? 0} prestations.
-                  Tous les devis retenus de ce chantier sont regroupés dans un seul projet.
+                  {active?.quoteLabel} · {active?.lines?.length ?? 0} prestations. Tous les devis
+                  retenus de ce chantier sont regroupés dans un seul projet.
                 </p>
               </div>
               <p>

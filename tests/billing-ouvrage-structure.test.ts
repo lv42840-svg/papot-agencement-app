@@ -5,10 +5,7 @@ import {
   type BillingDocumentLine,
   type BillingSource,
 } from "../src/lib/billing/domain";
-import {
-  groupInvoiceOuvrages,
-  moveInvoiceEditorRow,
-} from "../src/lib/billing/ouvrage-structure";
+import { groupInvoiceOuvrages, moveInvoiceEditorRow } from "../src/lib/billing/ouvrage-structure";
 
 const source: BillingSource = {
   quoteId: "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa",
@@ -51,12 +48,7 @@ describe("ouvrages de la facture", () => {
       "Lucien",
     );
     const lines = draft.documentLines ?? [];
-    expect(lines.map((line) => line.description)).toEqual([
-      "Mobilier",
-      "Meuble",
-      "Pose",
-      "Pose",
-    ]);
+    expect(lines.map((line) => line.description)).toEqual(["Mobilier", "Meuble", "Pose", "Pose"]);
     expect(lines.filter((line) => line.origin === "TITLE")).toHaveLength(2);
     const groups = groupInvoiceOuvrages(lines);
     expect(groups.map((group) => group.amountHtCents)).toEqual([20_000, 10_000]);
@@ -100,10 +92,22 @@ describe("ouvrages de la facture", () => {
       { id: "c", origin: "FREE" },
     ];
     expect(moveInvoiceEditorRow(rows, 0, 1).map((item) => item.id)).toEqual([
-      "t2", "c", "t1", "s1", "a", "s2", "b",
+      "t2",
+      "c",
+      "t1",
+      "s1",
+      "a",
+      "s2",
+      "b",
     ]);
     expect(moveInvoiceEditorRow(rows, 1, 1).map((item) => item.id)).toEqual([
-      "t1", "s2", "b", "s1", "a", "t2", "c",
+      "t1",
+      "s2",
+      "b",
+      "s1",
+      "a",
+      "t2",
+      "c",
     ]);
     expect(moveInvoiceEditorRow(rows, 3, 1)).toBe(rows);
     expect(moveInvoiceEditorRow(rows, 1, -1)).toBe(rows);

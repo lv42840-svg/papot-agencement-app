@@ -126,7 +126,8 @@ function statusFor(code: string): number {
     code === "BILLING_MARKET_ALREADY_PREPARED" ||
     code === "BILLING_MARKET_LINES_LIMIT" ||
     code === "BILLING_MARKET_LINE_DUPLICATE"
-  ) return 409;
+  )
+    return 409;
   if (
     code === "BILLING_VERSION_CONFLICT" ||
     code === "BILLING_AMOUNT_EXCEEDS_CONTRACT" ||
@@ -215,16 +216,15 @@ export async function POST(request: Request) {
           throw new Error("BILLING_MARKET_WITHOUT_CLIENT");
         }
         const markets = [...(current.manualMarkets ?? [])];
-        const existingIndex = markets.findIndex(
-          (item) => item.chantierId === chantier.id,
-        );
+        const existingIndex = markets.findIndex((item) => item.chantierId === chantier.id);
         const existing = markets[existingIndex];
         if (
           existing &&
           existing.description === input.description &&
           existing.amountHtCents === input.amountHtCents &&
           existing.vatRatePercent === input.vatRatePercent
-        ) return current;
+        )
+          return current;
         if (drafts.some((draft) => draft.chantierId === chantier.id)) {
           throw new Error("BILLING_MARKET_ALREADY_PREPARED");
         }
@@ -287,9 +287,7 @@ export async function POST(request: Request) {
           throw new Error("BILLING_VERSION_CONFLICT");
         }
         if (
-          drafts
-            .slice(index + 1)
-            .some((draft) => draft.chantierId === drafts[index].chantierId)
+          drafts.slice(index + 1).some((draft) => draft.chantierId === drafts[index].chantierId)
         ) {
           throw new Error("BILLING_DRAFT_HAS_DEPENDENTS");
         }

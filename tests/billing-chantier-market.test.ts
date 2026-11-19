@@ -1,7 +1,5 @@
 import { describe, expect, it } from "vitest";
-import {
-  summarizeChantierBillingMarkets,
-} from "../src/lib/billing/chantier-market";
+import { summarizeChantierBillingMarkets } from "../src/lib/billing/chantier-market";
 import { createBillingDraft, type BillingSource } from "../src/lib/billing/domain";
 
 const chantierId = "11111111-1111-4111-8111-111111111111";
@@ -37,11 +35,7 @@ describe("marché global de facturation par chantier", () => {
       { requestId: crypto.randomUUID(), type: "DEPOSIT", amountHtCents: 30_000 },
       "Nadia",
     );
-    const markets = summarizeChantierBillingMarkets(
-      [chantier(chantierId)],
-      [a, b],
-      [draft],
-    );
+    const markets = summarizeChantierBillingMarkets([chantier(chantierId)], [a, b], [draft]);
     expect(markets[0]).toMatchObject({
       quoteCount: 2,
       draftCount: 1,
@@ -54,11 +48,7 @@ describe("marché global de facturation par chantier", () => {
   });
 
   it("conserve la visibilité d'un chantier sans devis, sans inventer de montant", () => {
-    const [market] = summarizeChantierBillingMarkets(
-      [chantier(chantierWithoutQuote)],
-      [],
-      [],
-    );
+    const [market] = summarizeChantierBillingMarkets([chantier(chantierWithoutQuote)], [], []);
     expect(market.requiresMarketEntry).toBe(true);
     expect(market.contractHtCents).toBe(0);
     expect(market.remainingToPrepareHtCents).toBe(0);
@@ -90,20 +80,16 @@ describe("marché global de facturation par chantier", () => {
 
   it("signale les sources dupliquées et un dépassement de préparation", () => {
     const a = source("aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa", 100_000);
-    expect(() =>
-      summarizeChantierBillingMarkets([chantier(chantierId)], [a, a], []),
-    ).toThrow("BILLING_CHANTIER_MARKET_QUOTE_DUPLICATE");
+    expect(() => summarizeChantierBillingMarkets([chantier(chantierId)], [a, a], [])).toThrow(
+      "BILLING_CHANTIER_MARKET_QUOTE_DUPLICATE",
+    );
     const draft = createBillingDraft(
       { schemaVersion: 1, drafts: [] },
       a,
       { requestId: crypto.randomUUID(), type: "STANDARD" },
       "Nadia",
     );
-    const market = summarizeChantierBillingMarkets(
-      [chantier(chantierId)],
-      [],
-      [draft],
-    )[0];
+    const market = summarizeChantierBillingMarkets([chantier(chantierId)], [], [draft])[0];
     expect(market.preparationExceedsContract).toBe(true);
   });
 });

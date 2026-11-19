@@ -466,9 +466,9 @@ export function BillingDocumentEditor({ draftId }: { draftId: string }) {
       </header>
 
       <aside className="invoiceDraftNotice">
-        Tu modifies une <strong>copie du marché du chantier</strong>, uniquement pour ce projet.
-        Les devis retenus restent inchangés. Ce document n&apos;a ni numéro officiel, ni PDF émis,
-        ni envoi Pennylane.
+        Tu modifies une <strong>copie du marché du chantier</strong>, uniquement pour ce projet. Les
+        devis retenus restent inchangés. Ce document n&apos;a ni numéro officiel, ni PDF émis, ni
+        envoi Pennylane.
       </aside>
       {error && (
         <p className="invoiceError" role="alert">
@@ -530,8 +530,8 @@ export function BillingDocumentEditor({ draftId }: { draftId: string }) {
       <section className="invoiceCard">
         <h2>Déjà préparé sur ce chantier</h2>
         <p>
-          Ces montants correspondent aux anciens projets, acomptes et situations du chantier,
-          même issus de plusieurs devis. Ils ne sont pas des factures officiellement émises.
+          Ces montants correspondent aux anciens projets, acomptes et situations du chantier, même
+          issus de plusieurs devis. Ils ne sont pas des factures officiellement émises.
         </p>
         {priorProjects.length === 0 ? (
           <p>Aucun acompte ni situation précédemment préparé sur ce devis.</p>
@@ -735,9 +735,7 @@ export function BillingDocumentEditor({ draftId }: { draftId: string }) {
                           <button
                             title="Monter"
                             aria-label={`Monter ligne ${index + 1}`}
-                            disabled={
-                              moveInvoiceEditorRow(rows, index, -1) === rows || busy
-                            }
+                            disabled={moveInvoiceEditorRow(rows, index, -1) === rows || busy}
                             onClick={() => reorder(index, -1)}
                           >
                             <ArrowUp size={14} />
@@ -745,9 +743,7 @@ export function BillingDocumentEditor({ draftId }: { draftId: string }) {
                           <button
                             title="Descendre"
                             aria-label={`Descendre ligne ${index + 1}`}
-                            disabled={
-                              moveInvoiceEditorRow(rows, index, 1) === rows || busy
-                            }
+                            disabled={moveInvoiceEditorRow(rows, index, 1) === rows || busy}
                             onClick={() => reorder(index, 1)}
                           >
                             <ArrowDown size={14} />
