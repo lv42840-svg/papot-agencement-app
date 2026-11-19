@@ -76,6 +76,7 @@ const errors: Record<string, string> = {
   COMMERCIAL_CASE_NOT_FOUND: "Cette affaire n’existe plus.",
   COMMERCIAL_CLIENT_NOT_FOUND: "Ce client n’existe plus.",
   COMMERCIAL_CLIENT_REQUIRED: "Choisis ou crée un client avant de continuer.",
+  CLIENT_SIRET_EXISTS: "Ce SIRET est déjà associé à un client. Choisis sa fiche dans « Client existant ».",
   CLIENTS_LOCKED:
     "Le fichier clients est modifié sur un autre poste. Réessaie dans quelques secondes.",
   CLIENTS_VERSION_CONFLICT: "Le fichier clients a changé sur un autre poste. Réessaie.",
