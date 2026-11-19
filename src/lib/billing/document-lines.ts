@@ -148,7 +148,9 @@ export function buildInvoiceDocumentLines(
       const target = draft.lineProgress?.find(
         (row) => row.lineId === line.lineId,
       )?.cumulativeHtCents;
-      if (target === undefined) return line.amountHtCents;
+      if (target === undefined) {
+        return Math.max(0, line.amountHtCents - (previousAmounts.get(line.lineId) ?? 0));
+      }
       const previousTarget = previousSituations.reduce((maximum, item) => {
         const row = item.lineProgress?.find((entry) => entry.lineId === line.lineId);
         if (!row && !item.lines?.some((candidate) => candidate.lineId === line.lineId)) {

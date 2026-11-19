@@ -112,6 +112,30 @@ describe("moteur marché unique par chantier", () => {
     expect(draft.amountHtCents).toBe(98_000);
   });
 
+  it("ne refacture pas les lignes d'un devis déjà soldé", () => {
+    const legacy = createBillingDraft(
+      empty,
+      quote(q1, l1, 80_000),
+      { requestId: crypto.randomUUID(), type: "STANDARD" },
+      "Nadia",
+    );
+    const final = createBillingDraft(
+      { schemaVersion: 1, drafts: [legacy] },
+      market(),
+      { requestId: crypto.randomUUID(), type: "FINAL" },
+      "Lucien",
+    );
+    expect(final.amountHtCents).toBe(120_000);
+    expect(
+      final.documentLines
+        ?.filter((line) => line.origin === "QUOTE")
+        .map((line) => [line.sourceLineId, line.unitPriceCents]),
+    ).toEqual([
+      [l1, 0],
+      [l2, 120_000],
+    ]);
+  });
+
   it("refuse les devis d'un autre client dans le marché", () => {
     expect(() =>
       buildChantierMarketSources(
