@@ -101,6 +101,27 @@ describe("PDF des versions de visa provisoires", () => {
     expect(data).toContain("PROVISOIRE - NON FACTURE - AUCUN ENVOI PENNYLANE");
   });
 
+  it("interrompt une exportation disproportionnée pour protéger le serveur", () => {
+    const payload = prepare();
+    const draft = payload.drafts[0];
+    const visa = payload.visaVersions![0];
+    const description = Array.from(
+      { length: 180 },
+      (_, index) => `Prestation${index}`,
+    ).join(" ");
+    const bulk = {
+      ...visa,
+      documentLines: Array.from({ length: 250 }, (_, index) => ({
+        ...visa.documentLines[0],
+        id: crypto.randomUUID(),
+        description: `${description} - ligne ${index}`,
+      })),
+    };
+    expect(() => generateBillingVisaProvisionalPdf(bulk, draft)).toThrow(
+      "BILLING_VISA_PDF_PAGE_LIMIT",
+    );
+  });
+
   it("interdit le PDF d'un brouillon qui ne correspond pas à la version", () => {
     const payload = prepare();
     const visa = payload.visaVersions![0];

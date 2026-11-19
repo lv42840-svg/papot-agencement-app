@@ -98,6 +98,7 @@ export function generateBillingVisaProvisionalPdf(
     cursor = 245;
   }
   function addPage() {
+    if (pages.length >= 200) throw new Error("BILLING_VISA_PDF_PAGE_LIMIT");
     commands = [];
     pages.push(commands);
     header();
