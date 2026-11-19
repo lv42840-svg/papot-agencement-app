@@ -1,0 +1,57 @@
+name: Format client Pennylane fix
+
+on:
+  push:
+    branches:
+      - fix/clients-pennylane-siret-new-client-20261119
+
+permissions:
+  contents: write
+
+jobs:
+  format:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: true
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - name: Format changed files
+        run: |
+          npx prettier --write \
+            src/lib/pennylane/customers.ts \
+            src/lib/pennylane/customer-siret.ts \
+            src/lib/pennylane/customer-import-store.ts \
+            src/lib/clients/repository.ts \
+            src/lib/clients/postgres-repository.ts \
+            src/app/api/desktop/clients/route.ts \
+            src/components/clients-workspace.tsx \
+            tests/pennylane-customers.test.ts \
+            tests/pennylane-customer-siret.test.ts \
+            tests/pennylane-customers.integration.test.ts \
+            docs/pennylane-customers-import.md
+          git diff --check
+      - name: Commit formatting
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          if ! git diff --quiet; then
+            git add \
+            src/lib/pennylane/customers.ts \
+            src/lib/pennylane/customer-siret.ts \
+            src/lib/pennylane/customer-import-store.ts \
+            src/lib/clients/repository.ts \
+            src/lib/clients/postgres-repository.ts \
+            src/app/api/desktop/clients/route.ts \
+            src/components/clients-workspace.tsx \
+            tests/pennylane-customers.test.ts \
+            tests/pennylane-customer-siret.test.ts \
+            tests/pennylane-customers.integration.test.ts \
+            docs/pennylane-customers-import.md
+            git commit -m "style: format client Pennylane and SIRET fixes"
+            git push origin HEAD:fix/clients-pennylane-siret-new-client-20261119
+          fi
