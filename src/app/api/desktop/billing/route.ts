@@ -21,6 +21,13 @@ import { clientDisplayName } from "@/lib/clients/domain";
 import { createCommercialRepository } from "@/lib/commercial/create-repository";
 import { buildChantierMarketSources } from "@/lib/billing/market-sources";
 import { addBillingExtra, confirmBillingExtra } from "@/lib/billing/extras";
+import {
+  presentBillingVisa,
+  recordBillingVisaDecision,
+  setBillingVisaRequirement,
+  withdrawBillingVisa,
+} from "@/lib/billing/visa";
+import { billingVisaMethodSchema } from "@/lib/billing/domain";
 import { vatRatePercentSchema } from "@/lib/vat";
 import { loadBillingSources } from "@/lib/billing/sources";
 
@@ -28,6 +35,35 @@ export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
 const billingMutationSchema = z.discriminatedUnion("action", [
+  z.object({
+    action: z.literal("SET_VISA_REQUIREMENT"),
+    chantierId: z.string().uuid(),
+    required: z.boolean(),
+  }).strict(),
+  z.object({
+    action: z.literal("PRESENT_VISA"),
+    draftId: z.string().uuid(),
+    expectedUpdatedAt: z.string().datetime({ offset: true }),
+    submittedTo: z.string().trim().min(1).max(240),
+    submittedNotes: z.string().trim().max(2000),
+  }).strict(),
+  z.object({
+    action: z.literal("REVIEW_VISA"),
+    draftId: z.string().uuid(),
+    version: z.number().int().positive(),
+    decision: z.enum(["ACCEPTED", "PARTIAL", "REFUSED"]),
+    acceptedHtCents: z.number().int().positive().safe().optional(),
+    reviewMethod: billingVisaMethodSchema,
+    externalContact: z.string().trim().min(1).max(240),
+    evidence: z.string().trim().min(1).max(2000),
+    reason: z.string().trim().min(1).max(2000),
+  }).strict(),
+  z.object({
+    action: z.literal("WITHDRAW_VISA"),
+    draftId: z.string().uuid(),
+    version: z.number().int().positive(),
+    reason: z.string().trim().min(1).max(2000),
+  }).strict(),
   z
     .object({
       action: z.literal("ADD_EXTRA"),
@@ -148,7 +184,8 @@ function statusFor(code: string): number {
     code === "BILLING_EXTRA_MARKET_REQUIRED"
   )
     return 409;
-  if (code === "BILLING_EXTRA_NOT_FOUND") return 404;
+  if (code === "BILLING_EXTRA_NOT_FOUND" || code === "BILLING_VISA_NOT_FOUND") return 404;
+  if (code.startsWith("BILLING_VISA_")) return 409;
   if (
     code === "BILLING_VERSION_CONFLICT" ||
     code === "BILLING_AMOUNT_EXCEEDS_CONTRACT" ||
@@ -209,7 +246,8 @@ export async function POST(request: Request) {
     const needsMarket =
       input.action === "CREATE" ||
       input.action === "SET_MANUAL_MARKET" ||
-      input.action === "ADD_EXTRA";
+      input.action === "ADD_EXTRA" ||
+      input.action === "SET_VISA_REQUIREMENT";
     const [quotes, chantiers, commercial, clients] = needsMarket
       ? await Promise.all([
           loadBillingSources(),
@@ -223,6 +261,28 @@ export async function POST(request: Request) {
       const drafts = [...current.drafts];
       if (input.action === "SET_TITLES") {
         return { ...current, invoiceTitles: input.invoiceTitles };
+      }
+      if (input.action === "SET_VISA_REQUIREMENT") {
+        if (!chantiers?.chantiers.some((site) => site.id === input.chantierId)) {
+          throw new Error("BILLING_QUOTE_NOT_AVAILABLE");
+        }
+        if (
+          drafts.some(
+            (draft) => draft.chantierId === input.chantierId && draft.status === "APPROVED",
+          )
+        ) throw new Error("BILLING_VISA_RULE_AFTER_APPROVAL");
+        return setBillingVisaRequirement(
+          current, input.chantierId, input.required, context.user.displayName,
+        );
+      }
+      if (input.action === "PRESENT_VISA") {
+        return presentBillingVisa(current, input, context.user.displayName);
+      }
+      if (input.action === "REVIEW_VISA") {
+        return recordBillingVisaDecision(current, input, context.user.displayName);
+      }
+      if (input.action === "WITHDRAW_VISA") {
+        return withdrawBillingVisa(current, input, context.user.displayName);
       }
       if (input.action === "ADD_EXTRA") {
         const sources = buildChantierMarketSources(
@@ -324,6 +384,9 @@ export async function POST(request: Request) {
         const index = drafts.findIndex((draft) => draft.id === input.draftId);
         if (index < 0) throw new Error("BILLING_DRAFT_NOT_FOUND");
         if (drafts[index].status !== "DRAFT") throw new Error("BILLING_DRAFT_LOCKED");
+        if ((current.visaVersions ?? []).some((visa) => visa.draftId === drafts[index].id)) {
+          throw new Error("BILLING_VISA_HISTORY_PROTECTED");
+        }
         if (drafts[index].updatedAt !== input.expectedUpdatedAt) {
           throw new Error("BILLING_VERSION_CONFLICT");
         }

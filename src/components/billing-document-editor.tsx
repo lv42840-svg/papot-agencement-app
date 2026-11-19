@@ -18,6 +18,8 @@ import {
 import { calculateLineProgress, type LineProgressInput } from "@/lib/billing/progress";
 import { moveInvoiceEditorRow } from "@/lib/billing/ouvrage-structure";
 import { belongsToBillingSource } from "@/lib/billing/domain";
+import { BillingVisaPanel } from "@/components/billing-visa-panel";
+import { latestBillingVisa, visaRequiredForChantier } from "@/lib/billing/visa-policy";
 
 type ApiSnapshot = { payload: BillingPayload; canWrite: boolean; error?: string };
 type EditableRow = BillingDocumentLine & { quantityInput: string; priceInput: string };
@@ -185,6 +187,14 @@ export function BillingDocumentEditor({ draftId }: { draftId: string }) {
           .filter((item) => belongsToBillingSource(item, draft))
       : [];
   const priorHt = priorProjects.reduce((sum, item) => sum + item.amountHtCents, 0);
+  const latestVisa = draft && payload ? latestBillingVisa(payload, draft.id) : null;
+  const visaRequired = draft && payload ? visaRequiredForChantier(payload, draft.chantierId) : false;
+  const visaBlocksApproval =
+    latestVisa?.status === "SUBMITTED" ||
+    latestVisa?.status === "REFUSED" ||
+    latestVisa?.status === "PARTIAL" ||
+    (latestVisa?.status === "ACCEPTED" && latestVisa.draftUpdatedAt !== draft?.updatedAt) ||
+    (visaRequired && latestVisa?.status !== "ACCEPTED");
 
   function alter(id: string, patch: Partial<EditableRow>) {
     setRows((old) => old.map((row) => (row.id === id ? { ...row, ...patch } : row)));
@@ -828,6 +838,15 @@ export function BillingDocumentEditor({ draftId }: { draftId: string }) {
         </p>
       </section>
 
+      {payload && (
+        <BillingVisaPanel
+          draft={draft}
+          payload={payload}
+          canWrite={canWrite}
+          dirty={dirty}
+          onRefresh={reload}
+        />
+      )}
       <section className="invoiceCard invoiceSummary">
         <h2>Synthèse du projet</h2>
         <div className="invoiceTotals">
@@ -855,11 +874,17 @@ export function BillingDocumentEditor({ draftId }: { draftId: string }) {
           </div>
         </div>
         <div className="invoiceFooterActions">
+          {draft.status === "DRAFT" && visaBlocksApproval && (
+            <p role="status">
+              La validation interne attend la décision de visa externe applicable à cette
+              situation, ou une nouvelle présentation après correction.
+            </p>
+          )}
           {draft.status === "DRAFT" && (
             <button
               className="secondaryButton"
               type="button"
-              disabled={!canWrite || busy || dirty || !preview}
+              disabled={!canWrite || busy || dirty || !preview || visaBlocksApproval}
               onClick={() => void approve()}
             >
               Valider en interne et verrouiller

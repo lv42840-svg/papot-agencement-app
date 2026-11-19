@@ -1,4 +1,5 @@
 import { calculateLineProgress } from "./progress";
+import { assertBillingVisaEditable, assertBillingVisaAllowsApproval } from "./visa-policy";
 import { buildInvoiceDocumentLines, calculateInvoiceDocumentTotals } from "./document-lines";
 import { z } from "zod";
 
@@ -499,6 +500,7 @@ export function updateBillingDraft(
   if (!draft) throw new Error("BILLING_DRAFT_NOT_FOUND");
   if (draft.status !== "DRAFT") throw new Error("BILLING_DRAFT_LOCKED");
   if (draft.updatedAt !== input.expectedUpdatedAt) throw new Error("BILLING_VERSION_CONFLICT");
+  assertBillingVisaEditable(payload, draftId);
   const alreadyPreparedCents = preparedForBillingSource(payload, draft, draft.id);
   const amountHtCents =
     draft.type === "STANDARD" || draft.type === "FINAL"
@@ -565,6 +567,7 @@ export function updateBillingDocument(
   const draft = payload.drafts[index];
   if (draft.status !== "DRAFT") throw new Error("BILLING_DRAFT_LOCKED");
   if (draft.updatedAt !== input.expectedUpdatedAt) throw new Error("BILLING_VERSION_CONFLICT");
+  assertBillingVisaEditable(payload, draftId);
   const documentLines = z
     .array(billingDocumentLineSchema)
     .min(1)
@@ -676,6 +679,7 @@ export function approveBillingDraft(
   if (!draft) throw new Error("BILLING_DRAFT_NOT_FOUND");
   if (draft.status !== "DRAFT") throw new Error("BILLING_DRAFT_LOCKED");
   if (draft.updatedAt !== expectedUpdatedAt) throw new Error("BILLING_VERSION_CONFLICT");
+  assertBillingVisaAllowsApproval(payload, draft);
   const lines = draft.documentLines ?? buildInvoiceDocumentLines(draft, payload);
   const totals = calculateInvoiceDocumentTotals(lines);
   if (
