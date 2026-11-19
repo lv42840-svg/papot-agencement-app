@@ -1,0 +1,46 @@
+name: Format commercial fix
+
+on:
+  push:
+    branches:
+      - fix/affaire-nouveau-client-siret-20261119
+
+permissions:
+  contents: write
+
+jobs:
+  format:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: true
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - name: Format changed files
+        run: |
+          npx prettier --write \
+            src/app/api/desktop/commercial/route.ts \
+            src/app/api/desktop/company-search/route.ts \
+            src/components/commercial-workspace-v2.tsx \
+            src/components/company-lookup.tsx \
+            src/lib/clients/postgres-repository.ts \
+            tests/commercial-provisional-client.test.ts
+          git diff --check
+      - name: Commit formatting
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          if ! git diff --quiet; then
+            git add src/app/api/desktop/commercial/route.ts \
+              src/app/api/desktop/company-search/route.ts \
+              src/components/commercial-workspace-v2.tsx \
+              src/components/company-lookup.tsx \
+              src/lib/clients/postgres-repository.ts \
+              tests/commercial-provisional-client.test.ts
+            git commit -m "style: appliquer Prettier aux correctifs commercial et SIRET"
+            git push origin HEAD:fix/affaire-nouveau-client-siret-20261119
+          fi
