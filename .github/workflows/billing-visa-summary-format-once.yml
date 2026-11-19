@@ -1,0 +1,29 @@
+name: One-time billing chantier summary formatting
+on:
+  pull_request:
+    paths:
+      - ".github/workflows/billing-visa-summary-format-once.yml"
+permissions:
+  contents: write
+jobs:
+  format:
+    if: github.event.pull_request.number == 280 && github.event.pull_request.head.repo.full_name == github.repository && github.head_ref == 'feat/billing-chantier-market-foundation'
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.ref }}
+          persist-credentials: true
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - run: npx prettier --write src/components/chantier-billing-tab.tsx
+      - name: Commit formatting
+        run: |
+          git add src/components/chantier-billing-tab.tsx
+          if ! git diff --cached --quiet; then
+            git -c user.name='github-actions[bot]' -c user.email='41898282+github-actions[bot]@users.noreply.github.com' commit -m 'style(billing): format chantier visa summary'
+            git push origin HEAD:feat/billing-chantier-market-foundation
+          fi
