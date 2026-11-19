@@ -347,6 +347,14 @@ export function BillingVisaPanel({
                 Instantané : {version.documentLabel}, {version.documentLines.length} lignes, total{" "}
                 {money(version.totalTtcCents)} TTC.
               </p>
+              <a
+                className="secondaryButton"
+                href={`/api/desktop/billing/${encodeURIComponent(draft.id)}/visa/${version.version}/pdf`}
+                download
+                style={{ display: "inline-block", marginBottom: 10 }}
+              >
+                Télécharger le PDF provisoire V{version.version}
+              </a>
               <details>
                 <summary>Voir les lignes de cette version</summary>
                 <ul>
