@@ -1,6 +1,7 @@
 "use client";
 
 import Link from "next/link";
+import { InvoiceOuvragesNavigator } from "@/components/invoice-ouvrages-navigator";
 import { useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import { ArrowLeft, ArrowDown, ArrowUp, Copy, FileText, Plus, Save, Trash2 } from "lucide-react";
@@ -15,6 +16,7 @@ import {
   type BillingPayload,
 } from "@/lib/billing/domain";
 import { calculateLineProgress, type LineProgressInput } from "@/lib/billing/progress";
+import { moveInvoiceEditorRow } from "@/lib/billing/ouvrage-structure";
 
 type ApiSnapshot = { payload: BillingPayload; canWrite: boolean; error?: string };
 type EditableRow = BillingDocumentLine & { quantityInput: string; priceInput: string };
@@ -163,6 +165,7 @@ export function BillingDocumentEditor({ draftId }: { draftId: string }) {
       return null;
     }
   }, [parsedRows, invalid]);
+  const navigationRows = rows.map((row, index) => parsedRows[index] ?? row);
   const rates = [...new Set(draft?.contractTaxGroups.map((rate) => rate.ratePercent) ?? [20])].sort(
     (a, b) => a - b,
   );
@@ -184,18 +187,12 @@ export function BillingDocumentEditor({ draftId }: { draftId: string }) {
     setDirty(true);
     setNotice("");
   }
-  function reorder(index: number, direction: number) {
-    const other = index + direction;
-    if (other < 0 || other >= rows.length) return;
-    setRows((old) => {
-      const result = [...old];
-      [result[index], result[other]] = [result[other], result[index]];
-      return result;
-    });
+  function reorder(index: number, direction: -1 | 1) {
+    setRows((old) => [...moveInvoiceEditorRow(old, index, direction)]);
     setDirty(true);
     setNotice("");
   }
-  function addLine(kind: "FREE" | "TITLE") {
+  function addLine(kind: "FREE" | "TITLE", insertionIndex = rows.length) {
     const row: BillingDocumentLine = {
       id: crypto.randomUUID(),
       origin: kind,
@@ -206,7 +203,11 @@ export function BillingDocumentEditor({ draftId }: { draftId: string }) {
       unitPriceCents: 0,
       vatRatePercent: kind === "TITLE" ? 0 : (rates[0] ?? 20),
     };
-    setRows((old) => [...old, editable(row)]);
+    setRows((old) => [
+      ...old.slice(0, insertionIndex),
+      editable(row),
+      ...old.slice(insertionIndex),
+    ]);
     setDirty(true);
     setNotice("");
   }
@@ -262,8 +263,25 @@ export function BillingDocumentEditor({ draftId }: { draftId: string }) {
         vatCents: result.tax.vatCents,
         totalTtcCents: result.tax.ttcCents,
       };
-      const custom = rows.filter((row) => row.origin !== "QUOTE");
-      setRows([...buildInvoiceDocumentLines(recalculated, previous).map(editable), ...custom]);
+      const refreshed = buildInvoiceDocumentLines(recalculated, previous).map(editable);
+      const refreshedBySource = new Map(
+        refreshed.filter((row) => row.origin === "QUOTE").map((row) => [row.sourceLineId, row]),
+      );
+      const existingSources = new Set(
+        rows.filter((row) => row.origin === "QUOTE").map((row) => row.sourceLineId),
+      );
+      // Preserve edited titles, free prestations and their positions when progress is recalculated.
+      const kept = rows.map((row) => {
+        if (row.origin !== "QUOTE") return row;
+        const changed = refreshedBySource.get(row.sourceLineId);
+        return changed ? { ...changed, id: row.id, description: row.description } : row;
+      });
+      setRows([
+        ...kept,
+        ...refreshed.filter(
+          (row) => row.origin === "QUOTE" && !existingSources.has(row.sourceLineId),
+        ),
+      ]);
       setPendingPercentages(percentages);
       setDirty(true);
       setError("");
@@ -547,7 +565,7 @@ export function BillingDocumentEditor({ draftId }: { draftId: string }) {
               disabled={!canWrite || busy}
               onClick={() => addLine("TITLE")}
             >
-              <Plus size={15} /> Titre
+              <Plus size={15} /> Titre / ouvrage
             </button>
             <button
               className="primaryButton"
@@ -559,6 +577,17 @@ export function BillingDocumentEditor({ draftId }: { draftId: string }) {
             </button>
           </div>
         </div>
+        <InvoiceOuvragesNavigator
+          lines={navigationRows}
+          disabled={!canWrite || busy || draft.status !== "DRAFT"}
+          onNavigate={(id) =>
+            document.getElementById(`invoice-document-row-${id}`)?.scrollIntoView({
+              behavior: "smooth",
+              block: "center",
+            })
+          }
+          onInsertLine={(index) => addLine("FREE", index)}
+        />
         <div className="invoiceScroll">
           <table className="invoiceTable">
             <thead>
@@ -580,7 +609,11 @@ export function BillingDocumentEditor({ draftId }: { draftId: string }) {
                   ? Math.round(current.quantity * current.unitPriceCents)
                   : NaN;
                 return (
-                  <tr key={row.id} className={row.origin === "TITLE" ? "invoiceTitleRow" : ""}>
+                  <tr
+                    key={row.id}
+                    id={`invoice-document-row-${row.id}`}
+                    className={row.origin === "TITLE" ? "invoiceTitleRow" : ""}
+                  >
                     <td className="invoiceIndex">{index + 1}</td>
                     <td className="invoiceDescription">
                       <input
@@ -657,7 +690,9 @@ export function BillingDocumentEditor({ draftId }: { draftId: string }) {
                           <button
                             title="Monter"
                             aria-label={`Monter ligne ${index + 1}`}
-                            disabled={index === 0}
+                            disabled={
+                              moveInvoiceEditorRow(rows, index, -1) === rows || busy
+                            }
                             onClick={() => reorder(index, -1)}
                           >
                             <ArrowUp size={14} />
@@ -665,7 +700,9 @@ export function BillingDocumentEditor({ draftId }: { draftId: string }) {
                           <button
                             title="Descendre"
                             aria-label={`Descendre ligne ${index + 1}`}
-                            disabled={index === rows.length - 1}
+                            disabled={
+                              moveInvoiceEditorRow(rows, index, 1) === rows || busy
+                            }
                             onClick={() => reorder(index, 1)}
                           >
                             <ArrowDown size={14} />

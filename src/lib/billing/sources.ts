@@ -13,11 +13,13 @@ import {
   type BillingSource,
   type BillingTaxGroup,
   type BillingSourceLine,
+  type BillingSourceStructureItem,
 } from "./domain";
 
 function quoteContractData(quote: NativeQuoteRecord): {
   taxGroups: BillingTaxGroup[];
   lines: BillingSourceLine[];
+  structure: BillingSourceStructureItem[];
 } {
   const price = calculateQuoteAdjustedPricing(quote.model.items, quote.pricingConfig);
   if (price.warnings.length > 0) throw new Error("BILLING_QUOTE_PRICING_REVIEW_REQUIRED");
@@ -37,6 +39,28 @@ function quoteContractData(quote: NativeQuoteRecord): {
       quantity: byLineId.get(line.lineId)?.quantity ?? 1,
       unit: byLineId.get(line.lineId)?.unit ?? "u",
     }));
+  const included = new Set(lines.map((line) => line.lineId));
+  const allItems = new Map(quote.model.items.map((item) => [item.id, item]));
+  const usedHeadings = new Set<string>();
+  for (const item of quote.model.items) {
+    if (item.kind !== "LINE" || !included.has(item.id)) continue;
+    let parentId = item.parentId;
+    while (parentId) {
+      const parent = allItems.get(parentId);
+      if (!parent || (parent.kind !== "SECTION" && parent.kind !== "SUBSECTION")) break;
+      usedHeadings.add(parent.id);
+      parentId = parent.parentId;
+    }
+  }
+  const structure = quote.model.items.flatMap((item): BillingSourceStructureItem[] => {
+    if (item.kind === "LINE") {
+      return included.has(item.id) ? [{ kind: "LINE", lineId: item.id }] : [];
+    }
+    if ((item.kind === "SECTION" || item.kind === "SUBSECTION") && usedHeadings.has(item.id)) {
+      return [{ kind: "TITLE", title: item.title }];
+    }
+    return [];
+  });
   const byRate = new Map<number, number>();
   for (const line of lines) {
     byRate.set(line.vatRatePercent, (byRate.get(line.vatRatePercent) ?? 0) + line.amountHtCents);
@@ -47,6 +71,7 @@ function quoteContractData(quote: NativeQuoteRecord): {
   }
   return {
     lines,
+    structure,
     taxGroups: [...byRate.entries()]
       .map(([ratePercent, baseHtCents]) => ({ ratePercent, baseHtCents }))
       .sort((a, b) => a.ratePercent - b.ratePercent),
@@ -81,7 +106,7 @@ export async function loadBillingSources(): Promise<BillingSource[]> {
       if (!client) return [];
 
       try {
-        const { taxGroups, lines } = quoteContractData(quote);
+        const { taxGroups, lines, structure } = quoteContractData(quote);
         const chantier = byAffairChantier.get(affair.id) ?? null;
         return [
           billingSourceSchema.parse({
@@ -96,6 +121,7 @@ export async function loadBillingSources(): Promise<BillingSource[]> {
             contractHtCents: taxGroups.reduce((sum, group) => sum + group.baseHtCents, 0),
             contractTaxGroups: taxGroups,
             lines,
+            structure,
           }),
         ];
       } catch {

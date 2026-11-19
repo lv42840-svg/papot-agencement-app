@@ -3,6 +3,7 @@ import type {
   BillingDraft,
   BillingPayload,
   BillingSourceLine,
+  BillingSourceStructureItem,
 } from "./domain";
 
 export function lineHtCents(line: BillingDocumentLine): number {
@@ -60,6 +61,45 @@ function distributeAmounts(
     remaining--;
   }
   return parts.map((part) => part.amount);
+}
+
+function followSourceStructure(
+  rows: BillingDocumentLine[],
+  structure: readonly BillingSourceStructureItem[] | undefined,
+): BillingDocumentLine[] {
+  if (!structure?.length) return rows;
+  const bySourceId = new Map(
+    rows.filter((line) => line.origin === "QUOTE" && line.sourceLineId !== null)
+      .map((line) => [line.sourceLineId, line]),
+  );
+  const used = new Set<string>();
+  const result: BillingDocumentLine[] = [];
+  const maxTitles = Math.max(0, 1000 - rows.length);
+  let titles = 0;
+
+  for (const item of structure) {
+    if (item.kind === "TITLE") {
+      if (titles >= maxTitles) continue;
+      result.push({
+        id: globalThis.crypto.randomUUID(),
+        origin: "TITLE",
+        sourceLineId: null,
+        description: item.title,
+        quantity: 0,
+        unit: "",
+        unitPriceCents: 0,
+        vatRatePercent: 0,
+      });
+      titles++;
+      continue;
+    }
+    const line = bySourceId.get(item.lineId);
+    if (line && !used.has(line.id)) {
+      used.add(line.id);
+      result.push(line);
+    }
+  }
+  return [...result, ...rows.filter((line) => !used.has(line.id))];
 }
 
 /** Generates an independent editable snapshot; the retained quote is never changed. */
@@ -132,5 +172,5 @@ export function buildInvoiceDocumentLines(
       });
     });
   }
-  return output;
+  return followSourceStructure(output, draft.structure);
 }

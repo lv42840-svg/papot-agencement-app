@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { useEffect, useState } from "react";
 import type { BillingPayload } from "@/lib/billing/domain";
+import type { ChantierBillingMarket } from "@/lib/billing/chantier-market";
 
 const money = (cents: number) =>
   (cents / 100).toLocaleString("fr-FR", { style: "currency", currency: "EUR" });
@@ -10,6 +11,8 @@ const money = (cents: number) =>
 export function ChantierBillingTab({ chantierId }: { chantierId: string }) {
   const [snapshot, setSnapshot] = useState<BillingPayload | null>(null);
   const [error, setError] = useState("");
+  const [market, setMarket] = useState<ChantierBillingMarket | null>(null);
+  const [marketError, setMarketError] = useState("");
 
   useEffect(() => {
     void (async () => {
@@ -20,6 +23,18 @@ export function ChantierBillingTab({ chantierId }: { chantierId: string }) {
           throw new Error(result.error ?? "Chargement impossible");
         setSnapshot(result.payload);
         setError("");
+        const marketResponse = await fetch("/api/desktop/billing/markets", {
+          cache: "no-store",
+        });
+        if (marketResponse.ok) {
+          const marketResult = (await marketResponse.json()) as {
+            markets: ChantierBillingMarket[];
+          };
+          setMarket(marketResult.markets.find((item) => item.chantierId === chantierId) ?? null);
+          setMarketError("");
+        } else {
+          setMarketError("Aperçu du marché indisponible.");
+        }
       } catch {
         setError("Impossible d'afficher les projets de facture. Vérifie les droits Facturation.");
       }
@@ -51,6 +66,46 @@ export function ChantierBillingTab({ chantierId }: { chantierId: string }) {
         ni numéro légal ni facture officielle sans le raccordement Pennylane. Les projets validés en
         interne ne sont pas des factures émises.
       </p>
+      {marketError ? <p role="status">{marketError}</p> : null}
+      {market && (
+        <section className="invoiceCard">
+          <h3>Marché global du chantier : aperçu</h3>
+          <p>
+            <strong>{market.quoteCount} devis retenu(s)</strong> · Marché :{" "}
+            <strong>{money(market.contractHtCents)} HT</strong>
+          </p>
+          <p>
+            Projets préparés, non émis : {money(market.preparedHtCents)} HT · Reste à préparer :{" "}
+            {money(market.remainingToPrepareHtCents)} HT.
+          </p>
+          {market.requiresMarketEntry ? (
+            <p role="status">
+              Ce chantier n&apos;a pas de devis retenu. La saisie d&apos;un marché sans devis
+              sera ouverte dans une prochaine étape ; aucun montant n&apos;est inventé.
+            </p>
+          ) : (
+            <details>
+              <summary>Voir les devis composant le marché</summary>
+              <ul>
+                {market.quotes.map((quote) => (
+                  <li key={quote.quoteId}>
+                    {quote.label} : {money(quote.amountHtCents)} HT
+                  </li>
+                ))}
+              </ul>
+            </details>
+          )}
+          {market.quoteCount > 1 && (
+            <p>
+              Le marché est consolidé ici. La préparation d&apos;une facture unique sur
+              plusieurs devis reste à développer ; le formulaire actuel travaille par devis.
+            </p>
+          )}
+          {market.preparationExceedsContract && (
+            <p role="alert">Les projets préparés dépassent le marché connu : vérification nécessaire.</p>
+          )}
+        </section>
+      )}
       {error ? <p role="alert">{error}</p> : null}
       {!error && !snapshot ? <p>Chargement des projets…</p> : null}
       {snapshot && (

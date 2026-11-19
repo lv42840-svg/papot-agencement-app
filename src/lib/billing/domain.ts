@@ -57,6 +57,12 @@ export const billingDocumentLineSchema = z
   });
 export type BillingDocumentLine = z.infer<typeof billingDocumentLineSchema>;
 
+export const billingSourceStructureItemSchema = z.discriminatedUnion("kind", [
+  z.object({ kind: z.literal("TITLE"), title: z.string().trim().min(1).max(500) }),
+  z.object({ kind: z.literal("LINE"), lineId: z.string().uuid() }),
+]);
+export type BillingSourceStructureItem = z.infer<typeof billingSourceStructureItemSchema>;
+
 export const billingSourceSchema = z.object({
   quoteId: z.string().uuid(),
   commercialCaseId: z.string().uuid(),
@@ -68,6 +74,7 @@ export const billingSourceSchema = z.object({
   contractHtCents: centsSchema.positive(),
   contractTaxGroups: z.array(billingTaxGroupSchema).min(1),
   lines: z.array(billingSourceLineSchema).max(1000).optional(),
+  structure: z.array(billingSourceStructureItemSchema).max(1000).optional(),
 });
 export type BillingSource = z.infer<typeof billingSourceSchema>;
 
