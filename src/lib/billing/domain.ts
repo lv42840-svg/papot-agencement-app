@@ -194,6 +194,8 @@ export const billingVisaVersionSchema = z
     draftId: z.string().uuid(),
     version: z.number().int().positive().max(100),
     draftUpdatedAt: dateTimeSchema,
+    clientName: z.string().trim().min(1).max(240),
+    chantierName: z.string().trim().min(1).max(240),
     documentLabel: z.string().trim().min(1).max(240),
     documentNotes: z.string().max(4000),
     documentLines: z.array(billingDocumentLineSchema).min(1).max(1000),

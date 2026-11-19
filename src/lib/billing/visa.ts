@@ -69,6 +69,8 @@ export function presentBillingVisa(
     draftId: draft.id,
     version: past.length + 1,
     draftUpdatedAt: draft.updatedAt,
+    clientName: draft.clientName,
+    chantierName: draft.affairName,
     documentLabel: draft.label,
     documentNotes: draft.notes,
     documentLines: lines.map((line) => ({ ...line })),

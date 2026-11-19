@@ -51,6 +51,7 @@ describe("PDF des versions de visa provisoires", () => {
     expect(text).toContain("PRESENTATION PROVISOIRE - VERSION V1");
     expect(text).toContain("DOCUMENT DE VALIDATION - NON FACTURE / SANS NUMERO LEGAL");
     expect(text).toContain("Client Pralus");
+    expect(text).toContain("Boutique Pralus");
     expect(text).toContain("Agencement et finitions");
     expect(text).toContain("TOTAL TTC");
     expect(text).not.toContain("NUMERO DE FACTURE");
@@ -110,4 +111,39 @@ describe("PDF des versions de visa provisoires", () => {
       }),
     ).toThrow("BILLING_VISA_DRAFT_MISMATCH");
   });
+  it("garde le nom historique du client et du chantier si le brouillon change", () => {
+    const payload = prepare();
+    const draft = payload.drafts[0];
+    const visa = payload.visaVersions![0];
+    const original = generateBillingVisaProvisionalPdf(visa, draft);
+    const modified = generateBillingVisaProvisionalPdf(visa, {
+      id: draft.id,
+    });
+    expect(Buffer.from(modified).equals(Buffer.from(original))).toBe(true);
+    expect(visa.clientName).toBe("Client Pralus");
+    expect(visa.chantierName).toBe("Boutique Pralus");
+  });
+
+  it("pagine une seule description de 4 000 caractères sans la tronquer", () => {
+    const payload = prepare();
+    const draft = payload.drafts[0];
+    const visa = payload.visaVersions![0];
+    const description = Array.from(
+      { length: 120 },
+      (_, i) => `Segment${String(i).padStart(3, "0")}`,
+    ).join(" ");
+    const extended = {
+      ...visa,
+      documentLines: [
+        { ...visa.documentLines[0], description },
+      ],
+    };
+    const pdf = Buffer.from(
+      generateBillingVisaProvisionalPdf(extended, draft),
+    ).toString("latin1");
+    expect(pdf).toContain("Segment000");
+    expect(pdf).toContain("Segment119");
+    expect(Number(pdf.match(/\\/Type \\/Pages \\/Count (\\d+)/)?.[1])).toBeGreaterThan(1);
+  });
+
 });

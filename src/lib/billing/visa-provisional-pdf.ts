@@ -51,10 +51,7 @@ function wrapWords(value: string, width: number): string[] {
   return result;
 }
 
-export type BillingVisaPdfIdentity = Pick<
-  BillingDraft,
-  "id" | "affairName" | "clientName"
->;
+export type BillingVisaPdfIdentity = Pick<BillingDraft, "id">;
 
 export function generateBillingVisaProvisionalPdf(
   visa: BillingVisaVersion,
@@ -83,8 +80,8 @@ export function generateBillingVisaProvisionalPdf(
     text("DOCUMENT DE VALIDATION - NON FACTURE / SANS NUMERO LEGAL", 38, 93, 9, true);
     line(105);
 
-    text(`Client : ${draft.clientName}`.slice(0, 92), 38, 126, 9);
-    text(`Chantier : ${draft.affairName}`.slice(0, 92), 38, 142, 9);
+    text(`Client : ${visa.clientName}`.slice(0, 92), 38, 126, 9);
+    text(`Chantier : ${visa.chantierName}`.slice(0, 92), 38, 142, 9);
     text(`Intitule : ${visa.documentLabel}`.slice(0, 92), 38, 158, 9);
     text(`Destinataire : ${visa.submittedTo}`.slice(0, 92), 38, 174, 9);
     text(`Presentation du ${new Date(visa.submittedAt).toLocaleDateString("fr-FR")}`, 38, 190, 9);
@@ -110,29 +107,48 @@ export function generateBillingVisaProvisionalPdf(
   for (const item of visa.documentLines) {
     const title = item.origin === "TITLE";
     const indent = title && item.headingLevel === "SUBSECTION" ? 14 : 0;
-    const descriptionLines = wrapWords(item.description, title ? 58 : 47);
+    const descriptionLines = wrapWords(item.description, title ? 44 : 31);
     const lineHeight = title ? 13 : 12;
-    const height = Math.max(title ? 26 : 24, descriptionLines.length * lineHeight + 10);
-    if (cursor + height > PAGE_BOTTOM) addPage();
 
-    if (title) {
-      raw("0.28 0.20 0.45 rg");
-      for (let i = 0; i < descriptionLines.length; i++) {
-        text(descriptionLines[i], 41 + indent, cursor + 11 + i * lineHeight, 10, true);
+    // A single 4,000-character line may span multiple A4 pages.
+    // Split its description at a visible page boundary instead of drawing through the footer.
+    let printed = 0;
+    while (printed < descriptionLines.length) {
+      const maximumLines = Math.floor((PAGE_BOTTOM - cursor - 12) / lineHeight);
+      if (maximumLines < 1) {
+        addPage();
+        continue;
       }
-      raw("0 g");
-    } else {
-      for (let i = 0; i < descriptionLines.length; i++) {
-        text(descriptionLines[i], 41, cursor + 10 + i * lineHeight, 8.5);
+      const count = Math.min(maximumLines, descriptionLines.length - printed);
+      const height = Math.max(title ? 26 : 24, count * lineHeight + 10);
+      if (cursor + height > PAGE_BOTTOM) {
+        addPage();
+        continue;
       }
-      text(quantity(item.quantity), 311, cursor + 10, 8);
-      text(item.unit, 348, cursor + 10, 8);
-      text(euros(item.unitPriceCents), 395, cursor + 10, 7.5);
-      text(`${item.vatRatePercent} %`, 464, cursor + 10, 8);
-      text(euros(lineHtCents(item)), 505, cursor + 10, 7.5);
+
+      if (title) raw("0.28 0.20 0.45 rg");
+      for (let i = 0; i < count; i++) {
+        text(
+          descriptionLines[printed + i],
+          41 + (title ? indent : 0),
+          cursor + 10 + i * lineHeight,
+          title ? 9.5 : 8.5,
+          title,
+        );
+      }
+      if (title) raw("0 g");
+      if (!title && printed === 0) {
+        text(quantity(item.quantity), 311, cursor + 10, 8);
+        text(item.unit, 348, cursor + 10, 8);
+        text(euros(item.unitPriceCents), 395, cursor + 10, 7.5);
+        text(`${item.vatRatePercent} %`, 464, cursor + 10, 8);
+        text(euros(lineHtCents(item)), 500, cursor + 10, 7.0);
+      }
+      line(cursor + height - 4);
+      cursor += height;
+      printed += count;
+      if (printed < descriptionLines.length) addPage();
     }
-    line(cursor + height - 4);
-    cursor += height;
   }
 
   const noteLines = visa.documentNotes ? wrapWords(visa.documentNotes, 88) : [];
