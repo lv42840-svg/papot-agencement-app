@@ -305,7 +305,7 @@ export function createBillingDraft(
   }
   const hasLineHistory = payload.drafts.some(
     (draft) =>
-      draft.quoteId === source.quoteId &&
+      belongsToBillingSource(draft, validSource) &&
       draft.type === "PROGRESS" &&
       Boolean(draft.lineProgress?.length),
   );
@@ -396,7 +396,7 @@ export function updateBillingDraft(
     if (
       payload.drafts
         .slice(draftIndex + 1)
-        .some((item) => belongsToBillingSource(item, draft) && item.type === "PROGRESS")
+        .some((item) => item.chantierId === draft.chantierId && item.type === "PROGRESS")
     ) {
       throw new Error("BILLING_DRAFT_HAS_DEPENDENTS");
     }
@@ -524,7 +524,11 @@ export function updateBillingDocument(
     );
   if (
     (financialChange || progressChanged) &&
-    payload.drafts.slice(index + 1).some((candidate) => belongsToBillingSource(candidate, draft))
+    payload.drafts.slice(index + 1).some(
+      (candidate) =>
+        candidate.chantierId !== null &&
+        candidate.chantierId === draft.chantierId,
+    )
   ) {
     throw new Error("BILLING_DRAFT_HAS_DEPENDENTS");
   }

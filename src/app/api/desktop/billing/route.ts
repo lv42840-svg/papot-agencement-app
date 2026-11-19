@@ -201,12 +201,15 @@ export async function POST(request: Request) {
       if (input.action === "SET_MANUAL_MARKET") {
         const chantier = chantiers?.chantiers.find((item) => item.id === input.chantierId);
         if (!chantier) throw new Error("BILLING_QUOTE_NOT_AVAILABLE");
-        if (quotes.some((item) => item.chantierId === chantier.id)) {
-          throw new Error("BILLING_MARKET_SOURCE_CONFLICT");
-        }
         const affair = commercial?.cases.find(
           (item) => item.id === chantier.sourceCommercialCaseId,
         );
+        if (
+          quotes.some((item) => item.chantierId === chantier.id) ||
+          (affair?.retainedQuoteIds.length ?? 0) > 0
+        ) {
+          throw new Error("BILLING_MARKET_SOURCE_CONFLICT");
+        }
         const client = clients?.clients.find((item) => item.id === affair?.clientId);
         if (!affair || !client || client.isArchived) {
           throw new Error("BILLING_MARKET_WITHOUT_CLIENT");

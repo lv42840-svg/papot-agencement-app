@@ -115,6 +115,16 @@ export function buildInvoiceDocumentLines(
     .filter((item) => belongsToBillingSource(item, draft));
   const sourceLines = draft.lines ?? [];
   const output: BillingDocumentLine[] = [];
+  const previousAmounts = new Map<string, number>();
+  for (const priorDraft of prior) {
+    for (const row of priorDraft.documentLines ?? []) {
+      if (row.origin !== "QUOTE" || !row.sourceLineId) continue;
+      previousAmounts.set(
+        row.sourceLineId,
+        (previousAmounts.get(row.sourceLineId) ?? 0) + lineHtCents(row),
+      );
+    }
+  }
 
   for (const group of draft.taxGroups) {
     const matching = sourceLines.filter((line) => line.vatRatePercent === group.ratePercent);
@@ -140,6 +150,9 @@ export function buildInvoiceDocumentLines(
       if (target === undefined) return line.amountHtCents;
       const previousTarget = previousSituations.reduce((maximum, item) => {
         const row = item.lineProgress?.find((entry) => entry.lineId === line.lineId);
+        if (!row && !item.lines?.some((candidate) => candidate.lineId === line.lineId)) {
+          return maximum;
+        }
         const amount =
           row?.cumulativeHtCents ??
           (item.cumulativePercent === null
@@ -147,7 +160,12 @@ export function buildInvoiceDocumentLines(
             : Math.round((line.amountHtCents * item.cumulativePercent) / 100));
         return Math.max(maximum, amount);
       }, 0);
-      return Math.max(0, target - previousTarget);
+      // Previous deposit and situation documents may have charged this line already.
+      // Prior amounts must be deducted line by line, not spread again across all devis.
+      return Math.max(
+        0,
+        target - Math.max(previousTarget, previousAmounts.get(line.lineId) ?? 0),
+      );
     });
     const allocated = distributeAmounts(matching, group.baseHtCents, weights);
     matching.forEach((source, index) => {

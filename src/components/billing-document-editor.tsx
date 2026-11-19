@@ -17,6 +17,7 @@ import {
 } from "@/lib/billing/domain";
 import { calculateLineProgress, type LineProgressInput } from "@/lib/billing/progress";
 import { moveInvoiceEditorRow } from "@/lib/billing/ouvrage-structure";
+import { belongsToBillingSource } from "@/lib/billing/domain";
 
 type ApiSnapshot = { payload: BillingPayload; canWrite: boolean; error?: string };
 type EditableRow = BillingDocumentLine & { quantityInput: string; priceInput: string };
@@ -181,7 +182,7 @@ export function BillingDocumentEditor({ draftId }: { draftId: string }) {
             0,
             payload.drafts.findIndex((item) => item.id === draft.id),
           )
-          .filter((item) => item.quoteId === draft.quoteId)
+          .filter((item) => belongsToBillingSource(item, draft))
       : [];
   const priorHt = priorProjects.reduce((sum, item) => sum + item.amountHtCents, 0);
 
@@ -434,7 +435,18 @@ export function BillingDocumentEditor({ draftId }: { draftId: string }) {
             {draft.affairName} · {draft.clientName}
           </p>
           <div className="invoiceReferences">
-            <Link href={`/devis/${draft.quoteId}`}>Devis source : {draft.quoteLabel}</Link>
+            {draft.sourceMode === "CHANTIER" ? (
+              <>
+                <span>{draft.quoteLabel}</span>
+                {(draft.sourceQuoteIds ?? []).map((quoteId) => (
+                  <Link key={quoteId} href={`/devis/${quoteId}`}>
+                    Devis {quoteId.slice(0, 8)}
+                  </Link>
+                ))}
+              </>
+            ) : (
+              <Link href={`/devis/${draft.quoteId}`}>Devis source : {draft.quoteLabel}</Link>
+            )}
             {draft.chantierId && (
               <Link href={`/chantiers/${draft.chantierId}`}>Ouvrir le chantier</Link>
             )}
@@ -516,10 +528,10 @@ export function BillingDocumentEditor({ draftId }: { draftId: string }) {
       </section>
 
       <section className="invoiceCard">
-        <h2>Déjà préparé sur ce devis</h2>
+        <h2>Déjà préparé sur ce chantier</h2>
         <p>
-          Ces montants correspondent aux projets antérieurs, acomptes et situations inclus. Ce ne
-          sont pas des factures officiellement émises.
+          Ces montants correspondent aux anciens projets, acomptes et situations du chantier,
+          même issus de plusieurs devis. Ils ne sont pas des factures officiellement émises.
         </p>
         {priorProjects.length === 0 ? (
           <p>Aucun acompte ni situation précédemment préparé sur ce devis.</p>
@@ -558,7 +570,7 @@ export function BillingDocumentEditor({ draftId }: { draftId: string }) {
           </div>
         )}
         <p>
-          <strong>Déjà préparé : {currency(priorHt)} HT</strong> · Projet actuel :{" "}
+          <strong>Déjà préparé sur le chantier : {currency(priorHt)} HT</strong> · Projet actuel :{" "}
           {currency(preview?.amountHtCents ?? draft.amountHtCents)} HT · Cumul après ce projet :{" "}
           {currency(priorHt + (preview?.amountHtCents ?? draft.amountHtCents))} HT sur{" "}
           {currency(draft.contractHtCents)} HT.

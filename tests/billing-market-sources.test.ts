@@ -78,6 +78,14 @@ describe("moteur marché unique par chantier", () => {
       "Lucien",
     );
     expect(draft.amountHtCents).toBe(60_000);
+    expect(
+      draft.documentLines
+        ?.filter((line) => line.origin === "QUOTE")
+        .map((line) => [line.sourceLineId, line.unitPriceCents]),
+    ).toEqual([
+      [l1, 12_000],
+      [l2, 48_000],
+    ]);
     expect(billingPreparationFollowup([source], [legacy, draft])[0].preparedHtCents).toBe(80_000);
   });
 
