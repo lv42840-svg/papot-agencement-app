@@ -29,10 +29,10 @@ export function CompanyLookup({
       setError(false);
       setResults([]);
       try {
-        const response = await fetch(
-          `/api/desktop/company-search?q=${encodeURIComponent(term)}`,
-          { cache: "no-store", signal: controller.signal },
-        );
+        const response = await fetch(`/api/desktop/company-search?q=${encodeURIComponent(term)}`, {
+          cache: "no-store",
+          signal: controller.signal,
+        });
         if (!response.ok) throw new Error("COMPANY_LOOKUP_UNAVAILABLE");
         const data = (await response.json()) as { results?: CompanySuggestion[] };
         if (!controller.signal.aborted) {
@@ -87,18 +87,42 @@ export function CompanyLookup({
         <small>Aucune correspondance affichée. La saisie manuelle reste possible.</small>
       ) : null}
       <style jsx>{`
-        .companyLookup { width: 100%; margin-top: 5px; }
-        .companyLookup small { display: block; opacity: .75; margin: 4px 0; }
-        .companyLookupResults { display: grid; gap: 5px; margin: 6px 0; }
+        .companyLookup {
+          width: 100%;
+          margin-top: 5px;
+        }
+        .companyLookup small {
+          display: block;
+          opacity: 0.75;
+          margin: 4px 0;
+        }
+        .companyLookupResults {
+          display: grid;
+          gap: 5px;
+          margin: 6px 0;
+        }
         .companyLookupResults button {
-          display: flex; flex-direction: column; align-items: flex-start; text-align: left;
-          width: 100%; padding: 9px 11px; border: 1px solid #c9bfdf;
-          border-radius: 8px; background: #f7f3fc; color: #312842; cursor: pointer;
+          display: flex;
+          flex-direction: column;
+          align-items: flex-start;
+          text-align: left;
+          width: 100%;
+          padding: 9px 11px;
+          border: 1px solid #c9bfdf;
+          border-radius: 8px;
+          background: #f7f3fc;
+          color: #312842;
+          cursor: pointer;
         }
-        .companyLookupResults button:hover, .companyLookupResults button:focus-visible {
-          border-color: #8066b4; background: #eee6fa;
+        .companyLookupResults button:hover,
+        .companyLookupResults button:focus-visible {
+          border-color: #8066b4;
+          background: #eee6fa;
         }
-        .companyLookupResults span { font-size: .85em; margin-top: 3px; }
+        .companyLookupResults span {
+          font-size: 0.85em;
+          margin-top: 3px;
+        }
       `}</style>
     </div>
   );

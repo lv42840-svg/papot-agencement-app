@@ -36,7 +36,10 @@ export async function GET(request: Request) {
 
   try {
     const response = await fetch(url, {
-      headers: { Accept: "application/json", "User-Agent": "PAPOT-AGENCEMENT/1.0 (company-search)" },
+      headers: {
+        Accept: "application/json",
+        "User-Agent": "PAPOT-AGENCEMENT/1.0 (company-search)",
+      },
       signal: AbortSignal.timeout(7_000),
       cache: "no-store",
       redirect: "error",

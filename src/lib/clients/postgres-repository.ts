@@ -79,10 +79,7 @@ export function createPostgresClientsRepository(pool: Pool = getServerDbPool()):
           // A commercial lead needs a local provisional identity before the customer
           // is formally created in Pennylane. Only the internal commercial caller can
           // opt into this exception; normal Clients API creation remains forbidden.
-          if (
-            input.action === "create" &&
-            !isAllowedCommercialProvisionalCreate(input, options)
-          ) {
+          if (input.action === "create" && !isAllowedCommercialProvisionalCreate(input, options)) {
             throw new Error("CLIENT_CREATE_IN_PENNYLANE");
           }
           if (input.action === "update") {

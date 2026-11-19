@@ -28,14 +28,25 @@ function setup() {
       return result;
     },
   };
-  return { clients, optionsSeen, get payload() { return payload; }, get created() { return created; } };
+  return {
+    clients,
+    optionsSeen,
+    get payload() {
+      return payload;
+    },
+    get created() {
+      return created;
+    },
+  };
 }
 
 describe("New commercial affair and customer", () => {
   it("creates an unlinked provisional customer despite Pennylane's normal create restriction", async () => {
     const state = setup();
     const selected = await resolveCommercialClient({
-      clients: state.clients, actor, newClientName: "Client sans fiche",
+      clients: state.clients,
+      actor,
+      newClientName: "Client sans fiche",
     });
     expect(state.created).toBe(1);
     expect(state.optionsSeen).toEqual([{ source: "commercialProvisional" }]);
@@ -69,7 +80,9 @@ describe("New commercial affair and customer", () => {
   it("reuses an existing customer without creating a duplicate", async () => {
     const state = setup();
     const original = await resolveCommercialClient({
-      clients: state.clients, actor, newClientName: "Existant",
+      clients: state.clients,
+      actor,
+      newClientName: "Existant",
     });
     const selected = await resolveCommercialClient({
       clients: state.clients,
@@ -101,7 +114,9 @@ describe("New commercial affair and customer", () => {
       contacts: [],
     };
     expect(isAllowedCommercialProvisionalCreate(input)).toBe(false);
-    expect(isAllowedCommercialProvisionalCreate(input, { source: "commercialProvisional" })).toBe(true);
+    expect(isAllowedCommercialProvisionalCreate(input, { source: "commercialProvisional" })).toBe(
+      true,
+    );
     expect(
       isAllowedCommercialProvisionalCreate(
         { ...input, paymentTerms: "60 jours" },
