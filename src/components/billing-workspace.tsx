@@ -670,7 +670,7 @@ export function BillingWorkspace({
         >
           <h2>Travaux supplémentaires du chantier</h2>
           <p>
-            Un supplément en attente d'accord reste visible, mais il n'augmente pas le marché
+            Un supplément en attente d&apos;accord reste visible, mais il n&apos;augmente pas le marché
             facturable. Une confirmation documentée est nécessaire.
           </p>
           <div style={{ display: "grid", gap: 10 }}>
@@ -708,7 +708,7 @@ export function BillingWorkspace({
               disabled={!data.canWrite || busy}
               onClick={() => void addExtra()}
             >
-              Ajouter un supplément en attente d'accord
+              Ajouter un supplément en attente d&apos;accord
             </button>
           </div>
           {chantierExtras.length === 0 ? (
@@ -729,7 +729,7 @@ export function BillingWorkspace({
                   ) : (
                     <div style={{ display: "grid", gap: 6, maxWidth: 700 }}>
                       <label>
-                        Justificatif de l'accord (date, interlocuteur et référence)
+                        Justificatif de l&apos;accord (date, interlocuteur et référence)
                         <input
                           value={extraEvidence[extra.id] ?? ""}
                           maxLength={1000}
@@ -748,7 +748,7 @@ export function BillingWorkspace({
                         disabled={!data.canWrite || busy}
                         onClick={() => void confirmExtra(extra.id)}
                       >
-                        Confirmer l'accord et intégrer au marché
+                        Confirmer l&apos;accord et intégrer au marché
                       </button>
                     </div>
                   )}
@@ -758,7 +758,7 @@ export function BillingWorkspace({
           )}
           <p>
             La confirmation crée une nouvelle base de préparation. Les anciens devis restent
-            inchangés et aucun document officiel n'est émis.
+            inchangés et aucun document officiel n&apos;est émis.
           </p>
         </section>
       )}
@@ -767,14 +767,14 @@ export function BillingWorkspace({
           role="tabpanel"
           style={{ background: "white", padding: 20, borderRadius: 12, display: "grid", gap: 14 }}
         >
-          <h2>Devis acceptés et suivi de préparation des factures</h2>
+          <h2>Marchés des chantiers et préparation des factures</h2>
           <p>
             Un devis signé n&apos;est pas une facture. Les acomptes, situations et soldes ci-dessous
             sont uniquement des <strong>projets PAPOT non émis</strong>. En attendant Pennylane,
             l&apos;état réellement non facturé ou partiellement facturé ne peut pas être certifié.
           </p>
           <div style={{ display: "flex", flexWrap: "wrap", gap: 12 }}>
-            <strong>{followup.length} devis retenu(s)</strong>
+            <strong>{followup.length} marché(s) de chantier</strong>
             <strong>
               {money(followup.reduce((s, r) => s + r.preparedHtCents, 0))} HT en projets
             </strong>
@@ -784,7 +784,7 @@ export function BillingWorkspace({
           </div>
           <div style={{ display: "flex", gap: 12, flexWrap: "wrap" }}>
             <label style={{ display: "grid", gap: 5, flex: "2 1 220px" }}>
-              Rechercher un devis accepté
+              Rechercher un marché de chantier
               <input
                 value={followupSearch}
                 onChange={(event) => setFollowupSearch(event.target.value)}
@@ -797,7 +797,7 @@ export function BillingWorkspace({
                 value={followupStatus}
                 onChange={(event) => setFollowupStatus(event.target.value as typeof followupStatus)}
               >
-                <option value="ALL">Tous les devis</option>
+                <option value="ALL">Tous les marchés</option>
                 <option value="NONE">Aucun projet</option>
                 <option value="PARTIAL">Projets partiels</option>
                 <option value="FULL">Totalité préparée (non émise)</option>
@@ -809,7 +809,7 @@ export function BillingWorkspace({
               <thead>
                 <tr style={{ textAlign: "left", borderBottom: "2px solid #ded8e9" }}>
                   <th style={{ padding: 9 }}>Client / chantier</th>
-                  <th style={{ padding: 9 }}>Devis accepté</th>
+                  <th style={{ padding: 9 }}>Devis du marché</th>
                   <th style={{ padding: 9, textAlign: "right" }}>Contrat HT</th>
                   <th style={{ padding: 9, textAlign: "right" }}>Projets préparés HT</th>
                   <th style={{ padding: 9, textAlign: "right" }}>Reste à préparer HT</th>
@@ -826,9 +826,18 @@ export function BillingWorkspace({
                       <div>{row.source.affairName}</div>
                     </td>
                     <td style={{ padding: 9 }}>
-                      <Link href={`/devis/${encodeURIComponent(row.source.quoteId)}`}>
-                        {row.source.quoteLabel}
-                      </Link>
+                      {row.source.sourceQuoteIds?.length ? (
+                        <div style={{ display: "grid", gap: 5 }}>
+                          <strong>{row.source.sourceQuoteIds.length} devis retenu(s)</strong>
+                          {row.source.sourceQuoteIds.map((quoteId) => (
+                            <Link key={quoteId} href={`/devis/${encodeURIComponent(quoteId)}`}>
+                              Ouvrir le devis {quoteId.slice(0, 8)}
+                            </Link>
+                          ))}
+                        </div>
+                      ) : (
+                        "Marché sans devis"
+                      )}
                     </td>
                     <td style={{ padding: 9, textAlign: "right" }}>
                       {money(row.source.contractHtCents)}
@@ -861,12 +870,7 @@ export function BillingWorkspace({
                           Préparer une facture
                         </button>
                       ) : (
-                        <Link
-                          className="secondaryButton"
-                          href={`/devis/${encodeURIComponent(row.source.quoteId)}`}
-                        >
-                          Voir le devis
-                        </Link>
+                        <span>Chantier à vérifier</span>
                       )}
                     </td>
                   </tr>
