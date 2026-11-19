@@ -189,6 +189,7 @@ export function BillingDocumentEditor({ draftId }: { draftId: string }) {
   const priorHt = priorProjects.reduce((sum, item) => sum + item.amountHtCents, 0);
   const latestVisa = draft && payload ? latestBillingVisa(payload, draft.id) : null;
   const visaRequired = draft && payload ? visaRequiredForChantier(payload, draft.chantierId) : false;
+  const editorCanEdit = canWrite && latestVisa?.status !== "SUBMITTED";
   const visaBlocksApproval =
     latestVisa?.status === "SUBMITTED" ||
     latestVisa?.status === "REFUSED" ||
@@ -467,7 +468,7 @@ export function BillingDocumentEditor({ draftId }: { draftId: string }) {
           <button
             type="button"
             className="primaryButton"
-            disabled={!canWrite || busy || !dirty}
+            disabled={!editorCanEdit || busy || !dirty}
             onClick={() => void save()}
           >
             <Save size={16} /> {busy ? "Enregistrement…" : "Enregistrer le projet"}
@@ -490,11 +491,13 @@ export function BillingDocumentEditor({ draftId }: { draftId: string }) {
           {notice}
         </p>
       )}
-      {!canWrite && (
+      {!editorCanEdit && (
         <p className="invoiceDraftNotice">
           {draft.status === "APPROVED"
             ? "Projet verrouillé après validation interne."
-            : "Lecture seule : droit Facturation en écriture requis."}
+            : latestVisa?.status === "SUBMITTED"
+              ? "Version provisoire présentée : modification bloquée jusqu'à décision ou retrait."
+              : "Lecture seule : droit Facturation en écriture requis."}
         </p>
       )}
 
@@ -505,7 +508,7 @@ export function BillingDocumentEditor({ draftId }: { draftId: string }) {
             Intitulé de la facture
             <select
               value={label}
-              disabled={!canWrite}
+              disabled={!editorCanEdit}
               onChange={(e) => {
                 setLabel(e.target.value);
                 setDirty(true);
@@ -526,7 +529,7 @@ export function BillingDocumentEditor({ draftId }: { draftId: string }) {
             <textarea
               rows={2}
               value={notes}
-              disabled={!canWrite}
+              disabled={!editorCanEdit}
               maxLength={4000}
               onChange={(e) => {
                 setNotes(e.target.value);
@@ -544,7 +547,7 @@ export function BillingDocumentEditor({ draftId }: { draftId: string }) {
           issus de plusieurs devis. Ils ne sont pas des factures officiellement émises.
         </p>
         {priorProjects.length === 0 ? (
-          <p>Aucun acompte ni situation précédemment préparé sur ce devis.</p>
+          <p>Aucun acompte ni situation précédemment préparé sur ce chantier.</p>
         ) : (
           <div className="invoiceScroll">
             <table className="invoiceTable">
@@ -597,7 +600,7 @@ export function BillingDocumentEditor({ draftId }: { draftId: string }) {
             <button
               className="secondaryButton"
               type="button"
-              disabled={!canWrite || busy}
+              disabled={!editorCanEdit || busy}
               onClick={() => addLine("TITLE")}
             >
               <Plus size={15} /> Titre / ouvrage
@@ -605,7 +608,7 @@ export function BillingDocumentEditor({ draftId }: { draftId: string }) {
             <button
               className="secondaryButton"
               type="button"
-              disabled={!canWrite || busy || rows.length >= 1000}
+              disabled={!editorCanEdit || busy || rows.length >= 1000}
               onClick={() => addLine("TITLE", rows.length, "SUBSECTION")}
             >
               <Plus size={15} /> Sous-titre
@@ -613,7 +616,7 @@ export function BillingDocumentEditor({ draftId }: { draftId: string }) {
             <button
               className="primaryButton"
               type="button"
-              disabled={!canWrite || busy || rows.length >= 1000}
+              disabled={!editorCanEdit || busy || rows.length >= 1000}
               onClick={() => addLine("FREE")}
             >
               <Plus size={15} /> Ajouter une ligne
@@ -622,7 +625,7 @@ export function BillingDocumentEditor({ draftId }: { draftId: string }) {
         </div>
         <InvoiceOuvragesNavigator
           lines={navigationRows}
-          disabled={!canWrite || busy || draft.status !== "DRAFT"}
+          disabled={!editorCanEdit || busy || draft.status !== "DRAFT"}
           onNavigate={(id) =>
             document.getElementById(`invoice-document-row-${id}`)?.scrollIntoView({
               behavior: "smooth",
@@ -661,7 +664,7 @@ export function BillingDocumentEditor({ draftId }: { draftId: string }) {
                     <td className="invoiceDescription">
                       <input
                         aria-label={`Désignation ligne ${index + 1}`}
-                        disabled={!canWrite}
+                        disabled={!editorCanEdit}
                         value={row.description}
                         onChange={(e) => alter(row.id, { description: e.target.value })}
                       />
@@ -677,7 +680,7 @@ export function BillingDocumentEditor({ draftId }: { draftId: string }) {
                       <td colSpan={5} className="invoiceTitleHint">
                         <select
                           aria-label={`Niveau du titre ligne ${index + 1}`}
-                          disabled={!canWrite || busy}
+                          disabled={!editorCanEdit || busy}
                           value={row.headingLevel ?? "SECTION"}
                           onChange={(event) =>
                             alter(row.id, {
@@ -695,7 +698,7 @@ export function BillingDocumentEditor({ draftId }: { draftId: string }) {
                           <input
                             aria-label={`Quantité ligne ${index + 1}`}
                             inputMode="decimal"
-                            disabled={!canWrite}
+                            disabled={!editorCanEdit}
                             value={row.quantityInput}
                             onChange={(e) => alter(row.id, { quantityInput: e.target.value })}
                           />
@@ -703,7 +706,7 @@ export function BillingDocumentEditor({ draftId }: { draftId: string }) {
                         <td>
                           <input
                             aria-label={`Unité ligne ${index + 1}`}
-                            disabled={!canWrite}
+                            disabled={!editorCanEdit}
                             maxLength={40}
                             value={row.unit}
                             onChange={(e) => alter(row.id, { unit: e.target.value })}
@@ -713,7 +716,7 @@ export function BillingDocumentEditor({ draftId }: { draftId: string }) {
                           <input
                             aria-label={`Prix unitaire HT ligne ${index + 1}`}
                             inputMode="decimal"
-                            disabled={!canWrite}
+                            disabled={!editorCanEdit}
                             value={row.priceInput}
                             onChange={(e) => alter(row.id, { priceInput: e.target.value })}
                           />
@@ -721,7 +724,7 @@ export function BillingDocumentEditor({ draftId }: { draftId: string }) {
                         <td>
                           <select
                             aria-label={`TVA ligne ${index + 1}`}
-                            disabled={!canWrite}
+                            disabled={!editorCanEdit}
                             value={row.vatRatePercent}
                             onChange={(e) =>
                               alter(row.id, { vatRatePercent: Number(e.target.value) })
@@ -740,7 +743,7 @@ export function BillingDocumentEditor({ draftId }: { draftId: string }) {
                       </>
                     )}
                     <td className="invoiceRowTools">
-                      {canWrite && (
+                      {editorCanEdit && (
                         <>
                           <button
                             title="Monter"
@@ -806,7 +809,7 @@ export function BillingDocumentEditor({ draftId }: { draftId: string }) {
                         <input
                           aria-label={`Avancement cumulé de ${line.description}`}
                           inputMode="decimal"
-                          disabled={!canWrite || busy}
+                          disabled={!editorCanEdit || busy}
                           value={progressValues[line.lineId] ?? "0"}
                           onChange={(event) =>
                             setProgressValues((old) => ({
@@ -824,7 +827,7 @@ export function BillingDocumentEditor({ draftId }: { draftId: string }) {
             <button
               type="button"
               className="secondaryButton"
-              disabled={!canWrite || busy}
+              disabled={!editorCanEdit || busy}
               onClick={applyProgress}
             >
               Recalculer les lignes depuis les pourcentages
@@ -833,8 +836,8 @@ export function BillingDocumentEditor({ draftId }: { draftId: string }) {
           </details>
         ) : null}
         <p className="invoiceHint">
-          Les lignes libres sont intégrées au plafond du devis retenu. Pour facturer des travaux
-          supplémentaires dépassant le contrat, crée et fais valider un devis complémentaire.
+          Les lignes libres sont intégrées au plafond du marché du chantier. Pour facturer des travaux
+          supplémentaires dépassant le contrat, ajoute un supplément au chantier et enregistre son accord.
         </p>
       </section>
 
@@ -884,7 +887,7 @@ export function BillingDocumentEditor({ draftId }: { draftId: string }) {
             <button
               className="secondaryButton"
               type="button"
-              disabled={!canWrite || busy || dirty || !preview || visaBlocksApproval}
+              disabled={!editorCanEdit || busy || dirty || !preview || visaBlocksApproval}
               onClick={() => void approve()}
             >
               Valider en interne et verrouiller
@@ -921,7 +924,7 @@ export function BillingDocumentEditor({ draftId }: { draftId: string }) {
           <button
             className="primaryButton"
             type="button"
-            disabled={!canWrite || busy || !dirty || !preview}
+            disabled={!editorCanEdit || busy || !dirty || !preview}
             onClick={() => void save()}
           >
             <Save size={16} /> Enregistrer le projet

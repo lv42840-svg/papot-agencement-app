@@ -141,7 +141,7 @@ export function BillingVisaPanel({
     <section className="invoiceCard" aria-label="Visa externe de la situation">
       <h2>Visa extérieur et versions provisoires</h2>
       <p>
-        Ce suivi garde les versions présentées au client ou au maître d'œuvre, sans émettre de
+        Ce suivi garde les versions présentées au client ou au maître d&apos;œuvre, sans émettre de
         facture légale. Une validation interne est distincte du visa extérieur.
       </p>
       {draft.chantierId && (
@@ -204,8 +204,8 @@ export function BillingVisaPanel({
             Enregistrer la présentation provisoire
           </button>
           <small>
-            PAPOT enregistre l'état du document et l'historique. Aucun e-mail ni PDF
-            officiel n'est envoyé par cette action.
+            PAPOT enregistre l&apos;état du document et l&apos;historique. Aucun e-mail ni PDF
+            officiel n&apos;est envoyé par cette action.
           </small>
         </div>
       )}
