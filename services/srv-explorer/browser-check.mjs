@@ -52,7 +52,7 @@ const identityServer = createServer(async (req, res) => {
   if (req.url === "/api/auth/login") {
     req.resume();
     res.setHeader("Set-Cookie", [
-      "papot_session=browser-test; Path=/; HttpOnly",
+      "papot_agencement_session=browser-test; Path=/; HttpOnly",
       "papot_concept_session=browser-test; Path=/; HttpOnly",
     ]);
     return res.end('{"ok":true}');
