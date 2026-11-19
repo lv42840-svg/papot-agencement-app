@@ -77,7 +77,7 @@ before(async () => {
       const token = randomBytes(32).toString("hex");
       tokens.set(token, username);
       res.setHeader("Set-Cookie", [
-        `papot_session=${token}; HttpOnly; Secure; Path=/`,
+        `papot_agencement_session=${token}; HttpOnly; Secure; Path=/`,
         `papot_concept_session=${token}; HttpOnly; Secure; Path=/`,
       ]);
       return res.end('{"ok":true}');
@@ -427,4 +427,14 @@ test("range parser and configuration reject invalid inputs", () => {
       SRV_CONCEPT_URL: "http://external.example",
     }),
   );
+});
+
+test("Agencement cookie default matches deployment and supports override", () => {
+  assert.equal(config.sources.agencement.cookie, "papot_agencement_session");
+  const custom = configFromEnv({
+    SRV_SESSION_KEY: randomBytes(32).toString("hex"),
+    SRV_ADMIN_USER_ID: "user-1",
+    SRV_AGENCEMENT_COOKIE: "different_agencement_cookie",
+  });
+  assert.equal(custom.sources.agencement.cookie, "different_agencement_cookie");
 });
