@@ -1,0 +1,30 @@
+name: Billing PR formatting (temporary)
+on:
+  pull_request:
+    types: [synchronize, opened, reopened]
+permissions:
+  contents: write
+jobs:
+  format:
+    if: ${{ github.event.pull_request.number == 280 && github.event.pull_request.head.repo.full_name == github.repository && github.event.pull_request.head.ref == 'feat/billing-chantier-market-foundation' }}
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.ref }}
+          persist-credentials: true
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - name: Format billing and test files
+        run: |
+          npx prettier --write src/lib/billing src/components/billing-document-editor.tsx src/components/billing-workspace.tsx src/components/chantier-billing-tab.tsx src/components/invoice-ouvrages-navigator.tsx src/app/api/desktop/billing tests/billing-*.test.ts
+      - name: Commit formatting when needed
+        run: |
+          git add src/lib/billing src/components/billing-document-editor.tsx src/components/billing-workspace.tsx src/components/chantier-billing-tab.tsx src/components/invoice-ouvrages-navigator.tsx src/app/api/desktop/billing tests/
+          if ! git diff --cached --quiet; then
+            git -c user.name='github-actions[bot]' -c user.email='41898282+github-actions[bot]@users.noreply.github.com' commit -m 'style(billing): apply Prettier to extras implementation'
+            git push origin HEAD:feat/billing-chantier-market-foundation
+          fi
