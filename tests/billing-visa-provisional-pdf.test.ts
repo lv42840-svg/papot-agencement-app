@@ -143,7 +143,7 @@ describe("PDF des versions de visa provisoires", () => {
     ).toString("latin1");
     expect(pdf).toContain("Segment000");
     expect(pdf).toContain("Segment119");
-    expect(Number(pdf.match(/\\/Type \\/Pages \\/Count (\\d+)/)?.[1])).toBeGreaterThan(1);
+    expect(Number(pdf.match(/\/Type \/Pages \/Count (\d+)/)?.[1])).toBeGreaterThan(1);
   });
 
 });
