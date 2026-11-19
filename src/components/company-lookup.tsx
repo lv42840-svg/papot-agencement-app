@@ -13,11 +13,13 @@ export function CompanyLookup({
   disabled?: boolean;
 }) {
   const [results, setResults] = useState<CompanySuggestion[]>([]);
+  const [completedTerm, setCompletedTerm] = useState("");
   const [selectedName, setSelectedName] = useState("");
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(false);
   const term = query.trim();
   const searching = !disabled && term.length >= 3 && term !== selectedName;
+  const visibleResults = completedTerm === term ? results : [];
 
   useEffect(() => {
     if (!searching) return;
@@ -33,7 +35,10 @@ export function CompanyLookup({
         );
         if (!response.ok) throw new Error("COMPANY_LOOKUP_UNAVAILABLE");
         const data = (await response.json()) as { results?: CompanySuggestion[] };
-        if (!controller.signal.aborted) setResults(Array.isArray(data.results) ? data.results : []);
+        if (!controller.signal.aborted) {
+          setResults(Array.isArray(data.results) ? data.results : []);
+          setCompletedTerm(term);
+        }
       } catch {
         if (!controller.signal.aborted) setError(true);
       } finally {
@@ -53,11 +58,11 @@ export function CompanyLookup({
       {!loading && error ? (
         <small>Annuaire indisponible. Tu peux continuer et renseigner le SIRET manuellement.</small>
       ) : null}
-      {!loading && !error && results.length > 0 ? (
+      {!loading && !error && visibleResults.length > 0 ? (
         <>
           <small>Sélectionne la bonne entreprise pour récupérer le SIRET de son siège :</small>
           <div className="companyLookupResults">
-            {results.map((company) => (
+            {visibleResults.map((company) => (
               <button
                 key={company.siret}
                 type="button"
@@ -78,7 +83,7 @@ export function CompanyLookup({
           </div>
         </>
       ) : null}
-      {!loading && !error && results.length === 0 ? (
+      {!loading && !error && completedTerm === term && visibleResults.length === 0 ? (
         <small>Aucune correspondance affichée. La saisie manuelle reste possible.</small>
       ) : null}
       <style jsx>{`
