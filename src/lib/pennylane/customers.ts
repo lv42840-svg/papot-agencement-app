@@ -21,6 +21,7 @@ const customerSchema = z
         address: z.string().nullish(),
         postal_code: z.string().nullish(),
         city: z.string().nullish(),
+        country_alpha2: z.string().nullish(),
       })
       .nullish(),
   })
@@ -47,7 +48,7 @@ function customerSiret(regNo: string, electronicAddress: string): string {
 
   // The V2 API can send SIREN_NIC (9+5) or SIREN_SIRET (9+14).
   // reg_no itself is normally only the nine-digit SIREN.
-  const match = /^(\d{9})_(\d{5}|\d{14})$/.exec(electronicAddress);
+  const match = /^(\d{9})_(\d{5}|\d{14})(?:_.+)?$/.exec(electronicAddress);
   if (!match) return "";
   if (/^\d{9}$/.test(regNo) && match[1] !== regNo) return "";
 
@@ -76,6 +77,8 @@ export type PennylaneCustomerFields = Pick<
 export type PennylaneCustomer = {
   id: string;
   name: string;
+  /** Nine-digit SIREN from the provider, never treated as a SIRET. */
+  siren: string;
   updatedAt: string | null;
   fields: PennylaneCustomerFields;
 };
@@ -95,7 +98,15 @@ export function normalizePennylaneCustomer(input: unknown): PennylaneCustomer {
   }
   const email = (raw.emails ?? []).find((item) => z.string().email().safeParse(item).success) ?? "";
   const regNo = trim(raw.reg_no, 20);
-  const siret = individual ? "" : customerSiret(regNo, trim(raw.electronic_billing_address, 70));
+  const billingAddress = trim(raw.electronic_billing_address, 130);
+  const siret = individual ? "" : customerSiret(regNo, billingAddress);
+  const siren = individual || (raw.billing_address?.country_alpha2 ?? "FR") !== "FR"
+    ? ""
+    : /^\d{9}$/.test(regNo)
+      ? regNo
+      : siret
+        ? siret.slice(0, 9)
+        : "";
   const type: ClientType = individual
     ? "PARTICULIER"
     : raw.public_administration
@@ -119,6 +130,7 @@ export function normalizePennylaneCustomer(input: unknown): PennylaneCustomer {
   return {
     id,
     name: individual ? [firstName, lastName].filter(Boolean).join(" ") : companyName,
+    siren,
     updatedAt: raw.updated_at ?? null,
     fields,
   };
@@ -163,7 +175,10 @@ export function mergePennylaneIdentity(
   if (current.pennylaneId && current.pennylaneId !== customer.id) {
     throw new Error("PENNYLANE_CLIENT_LINK_CONFLICT");
   }
-  if (current.siret && customer.fields.siret && current.siret !== customer.fields.siret) {
+  if (
+    (current.siret && customer.fields.siret && current.siret !== customer.fields.siret) ||
+    (current.siret && customer.siren && !current.siret.startsWith(customer.siren))
+  ) {
     throw new Error("PENNYLANE_CLIENT_SIRET_CONFLICT");
   }
   return {
