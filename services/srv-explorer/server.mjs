@@ -45,7 +45,7 @@ export function configFromEnv(env = process.env) {
   const sources = {
     agencement: {
       base: env.SRV_AGENCEMENT_URL || "http://127.0.0.1:3002",
-      cookie: env.SRV_AGENCEMENT_COOKIE || "papot_session",
+      cookie: env.SRV_AGENCEMENT_COOKIE || "papot_agencement_session",
     },
     concept: {
       base: env.SRV_CONCEPT_URL || "http://127.0.0.1:3001",
