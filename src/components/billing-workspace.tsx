@@ -63,7 +63,7 @@ export function BillingWorkspace({
   const [manualAmount, setManualAmount] = useState("");
   const [manualVat, setManualVat] = useState("20");
   const [tab, setTab] = useState<"CHANTIER" | "PROJECTS" | "FOLLOWUP">(
-    (chantierId || quoteId) ? "CHANTIER" : initialTab === "FOLLOWUP" ? "FOLLOWUP" : "PROJECTS",
+    chantierId || quoteId ? "CHANTIER" : initialTab === "FOLLOWUP" ? "FOLLOWUP" : "PROJECTS",
   );
   const [selectedChantier, setSelectedChantier] = useState(chantierId ?? "");
   const [projectSearch, setProjectSearch] = useState("");
