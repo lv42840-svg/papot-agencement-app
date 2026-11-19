@@ -1,5 +1,5 @@
 import type { ChantierRecord } from "@/lib/chantiers/domain";
-import type { BillingDraft, BillingSource } from "./domain";
+import type { BillingDraft, BillingSource, BillingManualMarket } from "./domain";
 
 type ChantierIdentity = Pick<
   ChantierRecord,
@@ -39,6 +39,7 @@ export function summarizeChantierBillingMarkets(
   chantiers: readonly ChantierIdentity[],
   sources: readonly BillingSource[],
   drafts: readonly BillingDraft[],
+  manualMarkets: readonly BillingManualMarket[] = [],
 ): ChantierBillingMarket[] {
   return chantiers.map((chantier) => {
     const retained = sources.filter((source) => source.chantierId === chantier.id);
@@ -46,7 +47,11 @@ export function summarizeChantierBillingMarkets(
       throw new Error("BILLING_CHANTIER_MARKET_QUOTE_DUPLICATE");
     }
     const prepared = drafts.filter((draft) => draft.chantierId === chantier.id);
-    const contractHtCents = safeSum(retained.map((source) => source.contractHtCents));
+    const manual = manualMarkets.find((item) => item.chantierId === chantier.id);
+    const contractHtCents = safeSum([
+      ...retained.map((source) => source.contractHtCents),
+      ...(manual ? [manual.amountHtCents] : []),
+    ]);
     const preparedHtCents = safeSum(prepared.map((draft) => draft.amountHtCents));
     return {
       chantierId: chantier.id,
@@ -60,7 +65,7 @@ export function summarizeChantierBillingMarkets(
       preparedHtCents,
       remainingToPrepareHtCents: Math.max(0, contractHtCents - preparedHtCents),
       preparationExceedsContract: preparedHtCents > contractHtCents,
-      requiresMarketEntry: retained.length === 0,
+      requiresMarketEntry: retained.length === 0 && !manual,
       quotes: retained.map((source) => ({
         quoteId: source.quoteId,
         label: source.quoteLabel,

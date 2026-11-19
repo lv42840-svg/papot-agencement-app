@@ -5,6 +5,8 @@ import {
 import { createBillingDraft, type BillingSource } from "../src/lib/billing/domain";
 
 const chantierId = "11111111-1111-4111-8111-111111111111";
+const caseId = "44444444-4444-4444-8444-444444444444";
+const clientId = "33333333-3333-4333-8333-333333333333";
 const chantierWithoutQuote = "22222222-2222-4222-8222-222222222222";
 const clientId = "33333333-3333-4333-8333-333333333333";
 const caseId = "44444444-4444-4444-8444-444444444444";
@@ -62,6 +64,30 @@ describe("marché global de facturation par chantier", () => {
     expect(market.requiresMarketEntry).toBe(true);
     expect(market.contractHtCents).toBe(0);
     expect(market.remainingToPrepareHtCents).toBe(0);
+  });
+
+  it("affiche un marché manuel sans devis dans l'aperçu du chantier", () => {
+    const [manual] = summarizeChantierBillingMarkets(
+      [chantier(chantierWithoutQuote)],
+      [],
+      [],
+      [
+        {
+          chantierId: chantierWithoutQuote,
+          commercialCaseId: caseId,
+          clientId,
+          clientName: "Client test",
+          description: "Intervention",
+          lineId: "55555555-5555-4555-8555-555555555555",
+          amountHtCents: 50000,
+          vatRatePercent: 20,
+          createdAt: new Date().toISOString(),
+          createdByName: "Nadia",
+        },
+      ],
+    );
+    expect(manual.requiresMarketEntry).toBe(false);
+    expect(manual.contractHtCents).toBe(50000);
   });
 
   it("signale les sources dupliquées et un dépassement de préparation", () => {

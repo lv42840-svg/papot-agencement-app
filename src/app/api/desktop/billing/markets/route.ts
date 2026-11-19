@@ -25,6 +25,7 @@ export async function GET() {
       chantiers.chantiers,
       sources,
       payload.drafts,
+      payload.manualMarkets ?? [],
     );
     return NextResponse.json(
       { markets },

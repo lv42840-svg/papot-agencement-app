@@ -224,7 +224,15 @@ export function BillingWorkspace({
             `Des données du devis empêchent la création${fields}. Vérifie les lignes du devis.`,
           );
         }
-        throw new Error(result.error ?? "Erreur de facturation");
+        const descriptions: Record<string, string> = {
+          BILLING_MARKET_WITHOUT_CLIENT:
+            "Rattache un client existant à l'affaire commerciale avant de créer un marché sans devis.",
+          BILLING_MARKET_SOURCE_CONFLICT:
+            "Ce chantier comporte déjà un devis retenu. Corrige les devis retenus avant de créer ce marché.",
+          BILLING_MARKET_ALREADY_PREPARED:
+            "Le marché ne peut plus être modifié après la création d'un projet. Une régularisation devra être enregistrée.",
+        };
+        throw new Error(descriptions[result.error ?? ""] ?? result.error ?? "Erreur de facturation");
       }
       await refresh();
       setNotice(success);

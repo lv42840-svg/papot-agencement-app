@@ -396,7 +396,7 @@ export function updateBillingDraft(
     if (
       payload.drafts
         .slice(draftIndex + 1)
-        .some((item) => item.chantierId === draft.chantierId && item.type === "PROGRESS")
+        .some((item) => item.chantierId === draft.chantierId)
     ) {
       throw new Error("BILLING_DRAFT_HAS_DEPENDENTS");
     }
