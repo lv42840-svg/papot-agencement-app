@@ -16,6 +16,9 @@ import { createPostgresClientsRepository } from "../src/lib/clients/postgres-rep
 const describeIfPostgres = process.env.PAPOT_DATABASE_URL ? describe : describe.skip;
 const providerId = "918000001001";
 const providerIdNew = "918000001002";
+const providerIdHeadquarters = "918000001003";
+const localClientId = randomUUID();
+const headquartersClientId = randomUUID();
 const siret = "85643001900028";
 const prior = process.env.PAPOT_PENNYLANE_ENABLED;
 const provider = {
@@ -79,12 +82,19 @@ describeIfPostgres("import clients Pennylane et préservation du référentiel e
   afterAll(async () => {
     if (pool) {
       await pool.query(
-        "DELETE FROM papot_clients WHERE id=$1 OR record->>'pennylaneId' IN ($2,$3)",
-        [originalId, providerId, providerIdNew],
+        "DELETE FROM papot_clients WHERE id IN ($1,$2,$3) OR record->>'pennylaneId' IN ($4,$5,$6)",
+        [
+          originalId,
+          localClientId,
+          headquartersClientId,
+          providerId,
+          providerIdNew,
+          providerIdHeadquarters,
+        ],
       );
       await pool.query(
-        "DELETE FROM papot_pennylane_staging WHERE resource='customers' AND external_id IN ($1,$2)",
-        [providerId, providerIdNew],
+        "DELETE FROM papot_pennylane_staging WHERE resource='customers' AND external_id IN ($1,$2,$3)",
+        [providerId, providerIdNew, providerIdHeadquarters],
       );
       await pool.query("DELETE FROM papot_pennylane_sync_state WHERE resource='customers'");
       await closeServerDbPool();
@@ -138,31 +148,102 @@ describeIfPostgres("import clients Pennylane et préservation du référentiel e
     expect(rows.rows[0].record.addressLine1).toBe("9 avenue de la Gare");
   });
 
-  it("interdit toute création directe dans PAPOT lorsque Pennylane est la référence", async () => {
+  it("crée une fiche locale depuis le module Clients malgré le mode Pennylane", async () => {
     const repository = createPostgresClientsRepository(pool);
-    await expect(
-      repository.mutate(
-        {
-          action: "create",
-          type: "ENTREPRISE",
-          companyName: "Client hors Pennylane",
-          firstName: "",
-          lastName: "",
-          addressLine1: "",
-          addressLine2: "",
-          postalCode: "",
-          city: "",
-          phone: "",
-          email: "",
-          siret: "",
-          vatNumber: "",
-          paymentTerms: "",
-          notes: "",
-          contacts: [],
-        },
-        { userId: randomUUID(), displayName: "Nadia" },
+    const input = {
+      action: "create" as const,
+      clientId: localClientId,
+      type: "ENTREPRISE" as const,
+      companyName: "Nouveau prospect local sans SIRET",
+      firstName: "",
+      lastName: "",
+      addressLine1: "",
+      addressLine2: "",
+      postalCode: "",
+      city: "",
+      phone: "",
+      email: "",
+      siret: "",
+      vatNumber: "",
+      paymentTerms: "",
+      notes: "",
+      contacts: [],
+    };
+    const actor = { userId: randomUUID(), displayName: "Nadia" };
+
+    await expect(repository.mutate(input, actor)).rejects.toThrow("CLIENT_CREATE_IN_PENNYLANE");
+    const result = await repository.mutate(input, actor, { source: "clientsLocal" });
+    const client = result.payload.clients.find((entry) => entry.id === localClientId);
+    expect(client).toMatchObject({ id: localClientId, companyName: input.companyName, siret: "" });
+    expect(client?.pennylaneId).toBeUndefined();
+  });
+
+  it("rattache un client local et récupère le SIRET officiel du siège lorsque Pennylane n'a que le SIREN", async () => {
+    const repository = createPostgresClientsRepository(pool);
+    await repository.mutate(
+      {
+        action: "create",
+        clientId: headquartersClientId,
+        type: "ENTREPRISE",
+        companyName: "Client siège uniquement",
+        firstName: "",
+        lastName: "",
+        addressLine1: "",
+        addressLine2: "",
+        postalCode: "",
+        city: "",
+        phone: "",
+        email: "",
+        siret: "",
+        vatNumber: "",
+        paymentTerms: "",
+        notes: "Conserver cette note chantier",
+        contacts: [],
+      },
+      { userId: randomUUID(), displayName: "Lucien" },
+      { source: "clientsLocal" },
+    );
+    await pool.query(
+      "INSERT INTO papot_pennylane_staging (resource,external_id,payload,synced_at) VALUES ('customers',$1,$2::jsonb,NOW())",
+      [
+        providerIdHeadquarters,
+        JSON.stringify({
+          ...provider,
+          id: Number(providerIdHeadquarters),
+          name: "Client siège uniquement",
+          reg_no: "741852963",
+          electronic_billing_address: null,
+        }),
+      ],
+    );
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async () =>
+        Response.json({
+          results: [{ siren: "741852963", siege: { siret: "74185296300024" } }],
+        }),
       ),
-    ).rejects.toThrow("CLIENT_CREATE_IN_PENNYLANE");
+    );
+    try {
+      const linked = await importPennylaneCustomer(
+        "LINK",
+        providerIdHeadquarters,
+        headquartersClientId,
+        "Nadia",
+        pool,
+      );
+      expect(linked).toEqual({ clientId: headquartersClientId, action: "LINKED" });
+      const row = await pool.query<{
+        record: { siret: string; notes: string; pennylaneId: string };
+      }>("SELECT record FROM papot_clients WHERE id=$1", [headquartersClientId]);
+      expect(row.rows[0].record).toMatchObject({
+        siret: "74185296300024",
+        pennylaneId: providerIdHeadquarters,
+        notes: "Conserver cette note chantier",
+      });
+    } finally {
+      vi.unstubAllGlobals();
+    }
   });
 
   it("importe un vrai nouveau client une seule fois, même après plusieurs clics", async () => {

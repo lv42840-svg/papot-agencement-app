@@ -79,6 +79,40 @@ describe("import clients Pennylane en lecture seule", () => {
     ).toBe("");
   });
 
+  it("reconnaît les formats SIREN_SIRET à 14 chiffres de Pennylane", () => {
+    const address = "123456789_12345678900012";
+    const customer = normalizePennylaneCustomer({
+      ...provider,
+      electronic_billing_address: address,
+    });
+    expect(customer.fields.siret).toBe("12345678900012");
+    expect(customer.siren).toBe("123456789");
+    expect(
+      normalizePennylaneCustomer({
+        ...provider,
+        electronic_billing_address: address + "_comptabilite",
+      }).fields.siret,
+    ).toBe("12345678900012");
+    expect(
+      normalizePennylaneCustomer({
+        ...provider,
+        electronic_billing_address: "123456789",
+      }).fields.siret,
+    ).toBe("");
+  });
+
+  it("ne transforme pas un SIREN seul en SIRET et vérifie les établissements", () => {
+    const customer = normalizePennylaneCustomer({
+      ...provider,
+      electronic_billing_address: null,
+    });
+    expect(customer.siren).toBe("123456789");
+    expect(customer.fields.siret).toBe("");
+    expect(() =>
+      mergePennylaneIdentity({ ...existing(), siret: "98765432100012" }, customer, "Nadia"),
+    ).toThrow("PENNYLANE_CLIENT_SIRET_CONFLICT");
+  });
+
   it("refuse une adresse électronique incompatible avec le SIREN", () => {
     const c = normalizePennylaneCustomer({
       ...provider,

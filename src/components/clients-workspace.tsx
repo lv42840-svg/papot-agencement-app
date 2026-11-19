@@ -391,7 +391,7 @@ export function ClientsWorkspace() {
           <Link href="/clients/pennylane" className="secondaryButton">
             Clients Pennylane · Importer
           </Link>
-          {canWrite && !pennylaneMode ? (
+          {canWrite ? (
             <button className="primaryButton" type="button" onClick={startNew} disabled={busy}>
               <Plus size={15} aria-hidden="true" />
               Nouveau client
@@ -402,8 +402,8 @@ export function ClientsWorkspace() {
 
       {pennylaneMode ? (
         <p className="muted">
-          Crée les clients dans Pennylane puis importe-les dans PAPOT. Les anciennes fiches restent
-          conservées.
+          Tu peux créer une fiche client dans PAPOT pour démarrer un dossier, puis la rattacher à
+          Pennylane depuis « Clients Pennylane · Importer » sans perdre ses affaires.
         </p>
       ) : null}
       {error ? <div className="clientsAlert clientsAlertError">{error}</div> : null}
@@ -481,7 +481,11 @@ export function ClientsWorkspace() {
                       {new Date(displayedClient.updatedAt).toLocaleDateString("fr-FR")}
                     </p>
                   ) : (
-                    <p className="muted">Crée la fiche maître utilisée par les autres modules.</p>
+                    <p className="muted">
+                      {pennylaneMode
+                        ? "Fiche PAPOT à rattacher ultérieurement à Pennylane pour la comptabilité."
+                        : "Crée la fiche maître utilisée par les autres modules."}
+                    </p>
                   )}
                 </div>
 

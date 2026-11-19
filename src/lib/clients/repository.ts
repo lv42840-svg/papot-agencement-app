@@ -1,7 +1,7 @@
 import type { ClientsPayload } from "./domain";
 import type { ClientsActor, ClientsMutation, ClientsMutationResult } from "./mutations";
 
-export type ClientsMutationOptions = { source: "commercialProvisional" };
+export type ClientsMutationOptions = { source: "commercialProvisional" | "clientsLocal" };
 
 export interface ClientsRepository {
   load(): Promise<ClientsPayload>;

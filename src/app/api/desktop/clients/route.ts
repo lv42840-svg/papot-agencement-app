@@ -61,10 +61,16 @@ export async function POST(request: Request) {
     const repository = await createClientsRepository();
 
     stage = "mutate";
-    const mutation = await repository.mutate(input, {
-      userId: context.user.id,
-      displayName: context.user.displayName,
-    });
+    const mutation = await repository.mutate(
+      input,
+      {
+        userId: context.user.id,
+        displayName: context.user.displayName,
+      },
+      // This route already requires the Clients WRITE permission. The new
+      // record is operational only; linking it to Pennylane stays explicit.
+      input.action === "create" ? { source: "clientsLocal" } : undefined,
+    );
 
     console.info("[PAPOT][Clients] POST saved", { ms: Date.now() - startedAt });
     return noStoreJson(

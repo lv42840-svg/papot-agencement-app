@@ -14,6 +14,7 @@ import {
 import { applyClientsMutation } from "@/lib/clients/mutations";
 import { listPennylaneResource, verifyPennylaneCompany } from "./client";
 import { readPennylaneStoredConfig } from "./connection";
+import { findHeadquartersSiret } from "./customer-siret";
 import { pennylaneEnabled } from "./config";
 import {
   mergePennylaneIdentity,
@@ -96,7 +97,9 @@ export async function readPennylaneCustomerCatalog(
       return {
         id: candidate.id,
         name: candidate.name,
-        siret: candidate.fields.siret,
+        // Display the actual linked PAPOT SIRET after a government-directory
+        // enrichment, even if Pennylane itself only contains the SIREN.
+        siret: candidate.fields.siret || alreadyLinked?.siret || "",
         email: candidate.fields.email,
         customerType: candidate.fields.type,
         updatedAt: candidate.updatedAt,
@@ -178,6 +181,20 @@ export async function importPennylaneCustomer(
   if (!pennylaneEnabled()) throw new Error("PENNYLANE_DISABLED");
   if (!/^\d{1,20}$/.test(customerId)) throw new Error("PENNYLANE_CUSTOMER_ID_INVALID");
   await runServerDbMigrations(pool);
+
+  // Resolve a missing SIRET before taking PostgreSQL locks. Pennylane may
+  // only provide the nine-digit SIREN; in that case we can query the official
+  // public directory for the head-office establishment, but never invent one.
+  const stagedBeforeLock = await pool.query<StageRow>(
+    "SELECT external_id, payload FROM papot_pennylane_staging WHERE resource='customers' AND external_id=$1",
+    [customerId],
+  );
+  const preflight = stagedBeforeLock.rows[0]
+    ? normalizePennylaneCustomer(stagedBeforeLock.rows[0].payload)
+    : null;
+  const headquartersSiret =
+    preflight?.siren && !preflight.fields.siret ? await findHeadquartersSiret(preflight.siren) : "";
+
   return withServerDbTransaction(async (client) => {
     // Stage refresh and client creation cannot race with a manual link.
     await client.query("SELECT pg_advisory_xact_lock($1)", [STAGING_LOCK_ID]);
@@ -201,6 +218,19 @@ export async function importPennylaneCustomer(
     const target =
       alreadyLinked ?? (chosenClientId ? native.find((c) => c.id === chosenClientId) : undefined);
     if (action === "LINK" && !target) throw new Error("CLIENT_NOT_FOUND");
+
+    // Only fill a blank SIRET, and only if staging still has the same SIREN.
+    // A local establishment SIRET takes precedence over the headquarters SIRET.
+    if (
+      !customer.fields.siret &&
+      !target?.siret &&
+      customer.siren &&
+      customer.siren === preflight?.siren &&
+      headquartersSiret
+    ) {
+      customer.fields.siret = headquartersSiret;
+    }
+
     // Once linked by its stable provider ID, a later name collision with another
     // client must not prevent the normal refresh of that established link.
     const candidates = alreadyLinked
