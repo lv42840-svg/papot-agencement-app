@@ -59,7 +59,7 @@ const present = (p: BillingPayload) =>
   );
 
 describe("visa externe des situations et factures provisoires", () => {
-  it("numérote, fige les lignes et bloque l'approbation interne pendant l'attente", () => {
+  it("numérote, fige les lignes et bloque la validation interne pendant l'attente", () => {
     const payload = present(setBillingVisaRequirement(make(), site, true, "Lucien"));
     const visa = latestBillingVisa(payload, payload.drafts[0].id)!;
     expect(visa.version).toBe(1);
