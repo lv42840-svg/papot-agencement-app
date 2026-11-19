@@ -15,12 +15,27 @@ import {
   billingTitlesSchema,
 } from "@/lib/billing/domain";
 import { createBillingRepository } from "@/lib/billing/repository";
+import { createChantiersRepository } from "@/lib/chantiers/create-repository";
+import { createClientsRepository } from "@/lib/clients/create-repository";
+import { clientDisplayName } from "@/lib/clients/domain";
+import { createCommercialRepository } from "@/lib/commercial/create-repository";
+import { buildChantierMarketSources } from "@/lib/billing/market-sources";
+import { vatRatePercentSchema } from "@/lib/vat";
 import { loadBillingSources } from "@/lib/billing/sources";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
 const billingMutationSchema = z.discriminatedUnion("action", [
+  z
+    .object({
+      action: z.literal("SET_MANUAL_MARKET"),
+      chantierId: z.string().uuid(),
+      description: z.string().trim().min(1).max(4000),
+      amountHtCents: z.number().int().positive().safe(),
+      vatRatePercent: vatRatePercentSchema,
+    })
+    .strict(),
   z
     .object({
       action: z.literal("SET_TITLES"),
@@ -105,6 +120,14 @@ function statusFor(code: string): number {
   if (authStatus) return authStatus;
   if (code === "BILLING_DRAFT_NOT_FOUND" || code === "BILLING_QUOTE_NOT_AVAILABLE") return 404;
   if (
+    code === "BILLING_MARKET_WITHOUT_CLIENT" ||
+    code === "BILLING_MARKET_CLIENT_MISMATCH" ||
+    code === "BILLING_MARKET_SOURCE_CONFLICT" ||
+    code === "BILLING_MARKET_ALREADY_PREPARED" ||
+    code === "BILLING_MARKET_LINES_LIMIT" ||
+    code === "BILLING_MARKET_LINE_DUPLICATE"
+  ) return 409;
+  if (
     code === "BILLING_VERSION_CONFLICT" ||
     code === "BILLING_AMOUNT_EXCEEDS_CONTRACT" ||
     code === "BILLING_CONTRACT_ALREADY_PREPARED" ||
@@ -122,11 +145,27 @@ function statusFor(code: string): number {
 export async function GET() {
   try {
     const context = await requireModuleRequestContext("billing", "READ");
-    const [payload, sources] = await Promise.all([
+    const [payload, quotes, chantiers] = await Promise.all([
       createBillingRepository().load(),
       loadBillingSources(),
+      createChantiersRepository().load(),
     ]);
-    return noStoreJson({ payload, sources, canWrite: context.moduleAccess.canWrite });
+    const sources = buildChantierMarketSources(
+      chantiers.chantiers,
+      quotes,
+      payload.manualMarkets ?? [],
+    );
+    return noStoreJson({
+      payload,
+      sources,
+      chantiers: chantiers.chantiers.map((chantier) => ({
+        id: chantier.id,
+        name: chantier.name,
+        clientName: chantier.clientName,
+        status: chantier.status,
+      })),
+      canWrite: context.moduleAccess.canWrite,
+    });
   } catch (error) {
     const code = error instanceof Error ? error.message : "BILLING_LOAD_FAILED";
     return noStoreJson({ error: code }, statusFor(code));
@@ -144,16 +183,72 @@ export async function POST(request: Request) {
       return noStoreJson({ error: "BILLING_REQUEST_INVALID", fields }, 400);
     }
     const input = parsed.data;
-    const sources = input.action === "CREATE" ? await loadBillingSources() : [];
+    const needsMarket = input.action === "CREATE" || input.action === "SET_MANUAL_MARKET";
+    const [quotes, chantiers, commercial, clients] = needsMarket
+      ? await Promise.all([
+          loadBillingSources(),
+          createChantiersRepository().load(),
+          createCommercialRepository().load(),
+          (await createClientsRepository()).load(),
+        ])
+      : [[], null, null, null];
     const repository = createBillingRepository();
     const payload = await repository.mutate((current) => {
       const drafts = [...current.drafts];
       if (input.action === "SET_TITLES") {
         return { ...current, invoiceTitles: input.invoiceTitles };
       }
+      if (input.action === "SET_MANUAL_MARKET") {
+        const chantier = chantiers?.chantiers.find((item) => item.id === input.chantierId);
+        if (!chantier) throw new Error("BILLING_QUOTE_NOT_AVAILABLE");
+        if (quotes.some((item) => item.chantierId === chantier.id)) {
+          throw new Error("BILLING_MARKET_SOURCE_CONFLICT");
+        }
+        const affair = commercial?.cases.find(
+          (item) => item.id === chantier.sourceCommercialCaseId,
+        );
+        const client = clients?.clients.find((item) => item.id === affair?.clientId);
+        if (!affair || !client || client.isArchived) {
+          throw new Error("BILLING_MARKET_WITHOUT_CLIENT");
+        }
+        const markets = [...(current.manualMarkets ?? [])];
+        const existingIndex = markets.findIndex(
+          (item) => item.chantierId === chantier.id,
+        );
+        const existing = markets[existingIndex];
+        if (
+          existing &&
+          existing.description === input.description &&
+          existing.amountHtCents === input.amountHtCents &&
+          existing.vatRatePercent === input.vatRatePercent
+        ) return current;
+        if (drafts.some((draft) => draft.chantierId === chantier.id)) {
+          throw new Error("BILLING_MARKET_ALREADY_PREPARED");
+        }
+        const market = {
+          chantierId: chantier.id,
+          commercialCaseId: chantier.sourceCommercialCaseId,
+          clientId: client.id,
+          clientName: clientDisplayName(client),
+          description: input.description,
+          lineId: existing?.lineId ?? globalThis.crypto.randomUUID(),
+          amountHtCents: input.amountHtCents,
+          vatRatePercent: input.vatRatePercent,
+          createdAt: existing?.createdAt ?? new Date().toISOString(),
+          createdByName: existing?.createdByName ?? context.user.displayName,
+        };
+        if (existingIndex >= 0) markets[existingIndex] = market;
+        else markets.push(market);
+        return { ...current, manualMarkets: markets };
+      }
       if (input.action === "CREATE") {
         // Request IDs survive retries, including a retry after a connection timeout.
         if (drafts.some((draft) => draft.requestId === input.requestId)) return current;
+        const sources = buildChantierMarketSources(
+          chantiers?.chantiers ?? [],
+          quotes,
+          current.manualMarkets ?? [],
+        );
         const source = sources.find((candidate) => candidate.quoteId === input.quoteId);
         if (!source || (input.chantierId && source.chantierId !== input.chantierId)) {
           throw new Error("BILLING_QUOTE_NOT_AVAILABLE");
@@ -188,7 +283,11 @@ export async function POST(request: Request) {
         if (drafts[index].updatedAt !== input.expectedUpdatedAt) {
           throw new Error("BILLING_VERSION_CONFLICT");
         }
-        if (drafts.slice(index + 1).some((draft) => draft.quoteId === drafts[index].quoteId)) {
+        if (
+          drafts
+            .slice(index + 1)
+            .some((draft) => draft.chantierId === drafts[index].chantierId)
+        ) {
           throw new Error("BILLING_DRAFT_HAS_DEPENDENTS");
         }
         drafts.splice(index, 1);

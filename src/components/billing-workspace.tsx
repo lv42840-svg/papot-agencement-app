@@ -9,13 +9,25 @@ import {
   billingPreparationFollowup,
   type BillingPreparationStatus,
 } from "@/lib/billing/preparation-followup";
+import { belongsToBillingSource } from "@/lib/billing/domain";
 import type {
   BillingDraft,
   BillingPayload,
   BillingSource,
   BillingType,
 } from "@/lib/billing/domain";
-type Snapshot = { payload: BillingPayload; sources: BillingSource[]; canWrite: boolean };
+type BillingChantierChoice = {
+  id: string;
+  name: string;
+  clientName: string | null;
+  status: string;
+};
+type Snapshot = {
+  payload: BillingPayload;
+  sources: BillingSource[];
+  chantiers: BillingChantierChoice[];
+  canWrite: boolean;
+};
 const money = (n: number) =>
   (n / 100).toLocaleString("fr-FR", { style: "currency", currency: "EUR" });
 const options: { value: BillingType; label: string }[] = [
@@ -47,6 +59,9 @@ export function BillingWorkspace({
   const [mode, setMode] = useState<"AMOUNT" | "PERCENT" | "LINES">("PERCENT");
   const [lineValues, setLineValues] = useState<Record<string, string>>({});
   const [value, setValue] = useState("");
+  const [manualDescription, setManualDescription] = useState("Travaux réalisés");
+  const [manualAmount, setManualAmount] = useState("");
+  const [manualVat, setManualVat] = useState("20");
   const [tab, setTab] = useState<"CHANTIER" | "PROJECTS" | "FOLLOWUP">(
     chantierId ? "CHANTIER" : initialTab === "FOLLOWUP" ? "FOLLOWUP" : "PROJECTS",
   );
@@ -68,21 +83,21 @@ export function BillingWorkspace({
     void refresh().catch(() => setError("Impossible de charger la facturation."));
   }, []);
   const allSources = data?.sources ?? [];
-  const chantierChoices = [
-    ...new Map<string, { id: string; name: string; client: string }>(
-      allSources
-        .filter((source) => source.chantierId !== null)
-        .map((source) => [
-          source.chantierId!,
-          { id: source.chantierId!, name: source.affairName, client: source.clientName },
-        ]),
-    ).values(),
-  ].sort((a, b) => a.name.localeCompare(b.name, "fr-FR"));
+  const chantierChoices = [...(data?.chantiers ?? [])]
+    .map((chantier) => ({
+      id: chantier.id,
+      name: chantier.name,
+      client: chantier.clientName || "Client à rattacher",
+    }))
+    .sort((a, b) => a.name.localeCompare(b.name, "fr-FR"));
   const activeChantierId = chantierChoices.some((site) => site.id === selectedChantier)
     ? selectedChantier
     : (chantierChoices[0]?.id ?? "");
   const sources = allSources.filter((source) => source.chantierId === activeChantierId);
-  const active = sources.find((source) => source.quoteId === selection) ?? sources[0];
+  const active =
+    sources.find(
+      (source) => source.quoteId === selection || source.sourceQuoteIds?.includes(selection),
+    ) ?? sources[0];
   const drafts = data?.payload.drafts ?? [];
   const followup = billingPreparationFollowup(allSources, drafts);
   const visibleFollowup = followup.filter((row) => {
@@ -112,24 +127,26 @@ export function BillingWorkspace({
   });
   const used = active
     ? (data?.payload.drafts ?? [])
-        .filter((d) => d.quoteId === active.quoteId)
+        .filter((d) => belongsToBillingSource(d, active))
         .reduce((n, d) => n + d.amountHtCents, 0)
     : 0;
   const remaining = Math.max(0, (active?.contractHtCents ?? 0) - used);
   function previousPercents(source: BillingSource): Record<string, string> {
-    const latest = (data?.payload.drafts ?? [])
-      .filter((draft) => draft.quoteId === source.quoteId && draft.type === "PROGRESS")
-      .sort((a, b) => a.createdAt.localeCompare(b.createdAt))
-      .at(-1);
+    const history = (data?.payload.drafts ?? []).filter(
+      (draft) => draft.type === "PROGRESS" && belongsToBillingSource(draft, source),
+    );
     return Object.fromEntries(
-      (source.lines ?? []).map((line) => [
-        line.lineId,
-        String(
-          latest?.lineProgress?.find((progress) => progress.lineId === line.lineId)?.percent ??
-            latest?.cumulativePercent ??
-            0,
-        ),
-      ]),
+      (source.lines ?? []).map((line) => {
+        const prior = history.reduce((maximum, draft) => {
+          const progress = draft.lineProgress?.find((row) => row.lineId === line.lineId);
+          const included = draft.lines?.some((row) => row.lineId === line.lineId);
+          return Math.max(
+            maximum,
+            progress?.percent ?? (included ? (draft.cumulativePercent ?? 0) : 0),
+          );
+        }, 0);
+        return [line.lineId, String(prior)];
+      }),
     );
   }
   // Preview and submit the same percentages, including visible saved defaults.
@@ -219,6 +236,30 @@ export function BillingWorkspace({
       setBusy(false);
     }
   }
+  async function saveManualMarket() {
+    if (!activeChantierId) return;
+    const amountHtCents = parseMoney(manualAmount);
+    const vatRatePercent = Number(manualVat.replace(",", "."));
+    if (!Number.isSafeInteger(amountHtCents) || amountHtCents <= 0) {
+      setError("Saisis un montant de marché HT positif.");
+      return;
+    }
+    if (!manualDescription.trim() || !Number.isFinite(vatRatePercent)) {
+      setError("Indique la prestation et un taux de TVA.");
+      return;
+    }
+    await write(
+      {
+        action: "SET_MANUAL_MARKET",
+        chantierId: activeChantierId,
+        description: manualDescription.trim(),
+        amountHtCents,
+        vatRatePercent,
+      },
+      "Marché sans devis enregistré. Tu peux maintenant préparer un projet.",
+    );
+  }
+
   async function create() {
     if (!active) return;
     const linesMode = type === "PROGRESS" && mode === "LINES";
@@ -356,30 +397,55 @@ export function BillingWorkspace({
             )}
           </label>
           {sources.length === 0 ? (
-            <p>
-              Aucun devis retenu éligible pour cette sélection. Vérifie les devis retenus et leurs
-              prix.
-            </p>
+            <div className="invoiceCard">
+              <h3>Chantier sans devis retenu</h3>
+              <p>
+                Renseigne un marché simplifié pour préparer une facture. Ce montant constitue
+                une base de travail interne, sans émission officielle.
+              </p>
+              <label>
+                Désignation des travaux
+                <input
+                  value={manualDescription}
+                  maxLength={4000}
+                  onChange={(event) => setManualDescription(event.target.value)}
+                />
+              </label>
+              <label>
+                Montant total HT
+                <input
+                  value={manualAmount}
+                  inputMode="decimal"
+                  placeholder="Ex. 1500,00"
+                  onChange={(event) => setManualAmount(event.target.value)}
+                />
+              </label>
+              <label>
+                Taux de TVA applicable (%), à confirmer selon le chantier
+                <input
+                  value={manualVat}
+                  inputMode="decimal"
+                  onChange={(event) => setManualVat(event.target.value)}
+                />
+              </label>
+              <button
+                className="primaryButton"
+                type="button"
+                disabled={!data.canWrite || busy}
+                onClick={() => void saveManualMarket()}
+              >
+                Enregistrer le marché simplifié
+              </button>
+            </div>
           ) : (
             <>
-              <label>
-                Devis retenu{" "}
-                <select
-                  style={{ width: "100%", padding: 9 }}
-                  value={active?.quoteId ?? ""}
-                  onChange={(e) => {
-                    setSelection(e.target.value);
-                    const source = sources.find((item) => item.quoteId === e.target.value);
-                    if (source) setLineValues(previousPercents(source));
-                  }}
-                >
-                  {sources.map((s) => (
-                    <option key={s.quoteId} value={s.quoteId}>
-                      {s.affairName} · {s.quoteLabel} · {s.clientName}
-                    </option>
-                  ))}
-                </select>
-              </label>
+              <div>
+                <strong>Marché global du chantier</strong>
+                <p>
+                  {active?.quoteLabel} · {active?.lines?.length ?? 0} prestations.
+                  Tous les devis retenus de ce chantier sont regroupés dans un seul projet.
+                </p>
+              </div>
               <p>
                 <b>Contrat :</b> {money(active?.contractHtCents ?? 0)} HT · <b>Déjà préparé :</b>{" "}
                 {money(used)} HT · <b>Disponible :</b> {money(remaining)} HT
