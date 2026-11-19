@@ -97,7 +97,9 @@ export async function readPennylaneCustomerCatalog(
       return {
         id: candidate.id,
         name: candidate.name,
-        siret: candidate.fields.siret,
+        // Display the actual linked PAPOT SIRET after a government-directory
+        // enrichment, even if Pennylane itself only contains the SIREN.
+        siret: candidate.fields.siret || alreadyLinked?.siret || "",
         email: candidate.fields.email,
         customerType: candidate.fields.type,
         updatedAt: candidate.updatedAt,
