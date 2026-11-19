@@ -44,11 +44,16 @@ function trim(value: string | null | undefined, max: number): string {
 
 function customerSiret(regNo: string, electronicAddress: string): string {
   if (/^\d{14}$/.test(regNo)) return regNo;
-  // Pennylane represents a French billing establishment as SIREN_NIC.
-  const match = /^(\d{9})_(\d{5})$/.exec(electronicAddress);
+
+  // The V2 API can send SIREN_NIC (9+5) or SIREN_SIRET (9+14).
+  // reg_no itself is normally only the nine-digit SIREN.
+  const match = /^(\d{9})_(\d{5}|\d{14})$/.exec(electronicAddress);
   if (!match) return "";
-  if (regNo && /^\d{9}$/.test(regNo) && match[1] !== regNo) return "";
-  return match[1] + match[2];
+  if (/^\d{9}$/.test(regNo) && match[1] !== regNo) return "";
+
+  const siret = match[2].length === 5 ? match[1] + match[2] : match[2];
+  // Do not accept an inconsistent electronic address from Pennylane.
+  return siret.slice(0, 9) === match[1] ? siret : "";
 }
 
 export type PennylaneCustomerFields = Pick<
