@@ -26,6 +26,7 @@ export async function GET() {
       sources,
       payload.drafts,
       payload.manualMarkets ?? [],
+      payload.extras ?? [],
     );
     return NextResponse.json({ markets }, { headers: { "Cache-Control": "no-store" } });
   } catch (error) {

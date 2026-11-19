@@ -1,5 +1,5 @@
 import type { ChantierRecord } from "@/lib/chantiers/domain";
-import type { BillingDraft, BillingSource, BillingManualMarket } from "./domain";
+import type { BillingDraft, BillingSource, BillingManualMarket, BillingExtra } from "./domain";
 
 type ChantierIdentity = Pick<ChantierRecord, "id" | "name" | "number" | "clientName" | "status">;
 
@@ -11,6 +11,9 @@ export type ChantierBillingMarket = {
   status: ChantierRecord["status"];
   quoteCount: number;
   draftCount: number;
+  confirmedExtraHtCents: number;
+  pendingExtraHtCents: number;
+  pendingExtraCount: number;
   contractHtCents: number;
   preparedHtCents: number;
   remainingToPrepareHtCents: number;
@@ -37,6 +40,7 @@ export function summarizeChantierBillingMarkets(
   sources: readonly BillingSource[],
   drafts: readonly BillingDraft[],
   manualMarkets: readonly BillingManualMarket[] = [],
+  extras: readonly BillingExtra[] = [],
 ): ChantierBillingMarket[] {
   return chantiers.map((chantier) => {
     const retained = sources.filter((source) => source.chantierId === chantier.id);
@@ -45,9 +49,13 @@ export function summarizeChantierBillingMarkets(
     }
     const prepared = drafts.filter((draft) => draft.chantierId === chantier.id);
     const manual = manualMarkets.find((item) => item.chantierId === chantier.id);
+    const siteExtras = extras.filter((extra) => extra.chantierId === chantier.id);
+    const confirmedExtras = siteExtras.filter((extra) => extra.agreementStatus === "CONFIRMED");
+    const pendingExtras = siteExtras.filter((extra) => extra.agreementStatus === "TO_CONFIRM");
     const contractHtCents = safeSum([
       ...retained.map((source) => source.contractHtCents),
       ...(manual ? [manual.amountHtCents] : []),
+      ...confirmedExtras.map((extra) => extra.amountHtCents),
     ]);
     const preparedHtCents = safeSum(prepared.map((draft) => draft.amountHtCents));
     return {
@@ -58,6 +66,9 @@ export function summarizeChantierBillingMarkets(
       status: chantier.status,
       quoteCount: retained.length,
       draftCount: prepared.length,
+      confirmedExtraHtCents: safeSum(confirmedExtras.map((extra) => extra.amountHtCents)),
+      pendingExtraHtCents: safeSum(pendingExtras.map((extra) => extra.amountHtCents)),
+      pendingExtraCount: pendingExtras.length,
       contractHtCents,
       preparedHtCents,
       remainingToPrepareHtCents: Math.max(0, contractHtCents - preparedHtCents),

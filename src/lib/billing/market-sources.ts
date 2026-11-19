@@ -1,6 +1,7 @@
 import type { ChantierRecord } from "@/lib/chantiers/domain";
 import type {
   BillingManualMarket,
+  BillingExtra,
   BillingSource,
   BillingSourceLine,
   BillingSourceStructureItem,
@@ -29,6 +30,7 @@ export function buildChantierMarketSources(
   chantiers: readonly ChantierIdentity[],
   quoteSources: readonly BillingSource[],
   manualMarkets: readonly BillingManualMarket[],
+  extras: readonly BillingExtra[] = [],
 ): BillingSource[] {
   const markets: BillingSource[] = [];
   const configured = new Set<string>();
@@ -132,5 +134,54 @@ export function buildChantierMarketSources(
       structure,
     });
   }
-  return markets;
+  return markets.map((market) => {
+    const confirmed = extras.filter(
+      (extra) => extra.chantierId === market.chantierId && extra.agreementStatus === "CONFIRMED",
+    );
+    if (!confirmed.length) return market;
+
+    const lineIds = new Set((market.lines ?? []).map((line) => line.lineId));
+    if (confirmed.some((extra) => lineIds.has(extra.lineId))) {
+      throw new Error("BILLING_MARKET_LINE_DUPLICATE");
+    }
+    const newLines: BillingSourceLine[] = confirmed.map((extra) => ({
+      lineId: extra.lineId,
+      description: extra.description,
+      amountHtCents: extra.amountHtCents,
+      vatRatePercent: extra.vatRatePercent,
+      quantity: 1,
+      unit: "forfait",
+    }));
+    const structure: BillingSourceStructureItem[] = [
+      ...(market.structure ?? []),
+      { kind: "TITLE", title: "Travaux supplémentaires confirmés", level: "SECTION" },
+      ...confirmed.map((extra) => ({ kind: "LINE" as const, lineId: extra.lineId })),
+    ];
+    const lines = [...(market.lines ?? []), ...newLines];
+    if (lines.length > 1000 || structure.length > 1000) {
+      throw new Error("BILLING_MARKET_LINES_LIMIT");
+    }
+
+    const taxBase = new Map(
+      market.contractTaxGroups.map((group) => [group.ratePercent, group.baseHtCents]),
+    );
+    for (const extra of confirmed) {
+      taxBase.set(
+        extra.vatRatePercent,
+        (taxBase.get(extra.vatRatePercent) ?? 0) + extra.amountHtCents,
+      );
+    }
+    return {
+      ...market,
+      contractHtCents: checkedSum([
+        market.contractHtCents,
+        ...confirmed.map((extra) => extra.amountHtCents),
+      ]),
+      contractTaxGroups: [...taxBase.entries()]
+        .map(([ratePercent, baseHtCents]) => ({ ratePercent, baseHtCents }))
+        .sort((a, b) => a.ratePercent - b.ratePercent),
+      lines,
+      structure,
+    };
+  });
 }

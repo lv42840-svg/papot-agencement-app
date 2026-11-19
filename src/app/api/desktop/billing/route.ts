@@ -20,6 +20,7 @@ import { createClientsRepository } from "@/lib/clients/create-repository";
 import { clientDisplayName } from "@/lib/clients/domain";
 import { createCommercialRepository } from "@/lib/commercial/create-repository";
 import { buildChantierMarketSources } from "@/lib/billing/market-sources";
+import { addBillingExtra, confirmBillingExtra } from "@/lib/billing/extras";
 import { vatRatePercentSchema } from "@/lib/vat";
 import { loadBillingSources } from "@/lib/billing/sources";
 
@@ -27,6 +28,23 @@ export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
 const billingMutationSchema = z.discriminatedUnion("action", [
+  z
+    .object({
+      action: z.literal("ADD_EXTRA"),
+      requestId: z.string().uuid(),
+      chantierId: z.string().uuid(),
+      description: z.string().trim().min(1).max(4000),
+      amountHtCents: z.number().int().positive().safe(),
+      vatRatePercent: vatRatePercentSchema,
+    })
+    .strict(),
+  z
+    .object({
+      action: z.literal("CONFIRM_EXTRA"),
+      extraId: z.string().uuid(),
+      evidence: z.string().trim().min(1).max(1000),
+    })
+    .strict(),
   z
     .object({
       action: z.literal("SET_MANUAL_MARKET"),
@@ -125,9 +143,12 @@ function statusFor(code: string): number {
     code === "BILLING_MARKET_SOURCE_CONFLICT" ||
     code === "BILLING_MARKET_ALREADY_PREPARED" ||
     code === "BILLING_MARKET_LINES_LIMIT" ||
-    code === "BILLING_MARKET_LINE_DUPLICATE"
+    code === "BILLING_MARKET_LINE_DUPLICATE" ||
+    code === "BILLING_EXTRA_ALREADY_CONFIRMED" ||
+    code === "BILLING_EXTRA_MARKET_REQUIRED"
   )
     return 409;
+  if (code === "BILLING_EXTRA_NOT_FOUND") return 404;
   if (
     code === "BILLING_VERSION_CONFLICT" ||
     code === "BILLING_AMOUNT_EXCEEDS_CONTRACT" ||
@@ -155,6 +176,7 @@ export async function GET() {
       chantiers.chantiers,
       quotes,
       payload.manualMarkets ?? [],
+      payload.extras ?? [],
     );
     return noStoreJson({
       payload,
@@ -184,7 +206,10 @@ export async function POST(request: Request) {
       return noStoreJson({ error: "BILLING_REQUEST_INVALID", fields }, 400);
     }
     const input = parsed.data;
-    const needsMarket = input.action === "CREATE" || input.action === "SET_MANUAL_MARKET";
+    const needsMarket =
+      input.action === "CREATE" ||
+      input.action === "SET_MANUAL_MARKET" ||
+      input.action === "ADD_EXTRA";
     const [quotes, chantiers, commercial, clients] = needsMarket
       ? await Promise.all([
           loadBillingSources(),
@@ -198,6 +223,21 @@ export async function POST(request: Request) {
       const drafts = [...current.drafts];
       if (input.action === "SET_TITLES") {
         return { ...current, invoiceTitles: input.invoiceTitles };
+      }
+      if (input.action === "ADD_EXTRA") {
+        const sources = buildChantierMarketSources(
+          chantiers?.chantiers ?? [],
+          quotes,
+          current.manualMarkets ?? [],
+          current.extras ?? [],
+        );
+        if (!sources.some((source) => source.chantierId === input.chantierId)) {
+          throw new Error("BILLING_EXTRA_MARKET_REQUIRED");
+        }
+        return addBillingExtra(current, input, context.user.displayName);
+      }
+      if (input.action === "CONFIRM_EXTRA") {
+        return confirmBillingExtra(current, input, context.user.displayName);
       }
       if (input.action === "SET_MANUAL_MARKET") {
         const chantier = chantiers?.chantiers.find((item) => item.id === input.chantierId);
@@ -251,6 +291,7 @@ export async function POST(request: Request) {
           chantiers?.chantiers ?? [],
           quotes,
           current.manualMarkets ?? [],
+          current.extras ?? [],
         );
         const source = sources.find((candidate) => candidate.quoteId === input.quoteId);
         if (!source || (input.chantierId && source.chantierId !== input.chantierId)) {

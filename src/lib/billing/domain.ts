@@ -141,10 +141,43 @@ export const billingManualMarketSchema = z.object({
 });
 export type BillingManualMarket = z.infer<typeof billingManualMarketSchema>;
 
+/** Extras are segregated from signed market until a named agreement is recorded. */
+export const billingExtraSchema = z
+  .object({
+    id: z.string().uuid(),
+    chantierId: z.string().uuid(),
+    lineId: z.string().uuid(),
+    description: z.string().trim().min(1).max(4000),
+    amountHtCents: centsSchema.positive(),
+    vatRatePercent: z.number().finite().min(0).max(100),
+    agreementStatus: z.enum(["TO_CONFIRM", "CONFIRMED"]),
+    agreementEvidence: z.string().trim().min(1).max(1000).nullable(),
+    confirmedAt: dateTimeSchema.nullable(),
+    confirmedByName: z.string().trim().min(1).max(160).nullable(),
+    createdAt: dateTimeSchema,
+    createdByName: z.string().trim().min(1).max(160),
+  })
+  .superRefine((item, ctx) => {
+    if (
+      item.agreementStatus === "CONFIRMED" &&
+      (!item.agreementEvidence || !item.confirmedAt || !item.confirmedByName)
+    ) {
+      ctx.addIssue({ code: z.ZodIssueCode.custom, message: "BILLING_EXTRA_AGREEMENT_REQUIRED" });
+    }
+    if (
+      item.agreementStatus === "TO_CONFIRM" &&
+      (item.agreementEvidence || item.confirmedAt || item.confirmedByName)
+    ) {
+      ctx.addIssue({ code: z.ZodIssueCode.custom, message: "BILLING_EXTRA_AGREEMENT_INCONSISTENT" });
+    }
+  });
+export type BillingExtra = z.infer<typeof billingExtraSchema>;
+
 export const billingPayloadSchema = z.object({
   schemaVersion: z.literal(1),
   drafts: z.array(billingDraftSchema),
   manualMarkets: z.array(billingManualMarketSchema).optional(),
+  extras: z.array(billingExtraSchema).optional(),
   invoiceTitles: billingTitlesSchema.optional(),
 });
 export type BillingPayload = z.infer<typeof billingPayloadSchema>;
