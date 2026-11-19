@@ -17,5 +17,9 @@ describe("visa extérieur des factures provisoires", () => {
     expect(api).toContain('z.literal("REVIEW_VISA")');
     expect(api).toContain('z.literal("WITHDRAW_VISA")');
     expect(api).toContain("BILLING_VISA_HISTORY_PROTECTED");
+    const chantier = readFileSync("src/components/chantier-billing-tab.tsx", "utf8");
+    expect(chantier).toContain("Visa extérieur");
+    expect(chantier).toContain("visaVersions");
+    expect(chantier).toContain("pendingExtraCount");
   });
 });
