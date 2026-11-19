@@ -8,7 +8,7 @@ describe("suppléments de chantier", () => {
     expect(view).toContain("Travaux supplémentaires du chantier");
     expect(view).toContain('action: "ADD_EXTRA"');
     expect(view).toContain('action: "CONFIRM_EXTRA"');
-    expect(view).toContain("Confirmer l'accord et intégrer au marché");
+    expect(view).toContain("Confirmer l&apos;accord et intégrer au marché");
     expect(api).toContain('z.literal("ADD_EXTRA")');
     expect(api).toContain('z.literal("CONFIRM_EXTRA")');
   });
