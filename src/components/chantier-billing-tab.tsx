@@ -11,9 +11,7 @@ const money = (cents: number) =>
 function visaLabel(payload: BillingPayload, draftId: string, chantierId: string): string {
   const latest = (payload.visaVersions ?? []).filter((item) => item.draftId === draftId).at(-1);
   if (!latest) {
-    return payload.visaRequirements?.some(
-      (rule) => rule.chantierId === chantierId && rule.required,
-    )
+    return payload.visaRequirements?.some((rule) => rule.chantierId === chantierId && rule.required)
       ? "Visa obligatoire, non présenté"
       : "Facultatif, non présenté";
   }
@@ -164,9 +162,7 @@ export function ChantierBillingTab({ chantierId }: { chantierId: string }) {
                         {draft.status === "APPROVED" ? "Validé en interne" : "À préparer"}
                         <div style={{ fontSize: 11 }}>Non émis</div>
                       </td>
-                      <td style={{ padding: 8 }}>
-                        {visaLabel(snapshot, draft.id, chantierId)}
-                      </td>
+                      <td style={{ padding: 8 }}>{visaLabel(snapshot, draft.id, chantierId)}</td>
                       <td style={{ padding: 8, textAlign: "right" }}>
                         {money(draft.amountHtCents)}
                       </td>
