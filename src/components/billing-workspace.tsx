@@ -670,8 +670,8 @@ export function BillingWorkspace({
         >
           <h2>Travaux supplémentaires du chantier</h2>
           <p>
-            Un supplément en attente d&apos;accord reste visible, mais il n&apos;augmente pas le marché
-            facturable. Une confirmation documentée est nécessaire.
+            Un supplément en attente d&apos;accord reste visible, mais il n&apos;augmente pas le
+            marché facturable. Une confirmation documentée est nécessaire.
           </p>
           <div style={{ display: "grid", gap: 10 }}>
             <label>
