@@ -52,6 +52,7 @@ function serialize(row: EditableRow): BillingDocumentLine | null {
   return {
     id: row.id,
     origin: row.origin,
+    ...(row.headingLevel ? { headingLevel: row.headingLevel } : {}),
     sourceLineId: row.sourceLineId,
     description: row.description,
     quantity,
@@ -165,7 +166,9 @@ export function BillingDocumentEditor({ draftId }: { draftId: string }) {
       return null;
     }
   }, [parsedRows, invalid]);
-  const navigationRows = rows.map((row, index) => parsedRows[index] ?? row);
+  const navigationRows = rows.map(
+    (row, index) => parsedRows[index] ?? { ...row, quantity: 0, unitPriceCents: 0 },
+  );
   const rates = [...new Set(draft?.contractTaxGroups.map((rate) => rate.ratePercent) ?? [20])].sort(
     (a, b) => a - b,
   );
@@ -192,12 +195,22 @@ export function BillingDocumentEditor({ draftId }: { draftId: string }) {
     setDirty(true);
     setNotice("");
   }
-  function addLine(kind: "FREE" | "TITLE", insertionIndex = rows.length) {
+  function addLine(
+    kind: "FREE" | "TITLE",
+    insertionIndex = rows.length,
+    headingLevel: "SECTION" | "SUBSECTION" = "SECTION",
+  ) {
     const row: BillingDocumentLine = {
       id: crypto.randomUUID(),
       origin: kind,
+      ...(kind === "TITLE" ? { headingLevel } : {}),
       sourceLineId: null,
-      description: kind === "TITLE" ? "Nouveau titre" : "Prestation complémentaire",
+      description:
+        kind === "TITLE"
+          ? headingLevel === "SUBSECTION"
+            ? "Nouveau sous-titre"
+            : "Nouveau titre"
+          : "Prestation complémentaire",
       quantity: kind === "TITLE" ? 0 : 1,
       unit: kind === "TITLE" ? "" : "u",
       unitPriceCents: 0,
@@ -568,6 +581,14 @@ export function BillingDocumentEditor({ draftId }: { draftId: string }) {
               <Plus size={15} /> Titre / ouvrage
             </button>
             <button
+              className="secondaryButton"
+              type="button"
+              disabled={!canWrite || busy || rows.length >= 1000}
+              onClick={() => addLine("TITLE", rows.length, "SUBSECTION")}
+            >
+              <Plus size={15} /> Sous-titre
+            </button>
+            <button
               className="primaryButton"
               type="button"
               disabled={!canWrite || busy || rows.length >= 1000}
@@ -632,7 +653,19 @@ export function BillingDocumentEditor({ draftId }: { draftId: string }) {
                     </td>
                     {row.origin === "TITLE" ? (
                       <td colSpan={5} className="invoiceTitleHint">
-                        Titre libre, sans montant facturé
+                        <select
+                          aria-label={`Niveau du titre ligne ${index + 1}`}
+                          disabled={!canWrite || busy}
+                          value={row.headingLevel ?? "SECTION"}
+                          onChange={(event) =>
+                            alter(row.id, {
+                              headingLevel: event.target.value as "SECTION" | "SUBSECTION",
+                            })
+                          }
+                        >
+                          <option value="SECTION">Titre / ouvrage</option>
+                          <option value="SUBSECTION">Sous-titre</option>
+                        </select>
                       </td>
                     ) : (
                       <>

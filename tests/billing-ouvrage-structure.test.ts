@@ -35,9 +35,9 @@ const source: BillingSource = {
     },
   ],
   structure: [
-    { kind: "TITLE", title: "Mobilier" },
+    { kind: "TITLE", title: "Mobilier", level: "SECTION" },
     { kind: "LINE", lineId: "11111111-1111-4111-8111-111111111111" },
-    { kind: "TITLE", title: "Pose" },
+    { kind: "TITLE", title: "Pose", level: "SECTION" },
     { kind: "LINE", lineId: "22222222-2222-4222-8222-222222222222" },
   ],
 };
@@ -86,6 +86,26 @@ describe("ouvrages de la facture", () => {
       "b",
     ]);
     expect(moveInvoiceEditorRow(rows, 2, 1)).toBe(rows);
+    expect(moveInvoiceEditorRow(rows, 1, -1)).toBe(rows);
+  });
+
+  it("déplace une section avec ses sous-titres et interdit de sortir un sous-titre de son parent", () => {
+    const rows = [
+      { id: "t1", origin: "TITLE", headingLevel: "SECTION" as const },
+      { id: "s1", origin: "TITLE", headingLevel: "SUBSECTION" as const },
+      { id: "a", origin: "QUOTE" },
+      { id: "s2", origin: "TITLE", headingLevel: "SUBSECTION" as const },
+      { id: "b", origin: "QUOTE" },
+      { id: "t2", origin: "TITLE", headingLevel: "SECTION" as const },
+      { id: "c", origin: "FREE" },
+    ];
+    expect(moveInvoiceEditorRow(rows, 0, 1).map((item) => item.id)).toEqual([
+      "t2", "c", "t1", "s1", "a", "s2", "b",
+    ]);
+    expect(moveInvoiceEditorRow(rows, 1, 1).map((item) => item.id)).toEqual([
+      "t1", "s2", "b", "s1", "a", "t2", "c",
+    ]);
+    expect(moveInvoiceEditorRow(rows, 3, 1)).toBe(rows);
     expect(moveInvoiceEditorRow(rows, 1, -1)).toBe(rows);
   });
 

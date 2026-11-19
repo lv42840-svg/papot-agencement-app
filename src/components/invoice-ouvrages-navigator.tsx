@@ -28,7 +28,11 @@ export function InvoiceOuvragesNavigator({
       </div>
       <div className="invoiceOuvragesGroups">
         {groups.map((group, index) => (
-          <details key={group.key} open={index === 0}>
+          <details
+            key={group.key}
+            className={group.headingLevel === "SUBSECTION" ? "invoiceOuvrageSubsection" : ""}
+            open={index === 0}
+          >
             <summary>
               {group.title} · {currency(group.amountHtCents)} HT
             </summary>
@@ -59,7 +63,14 @@ export function InvoiceOuvragesNavigator({
                 type="button"
                 className="secondaryButton"
                 disabled={disabled || lines.length >= 1000}
-                onClick={() => onInsertLine(group.endExclusive)}
+                onClick={() =>
+                  onInsertLine(
+                    group.headingId &&
+                      groups.some((child) => child.parentHeadingId === group.headingId)
+                      ? group.startIndex + 1
+                      : group.endExclusive,
+                  )
+                }
               >
                 + Prestation dans cet ouvrage
               </button>

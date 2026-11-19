@@ -35,6 +35,7 @@ export const billingDocumentLineSchema = z
   .object({
     id: z.string().uuid(),
     origin: z.enum(["QUOTE", "FREE", "TITLE"]),
+    headingLevel: z.enum(["SECTION", "SUBSECTION"]).optional(),
     sourceLineId: z.string().uuid().nullable(),
     description: z.string().trim().min(1).max(4000),
     quantity: z.number().finite().min(0).max(1000000),
@@ -58,7 +59,11 @@ export const billingDocumentLineSchema = z
 export type BillingDocumentLine = z.infer<typeof billingDocumentLineSchema>;
 
 export const billingSourceStructureItemSchema = z.discriminatedUnion("kind", [
-  z.object({ kind: z.literal("TITLE"), title: z.string().trim().min(1).max(500) }),
+  z.object({
+    kind: z.literal("TITLE"),
+    title: z.string().trim().min(1).max(500),
+    level: z.enum(["SECTION", "SUBSECTION"]).optional(),
+  }),
   z.object({ kind: z.literal("LINE"), lineId: z.string().uuid() }),
 ]);
 export type BillingSourceStructureItem = z.infer<typeof billingSourceStructureItemSchema>;

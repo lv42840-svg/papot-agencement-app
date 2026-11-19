@@ -57,7 +57,7 @@ function quoteContractData(quote: NativeQuoteRecord): {
       return included.has(item.id) ? [{ kind: "LINE", lineId: item.id }] : [];
     }
     if ((item.kind === "SECTION" || item.kind === "SUBSECTION") && usedHeadings.has(item.id)) {
-      return [{ kind: "TITLE", title: item.title }];
+      return [{ kind: "TITLE", title: item.title, level: item.kind }];
     }
     return [];
   });

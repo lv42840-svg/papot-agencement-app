@@ -83,6 +83,7 @@ function followSourceStructure(
       result.push({
         id: globalThis.crypto.randomUUID(),
         origin: "TITLE",
+        headingLevel: item.level ?? "SECTION",
         sourceLineId: null,
         description: item.title,
         quantity: 0,
