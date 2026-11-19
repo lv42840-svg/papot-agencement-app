@@ -193,9 +193,7 @@ export async function importPennylaneCustomer(
     ? normalizePennylaneCustomer(stagedBeforeLock.rows[0].payload)
     : null;
   const headquartersSiret =
-    preflight?.siren && !preflight.fields.siret
-      ? await findHeadquartersSiret(preflight.siren)
-      : "";
+    preflight?.siren && !preflight.fields.siret ? await findHeadquartersSiret(preflight.siren) : "";
 
   return withServerDbTransaction(async (client) => {
     // Stage refresh and client creation cannot race with a manual link.

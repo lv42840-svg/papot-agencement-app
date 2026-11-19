@@ -100,13 +100,14 @@ export function normalizePennylaneCustomer(input: unknown): PennylaneCustomer {
   const regNo = trim(raw.reg_no, 20);
   const billingAddress = trim(raw.electronic_billing_address, 130);
   const siret = individual ? "" : customerSiret(regNo, billingAddress);
-  const siren = individual || (raw.billing_address?.country_alpha2 ?? "FR") !== "FR"
-    ? ""
-    : /^\d{9}$/.test(regNo)
-      ? regNo
-      : siret
-        ? siret.slice(0, 9)
-        : "";
+  const siren =
+    individual || (raw.billing_address?.country_alpha2 ?? "FR") !== "FR"
+      ? ""
+      : /^\d{9}$/.test(regNo)
+        ? regNo
+        : siret
+          ? siret.slice(0, 9)
+          : "";
   const type: ClientType = individual
     ? "PARTICULIER"
     : raw.public_administration

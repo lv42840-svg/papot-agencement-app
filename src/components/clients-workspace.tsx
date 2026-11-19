@@ -402,8 +402,8 @@ export function ClientsWorkspace() {
 
       {pennylaneMode ? (
         <p className="muted">
-          Tu peux créer une fiche client dans PAPOT pour démarrer un dossier, puis la rattacher
-          à Pennylane depuis « Clients Pennylane · Importer » sans perdre ses affaires.
+          Tu peux créer une fiche client dans PAPOT pour démarrer un dossier, puis la rattacher à
+          Pennylane depuis « Clients Pennylane · Importer » sans perdre ses affaires.
         </p>
       ) : null}
       {error ? <div className="clientsAlert clientsAlertError">{error}</div> : null}

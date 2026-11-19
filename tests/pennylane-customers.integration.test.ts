@@ -83,7 +83,14 @@ describeIfPostgres("import clients Pennylane et préservation du référentiel e
     if (pool) {
       await pool.query(
         "DELETE FROM papot_clients WHERE id IN ($1,$2,$3) OR record->>'pennylaneId' IN ($4,$5,$6)",
-        [originalId, localClientId, headquartersClientId, providerId, providerIdNew, providerIdHeadquarters],
+        [
+          originalId,
+          localClientId,
+          headquartersClientId,
+          providerId,
+          providerIdNew,
+          providerIdHeadquarters,
+        ],
       );
       await pool.query(
         "DELETE FROM papot_pennylane_staging WHERE resource='customers' AND external_id IN ($1,$2,$3)",
@@ -198,17 +205,25 @@ describeIfPostgres("import clients Pennylane et préservation du référentiel e
     );
     await pool.query(
       "INSERT INTO papot_pennylane_staging (resource,external_id,payload,synced_at) VALUES ('customers',$1,$2::jsonb,NOW())",
-      [providerIdHeadquarters, JSON.stringify({
-        ...provider,
-        id: Number(providerIdHeadquarters),
-        name: "Client siège uniquement",
-        reg_no: "741852963",
-        electronic_billing_address: null,
-      })],
+      [
+        providerIdHeadquarters,
+        JSON.stringify({
+          ...provider,
+          id: Number(providerIdHeadquarters),
+          name: "Client siège uniquement",
+          reg_no: "741852963",
+          electronic_billing_address: null,
+        }),
+      ],
     );
-    vi.stubGlobal("fetch", vi.fn(async () => Response.json({
-      results: [{ siren: "741852963", siege: { siret: "74185296300024" } }],
-    })));
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async () =>
+        Response.json({
+          results: [{ siren: "741852963", siege: { siret: "74185296300024" } }],
+        }),
+      ),
+    );
     try {
       const linked = await importPennylaneCustomer(
         "LINK",
@@ -218,10 +233,9 @@ describeIfPostgres("import clients Pennylane et préservation du référentiel e
         pool,
       );
       expect(linked).toEqual({ clientId: headquartersClientId, action: "LINKED" });
-      const row = await pool.query<{ record: { siret: string; notes: string; pennylaneId: string } }>(
-        "SELECT record FROM papot_clients WHERE id=$1",
-        [headquartersClientId],
-      );
+      const row = await pool.query<{
+        record: { siret: string; notes: string; pennylaneId: string };
+      }>("SELECT record FROM papot_clients WHERE id=$1", [headquartersClientId]);
       expect(row.rows[0].record).toMatchObject({
         siret: "74185296300024",
         pennylaneId: providerIdHeadquarters,

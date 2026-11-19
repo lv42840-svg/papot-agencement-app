@@ -109,11 +109,7 @@ describe("import clients Pennylane en lecture seule", () => {
     expect(customer.siren).toBe("123456789");
     expect(customer.fields.siret).toBe("");
     expect(() =>
-      mergePennylaneIdentity(
-        { ...existing(), siret: "98765432100012" },
-        customer,
-        "Nadia",
-      ),
+      mergePennylaneIdentity({ ...existing(), siret: "98765432100012" }, customer, "Nadia"),
     ).toThrow("PENNYLANE_CLIENT_SIRET_CONFLICT");
   });
 
