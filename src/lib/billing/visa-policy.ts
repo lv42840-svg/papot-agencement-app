@@ -34,7 +34,18 @@ export function assertBillingVisaAllowsApproval(
   if (latest?.status === "SUBMITTED") throw new Error("BILLING_VISA_PENDING");
   if (latest?.status === "PARTIAL") throw new Error("BILLING_VISA_PARTIAL_REWORK_REQUIRED");
   if (latest?.status === "REFUSED") throw new Error("BILLING_VISA_REFUSED");
-  if (latest?.status === "ACCEPTED" && latest.draftUpdatedAt !== draft.updatedAt) {
+  if (
+    latest?.status === "ACCEPTED" &&
+    (
+      latest.draftUpdatedAt !== draft.updatedAt ||
+      latest.documentLabel !== draft.label ||
+      latest.documentNotes !== draft.notes ||
+      latest.amountHtCents !== draft.amountHtCents ||
+      latest.vatCents !== draft.vatCents ||
+      latest.totalTtcCents !== draft.totalTtcCents ||
+      JSON.stringify(latest.documentLines) !== JSON.stringify(draft.documentLines)
+    )
+  ) {
     throw new Error("BILLING_VISA_STALE");
   }
   if (visaRequiredForChantier(payload, draft.chantierId) && latest?.status !== "ACCEPTED") {

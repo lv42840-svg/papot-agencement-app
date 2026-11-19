@@ -1,5 +1,12 @@
 import { describe, expect, it } from "vitest";
-import { approveBillingDraft, createBillingDraft, type BillingPayload, type BillingSource } from "../src/lib/billing/domain";
+import {
+  approveBillingDraft,
+  createBillingDraft,
+  updateBillingDraft,
+  updateBillingDocument,
+  type BillingPayload,
+  type BillingSource,
+} from "../src/lib/billing/domain";
 import {
   assertBillingVisaEditable,
   latestBillingVisa,
@@ -170,4 +177,69 @@ describe("visa externe des situations et factures provisoires", () => {
       "Nadia",
     )).toThrow("BILLING_VISA_PENDING");
   });
+  it("bloque une modification pendant le visa et impose un nouveau visa après correction", () => {
+    const before = present(setBillingVisaRequirement(make(), site, true, "Nadia"));
+    const draft = before.drafts[0];
+    expect(() => updateBillingDraft(
+      before,
+      draft.id,
+      { expectedUpdatedAt: draft.updatedAt, label: "Nouveau libellé", notes: "" },
+      "Lucien",
+    )).toThrow("BILLING_VISA_PENDING");
+    expect(() => updateBillingDocument(
+      before,
+      draft.id,
+      {
+        expectedUpdatedAt: draft.updatedAt,
+        label: draft.label,
+        notes: draft.notes,
+        documentLines: draft.documentLines ?? [],
+      },
+      "Lucien",
+    )).toThrow("BILLING_VISA_PENDING");
+
+    const accepted = recordBillingVisaDecision(before, {
+      draftId: draft.id,
+      version: 1,
+      decision: "ACCEPTED",
+      reviewMethod: "EMAIL",
+      externalContact: "Architecte",
+      evidence: "Accord confirmé",
+      reason: "Visa intégral",
+    }, "Nadia");
+    const modified = updateBillingDraft(
+      accepted,
+      draft.id,
+      { expectedUpdatedAt: draft.updatedAt, label: "Modifié après accord", notes: "" },
+      "Lucien",
+      new Date(Date.now() + 5000),
+    );
+    const payload = { ...accepted, drafts: [modified] };
+    expect(() => approveBillingDraft(
+      payload, modified.id, modified.updatedAt, "Lucien",
+    )).toThrow("BILLING_VISA_STALE");
+    const updated = present(payload);
+    expect(updated.visaVersions?.map((v) => v.version)).toEqual([1, 2]);
+    expect(updated.visaVersions?.[0].documentLabel).toBe(draft.label);
+    expect(updated.visaVersions?.[1].documentLabel).toBe("Modifié après accord");
+  });
+
+  it("refuse la réutilisation d'une version déjà décidée", () => {
+    const p = present(make());
+    const draft = p.drafts[0];
+    const reviewed = recordBillingVisaDecision(p, {
+      draftId: draft.id, version: 1, decision: "ACCEPTED",
+      reviewMethod: "SIGNATURE", externalContact: "Client",
+      evidence: "Signature du 19/11", reason: "Conforme",
+    }, "Nadia");
+    expect(() => recordBillingVisaDecision(reviewed, {
+      draftId: draft.id, version: 1, decision: "REFUSED",
+      reviewMethod: "PHONE", externalContact: "Client",
+      evidence: "Appel", reason: "Contredit",
+    }, "Nadia")).toThrow("BILLING_VISA_ALREADY_REVIEWED");
+    expect(() => withdrawBillingVisa(reviewed, {
+      draftId: draft.id, version: 1, reason: "Tentative",
+    }, "Lucien")).toThrow("BILLING_VISA_ALREADY_REVIEWED");
+  });
+
 });

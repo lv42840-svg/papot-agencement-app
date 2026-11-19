@@ -91,6 +91,16 @@ const serverErrors: Record<string, string> = {
     "Un avancement ne peut pas être inférieur à la situation précédente.",
   BILLING_PROGRESS_TAX_ALLOCATION_UNAVAILABLE:
     "La TVA est incompatible avec les acomptes déjà préparés.",
+  BILLING_VISA_PENDING:
+    "Cette version est présentée à un tiers. Enregistre d'abord sa réponse ou retire la présentation.",
+  BILLING_VISA_REQUIRED:
+    "Le visa extérieur est obligatoire sur ce chantier avant la validation interne.",
+  BILLING_VISA_PARTIAL_REWORK_REQUIRED:
+    "Accord partiel : corrige le projet et représente une nouvelle version.",
+  BILLING_VISA_REFUSED:
+    "Le visa a été refusé : corrige le projet et présente une nouvelle version.",
+  BILLING_VISA_STALE:
+    "Le projet a changé depuis l'accord : présente une nouvelle version pour visa.",
 };
 
 export function BillingDocumentEditor({ draftId }: { draftId: string }) {
