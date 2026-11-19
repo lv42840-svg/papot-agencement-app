@@ -62,6 +62,10 @@ export function BillingWorkspace({
   const [manualDescription, setManualDescription] = useState("Travaux réalisés");
   const [manualAmount, setManualAmount] = useState("");
   const [manualVat, setManualVat] = useState("20");
+  const [extraDescription, setExtraDescription] = useState("");
+  const [extraAmount, setExtraAmount] = useState("");
+  const [extraVat, setExtraVat] = useState("20");
+  const [extraEvidence, setExtraEvidence] = useState<Record<string, string>>({});
   const [tab, setTab] = useState<"CHANTIER" | "PROJECTS" | "FOLLOWUP">(
     chantierId || quoteId ? "CHANTIER" : initialTab === "FOLLOWUP" ? "FOLLOWUP" : "PROJECTS",
   );
@@ -102,6 +106,9 @@ export function BillingWorkspace({
       (source) => source.quoteId === selection || source.sourceQuoteIds?.includes(selection),
     ) ?? sources[0];
   const drafts = data?.payload.drafts ?? [];
+  const chantierExtras = (data?.payload.extras ?? []).filter(
+    (extra) => extra.chantierId === activeChantierId,
+  );
   const followup = billingPreparationFollowup(allSources, drafts);
   const visibleFollowup = followup.filter((row) => {
     if (followupStatus !== "ALL" && row.status !== followupStatus) return false;
@@ -271,6 +278,50 @@ export function BillingWorkspace({
       },
       "Marché sans devis enregistré. Tu peux maintenant préparer un projet.",
     );
+  }
+
+  async function addExtra() {
+    if (!activeChantierId || !active) return;
+    const amountHtCents = parseMoney(extraAmount);
+    const vatRatePercent = Number(extraVat.trim().replace(",", "."));
+    if (!extraDescription.trim() || !Number.isSafeInteger(amountHtCents) || amountHtCents <= 0) {
+      setError("Renseigne une désignation et un montant HT positif pour ce supplément.");
+      return;
+    }
+    if (!Number.isFinite(vatRatePercent) || vatRatePercent < 0 || vatRatePercent > 100) {
+      setError("Renseigne un taux de TVA valide.");
+      return;
+    }
+    const result = await write(
+      {
+        action: "ADD_EXTRA",
+        requestId: crypto.randomUUID(),
+        chantierId: activeChantierId,
+        description: extraDescription.trim(),
+        amountHtCents,
+        vatRatePercent,
+      },
+      "Travaux supplémentaires enregistrés en attente d'accord. Ils ne sont pas facturables.",
+    );
+    if (result) {
+      setExtraDescription("");
+      setExtraAmount("");
+    }
+  }
+
+  async function confirmExtra(extraId: string) {
+    const evidence = extraEvidence[extraId]?.trim();
+    if (!evidence) {
+      setError("Indique la preuve de l'accord et sa date avant de confirmer.");
+      return;
+    }
+    const result = await write(
+      { action: "CONFIRM_EXTRA", extraId, evidence },
+      "Accord enregistré : le supplément entre désormais dans le marché du chantier.",
+    );
+    if (result) {
+      setExtraEvidence((old) => ({ ...old, [extraId]: "" }));
+    }
   }
 
   async function create() {
@@ -609,6 +660,106 @@ export function BillingWorkspace({
               </button>
             </>
           )}
+        </section>
+      )}
+      {data && tab === "CHANTIER" && active && (
+        <section
+          className="invoiceCard"
+          role="tabpanel"
+          aria-label="Travaux supplémentaires du chantier"
+        >
+          <h2>Travaux supplémentaires du chantier</h2>
+          <p>
+            Un supplément en attente d'accord reste visible, mais il n'augmente pas le
+            marché facturable. Une confirmation documentée est nécessaire.
+          </p>
+          <div style={{ display: "grid", gap: 10 }}>
+            <label>
+              Désignation des travaux supplémentaires
+              <input
+                value={extraDescription}
+                maxLength={4000}
+                onChange={(event) => setExtraDescription(event.target.value)}
+                placeholder="Ex. Cornières complémentaires"
+              />
+            </label>
+            <div style={{ display: "flex", gap: 12, flexWrap: "wrap" }}>
+              <label style={{ flex: "1 1 160px" }}>
+                Montant HT
+                <input
+                  value={extraAmount}
+                  inputMode="decimal"
+                  placeholder="Ex. 850,00"
+                  onChange={(event) => setExtraAmount(event.target.value)}
+                />
+              </label>
+              <label style={{ flex: "1 1 120px" }}>
+                TVA (%)
+                <input
+                  value={extraVat}
+                  inputMode="decimal"
+                  onChange={(event) => setExtraVat(event.target.value)}
+                />
+              </label>
+            </div>
+            <button
+              type="button"
+              className="secondaryButton"
+              disabled={!data.canWrite || busy}
+              onClick={() => void addExtra()}
+            >
+              Ajouter un supplément en attente d'accord
+            </button>
+          </div>
+          {chantierExtras.length === 0 ? (
+            <p>Aucun travail supplémentaire enregistré sur ce chantier.</p>
+          ) : (
+            <ul style={{ display: "grid", gap: 12, paddingLeft: 18 }}>
+              {chantierExtras.map((extra) => (
+                <li key={extra.id}>
+                  <strong>{extra.description}</strong> · {money(extra.amountHtCents)} HT ·
+                  {extra.agreementStatus === "CONFIRMED"
+                    ? " Accord confirmé"
+                    : " Accord à confirmer"}
+                  {extra.agreementStatus === "CONFIRMED" ? (
+                    <p>
+                      Justificatif : {extra.agreementEvidence} ·
+                      Confirmé par {extra.confirmedByName}
+                    </p>
+                  ) : (
+                    <div style={{ display: "grid", gap: 6, maxWidth: 700 }}>
+                      <label>
+                        Justificatif de l'accord (date, interlocuteur et référence)
+                        <input
+                          value={extraEvidence[extra.id] ?? ""}
+                          maxLength={1000}
+                          placeholder="Ex. Accord du client par mail le..."
+                          onChange={(event) =>
+                            setExtraEvidence((old) => ({
+                              ...old,
+                              [extra.id]: event.target.value,
+                            }))
+                          }
+                        />
+                      </label>
+                      <button
+                        type="button"
+                        className="secondaryButton"
+                        disabled={!data.canWrite || busy}
+                        onClick={() => void confirmExtra(extra.id)}
+                      >
+                        Confirmer l'accord et intégrer au marché
+                      </button>
+                    </div>
+                  )}
+                </li>
+              ))}
+            </ul>
+          )}
+          <p>
+            La confirmation crée une nouvelle base de préparation. Les anciens devis restent
+            inchangés et aucun document officiel n'est émis.
+          </p>
         </section>
       )}
       {data && tab === "FOLLOWUP" && (
