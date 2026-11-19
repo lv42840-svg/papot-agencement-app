@@ -7,6 +7,7 @@ import { pennylaneEnabled } from "../pennylane/config";
 import { withServerDbTransaction } from "../server-db/transaction";
 import { parseClientsPayload, type ClientRecord, type ClientsPayload } from "./domain";
 import { applyClientsMutation } from "./mutations";
+import { isAllowedCommercialProvisionalCreate } from "./provisional-policy";
 import { ClientsRepositoryError, type ClientsRepository } from "./repository";
 
 const CLIENTS_ORDER_LOCK_ID = 7_332_170_416_238_504;
@@ -67,7 +68,7 @@ export function createPostgresClientsRepository(pool: Pool = getServerDbPool()):
       return rowsToPayload(await loadRows(pool));
     },
 
-    async mutate(input, actor) {
+    async mutate(input, actor, options) {
       return withServerDbTransaction(async (client) => {
         const rows = await loadRows(client);
         const source = rowsToPayload(rows);
@@ -75,7 +76,12 @@ export function createPostgresClientsRepository(pool: Pool = getServerDbPool()):
         // Pennylane owns client creation and identity once the integration is enabled.
         // Operational-only fields (local notes, contacts, VAT preference) stay editable.
         if (pennylaneEnabled()) {
-          if (input.action === "create") throw new Error("CLIENT_CREATE_IN_PENNYLANE");
+          // A commercial lead needs a local provisional identity before the customer
+          // is formally created in Pennylane. Only the internal commercial caller can
+          // opt into this exception; normal Clients API creation remains forbidden.
+          if (input.action === "create" && !isAllowedCommercialProvisionalCreate(input, options)) {
+            throw new Error("CLIENT_CREATE_IN_PENNYLANE");
+          }
           if (input.action === "update") {
             const old = source.clients.find((candidate) => candidate.id === input.clientId);
             if (old?.pennylaneId) {

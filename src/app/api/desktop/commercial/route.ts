@@ -321,6 +321,11 @@ export async function POST(request: Request) {
             actor,
             existingClientId: rawString(raw, "existingClientId"),
             newClientName: input.clientName,
+            newClientSiret: input.action === "create" ? input.newClientSiret : undefined,
+            newClientAddressLine1:
+              input.action === "create" ? input.newClientAddressLine1 : undefined,
+            newClientPostalCode: input.action === "create" ? input.newClientPostalCode : undefined,
+            newClientCity: input.action === "create" ? input.newClientCity : undefined,
             currentClientId: currentItem?.clientId ?? null,
           });
         }

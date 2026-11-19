@@ -23,6 +23,8 @@ import {
 import { useRouter, useSearchParams } from "next/navigation";
 import { FormEvent, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { CommercialAffairQuotes } from "@/components/commercial-affair-quotes";
+import { CompanyLookup } from "@/components/company-lookup";
+import type { CompanySuggestion } from "@/lib/clients/company-lookup";
 import { CommercialConfirmationDialog } from "@/components/commercial-confirmation-dialog";
 import {
   CommercialDocumentActions,
@@ -74,6 +76,8 @@ const errors: Record<string, string> = {
   COMMERCIAL_CASE_NOT_FOUND: "Cette affaire n’existe plus.",
   COMMERCIAL_CLIENT_NOT_FOUND: "Ce client n’existe plus.",
   COMMERCIAL_CLIENT_REQUIRED: "Choisis ou crée un client avant de continuer.",
+  CLIENT_SIRET_EXISTS:
+    "Ce SIRET est déjà associé à un client. Choisis sa fiche dans « Client existant ».",
   CLIENTS_LOCKED:
     "Le fichier clients est modifié sur un autre poste. Réessaie dans quelques secondes.",
   CLIENTS_VERSION_CONFLICT: "Le fichier clients a changé sur un autre poste. Réessaie.",
@@ -534,6 +538,8 @@ function CreateAffair({
     clients.length ? "existing" : "new",
   );
   const [clientId, setClientId] = useState(clients[0]?.id ?? "");
+  const [newClientName, setNewClientName] = useState("");
+  const [foundCompany, setFoundCompany] = useState<CompanySuggestion | null>(null);
   const [differentSiteAddress, setDifferentSiteAddress] = useState(false);
   const selectedClient =
     clientMode === "existing" ? clients.find((client) => client.id === clientId) : undefined;
@@ -545,7 +551,11 @@ function CreateAffair({
       action: "create",
       name: String(form.get("name") ?? ""),
       existingClientId: clientMode === "existing" && clientId ? clientId : undefined,
-      clientName: clientMode === "new" ? String(form.get("clientName") ?? "") : "",
+      clientName: clientMode === "new" ? newClientName : "",
+      newClientSiret: clientMode === "new" ? foundCompany?.siret : undefined,
+      newClientAddressLine1: clientMode === "new" ? foundCompany?.addressLine1 : undefined,
+      newClientPostalCode: clientMode === "new" ? foundCompany?.postalCode : undefined,
+      newClientCity: clientMode === "new" ? foundCompany?.city : undefined,
       siteLabel: "",
       siteAddressOverride: differentSiteAddress ? siteAddressFromForm(form) : null,
       reviewDate: String(form.get("reviewDate") ?? ""),
@@ -585,10 +595,31 @@ function CreateAffair({
           </select>
         </label>
       ) : (
-        <label>
-          <span>Nouveau client</span>
-          <input name="clientName" placeholder="Nom du client" required />
-        </label>
+        <>
+          <label>
+            <span>Nouveau client</span>
+            <input
+              name="clientName"
+              value={newClientName}
+              onChange={(event) => {
+                setNewClientName(event.target.value);
+                setFoundCompany(null);
+              }}
+              placeholder="Nom du client"
+              required
+            />
+          </label>
+          <div className="wide">
+            <CompanyLookup
+              query={newClientName}
+              onSelect={(company) => {
+                setNewClientName(company.name);
+                setFoundCompany(company);
+              }}
+            />
+            {foundCompany ? <small>SIRET du siège sélectionné : {foundCompany.siret}</small> : null}
+          </div>
+        </>
       )}
       <label>
         <span>Nom de l’affaire *</span>
