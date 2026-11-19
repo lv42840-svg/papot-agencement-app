@@ -670,8 +670,8 @@ export function BillingWorkspace({
         >
           <h2>Travaux supplémentaires du chantier</h2>
           <p>
-            Un supplément en attente d'accord reste visible, mais il n'augmente pas le
-            marché facturable. Une confirmation documentée est nécessaire.
+            Un supplément en attente d'accord reste visible, mais il n'augmente pas le marché
+            facturable. Une confirmation documentée est nécessaire.
           </p>
           <div style={{ display: "grid", gap: 10 }}>
             <label>
@@ -723,8 +723,8 @@ export function BillingWorkspace({
                     : " Accord à confirmer"}
                   {extra.agreementStatus === "CONFIRMED" ? (
                     <p>
-                      Justificatif : {extra.agreementEvidence} ·
-                      Confirmé par {extra.confirmedByName}
+                      Justificatif : {extra.agreementEvidence} · Confirmé par{" "}
+                      {extra.confirmedByName}
                     </p>
                   ) : (
                     <div style={{ display: "grid", gap: 6, maxWidth: 700 }}>

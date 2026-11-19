@@ -2,7 +2,11 @@ import { describe, expect, it } from "vitest";
 import { addBillingExtra, confirmBillingExtra } from "../src/lib/billing/extras";
 import { buildChantierMarketSources } from "../src/lib/billing/market-sources";
 import { summarizeChantierBillingMarkets } from "../src/lib/billing/chantier-market";
-import { createBillingDraft, type BillingPayload, type BillingSource } from "../src/lib/billing/domain";
+import {
+  createBillingDraft,
+  type BillingPayload,
+  type BillingSource,
+} from "../src/lib/billing/domain";
 
 const chantierId = "11111111-1111-4111-8111-111111111111";
 const quoteId = "22222222-2222-4222-8222-222222222222";
@@ -43,12 +47,14 @@ describe("travaux supplémentaires", () => {
     const pending = addBillingExtra(empty, input, "Nadia");
     expect(pending.extras?.[0].agreementStatus).toBe("TO_CONFIRM");
     expect(addBillingExtra(pending, input, "Nadia")).toEqual(pending);
-    const market = buildChantierMarketSources(
-      [chantier], [source], [], pending.extras ?? [],
-    )[0];
+    const market = buildChantierMarketSources([chantier], [source], [], pending.extras ?? [])[0];
     expect(market.contractHtCents).toBe(100000);
     const overview = summarizeChantierBillingMarkets(
-      [chantier], [source], [], [], pending.extras,
+      [chantier],
+      [source],
+      [],
+      [],
+      pending.extras,
     )[0];
     expect(overview.pendingExtraHtCents).toBe(32000);
     expect(overview.confirmedExtraHtCents).toBe(0);
@@ -61,15 +67,16 @@ describe("travaux supplémentaires", () => {
       { extraId: requestId, evidence: "Accord client du 19/11/2026" },
       "Lucien",
     );
-    const market = buildChantierMarketSources(
-      [chantier], [source], [], approved.extras ?? [],
-    )[0];
+    const market = buildChantierMarketSources([chantier], [source], [], approved.extras ?? [])[0];
     expect(source.contractHtCents).toBe(100000);
     expect(approved.extras?.[0].confirmedByName).toBe("Lucien");
     expect(market.contractHtCents).toBe(132000);
     expect(market.lines).toHaveLength(2);
     const draft = createBillingDraft(
-      empty, market, { requestId: crypto.randomUUID(), type: "STANDARD" }, "Nadia",
+      empty,
+      market,
+      { requestId: crypto.randomUUID(), type: "STANDARD" },
+      "Nadia",
     );
     expect(draft.amountHtCents).toBe(132000);
     expect(draft.documentLines?.filter((row) => row.origin === "QUOTE")).toHaveLength(2);
@@ -81,12 +88,12 @@ describe("travaux supplémentaires", () => {
       confirmBillingExtra(pending, { extraId: requestId, evidence: "" }, "Lucien"),
     ).toThrow();
     const approved = confirmBillingExtra(
-      pending, { extraId: requestId, evidence: "Accord oral confirmé" }, "Lucien",
+      pending,
+      { extraId: requestId, evidence: "Accord oral confirmé" },
+      "Lucien",
     );
     expect(() =>
-      confirmBillingExtra(
-        approved, { extraId: requestId, evidence: "Accord différent" }, "Nadia",
-      ),
+      confirmBillingExtra(approved, { extraId: requestId, evidence: "Accord différent" }, "Nadia"),
     ).toThrow("BILLING_EXTRA_ALREADY_CONFIRMED");
   });
 });

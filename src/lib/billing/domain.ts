@@ -168,7 +168,10 @@ export const billingExtraSchema = z
       item.agreementStatus === "TO_CONFIRM" &&
       (item.agreementEvidence || item.confirmedAt || item.confirmedByName)
     ) {
-      ctx.addIssue({ code: z.ZodIssueCode.custom, message: "BILLING_EXTRA_AGREEMENT_INCONSISTENT" });
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        message: "BILLING_EXTRA_AGREEMENT_INCONSISTENT",
+      });
     }
   });
 export type BillingExtra = z.infer<typeof billingExtraSchema>;
