@@ -90,9 +90,14 @@ export function BillingWorkspace({
       client: chantier.clientName || "Client à rattacher",
     }))
     .sort((a, b) => a.name.localeCompare(b.name, "fr-FR"));
+  const linkedChantierId = allSources.find(
+    (source) =>
+      source.sourceQuoteIds?.includes(quoteId ?? "") ||
+      source.quoteId === quoteId,
+  )?.chantierId;
   const activeChantierId = chantierChoices.some((site) => site.id === selectedChantier)
     ? selectedChantier
-    : (chantierChoices[0]?.id ?? "");
+    : linkedChantierId ?? chantierChoices[0]?.id ?? "";
   const sources = allSources.filter((source) => source.chantierId === activeChantierId);
   const active =
     sources.find(
