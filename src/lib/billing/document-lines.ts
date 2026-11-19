@@ -1,3 +1,4 @@
+import { belongsToBillingSource } from "./domain";
 import type {
   BillingDocumentLine,
   BillingDraft,
@@ -111,7 +112,7 @@ export function buildInvoiceDocumentLines(
   const draftIndex = payload.drafts.findIndex((item) => item.id === draft.id);
   const prior = payload.drafts
     .slice(0, draftIndex < 0 ? payload.drafts.length : draftIndex)
-    .filter((item) => item.quoteId === draft.quoteId);
+    .filter((item) => belongsToBillingSource(item, draft));
   const sourceLines = draft.lines ?? [];
   const output: BillingDocumentLine[] = [];
 

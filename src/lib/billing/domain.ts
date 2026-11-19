@@ -21,6 +21,7 @@ export const billingSourceLineSchema = z.object({
   vatRatePercent: z.number().finite().min(0).max(100),
   quantity: z.number().finite().positive().optional(),
   unit: z.string().trim().max(40).optional(),
+  sourceQuoteId: z.string().uuid().optional(),
 });
 export type BillingSourceLine = z.infer<typeof billingSourceLineSchema>;
 
@@ -80,6 +81,8 @@ export const billingSourceSchema = z.object({
   contractTaxGroups: z.array(billingTaxGroupSchema).min(1),
   lines: z.array(billingSourceLineSchema).max(1000).optional(),
   structure: z.array(billingSourceStructureItemSchema).max(1000).optional(),
+  sourceMode: z.enum(["CHANTIER", "QUOTE"]).optional(),
+  sourceQuoteIds: z.array(z.string().uuid()).max(1000).optional(),
 });
 export type BillingSource = z.infer<typeof billingSourceSchema>;
 
@@ -123,9 +126,25 @@ export const billingTitlesSchema = z
     "BILLING_TITLES_DUPLICATE",
   );
 
+/** Manual contract for a chantier launched without a retained quote. */
+export const billingManualMarketSchema = z.object({
+  chantierId: z.string().uuid(),
+  commercialCaseId: z.string().uuid(),
+  clientId: z.string().uuid(),
+  clientName: z.string().trim().min(1).max(240),
+  description: z.string().trim().min(1).max(4000),
+  lineId: z.string().uuid(),
+  amountHtCents: centsSchema.positive(),
+  vatRatePercent: z.number().finite().min(0).max(100),
+  createdAt: dateTimeSchema,
+  createdByName: z.string().trim().min(1).max(160),
+});
+export type BillingManualMarket = z.infer<typeof billingManualMarketSchema>;
+
 export const billingPayloadSchema = z.object({
   schemaVersion: z.literal(1),
   drafts: z.array(billingDraftSchema),
+  manualMarkets: z.array(billingManualMarketSchema).optional(),
   invoiceTitles: billingTitlesSchema.optional(),
 });
 export type BillingPayload = z.infer<typeof billingPayloadSchema>;
@@ -143,6 +162,28 @@ export function preparedHtCents(
   return payload.drafts
     .filter((draft) => draft.quoteId === quoteId && draft.id !== excludingId)
     .reduce((sum, draft) => sum + draft.amountHtCents, 0);
+}
+
+export function belongsToBillingSource(
+  draft: BillingDraft,
+  source: BillingSource,
+): boolean {
+  if (source.sourceMode === "CHANTIER") {
+    return Boolean(source.chantierId && draft.chantierId === source.chantierId);
+  }
+  return draft.quoteId === source.quoteId;
+}
+
+export function preparedForBillingSource(
+  payload: BillingPayload,
+  source: BillingSource,
+  excludingId?: string,
+): number {
+  const total = payload.drafts
+    .filter((draft) => draft.id !== excludingId && belongsToBillingSource(draft, source))
+    .reduce((amount, draft) => amount + draft.amountHtCents, 0);
+  if (!Number.isSafeInteger(total)) throw new Error("BILLING_AMOUNT_INVALID");
+  return total;
 }
 
 function assertSource(source: BillingSource): BillingSource {
@@ -253,7 +294,7 @@ export function createBillingDraft(
   now = new Date(),
 ): BillingDraft {
   const validSource = assertSource(source);
-  const alreadyPreparedCents = preparedHtCents(payload, source.quoteId);
+  const alreadyPreparedCents = preparedForBillingSource(payload, validSource);
   if (
     input.linePercentages &&
     (input.type !== "PROGRESS" ||
@@ -339,7 +380,7 @@ export function updateBillingDraft(
   if (!draft) throw new Error("BILLING_DRAFT_NOT_FOUND");
   if (draft.status !== "DRAFT") throw new Error("BILLING_DRAFT_LOCKED");
   if (draft.updatedAt !== input.expectedUpdatedAt) throw new Error("BILLING_VERSION_CONFLICT");
-  const alreadyPreparedCents = preparedHtCents(payload, draft.quoteId, draft.id);
+  const alreadyPreparedCents = preparedForBillingSource(payload, draft, draft.id);
   const amountHtCents =
     draft.type === "STANDARD" || draft.type === "FINAL"
       ? draft.amountHtCents
@@ -355,7 +396,7 @@ export function updateBillingDraft(
     if (
       payload.drafts
         .slice(draftIndex + 1)
-        .some((item) => item.quoteId === draft.quoteId && item.type === "PROGRESS")
+        .some((item) => belongsToBillingSource(item, draft) && item.type === "PROGRESS")
     ) {
       throw new Error("BILLING_DRAFT_HAS_DEPENDENTS");
     }
@@ -470,7 +511,7 @@ export function updateBillingDocument(
         row.percent !==
         draft.lineProgress?.find((previous) => previous.lineId === row.lineId)?.percent,
     ) ?? false;
-  const priorCents = preparedHtCents(payload, draft.quoteId, draft.id);
+  const priorCents = preparedForBillingSource(payload, draft, draft.id);
   if (totals.amountHtCents + priorCents > draft.contractHtCents) {
     throw new Error("BILLING_AMOUNT_EXCEEDS_CONTRACT");
   }
@@ -483,7 +524,7 @@ export function updateBillingDocument(
     );
   if (
     (financialChange || progressChanged) &&
-    payload.drafts.slice(index + 1).some((candidate) => candidate.quoteId === draft.quoteId)
+    payload.drafts.slice(index + 1).some((candidate) => belongsToBillingSource(candidate, draft))
   ) {
     throw new Error("BILLING_DRAFT_HAS_DEPENDENTS");
   }
