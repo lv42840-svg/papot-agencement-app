@@ -1,10 +1,11 @@
 import { createServer } from "node:http";
+import { constants } from "node:fs";
 import { createCipheriv, createDecipheriv, randomBytes } from "node:crypto";
 import { isIP } from "node:net";
-import { readFile } from "node:fs/promises";
+import { access, readFile } from "node:fs/promises";
 import { pipeline } from "node:stream/promises";
 import { pathToFileURL } from "node:url";
-import { isAbsolute, resolve, sep } from "node:path";
+import { dirname, isAbsolute, resolve, sep } from "node:path";
 import {
   HttpError,
   listFiles,
@@ -210,7 +211,19 @@ export function createExplorer(config) {
         throw new HttpError(405, "Méthode non autorisée.");
       if (["POST", "PUT"].includes(method) && request.headers.origin !== config.origin)
         throw new HttpError(403, "Origine de requête refusée.");
-      if (url.pathname === "/health" && method === "GET") return json(response, 200, { ok: true });
+      if (url.pathname === "/health" && method === "GET") {
+        // A live HTTP process is not enough: the document mount and ACL storage
+        // must be available before the explorer can serve users safely.
+        try {
+          const rootHandle = await directory(config.root, []);
+          await rootHandle.close();
+          await access(dirname(config.accessFile), constants.R_OK | constants.W_OK);
+          await readAccess(config.accessFile);
+        } catch {
+          return json(response, 503, { ok: false });
+        }
+        return json(response, 200, { ok: true });
+      }
       if (staticFiles.has(url.pathname) && ["GET", "HEAD"].includes(method)) {
         const [file, mime] = staticFiles.get(url.pathname);
         const contents = await readFile(new URL(`public/${file}`, import.meta.url));
