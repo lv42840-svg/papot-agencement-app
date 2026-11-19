@@ -67,7 +67,9 @@ export function generateBillingVisaProvisionalPdf(
     commands.push(value);
   }
   function text(value: string, x: number, top: number, size = 9, bold = false) {
-    raw(`BT /${bold ? "F2" : "F1"} ${size} Tf ${x} ${PAGE_HEIGHT - top} Td (${pdfEscape(value)}) Tj ET`);
+    raw(
+      `BT /${bold ? "F2" : "F1"} ${size} Tf ${x} ${PAGE_HEIGHT - top} Td (${pdfEscape(value)}) Tj ET`,
+    );
   }
   function line(y: number) {
     raw(`0.78 G 0.6 w 38 ${PAGE_HEIGHT - y} m 557 ${PAGE_HEIGHT - y} l S 0 G`);
@@ -179,9 +181,7 @@ export function generateBillingVisaProvisionalPdf(
     sheet.push(
       `BT /F2 8 Tf 38 48 Td (${pdfEscape("PROVISOIRE - NON FACTURE - AUCUN ENVOI PENNYLANE")}) Tj ET`,
     );
-    sheet.push(
-      `BT /F1 8 Tf 498 48 Td (${pdfEscape(`Page ${index + 1}/${pages.length}`)}) Tj ET`,
-    );
+    sheet.push(`BT /F1 8 Tf 498 48 Td (${pdfEscape(`Page ${index + 1}/${pages.length}`)}) Tj ET`);
   }
 
   const objects: Buffer[] = [];

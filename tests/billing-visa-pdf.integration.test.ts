@@ -1,10 +1,7 @@
 import { mkdir, writeFile } from "node:fs/promises";
 import path from "node:path";
 import { describe, expect, it } from "vitest";
-import {
-  comparePdfVisualRenders,
-  renderPdfToPngPages,
-} from "../src/lib/documents/pdf-runtime";
+import { comparePdfVisualRenders, renderPdfToPngPages } from "../src/lib/documents/pdf-runtime";
 import {
   createBillingDraft,
   type BillingPayload,
@@ -25,7 +22,9 @@ const source: BillingSource = {
   quoteLabel: "D-2026-PROV",
   contractHtCents: 540_000,
   contractTaxGroups: [{ ratePercent: 20, baseHtCents: 540_000 }],
-  lines: [{ lineId, description: "Ouvrage de mobilier", amountHtCents: 540_000, vatRatePercent: 20 }],
+  lines: [
+    { lineId, description: "Ouvrage de mobilier", amountHtCents: 540_000, vatRatePercent: 20 },
+  ],
 };
 
 function createPreview() {

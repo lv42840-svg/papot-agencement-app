@@ -20,12 +20,17 @@ const source: BillingSource = {
   quoteLabel: "D-2026-001",
   contractHtCents: 10_000,
   contractTaxGroups: [{ ratePercent: 20, baseHtCents: 10_000 }],
-  lines: [{ lineId, description: "Agencement et finitions", amountHtCents: 10_000, vatRatePercent: 20 }],
+  lines: [
+    { lineId, description: "Agencement et finitions", amountHtCents: 10_000, vatRatePercent: 20 },
+  ],
 };
 const base = (): BillingPayload => ({ schemaVersion: 1, drafts: [] });
 const prepare = () => {
   const draft = createBillingDraft(
-    base(), source, { requestId: crypto.randomUUID(), type: "STANDARD" }, "Nadia",
+    base(),
+    source,
+    { requestId: crypto.randomUUID(), type: "STANDARD" },
+    "Nadia",
   );
   return presentBillingVisa(
     { ...base(), drafts: [draft] },
@@ -105,10 +110,7 @@ describe("PDF des versions de visa provisoires", () => {
     const payload = prepare();
     const draft = payload.drafts[0];
     const visa = payload.visaVersions![0];
-    const description = Array.from(
-      { length: 180 },
-      (_, index) => `Prestation${index}`,
-    ).join(" ");
+    const description = Array.from({ length: 180 }, (_, index) => `Prestation${index}`).join(" ");
     const bulk = {
       ...visa,
       documentLines: Array.from({ length: 250 }, (_, index) => ({
@@ -155,16 +157,11 @@ describe("PDF des versions de visa provisoires", () => {
     ).join(" ");
     const extended = {
       ...visa,
-      documentLines: [
-        { ...visa.documentLines[0], description },
-      ],
+      documentLines: [{ ...visa.documentLines[0], description }],
     };
-    const pdf = Buffer.from(
-      generateBillingVisaProvisionalPdf(extended, draft),
-    ).toString("latin1");
+    const pdf = Buffer.from(generateBillingVisaProvisionalPdf(extended, draft)).toString("latin1");
     expect(pdf).toContain("Segment000");
     expect(pdf).toContain("Segment119");
     expect(Number(pdf.match(/\/Type \/Pages \/Count (\d+)/)?.[1])).toBeGreaterThan(1);
   });
-
 });
