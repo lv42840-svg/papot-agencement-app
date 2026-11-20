@@ -1,7 +1,11 @@
 import { calculateLineProgress } from "./progress";
 import { assertBillingVisaEditable, assertBillingVisaAllowsApproval } from "./visa-policy";
 import { buildInvoiceDocumentLines, calculateInvoiceDocumentTotals } from "./document-lines";
-import { allocatedBillingLineId, reconcileDocumentLineProgress } from "./line-ledger";
+import {
+  allocatedBillingLineId,
+  allocatedDocumentAmounts,
+  reconcileDocumentLineProgress,
+} from "./line-ledger";
 import { z } from "zod";
 
 const centsSchema = z.number().int().nonnegative().safe();
@@ -715,8 +719,19 @@ export function updateBillingDocument(
         (totals.taxGroups.find((value) => value.ratePercent === group.ratePercent)?.baseHtCents ??
           0) !== group.baseHtCents,
     );
+  // A silent transfer between ouvrages can change the next situation even
+  // when HT and VAT totals are identical. Only harmless text edits remain allowed.
+  let sourceAllocationChanged = false;
+  if (draft.type === "PROGRESS" && draft.lines?.length && draft.documentLines) {
+    const previous = allocatedDocumentAmounts(draft.documentLines, draft.lines);
+    const proposed = allocatedDocumentAmounts(documentLines, draft.lines);
+    sourceAllocationChanged = draft.lines.some(
+      (line) =>
+        (previous.get(line.lineId) ?? 0) !== (proposed.get(line.lineId) ?? 0),
+    );
+  }
   if (
-    (financialChange || progressChanged) &&
+    (financialChange || progressChanged || sourceAllocationChanged) &&
     payload.drafts
       .slice(index + 1)
       .some(

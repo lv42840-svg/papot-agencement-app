@@ -209,6 +209,33 @@ describe("traçabilité des prestations libres dans les situations cumulées", (
     );
   });
 
+  it("verrouille une redistribution entre ouvrages si une situation suivante est déjà préparée", () => {
+    const deposit = createBillingDraft(empty(), source, {
+      requestId: crypto.randomUUID(),
+      type: "DEPOSIT",
+      amountHtCents: 20_000,
+    }, "Nadia");
+    const first = progress({ ...empty(), drafts: [deposit] }, 50);
+    const second = progress({ ...empty(), drafts: [deposit, first] }, 75);
+    const payload = { ...empty(), drafts: [deposit, first, second] };
+    const changed = rows(first).map((row) => {
+      if (row.sourceLineId === a) return { ...row, unitPriceCents: 13_000 };
+      if (row.sourceLineId === b) return { ...row, unitPriceCents: 17_000 };
+      return row;
+    });
+    expect(first.amountHtCents).toBe(30_000);
+    expect(changed.reduce((sum, row) => sum + lineHtCents(row), 0)).toBe(30_000);
+    expect(() => revised(payload, first, changed)).toThrow("BILLING_DRAFT_HAS_DEPENDENTS");
+
+    const wordingOnly = rows(first).map((row) =>
+      row.sourceLineId === a ? { ...row, description: "Mobilier rectifié" } : row,
+    );
+    const saved = revised(payload, first, wordingOnly);
+    expect(saved.amountHtCents).toBe(30_000);
+    expect(saved.documentLines?.find((row) => row.sourceLineId === a)?.description)
+      .toBe("Mobilier rectifié");
+  });
+
   it("traite un supplément confirmé comme une ligne du marché et pas comme une ligne libre", () => {
     const chantier = {
       id: chantierId,
