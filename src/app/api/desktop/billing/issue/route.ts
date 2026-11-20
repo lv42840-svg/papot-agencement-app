@@ -7,6 +7,7 @@ import {
 import { createBillingRepository } from "@/lib/billing/repository";
 import { issueNativeInvoice, issueNativeInvoiceInputSchema } from "@/lib/billing/native-issuance";
 import { generateNativeInvoicePdf } from "@/lib/billing/native-invoice-pdf";
+import { storeOriginalNativeInvoicePdf } from "@/lib/billing/native-pdf-archive";
 import { createCompanyProfileRepository } from "@/lib/company-profile/create-repository";
 import { createClientsRepository } from "@/lib/clients/create-repository";
 
