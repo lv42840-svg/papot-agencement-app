@@ -170,7 +170,7 @@ export function issueNativeInvoice(
   if (state.invoices.length && state.invoices.at(-1)!.issuedAt > issuedAt) {
     throw new Error("BILLING_NATIVE_DATE_BACKWARDS");
   }
-  if (input.serviceOn > issuedOn || input.dueOn < issuedOn) {
+  if ((draft.type !== "DEPOSIT" && input.serviceOn > issuedOn) || input.dueOn < issuedOn) {
     throw new Error("BILLING_NATIVE_DATES_INVALID");
   }
   assertProfiles(profile, client);
