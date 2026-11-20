@@ -44,8 +44,10 @@ export async function POST(request: Request) {
         (item) => item.requestId === input.requestId,
       );
       if (!issued) throw new Error("BILLING_NATIVE_ISSUE_NOT_PERSISTED");
-      // A bad document must roll back this entire transaction, including the legal number.
-      generateNativeInvoicePdf(issued);
+      // Original PDF and invoice number are committed by ONE transaction.
+      // On any archive failure, both PDF and the numbered invoice roll back.
+      const pdf = generateNativeInvoicePdf(issued);
+      await storeOriginalNativeInvoicePdf(issued, pdf);
       return next;
     });
     const invoice = payload.nativeInvoiceLedger?.invoices.find(
