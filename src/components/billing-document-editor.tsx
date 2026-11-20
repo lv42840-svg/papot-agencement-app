@@ -22,7 +22,14 @@ import { BillingVisaPanel } from "@/components/billing-visa-panel";
 import { latestBillingVisa, visaRequiredForChantier } from "@/lib/billing/visa-policy";
 import { calculateBillingDraftRetention } from "@/lib/billing/draft-retention";
 
-type ApiSnapshot = { payload: BillingPayload; canWrite: boolean; error?: string };
+type IssuedReference = { id: string; draftId: string; number: string; issuedAt: string };
+type ApiSnapshot = {
+  payload: BillingPayload;
+  canWrite: boolean;
+  canIssue?: boolean;
+  issuedInvoices?: IssuedReference[];
+  error?: string;
+};
 type EditableRow = BillingDocumentLine & { quantityInput: string; priceInput: string };
 
 const currency = (cents: number) =>
@@ -76,6 +83,13 @@ const labels: Record<BillingDraft["type"], string> = {
 };
 const serverErrors: Record<string, string> = {
   BILLING_DRAFT_LOCKED: "Ce document est validé en interne et verrouillé.",
+  BILLING_NATIVE_ISSUANCE_DISABLED: "L'émission officielle est désactivée avant la recette finale.",
+  BILLING_NATIVE_SELLER_PROFILE_INCOMPLETE: "Complète les mentions légales de PAPOT dans Paramètres.",
+  BILLING_NATIVE_BUYER_PROFILE_INCOMPLETE: "Complète la fiche client et ses conditions de paiement.",
+  BILLING_NATIVE_ALREADY_ISSUED: "Cette facture a déjà un numéro officiel. Recharge la page.",
+  BILLING_NATIVE_APPROVAL_REQUIRED: "Le projet doit être validé en interne avant l'émission.",
+  BILLING_NATIVE_DATES_INVALID: "Vérifie les dates de prestation et d'échéance.",
+  SPECIAL_PERMISSION_FORBIDDEN: "Le droit spécifique Émettre les factures doit être attribué par un administrateur.",
   BILLING_RETENTION_EXCEEDS_TTC:
     "La retenue en euros dépasse le TTC recalculé. Réduis son montant avant de poursuivre.",
   BILLING_RETENTION_PERCENT_INVALID:
@@ -127,6 +141,15 @@ export function BillingDocumentEditor({ draftId }: { draftId: string }) {
   const router = useRouter();
   const [draft, setDraft] = useState<BillingDraft | null>(null);
   const [canWrite, setCanWrite] = useState(false);
+  const [canIssue, setCanIssue] = useState(false);
+  const [issued, setIssued] = useState<IssuedReference | null>(null);
+  const [issueRequestId, setIssueRequestId] = useState<string | null>(null);
+  const [serviceOn, setServiceOn] = useState("");
+  const [dueOn, setDueOn] = useState("");
+  const [operationCategory, setOperationCategory] = useState<"SERVICE" | "GOODS" | "MIXED">("SERVICE");
+  const [vatOnDebits, setVatOnDebits] = useState(false);
+  const [buyerPurchaseOrderNumber, setBuyerPurchaseOrderNumber] = useState("");
+  const [latePenaltyRate, setLatePenaltyRate] = useState("");
   const [rows, setRows] = useState<EditableRow[]>([]);
   const [initialRows, setInitialRows] = useState<EditableRow[]>([]);
   const [payload, setPayload] = useState<BillingPayload | null>(null);
@@ -151,6 +174,8 @@ export function BillingDocumentEditor({ draftId }: { draftId: string }) {
     setDraft(selected);
     setPayload(json.payload);
     setCanWrite(json.canWrite && selected.status === "DRAFT");
+    setCanIssue(Boolean(json.canIssue));
+    setIssued(json.issuedInvoices?.find((item) => item.draftId === draftId) ?? null);
     setProgressValues(
       Object.fromEntries(
         (selected.lines ?? []).map((line) => [
@@ -482,6 +507,54 @@ export function BillingDocumentEditor({ draftId }: { draftId: string }) {
     }
   }
 
+  async function issue() {
+    if (!draft || draft.status !== "APPROVED" || !canIssue || issued || busy ||
+        !serviceOn || !dueOn || !latePenaltyRate) return;
+    const rate = Number(latePenaltyRate.replace(",", "."));
+    if (!Number.isFinite(rate) || rate <= 0 || rate > 100) {
+      setError("Saisis un taux annuel valide pour les pénalités de retard.");
+      return;
+    }
+    if (!window.confirm(
+      "Émettre DÉFINITIVEMENT cette facture ? Un numéro légal unique sera attribué. " +
+      "La facture deviendra non modifiable. Une correction devra faire l'objet d'un avoir. " +
+      "Aucun envoi automatique à Pennylane ou à une plateforme électronique."
+    )) return;
+    const requestId = issueRequestId ?? crypto.randomUUID();
+    setIssueRequestId(requestId);
+    setBusy(true);
+    setError("");
+    setNotice("");
+    try {
+      const response = await fetch("/api/desktop/billing/issue", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          requestId,
+          draftId: draft.id,
+          expectedUpdatedAt: draft.updatedAt,
+          serviceOn,
+          dueOn,
+          operationCategory,
+          vatOnDebits,
+          buyerPurchaseOrderNumber: buyerPurchaseOrderNumber.trim(),
+          latePenaltyRatePercent: rate,
+        }),
+      });
+      const result = (await response.json()) as { issued?: IssuedReference; error?: string };
+      if (!response.ok || !result.issued) throw new Error(result.error ?? "Émission impossible");
+      setIssued(result.issued);
+      await reload();
+      setNotice("Facture " + result.issued.number +
+        " émise dans PAPOT. PDF téléchargeable. Aucun envoi à Pennylane.");
+    } catch (caught) {
+      const code = caught instanceof Error ? caught.message : "";
+      setError(serverErrors[code] ?? code ?? "Émission impossible");
+    } finally {
+      setBusy(false);
+    }
+  }
+
   async function approve() {
     if (!draft || !canWrite || busy || dirty) return;
     if (
@@ -530,7 +603,11 @@ export function BillingDocumentEditor({ draftId }: { draftId: string }) {
             <ArrowLeft size={15} /> Retour aux projets
           </button>
           <span className="invoiceTag">
-            {draft.status === "APPROVED" ? "VALIDÉ EN INTERNE · NON ÉMIS" : "PROJET · NON ÉMIS"}
+            {issued
+              ? "FACTURE ÉMISE · " + issued.number
+              : draft.status === "APPROVED"
+                ? "VALIDÉ EN INTERNE · NON ÉMIS"
+                : "PROJET · NON ÉMIS"}
           </span>
           <h1>
             <FileText size={25} /> {labels[draft.type]}
@@ -1043,6 +1120,84 @@ export function BillingDocumentEditor({ draftId }: { draftId: string }) {
           <p className="invoiceHint">Enregistre d&apos;abord les modifications des lignes.</p>
         )}
       </section>
+      {draft.status === "APPROVED" && (
+        <section className="invoiceCard">
+          <h2>Émission officielle PAPOT</h2>
+          {issued ? (
+            <div>
+              <p role="status"><strong>Facture {issued.number} émise</strong></p>
+              <p>Le document et ses montants sont figés. Pour corriger, il faudra un avoir.</p>
+              <a
+                className="primaryButton"
+                href={`/api/desktop/billing/issued/${issued.id}/pdf`}
+              >
+                Télécharger la facture PDF
+              </a>
+            </div>
+          ) : (
+            <>
+              <p>
+                La validation du projet ne génère pas de numéro. Ce formulaire prépare
+                une émission définitive. Aucun transfert automatique vers Pennylane
+                ni transmission électronique n&apos;est réalisé.
+              </p>
+              <div className="invoiceMeta">
+                <label>
+                  Date de réalisation
+                  <input type="date" value={serviceOn}
+                    onChange={(event) => setServiceOn(event.target.value)}
+                    disabled={busy || !canIssue} />
+                </label>
+                <label>
+                  Échéance de règlement
+                  <input type="date" value={dueOn}
+                    onChange={(event) => setDueOn(event.target.value)}
+                    disabled={busy || !canIssue} />
+                </label>
+                <label>
+                  Nature de l&apos;opération
+                  <select value={operationCategory}
+                    onChange={(event) => setOperationCategory(
+                      event.target.value as "SERVICE" | "GOODS" | "MIXED"
+                    )} disabled={busy || !canIssue}>
+                    <option value="SERVICE">Prestations de services</option>
+                    <option value="GOODS">Livraison de biens</option>
+                    <option value="MIXED">Biens et services</option>
+                  </select>
+                </label>
+                <label>
+                  Taux annuel des pénalités de retard (%)
+                  <input type="text" inputMode="decimal"
+                    value={latePenaltyRate}
+                    onChange={(event) => setLatePenaltyRate(event.target.value)}
+                    placeholder="À renseigner" disabled={busy || !canIssue} />
+                </label>
+                <label>
+                  N° bon de commande du client (si applicable)
+                  <input type="text" value={buyerPurchaseOrderNumber}
+                    onChange={(event) => setBuyerPurchaseOrderNumber(event.target.value)}
+                    maxLength={160} disabled={busy || !canIssue} />
+                </label>
+                <label>
+                  <input type="checkbox" checked={vatOnDebits}
+                    onChange={(event) => setVatOnDebits(event.target.checked)}
+                    disabled={busy || !canIssue} />
+                  TVA acquittée sur les débits (si applicable)
+                </label>
+              </div>
+              <button className="primaryButton" type="button"
+                disabled={!canIssue || busy || !serviceOn || !dueOn || !latePenaltyRate}
+                onClick={() => void issue()}>
+                Émettre la facture et attribuer son numéro définitif
+              </button>
+              {!canIssue && (
+                <p>Émission verrouillée : activation du module et droit spécifique requis.
+                  Aucune facture officielle ne peut être créée pendant les tests.</p>
+              )}
+            </>
+          )}
+        </section>
+      )}
       <section className="invoiceCard invoiceSummary">
         <h2>Synthèse du projet</h2>
         <div className="invoiceTotals">
