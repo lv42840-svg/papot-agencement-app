@@ -7,7 +7,7 @@ import {
 import { createBillingRepository } from "@/lib/billing/repository";
 import { issueNativeInvoice, issueNativeInvoiceInputSchema } from "@/lib/billing/native-issuance";
 import { generateNativeInvoicePdf } from "@/lib/billing/native-invoice-pdf";
-import { storeOriginalNativeInvoicePdf } from "@/lib/billing/native-pdf-archive";
+import { loadOriginalNativeInvoicePdf, storeOriginalNativeInvoicePdf } from "@/lib/billing/native-pdf-archive";
 import { createCompanyProfileRepository } from "@/lib/company-profile/create-repository";
 import { createClientsRepository } from "@/lib/clients/create-repository";
 
@@ -39,11 +39,20 @@ export async function POST(request: Request) {
       if (!draft) throw new Error("BILLING_DRAFT_NOT_FOUND");
       const client = clients.clients.find((item) => item.id === draft.clientId);
       if (!client) throw new Error("BILLING_NATIVE_BUYER_PROFILE_INCOMPLETE");
+      const wasAlreadyIssued = current.nativeInvoiceLedger?.invoices.some(
+        (item) => item.requestId === input.requestId,
+      ) ?? false;
       const next = issueNativeInvoice(current, input, company, client, context.user.displayName);
       const issued = next.nativeInvoiceLedger?.invoices.find(
         (item) => item.requestId === input.requestId,
       );
       if (!issued) throw new Error("BILLING_NATIVE_ISSUE_NOT_PERSISTED");
+      if (wasAlreadyIssued) {
+        // Idempotent retries must return the historical PDF unchanged even if
+        // a later release modifies the rendering engine.
+        await loadOriginalNativeInvoicePdf(issued);
+        return next;
+      }
       // Original PDF and invoice number are committed by ONE transaction.
       // On any archive failure, both PDF and the numbered invoice roll back.
       const pdf = generateNativeInvoicePdf(issued);
