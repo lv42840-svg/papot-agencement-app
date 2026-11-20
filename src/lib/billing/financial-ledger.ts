@@ -146,6 +146,8 @@ export function registerConfirmedInvoice(
     internalDraft.id !== invoice.draftId ||
     internalDraft.chantierId !== invoice.chantierId ||
     internalDraft.clientId !== invoice.clientId ||
+    (internalDraft.retention !== undefined &&
+      internalDraft.retention.amountTtcCents !== invoice.retentionTtcCents) ||
     !compareTaxGroups(invoice.taxGroups, internalDraft.taxGroups) ||
     invoice.amountHtCents !== internalDraft.amountHtCents ||
     invoice.vatCents !== internalDraft.vatCents ||
