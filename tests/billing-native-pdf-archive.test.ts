@@ -97,7 +97,7 @@ describe("archive originale non remplaçable des factures PAPOT", () => {
   it("détecte une corruption des octets originaux lors de la lecture", async () => {
     getLocalDatabase()
       .prepare("UPDATE local_native_invoice_pdf_archive SET pdf = ? WHERE invoice_id = ?")
-      .run(Buffer.from("%PDF-1.4\n" + "corrupted".repeat(40), "ascii"), invoice.id);
+      .run(Buffer.from("%PDF-1.4\n" + "corrupted".repeat(40) + "%%EOF\n", "ascii"), invoice.id);
     await expect(loadOriginalNativeInvoicePdf(invoice)).rejects.toThrow(
       "BILLING_NATIVE_ARCHIVE_HASH_MISMATCH",
     );
