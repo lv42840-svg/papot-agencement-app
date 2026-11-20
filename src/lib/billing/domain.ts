@@ -1,6 +1,7 @@
 import { calculateLineProgress } from "./progress";
 import { assertBillingVisaEditable, assertBillingVisaAllowsApproval } from "./visa-policy";
 import { buildInvoiceDocumentLines, calculateInvoiceDocumentTotals } from "./document-lines";
+import { allocatedBillingLineId, reconcileDocumentLineProgress } from "./line-ledger";
 import { z } from "zod";
 
 const centsSchema = z.number().int().nonnegative().safe();
@@ -39,6 +40,8 @@ export const billingDocumentLineSchema = z
     origin: z.enum(["QUOTE", "FREE", "TITLE"]),
     headingLevel: z.enum(["SECTION", "SUBSECTION"]).optional(),
     sourceLineId: z.string().uuid().nullable(),
+    // FREE rows on cumulative situations are charged against a named contract work line.
+    allocationLineId: z.string().uuid().nullable().optional(),
     description: z.string().trim().min(1).max(4000),
     quantity: z.number().finite().min(0).max(1000000),
     unit: z.string().trim().max(40),
@@ -46,6 +49,9 @@ export const billingDocumentLineSchema = z
     vatRatePercent: z.number().finite().min(0).max(100),
   })
   .superRefine((line, ctx) => {
+    if (line.origin !== "FREE" && line.allocationLineId != null) {
+      ctx.addIssue({ code: z.ZodIssueCode.custom, message: "BILLING_DOCUMENT_ALLOCATION_INVALID" });
+    }
     if (line.origin === "TITLE") {
       if (line.quantity !== 0 || line.unitPriceCents !== 0 || line.sourceLineId !== null) {
         ctx.addIssue({ code: z.ZodIssueCode.custom, message: "BILLING_TITLE_INVALID" });
@@ -629,6 +635,7 @@ export function updateBillingDocument(
     throw new Error("BILLING_DOCUMENT_DUPLICATE_LINE");
   }
   const quoteIds = new Set((draft.lines ?? []).map((line) => line.lineId));
+  const sourceByLineId = new Map((draft.lines ?? []).map((line) => [line.lineId, line]));
   const seenQuoteIds = new Set<string>();
   const allowedRates = new Set(draft.contractTaxGroups.map((group) => group.ratePercent));
   for (const line of documentLines) {
@@ -645,12 +652,24 @@ export function updateBillingDocument(
     if (line.origin !== "TITLE" && !allowedRates.has(line.vatRatePercent)) {
       throw new Error("BILLING_DOCUMENT_VAT_OUTSIDE_CONTRACT");
     }
+    const allocationId = allocatedBillingLineId(line);
+    if (allocationId) {
+      const contractLine = sourceByLineId.get(allocationId);
+      if (!contractLine) throw new Error("BILLING_DOCUMENT_ALLOCATION_UNKNOWN");
+      if (line.vatRatePercent !== contractLine.vatRatePercent) {
+        throw new Error("BILLING_DOCUMENT_ALLOCATION_VAT_MISMATCH");
+      }
+    }
   }
   const totals = calculateInvoiceDocumentTotals(documentLines);
   const priorDrafts = payload.drafts.slice(0, index);
   const recalculatedProgress = input.linePercentages
     ? calculateLineProgress({ schemaVersion: 1, drafts: priorDrafts }, draft, input.linePercentages)
     : null;
+  const currentProgress =
+    draft.type === "PROGRESS"
+      ? reconcileDocumentLineProgress(payload, draft, documentLines, recalculatedProgress?.lineProgress)
+      : null;
   if (recalculatedProgress && draft.type !== "PROGRESS") {
     throw new Error("BILLING_PROGRESS_INPUT_CONFLICT");
   }
@@ -676,10 +695,10 @@ export function updateBillingDocument(
     }
   }
   const progressChanged =
-    recalculatedProgress?.lineProgress.some(
+    currentProgress?.some(
       (row) =>
-        row.percent !==
-        draft.lineProgress?.find((previous) => previous.lineId === row.lineId)?.percent,
+        row.cumulativeHtCents !==
+        draft.lineProgress?.find((previous) => previous.lineId === row.lineId)?.cumulativeHtCents,
     ) ?? false;
   const priorCents = preparedForBillingSource(payload, draft, draft.id);
   if (totals.amountHtCents + priorCents > draft.contractHtCents) {
@@ -707,8 +726,8 @@ export function updateBillingDocument(
     label: input.label,
     notes: input.notes,
     documentLines,
-    ...(recalculatedProgress
-      ? { lineProgress: recalculatedProgress.lineProgress, cumulativePercent: null }
+    ...(currentProgress
+      ? { lineProgress: currentProgress, cumulativePercent: null }
       : {}),
     amountHtCents: totals.amountHtCents,
     taxGroups: totals.taxGroups,
