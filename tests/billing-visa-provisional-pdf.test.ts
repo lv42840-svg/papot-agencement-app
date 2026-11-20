@@ -94,7 +94,7 @@ describe("PDF des versions de visa provisoires", () => {
     const text = Buffer.from(
       generateBillingVisaProvisionalPdf(visa.visaVersions![0], visa.drafts[0]),
     ).toString("latin1");
-    expect(text).toContain("RETENUE GARANTIE TTC (5 %) : 6,00 EUR");
+    expect(text).toContain("RETENUE GARANTIE TTC \\(5 %\\) : 6,00 EUR");
     expect(text).toContain("PART TTC HORS RETENUE : 114,00 EUR");
     expect(text).toContain("NON FACTURE");
   });
