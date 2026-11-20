@@ -38,6 +38,23 @@ La restauration refuse une base ou un répertoire déjà remplis. Elle ne suppri
 
 Avant une bascule réelle : démarrer le commit sauvegardé avec cette base et ces fichiers, sans SMTP ni synchronisation externe ; tester connexion, ouverture de devis/PDF/pièces jointes, chantier, heures et facturation ; comparer les nombres d'enregistrements et les derniers éléments saisis. Valider ensuite explicitement la bascule de configuration. Aucun script n'effectue automatiquement cette bascule.
 
+## Factures officielles PAPOT : sauvegarde de l'original
+
+Les factures numérotées PAPOT sont archivées dans **PostgreSQL** dans la table
+`papot_native_invoice_pdf_archive` : identifiant, numéro, date d'émission, octets
+du PDF original et empreinte SHA-256. Le `pg_dump` complet ci-dessus inclut
+cette table, sans copie séparée dans `/srv/agencement`. La restauration doit
+rétablir la table et les PDF **avec les mêmes octets**, pas les reconstruire
+avec le modèle d'une version ultérieure.
+
+Avant d'activer `PAPOT_NATIVE_BILLING_ISSUANCE_ENABLED=true` : effectuer un
+test de restauration isolé, comparer le nombre de factures émises au nombre
+d'archives originales et télécharger plusieurs factures restaurées. Un PDF
+manquant, un numéro orphelin ou une empreinte SHA-256 non conforme est une
+anomalie bloquante : **ne pas émettre de nouvelles factures** avant correction.
+Conserver une copie chiffrée hors du VPS et vérifier la rétention légale
+applicable avec le comptable.
+
 ## Validation continue et limite
 
 La CI teste un aller-retour PostgreSQL + fichier, le refus de cible non vide et le rejet d'une sauvegarde altérée. Ce test ne prouve pas que les sauvegardes du VPS sont programmées, copiées hors site ou restaurables : faire et consigner un exercice sur une copie réelle avant de considérer la reprise validée.
