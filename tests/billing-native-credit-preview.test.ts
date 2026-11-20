@@ -38,7 +38,7 @@ describe("simulation d'avoir avant émission", () => {
   });
 
   it("refuse une saisie invalide au lieu de l'ignorer", () => {
-    for (const invalidInput of ["toto", "-5", "5,123", "300", "100000000000000000000", "2.4.1"]) {
+    for (const invalidInput of ["toto", "-5", "5,123", "600", "100000000000000000000", "2.4.1"]) {
       const result = previewNativeCreditNote(allowances, "PARTIAL", {
         "10": "3,00",
         "20": invalidInput,
