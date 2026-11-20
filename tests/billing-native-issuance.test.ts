@@ -6,6 +6,7 @@ import {
   type BillingSource,
 } from "../src/lib/billing/domain";
 import {
+  assertNativeInvoiceSequence,
   emptyNativeInvoiceLedger,
   issueNativeInvoice,
   type IssueNativeInvoiceInput,
@@ -240,6 +241,34 @@ describe("numérotation légale PAPOT sans liaison d'émission Pennylane", () =>
         new Date("2026-11-20T10:00:00Z"),
       ),
     ).toThrow("BILLING_NATIVE_DATES_INVALID");
+  });
+
+  it("refuse les trous de numérotation et les doubles références avant une nouvelle émission", () => {
+    const draft = makeDraft();
+    const saved = issueNativeInvoice(
+      { ...empty(), drafts: [draft] },
+      prepare(draft.id, draft.updatedAt),
+      company,
+      client,
+      "Lucien",
+      new Date("2026-11-20T10:00:00Z"),
+    );
+    const state = saved.nativeInvoiceLedger!;
+    expect(() => assertNativeInvoiceSequence(state)).not.toThrow();
+    for (const corrupt of [
+      { ...state, lastOrdinal: 10 },
+      { ...state, invoices: [{ ...state.invoices[0], number: "PA-2026-000003" }] },
+      { ...state, invoices: [state.invoices[0], state.invoices[0]], lastOrdinal: 2 },
+    ]) {
+      expect(() => assertNativeInvoiceSequence(corrupt)).toThrow(
+        "BILLING_NATIVE_SEQUENCE_CORRUPT",
+      );
+      expect(() => issueNativeInvoice(
+        { ...saved, nativeInvoiceLedger: corrupt },
+        prepare(draft.id, draft.updatedAt),
+        company, client, "Lucien", new Date("2026-11-20T11:00:00Z"),
+      )).toThrow("BILLING_NATIVE_SEQUENCE_CORRUPT");
+    }
   });
 
   it("garde les compteurs vides avant la première émission", () => {
