@@ -188,6 +188,15 @@ export type BillingVisaRequirement = z.infer<typeof billingVisaRequirementSchema
 export const billingVisaMethodSchema = z.enum(["EMAIL", "SIGNATURE", "MEETING", "PHONE", "OTHER"]);
 export type BillingVisaMethod = z.infer<typeof billingVisaMethodSchema>;
 
+export const billingVisaLineDecisionSchema = z
+  .object({
+    documentLineId: z.string().uuid(),
+    acceptedHtCents: centsSchema,
+    reason: z.string().trim().max(1000),
+  })
+  .strict();
+export type BillingVisaLineDecision = z.infer<typeof billingVisaLineDecisionSchema>;
+
 export const billingVisaVersionSchema = z
   .object({
     id: z.string().uuid(),
@@ -208,6 +217,9 @@ export const billingVisaVersionSchema = z
     submittedByName: z.string().trim().min(1).max(160),
     status: z.enum(["SUBMITTED", "ACCEPTED", "PARTIAL", "REFUSED", "WITHDRAWN"]),
     acceptedHtCents: centsSchema.nullable(),
+    lineDecisions: z.array(billingVisaLineDecisionSchema).max(1000).optional(),
+    appliedAt: dateTimeSchema.optional(),
+    appliedByName: z.string().trim().min(1).max(160).optional(),
     reviewMethod: billingVisaMethodSchema.nullable(),
     externalContact: z.string().trim().min(1).max(240).nullable(),
     evidence: z.string().trim().min(1).max(2000).nullable(),
@@ -217,6 +229,44 @@ export const billingVisaVersionSchema = z
   })
   .superRefine((visa, ctx) => {
     const invalid = (message: string) => ctx.addIssue({ code: z.ZodIssueCode.custom, message });
+    const decisions = visa.lineDecisions;
+    if (
+      Boolean(visa.appliedAt) !== Boolean(visa.appliedByName) ||
+      (visa.appliedAt && (visa.status !== "PARTIAL" || !decisions?.length))
+    ) {
+      invalid("BILLING_VISA_APPLICATION_INVALID");
+    }
+    if (decisions?.length) {
+      if (visa.status !== "PARTIAL") {
+        invalid("BILLING_VISA_LINE_DECISIONS_NOT_PARTIAL");
+      } else {
+        const billable = visa.documentLines.filter((line) => line.origin !== "TITLE");
+        const lookup = new Map(billable.map((line) => [line.id, line]));
+        const seen = new Set<string>();
+        let acceptedSum = 0;
+        for (const decision of decisions) {
+          const original = lookup.get(decision.documentLineId);
+          if (!original || seen.has(decision.documentLineId)) {
+            invalid("BILLING_VISA_LINE_DECISION_INVALID");
+            continue;
+          }
+          seen.add(decision.documentLineId);
+          const originalHt = Math.round(original.quantity * original.unitPriceCents);
+          if (
+            !Number.isSafeInteger(originalHt) ||
+            decision.acceptedHtCents > originalHt
+          ) {
+            invalid("BILLING_VISA_LINE_AMOUNT_INVALID");
+          }
+          acceptedSum += decision.acceptedHtCents;
+        }
+        if (
+          seen.size !== billable.length ||
+          !Number.isSafeInteger(acceptedSum) ||
+          acceptedSum !== visa.acceptedHtCents
+        ) invalid("BILLING_VISA_LINE_TOTAL_MISMATCH");
+      }
+    }
     if (visa.status === "SUBMITTED") {
       if (
         visa.acceptedHtCents !== null ||
