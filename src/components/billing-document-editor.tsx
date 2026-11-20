@@ -21,6 +21,7 @@ import { belongsToBillingSource } from "@/lib/billing/domain";
 import { BillingVisaPanel } from "@/components/billing-visa-panel";
 import { latestBillingVisa, visaRequiredForChantier } from "@/lib/billing/visa-policy";
 import { calculateBillingDraftRetention } from "@/lib/billing/draft-retention";
+import { previewNativeCreditNote } from "@/lib/billing/native-credit-preview";
 
 type IssuedReference = { id: string; draftId: string; number: string; issuedAt: string };
 type IssuedCreditReference = {
@@ -306,6 +307,12 @@ export function BillingDocumentEditor({ draftId }: { draftId: string }) {
       return null;
     }
   }, [preview, retentionMode, retentionValue]);
+  const creditPreview = useMemo(
+    () => creditPosition
+      ? previewNativeCreditNote(creditPosition.allowances, creditMode, creditAmounts)
+      : null,
+    [creditPosition, creditMode, creditAmounts],
+  );
   const navigationRows = rows.map(
     (row, index) => parsedRows[index] ?? { ...row, quantity: 0, unitPriceCents: 0 },
   );
@@ -640,42 +647,11 @@ export function BillingDocumentEditor({ draftId }: { draftId: string }) {
       creditReason.trim().length < 3
     )
       return;
-    if (
-      creditMode === "PARTIAL" &&
-      creditPosition.allowances.some((allowance) => {
-        const raw = creditAmounts[String(allowance.ratePercent)]?.trim() ?? "";
-        if (!raw) return false;
-        const entered = centsFromEuros(raw);
-        return (
-          !Number.isSafeInteger(entered) || entered < 0 || entered > allowance.remainingHtCents
-        );
-      })
-    ) {
-      setError("Un montant HT est invalide ou dépasse le reste créditable.");
+    if (!creditPreview?.valid) {
+      setError(creditPreview?.error ?? "Vérifie les montants de l'avoir.");
       return;
     }
-    const amounts = creditPosition.allowances.flatMap((allowance) => {
-      if (allowance.remainingHtCents <= 0) return [];
-      const amount =
-        creditMode === "FULL"
-          ? allowance.remainingHtCents
-          : centsFromEuros(creditAmounts[String(allowance.ratePercent)] ?? "");
-      return Number.isSafeInteger(amount) && amount > 0
-        ? [{ ratePercent: allowance.ratePercent, baseHtCents: amount }]
-        : [];
-    });
-    if (
-      amounts.length === 0 ||
-      amounts.some((amount) => {
-        const available = creditPosition.allowances.find(
-          (item) => item.ratePercent === amount.ratePercent,
-        );
-        return !available || amount.baseHtCents > available.remainingHtCents;
-      })
-    ) {
-      setError("Saisis au moins un montant HT valide, sans dépasser le reste disponible.");
-      return;
-    }
+    const amounts = creditPreview.amounts;
     if (
       !window.confirm(
         "Émettre cet AVOIR OFFICIEL ? Un numéro définitif sera attribué et l'avoir " +
@@ -1486,6 +1462,33 @@ export function BillingDocumentEditor({ draftId }: { draftId: string }) {
                     </label>
                   ))}
               </div>
+              {creditPreview?.valid && (
+                <div className="invoiceTotals" role="status">
+                  <div>
+                    <span>Montant HT de l&apos;avoir envisagé</span>
+                    <strong>{currency(creditPreview.htCents)}</strong>
+                  </div>
+                  <div>
+                    <span>TVA de l&apos;avoir envisagé</span>
+                    <strong>{currency(creditPreview.vatCents)}</strong>
+                  </div>
+                  <div>
+                    <span>Crédit TTC à émettre</span>
+                    <strong>{currency(creditPreview.totalTtcCents)}</strong>
+                  </div>
+                  <div>
+                    <span>Reste TTC après émission</span>
+                    <strong>
+                      {currency(creditPosition.remainingTtcCents - creditPreview.totalTtcCents)}
+                    </strong>
+                  </div>
+                </div>
+              )}
+              {!creditPreview?.valid && (
+                <p className="invoiceHint" role="alert">
+                  {creditPreview?.error ?? "Vérifie les montants de l'avoir."}
+                </p>
+              )}
               <button
                 type="button"
                 className="primaryButton"
@@ -1493,7 +1496,8 @@ export function BillingDocumentEditor({ draftId }: { draftId: string }) {
                   busy ||
                   !canIssueCredits ||
                   creditReason.trim().length < 3 ||
-                  creditPosition.remainingTtcCents <= 0
+                  creditPosition.remainingTtcCents <= 0 ||
+                  !creditPreview?.valid
                 }
                 onClick={() => void issueCredit()}
               >
