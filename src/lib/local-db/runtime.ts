@@ -37,6 +37,14 @@ function ensureLocalSchema(target: DatabaseSync): void {
       payload_json TEXT NOT NULL,
       updated_at TEXT NOT NULL
     ) STRICT;
+    CREATE TABLE IF NOT EXISTS local_native_invoice_pdf_archive (
+      invoice_id TEXT PRIMARY KEY,
+      invoice_number TEXT NOT NULL UNIQUE,
+      issued_at TEXT NOT NULL,
+      pdf BLOB NOT NULL CHECK (length(pdf) > 0),
+      sha256 TEXT NOT NULL CHECK (length(sha256) = 64),
+      archived_at TEXT NOT NULL
+    ) STRICT;
   `);
 }
 
