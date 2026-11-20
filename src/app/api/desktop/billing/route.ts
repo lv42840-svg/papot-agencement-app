@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { z } from "zod";
+import { hasSpecialPermission } from "@/lib/auth/permissions";
 import type { BillingPayload } from "@/lib/billing/domain";
 
 import {
@@ -211,6 +212,7 @@ const billingMutationSchema = z.discriminatedUnion("action", [
 function publicBillingPayload(payload: BillingPayload): BillingPayload {
   const safe = { ...payload };
   delete safe.financialLedger;
+  delete safe.nativeInvoiceLedger;
   return safe;
 }
 
@@ -268,6 +270,12 @@ export async function GET() {
     );
     return noStoreJson({
       payload: publicBillingPayload(payload),
+      issuedInvoices: (payload.nativeInvoiceLedger?.invoices ?? []).map((invoice) => ({
+        id: invoice.id, draftId: invoice.draftId, number: invoice.number, issuedAt: invoice.issuedAt,
+      })),
+      canIssue: context.moduleAccess.canWrite &&
+        process.env.PAPOT_NATIVE_BILLING_ISSUANCE_ENABLED === "true" &&
+        await hasSpecialPermission(context.user.id, "billing.issue_invoices"),
       sources,
       chantiers: chantiers.chantiers.map((chantier) => ({
         id: chantier.id,
