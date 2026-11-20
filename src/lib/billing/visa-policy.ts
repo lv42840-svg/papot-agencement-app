@@ -42,6 +42,7 @@ export function assertBillingVisaAllowsApproval(
       latest.amountHtCents !== draft.amountHtCents ||
       latest.vatCents !== draft.vatCents ||
       latest.totalTtcCents !== draft.totalTtcCents ||
+      JSON.stringify(latest.retention ?? null) !== JSON.stringify(draft.retention ?? null) ||
       JSON.stringify(latest.documentLines) !== JSON.stringify(draft.documentLines))
   ) {
     throw new Error("BILLING_VISA_STALE");
