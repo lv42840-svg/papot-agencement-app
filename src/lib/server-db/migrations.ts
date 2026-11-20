@@ -68,6 +68,7 @@ async function ensureFreshWebBootstrap(client: PoolClient): Promise<void> {
     chantiers: string;
     library: string;
     quotes: string;
+    native_invoice_pdfs: string;
     cutovers: string;
   }>(`
     SELECT
@@ -79,6 +80,7 @@ async function ensureFreshWebBootstrap(client: PoolClient): Promise<void> {
       (SELECT COUNT(*)::text FROM papot_chantiers_state) AS chantiers,
       (SELECT COUNT(*)::text FROM papot_library_state) AS library,
       (SELECT COUNT(*)::text FROM papot_quotes_state) AS quotes,
+      (SELECT COUNT(*)::text FROM papot_native_invoice_pdf_archive) AS native_invoice_pdfs,
       (SELECT COUNT(*)::text FROM papot_domain_cutovers) AS cutovers
   `);
 
@@ -94,6 +96,7 @@ async function ensureFreshWebBootstrap(client: PoolClient): Promise<void> {
     row.chantiers,
     row.library,
     row.quotes,
+    row.native_invoice_pdfs,
   ];
 
   const allBusinessEmpty = businessCounts.every((count) => count === "0");
