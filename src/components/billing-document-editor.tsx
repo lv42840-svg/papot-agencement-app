@@ -23,11 +23,35 @@ import { latestBillingVisa, visaRequiredForChantier } from "@/lib/billing/visa-p
 import { calculateBillingDraftRetention } from "@/lib/billing/draft-retention";
 
 type IssuedReference = { id: string; draftId: string; number: string; issuedAt: string };
+type IssuedCreditReference = {
+  id: string;
+  originalInvoiceId: string;
+  number: string;
+  issuedOn: string;
+  reason: string;
+  totalTtcCents: number;
+};
+type CreditAllowance = {
+  ratePercent: number;
+  remainingHtCents: number;
+  remainingVatCents: number;
+  originalHtCents: number;
+};
+type CreditPosition = {
+  originalInvoiceId: string;
+  originalTtcCents: number;
+  creditedTtcCents: number;
+  remainingTtcCents: number;
+  allowances: CreditAllowance[];
+};
 type ApiSnapshot = {
   payload: BillingPayload;
   canWrite: boolean;
   canIssue?: boolean;
   issuedInvoices?: IssuedReference[];
+  canIssueCredits?: boolean;
+  issuedCreditNotes?: IssuedCreditReference[];
+  creditPositions?: CreditPosition[];
   error?: string;
 };
 type EditableRow = BillingDocumentLine & { quantityInput: string; priceInput: string };
@@ -84,6 +108,13 @@ const labels: Record<BillingDraft["type"], string> = {
 const serverErrors: Record<string, string> = {
   BILLING_DRAFT_LOCKED: "Ce document est validé en interne et verrouillé.",
   BILLING_NATIVE_ISSUANCE_DISABLED: "L'émission officielle est désactivée avant la recette finale.",
+  BILLING_NATIVE_CREDIT_ISSUANCE_DISABLED: "Les avoirs officiels restent désactivés avant la recette.",
+  BILLING_NATIVE_CREDIT_EXCEEDS_ORIGINAL: "Le montant de l'avoir dépasse le montant restant sur la facture.",
+  BILLING_NATIVE_CREDIT_FULL_AMOUNT_REQUIRED: "L'avoir total doit reprendre tous les montants restant à créditer.",
+  BILLING_NATIVE_CREDIT_DATE_BACKWARDS: "La date d'avoir ne peut pas précéder la facture d'origine.",
+  BILLING_NATIVE_CREDIT_SEQUENCE_CORRUPT: "La numérotation des avoirs est incohérente. Émission suspendue.",
+  BILLING_NATIVE_CREDIT_DUPLICATE_VAT: "Deux montants utilisent le même taux de TVA.",
+  BILLING_NATIVE_CREDIT_REQUEST_REUSED: "Cette demande d'avoir a déjà été utilisée avec des données différentes.",
   BILLING_NATIVE_SELLER_PROFILE_INCOMPLETE:
     "Complète les mentions légales de PAPOT dans Paramètres.",
   BILLING_NATIVE_BUYER_PROFILE_INCOMPLETE:
@@ -146,6 +177,13 @@ export function BillingDocumentEditor({ draftId }: { draftId: string }) {
   const [canWrite, setCanWrite] = useState(false);
   const [canIssue, setCanIssue] = useState(false);
   const [issued, setIssued] = useState<IssuedReference | null>(null);
+  const [canIssueCredits, setCanIssueCredits] = useState(false);
+  const [issuedCredits, setIssuedCredits] = useState<IssuedCreditReference[]>([]);
+  const [creditPosition, setCreditPosition] = useState<CreditPosition | null>(null);
+  const [creditMode, setCreditMode] = useState<"FULL" | "PARTIAL">("FULL");
+  const [creditReason, setCreditReason] = useState("");
+  const [creditAmounts, setCreditAmounts] = useState<Record<string, string>>({});
+  const [creditRequestId, setCreditRequestId] = useState<string | null>(null);
   const [issueRequestId, setIssueRequestId] = useState<string | null>(null);
   const [serviceOn, setServiceOn] = useState("");
   const [dueOn, setDueOn] = useState("");
@@ -180,7 +218,19 @@ export function BillingDocumentEditor({ draftId }: { draftId: string }) {
     setPayload(json.payload);
     setCanWrite(json.canWrite && selected.status === "DRAFT");
     setCanIssue(Boolean(json.canIssue));
-    setIssued(json.issuedInvoices?.find((item) => item.draftId === draftId) ?? null);
+    const currentIssued = json.issuedInvoices?.find((item) => item.draftId === draftId) ?? null;
+    setIssued(currentIssued);
+    setCanIssueCredits(Boolean(json.canIssueCredits));
+    setIssuedCredits(
+      (json.issuedCreditNotes ?? []).filter(
+        (credit) => credit.originalInvoiceId === currentIssued?.id,
+      ),
+    );
+    setCreditPosition(
+      json.creditPositions?.find((position) =>
+        position.originalInvoiceId === currentIssued?.id,
+      ) ?? null,
+    );
     setProgressValues(
       Object.fromEntries(
         (selected.lines ?? []).map((line) => [
@@ -570,6 +620,70 @@ export function BillingDocumentEditor({ draftId }: { draftId: string }) {
     } catch (caught) {
       const code = caught instanceof Error ? caught.message : "";
       setError(serverErrors[code] ?? code ?? "Émission impossible");
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  async function issueCredit() {
+    if (!issued || !canIssueCredits || !creditPosition || busy ||
+        creditPosition.remainingTtcCents <= 0 || creditReason.trim().length < 3) return;
+    const amounts = creditPosition.allowances.flatMap((allowance) => {
+      if (allowance.remainingHtCents <= 0) return [];
+      const amount = creditMode === "FULL"
+        ? allowance.remainingHtCents
+        : centsFromEuros(creditAmounts[String(allowance.ratePercent)] ?? "");
+      return Number.isSafeInteger(amount) && amount > 0
+        ? [{ ratePercent: allowance.ratePercent, baseHtCents: amount }]
+        : [];
+    });
+    if (amounts.length === 0 || amounts.some((amount) => {
+      const available = creditPosition.allowances.find(
+        (item) => item.ratePercent === amount.ratePercent,
+      );
+      return !available || amount.baseHtCents > available.remainingHtCents;
+    })) {
+      setError("Saisis au moins un montant HT valide, sans dépasser le reste disponible.");
+      return;
+    }
+    if (!window.confirm(
+      "Émettre cet AVOIR OFFICIEL ? Un numéro définitif sera attribué et l'avoir " +
+      "ne pourra plus être modifié. La facture d'origine reste intacte. " +
+      "Aucun transfert automatique vers Pennylane ni remboursement bancaire."
+    )) return;
+    const requestId = creditRequestId ?? crypto.randomUUID();
+    setCreditRequestId(requestId);
+    setBusy(true);
+    setError("");
+    setNotice("");
+    try {
+      const response = await fetch("/api/desktop/billing/credits/issue", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          requestId,
+          originalInvoiceId: issued.id,
+          mode: creditMode,
+          reason: creditReason.trim(),
+          amounts,
+        }),
+      });
+      const result = (await response.json()) as {
+        issued?: IssuedCreditReference;
+        error?: string;
+      };
+      if (!response.ok || !result.issued) throw new Error(result.error ?? "Émission impossible");
+      await reload();
+      setCreditRequestId(null);
+      setCreditReason("");
+      setCreditAmounts({});
+      setNotice(
+        "Avoir officiel " + result.issued.number +
+        " émis et archivé. Aucun envoi à Pennylane.",
+      );
+    } catch (caught) {
+      const code = caught instanceof Error ? caught.message : "";
+      setError(serverErrors[code] ?? code ?? "Émission d'avoir impossible");
     } finally {
       setBusy(false);
     }
