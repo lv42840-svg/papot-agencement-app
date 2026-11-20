@@ -1,4 +1,5 @@
 import { mkdtempSync, rmSync } from "node:fs";
+import { createRequire } from "node:module";
 import os from "node:os";
 import path from "node:path";
 import { afterAll, beforeAll, describe, expect, it, vi } from "vitest";
@@ -11,7 +12,6 @@ vi.mock("server-only", () => ({}));
 // the actual SQLite engine through Node require, while mocking just the
 // runtime adapter (not the archive algorithms under test).
 vi.mock("@/lib/local-db/runtime", async () => {
-  const { createRequire } = await import("node:module");
   const require = createRequire(import.meta.url);
   const sqlite = require("node:sqlite") as {
     DatabaseSync: new (file: string) => {
