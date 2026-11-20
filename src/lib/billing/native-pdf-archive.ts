@@ -25,11 +25,7 @@ function digest(bytes: Uint8Array): string {
 
 function assertPdf(bytes: Uint8Array): void {
   if (bytes.length < 100 || Buffer.from(bytes.subarray(0, 8)).toString("ascii") !== "%PDF-1.4") {
-    // The header includes a newline and custom comment, so the 8-byte prefix
-    // must be checked by its first 8 ASCII characters only.
-    if (Buffer.from(bytes.subarray(0, 8)).toString("ascii") !== "%PDF-1.4\n") {
-      throw new Error("BILLING_NATIVE_ARCHIVE_INVALID_PDF");
-    }
+    throw new Error("BILLING_NATIVE_ARCHIVE_INVALID_PDF");
   }
 }
 
