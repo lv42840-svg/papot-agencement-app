@@ -1,0 +1,36 @@
+name: Temporary final credit code formatter
+
+on:
+  push:
+    branches:
+      - feat/billing-chantier-market-foundation
+    paths:
+      - .github/workflows/billing-credit-final-format-temporary.yml
+
+permissions:
+  contents: write
+
+jobs:
+  format-credit-final:
+    if: github.ref == 'refs/heads/feat/billing-chantier-market-foundation'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: true
+      - run: |
+          git fetch origin feat/billing-chantier-market-foundation
+          git checkout -B feat/billing-chantier-market-foundation origin/feat/billing-chantier-market-foundation
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - run: npx --yes prettier@3.4.2 --write src/lib/billing/native-credit-notes.ts tests/billing-native-credit-notes.test.ts src/components/billing-document-editor.tsx
+      - run: |
+          git diff --check
+          if ! git diff --quiet; then
+            git config user.name "github-actions[bot]"
+            git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+            git add src/lib/billing/native-credit-notes.ts tests/billing-native-credit-notes.test.ts src/components/billing-document-editor.tsx
+            git commit -m "style(billing): format credit note validation and VAT editor"
+            git push
+          fi
