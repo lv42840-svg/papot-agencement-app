@@ -18,6 +18,9 @@ jobs:
       - uses: actions/checkout@v4
         with:
           persist-credentials: true
+      - run: |
+          git fetch origin feat/billing-chantier-market-foundation
+          git checkout -B feat/billing-chantier-market-foundation origin/feat/billing-chantier-market-foundation
       - uses: actions/setup-node@v4
         with:
           node-version: 22
