@@ -1,4 +1,5 @@
 import { belongsToBillingSource } from "./domain";
+import { previousBillingLineAmounts } from "./line-ledger";
 import type { BillingDraft, BillingLineProgress, BillingPayload, BillingSource } from "./domain";
 
 export type LineProgressInput = { lineId: string; percent: number };
@@ -39,6 +40,8 @@ export function calculateLineProgress(
   }
 
   const previousDrafts = payload.drafts.filter((draft) => belongsToBillingSource(draft, source));
+  // Unallocated historic FREE lines cannot be deducted per ouvrage.
+  const previousLineAmounts = previousBillingLineAmounts(payload, source);
   const history = previousDrafts.filter((draft) => draft.type === "PROGRESS");
   if (history.some((draft) => !draft.lineProgress?.length && draft.cumulativePercent === null)) {
     throw new Error("BILLING_PROGRESS_HISTORY_UNDETERMINED");
@@ -93,6 +96,11 @@ export function calculateLineProgress(
       vatCents: Math.round((baseHtCents * contract.ratePercent) / 100),
     };
   });
+  if (lineProgress.some(
+    (row) => row.cumulativeHtCents < (previousLineAmounts.get(row.lineId) ?? 0),
+  )) {
+    throw new Error("BILLING_PROGRESS_LINE_BELOW_PREPARED");
+  }
   const amountHtCents = groups.reduce((sum, group) => sum + group.baseHtCents, 0);
   const previousTotal = previousDrafts.reduce((sum, draft) => sum + draft.amountHtCents, 0);
   const contractRemaining = source.contractHtCents - previousTotal;

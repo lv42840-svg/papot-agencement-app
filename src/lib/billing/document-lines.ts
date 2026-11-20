@@ -1,4 +1,4 @@
-import { belongsToBillingSource } from "./domain";
+import { previousBillingLineAmounts } from "./line-ledger";
 import type {
   BillingDocumentLine,
   BillingDraft,
@@ -110,22 +110,10 @@ export function buildInvoiceDocumentLines(
   draft: BillingDraft,
   payload: BillingPayload,
 ): BillingDocumentLine[] {
-  const draftIndex = payload.drafts.findIndex((item) => item.id === draft.id);
-  const prior = payload.drafts
-    .slice(0, draftIndex < 0 ? payload.drafts.length : draftIndex)
-    .filter((item) => belongsToBillingSource(item, draft));
   const sourceLines = draft.lines ?? [];
   const output: BillingDocumentLine[] = [];
-  const previousAmounts = new Map<string, number>();
-  for (const priorDraft of prior) {
-    for (const row of priorDraft.documentLines ?? []) {
-      if (row.origin !== "QUOTE" || !row.sourceLineId) continue;
-      previousAmounts.set(
-        row.sourceLineId,
-        (previousAmounts.get(row.sourceLineId) ?? 0) + lineHtCents(row),
-      );
-    }
-  }
+  // Include prior FREE amounts allocated to contract lines, not just QUOTE rows.
+  const previousAmounts = previousBillingLineAmounts(payload, draft, draft.id);
 
   for (const group of draft.taxGroups) {
     const matching = sourceLines.filter((line) => line.vatRatePercent === group.ratePercent);
@@ -143,33 +131,19 @@ export function buildInvoiceDocumentLines(
       continue;
     }
 
-    const previousSituations = prior.filter((item) => item.type === "PROGRESS");
     const weights = matching.map((line) => {
       const target = draft.lineProgress?.find(
         (row) => row.lineId === line.lineId,
       )?.cumulativeHtCents;
-      if (target === undefined) {
-        return Math.max(0, line.amountHtCents - (previousAmounts.get(line.lineId) ?? 0));
-      }
-      const previousTarget = previousSituations.reduce((maximum, item) => {
-        const row = item.lineProgress?.find((entry) => entry.lineId === line.lineId);
-        if (!row && !item.lines?.some((candidate) => candidate.lineId === line.lineId)) {
-          return maximum;
-        }
-        const amount =
-          row?.cumulativeHtCents ??
-          (item.cumulativePercent === null
-            ? 0
-            : Math.round((line.amountHtCents * item.cumulativePercent) / 100));
-        return Math.max(maximum, amount);
-      }, 0);
-      // Previous deposit and situation documents may have charged this line already.
-      // Prior amounts must be deducted line by line, not spread again across all devis.
-      return Math.max(0, target - Math.max(previousTarget, previousAmounts.get(line.lineId) ?? 0));
+      const prepared = previousAmounts.get(line.lineId) ?? 0;
+      return Math.max(0, (target ?? line.amountHtCents) - prepared);
     });
     const allocated = distributeAmounts(matching, group.baseHtCents, weights);
     matching.forEach((source, index) => {
       const amount = allocated[index];
+      if (amount + (previousAmounts.get(source.lineId) ?? 0) > source.amountHtCents) {
+        throw new Error("BILLING_PROGRESS_LINE_EXCEEDS_CONTRACT");
+      }
       const quantity = source.quantity ?? 1;
       const roundedUnit = Math.round(amount / quantity);
       const exact =

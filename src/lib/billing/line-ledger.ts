@@ -5,6 +5,7 @@ import type {
   BillingDraft,
   BillingLineProgress,
   BillingPayload,
+  BillingSource,
   BillingSourceLine,
 } from "./domain";
 
@@ -41,18 +42,21 @@ export function allocatedDocumentAmounts(
 
 export function previousBillingLineAmounts(
   payload: BillingPayload,
-  draft: BillingDraft,
+  source: BillingSource,
+  beforeDraftId?: string,
 ): Map<string, number> {
-  const index = payload.drafts.findIndex((candidate) => candidate.id === draft.id);
+  const index = beforeDraftId
+    ? payload.drafts.findIndex((candidate) => candidate.id === beforeDraftId)
+    : -1;
   const history = payload.drafts
     .slice(0, index < 0 ? payload.drafts.length : index)
-    .filter((item) => belongsToBillingSource(item, draft));
+    .filter((item) => belongsToBillingSource(item, source));
   const totals = new Map<string, number>();
   for (const item of history) {
     if (!item.documentLines) {
       throw new Error("BILLING_PROGRESS_HISTORY_UNDETERMINED");
     }
-    const allocated = allocatedDocumentAmounts(item.documentLines, draft.lines ?? []);
+    const allocated = allocatedDocumentAmounts(item.documentLines, source.lines ?? []);
     for (const [id, amount] of allocated) {
       const next = (totals.get(id) ?? 0) + amount;
       if (!Number.isSafeInteger(next)) throw new Error("BILLING_DOCUMENT_AMOUNT_INVALID");
@@ -75,7 +79,7 @@ export function reconcileDocumentLineProgress(
 ): BillingLineProgress[] {
   const sources = draft.lines ?? [];
   if (!sources.length) throw new Error("BILLING_PROGRESS_LINES_UNAVAILABLE");
-  const prior = previousBillingLineAmounts(payload, draft);
+  const prior = previousBillingLineAmounts(payload, draft, draft.id);
   const current = allocatedDocumentAmounts(rows, sources);
   const priorPercentById = new Map<string, number>();
   const index = payload.drafts.findIndex((item) => item.id === draft.id);

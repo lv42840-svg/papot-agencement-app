@@ -667,7 +667,7 @@ export function updateBillingDocument(
     ? calculateLineProgress({ schemaVersion: 1, drafts: priorDrafts }, draft, input.linePercentages)
     : null;
   const currentProgress =
-    draft.type === "PROGRESS"
+    draft.type === "PROGRESS" && draft.lines?.length
       ? reconcileDocumentLineProgress(payload, draft, documentLines, recalculatedProgress?.lineProgress)
       : null;
   if (recalculatedProgress && draft.type !== "PROGRESS") {
