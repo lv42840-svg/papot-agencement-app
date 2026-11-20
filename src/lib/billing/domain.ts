@@ -7,6 +7,7 @@ import {
   reconcileDocumentLineProgress,
 } from "./line-ledger";
 import { z } from "zod";
+import { billingDraftRetentionSchema, rebaseBillingDraftRetention } from "./draft-retention";
 import { billingFinancialLedgerSchema } from "./financial-ledger";
 
 const centsSchema = z.number().int().nonnegative().safe();
@@ -114,6 +115,7 @@ export const billingDraftSchema = billingSourceSchema.extend({
   cumulativePercent: z.number().finite().min(0).max(100).nullable(),
   lineProgress: z.array(billingLineProgressSchema).max(1000).optional(),
   documentLines: z.array(billingDocumentLineSchema).max(1000).optional(),
+  retention: billingDraftRetentionSchema.optional(),
   createdAt: dateTimeSchema,
   createdByName: z.string().trim().min(1),
   updatedAt: dateTimeSchema,
@@ -605,6 +607,9 @@ export function updateBillingDraft(
     taxGroups: tax.groups,
     vatCents: tax.vatCents,
     totalTtcCents: tax.ttcCents,
+    ...(draft.retention
+      ? { retention: rebaseBillingDraftRetention(draft.retention, tax.ttcCents) }
+      : {}),
     // Editing the amount explicitly switches the draft away from a cumulative percentage.
     cumulativePercent: amountHtCents !== draft.amountHtCents ? null : draft.cumulativePercent,
     updatedAt: now.toISOString(),
@@ -753,6 +758,9 @@ export function updateBillingDocument(
     taxGroups: totals.taxGroups,
     vatCents: totals.vatCents,
     totalTtcCents: totals.totalTtcCents,
+    ...(draft.retention
+      ? { retention: rebaseBillingDraftRetention(draft.retention, totals.totalTtcCents) }
+      : {}),
     updatedAt: now.toISOString(),
     updatedByName: actorName,
   });
