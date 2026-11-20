@@ -308,9 +308,10 @@ export function BillingDocumentEditor({ draftId }: { draftId: string }) {
     }
   }, [preview, retentionMode, retentionValue]);
   const creditPreview = useMemo(
-    () => creditPosition
-      ? previewNativeCreditNote(creditPosition.allowances, creditMode, creditAmounts)
-      : null,
+    () =>
+      creditPosition
+        ? previewNativeCreditNote(creditPosition.allowances, creditMode, creditAmounts)
+        : null,
     [creditPosition, creditMode, creditAmounts],
   );
   const navigationRows = rows.map(

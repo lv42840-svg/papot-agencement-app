@@ -69,9 +69,8 @@ export function previewNativeCreditNote(
       return invalid("Un montant HT est invalide ou dépasse le reste créditable.");
     }
     if (amount === 0) continue;
-    const vat = amount === remainingHtCents
-      ? remainingVatCents
-      : Math.round((amount * ratePercent) / 100);
+    const vat =
+      amount === remainingHtCents ? remainingVatCents : Math.round((amount * ratePercent) / 100);
     if (!Number.isSafeInteger(vat) || vat > remainingVatCents) {
       return invalid("Le calcul de TVA dépasse le reste créditable.");
     }
