@@ -30,6 +30,7 @@ import {
   withdrawBillingVisa,
 } from "@/lib/billing/visa";
 import { billingVisaMethodSchema } from "@/lib/billing/domain";
+import { setBillingDraftRetention } from "@/lib/billing/draft-retention";
 import { vatRatePercentSchema } from "@/lib/vat";
 import { loadBillingSources } from "@/lib/billing/sources";
 
@@ -37,6 +38,15 @@ export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
 const billingMutationSchema = z.discriminatedUnion("action", [
+  z
+    .object({
+      action: z.literal("SET_DRAFT_RETENTION"),
+      draftId: z.string().uuid(),
+      expectedUpdatedAt: z.string().datetime({ offset: true }),
+      mode: z.enum(["PERCENT", "AMOUNT"]),
+      value: z.number().finite().nonnegative(),
+    })
+    .strict(),
   z
     .object({
       action: z.literal("SET_VISA_REQUIREMENT"),
@@ -231,6 +241,8 @@ function statusFor(code: string): number {
     code === "BILLING_CONTRACT_ALREADY_PREPARED" ||
     code === "BILLING_PROGRESS_CANNOT_DECREASE" ||
     code === "BILLING_PROGRESS_TAX_ALLOCATION_UNAVAILABLE" ||
+    code === "BILLING_RETENTION_AFTER_VISA" ||
+    code === "BILLING_RETENTION_EXCEEDS_TTC" ||
     code === "BILLING_DRAFT_HAS_DEPENDENTS" ||
     code === "BILLING_DOCUMENT_EDIT_REQUIRED" ||
     code === "BILLING_DRAFT_LOCKED" ||
@@ -300,6 +312,9 @@ export async function POST(request: Request) {
       const drafts = [...current.drafts];
       if (input.action === "SET_TITLES") {
         return { ...current, invoiceTitles: input.invoiceTitles };
+      }
+      if (input.action === "SET_DRAFT_RETENTION") {
+        return setBillingDraftRetention(current, input, context.user.displayName);
       }
       if (input.action === "SET_VISA_REQUIREMENT") {
         if (!chantiers?.chantiers.some((site) => site.id === input.chantierId)) {
