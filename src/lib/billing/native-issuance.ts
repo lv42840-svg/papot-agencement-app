@@ -4,10 +4,13 @@ import type { BillingDraft, BillingPayload } from "./domain";
 import { clientDisplayName, type ClientRecord } from "../clients/domain";
 import type { CompanyProfile } from "../company-profile/domain";
 
-const dateSchema = z.string().regex(/^\d{4}-\d{2}-\d{2}$/).refine((text) => {
-  const date = new Date(text + "T00:00:00Z");
-  return !Number.isNaN(date.valueOf()) && date.toISOString().slice(0, 10) === text;
-}, "BILLING_NATIVE_DATE_INVALID");
+const dateSchema = z
+  .string()
+  .regex(/^\d{4}-\d{2}-\d{2}$/)
+  .refine((text) => {
+    const date = new Date(text + "T00:00:00Z");
+    return !Number.isNaN(date.valueOf()) && date.toISOString().slice(0, 10) === text;
+  }, "BILLING_NATIVE_DATE_INVALID");
 const cents = z.number().int().nonnegative().safe();
 const taxGroup = z.object({
   ratePercent: z.number().finite().min(0).max(100),
@@ -114,23 +117,40 @@ export type IssueNativeInvoiceInput = z.infer<typeof issueNativeInvoiceInputSche
 
 function parisDate(now: Date): string {
   const parts = Object.fromEntries(
-    new Intl.DateTimeFormat("en-GB", { timeZone: "Europe/Paris", year: "numeric", month: "2-digit", day: "2-digit" })
-      .formatToParts(now).map((part) => [part.type, part.value]),
+    new Intl.DateTimeFormat("en-GB", {
+      timeZone: "Europe/Paris",
+      year: "numeric",
+      month: "2-digit",
+      day: "2-digit",
+    })
+      .formatToParts(now)
+      .map((part) => [part.type, part.value]),
   );
   return [parts.year, parts.month, parts.day].join("-");
 }
 
 function assertProfiles(profile: CompanyProfile, client: ClientRecord): void {
-  if (!profile.name.trim() || !profile.legalForm.trim() || !profile.addressLine1.trim() ||
-    !profile.postalCode.trim() || !profile.city.trim() ||
+  if (
+    !profile.name.trim() ||
+    !profile.legalForm.trim() ||
+    !profile.addressLine1.trim() ||
+    !profile.postalCode.trim() ||
+    !profile.city.trim() ||
     !/^\d{14}$/.test(profile.siret.replace(/\s/g, "")) ||
-    !profile.vatNumber.trim() || !profile.rcs.trim()) {
+    !profile.vatNumber.trim() ||
+    !profile.rcs.trim()
+  ) {
     throw new Error("BILLING_NATIVE_SELLER_PROFILE_INCOMPLETE");
   }
-  if (client.isArchived || !clientDisplayName(client).trim() || !client.addressLine1.trim() ||
-    !client.postalCode.trim() || !client.city.trim() ||
+  if (
+    client.isArchived ||
+    !clientDisplayName(client).trim() ||
+    !client.addressLine1.trim() ||
+    !client.postalCode.trim() ||
+    !client.city.trim() ||
     (client.type !== "PARTICULIER" && !/^\d{14}$/.test(client.siret)) ||
-    !client.paymentTerms.trim()) {
+    !client.paymentTerms.trim()
+  ) {
     throw new Error("BILLING_NATIVE_BUYER_PROFILE_INCOMPLETE");
   }
 }
@@ -181,11 +201,15 @@ export function issueNativeInvoice(
     totals.vatCents !== draft.vatCents ||
     totals.totalTtcCents !== draft.totalTtcCents ||
     totals.taxGroups.length !== draft.taxGroups.length ||
-    totals.taxGroups.some((t) => !draft.taxGroups.some((g) =>
-      g.ratePercent === t.ratePercent &&
-      g.baseHtCents === t.baseHtCents &&
-      g.vatCents === t.vatCents
-    ))
+    totals.taxGroups.some(
+      (t) =>
+        !draft.taxGroups.some(
+          (g) =>
+            g.ratePercent === t.ratePercent &&
+            g.baseHtCents === t.baseHtCents &&
+            g.vatCents === t.vatCents,
+        ),
+    )
   ) {
     throw new Error("BILLING_APPROVAL_TOTALS_MISMATCH");
   }
@@ -216,24 +240,41 @@ export function issueNativeInvoice(
     latePenaltyRatePercent: input.latePenaltyRatePercent,
     collectionFeeCents: client.type === "PARTICULIER" ? 0 : 4000,
     seller: {
-      name: profile.name, legalForm: profile.legalForm, address: profile.addressLine1,
-      postalCode: profile.postalCode, city: profile.city,
-      siret: profile.siret.replace(/\s/g, ""), rcs: profile.rcs, capital: profile.capital,
-      vatNumber: profile.vatNumber, iban: profile.iban, bic: profile.bic,
-      insurerName: profile.insurerName, insurerAddress: profile.insurerAddress,
+      name: profile.name,
+      legalForm: profile.legalForm,
+      address: profile.addressLine1,
+      postalCode: profile.postalCode,
+      city: profile.city,
+      siret: profile.siret.replace(/\s/g, ""),
+      rcs: profile.rcs,
+      capital: profile.capital,
+      vatNumber: profile.vatNumber,
+      iban: profile.iban,
+      bic: profile.bic,
+      insurerName: profile.insurerName,
+      insurerAddress: profile.insurerAddress,
       insuranceCoverage: profile.insuranceCoverage,
     },
     buyer: {
-      name: clientDisplayName(client), address: client.addressLine1,
-      addressLine2: client.addressLine2, postalCode: client.postalCode, city: client.city,
-      siret: client.siret, vatNumber: client.vatNumber, type: client.type,
+      name: clientDisplayName(client),
+      address: client.addressLine1,
+      addressLine2: client.addressLine2,
+      postalCode: client.postalCode,
+      city: client.city,
+      siret: client.siret,
+      vatNumber: client.vatNumber,
+      type: client.type,
     },
     type: draft.type,
-    label: draft.label, affairName: draft.affairName, quoteLabel: draft.quoteLabel,
-    notes: draft.notes, paymentTerms: client.paymentTerms,
+    label: draft.label,
+    affairName: draft.affairName,
+    quoteLabel: draft.quoteLabel,
+    notes: draft.notes,
+    paymentTerms: client.paymentTerms,
     documentLines: draft.documentLines.map((line) => ({ ...line })),
     taxGroups: draft.taxGroups.map((t) => ({ ...t })),
-    amountHtCents: draft.amountHtCents, vatCents: draft.vatCents,
+    amountHtCents: draft.amountHtCents,
+    vatCents: draft.vatCents,
     totalTtcCents: draft.totalTtcCents,
     retentionTtcCents: draft.retention?.amountTtcCents ?? 0,
     priorDepositNumbers: state.invoices

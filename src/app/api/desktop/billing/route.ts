@@ -271,11 +271,15 @@ export async function GET() {
     return noStoreJson({
       payload: publicBillingPayload(payload),
       issuedInvoices: (payload.nativeInvoiceLedger?.invoices ?? []).map((invoice) => ({
-        id: invoice.id, draftId: invoice.draftId, number: invoice.number, issuedAt: invoice.issuedAt,
+        id: invoice.id,
+        draftId: invoice.draftId,
+        number: invoice.number,
+        issuedAt: invoice.issuedAt,
       })),
-      canIssue: context.moduleAccess.canWrite &&
+      canIssue:
+        context.moduleAccess.canWrite &&
         process.env.PAPOT_NATIVE_BILLING_ISSUANCE_ENABLED === "true" &&
-        await hasSpecialPermission(context.user.id, "billing.issue_invoices"),
+        (await hasSpecialPermission(context.user.id, "billing.issue_invoices")),
       sources,
       chantiers: chantiers.chantiers.map((chantier) => ({
         id: chantier.id,

@@ -17,10 +17,7 @@ describe("émission native PAPOT protégée, sans Pennylane sortant", () => {
   });
 
   it("la facture définitive se télécharge depuis le registre figé et non depuis le brouillon", () => {
-    const pdf = readFileSync(
-      "src/app/api/desktop/billing/issued/[invoiceId]/pdf/route.ts",
-      "utf8",
-    );
+    const pdf = readFileSync("src/app/api/desktop/billing/issued/[invoiceId]/pdf/route.ts", "utf8");
     const editor = readFileSync("src/components/billing-document-editor.tsx", "utf8");
     const billing = readFileSync("src/app/api/desktop/billing/route.ts", "utf8");
     expect(pdf).toContain("nativeInvoiceLedger?.invoices.find");

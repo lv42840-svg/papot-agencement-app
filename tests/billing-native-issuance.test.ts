@@ -100,7 +100,12 @@ describe("numérotation légale PAPOT sans liaison d'émission Pennylane", () =>
     const original = { ...empty(), drafts: [draft] };
     const input = prepare(draft.id, draft.updatedAt);
     const issued = issueNativeInvoice(
-      original, input, company, client, "Lucien", new Date("2026-11-20T10:00:00Z"),
+      original,
+      input,
+      company,
+      client,
+      "Lucien",
+      new Date("2026-11-20T10:00:00Z"),
     );
     expect(issued.nativeInvoiceLedger?.lastOrdinal).toBe(1);
     const record = issued.nativeInvoiceLedger!.invoices[0];
@@ -122,19 +127,33 @@ describe("numérotation légale PAPOT sans liaison d'émission Pennylane", () =>
     const draft = makeDraft();
     const input = prepare(draft.id, draft.updatedAt);
     const one = issueNativeInvoice(
-      { ...empty(), drafts: [draft] }, input, company, client, "Nadia",
+      { ...empty(), drafts: [draft] },
+      input,
+      company,
+      client,
+      "Nadia",
       new Date("2026-11-20T10:00:00Z"),
     );
     const replay = issueNativeInvoice(
-      one, input, company, client, "Nadia", new Date("2026-11-20T10:00:05Z"),
+      one,
+      input,
+      company,
+      client,
+      "Nadia",
+      new Date("2026-11-20T10:00:05Z"),
     );
     expect(replay).toBe(one);
     expect(replay.nativeInvoiceLedger?.invoices).toHaveLength(1);
-    expect(() => issueNativeInvoice(
-      one,
-      { ...input, requestId: crypto.randomUUID() },
-      company, client, "Lucien", new Date("2026-11-20T10:00:10Z"),
-    )).toThrow("BILLING_NATIVE_ALREADY_ISSUED");
+    expect(() =>
+      issueNativeInvoice(
+        one,
+        { ...input, requestId: crypto.randomUUID() },
+        company,
+        client,
+        "Lucien",
+        new Date("2026-11-20T10:00:10Z"),
+      ),
+    ).toThrow("BILLING_NATIVE_ALREADY_ISSUED");
   });
 
   it("conserve une suite croissante entre deux années, sans réinitialisation", () => {
@@ -146,12 +165,20 @@ describe("numérotation légale PAPOT sans liaison d'émission Pennylane", () =>
     });
     const p = { ...empty(), drafts: [a, b] };
     const first = issueNativeInvoice(
-      p, { ...prepare(a.id, a.updatedAt), dueOn: "2027-01-30" }, company, client, "Nadia",
+      p,
+      { ...prepare(a.id, a.updatedAt), dueOn: "2027-01-30" },
+      company,
+      client,
+      "Nadia",
       new Date("2026-12-31T12:00:00Z"),
     );
     const second = issueNativeInvoice(
-      first, { ...prepare(b.id, b.updatedAt), serviceOn: "2026-12-31", dueOn: "2027-02-01" },
-      company, client, "Nadia", new Date("2027-01-01T12:00:00Z"),
+      first,
+      { ...prepare(b.id, b.updatedAt), serviceOn: "2026-12-31", dueOn: "2027-02-01" },
+      company,
+      client,
+      "Nadia",
+      new Date("2027-01-01T12:00:00Z"),
     );
     expect(second.nativeInvoiceLedger?.invoices.map((item) => item.number)).toEqual([
       "PA-2026-000001",
@@ -163,21 +190,36 @@ describe("numérotation légale PAPOT sans liaison d'émission Pennylane", () =>
   it("bloque brouillon non approuvé, identité vendeur incomplète et antédate", () => {
     const approved = makeDraft();
     const input = prepare(approved.id, approved.updatedAt);
-    expect(() => issueNativeInvoice(
-      { ...empty(), drafts: [{ ...approved, status: "DRAFT" }] },
-      input, company, client, "Lucien", new Date("2026-11-20T10:00:00Z"),
-    )).toThrow("BILLING_NATIVE_APPROVAL_REQUIRED");
-    expect(() => issueNativeInvoice(
-      { ...empty(), drafts: [approved] }, input,
-      { ...company, siret: "" }, client, "Lucien",
-      new Date("2026-11-20T10:00:00Z"),
-    )).toThrow("BILLING_NATIVE_SELLER_PROFILE_INCOMPLETE");
-    expect(() => issueNativeInvoice(
-      { ...empty(), drafts: [approved] },
-      { ...input, serviceOn: "2026-11-25" },
-      company, client, "Lucien",
-      new Date("2026-11-20T10:00:00Z"),
-    )).toThrow("BILLING_NATIVE_DATES_INVALID");
+    expect(() =>
+      issueNativeInvoice(
+        { ...empty(), drafts: [{ ...approved, status: "DRAFT" }] },
+        input,
+        company,
+        client,
+        "Lucien",
+        new Date("2026-11-20T10:00:00Z"),
+      ),
+    ).toThrow("BILLING_NATIVE_APPROVAL_REQUIRED");
+    expect(() =>
+      issueNativeInvoice(
+        { ...empty(), drafts: [approved] },
+        input,
+        { ...company, siret: "" },
+        client,
+        "Lucien",
+        new Date("2026-11-20T10:00:00Z"),
+      ),
+    ).toThrow("BILLING_NATIVE_SELLER_PROFILE_INCOMPLETE");
+    expect(() =>
+      issueNativeInvoice(
+        { ...empty(), drafts: [approved] },
+        { ...input, serviceOn: "2026-11-25" },
+        company,
+        client,
+        "Lucien",
+        new Date("2026-11-20T10:00:00Z"),
+      ),
+    ).toThrow("BILLING_NATIVE_DATES_INVALID");
   });
 
   it("garde les compteurs vides avant la première émission", () => {
