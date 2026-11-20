@@ -129,6 +129,17 @@ describe("registre de facturation confirmée, séparé des projets", () => {
         approved,
       ),
     ).toThrow("BILLING_FINANCIAL_SOURCE_NOT_APPROVED");
+    const explicitlyRetained = {
+      ...approved,
+      retention: { mode: "PERCENT" as const, ratePercent: 5, amountTtcCents: 6_000 },
+    };
+    expect(() =>
+      registerConfirmedInvoice(
+        emptyBillingFinancialLedger(),
+        { ...proposed, retentionTtcCents: 3_000 },
+        explicitlyRetained,
+      ),
+    ).toThrow("BILLING_FINANCIAL_SOURCE_NOT_APPROVED");
   });
 
   it("déduit les avoirs confirmés par taux de TVA et refuse le sur-crédit", () => {
