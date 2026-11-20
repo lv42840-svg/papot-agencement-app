@@ -1356,6 +1356,129 @@ export function BillingDocumentEditor({ draftId }: { draftId: string }) {
           )}
         </section>
       )}
+      {issued && (
+        <section className="invoiceCard">
+          <h2>Avoirs officiels liés à {issued.number}</h2>
+          <p className="invoiceHint">
+            Les avoirs possèdent leur propre numérotation. La facture d&apos;origine
+            est conservée sans modification. Aucun remboursement ou envoi à
+            Pennylane n&apos;est déclenché par cette opération.
+          </p>
+          {creditPosition && (
+            <div className="invoiceTotals">
+              <div>
+                <span>Facture d&apos;origine TTC</span>
+                <strong>{currency(creditPosition.originalTtcCents)}</strong>
+              </div>
+              <div>
+                <span>Avoirs déjà émis TTC</span>
+                <strong>{currency(creditPosition.creditedTtcCents)}</strong>
+              </div>
+              <div>
+                <span>Reste TTC après avoirs</span>
+                <strong>{currency(creditPosition.remainingTtcCents)}</strong>
+              </div>
+            </div>
+          )}
+          {issuedCredits.length > 0 && (
+            <div>
+              <h3>Avoirs émis</h3>
+              {issuedCredits.map((credit) => (
+                <p key={credit.id}>
+                  <strong>{credit.number}</strong> · {currency(credit.totalTtcCents)} ·
+                  {credit.reason} ·{" "}
+                  <a
+                    href={`/api/desktop/billing/credits/issued/${credit.id}/pdf`}
+                  >
+                    Télécharger l&apos;avoir PDF
+                  </a>
+                </p>
+              ))}
+            </div>
+          )}
+          {creditPosition && creditPosition.remainingTtcCents > 0 && (
+            <>
+              <h3>Préparer un nouvel avoir</h3>
+              <div className="invoiceMeta">
+                <label>
+                  Type d&apos;avoir
+                  <select
+                    value={creditMode}
+                    disabled={busy || !canIssueCredits}
+                    onChange={(event) => {
+                      setCreditMode(event.target.value as "FULL" | "PARTIAL");
+                      setCreditRequestId(null);
+                    }}
+                  >
+                    <option value="FULL">Total du solde restant</option>
+                    <option value="PARTIAL">Partiel par taux de TVA</option>
+                  </select>
+                </label>
+                <label>
+                  Motif obligatoire
+                  <textarea
+                    rows={2}
+                    maxLength={2000}
+                    value={creditReason}
+                    disabled={busy || !canIssueCredits}
+                    onChange={(event) => {
+                      setCreditReason(event.target.value);
+                      setCreditRequestId(null);
+                    }}
+                    placeholder="Ex. correction d'une prestation facturée"
+                  />
+                </label>
+              </div>
+              <div>
+                {creditPosition.allowances
+                  .filter((allowance) => allowance.remainingHtCents > 0)
+                  .map((allowance) => (
+                    <label key={allowance.ratePercent} className="invoiceCreditRate">
+                      TVA {allowance.ratePercent} % · HT encore créditable :{" "}
+                      {currency(allowance.remainingHtCents)}
+                      {creditMode === "PARTIAL" && (
+                        <input
+                          type="text"
+                          inputMode="decimal"
+                          value={creditAmounts[String(allowance.ratePercent)] ?? ""}
+                          disabled={busy || !canIssueCredits}
+                          onChange={(event) => {
+                            setCreditAmounts((old) => ({
+                              ...old,
+                              [String(allowance.ratePercent)]: event.target.value,
+                            }));
+                            setCreditRequestId(null);
+                          }}
+                          aria-label={`Montant HT avoir TVA ${allowance.ratePercent} %`}
+                          placeholder="Montant HT à créditer (€)"
+                        />
+                      )}
+                    </label>
+                  ))}
+              </div>
+              <button
+                type="button"
+                className="primaryButton"
+                disabled={
+                  busy ||
+                  !canIssueCredits ||
+                  creditReason.trim().length < 3 ||
+                  creditPosition.remainingTtcCents <= 0
+                }
+                onClick={() => void issueCredit()}
+              >
+                Émettre l&apos;avoir officiel et attribuer son numéro
+              </button>
+              {!canIssueCredits && (
+                <p className="invoiceHint">
+                  Émission d&apos;avoir désactivée tant que la recette et
+                  l&apos;autorisation spécifique ne sont pas validées.
+                </p>
+              )}
+            </>
+          )}
+        </section>
+      )}
       <section className="invoiceCard invoiceSummary">
         <h2>Synthèse du projet</h2>
         <div className="invoiceTotals">
