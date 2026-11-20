@@ -10,6 +10,7 @@ import { z } from "zod";
 import { billingDraftRetentionSchema, rebaseBillingDraftRetention } from "./draft-retention";
 import { billingFinancialLedgerSchema } from "./financial-ledger";
 import { nativeInvoiceLedgerSchema } from "./native-issuance";
+import { nativeCreditNoteLedgerSchema } from "./native-credit-notes";
 
 const centsSchema = z.number().int().nonnegative().safe();
 const dateTimeSchema = z.string().datetime({ offset: true });
@@ -338,6 +339,7 @@ export const billingPayloadSchema = z.object({
   invoiceTitles: billingTitlesSchema.optional(),
   financialLedger: billingFinancialLedgerSchema.optional(),
   nativeInvoiceLedger: nativeInvoiceLedgerSchema.optional(),
+  nativeCreditNoteLedger: nativeCreditNoteLedgerSchema.optional(),
 });
 export type BillingPayload = z.infer<typeof billingPayloadSchema>;
 
