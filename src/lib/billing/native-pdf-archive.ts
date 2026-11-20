@@ -3,7 +3,8 @@ import "server-only";
 import { createHash } from "node:crypto";
 import { getLocalDatabase, isLocalStorageMode } from "@/lib/local-db/runtime";
 import { getServerDbPool, withServerDbTransaction } from "@/lib/server-db";
-import type { NativeIssuedInvoice } from "./native-issuance";
+/** All legal document series share one immutable archive. */
+export type NativeArchivedDocument = { id: string; number: string; issuedAt: string };
 
 type NativeArchiveRow = {
   invoice_id: string;
@@ -35,7 +36,7 @@ function assertPdf(bytes: Uint8Array): void {
   }
 }
 
-function inspectArchive(row: NativeArchiveRow, invoice: NativeIssuedInvoice): NativePdfArchive {
+function inspectArchive(row: NativeArchiveRow, invoice: NativeArchivedDocument): NativePdfArchive {
   if (row.invoice_id !== invoice.id || row.invoice_number !== invoice.number) {
     throw new Error("BILLING_NATIVE_ARCHIVE_CONFLICT");
   }
@@ -57,7 +58,7 @@ function inspectArchive(row: NativeArchiveRow, invoice: NativeIssuedInvoice): Na
  * PDF are persisted by the SAME SQLite/PG transaction. No overwrite is allowed.
  */
 export async function storeOriginalNativeInvoicePdf(
-  invoice: NativeIssuedInvoice,
+  invoice: NativeArchivedDocument,
   pdf: Uint8Array,
 ): Promise<NativePdfArchive> {
   assertPdf(pdf);
@@ -112,7 +113,7 @@ export async function storeOriginalNativeInvoicePdf(
 
 /** Historical records without an original archive must fail closed. Never regenerate as original. */
 export async function loadOriginalNativeInvoicePdf(
-  invoice: NativeIssuedInvoice,
+  invoice: NativeArchivedDocument,
 ): Promise<NativePdfArchive> {
   if (isLocalStorageMode()) {
     const row = getLocalDatabase()
