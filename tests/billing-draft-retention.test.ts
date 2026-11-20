@@ -132,12 +132,7 @@ describe("retenue de garantie sur projet non émis", () => {
         "Lucien",
       ),
     ).toThrow("BILLING_VERSION_CONFLICT");
-    const approved = approveBillingDraft(
-      changed,
-      draft.id,
-      changed.drafts[0].updatedAt,
-      "Lucien",
-    );
+    const approved = approveBillingDraft(changed, draft.id, changed.drafts[0].updatedAt, "Lucien");
     expect(() =>
       setBillingDraftRetention(
         { ...changed, drafts: [approved] },

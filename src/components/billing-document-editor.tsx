@@ -76,8 +76,10 @@ const labels: Record<BillingDraft["type"], string> = {
 };
 const serverErrors: Record<string, string> = {
   BILLING_DRAFT_LOCKED: "Ce document est validé en interne et verrouillé.",
-  BILLING_RETENTION_EXCEEDS_TTC: "La retenue en euros dépasse le TTC recalculé. Réduis son montant avant de poursuivre.",
-  BILLING_RETENTION_PERCENT_INVALID: "Le pourcentage de retenue doit être compris entre 0 et 100 avec au plus deux décimales.",
+  BILLING_RETENTION_EXCEEDS_TTC:
+    "La retenue en euros dépasse le TTC recalculé. Réduis son montant avant de poursuivre.",
+  BILLING_RETENTION_PERCENT_INVALID:
+    "Le pourcentage de retenue doit être compris entre 0 et 100 avec au plus deux décimales.",
   BILLING_APPROVAL_TOTALS_MISMATCH:
     "Les totaux ne correspondent pas. Corrige puis enregistre avant validation.",
   BILLING_PROGRESS_DOCUMENT_MISMATCH:
@@ -462,9 +464,10 @@ export function BillingDocumentEditor({ draftId }: { draftId: string }) {
           draftId: draft.id,
           expectedUpdatedAt: draft.updatedAt,
           mode: retentionMode,
-          value: retentionMode === "AMOUNT"
-            ? retentionPreview.amountTtcCents
-            : retentionPreview.ratePercent,
+          value:
+            retentionMode === "AMOUNT"
+              ? retentionPreview.amountTtcCents
+              : retentionPreview.ratePercent,
         }),
       });
       const result = (await response.json()) as ApiSnapshot;
@@ -975,9 +978,9 @@ export function BillingDocumentEditor({ draftId }: { draftId: string }) {
       <section className="invoiceCard">
         <h2>Retenue de garantie du projet</h2>
         <p className="invoiceHint">
-          Cette retenue ne change pas le HT, la TVA ou le TTC du projet. Elle distingue
-          uniquement la part hors retenue de celle conservée en garantie.
-          Aucun règlement réel n&apos;est créé ici.
+          Cette retenue ne change pas le HT, la TVA ou le TTC du projet. Elle distingue uniquement
+          la part hors retenue de celle conservée en garantie. Aucun règlement réel n&apos;est créé
+          ici.
         </p>
         <div className="invoiceMeta">
           <label>
