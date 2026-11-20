@@ -28,6 +28,8 @@ jobs:
       - run: npm ci
       - run: |
           npx prettier --write \
+            src/lib/billing/native-issuance.ts \
+            tests/billing-native-issuance.test.ts \
             src/lib/billing/native-pdf-archive.ts \
             src/lib/server-db/migrations.ts \
             src/lib/local-db/runtime.ts \
@@ -41,7 +43,7 @@ jobs:
           if ! git diff --quiet; then
             git config user.name "github-actions[bot]"
             git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-            git add src/lib/billing/native-pdf-archive.ts src/lib/server-db/migrations.ts src/lib/local-db/runtime.ts src/app/api/desktop/billing/issue/route.ts 'src/app/api/desktop/billing/issued/[invoiceId]/pdf/route.ts' tests/billing-native-pdf-archive.test.ts tests/billing-native-issuance-ui.test.ts docs/backup-restore.md
+            git add src/lib/billing/native-issuance.ts tests/billing-native-issuance.test.ts src/lib/billing/native-pdf-archive.ts src/lib/server-db/migrations.ts src/lib/local-db/runtime.ts src/app/api/desktop/billing/issue/route.ts 'src/app/api/desktop/billing/issued/[invoiceId]/pdf/route.ts' tests/billing-native-pdf-archive.test.ts tests/billing-native-issuance-ui.test.ts docs/backup-restore.md
             git commit -m "style(billing): format native invoice PDF archive and integrity tests"
             git push
           fi
