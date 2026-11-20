@@ -103,6 +103,35 @@ export function emptyNativeInvoiceLedger(): NativeInvoiceLedger {
   return { lastOrdinal: 0, invoices: [] };
 }
 
+/** Fail closed if a restored or manually modified ledger contains a number gap. */
+export function assertNativeInvoiceSequence(state: NativeInvoiceLedger): void {
+  if (state.lastOrdinal !== state.invoices.length) {
+    throw new Error("BILLING_NATIVE_SEQUENCE_CORRUPT");
+  }
+  const requestIds = new Set<string>();
+  const draftIds = new Set<string>();
+  const invoiceIds = new Set<string>();
+  let previousDate = "";
+  state.invoices.forEach((invoice, index) => {
+    const ordinal = index + 1;
+    const number = ["PA", invoice.issuedOn.slice(0, 4), String(ordinal).padStart(6, "0")].join("-");
+    if (
+      invoice.ordinal !== ordinal ||
+      invoice.number !== number ||
+      (previousDate && invoice.issuedAt < previousDate) ||
+      requestIds.has(invoice.requestId) ||
+      draftIds.has(invoice.draftId) ||
+      invoiceIds.has(invoice.id)
+    ) {
+      throw new Error("BILLING_NATIVE_SEQUENCE_CORRUPT");
+    }
+    requestIds.add(invoice.requestId);
+    draftIds.add(invoice.draftId);
+    invoiceIds.add(invoice.id);
+    previousDate = invoice.issuedAt;
+  });
+}
+
 export const issueNativeInvoiceInputSchema = z.object({
   requestId: z.string().uuid(),
   draftId: z.string().uuid(),
@@ -170,6 +199,7 @@ export function issueNativeInvoice(
 ): BillingPayload {
   const input = issueNativeInvoiceInputSchema.parse(rawInput);
   const state = payload.nativeInvoiceLedger ?? emptyNativeInvoiceLedger();
+  assertNativeInvoiceSequence(state);
   const replay = state.invoices.find((item) => item.requestId === input.requestId);
   if (replay) {
     if (replay.draftId !== input.draftId) throw new Error("BILLING_NATIVE_REQUEST_REUSED");
