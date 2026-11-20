@@ -258,6 +258,12 @@ export const billingVisaVersionSchema = z
           ) {
             invalid("BILLING_VISA_LINE_AMOUNT_INVALID");
           }
+          if (
+            decision.acceptedHtCents < originalHt &&
+            !decision.reason.trim()
+          ) {
+            invalid("BILLING_VISA_LINE_REASON_REQUIRED");
+          }
           acceptedSum += decision.acceptedHtCents;
         }
         if (

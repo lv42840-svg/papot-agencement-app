@@ -23,6 +23,7 @@ import { buildChantierMarketSources } from "@/lib/billing/market-sources";
 import { addBillingExtra, confirmBillingExtra } from "@/lib/billing/extras";
 import {
   presentBillingVisa,
+  applyBillingVisaPartial,
   recordBillingVisaDecision,
   setBillingVisaRequirement,
   withdrawBillingVisa,
@@ -58,10 +59,28 @@ const billingMutationSchema = z.discriminatedUnion("action", [
       version: z.number().int().positive(),
       decision: z.enum(["ACCEPTED", "PARTIAL", "REFUSED"]),
       acceptedHtCents: z.number().int().positive().safe().optional(),
+      lineDecisions: z
+        .array(
+          z.object({
+            documentLineId: z.string().uuid(),
+            acceptedHtCents: z.number().int().nonnegative().safe(),
+            reason: z.string().trim().max(1000),
+          }).strict(),
+        )
+        .max(1000)
+        .optional(),
       reviewMethod: billingVisaMethodSchema,
       externalContact: z.string().trim().min(1).max(240),
       evidence: z.string().trim().min(1).max(2000),
       reason: z.string().trim().min(1).max(2000),
+    })
+    .strict(),
+  z
+    .object({
+      action: z.literal("APPLY_VISA_PARTIAL"),
+      draftId: z.string().uuid(),
+      version: z.number().int().positive(),
+      expectedUpdatedAt: z.string().datetime({ offset: true }),
     })
     .strict(),
   z
@@ -295,6 +314,9 @@ export async function POST(request: Request) {
       }
       if (input.action === "WITHDRAW_VISA") {
         return withdrawBillingVisa(current, input, context.user.displayName);
+      }
+      if (input.action === "APPLY_VISA_PARTIAL") {
+        return applyBillingVisaPartial(current, input, context.user.displayName);
       }
       if (input.action === "ADD_EXTRA") {
         const sources = buildChantierMarketSources(

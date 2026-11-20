@@ -3,6 +3,7 @@
 import { useState } from "react";
 import type { BillingDraft, BillingPayload, BillingVisaMethod } from "@/lib/billing/domain";
 import { latestBillingVisa, visaRequiredForChantier } from "@/lib/billing/visa-policy";
+import { lineHtCents } from "@/lib/billing/document-lines";
 
 const money = (cents: number) =>
   (cents / 100).toLocaleString("fr-FR", { style: "currency", currency: "EUR" });
@@ -50,7 +51,11 @@ export function BillingVisaPanel({
   const [recipient, setRecipient] = useState("");
   const [presentationNotes, setPresentationNotes] = useState("");
   const [decision, setDecision] = useState<"ACCEPTED" | "PARTIAL" | "REFUSED">("ACCEPTED");
-  const [acceptedAmount, setAcceptedAmount] = useState("");
+  const [lineStatuses, setLineStatuses] = useState<
+    Record<string, "ACCEPTED" | "PARTIAL" | "REFUSED">
+  >({});
+  const [lineAmounts, setLineAmounts] = useState<Record<string, string>>({});
+  const [lineReasons, setLineReasons] = useState<Record<string, string>>({});
   const [method, setMethod] = useState<BillingVisaMethod>("EMAIL");
   const [contact, setContact] = useState("");
   const [evidence, setEvidence] = useState("");
@@ -108,14 +113,44 @@ export function BillingVisaPanel({
       setError("Renseigne l'interlocuteur, le justificatif et le motif de la décision.");
       return;
     }
-    const partialHtCents = decision === "PARTIAL" ? parseMoney(acceptedAmount) : undefined;
+    const billable = latest.documentLines.filter((line) => line.origin !== "TITLE");
+    const lineDecisions =
+      decision === "PARTIAL"
+        ? billable.map((line) => {
+            const status = lineStatuses[line.id] ?? "ACCEPTED";
+            const acceptedHtCents =
+              status === "ACCEPTED"
+                ? lineHtCents(line)
+                : status === "REFUSED"
+                  ? 0
+                  : parseMoney(lineAmounts[line.id] ?? "");
+            return {
+              documentLineId: line.id,
+              acceptedHtCents,
+              reason: status === "ACCEPTED" ? "" : (lineReasons[line.id] ?? "").trim(),
+            };
+          })
+        : undefined;
+    const partialHtCents = lineDecisions?.reduce(
+      (total, item) => total + item.acceptedHtCents,
+      0,
+    );
     if (
       decision === "PARTIAL" &&
-      (!Number.isSafeInteger(partialHtCents) ||
+      (!lineDecisions?.length ||
+        lineDecisions.some(
+          (row) =>
+            !Number.isSafeInteger(row.acceptedHtCents) ||
+            row.acceptedHtCents < 0 ||
+            (row.acceptedHtCents <
+              lineHtCents(billable.find((line) => line.id === row.documentLineId)!) &&
+              !row.reason),
+        ) ||
+        !Number.isSafeInteger(partialHtCents) ||
         partialHtCents! <= 0 ||
         partialHtCents! >= latest.amountHtCents)
     ) {
-      setError("Le montant accepté doit être supérieur à zéro et inférieur au montant présenté.");
+      setError("Renseigne pour chaque ligne son montant accepté et le motif de tout refus ou réduction. Le total doit être partiel.");
       return;
     }
     void mutate(
@@ -125,6 +160,7 @@ export function BillingVisaPanel({
         version: latest.version,
         decision,
         ...(partialHtCents !== undefined ? { acceptedHtCents: partialHtCents } : {}),
+        ...(lineDecisions ? { lineDecisions } : {}),
         reviewMethod: method,
         externalContact: contact.trim(),
         evidence: evidence.trim(),
@@ -230,15 +266,86 @@ export function BillingVisaPanel({
             </select>
           </label>
           {decision === "PARTIAL" && (
-            <label>
-              Montant HT accepté (sur {money(latest.amountHtCents)} HT)
-              <input
-                value={acceptedAmount}
-                inputMode="decimal"
-                placeholder="Ex. 32000,00"
-                onChange={(event) => setAcceptedAmount(event.target.value)}
-              />
-            </label>
+            <div style={{ display: "grid", gap: 8 }}>
+              <p>
+                Décide ouvrage par ouvrage. Les lignes rejetées ou diminuées doivent avoir un
+                motif. Seules les sommes acceptées seront reprises dans la révision du projet.
+              </p>
+              <div style={{ overflowX: "auto" }}>
+                <table style={{ borderCollapse: "collapse", width: "100%", minWidth: 620 }}>
+                  <thead>
+                    <tr>
+                      <th style={{ textAlign: "left", padding: 8 }}>Prestation</th>
+                      <th style={{ textAlign: "right", padding: 8 }}>Présenté HT</th>
+                      <th style={{ textAlign: "left", padding: 8 }}>Visa</th>
+                      <th style={{ textAlign: "left", padding: 8 }}>Accepté HT / motif</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {latest.documentLines
+                      .filter((line) => line.origin !== "TITLE")
+                      .map((line) => {
+                        const status = lineStatuses[line.id] ?? "ACCEPTED";
+                        return (
+                          <tr key={line.id}>
+                            <td style={{ padding: 8 }}>{line.description}</td>
+                            <td style={{ padding: 8, textAlign: "right" }}>
+                              {money(lineHtCents(line))}
+                            </td>
+                            <td style={{ padding: 8 }}>
+                              <select
+                                aria-label={`Visa de ${line.description}`}
+                                value={status}
+                                onChange={(event) =>
+                                  setLineStatuses((current) => ({
+                                    ...current,
+                                    [line.id]: event.target.value as typeof status,
+                                  }))
+                                }
+                              >
+                                <option value="ACCEPTED">Acceptée</option>
+                                <option value="PARTIAL">Partiellement acceptée</option>
+                                <option value="REFUSED">Refusée</option>
+                              </select>
+                            </td>
+                            <td style={{ padding: 8 }}>
+                              {status === "PARTIAL" && (
+                                <input
+                                  aria-label={`Montant accepté ${line.description}`}
+                                  inputMode="decimal"
+                                  placeholder="Montant HT accepté"
+                                  value={lineAmounts[line.id] ?? ""}
+                                  onChange={(event) =>
+                                    setLineAmounts((current) => ({
+                                      ...current,
+                                      [line.id]: event.target.value,
+                                    }))
+                                  }
+                                />
+                              )}
+                              {status !== "ACCEPTED" && (
+                                <input
+                                  aria-label={`Motif ${line.description}`}
+                                  placeholder="Motif de réduction ou refus"
+                                  maxLength={1000}
+                                  value={lineReasons[line.id] ?? ""}
+                                  onChange={(event) =>
+                                    setLineReasons((current) => ({
+                                      ...current,
+                                      [line.id]: event.target.value,
+                                    }))
+                                  }
+                                />
+                              )}
+                              {status === "ACCEPTED" && <span>Montant intégral</span>}
+                            </td>
+                          </tr>
+                        );
+                      })}
+                  </tbody>
+                </table>
+              </div>
+            </div>
           )}
           <label>
             Nature de la preuve
@@ -314,6 +421,39 @@ export function BillingVisaPanel({
         </div>
       )}
 
+      {latest?.status === "PARTIAL" && latest.lineDecisions?.length && !latest.appliedAt && (
+        <div style={{ display: "grid", gap: 8, marginTop: 12 }}>
+          <p role="status">
+            Visa partiel enregistré : {money(latest.acceptedHtCents ?? 0)} HT autorisés.
+            Les lignes rejetées restent dans V{latest.version}, mais ne seront pas reprises
+            dans la nouvelle version du projet.
+          </p>
+          <button
+            type="button"
+            className="primaryButton"
+            disabled={!canAct}
+            onClick={() =>
+              void mutate(
+                {
+                  action: "APPLY_VISA_PARTIAL",
+                  draftId: draft.id,
+                  version: latest.version,
+                  expectedUpdatedAt: draft.updatedAt,
+                },
+                "Brouillon révisé avec les lignes acceptées. Présente une nouvelle version pour visa.",
+              )
+            }
+          >
+            Reprendre les lignes acceptées dans le brouillon
+          </button>
+        </div>
+      )}
+      {latest?.status === "PARTIAL" && latest.appliedAt && (
+        <p role="status">
+          Visa partiel déjà appliqué par {latest.appliedByName}. Le document corrigé doit
+          être présenté à nouveau pour validation extérieure.
+        </p>
+      )}
       <h3>Historique des présentations ({versions.length})</h3>
       {versions.length === 0 ? (
         <p>Aucune version provisoire enregistrée.</p>
@@ -347,6 +487,26 @@ export function BillingVisaPanel({
                 Instantané : {version.documentLabel}, {version.documentLines.length} lignes, total{" "}
                 {money(version.totalTtcCents)} TTC.
               </p>
+              {version.lineDecisions?.length ? (
+                <details>
+                  <summary>Détail du visa par prestation</summary>
+                  <ul>
+                    {version.lineDecisions.map((result) => {
+                      const line = version.documentLines.find(
+                        (entry) => entry.id === result.documentLineId,
+                      );
+                      return (
+                        <li key={result.documentLineId}>
+                          {line?.description ?? "Prestation archivée"} :{" "}
+                          {money(result.acceptedHtCents)} HT acceptés sur{" "}
+                          {line ? money(lineHtCents(line)) : "?"}
+                          {result.reason ? ` · ${result.reason}` : ""}
+                        </li>
+                      );
+                    })}
+                  </ul>
+                </details>
+              ) : null}
               <a
                 className="secondaryButton"
                 href={`/api/desktop/billing/${encodeURIComponent(draft.id)}/visa/${version.version}/pdf`}

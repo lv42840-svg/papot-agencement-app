@@ -136,6 +136,9 @@ export function recordBillingVisaDecision(
         row.acceptedHtCents < 0 ||
         row.acceptedHtCents > lineHtCents(original)
       ) throw new Error("BILLING_VISA_LINE_AMOUNT_INVALID");
+      if (row.acceptedHtCents < lineHtCents(original) && !row.reason.trim()) {
+        throw new Error("BILLING_VISA_LINE_REASON_REQUIRED");
+      }
       subtotal += row.acceptedHtCents;
     }
     if (!Number.isSafeInteger(subtotal) || subtotal <= 0 || subtotal >= latest.amountHtCents) {
