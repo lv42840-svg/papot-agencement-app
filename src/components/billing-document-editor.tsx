@@ -57,6 +57,9 @@ function serialize(row: EditableRow): BillingDocumentLine | null {
     origin: row.origin,
     ...(row.headingLevel ? { headingLevel: row.headingLevel } : {}),
     sourceLineId: row.sourceLineId,
+    ...(row.origin === "FREE" && row.allocationLineId
+      ? { allocationLineId: row.allocationLineId }
+      : {}),
     description: row.description,
     quantity,
     unit: row.unit,
@@ -91,6 +94,18 @@ const serverErrors: Record<string, string> = {
     "Un avancement ne peut pas être inférieur à la situation précédente.",
   BILLING_PROGRESS_TAX_ALLOCATION_UNAVAILABLE:
     "La TVA est incompatible avec les acomptes déjà préparés.",
+  BILLING_PROGRESS_FREE_UNALLOCATED:
+    "Affecte les prestations libres à un ouvrage du marché pour cette situation.",
+  BILLING_DOCUMENT_ALLOCATION_UNKNOWN:
+    "La prestation est affectée à un ouvrage inconnu. Choisis un ouvrage du marché.",
+  BILLING_DOCUMENT_ALLOCATION_VAT_MISMATCH:
+    "Le taux de TVA doit correspondre à l'ouvrage auquel la prestation est affectée.",
+  BILLING_PROGRESS_LINE_EXCEEDS_CONTRACT:
+    "Le total affecté à un ouvrage dépasse son marché. Vérifie les montants déjà préparés.",
+  BILLING_PROGRESS_LINE_BELOW_PREPARED:
+    "L'avancement proposé est inférieur aux montants déjà préparés sur un ouvrage.",
+  BILLING_PROGRESS_HISTORY_UNDETERMINED:
+    "Une ancienne prestation sans affectation empêche le cumul par ouvrage. Régularise-la d'abord.",
   BILLING_VISA_PENDING:
     "Cette version est présentée à un tiers. Enregistre d'abord sa réponse ou retire la présentation.",
   BILLING_VISA_REQUIRED:
@@ -228,6 +243,7 @@ export function BillingDocumentEditor({ draftId }: { draftId: string }) {
       origin: kind,
       ...(kind === "TITLE" ? { headingLevel } : {}),
       sourceLineId: null,
+      ...(kind === "FREE" ? { allocationLineId: null } : {}),
       description:
         kind === "TITLE"
           ? headingLevel === "SUBSECTION"
@@ -254,6 +270,7 @@ export function BillingDocumentEditor({ draftId }: { draftId: string }) {
       id: crypto.randomUUID(),
       origin: "FREE",
       sourceLineId: null,
+      allocationLineId: null,
       description: `${row.description} (copie)`,
     };
     setRows((old) => [...old.slice(0, index + 1), copy, ...old.slice(index + 1)]);
@@ -655,6 +672,7 @@ export function BillingDocumentEditor({ draftId }: { draftId: string }) {
                 <th>Unité</th>
                 <th>Prix unit. HT</th>
                 <th>TVA</th>
+                <th>Affectation marché</th>
                 <th>Total HT</th>
                 <th>Actions</th>
               </tr>
@@ -688,7 +706,7 @@ export function BillingDocumentEditor({ draftId }: { draftId: string }) {
                       )}
                     </td>
                     {row.origin === "TITLE" ? (
-                      <td colSpan={5} className="invoiceTitleHint">
+                      <td colSpan={6} className="invoiceTitleHint">
                         <select
                           aria-label={`Niveau du titre ligne ${index + 1}`}
                           disabled={!editorCanEdit || busy}
@@ -747,6 +765,35 @@ export function BillingDocumentEditor({ draftId }: { draftId: string }) {
                               </option>
                             ))}
                           </select>
+                        </td>
+                        <td>
+                          {draft.type === "PROGRESS" && row.origin === "FREE" ? (
+                            <select
+                              aria-label={`Affectation de ${row.description}`}
+                              disabled={!editorCanEdit}
+                              value={row.allocationLineId ?? ""}
+                              onChange={(event) => {
+                                const chosen = draft.lines?.find(
+                                  (line) => line.lineId === event.target.value,
+                                );
+                                alter(row.id, {
+                                  allocationLineId: chosen?.lineId ?? null,
+                                  ...(chosen ? { vatRatePercent: chosen.vatRatePercent } : {}),
+                                });
+                              }}
+                            >
+                              <option value="">À affecter</option>
+                              {(draft.lines ?? []).map((line) => (
+                                <option key={line.lineId} value={line.lineId}>
+                                  {line.description}
+                                </option>
+                              ))}
+                            </select>
+                          ) : row.origin === "FREE" ? (
+                            <span>Prestation libre</span>
+                          ) : (
+                            <span>Ouvrage du marché</span>
+                          )}
                         </td>
                         <td className="invoiceLineSum">
                           {Number.isSafeInteger(amount) ? currency(amount) : "À vérifier"}
@@ -847,7 +894,9 @@ export function BillingDocumentEditor({ draftId }: { draftId: string }) {
           </details>
         ) : null}
         <p className="invoiceHint">
-          Les lignes libres sont intégrées au plafond du marché du chantier. Pour facturer des
+          Pour une situation, affecte chaque prestation ajoutée à l'ouvrage du marché
+          qu'elle concerne. Cette affectation consomme son budget, elle ne crée pas un
+          nouveau marché. Pour facturer des
           travaux supplémentaires dépassant le contrat, ajoute un supplément au chantier et
           enregistre son accord.
         </p>
