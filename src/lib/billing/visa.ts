@@ -80,6 +80,7 @@ export function presentBillingVisa(
     amountHtCents: draft.amountHtCents,
     vatCents: draft.vatCents,
     totalTtcCents: draft.totalTtcCents,
+    ...(draft.retention ? { retention: draft.retention } : {}),
     submittedTo: input.submittedTo,
     submittedNotes: input.submittedNotes,
     submittedAt: now.toISOString(),
