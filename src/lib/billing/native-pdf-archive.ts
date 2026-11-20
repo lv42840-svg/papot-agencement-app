@@ -77,7 +77,14 @@ export async function storeOriginalNativeInvoicePdf(
         .prepare(
           "INSERT INTO local_native_invoice_pdf_archive (invoice_id, invoice_number, issued_at, pdf, sha256, archived_at) VALUES (?, ?, ?, ?, ?, ?)",
         )
-        .run(invoice.id, invoice.number, invoice.issuedAt, Buffer.from(pdf), sha256, new Date().toISOString());
+        .run(
+          invoice.id,
+          invoice.number,
+          invoice.issuedAt,
+          Buffer.from(pdf),
+          sha256,
+          new Date().toISOString(),
+        );
       return { number: invoice.number, bytes: pdf, sha256 };
     }
     const stored = inspectArchive(rows[0], invoice);

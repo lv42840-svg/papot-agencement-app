@@ -894,4 +894,3 @@ export async function runServerDbMigrations(
     client.release();
   }
 }
-

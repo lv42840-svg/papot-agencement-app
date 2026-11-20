@@ -7,7 +7,10 @@ import {
 import { createBillingRepository } from "@/lib/billing/repository";
 import { issueNativeInvoice, issueNativeInvoiceInputSchema } from "@/lib/billing/native-issuance";
 import { generateNativeInvoicePdf } from "@/lib/billing/native-invoice-pdf";
-import { loadOriginalNativeInvoicePdf, storeOriginalNativeInvoicePdf } from "@/lib/billing/native-pdf-archive";
+import {
+  loadOriginalNativeInvoicePdf,
+  storeOriginalNativeInvoicePdf,
+} from "@/lib/billing/native-pdf-archive";
 import { createCompanyProfileRepository } from "@/lib/company-profile/create-repository";
 import { createClientsRepository } from "@/lib/clients/create-repository";
 
@@ -39,9 +42,9 @@ export async function POST(request: Request) {
       if (!draft) throw new Error("BILLING_DRAFT_NOT_FOUND");
       const client = clients.clients.find((item) => item.id === draft.clientId);
       if (!client) throw new Error("BILLING_NATIVE_BUYER_PROFILE_INCOMPLETE");
-      const wasAlreadyIssued = current.nativeInvoiceLedger?.invoices.some(
-        (item) => item.requestId === input.requestId,
-      ) ?? false;
+      const wasAlreadyIssued =
+        current.nativeInvoiceLedger?.invoices.some((item) => item.requestId === input.requestId) ??
+        false;
       const next = issueNativeInvoice(current, input, company, client, context.user.displayName);
       const issued = next.nativeInvoiceLedger?.invoices.find(
         (item) => item.requestId === input.requestId,

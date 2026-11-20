@@ -72,7 +72,10 @@ const invoice = {
   number: "PA-2026-000001",
   issuedAt: "2026-11-20T12:00:00.000Z",
 } as NativeIssuedInvoice;
-const bytes = Buffer.from("%PDF-1.4\n" + "archived invoice bytes\n".repeat(30) + "%%EOF\n", "ascii");
+const bytes = Buffer.from(
+  "%PDF-1.4\n" + "archived invoice bytes\n".repeat(30) + "%%EOF\n",
+  "ascii",
+);
 let directory = "";
 
 beforeAll(() => {
@@ -100,12 +103,14 @@ describe("archive originale non remplaçable des factures PAPOT", () => {
       storeOriginalNativeInvoicePdf(invoice, bytes),
     );
     expect(retried.sha256).toBe(original.sha256);
-    await expect(withLocalDatabaseWrite(async () =>
-      storeOriginalNativeInvoicePdf(
-        invoice,
-        Buffer.from("%PDF-1.4\n" + "altered later renderer\n".repeat(30) + "%%EOF\n", "ascii"),
+    await expect(
+      withLocalDatabaseWrite(async () =>
+        storeOriginalNativeInvoicePdf(
+          invoice,
+          Buffer.from("%PDF-1.4\n" + "altered later renderer\n".repeat(30) + "%%EOF\n", "ascii"),
+        ),
       ),
-    )).rejects.toThrow("BILLING_NATIVE_ARCHIVE_IMMUTABLE");
+    ).rejects.toThrow("BILLING_NATIVE_ARCHIVE_IMMUTABLE");
     const stillOriginal = await loadOriginalNativeInvoicePdf(invoice);
     expect(stillOriginal.bytes).toEqual(new Uint8Array(bytes));
   });
@@ -115,9 +120,9 @@ describe("archive originale non remplaçable des factures PAPOT", () => {
       ...invoice,
       id: "22222222-2222-4222-8222-222222222222",
     };
-    await expect(withLocalDatabaseWrite(async () =>
-      storeOriginalNativeInvoicePdf(other, bytes),
-    )).rejects.toThrow("BILLING_NATIVE_ARCHIVE_CONFLICT");
+    await expect(
+      withLocalDatabaseWrite(async () => storeOriginalNativeInvoicePdf(other, bytes)),
+    ).rejects.toThrow("BILLING_NATIVE_ARCHIVE_CONFLICT");
   });
 
   it("détecte les archives modifiées en base et les références absentes", async () => {
@@ -139,10 +144,12 @@ describe("archive originale non remplaçable des factures PAPOT", () => {
       id: "44444444-4444-4444-8444-444444444444",
       number: "PA-2026-000003",
     };
-    await expect(withLocalDatabaseWrite(async () => {
-      await storeOriginalNativeInvoicePdf(orphan, bytes);
-      throw new Error("TEST_FORCE_ROLLBACK");
-    })).rejects.toThrow("TEST_FORCE_ROLLBACK");
+    await expect(
+      withLocalDatabaseWrite(async () => {
+        await storeOriginalNativeInvoicePdf(orphan, bytes);
+        throw new Error("TEST_FORCE_ROLLBACK");
+      }),
+    ).rejects.toThrow("TEST_FORCE_ROLLBACK");
     await expect(loadOriginalNativeInvoicePdf(orphan)).rejects.toThrow(
       "BILLING_NATIVE_ARCHIVE_MISSING",
     );
