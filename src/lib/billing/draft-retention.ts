@@ -33,7 +33,7 @@ export function calculateBillingDraftRetention(
     throw new Error("BILLING_RETENTION_INPUT_INVALID");
   }
   if (mode === "PERCENT") {
-    if (value > 100 || Math.round(value * 100) !== value * 100) {
+    if (value > 100 || Math.abs(Math.round(value * 100) - value * 100) > 1e-8) {
       throw new Error("BILLING_RETENTION_PERCENT_INVALID");
     }
     const amountTtcCents = Math.round((totalTtcCents * value) / 100);
