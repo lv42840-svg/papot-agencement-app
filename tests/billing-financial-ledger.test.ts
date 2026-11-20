@@ -160,6 +160,18 @@ describe("registre de facturation confirmée, séparé des projets", () => {
         }),
       ),
     ).toThrow("BILLING_FINANCIAL_CREDIT_EXCEEDS_INVOICE");
+    expect(() =>
+      registerConfirmedCreditNote(
+        initial,
+        credit(invoice.id, 100_000, {
+          taxGroups: [
+            { ratePercent: 20, baseHtCents: 60_000, vatCents: 12_000 },
+            { ratePercent: 20, baseHtCents: 60_000, vatCents: 12_000 },
+          ],
+          totalTtcCents: 144_000,
+        }),
+      ),
+    ).toThrow("BILLING_FINANCIAL_CREDIT_EXCEEDS_INVOICE");
   });
 
   it("suit les paiements partiels sans double rapprochement bancaire", () => {
