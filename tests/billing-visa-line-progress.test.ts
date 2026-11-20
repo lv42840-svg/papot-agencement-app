@@ -98,7 +98,13 @@ describe("visa partiel par prestation et situation cumulative", () => {
         [version.documentLines.find((line) => line.sourceLineId === lineB)!.id, 0],
       ]),
     );
-    expect(version.lineDecisions?.[1].reason).toBe("Ouvrage refusé");
+    expect(
+      version.lineDecisions?.find(
+        (item) =>
+          item.documentLineId ===
+          version.documentLines.find((line) => line.sourceLineId === lineB)?.id,
+      )?.reason,
+    ).toBe("Ouvrage refusé");
   });
 
   it("écarte l'ouvrage refusé, calcule la TVA du montant accepté et maintient les cumuls", () => {
