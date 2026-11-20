@@ -20,6 +20,7 @@ import { moveInvoiceEditorRow } from "@/lib/billing/ouvrage-structure";
 import { belongsToBillingSource } from "@/lib/billing/domain";
 import { BillingVisaPanel } from "@/components/billing-visa-panel";
 import { latestBillingVisa, visaRequiredForChantier } from "@/lib/billing/visa-policy";
+import { calculateBillingDraftRetention } from "@/lib/billing/draft-retention";
 
 type ApiSnapshot = { payload: BillingPayload; canWrite: boolean; error?: string };
 type EditableRow = BillingDocumentLine & { quantityInput: string; priceInput: string };
@@ -129,6 +130,8 @@ export function BillingDocumentEditor({ draftId }: { draftId: string }) {
   const [pendingPercentages, setPendingPercentages] = useState<LineProgressInput[] | null>(null);
   const [label, setLabel] = useState("");
   const [notes, setNotes] = useState("");
+  const [retentionMode, setRetentionMode] = useState<"PERCENT" | "AMOUNT">("PERCENT");
+  const [retentionValue, setRetentionValue] = useState("0");
   const [busy, setBusy] = useState(false);
   const [loading, setLoading] = useState(true);
   const [dirty, setDirty] = useState(false);
@@ -159,6 +162,12 @@ export function BillingDocumentEditor({ draftId }: { draftId: string }) {
     setPendingPercentages(null);
     setLabel(selected.label);
     setNotes(selected.notes);
+    setRetentionMode(selected.retention?.mode ?? "PERCENT");
+    setRetentionValue(
+      selected.retention?.mode === "AMOUNT"
+        ? euros(selected.retention.amountTtcCents)
+        : decimal(selected.retention?.ratePercent ?? 0),
+    );
     const original = (
       selected.documentLines ?? buildInvoiceDocumentLines(selected, json.payload)
     ).map(editable);
@@ -194,6 +203,20 @@ export function BillingDocumentEditor({ draftId }: { draftId: string }) {
       return null;
     }
   }, [parsedRows, invalid]);
+  const retentionPreview = useMemo(() => {
+    if (!preview) return null;
+    const value =
+      retentionMode === "AMOUNT"
+        ? centsFromEuros(retentionValue)
+        : /^\d{1,3}(?:[,.]\d{1,2})?$/.test(retentionValue.trim())
+          ? Number(retentionValue.replace(",", "."))
+          : NaN;
+    try {
+      return calculateBillingDraftRetention(retentionMode, value, preview.totalTtcCents);
+    } catch {
+      return null;
+    }
+  }, [preview, retentionMode, retentionValue]);
   const navigationRows = rows.map(
     (row, index) => parsedRows[index] ?? { ...row, quantity: 0, unitPriceCents: 0 },
   );
@@ -387,6 +410,12 @@ export function BillingDocumentEditor({ draftId }: { draftId: string }) {
       if (!saved) throw new Error("Projet introuvable après enregistrement");
       setDraft(saved);
       setPayload(json.payload);
+      setRetentionMode(saved.retention?.mode ?? "PERCENT");
+      setRetentionValue(
+        saved.retention?.mode === "AMOUNT"
+          ? euros(saved.retention.amountTtcCents)
+          : decimal(saved.retention?.ratePercent ?? 0),
+      );
       setPendingPercentages(null);
       setProgressValues(
         Object.fromEntries(
@@ -409,6 +438,37 @@ export function BillingDocumentEditor({ draftId }: { draftId: string }) {
           ? "Projet enregistré et totaux recalculés. Aucune facture officielle émise."
           : "Modifications enregistrées. Aucune facture officielle émise.",
       );
+    } catch (caught) {
+      const code = caught instanceof Error ? caught.message : "";
+      setError(serverErrors[code] ?? code ?? "Enregistrement impossible");
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  async function saveRetention() {
+    if (!draft || !editorCanEdit || busy || dirty || !retentionPreview) return;
+    setBusy(true);
+    setError("");
+    setNotice("");
+    try {
+      const response = await fetch("/api/desktop/billing", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          action: "SET_DRAFT_RETENTION",
+          draftId: draft.id,
+          expectedUpdatedAt: draft.updatedAt,
+          mode: retentionMode,
+          value: retentionMode === "AMOUNT"
+            ? retentionPreview.amountTtcCents
+            : retentionPreview.ratePercent,
+        }),
+      });
+      const result = (await response.json()) as ApiSnapshot;
+      if (!response.ok) throw new Error(result.error ?? "Enregistrement impossible");
+      await reload();
+      setNotice("Conditions de retenue enregistrées sur le projet. Aucune facture émise.");
     } catch (caught) {
       const code = caught instanceof Error ? caught.message : "";
       setError(serverErrors[code] ?? code ?? "Enregistrement impossible");
