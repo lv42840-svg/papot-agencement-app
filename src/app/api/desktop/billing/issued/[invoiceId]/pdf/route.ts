@@ -4,7 +4,7 @@ import {
   desktopRequestErrorStatus,
 } from "@/lib/desktop/request-context";
 import { createBillingRepository } from "@/lib/billing/repository";
-import { generateNativeInvoicePdf } from "@/lib/billing/native-invoice-pdf";
+import { loadOriginalNativeInvoicePdf } from "@/lib/billing/native-pdf-archive";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
