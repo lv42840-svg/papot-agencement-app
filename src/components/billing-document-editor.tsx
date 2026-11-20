@@ -1706,6 +1706,23 @@ export function BillingDocumentEditor({ draftId }: { draftId: string }) {
           background: #fff;
           color: #2b2735;
         }
+        .invoiceCreditRate {
+          display: grid;
+          gap: 8px;
+          max-width: 640px;
+          padding: 11px 0;
+          border-bottom: 1px solid #ece8f0;
+          font-size: 12px;
+          font-weight: 600;
+        }
+        .invoiceCreditRate input {
+          max-width: 340px;
+          border: 1px solid #ded9e5;
+          border-radius: 7px;
+          padding: 10px;
+          background: #fff;
+          color: #2b2735;
+        }
         .invoiceCardHeader {
           display: flex;
           align-items: flex-start;
