@@ -230,17 +230,22 @@ export function registerConfirmedCreditNote(
   if (totals.ttc !== credit.totalTtcCents) {
     throw new Error("BILLING_FINANCIAL_CREDIT_TOTALS_MISMATCH");
   }
-  for (const group of credit.taxGroups) {
-    const original = invoice.taxGroups.find((item) => item.ratePercent === group.ratePercent);
+  // Aggregate by VAT rate before validating: a single credit may contain
+  // several rows of the same rate, and they must share the same ceiling.
+  const rates = new Set(credit.taxGroups.map((group) => group.ratePercent));
+  for (const rate of rates) {
+    const original = invoice.taxGroups.filter((group) => group.ratePercent === rate);
     const previous = ledger.creditNotes
       .filter((item) => item.invoiceId === credit.invoiceId)
       .flatMap((item) => item.taxGroups)
-      .filter((item) => item.ratePercent === group.ratePercent);
+      .filter((item) => item.ratePercent === rate);
+    const current = credit.taxGroups.filter((group) => group.ratePercent === rate);
     if (
-      !original ||
-      safeTotal([...previous.map((item) => item.baseHtCents), group.baseHtCents]) >
-        original.baseHtCents ||
-      safeTotal([...previous.map((item) => item.vatCents), group.vatCents]) > original.vatCents
+      original.length === 0 ||
+      safeTotal([...previous, ...current].map((item) => item.baseHtCents)) >
+        safeTotal(original.map((item) => item.baseHtCents)) ||
+      safeTotal([...previous, ...current].map((item) => item.vatCents)) >
+        safeTotal(original.map((item) => item.vatCents))
     ) {
       throw new Error("BILLING_FINANCIAL_CREDIT_EXCEEDS_INVOICE");
     }
