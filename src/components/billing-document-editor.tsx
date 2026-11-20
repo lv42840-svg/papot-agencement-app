@@ -567,7 +567,7 @@ export function BillingDocumentEditor({ draftId }: { draftId: string }) {
       <aside className="invoiceDraftNotice">
         Tu modifies une <strong>copie du marché du chantier</strong>, uniquement pour ce projet. Les
         devis retenus restent inchangés. Ce document n&apos;a ni numéro officiel, ni PDF émis, ni
-        envoi Pennylane.
+        envoi Pennylane, ni transmission électronique.
       </aside>
       {error && (
         <p className="invoiceError" role="alert">
@@ -970,6 +970,74 @@ export function BillingDocumentEditor({ draftId }: { draftId: string }) {
           onRefresh={reload}
         />
       )}
+      <section className="invoiceCard">
+        <h2>Retenue de garantie du projet</h2>
+        <p className="invoiceHint">
+          Cette retenue ne change pas le HT, la TVA ou le TTC du projet. Elle distingue
+          uniquement la part hors retenue de celle conservée en garantie.
+          Aucun règlement réel n&apos;est créé ici.
+        </p>
+        <div className="invoiceMeta">
+          <label>
+            Mode de saisie
+            <select
+              value={retentionMode}
+              disabled={!editorCanEdit || busy}
+              onChange={(event) => {
+                const mode = event.target.value as "PERCENT" | "AMOUNT";
+                setRetentionMode(mode);
+                setRetentionValue(
+                  mode === "AMOUNT"
+                    ? euros(draft.retention?.amountTtcCents ?? 0)
+                    : decimal(draft.retention?.ratePercent ?? 0),
+                );
+              }}
+            >
+              <option value="PERCENT">Pourcentage du TTC</option>
+              <option value="AMOUNT">Montant TTC en euros</option>
+            </select>
+          </label>
+          <label>
+            {retentionMode === "PERCENT" ? "Retenue (%)" : "Retenue TTC (€)"}
+            <input
+              type="text"
+              inputMode="decimal"
+              value={retentionValue}
+              disabled={!editorCanEdit || busy}
+              onChange={(event) => setRetentionValue(event.target.value)}
+              aria-label="Saisir la retenue de garantie"
+            />
+          </label>
+        </div>
+        {!retentionPreview && (
+          <p role="alert" className="invoiceError">
+            Saisis une retenue comprise entre 0 et 100 % et ne dépassant pas le TTC du projet.
+          </p>
+        )}
+        {retentionPreview && preview && (
+          <div className="invoiceTotals">
+            <div>
+              <span>Retenue TTC indicative</span>
+              <strong>{currency(retentionPreview.amountTtcCents)}</strong>
+            </div>
+            <div>
+              <span>Part TTC hors retenue (indicative)</span>
+              <strong>{currency(preview.totalTtcCents - retentionPreview.amountTtcCents)}</strong>
+            </div>
+          </div>
+        )}
+        <button
+          type="button"
+          className="secondaryButton"
+          disabled={!editorCanEdit || busy || dirty || !preview || !retentionPreview}
+          onClick={() => void saveRetention()}
+        >
+          Enregistrer la retenue du projet
+        </button>
+        {dirty && (
+          <p className="invoiceHint">Enregistre d&apos;abord les modifications des lignes.</p>
+        )}
+      </section>
       <section className="invoiceCard invoiceSummary">
         <h2>Synthèse du projet</h2>
         <div className="invoiceTotals">
