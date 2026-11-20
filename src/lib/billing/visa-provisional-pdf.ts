@@ -170,11 +170,26 @@ export function generateBillingVisaProvisionalPdf(
   }
   paragraph("Observations :", noteLines);
   paragraph("Note de presentation :", presentationLines);
-  if (cursor + 95 > PAGE_BOTTOM) addPage();
+  if (cursor + (visa.retention ? 135 : 95) > PAGE_BOTTOM) addPage();
   line(cursor + 6);
   text(`TOTAL HT : ${euros(visa.amountHtCents)}`, 380, cursor + 26, 10, true);
   text(`TVA : ${euros(visa.vatCents)}`, 380, cursor + 46, 10);
   text(`TOTAL TTC : ${euros(visa.totalTtcCents)}`, 380, cursor + 68, 11, true);
+  if (visa.retention) {
+    text(
+      `RETENUE GARANTIE TTC (${String(visa.retention.ratePercent).replace(".", ",")} %) : ${euros(visa.retention.amountTtcCents)}`,
+      295,
+      cursor + 89,
+      8,
+    );
+    text(
+      `PART TTC HORS RETENUE : ${euros(visa.totalTtcCents - visa.retention.amountTtcCents)}`,
+      295,
+      cursor + 109,
+      8,
+      true,
+    );
+  }
 
   for (const [index, sheet] of pages.entries()) {
     sheet.push(`0.72 G 0.6 w 38 64 m 557 64 l S 0 G`);
