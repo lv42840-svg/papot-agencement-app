@@ -7,6 +7,7 @@ import {
   reconcileDocumentLineProgress,
 } from "./line-ledger";
 import { z } from "zod";
+import { billingFinancialLedgerSchema } from "./financial-ledger";
 
 const centsSchema = z.number().int().nonnegative().safe();
 const dateTimeSchema = z.string().datetime({ offset: true });
@@ -331,6 +332,7 @@ export const billingPayloadSchema = z.object({
   visaRequirements: z.array(billingVisaRequirementSchema).optional(),
   visaVersions: z.array(billingVisaVersionSchema).optional(),
   invoiceTitles: billingTitlesSchema.optional(),
+  financialLedger: billingFinancialLedgerSchema.optional(),
 });
 export type BillingPayload = z.infer<typeof billingPayloadSchema>;
 
