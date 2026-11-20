@@ -85,10 +85,8 @@ export function setBillingDraftRetention(
   if (draft.status !== "DRAFT") throw new Error("BILLING_DRAFT_LOCKED");
   if (draft.updatedAt !== input.expectedUpdatedAt) throw new Error("BILLING_VERSION_CONFLICT");
   assertBillingVisaEditable(payload, draft.id);
-  if (payload.visaVersions?.some((version) => version.draftId === draft.id)) {
-    // Payment conditions must not silently differ from an externally presented version.
-    throw new Error("BILLING_RETENTION_AFTER_VISA");
-  }
+  // A pending visa is already locked above. Changes after a reviewed visa
+  // invalidate that version at internal validation and require a new presentation.
   const retention = calculateBillingDraftRetention(input.mode, input.value, draft.totalTtcCents);
   if (
     draft.retention?.mode === retention.mode &&
