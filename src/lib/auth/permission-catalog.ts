@@ -82,6 +82,11 @@ export const SPECIAL_PERMISSIONS = [
     moduleKey: "billing",
   },
   {
+    key: "billing.issue_credit_notes",
+    label: "Émettre et numéroter les avoirs officiels",
+    moduleKey: "billing",
+  },
+  {
     key: "dashboard.view_global",
     label: "Voir le tableau de bord global",
     moduleKey: "pilotage",
