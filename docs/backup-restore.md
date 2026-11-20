@@ -40,10 +40,10 @@ Avant une bascule réelle : démarrer le commit sauvegardé avec cette base et c
 
 ## Factures officielles PAPOT : sauvegarde de l'original
 
-Les factures numérotées PAPOT sont archivées dans **PostgreSQL** dans la table
+Les factures et avoirs numérotés PAPOT sont archivés dans **PostgreSQL** dans la table
 `papot_native_invoice_pdf_archive` : identifiant, numéro, date d'émission, octets
 du PDF original et empreinte SHA-256. Le `pg_dump` complet ci-dessus inclut
-cette table, sans copie séparée dans `/srv/agencement`. La restauration doit
+cette table, sans copie séparée dans `/srv/agencement`. Les avoirs utilisent leur propre série `AV-AAAA-NNNNNN`, conservent le numéro de facture d'origine et partagent l'archive des originaux PDF. La restauration doit
 rétablir la table et les PDF **avec les mêmes octets**, pas les reconstruire
 avec le modèle d'une version ultérieure.
 
