@@ -260,14 +260,17 @@ describe("numérotation légale PAPOT sans liaison d'émission Pennylane", () =>
       { ...state, invoices: [{ ...state.invoices[0], number: "PA-2026-000003" }] },
       { ...state, invoices: [state.invoices[0], state.invoices[0]], lastOrdinal: 2 },
     ]) {
-      expect(() => assertNativeInvoiceSequence(corrupt)).toThrow(
-        "BILLING_NATIVE_SEQUENCE_CORRUPT",
-      );
-      expect(() => issueNativeInvoice(
-        { ...saved, nativeInvoiceLedger: corrupt },
-        prepare(draft.id, draft.updatedAt),
-        company, client, "Lucien", new Date("2026-11-20T11:00:00Z"),
-      )).toThrow("BILLING_NATIVE_SEQUENCE_CORRUPT");
+      expect(() => assertNativeInvoiceSequence(corrupt)).toThrow("BILLING_NATIVE_SEQUENCE_CORRUPT");
+      expect(() =>
+        issueNativeInvoice(
+          { ...saved, nativeInvoiceLedger: corrupt },
+          prepare(draft.id, draft.updatedAt),
+          company,
+          client,
+          "Lucien",
+          new Date("2026-11-20T11:00:00Z"),
+        ),
+      ).toThrow("BILLING_NATIVE_SEQUENCE_CORRUPT");
     }
   });
 
