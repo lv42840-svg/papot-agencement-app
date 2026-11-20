@@ -224,6 +224,7 @@ export const billingVisaVersionSchema = z
     amountHtCents: centsSchema.positive(),
     vatCents: centsSchema,
     totalTtcCents: centsSchema.positive(),
+    retention: billingDraftRetentionSchema.optional(),
     submittedTo: z.string().trim().min(1).max(240),
     submittedNotes: z.string().trim().max(2000),
     submittedAt: dateTimeSchema,
