@@ -280,10 +280,13 @@ export function issueNativeInvoice(
     totalTtcCents: draft.totalTtcCents,
     retentionTtcCents: draft.retention?.amountTtcCents ?? 0,
     priorDepositNumbers: state.invoices
-      .filter((item) => item.type === "DEPOSIT" &&
-        (draft.chantierId
-          ? item.chantierId === draft.chantierId
-          : item.sourceQuoteId === draft.quoteId))
+      .filter(
+        (item) =>
+          item.type === "DEPOSIT" &&
+          (draft.chantierId
+            ? item.chantierId === draft.chantierId
+            : item.sourceQuoteId === draft.quoteId),
+      )
       .map((item) => item.number),
     issuedByName: actor,
     status: "ISSUED",

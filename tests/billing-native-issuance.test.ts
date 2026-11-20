@@ -132,7 +132,10 @@ describe("numérotation légale PAPOT sans liaison d'émission Pennylane", () =>
     const generated = issueNativeInvoice(
       { ...empty(), drafts: [quoteOnly] },
       prepare(quoteOnly.id, quoteOnly.updatedAt),
-      company, client, "Lucien", new Date("2026-11-20T11:00:00Z"),
+      company,
+      client,
+      "Lucien",
+      new Date("2026-11-20T11:00:00Z"),
     );
     const record = generated.nativeInvoiceLedger!.invoices[0];
     expect(record.chantierId).toBeNull();
