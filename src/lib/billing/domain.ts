@@ -236,6 +236,9 @@ export const billingVisaVersionSchema = z
     ) {
       invalid("BILLING_VISA_APPLICATION_INVALID");
     }
+    if (visa.status === "PARTIAL" && !decisions?.length) {
+      invalid("BILLING_VISA_LINE_DECISIONS_REQUIRED");
+    }
     if (decisions?.length) {
       if (visa.status !== "PARTIAL") {
         invalid("BILLING_VISA_LINE_DECISIONS_NOT_PARTIAL");
