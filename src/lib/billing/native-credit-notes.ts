@@ -138,8 +138,21 @@ export function nativeCreditAllowances(
       vat: safeSum([current.vat, group.vatCents]),
     });
   }
+  if (
+    safeSum([...groups.values()].map((group) => group.ht)) !== invoice.amountHtCents ||
+    safeSum([...groups.values()].map((group) => group.vat)) !== invoice.vatCents
+  ) {
+    throw new Error("BILLING_NATIVE_CREDIT_SOURCE_CORRUPT");
+  }
   const used = new Map<number, { ht: number; vat: number }>();
   for (const credit of credits) {
+    if (
+      safeSum(credit.taxGroups.map((group) => group.baseHtCents)) !== credit.amountHtCents ||
+      safeSum(credit.taxGroups.map((group) => group.vatCents)) !== credit.vatCents ||
+      safeSum([credit.amountHtCents, credit.vatCents]) !== credit.totalTtcCents
+    ) {
+      throw new Error("BILLING_NATIVE_CREDIT_SOURCE_CORRUPT");
+    }
     if (
       credit.originalInvoiceId !== invoice.id ||
       credit.originalInvoiceNumber !== invoice.number ||
@@ -190,6 +203,9 @@ export function issueNativeCreditNote(
   now = new Date(),
 ): BillingPayload {
   const input = issueNativeCreditNoteInputSchema.parse(rawInput);
+  if (new Set(input.amounts.map((amount) => amount.ratePercent)).size !== input.amounts.length) {
+    throw new Error("BILLING_NATIVE_CREDIT_DUPLICATE_VAT");
+  }
   const invoices = payload.nativeInvoiceLedger;
   if (!invoices) throw new Error("BILLING_NATIVE_CREDIT_ORIGINAL_NOT_FOUND");
   assertNativeInvoiceSequence(invoices);
