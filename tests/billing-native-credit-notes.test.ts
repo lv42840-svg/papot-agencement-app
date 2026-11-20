@@ -336,26 +336,31 @@ describe("avoirs PAPOT officiels à numérotation indépendante", () => {
     const { payload, invoice } = issued();
     const input = request(invoice.id, 10_000);
     const first = issueNativeCreditNote(
-      payload, input, "Nadia", new Date("2026-11-20T11:00:00.000Z"),
-    );
-    expect(() => nativeCreditAllowances(
-      { ...invoice, amountHtCents: invoice.amountHtCents + 1 }, [],
-    )).toThrow("BILLING_NATIVE_CREDIT_SOURCE_CORRUPT");
-    expect(() => nativeCreditAllowances(
-      invoice, [{ ...notes(first)[0], totalTtcCents: 1 }],
-    )).toThrow("BILLING_NATIVE_CREDIT_SOURCE_CORRUPT");
-    expect(() => issueNativeCreditNote(
-      first,
-      {
-        ...input,
-        amounts: [
-          { ratePercent: 20, baseHtCents: 10_000 },
-          { ratePercent: 20, baseHtCents: 10_000 },
-        ],
-      },
+      payload,
+      input,
       "Nadia",
-      new Date("2026-11-20T11:05:00.000Z"),
-    )).toThrow("BILLING_NATIVE_CREDIT_DUPLICATE_VAT");
+      new Date("2026-11-20T11:00:00.000Z"),
+    );
+    expect(() =>
+      nativeCreditAllowances({ ...invoice, amountHtCents: invoice.amountHtCents + 1 }, []),
+    ).toThrow("BILLING_NATIVE_CREDIT_SOURCE_CORRUPT");
+    expect(() =>
+      nativeCreditAllowances(invoice, [{ ...notes(first)[0], totalTtcCents: 1 }]),
+    ).toThrow("BILLING_NATIVE_CREDIT_SOURCE_CORRUPT");
+    expect(() =>
+      issueNativeCreditNote(
+        first,
+        {
+          ...input,
+          amounts: [
+            { ratePercent: 20, baseHtCents: 10_000 },
+            { ratePercent: 20, baseHtCents: 10_000 },
+          ],
+        },
+        "Nadia",
+        new Date("2026-11-20T11:05:00.000Z"),
+      ),
+    ).toThrow("BILLING_NATIVE_CREDIT_DUPLICATE_VAT");
   });
 
   it("les crédits archivés restent cohérents avec la facture source", () => {
