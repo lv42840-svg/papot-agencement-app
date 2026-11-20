@@ -49,7 +49,7 @@ describe("archive originale non remplaçable des factures PAPOT", () => {
     await expect(withLocalDatabaseWrite(async () =>
       storeOriginalNativeInvoicePdf(
         invoice,
-        Buffer.from("%PDF-1.4\n" + "altered later renderer\n".repeat(30), "ascii"),
+        Buffer.from("%PDF-1.4\n" + "altered later renderer\n".repeat(30) + "%%EOF\n", "ascii"),
       ),
     )).rejects.toThrow("BILLING_NATIVE_ARCHIVE_IMMUTABLE");
     const stillOriginal = await loadOriginalNativeInvoicePdf(invoice);
