@@ -113,7 +113,7 @@ describe("registre de facturation confirmée, séparé des projets", () => {
     );
   });
 
-  it("refuse un brouillon ou un montant différent de l'approbation interne", () => {
+  it("refuse un brouillon ou un montant différent du projet validé", () => {
     const approved = approvedDraft();
     const proposed = issuedInvoice(approved);
     expect(() =>
@@ -147,7 +147,7 @@ describe("registre de facturation confirmée, séparé des projets", () => {
     expect(() => registerConfirmedCreditNote(ledger, first)).toThrow(
       "BILLING_FINANCIAL_CREDIT_DUPLICATE",
     );
-    expect(() => registerConfirmedCreditNote(ledger, credit(invoice.id, 95_000))).toThrow(
+    expect(() => registerConfirmedCreditNote(ledger, credit(invoice.id, 95_000, { number: "AV-2026-03" }))).toThrow(
       "BILLING_FINANCIAL_CREDIT_EXCEEDS_INVOICE",
     );
     expect(() =>
