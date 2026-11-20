@@ -32,6 +32,7 @@ import {
 } from "@/lib/billing/visa";
 import { billingVisaMethodSchema } from "@/lib/billing/domain";
 import { setBillingDraftRetention } from "@/lib/billing/draft-retention";
+import { nativeInvoiceNetPosition } from "@/lib/billing/native-credit-notes";
 import { vatRatePercentSchema } from "@/lib/vat";
 import { loadBillingSources } from "@/lib/billing/sources";
 
@@ -213,6 +214,7 @@ function publicBillingPayload(payload: BillingPayload): BillingPayload {
   const safe = { ...payload };
   delete safe.financialLedger;
   delete safe.nativeInvoiceLedger;
+  delete safe.nativeCreditNoteLedger;
   return safe;
 }
 
@@ -276,6 +278,23 @@ export async function GET() {
         number: invoice.number,
         issuedAt: invoice.issuedAt,
       })),
+      issuedCreditNotes: (payload.nativeCreditNoteLedger?.creditNotes ?? []).map((note) => ({
+        id: note.id,
+        originalInvoiceId: note.originalInvoiceId,
+        number: note.number,
+        issuedOn: note.issuedOn,
+        reason: note.reason,
+        totalTtcCents: note.totalTtcCents,
+      })),
+      creditPositions: (payload.nativeInvoiceLedger?.invoices ?? []).map((invoice) => ({
+        originalInvoiceId: invoice.id,
+        ...nativeInvoiceNetPosition(payload, invoice.id),
+      })),
+      canIssueCredits:
+        context.moduleAccess.canWrite &&
+        process.env.PAPOT_NATIVE_BILLING_ISSUANCE_ENABLED === "true" &&
+        process.env.PAPOT_NATIVE_CREDIT_NOTES_ENABLED === "true" &&
+        (await hasSpecialPermission(context.user.id, "billing.issue_credit_notes")),
       canIssue:
         context.moduleAccess.canWrite &&
         process.env.PAPOT_NATIVE_BILLING_ISSUANCE_ENABLED === "true" &&
