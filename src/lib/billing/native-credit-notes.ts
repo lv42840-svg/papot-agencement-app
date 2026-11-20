@@ -290,11 +290,11 @@ export function nativeInvoiceNetPosition(payload: BillingPayload, invoiceId: str
   const notes = (payload.nativeCreditNoteLedger?.creditNotes ?? []).filter(
     (note) => note.originalInvoiceId === invoiceId,
   );
-  const allowance = nativeCreditAllowances(original, notes);
+  const allowances = nativeCreditAllowances(original, notes);
   return {
     originalTtcCents: original.totalTtcCents,
     creditedTtcCents: safeSum(notes.map((note) => note.totalTtcCents)),
-    remainingTtcCents: safeSum(allowance.map((group) =>
+    remainingTtcCents: safeSum(allowances.map((group) =>
       safeSum([group.remainingHtCents, group.remainingVatCents]),
     )),
     allowances,
