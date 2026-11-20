@@ -76,6 +76,8 @@ const labels: Record<BillingDraft["type"], string> = {
 };
 const serverErrors: Record<string, string> = {
   BILLING_DRAFT_LOCKED: "Ce document est validé en interne et verrouillé.",
+  BILLING_RETENTION_EXCEEDS_TTC: "La retenue en euros dépasse le TTC recalculé. Réduis son montant avant de poursuivre.",
+  BILLING_RETENTION_PERCENT_INVALID: "Le pourcentage de retenue doit être compris entre 0 et 100 avec au plus deux décimales.",
   BILLING_APPROVAL_TOTALS_MISMATCH:
     "Les totaux ne correspondent pas. Corrige puis enregistre avant validation.",
   BILLING_PROGRESS_DOCUMENT_MISMATCH:
