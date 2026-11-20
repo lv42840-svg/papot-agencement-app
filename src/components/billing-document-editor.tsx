@@ -108,13 +108,19 @@ const labels: Record<BillingDraft["type"], string> = {
 const serverErrors: Record<string, string> = {
   BILLING_DRAFT_LOCKED: "Ce document est validé en interne et verrouillé.",
   BILLING_NATIVE_ISSUANCE_DISABLED: "L'émission officielle est désactivée avant la recette finale.",
-  BILLING_NATIVE_CREDIT_ISSUANCE_DISABLED: "Les avoirs officiels restent désactivés avant la recette.",
-  BILLING_NATIVE_CREDIT_EXCEEDS_ORIGINAL: "Le montant de l'avoir dépasse le montant restant sur la facture.",
-  BILLING_NATIVE_CREDIT_FULL_AMOUNT_REQUIRED: "L'avoir total doit reprendre tous les montants restant à créditer.",
-  BILLING_NATIVE_CREDIT_DATE_BACKWARDS: "La date d'avoir ne peut pas précéder la facture d'origine.",
-  BILLING_NATIVE_CREDIT_SEQUENCE_CORRUPT: "La numérotation des avoirs est incohérente. Émission suspendue.",
+  BILLING_NATIVE_CREDIT_ISSUANCE_DISABLED:
+    "Les avoirs officiels restent désactivés avant la recette.",
+  BILLING_NATIVE_CREDIT_EXCEEDS_ORIGINAL:
+    "Le montant de l'avoir dépasse le montant restant sur la facture.",
+  BILLING_NATIVE_CREDIT_FULL_AMOUNT_REQUIRED:
+    "L'avoir total doit reprendre tous les montants restant à créditer.",
+  BILLING_NATIVE_CREDIT_DATE_BACKWARDS:
+    "La date d'avoir ne peut pas précéder la facture d'origine.",
+  BILLING_NATIVE_CREDIT_SEQUENCE_CORRUPT:
+    "La numérotation des avoirs est incohérente. Émission suspendue.",
   BILLING_NATIVE_CREDIT_DUPLICATE_VAT: "Deux montants utilisent le même taux de TVA.",
-  BILLING_NATIVE_CREDIT_REQUEST_REUSED: "Cette demande d'avoir a déjà été utilisée avec des données différentes.",
+  BILLING_NATIVE_CREDIT_REQUEST_REUSED:
+    "Cette demande d'avoir a déjà été utilisée avec des données différentes.",
   BILLING_NATIVE_SELLER_PROFILE_INCOMPLETE:
     "Complète les mentions légales de PAPOT dans Paramètres.",
   BILLING_NATIVE_BUYER_PROFILE_INCOMPLETE:
@@ -227,9 +233,8 @@ export function BillingDocumentEditor({ draftId }: { draftId: string }) {
       ),
     );
     setCreditPosition(
-      json.creditPositions?.find((position) =>
-        position.originalInvoiceId === currentIssued?.id,
-      ) ?? null,
+      json.creditPositions?.find((position) => position.originalInvoiceId === currentIssued?.id) ??
+        null,
     );
     setProgressValues(
       Object.fromEntries(
@@ -626,17 +631,24 @@ export function BillingDocumentEditor({ draftId }: { draftId: string }) {
   }
 
   async function issueCredit() {
-    if (!issued || !canIssueCredits || !creditPosition || busy ||
-        creditPosition.remainingTtcCents <= 0 || creditReason.trim().length < 3) return;
+    if (
+      !issued ||
+      !canIssueCredits ||
+      !creditPosition ||
+      busy ||
+      creditPosition.remainingTtcCents <= 0 ||
+      creditReason.trim().length < 3
+    )
+      return;
     if (
       creditMode === "PARTIAL" &&
       creditPosition.allowances.some((allowance) => {
         const raw = creditAmounts[String(allowance.ratePercent)]?.trim() ?? "";
         if (!raw) return false;
         const entered = centsFromEuros(raw);
-        return !Number.isSafeInteger(entered) ||
-          entered < 0 ||
-          entered > allowance.remainingHtCents;
+        return (
+          !Number.isSafeInteger(entered) || entered < 0 || entered > allowance.remainingHtCents
+        );
       })
     ) {
       setError("Un montant HT est invalide ou dépasse le reste créditable.");
@@ -644,27 +656,34 @@ export function BillingDocumentEditor({ draftId }: { draftId: string }) {
     }
     const amounts = creditPosition.allowances.flatMap((allowance) => {
       if (allowance.remainingHtCents <= 0) return [];
-      const amount = creditMode === "FULL"
-        ? allowance.remainingHtCents
-        : centsFromEuros(creditAmounts[String(allowance.ratePercent)] ?? "");
+      const amount =
+        creditMode === "FULL"
+          ? allowance.remainingHtCents
+          : centsFromEuros(creditAmounts[String(allowance.ratePercent)] ?? "");
       return Number.isSafeInteger(amount) && amount > 0
         ? [{ ratePercent: allowance.ratePercent, baseHtCents: amount }]
         : [];
     });
-    if (amounts.length === 0 || amounts.some((amount) => {
-      const available = creditPosition.allowances.find(
-        (item) => item.ratePercent === amount.ratePercent,
-      );
-      return !available || amount.baseHtCents > available.remainingHtCents;
-    })) {
+    if (
+      amounts.length === 0 ||
+      amounts.some((amount) => {
+        const available = creditPosition.allowances.find(
+          (item) => item.ratePercent === amount.ratePercent,
+        );
+        return !available || amount.baseHtCents > available.remainingHtCents;
+      })
+    ) {
       setError("Saisis au moins un montant HT valide, sans dépasser le reste disponible.");
       return;
     }
-    if (!window.confirm(
-      "Émettre cet AVOIR OFFICIEL ? Un numéro définitif sera attribué et l'avoir " +
-      "ne pourra plus être modifié. La facture d'origine reste intacte. " +
-      "Aucun transfert automatique vers Pennylane ni remboursement bancaire."
-    )) return;
+    if (
+      !window.confirm(
+        "Émettre cet AVOIR OFFICIEL ? Un numéro définitif sera attribué et l'avoir " +
+          "ne pourra plus être modifié. La facture d'origine reste intacte. " +
+          "Aucun transfert automatique vers Pennylane ni remboursement bancaire.",
+      )
+    )
+      return;
     const requestId = creditRequestId ?? crypto.randomUUID();
     setCreditRequestId(requestId);
     setBusy(true);
@@ -692,8 +711,7 @@ export function BillingDocumentEditor({ draftId }: { draftId: string }) {
       setCreditReason("");
       setCreditAmounts({});
       setNotice(
-        "Avoir officiel " + result.issued.number +
-        " émis et archivé. Aucun envoi à Pennylane.",
+        "Avoir officiel " + result.issued.number + " émis et archivé. Aucun envoi à Pennylane.",
       );
     } catch (caught) {
       const code = caught instanceof Error ? caught.message : "";
@@ -1374,9 +1392,9 @@ export function BillingDocumentEditor({ draftId }: { draftId: string }) {
         <section className="invoiceCard">
           <h2>Avoirs officiels liés à {issued.number}</h2>
           <p className="invoiceHint">
-            Les avoirs possèdent leur propre numérotation. La facture d&apos;origine
-            est conservée sans modification. Aucun remboursement ou envoi à
-            Pennylane n&apos;est déclenché par cette opération.
+            Les avoirs possèdent leur propre numérotation. La facture d&apos;origine est conservée
+            sans modification. Aucun remboursement ou envoi à Pennylane n&apos;est déclenché par
+            cette opération.
           </p>
           {creditPosition && (
             <div className="invoiceTotals">
@@ -1401,9 +1419,7 @@ export function BillingDocumentEditor({ draftId }: { draftId: string }) {
                 <p key={credit.id}>
                   <strong>{credit.number}</strong> · {currency(credit.totalTtcCents)} ·
                   {credit.reason} ·{" "}
-                  <a
-                    href={`/api/desktop/billing/credits/issued/${credit.id}/pdf`}
-                  >
+                  <a href={`/api/desktop/billing/credits/issued/${credit.id}/pdf`}>
                     Télécharger l&apos;avoir PDF
                   </a>
                 </p>
@@ -1485,8 +1501,8 @@ export function BillingDocumentEditor({ draftId }: { draftId: string }) {
               </button>
               {!canIssueCredits && (
                 <p className="invoiceHint">
-                  Émission d&apos;avoir désactivée tant que la recette et
-                  l&apos;autorisation spécifique ne sont pas validées.
+                  Émission d&apos;avoir désactivée tant que la recette et l&apos;autorisation
+                  spécifique ne sont pas validées.
                 </p>
               )}
             </>

@@ -1,5 +1,8 @@
 import { z } from "zod";
-import { requireModuleRequestContext, desktopRequestErrorStatus } from "@/lib/desktop/request-context";
+import {
+  requireModuleRequestContext,
+  desktopRequestErrorStatus,
+} from "@/lib/desktop/request-context";
 import { createBillingRepository } from "@/lib/billing/repository";
 import { loadOriginalNativeInvoicePdf } from "@/lib/billing/native-pdf-archive";
 
@@ -34,9 +37,12 @@ export async function GET(
     });
   } catch (error) {
     const code = error instanceof Error ? error.message : "BILLING_NATIVE_CREDIT_PDF_FAILED";
-    return Response.json({ error: code }, {
-      status: desktopRequestErrorStatus(code) ?? 500,
-      headers: { "Cache-Control": "private, no-store" },
-    });
+    return Response.json(
+      { error: code },
+      {
+        status: desktopRequestErrorStatus(code) ?? 500,
+        headers: { "Cache-Control": "private, no-store" },
+      },
+    );
   }
 }

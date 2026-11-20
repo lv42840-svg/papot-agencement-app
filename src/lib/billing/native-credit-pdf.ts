@@ -63,14 +63,22 @@ export function generateNativeCreditNotePdf(
   let y = 0;
   function text(value: string, x: number, top: number, size = 9, bold = false) {
     content.push(
-      "BT /" + (bold ? "F2" : "F1") + " " + size + " Tf " + x + " " +
-        (PAGE_HEIGHT - top) + " Td (" + escaped(value) + ") Tj ET",
+      "BT /" +
+        (bold ? "F2" : "F1") +
+        " " +
+        size +
+        " Tf " +
+        x +
+        " " +
+        (PAGE_HEIGHT - top) +
+        " Td (" +
+        escaped(value) +
+        ") Tj ET",
     );
   }
   function rule(top: number) {
     content.push(
-      "0.75 G 0.5 w 40 " + (PAGE_HEIGHT - top) + " m 555 " +
-        (PAGE_HEIGHT - top) + " l S 0 G",
+      "0.75 G 0.5 w 40 " + (PAGE_HEIGHT - top) + " m 555 " + (PAGE_HEIGHT - top) + " l S 0 G",
     );
   }
   function newPage() {
@@ -143,18 +151,20 @@ export function generateNativeCreditNotePdf(
   write(["TOTAL TTC DE L'AVOIR : -" + money(note.totalTtcCents)], true);
   y += 15;
   write([
-    "Cet avoir réduit le montant de la facture d'origine " +
-      note.originalInvoiceNumber + ".",
+    "Cet avoir réduit le montant de la facture d'origine " + note.originalInvoiceNumber + ".",
     "Les éventuels remboursements sont suivis séparément.",
     ...(original.vatOnDebits ? ["TVA acquittée sur les débits."] : []),
   ]);
   for (const [index, page] of pages.entries()) {
     page.push("0.75 G 0.5 w 40 65 m 555 65 l S 0 G");
-    page.push("BT /F1 8 Tf 40 48 Td (" +
-      escaped("Avoir PAPOT " + note.number + " · Facture " + note.originalInvoiceNumber) +
-      ") Tj ET");
-    page.push("BT /F1 8 Tf 505 48 Td (" +
-      escaped("Page " + (index + 1) + "/" + pages.length) + ") Tj ET");
+    page.push(
+      "BT /F1 8 Tf 40 48 Td (" +
+        escaped("Avoir PAPOT " + note.number + " · Facture " + note.originalInvoiceNumber) +
+        ") Tj ET",
+    );
+    page.push(
+      "BT /F1 8 Tf 505 48 Td (" + escaped("Page " + (index + 1) + "/" + pages.length) + ") Tj ET",
+    );
   }
   const objects: Buffer[] = [];
   function addObject(value: string | Buffer): number {
@@ -164,23 +174,34 @@ export function generateNativeCreditNotePdf(
   addObject("<< /Type /Catalog /Pages 2 0 R >>");
   addObject("");
   addObject("<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica /Encoding /WinAnsiEncoding >>");
-  addObject("<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica-Bold /Encoding /WinAnsiEncoding >>");
+  addObject(
+    "<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica-Bold /Encoding /WinAnsiEncoding >>",
+  );
   const pageIds: number[] = [];
   for (const page of pages) {
     const bytes = Buffer.from(page.join("\n") + "\n", "latin1");
-    const stream = addObject(Buffer.concat([
-      Buffer.from("<< /Length " + bytes.length + " >>\nstream\n", "ascii"),
-      bytes,
-      Buffer.from("endstream", "ascii"),
-    ]));
-    pageIds.push(addObject(
-      "<< /Type /Page /Parent 2 0 R /MediaBox [0 0 595 842] /Resources " +
-      "<< /Font << /F1 3 0 R /F2 4 0 R >> >> /Contents " + stream + " 0 R >>",
-    ));
+    const stream = addObject(
+      Buffer.concat([
+        Buffer.from("<< /Length " + bytes.length + " >>\nstream\n", "ascii"),
+        bytes,
+        Buffer.from("endstream", "ascii"),
+      ]),
+    );
+    pageIds.push(
+      addObject(
+        "<< /Type /Page /Parent 2 0 R /MediaBox [0 0 595 842] /Resources " +
+          "<< /Font << /F1 3 0 R /F2 4 0 R >> >> /Contents " +
+          stream +
+          " 0 R >>",
+      ),
+    );
   }
   objects[1] = Buffer.from(
-    "<< /Type /Pages /Count " + pageIds.length + " /Kids [" +
-      pageIds.map((item) => item + " 0 R").join(" ") + "] >>",
+    "<< /Type /Pages /Count " +
+      pageIds.length +
+      " /Kids [" +
+      pageIds.map((item) => item + " 0 R").join(" ") +
+      "] >>",
     "ascii",
   );
   const output: Buffer[] = [Buffer.from("%PDF-1.4\n%PAPOT\n", "ascii")];
@@ -188,19 +209,30 @@ export function generateNativeCreditNotePdf(
   let currentOffset = output[0].length;
   for (const [index, item] of objects.entries()) {
     const bytes = Buffer.concat([
-      Buffer.from(index + 1 + " 0 obj\n", "ascii"), item,
+      Buffer.from(index + 1 + " 0 obj\n", "ascii"),
+      item,
       Buffer.from("\nendobj\n", "ascii"),
     ]);
     offsets.push(currentOffset);
     output.push(bytes);
     currentOffset += bytes.length;
   }
-  output.push(Buffer.from(
-    "xref\n0 " + (objects.length + 1) + "\n0000000000 65535 f \n" +
-    offsets.slice(1).map((offset) => String(offset).padStart(10, "0") + " 00000 n \n").join("") +
-    "trailer\n<< /Size " + (objects.length + 1) + " /Root 1 0 R >>\nstartxref\n" +
-    currentOffset + "\n%%EOF\n",
-    "ascii",
-  ));
+  output.push(
+    Buffer.from(
+      "xref\n0 " +
+        (objects.length + 1) +
+        "\n0000000000 65535 f \n" +
+        offsets
+          .slice(1)
+          .map((offset) => String(offset).padStart(10, "0") + " 00000 n \n")
+          .join("") +
+        "trailer\n<< /Size " +
+        (objects.length + 1) +
+        " /Root 1 0 R >>\nstartxref\n" +
+        currentOffset +
+        "\n%%EOF\n",
+      "ascii",
+    ),
+  );
   return new Uint8Array(Buffer.concat(output));
 }

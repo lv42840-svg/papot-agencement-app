@@ -1,15 +1,15 @@
 import { z } from "zod";
 import type { BillingPayload } from "./domain";
-import {
-  assertNativeInvoiceSequence,
-  type NativeIssuedInvoice,
-} from "./native-issuance";
+import { assertNativeInvoiceSequence, type NativeIssuedInvoice } from "./native-issuance";
 
 const cents = z.number().int().nonnegative().safe();
-const dateSchema = z.string().regex(/^\d{4}-\d{2}-\d{2}$/).refine((value) => {
-  const parsed = new Date(value + "T00:00:00.000Z");
-  return !Number.isNaN(parsed.valueOf()) && parsed.toISOString().slice(0, 10) === value;
-}, "BILLING_NATIVE_CREDIT_DATE_INVALID");
+const dateSchema = z
+  .string()
+  .regex(/^\d{4}-\d{2}-\d{2}$/)
+  .refine((value) => {
+    const parsed = new Date(value + "T00:00:00.000Z");
+    return !Number.isNaN(parsed.valueOf()) && parsed.toISOString().slice(0, 10) === value;
+  }, "BILLING_NATIVE_CREDIT_DATE_INVALID");
 const taxGroupSchema = z.object({
   ratePercent: z.number().finite().min(0).max(100),
   baseHtCents: cents.positive(),
@@ -48,18 +48,25 @@ export function emptyNativeCreditNoteLedger(): NativeCreditNoteLedger {
   return { lastOrdinal: 0, creditNotes: [] };
 }
 
-export const issueNativeCreditNoteInputSchema = z.object({
-  requestId: z.string().uuid(),
-  originalInvoiceId: z.string().uuid(),
-  mode: z.enum(["FULL", "PARTIAL"]),
-  reason: z.string().trim().min(3).max(2000),
-  amounts: z.array(
-    z.object({
-      ratePercent: z.number().finite().min(0).max(100),
-      baseHtCents: cents.positive(),
-    }).strict(),
-  ).min(1).max(20),
-}).strict();
+export const issueNativeCreditNoteInputSchema = z
+  .object({
+    requestId: z.string().uuid(),
+    originalInvoiceId: z.string().uuid(),
+    mode: z.enum(["FULL", "PARTIAL"]),
+    reason: z.string().trim().min(3).max(2000),
+    amounts: z
+      .array(
+        z
+          .object({
+            ratePercent: z.number().finite().min(0).max(100),
+            baseHtCents: cents.positive(),
+          })
+          .strict(),
+      )
+      .min(1)
+      .max(20),
+  })
+  .strict();
 export type IssueNativeCreditNoteInput = z.infer<typeof issueNativeCreditNoteInputSchema>;
 
 function safeSum(values: number[]): number {
@@ -75,7 +82,9 @@ function parisDate(now: Date): string {
       year: "numeric",
       month: "2-digit",
       day: "2-digit",
-    }).formatToParts(now).map((part) => [part.type, part.value]),
+    })
+      .formatToParts(now)
+      .map((part) => [part.type, part.value]),
   );
   return [parts.year, parts.month, parts.day].join("-");
 }
@@ -89,9 +98,9 @@ export function assertNativeCreditNoteSequence(ledger: NativeCreditNoteLedger): 
   let lastIssued = "";
   ledger.creditNotes.forEach((note, index) => {
     const ordinal = index + 1;
-    const expectedNumber = [
-      "AV", note.issuedOn.slice(0, 4), String(ordinal).padStart(6, "0"),
-    ].join("-");
+    const expectedNumber = ["AV", note.issuedOn.slice(0, 4), String(ordinal).padStart(6, "0")].join(
+      "-",
+    );
     if (
       note.ordinal !== ordinal ||
       note.number !== expectedNumber ||
@@ -150,21 +159,23 @@ export function nativeCreditAllowances(
   if ([...used.keys()].some((rate) => !groups.has(rate))) {
     throw new Error("BILLING_NATIVE_CREDIT_SOURCE_CORRUPT");
   }
-  return [...groups.entries()].sort((a, b) => a[0] - b[0]).map(([rate, original]) => {
-    const credited = used.get(rate) ?? { ht: 0, vat: 0 };
-    if (credited.ht > original.ht || credited.vat > original.vat) {
-      throw new Error("BILLING_NATIVE_CREDIT_EXCEEDS_ORIGINAL");
-    }
-    return {
-      ratePercent: rate,
-      originalHtCents: original.ht,
-      originalVatCents: original.vat,
-      creditedHtCents: credited.ht,
-      creditedVatCents: credited.vat,
-      remainingHtCents: original.ht - credited.ht,
-      remainingVatCents: original.vat - credited.vat,
-    };
-  });
+  return [...groups.entries()]
+    .sort((a, b) => a[0] - b[0])
+    .map(([rate, original]) => {
+      const credited = used.get(rate) ?? { ht: 0, vat: 0 };
+      if (credited.ht > original.ht || credited.vat > original.vat) {
+        throw new Error("BILLING_NATIVE_CREDIT_EXCEEDS_ORIGINAL");
+      }
+      return {
+        ratePercent: rate,
+        originalHtCents: original.ht,
+        originalVatCents: original.vat,
+        creditedHtCents: credited.ht,
+        creditedVatCents: credited.vat,
+        remainingHtCents: original.ht - credited.ht,
+        remainingVatCents: original.vat - credited.vat,
+      };
+    });
 }
 
 /**
@@ -186,10 +197,14 @@ export function issueNativeCreditNote(
   assertNativeCreditNoteSequence(ledger);
   const replay = ledger.creditNotes.find((item) => item.requestId === input.requestId);
   if (replay) {
-    const matchingAmounts = replay.taxGroups.length === input.amounts.length &&
-      input.amounts.every((amount) => replay.taxGroups.some((group) =>
-        group.ratePercent === amount.ratePercent && group.baseHtCents === amount.baseHtCents
-      ));
+    const matchingAmounts =
+      replay.taxGroups.length === input.amounts.length &&
+      input.amounts.every((amount) =>
+        replay.taxGroups.some(
+          (group) =>
+            group.ratePercent === amount.ratePercent && group.baseHtCents === amount.baseHtCents,
+        ),
+      );
     if (
       replay.originalInvoiceId !== input.originalInvoiceId ||
       replay.mode !== input.mode ||
@@ -220,39 +235,52 @@ export function issueNativeCreditNote(
     }
     inputs.set(amount.ratePercent, amount.baseHtCents);
   }
-  if (input.mode === "FULL" &&
-      allowances.some((available) => available.remainingHtCents > 0 &&
-        inputs.get(available.ratePercent) !== available.remainingHtCents)) {
+  if (
+    input.mode === "FULL" &&
+    allowances.some(
+      (available) =>
+        available.remainingHtCents > 0 &&
+        inputs.get(available.ratePercent) !== available.remainingHtCents,
+    )
+  ) {
     throw new Error("BILLING_NATIVE_CREDIT_FULL_AMOUNT_REQUIRED");
   }
   const creditGroups: NativeCreditNote["taxGroups"] = [];
   for (const [rate, requestedHt] of inputs) {
     const available = allowances.find((item) => item.ratePercent === rate);
-    if (!available || requestedHt > available.remainingHtCents ||
-        available.remainingHtCents === 0) {
+    if (
+      !available ||
+      requestedHt > available.remainingHtCents ||
+      available.remainingHtCents === 0
+    ) {
       throw new Error("BILLING_NATIVE_CREDIT_EXCEEDS_ORIGINAL");
     }
     // A final reduction consumes the exact original VAT remainder, including
     // the rounding cent from the original invoice or earlier partial credits.
-    const vat = requestedHt === available.remainingHtCents
-      ? available.remainingVatCents
-      : Math.round(requestedHt * rate / 100);
+    const vat =
+      requestedHt === available.remainingHtCents
+        ? available.remainingVatCents
+        : Math.round((requestedHt * rate) / 100);
     if (vat > available.remainingVatCents) {
       throw new Error("BILLING_NATIVE_CREDIT_VAT_EXCEEDS_ORIGINAL");
     }
     creditGroups.push({ ratePercent: rate, baseHtCents: requestedHt, vatCents: vat });
   }
-  if (input.mode === "FULL" && creditGroups.length !== allowances.filter(
-    (available) => available.remainingHtCents > 0,
-  ).length) throw new Error("BILLING_NATIVE_CREDIT_FULL_AMOUNT_REQUIRED");
+  if (
+    input.mode === "FULL" &&
+    creditGroups.length !== allowances.filter((available) => available.remainingHtCents > 0).length
+  )
+    throw new Error("BILLING_NATIVE_CREDIT_FULL_AMOUNT_REQUIRED");
   const amountHtCents = safeSum(creditGroups.map((group) => group.baseHtCents));
   const vatCents = safeSum(creditGroups.map((group) => group.vatCents));
   const totalTtcCents = safeSum([amountHtCents, vatCents]);
   const ordinal = ledger.lastOrdinal + 1;
   if (!Number.isSafeInteger(ordinal)) throw new Error("BILLING_NATIVE_CREDIT_SEQUENCE_EXHAUSTED");
   const number = ["AV", issuedOn.slice(0, 4), String(ordinal).padStart(6, "0")].join("-");
-  if (invoices.invoices.some((item) => item.number === number) ||
-      ledger.creditNotes.some((item) => item.number === number)) {
+  if (
+    invoices.invoices.some((item) => item.number === number) ||
+    ledger.creditNotes.some((item) => item.number === number)
+  ) {
     throw new Error("BILLING_NATIVE_CREDIT_NUMBER_CONFLICT");
   }
   const note = nativeCreditNoteSchema.parse({
@@ -294,9 +322,9 @@ export function nativeInvoiceNetPosition(payload: BillingPayload, invoiceId: str
   return {
     originalTtcCents: original.totalTtcCents,
     creditedTtcCents: safeSum(notes.map((note) => note.totalTtcCents)),
-    remainingTtcCents: safeSum(allowances.map((group) =>
-      safeSum([group.remainingHtCents, group.remainingVatCents]),
-    )),
+    remainingTtcCents: safeSum(
+      allowances.map((group) => safeSum([group.remainingHtCents, group.remainingVatCents])),
+    ),
     allowances,
   };
 }

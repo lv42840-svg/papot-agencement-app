@@ -20,7 +20,8 @@ describe("avoirs officiels PAPOT : garde-fous V1", () => {
   it("persiste le PDF et l'avoir dans une transaction, sans régénération sur les replays", () => {
     const api = readFileSync("src/app/api/desktop/billing/credits/issue/route.ts", "utf8");
     const pdf = readFileSync(
-      "src/app/api/desktop/billing/credits/issued/[creditId]/pdf/route.ts", "utf8",
+      "src/app/api/desktop/billing/credits/issued/[creditId]/pdf/route.ts",
+      "utf8",
     );
     expect(api).toContain("repository.mutate(async (current)");
     expect(api).toContain("generateNativeCreditNotePdf(note, original)");
