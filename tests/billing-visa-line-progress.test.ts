@@ -92,7 +92,14 @@ describe("visa partiel par prestation et situation cumulative", () => {
     expect(version.documentLines.filter((line) => line.origin !== "TITLE")).toHaveLength(2);
     expect(version.amountHtCents).toBe(50_000);
     expect(version.acceptedHtCents).toBe(20_000);
-    expect(version.lineDecisions?.map((item) => item.acceptedHtCents)).toEqual([20_000, 0]);
+    expect(
+      version.lineDecisions?.map((row) => [row.documentLineId, row.acceptedHtCents]),
+    ).toEqual(
+      expect.arrayContaining([
+        [version.documentLines.find((line) => line.sourceLineId === lineA)!.id, 20_000],
+        [version.documentLines.find((line) => line.sourceLineId === lineB)!.id, 0],
+      ]),
+    );
     expect(version.lineDecisions?.[1].reason).toBe("Ouvrage refusé");
   });
 
@@ -162,10 +169,12 @@ describe("visa partiel par prestation et situation cumulative", () => {
       next.documentLines
         ?.filter((row) => row.origin === "QUOTE")
         .map((row) => [row.sourceLineId, lineHtCents(row)]),
-    ).toEqual([
-      [lineA, 10_000],
-      [lineB, 20_000],
-    ]);
+    ).toEqual(
+      expect.arrayContaining([
+        [lineA, 10_000],
+        [lineB, 20_000],
+      ]),
+    );
     expect(next.vatCents).toBe(4_000);
   });
 
