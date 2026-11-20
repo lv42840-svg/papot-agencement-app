@@ -253,7 +253,12 @@ export function applyBillingVisaPartial(
   // next situation. Unallocated free rows cannot be reconciled automatically.
   if (
     draft.type === "PROGRESS" &&
-    latest.documentLines.some((line) => line.origin === "FREE" && lineHtCents(line) > 0)
+    latest.documentLines.some(
+      (line) =>
+        line.origin === "FREE" &&
+        lineHtCents(line) > 0 &&
+        !line.allocationLineId,
+    )
   ) {
     throw new Error("BILLING_VISA_PROGRESS_FREE_LINES_UNSUPPORTED");
   }

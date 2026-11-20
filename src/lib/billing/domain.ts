@@ -694,14 +694,6 @@ export function updateBillingDocument(
       throw new Error("BILLING_PROGRESS_DOCUMENT_MISMATCH");
     }
   }
-  if (draft.type === "PROGRESS" && draft.lines?.length) {
-    reconcileDocumentLineProgress(
-      payload,
-      draft,
-      documentLines,
-      recalculatedProgress?.lineProgress,
-    );
-  }
   const progressChanged =
     recalculatedProgress?.lineProgress.some(
       (row) =>
@@ -739,6 +731,14 @@ export function updateBillingDocument(
       )
   ) {
     throw new Error("BILLING_DRAFT_HAS_DEPENDENTS");
+  }
+  if (draft.type === "PROGRESS" && draft.lines?.length) {
+    reconcileDocumentLineProgress(
+      payload,
+      draft,
+      documentLines,
+      recalculatedProgress?.lineProgress,
+    );
   }
   return billingDraftSchema.parse({
     ...draft,
