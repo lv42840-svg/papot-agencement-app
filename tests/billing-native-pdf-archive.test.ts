@@ -18,7 +18,7 @@ const invoice = {
   number: "PA-2026-000001",
   issuedAt: "2026-11-20T12:00:00.000Z",
 } as NativeIssuedInvoice;
-const bytes = Buffer.from("%PDF-1.4\n" + "archived invoice bytes\n".repeat(30), "ascii");
+const bytes = Buffer.from("%PDF-1.4\n" + "archived invoice bytes\n".repeat(30) + "%%EOF\n", "ascii");
 let directory = "";
 
 beforeAll(() => {
