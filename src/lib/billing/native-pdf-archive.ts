@@ -24,7 +24,13 @@ function digest(bytes: Uint8Array): string {
 }
 
 function assertPdf(bytes: Uint8Array): void {
-  if (bytes.length < 100 || Buffer.from(bytes.subarray(0, 8)).toString("ascii") !== "%PDF-1.4") {
+  if (
+    bytes.length < 100 ||
+    Buffer.from(bytes.subarray(0, 8)).toString("ascii") !== "%PDF-1.4" ||
+    !Buffer.from(bytes.subarray(Math.max(0, bytes.length - 4096)))
+      .toString("latin1")
+      .includes("%%EOF")
+  ) {
     throw new Error("BILLING_NATIVE_ARCHIVE_INVALID_PDF");
   }
 }
