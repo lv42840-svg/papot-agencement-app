@@ -156,7 +156,7 @@ describe("traçabilité des prestations libres dans les situations cumulées", (
     expect(amountBySource(next)).toEqual(new Map([[a, 18_000], [b, 12_000]]));
   });
 
-  it("bloque une future situation si un acompte contient une ligne libre sans affectation", () => {
+  it("déduit une prestation libre sur acompte comme une avance globale par TVA", () => {
     const deposit = createBillingDraft(empty(), source, {
       requestId: crypto.randomUUID(),
       type: "DEPOSIT",
@@ -167,9 +167,10 @@ describe("traçabilité des prestations libres dans les situations cumulées", (
     );
     modified.push(free(10_000, null));
     const first = revised({ ...empty(), drafts: [deposit] }, deposit, modified);
-    expect(() => progress({ ...empty(), drafts: [first] }, 50)).toThrow(
-      "BILLING_PROGRESS_FREE_UNALLOCATED",
-    );
+    // An advance is a payment credit, not physical progress by ouvrage.
+    const next = progress({ ...empty(), drafts: [first] }, 50);
+    expect(next.amountHtCents).toBe(30_000);
+    expect(amountBySource(next)).toEqual(new Map([[a, 18_000], [b, 12_000]]));
   });
 
   it("traite un supplément confirmé comme une ligne du marché et pas comme une ligne libre", () => {

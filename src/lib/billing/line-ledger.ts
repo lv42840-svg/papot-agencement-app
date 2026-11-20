@@ -117,7 +117,10 @@ export function reconcileDocumentLineProgress(
       throw new Error("BILLING_PROGRESS_CANNOT_DECREASE");
     }
     const billed = (prior.get(source.lineId) ?? 0) + (current.get(source.lineId) ?? 0);
-    if (!Number.isSafeInteger(billed) || billed > target) {
+    if (!Number.isSafeInteger(billed) || billed > source.amountHtCents) {
+      throw new Error("BILLING_PROGRESS_LINE_EXCEEDS_CONTRACT");
+    }
+    if (billed > target) {
       throw new Error("BILLING_PROGRESS_LINE_EXCEEDS_CUMULATIVE");
     }
     return selected;
