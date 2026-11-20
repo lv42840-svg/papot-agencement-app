@@ -27,6 +27,13 @@ export async function POST(request: Request) {
     const input = issueNativeCreditNoteInputSchema.parse(await request.json());
     const repository = createBillingRepository();
     const payload = await repository.mutate(async (current) => {
+      const originalInvoice = current.nativeInvoiceLedger?.invoices.find(
+        (invoice) => invoice.id === input.originalInvoiceId,
+      );
+      if (!originalInvoice) throw new Error("BILLING_NATIVE_CREDIT_ORIGINAL_NOT_FOUND");
+      // A correction is legal only against an archived, integrity-verified
+      // original invoice, not against an orphaned register entry.
+      await loadOriginalNativeInvoicePdf(originalInvoice);
       const wasIssued = current.nativeCreditNoteLedger?.creditNotes.some(
         (note) => note.requestId === input.requestId,
       ) ?? false;
