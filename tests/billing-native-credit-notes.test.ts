@@ -167,6 +167,62 @@ describe("avoirs PAPOT officiels à numérotation indépendante", () => {
     )).toThrow("BILLING_NATIVE_CREDIT_EXCEEDS_ORIGINAL");
   });
 
+  it("conserve séparément les plafonds de deux taux TVA et solde les arrondis", () => {
+    const { payload, invoice } = issued();
+    const mixed: NativeIssuedInvoice = {
+      ...invoice,
+      taxGroups: [
+        { ratePercent: 10, baseHtCents: 30_000, vatCents: 3_000 },
+        { ratePercent: 20, baseHtCents: 70_000, vatCents: 14_000 },
+      ],
+      vatCents: 17_000,
+      totalTtcCents: 117_000,
+    };
+    const source = {
+      ...payload,
+      nativeInvoiceLedger: { ...payload.nativeInvoiceLedger!, invoices: [mixed] },
+    };
+    const first = issueNativeCreditNote(
+      source,
+      {
+        requestId: crypto.randomUUID(),
+        originalInvoiceId: mixed.id,
+        mode: "PARTIAL",
+        reason: "Répartition de corrections sur deux taux",
+        amounts: [
+          { ratePercent: 10, baseHtCents: 10_000 },
+          { ratePercent: 20, baseHtCents: 20_000 },
+        ],
+      },
+      "Nadia",
+      new Date("2026-11-20T11:00:00.000Z"),
+    );
+    expect(notes(first)[0].taxGroups).toEqual([
+      { ratePercent: 10, baseHtCents: 10_000, vatCents: 1_000 },
+      { ratePercent: 20, baseHtCents: 20_000, vatCents: 4_000 },
+    ]);
+    const rest = nativeInvoiceNetPosition(first, mixed.id);
+    expect(rest.remainingTtcCents).toBe(82_000);
+    expect(rest.allowances.map((group) => group.remainingHtCents)).toEqual([20_000, 50_000]);
+    const last = issueNativeCreditNote(
+      first,
+      {
+        requestId: crypto.randomUUID(),
+        originalInvoiceId: mixed.id,
+        mode: "FULL",
+        reason: "Correction finale restante",
+        amounts: [
+          { ratePercent: 10, baseHtCents: 20_000 },
+          { ratePercent: 20, baseHtCents: 50_000 },
+        ],
+      },
+      "Lucien",
+      new Date("2026-11-20T12:00:00.000Z"),
+    );
+    expect(nativeInvoiceNetPosition(last, mixed.id).remainingTtcCents).toBe(0);
+    expect(last.nativeInvoiceLedger!.invoices[0]).toEqual(mixed);
+  });
+
   it("refuse une correction de TVA excessive, les taux inconnus et les doublons", () => {
     const { payload, invoice } = issued();
     for (const input of [
