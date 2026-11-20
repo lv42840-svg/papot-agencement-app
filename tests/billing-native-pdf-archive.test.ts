@@ -11,7 +11,7 @@ import {
   loadOriginalNativeInvoicePdf,
   storeOriginalNativeInvoicePdf,
 } from "../src/lib/billing/native-pdf-archive";
-import { withLocalDatabaseWrite } from "../src/lib/local-db/runtime";
+import { getLocalDatabase, withLocalDatabaseWrite } from "../src/lib/local-db/runtime";
 
 const invoice = {
   id: "11111111-1111-4111-8111-111111111111",
@@ -77,5 +77,29 @@ describe("archive originale non remplaçable des factures PAPOT", () => {
       "BILLING_NATIVE_ARCHIVE_MISSING",
     );
     expect(original.bytes).toEqual(new Uint8Array(bytes));
+  });
+
+  it("annule aussi l'archive si l'émission échoue en transaction", async () => {
+    const orphan = {
+      ...invoice,
+      id: "44444444-4444-4444-8444-444444444444",
+      number: "PA-2026-000003",
+    };
+    await expect(withLocalDatabaseWrite(async () => {
+      await storeOriginalNativeInvoicePdf(orphan, bytes);
+      throw new Error("TEST_FORCE_ROLLBACK");
+    })).rejects.toThrow("TEST_FORCE_ROLLBACK");
+    await expect(loadOriginalNativeInvoicePdf(orphan)).rejects.toThrow(
+      "BILLING_NATIVE_ARCHIVE_MISSING",
+    );
+  });
+
+  it("détecte une corruption des octets originaux lors de la lecture", async () => {
+    getLocalDatabase()
+      .prepare("UPDATE local_native_invoice_pdf_archive SET pdf = ? WHERE invoice_id = ?")
+      .run(Buffer.from("%PDF-1.4\n" + "corrupted".repeat(40), "ascii"), invoice.id);
+    await expect(loadOriginalNativeInvoicePdf(invoice)).rejects.toThrow(
+      "BILLING_NATIVE_ARCHIVE_HASH_MISMATCH",
+    );
   });
 });
