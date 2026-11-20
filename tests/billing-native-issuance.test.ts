@@ -146,7 +146,7 @@ describe("numérotation légale PAPOT sans liaison d'émission Pennylane", () =>
     });
     const p = { ...empty(), drafts: [a, b] };
     const first = issueNativeInvoice(
-      p, prepare(a.id, a.updatedAt), company, client, "Nadia",
+      p, { ...prepare(a.id, a.updatedAt), dueOn: "2027-01-30" }, company, client, "Nadia",
       new Date("2026-12-31T12:00:00Z"),
     );
     const second = issueNativeInvoice(
