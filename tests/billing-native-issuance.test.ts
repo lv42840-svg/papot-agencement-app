@@ -123,6 +123,23 @@ describe("numérotation légale PAPOT sans liaison d'émission Pennylane", () =>
     expect(pdf).not.toContain("PROVISOIRE - NON FACTURE");
   });
 
+  it("numérote aussi un devis retenu sans chantier sans utiliser une autre série", () => {
+    const quoteOnly = makeDraft({
+      ...source,
+      chantierId: null,
+      quoteId: "77777777-7777-4777-8777-777777777777",
+    });
+    const generated = issueNativeInvoice(
+      { ...empty(), drafts: [quoteOnly] },
+      prepare(quoteOnly.id, quoteOnly.updatedAt),
+      company, client, "Lucien", new Date("2026-11-20T11:00:00Z"),
+    );
+    const record = generated.nativeInvoiceLedger!.invoices[0];
+    expect(record.chantierId).toBeNull();
+    expect(record.sourceQuoteId).toBe("77777777-7777-4777-8777-777777777777");
+    expect(record.number).toBe("PA-2026-000001");
+  });
+
   it("le même identifiant de demande n'attribue pas un second numéro", () => {
     const draft = makeDraft();
     const input = prepare(draft.id, draft.updatedAt);
