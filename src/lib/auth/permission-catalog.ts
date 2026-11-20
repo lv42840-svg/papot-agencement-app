@@ -77,6 +77,11 @@ export const SPECIAL_PERMISSIONS = [
     moduleKey: "purchases",
   },
   {
+    key: "billing.issue_invoices",
+    label: "Émettre et numéroter les factures définitives",
+    moduleKey: "billing",
+  },
+  {
     key: "dashboard.view_global",
     label: "Voir le tableau de bord global",
     moduleKey: "pilotage",
