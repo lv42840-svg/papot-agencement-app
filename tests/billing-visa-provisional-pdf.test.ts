@@ -7,6 +7,7 @@ import {
   type BillingSource,
 } from "../src/lib/billing/domain";
 import { presentBillingVisa, recordBillingVisaDecision } from "../src/lib/billing/visa";
+import { setBillingDraftRetention } from "../src/lib/billing/draft-retention";
 
 const site = "11111111-1111-4111-8111-111111111111";
 const lineId = "22222222-2222-4222-8222-222222222222";
@@ -61,6 +62,41 @@ describe("PDF des versions de visa provisoires", () => {
     expect(text).toContain("TOTAL TTC");
     expect(text).not.toContain("NUMERO DE FACTURE");
     expect(JSON.stringify(payload)).toBe(before);
+  });
+
+  it("affiche les conditions archivées de retenue sur le PDF provisoire", () => {
+    const draft = createBillingDraft(
+      base(),
+      source,
+      { requestId: crypto.randomUUID(), type: "STANDARD" },
+      "Nadia",
+    );
+    const withRetention = setBillingDraftRetention(
+      { ...base(), drafts: [draft] },
+      {
+        draftId: draft.id,
+        expectedUpdatedAt: draft.updatedAt,
+        mode: "PERCENT",
+        value: 5,
+      },
+      "Nadia",
+    );
+    const visa = presentBillingVisa(
+      withRetention,
+      {
+        draftId: draft.id,
+        expectedUpdatedAt: withRetention.drafts[0].updatedAt,
+        submittedTo: "Architecte",
+        submittedNotes: "Version avec retenue",
+      },
+      "Nadia",
+    );
+    const text = Buffer.from(
+      generateBillingVisaProvisionalPdf(visa.visaVersions![0], visa.drafts[0]),
+    ).toString("latin1");
+    expect(text).toContain("RETENUE GARANTIE TTC (5 %) : 6,00 EUR");
+    expect(text).toContain("PART TTC HORS RETENUE : 114,00 EUR");
+    expect(text).toContain("NON FACTURE");
   });
 
   it("rend exactement la même présentation après sa décision extérieure", () => {
