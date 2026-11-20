@@ -25,8 +25,8 @@ export async function GET(
     if (!invoice) {
       return Response.json({ error: "BILLING_NATIVE_INVOICE_NOT_FOUND" }, { status: 404 });
     }
-    const pdf = generateNativeInvoicePdf(invoice);
-    return new Response(Buffer.from(pdf), {
+    const archived = await loadOriginalNativeInvoicePdf(invoice);
+    return new Response(Buffer.from(archived.bytes), {
       status: 200,
       headers: {
         "Content-Type": "application/pdf",
