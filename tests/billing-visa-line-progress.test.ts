@@ -92,9 +92,7 @@ describe("visa partiel par prestation et situation cumulative", () => {
     expect(version.documentLines.filter((line) => line.origin !== "TITLE")).toHaveLength(2);
     expect(version.amountHtCents).toBe(50_000);
     expect(version.acceptedHtCents).toBe(20_000);
-    expect(
-      version.lineDecisions?.map((row) => [row.documentLineId, row.acceptedHtCents]),
-    ).toEqual(
+    expect(version.lineDecisions?.map((row) => [row.documentLineId, row.acceptedHtCents])).toEqual(
       expect.arrayContaining([
         [version.documentLines.find((line) => line.sourceLineId === lineA)!.id, 20_000],
         [version.documentLines.find((line) => line.sourceLineId === lineB)!.id, 0],
