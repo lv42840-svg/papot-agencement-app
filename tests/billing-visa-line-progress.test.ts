@@ -61,9 +61,7 @@ function prepareProgress() {
 }
 function reviewPartial() {
   const { draft, pending } = prepareProgress();
-  const lines = pending.visaVersions![0].documentLines.filter(
-    (item) => item.origin !== "TITLE",
-  );
+  const lines = pending.visaVersions![0].documentLines.filter((item) => item.origin !== "TITLE");
   const accepted = lines.map((item) => ({
     documentLineId: item.id,
     acceptedHtCents: item.sourceLineId === lineA ? 20_000 : 0,
@@ -113,7 +111,9 @@ describe("visa partiel par prestation et situation cumulative", () => {
     expect(financialRows.reduce((total, row) => total + lineHtCents(row), 0)).toBe(20_000);
     expect(revised.amountHtCents).toBe(20_000);
     expect(revised.vatCents).toBe(4_000);
-    expect(revised.lineProgress?.find((row) => row.lineId === lineA)?.cumulativeHtCents).toBe(20_000);
+    expect(revised.lineProgress?.find((row) => row.lineId === lineA)?.cumulativeHtCents).toBe(
+      20_000,
+    );
     expect(revised.lineProgress?.find((row) => row.lineId === lineB)?.cumulativeHtCents).toBe(0);
     expect(applied.visaVersions?.[0].documentLines).toEqual(after.visaVersions?.[0].documentLines);
     expect(() => approveBillingDraft(applied, draft.id, revised.updatedAt, "Lucien")).toThrow(
@@ -143,9 +143,7 @@ describe("visa partiel par prestation et situation cumulative", () => {
       },
       "Lucien",
     );
-    const approved = approveBillingDraft(
-      accepted, draft.id, revised.updatedAt, "Lucien",
-    );
+    const approved = approveBillingDraft(accepted, draft.id, revised.updatedAt, "Lucien");
     expect(approved.status).toBe("APPROVED");
     expect(approved.amountHtCents).toBe(20_000);
 
@@ -160,25 +158,38 @@ describe("visa partiel par prestation et situation cumulative", () => {
       "Nadia",
     );
     expect(next.amountHtCents).toBe(30_000);
-    expect(next.documentLines?.filter((row) => row.origin === "QUOTE")
-      .map((row) => [row.sourceLineId, lineHtCents(row)])).toEqual([
-        [lineA, 10_000],
-        [lineB, 20_000],
-      ]);
+    expect(
+      next.documentLines
+        ?.filter((row) => row.origin === "QUOTE")
+        .map((row) => [row.sourceLineId, lineHtCents(row)]),
+    ).toEqual([
+      [lineA, 10_000],
+      [lineB, 20_000],
+    ]);
     expect(next.vatCents).toBe(4_000);
   });
 
   it("refuse d'appliquer un visa partiel deux fois ou avec une version inconnue", () => {
     const { draft, after } = reviewPartial();
-    expect(() => applyBillingVisaPartial(
-      after, { draftId: draft.id, version: 5, expectedUpdatedAt: draft.updatedAt }, "Nadia",
-    )).toThrow("BILLING_VISA_VERSION_CONFLICT");
+    expect(() =>
+      applyBillingVisaPartial(
+        after,
+        { draftId: draft.id, version: 5, expectedUpdatedAt: draft.updatedAt },
+        "Nadia",
+      ),
+    ).toThrow("BILLING_VISA_VERSION_CONFLICT");
     const applied = applyBillingVisaPartial(
-      after, { draftId: draft.id, version: 1, expectedUpdatedAt: draft.updatedAt }, "Nadia",
+      after,
+      { draftId: draft.id, version: 1, expectedUpdatedAt: draft.updatedAt },
+      "Nadia",
     );
-    expect(() => applyBillingVisaPartial(
-      applied, { draftId: draft.id, version: 1, expectedUpdatedAt: applied.drafts[0].updatedAt }, "Nadia",
-    )).toThrow("BILLING_VISA_ALREADY_APPLIED");
+    expect(() =>
+      applyBillingVisaPartial(
+        applied,
+        { draftId: draft.id, version: 1, expectedUpdatedAt: applied.drafts[0].updatedAt },
+        "Nadia",
+      ),
+    ).toThrow("BILLING_VISA_ALREADY_APPLIED");
   });
 
   it("vérifie la présence des contrôles métier et de l'interface", () => {

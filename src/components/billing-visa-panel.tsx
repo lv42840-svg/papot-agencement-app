@@ -131,10 +131,7 @@ export function BillingVisaPanel({
             };
           })
         : undefined;
-    const partialHtCents = lineDecisions?.reduce(
-      (total, item) => total + item.acceptedHtCents,
-      0,
-    );
+    const partialHtCents = lineDecisions?.reduce((total, item) => total + item.acceptedHtCents, 0);
     if (
       decision === "PARTIAL" &&
       (!lineDecisions?.length ||
@@ -150,7 +147,9 @@ export function BillingVisaPanel({
         partialHtCents! <= 0 ||
         partialHtCents! >= latest.amountHtCents)
     ) {
-      setError("Renseigne pour chaque ligne son montant accepté et le motif de tout refus ou réduction. Le total doit être partiel.");
+      setError(
+        "Renseigne pour chaque ligne son montant accepté et le motif de tout refus ou réduction. Le total doit être partiel.",
+      );
       return;
     }
     void mutate(
@@ -268,8 +267,8 @@ export function BillingVisaPanel({
           {decision === "PARTIAL" && (
             <div style={{ display: "grid", gap: 8 }}>
               <p>
-                Décide ouvrage par ouvrage. Les lignes rejetées ou diminuées doivent avoir un
-                motif. Seules les sommes acceptées seront reprises dans la révision du projet.
+                Décide ouvrage par ouvrage. Les lignes rejetées ou diminuées doivent avoir un motif.
+                Seules les sommes acceptées seront reprises dans la révision du projet.
               </p>
               <div style={{ overflowX: "auto" }}>
                 <table style={{ borderCollapse: "collapse", width: "100%", minWidth: 620 }}>
@@ -424,9 +423,9 @@ export function BillingVisaPanel({
       {latest?.status === "PARTIAL" && latest.lineDecisions?.length && !latest.appliedAt && (
         <div style={{ display: "grid", gap: 8, marginTop: 12 }}>
           <p role="status">
-            Visa partiel enregistré : {money(latest.acceptedHtCents ?? 0)} HT autorisés.
-            Les lignes rejetées restent dans V{latest.version}, mais ne seront pas reprises
-            dans la nouvelle version du projet.
+            Visa partiel enregistré : {money(latest.acceptedHtCents ?? 0)} HT autorisés. Les lignes
+            rejetées restent dans V{latest.version}, mais ne seront pas reprises dans la nouvelle
+            version du projet.
           </p>
           <button
             type="button"
@@ -450,8 +449,8 @@ export function BillingVisaPanel({
       )}
       {latest?.status === "PARTIAL" && latest.appliedAt && (
         <p role="status">
-          Visa partiel déjà appliqué par {latest.appliedByName}. Le document corrigé doit
-          être présenté à nouveau pour validation extérieure.
+          Visa partiel déjà appliqué par {latest.appliedByName}. Le document corrigé doit être
+          présenté à nouveau pour validation extérieure.
         </p>
       )}
       <h3>Historique des présentations ({versions.length})</h3>

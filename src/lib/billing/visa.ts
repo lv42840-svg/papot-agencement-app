@@ -135,7 +135,8 @@ export function recordBillingVisaDecision(
         !Number.isSafeInteger(row.acceptedHtCents) ||
         row.acceptedHtCents < 0 ||
         row.acceptedHtCents > lineHtCents(original)
-      ) throw new Error("BILLING_VISA_LINE_AMOUNT_INVALID");
+      )
+        throw new Error("BILLING_VISA_LINE_AMOUNT_INVALID");
       if (row.acceptedHtCents < lineHtCents(original) && !row.reason.trim()) {
         throw new Error("BILLING_VISA_LINE_REASON_REQUIRED");
       }
@@ -172,7 +173,6 @@ export function recordBillingVisaDecision(
   };
 }
 
-
 /**
  * Apply a line-by-line partial external visa to the SAME draft.
  * The archived V1 document remains immutable. The revised document must be
@@ -203,7 +203,8 @@ export function applyBillingVisaPartial(
     latest.documentLabel !== draft.label ||
     latest.documentNotes !== draft.notes ||
     JSON.stringify(latest.documentLines) !== JSON.stringify(draft.documentLines)
-  ) throw new Error("BILLING_VISA_STALE");
+  )
+    throw new Error("BILLING_VISA_STALE");
 
   const acceptedById = new Map(
     latest.lineDecisions.map((decision) => [decision.documentLineId, decision.acceptedHtCents]),
@@ -298,9 +299,7 @@ export function applyBillingVisaPartial(
       return {
         lineId: sourceLine.lineId,
         percent:
-          sourceLine.amountHtCents > 0
-            ? (cumulativeHtCents * 100) / sourceLine.amountHtCents
-            : 0,
+          sourceLine.amountHtCents > 0 ? (cumulativeHtCents * 100) / sourceLine.amountHtCents : 0,
         cumulativeHtCents,
       };
     });
@@ -318,7 +317,7 @@ export function applyBillingVisaPartial(
   });
   return {
     ...payload,
-    drafts: payload.drafts.map((item) => item.id === updated.id ? updated : item),
+    drafts: payload.drafts.map((item) => (item.id === updated.id ? updated : item)),
     visaVersions: (payload.visaVersions ?? []).map((item) =>
       item.id === applied.id ? applied : item,
     ),

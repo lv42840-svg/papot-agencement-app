@@ -107,11 +107,13 @@ describe("visa externe des situations et factures provisoires", () => {
         version: 1,
         decision: "PARTIAL",
         acceptedHtCents: 60_000,
-        lineDecisions: [{
-          documentLineId: before.visaVersions![0].documentLines[0].id,
-          acceptedHtCents: 60_000,
-          reason: "Avancement accepté partiellement",
-        }],
+        lineDecisions: [
+          {
+            documentLineId: before.visaVersions![0].documentLines[0].id,
+            acceptedHtCents: 60_000,
+            reason: "Avancement accepté partiellement",
+          },
+        ],
         reviewMethod: "MEETING",
         externalContact: "MOE",
         evidence: "CR de chantier n°5",
@@ -181,28 +183,40 @@ describe("visa externe des situations et factures provisoires", () => {
     const documentLineId = p.visaVersions![0].documentLines[0].id;
     for (const amount of [0, 100_000, 150_000]) {
       expect(() =>
-        recordBillingVisaDecision(p, {
-          ...input,
-          acceptedHtCents: amount,
-          lineDecisions: [{
-            documentLineId,
+        recordBillingVisaDecision(
+          p,
+          {
+            ...input,
             acceptedHtCents: amount,
-            reason: "Refus partiel motivé",
-          }],
-        }, "Nadia"),
+            lineDecisions: [
+              {
+                documentLineId,
+                acceptedHtCents: amount,
+                reason: "Refus partiel motivé",
+              },
+            ],
+          },
+          "Nadia",
+        ),
       ).toThrow();
     }
     expect(() =>
-      recordBillingVisaDecision(p, {
-        ...input,
-        acceptedHtCents: 50_000,
-        lineDecisions: [{
-          documentLineId,
+      recordBillingVisaDecision(
+        p,
+        {
+          ...input,
           acceptedHtCents: 50_000,
-          reason: "Refus partiel motivé",
-        }],
-        evidence: "",
-      }, "Nadia"),
+          lineDecisions: [
+            {
+              documentLineId,
+              acceptedHtCents: 50_000,
+              reason: "Refus partiel motivé",
+            },
+          ],
+          evidence: "",
+        },
+        "Nadia",
+      ),
     ).toThrow();
     expect(() =>
       presentBillingVisa(
@@ -319,50 +333,71 @@ describe("visa externe des situations et factures provisoires", () => {
     const pending = present(setBillingVisaRequirement(make(), site, true, "Nadia"));
     const draft = pending.drafts[0];
     const documentLineId = pending.visaVersions![0].documentLines[0].id;
-    const reviewed = recordBillingVisaDecision(pending, {
-      draftId: draft.id,
-      version: 1,
-      decision: "PARTIAL",
-      acceptedHtCents: 60_000,
-      lineDecisions: [{
-        documentLineId,
+    const reviewed = recordBillingVisaDecision(
+      pending,
+      {
+        draftId: draft.id,
+        version: 1,
+        decision: "PARTIAL",
         acceptedHtCents: 60_000,
-        reason: "40 % non acceptés",
-      }],
-      reviewMethod: "EMAIL",
-      externalContact: "Architecte",
-      evidence: "Visa de situation V1",
-      reason: "Réduction du montant",
-    }, "Lucien");
+        lineDecisions: [
+          {
+            documentLineId,
+            acceptedHtCents: 60_000,
+            reason: "40 % non acceptés",
+          },
+        ],
+        reviewMethod: "EMAIL",
+        externalContact: "Architecte",
+        evidence: "Visa de situation V1",
+        reason: "Réduction du montant",
+      },
+      "Lucien",
+    );
     const changed = applyBillingVisaPartial(
-      reviewed, { draftId: draft.id, version: 1, expectedUpdatedAt: draft.updatedAt }, "Nadia",
+      reviewed,
+      { draftId: draft.id, version: 1, expectedUpdatedAt: draft.updatedAt },
+      "Nadia",
     );
     expect(changed.drafts[0].amountHtCents).toBe(60_000);
-    expect(changed.drafts[0].documentLines?.filter(line => line.origin !== "TITLE")).toHaveLength(1);
-    expect(changed.visaVersions?.[0].documentLines).toEqual(pending.visaVersions?.[0].documentLines);
+    expect(changed.drafts[0].documentLines?.filter((line) => line.origin !== "TITLE")).toHaveLength(
+      1,
+    );
+    expect(changed.visaVersions?.[0].documentLines).toEqual(
+      pending.visaVersions?.[0].documentLines,
+    );
     expect(changed.visaVersions?.[0].appliedByName).toBe("Nadia");
-    expect(() => approveBillingDraft(
-      changed, draft.id, changed.drafts[0].updatedAt, "Lucien",
-    )).toThrow("BILLING_VISA_PARTIAL_REWORK_REQUIRED");
-    expect(() => applyBillingVisaPartial(
-      changed, { draftId: draft.id, version: 1, expectedUpdatedAt: changed.drafts[0].updatedAt }, "Nadia",
-    )).toThrow("BILLING_VISA_ALREADY_APPLIED");
+    expect(() =>
+      approveBillingDraft(changed, draft.id, changed.drafts[0].updatedAt, "Lucien"),
+    ).toThrow("BILLING_VISA_PARTIAL_REWORK_REQUIRED");
+    expect(() =>
+      applyBillingVisaPartial(
+        changed,
+        { draftId: draft.id, version: 1, expectedUpdatedAt: changed.drafts[0].updatedAt },
+        "Nadia",
+      ),
+    ).toThrow("BILLING_VISA_ALREADY_APPLIED");
 
     const v2 = present(changed);
-    expect(v2.visaVersions?.map(v => v.version)).toEqual([1, 2]);
+    expect(v2.visaVersions?.map((v) => v.version)).toEqual([1, 2]);
     expect(v2.visaVersions?.[1].amountHtCents).toBe(60_000);
-    const approvedVisa = recordBillingVisaDecision(v2, {
-      draftId: draft.id,
-      version: 2,
-      decision: "ACCEPTED",
-      reviewMethod: "EMAIL",
-      externalContact: "Architecte",
-      evidence: "Visa de situation V2",
-      reason: "Conforme",
-    }, "Nadia");
-    expect(approveBillingDraft(
-      approvedVisa, draft.id, approvedVisa.drafts[0].updatedAt, "Lucien",
-    ).amountHtCents).toBe(60_000);
+    const approvedVisa = recordBillingVisaDecision(
+      v2,
+      {
+        draftId: draft.id,
+        version: 2,
+        decision: "ACCEPTED",
+        reviewMethod: "EMAIL",
+        externalContact: "Architecte",
+        evidence: "Visa de situation V2",
+        reason: "Conforme",
+      },
+      "Nadia",
+    );
+    expect(
+      approveBillingDraft(approvedVisa, draft.id, approvedVisa.drafts[0].updatedAt, "Lucien")
+        .amountHtCents,
+    ).toBe(60_000);
   });
 
   it("refuse les décisions ligne inexistante, en doublon et sans motif de réduction", () => {
@@ -383,19 +418,29 @@ describe("visa externe des situations et factures provisoires", () => {
       acceptedHtCents: 50_000,
       reason: "Réduction motivée",
     };
-    expect(() => recordBillingVisaDecision(
-      pending, { ...input, lineDecisions: [{ ...row, reason: "" }] }, "Lucien",
-    )).toThrow("BILLING_VISA_LINE_REASON_REQUIRED");
-    expect(() => recordBillingVisaDecision(
-      pending, { ...input, lineDecisions: [{ ...row, documentLineId: crypto.randomUUID() }] }, "Lucien",
-    )).toThrow("BILLING_VISA_LINE_DECISION_INVALID");
-    expect(() => recordBillingVisaDecision(
-      pending, { ...input, lineDecisions: [row, row] }, "Lucien",
-    )).toThrow("BILLING_VISA_LINE_DECISIONS_REQUIRED");
-    expect(() => recordBillingVisaDecision(
-      pending, { ...input, lineDecisions: [{ ...row, acceptedHtCents: 60_000 }] }, "Lucien",
-    )).toThrow("BILLING_VISA_LINE_TOTAL_MISMATCH");
+    expect(() =>
+      recordBillingVisaDecision(
+        pending,
+        { ...input, lineDecisions: [{ ...row, reason: "" }] },
+        "Lucien",
+      ),
+    ).toThrow("BILLING_VISA_LINE_REASON_REQUIRED");
+    expect(() =>
+      recordBillingVisaDecision(
+        pending,
+        { ...input, lineDecisions: [{ ...row, documentLineId: crypto.randomUUID() }] },
+        "Lucien",
+      ),
+    ).toThrow("BILLING_VISA_LINE_DECISION_INVALID");
+    expect(() =>
+      recordBillingVisaDecision(pending, { ...input, lineDecisions: [row, row] }, "Lucien"),
+    ).toThrow("BILLING_VISA_LINE_DECISIONS_REQUIRED");
+    expect(() =>
+      recordBillingVisaDecision(
+        pending,
+        { ...input, lineDecisions: [{ ...row, acceptedHtCents: 60_000 }] },
+        "Lucien",
+      ),
+    ).toThrow("BILLING_VISA_LINE_TOTAL_MISMATCH");
   });
-
-
 });

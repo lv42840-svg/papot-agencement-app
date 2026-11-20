@@ -255,16 +255,10 @@ export const billingVisaVersionSchema = z
           }
           seen.add(decision.documentLineId);
           const originalHt = Math.round(original.quantity * original.unitPriceCents);
-          if (
-            !Number.isSafeInteger(originalHt) ||
-            decision.acceptedHtCents > originalHt
-          ) {
+          if (!Number.isSafeInteger(originalHt) || decision.acceptedHtCents > originalHt) {
             invalid("BILLING_VISA_LINE_AMOUNT_INVALID");
           }
-          if (
-            decision.acceptedHtCents < originalHt &&
-            !decision.reason.trim()
-          ) {
+          if (decision.acceptedHtCents < originalHt && !decision.reason.trim()) {
             invalid("BILLING_VISA_LINE_REASON_REQUIRED");
           }
           acceptedSum += decision.acceptedHtCents;
@@ -273,7 +267,8 @@ export const billingVisaVersionSchema = z
           seen.size !== billable.length ||
           !Number.isSafeInteger(acceptedSum) ||
           acceptedSum !== visa.acceptedHtCents
-        ) invalid("BILLING_VISA_LINE_TOTAL_MISMATCH");
+        )
+          invalid("BILLING_VISA_LINE_TOTAL_MISMATCH");
       }
     }
     if (visa.status === "SUBMITTED") {
