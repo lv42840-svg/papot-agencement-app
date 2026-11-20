@@ -1,5 +1,6 @@
 import { calculateInvoiceDocumentTotals, lineHtCents } from "./document-lines";
-import { updateBillingDocument } from "./domain";
+import { billingDraftSchema, updateBillingDocument } from "./domain";
+import { allocatedDocumentAmounts, reconcileDocumentLineProgress } from "./line-ledger";
 import type { BillingDocumentLine, BillingVisaLineDecision } from "./domain";
 import { billingVisaRequirementSchema, billingVisaVersionSchema } from "./domain";
 import type { BillingPayload, BillingVisaMethod } from "./domain";
@@ -269,6 +270,38 @@ export function applyBillingVisaPartial(
     actorName,
     now,
   );
+  let updated = changed;
+  if (draft.type === "PROGRESS") {
+    const sources = draft.lines ?? [];
+    if (!draft.lineProgress?.length || !sources.length) {
+      throw new Error("BILLING_PROGRESS_HISTORY_UNDETERMINED");
+    }
+    const before = allocatedDocumentAmounts(latest.documentLines, sources);
+    const after = allocatedDocumentAmounts(acceptedLines, sources);
+    const sourceById = new Map(sources.map((line) => [line.lineId, line]));
+    const adjusted = draft.lineProgress.map((row) => {
+      const source = sourceById.get(row.lineId);
+      if (!source) throw new Error("BILLING_PROGRESS_LINES_REQUIRED");
+      const rejected = (before.get(row.lineId) ?? 0) - (after.get(row.lineId) ?? 0);
+      if (rejected < 0) throw new Error("BILLING_VISA_LINE_AMOUNT_INVALID");
+      const cumulativeHtCents = row.cumulativeHtCents - rejected;
+      if (cumulativeHtCents < 0) throw new Error("BILLING_PROGRESS_CANNOT_DECREASE");
+      return {
+        lineId: row.lineId,
+        cumulativeHtCents,
+        percent: source.amountHtCents > 0
+          ? (cumulativeHtCents * 100) / source.amountHtCents
+          : 0,
+      };
+    });
+    reconcileDocumentLineProgress(payload, draft, acceptedLines, adjusted);
+    updated = billingDraftSchema.parse({
+      ...changed,
+      lineProgress: adjusted,
+      cumulativePercent: null,
+    });
+  }
+
   const applied = billingVisaVersionSchema.parse({
     ...latest,
     appliedAt: now.toISOString(),
@@ -276,7 +309,7 @@ export function applyBillingVisaPartial(
   });
   return {
     ...payload,
-    drafts: payload.drafts.map((item) => (item.id === changed.id ? changed : item)),
+    drafts: payload.drafts.map((item) => (item.id === updated.id ? updated : item)),
     visaVersions: (payload.visaVersions ?? []).map((item) =>
       item.id === applied.id ? applied : item,
     ),

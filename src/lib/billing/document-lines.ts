@@ -113,7 +113,9 @@ export function buildInvoiceDocumentLines(
   const sourceLines = draft.lines ?? [];
   const output: BillingDocumentLine[] = [];
   // Include prior FREE amounts allocated to contract lines, not just QUOTE rows.
-  const previousAmounts = previousBillingLineAmounts(payload, draft, draft.id);
+  const previousAmounts = sourceLines.length
+    ? previousBillingLineAmounts(payload, draft, draft.id)
+    : new Map<string, number>();
 
   for (const group of draft.taxGroups) {
     const matching = sourceLines.filter((line) => line.vatRatePercent === group.ratePercent);

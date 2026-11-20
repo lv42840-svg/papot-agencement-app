@@ -666,10 +666,9 @@ export function updateBillingDocument(
   const recalculatedProgress = input.linePercentages
     ? calculateLineProgress({ schemaVersion: 1, drafts: priorDrafts }, draft, input.linePercentages)
     : null;
-  const currentProgress =
-    draft.type === "PROGRESS" && draft.lines?.length
-      ? reconcileDocumentLineProgress(payload, draft, documentLines, recalculatedProgress?.lineProgress)
-      : null;
+  if (draft.type === "PROGRESS" && draft.lines?.length) {
+    reconcileDocumentLineProgress(payload, draft, documentLines, recalculatedProgress?.lineProgress);
+  }
   if (recalculatedProgress && draft.type !== "PROGRESS") {
     throw new Error("BILLING_PROGRESS_INPUT_CONFLICT");
   }
@@ -695,7 +694,7 @@ export function updateBillingDocument(
     }
   }
   const progressChanged =
-    currentProgress?.some(
+    recalculatedProgress?.lineProgress.some(
       (row) =>
         row.cumulativeHtCents !==
         draft.lineProgress?.find((previous) => previous.lineId === row.lineId)?.cumulativeHtCents,
@@ -726,8 +725,8 @@ export function updateBillingDocument(
     label: input.label,
     notes: input.notes,
     documentLines,
-    ...(currentProgress
-      ? { lineProgress: currentProgress, cumulativePercent: null }
+    ...(recalculatedProgress
+      ? { lineProgress: recalculatedProgress.lineProgress, cumulativePercent: null }
       : {}),
     amountHtCents: totals.amountHtCents,
     taxGroups: totals.taxGroups,
