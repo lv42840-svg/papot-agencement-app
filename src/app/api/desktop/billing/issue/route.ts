@@ -34,7 +34,7 @@ export async function POST(request: Request) {
       (await createClientsRepository()).load(),
     ]);
     const repository = createBillingRepository();
-    const payload = await repository.mutate((current) => {
+    const payload = await repository.mutate(async (current) => {
       const draft = current.drafts.find((item) => item.id === input.draftId);
       if (!draft) throw new Error("BILLING_DRAFT_NOT_FOUND");
       const client = clients.clients.find((item) => item.id === draft.clientId);
