@@ -60,7 +60,8 @@ export const nativeIssuedInvoiceSchema = z.object({
   id: z.string().uuid(),
   requestId: z.string().uuid(),
   draftId: z.string().uuid(),
-  chantierId: z.string().uuid(),
+  chantierId: z.string().uuid().nullable(),
+  sourceQuoteId: z.string().uuid(),
   clientId: z.string().uuid(),
   ordinal: z.number().int().positive().safe(),
   number: z.string().regex(/^PA-\d{4}-\d{6,}$/),
@@ -181,7 +182,7 @@ export function issueNativeInvoice(
   if (!draft) throw new Error("BILLING_DRAFT_NOT_FOUND");
   if (draft.status !== "APPROVED") throw new Error("BILLING_NATIVE_APPROVAL_REQUIRED");
   if (draft.updatedAt !== input.expectedUpdatedAt) throw new Error("BILLING_VERSION_CONFLICT");
-  if (!draft.chantierId || draft.clientId !== client.id) {
+  if (draft.clientId !== client.id) {
     throw new Error("BILLING_NATIVE_SOURCE_INVALID");
   }
   if (state.invoices.some((item) => item.draftId === draft.id)) {
@@ -227,6 +228,7 @@ export function issueNativeInvoice(
     requestId: input.requestId,
     draftId: draft.id,
     chantierId: draft.chantierId,
+    sourceQuoteId: draft.quoteId,
     clientId: client.id,
     ordinal,
     number,
@@ -278,7 +280,10 @@ export function issueNativeInvoice(
     totalTtcCents: draft.totalTtcCents,
     retentionTtcCents: draft.retention?.amountTtcCents ?? 0,
     priorDepositNumbers: state.invoices
-      .filter((item) => item.chantierId === draft.chantierId && item.type === "DEPOSIT")
+      .filter((item) => item.type === "DEPOSIT" &&
+        (draft.chantierId
+          ? item.chantierId === draft.chantierId
+          : item.sourceQuoteId === draft.quoteId))
       .map((item) => item.number),
     issuedByName: actor,
     status: "ISSUED",
