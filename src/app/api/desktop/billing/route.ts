@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { z } from "zod";
+import type { BillingPayload } from "@/lib/billing/domain";
 
 import {
   desktopRequestErrorStatus,
@@ -194,6 +195,15 @@ const billingMutationSchema = z.discriminatedUnion("action", [
     .strict(),
 ]);
 
+/** Bank movements and official tax documents require distinct financial permissions.
+ * Do not expose the private issued ledger through the ordinary billing workspace.
+ */
+function publicBillingPayload(payload: BillingPayload): BillingPayload {
+  const safe = { ...payload };
+  delete safe.financialLedger;
+  return safe;
+}
+
 function noStoreJson(data: unknown, status = 200) {
   return NextResponse.json(data, { status, headers: { "Cache-Control": "no-store" } });
 }
@@ -245,7 +255,7 @@ export async function GET() {
       payload.extras ?? [],
     );
     return noStoreJson({
-      payload,
+      payload: publicBillingPayload(payload),
       sources,
       chantiers: chantiers.chantiers.map((chantier) => ({
         id: chantier.id,
@@ -435,7 +445,7 @@ export async function POST(request: Request) {
       }
       return { ...current, drafts };
     });
-    return noStoreJson({ payload, canWrite: true });
+    return noStoreJson({ payload: publicBillingPayload(payload), canWrite: true });
   } catch (error) {
     if (error instanceof z.ZodError) {
       const fields = [...new Set(error.issues.map((issue) => issue.path.join(".") || "root"))];
