@@ -666,14 +666,6 @@ export function updateBillingDocument(
   const recalculatedProgress = input.linePercentages
     ? calculateLineProgress({ schemaVersion: 1, drafts: priorDrafts }, draft, input.linePercentages)
     : null;
-  if (draft.type === "PROGRESS" && draft.lines?.length) {
-    reconcileDocumentLineProgress(
-      payload,
-      draft,
-      documentLines,
-      recalculatedProgress?.lineProgress,
-    );
-  }
   if (recalculatedProgress && draft.type !== "PROGRESS") {
     throw new Error("BILLING_PROGRESS_INPUT_CONFLICT");
   }
@@ -697,6 +689,14 @@ export function updateBillingDocument(
     ) {
       throw new Error("BILLING_PROGRESS_DOCUMENT_MISMATCH");
     }
+  }
+  if (draft.type === "PROGRESS" && draft.lines?.length) {
+    reconcileDocumentLineProgress(
+      payload,
+      draft,
+      documentLines,
+      recalculatedProgress?.lineProgress,
+    );
   }
   const progressChanged =
     recalculatedProgress?.lineProgress.some(

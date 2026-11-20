@@ -50,9 +50,17 @@ export function previousBillingLineAmounts(
     : -1;
   const history = payload.drafts
     .slice(0, index < 0 ? payload.drafts.length : index)
-    // Deposits are financial advances against the VAT pool, not delivered work
-    // attributed to particular source lines.
-    .filter((item) => belongsToBillingSource(item, source) && item.type !== "DEPOSIT");
+    // A deposit on the entire chantier is a VAT-rate credit, not a physical
+    // progress allocation. A historic deposit on one signed quote, however,
+    // must stay attributed to that quote when several quotes are consolidated.
+    .filter(
+      (item) =>
+        belongsToBillingSource(item, source) &&
+        (item.type !== "DEPOSIT" ||
+          (source.sourceMode === "CHANTIER" &&
+            item.sourceMode !== "CHANTIER" &&
+            item.quoteId !== source.quoteId)),
+    );
   const totals = new Map<string, number>();
   for (const item of history) {
     if (!item.documentLines) {
