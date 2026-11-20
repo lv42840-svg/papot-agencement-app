@@ -553,7 +553,13 @@ async function ensureNativeInvoicePdfArchive(client: PoolClient): Promise<void> 
       invoice_number TEXT NOT NULL UNIQUE,
       issued_at TIMESTAMPTZ NOT NULL,
       pdf BYTEA NOT NULL CHECK (octet_length(pdf) > 0),
-      sha256 CHAR(64) NOT NULL CHECK (sha256 ~ '^[a-f0-9]{64}
+      sha256 CHAR(64) NOT NULL CHECK (char_length(sha256) = 64),
+      archived_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+    )
+  `);
+}
+
+async function ensurePennylaneStaging(client: PoolClient): Promise<void> {
   await client.query(`
     CREATE TABLE IF NOT EXISTS papot_pennylane_staging (
       resource TEXT NOT NULL CHECK (resource IN (
