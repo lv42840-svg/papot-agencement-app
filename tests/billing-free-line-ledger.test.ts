@@ -210,11 +210,16 @@ describe("traçabilité des prestations libres dans les situations cumulées", (
   });
 
   it("verrouille une redistribution entre ouvrages si une situation suivante est déjà préparée", () => {
-    const deposit = createBillingDraft(empty(), source, {
-      requestId: crypto.randomUUID(),
-      type: "DEPOSIT",
-      amountHtCents: 20_000,
-    }, "Nadia");
+    const deposit = createBillingDraft(
+      empty(),
+      source,
+      {
+        requestId: crypto.randomUUID(),
+        type: "DEPOSIT",
+        amountHtCents: 20_000,
+      },
+      "Nadia",
+    );
     const first = progress({ ...empty(), drafts: [deposit] }, 50);
     const second = progress({ ...empty(), drafts: [deposit, first] }, 75);
     const payload = { ...empty(), drafts: [deposit, first, second] };
@@ -232,8 +237,9 @@ describe("traçabilité des prestations libres dans les situations cumulées", (
     );
     const saved = revised(payload, first, wordingOnly);
     expect(saved.amountHtCents).toBe(30_000);
-    expect(saved.documentLines?.find((row) => row.sourceLineId === a)?.description)
-      .toBe("Mobilier rectifié");
+    expect(saved.documentLines?.find((row) => row.sourceLineId === a)?.description).toBe(
+      "Mobilier rectifié",
+    );
   });
 
   it("traite un supplément confirmé comme une ligne du marché et pas comme une ligne libre", () => {

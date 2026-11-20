@@ -718,8 +718,7 @@ export function updateBillingDocument(
     const previous = allocatedDocumentAmounts(draft.documentLines, draft.lines);
     const proposed = allocatedDocumentAmounts(documentLines, draft.lines);
     sourceAllocationChanged = draft.lines.some(
-      (line) =>
-        (previous.get(line.lineId) ?? 0) !== (proposed.get(line.lineId) ?? 0),
+      (line) => (previous.get(line.lineId) ?? 0) !== (proposed.get(line.lineId) ?? 0),
     );
   }
   if (

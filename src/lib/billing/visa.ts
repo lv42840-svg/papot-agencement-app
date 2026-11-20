@@ -254,10 +254,7 @@ export function applyBillingVisaPartial(
   if (
     draft.type === "PROGRESS" &&
     latest.documentLines.some(
-      (line) =>
-        line.origin === "FREE" &&
-        lineHtCents(line) > 0 &&
-        !line.allocationLineId,
+      (line) => line.origin === "FREE" && lineHtCents(line) > 0 && !line.allocationLineId,
     )
   ) {
     throw new Error("BILLING_VISA_PROGRESS_FREE_LINES_UNSUPPORTED");
