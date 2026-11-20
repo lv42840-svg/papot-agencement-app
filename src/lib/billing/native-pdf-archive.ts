@@ -85,7 +85,7 @@ export async function storeOriginalNativeInvoicePdf(
           sha256,
           new Date().toISOString(),
         );
-      return { number: invoice.number, bytes: pdf, sha256 };
+      return { number: invoice.number, bytes: new Uint8Array(pdf), sha256 };
     }
     const stored = inspectArchive(rows[0], invoice);
     if (stored.sha256 !== sha256) throw new Error("BILLING_NATIVE_ARCHIVE_IMMUTABLE");
