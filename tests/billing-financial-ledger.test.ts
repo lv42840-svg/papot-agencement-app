@@ -117,11 +117,10 @@ describe("registre de facturation confirmée, séparé des projets", () => {
     const approved = approvedDraft();
     const proposed = issuedInvoice(approved);
     expect(() =>
-      registerConfirmedInvoice(
-        emptyBillingFinancialLedger(),
-        proposed,
-        { ...approved, status: "DRAFT" },
-      ),
+      registerConfirmedInvoice(emptyBillingFinancialLedger(), proposed, {
+        ...approved,
+        status: "DRAFT",
+      }),
     ).toThrow("BILLING_FINANCIAL_SOURCE_NOT_APPROVED");
     expect(() =>
       registerConfirmedInvoice(
@@ -147,9 +146,9 @@ describe("registre de facturation confirmée, séparé des projets", () => {
     expect(() => registerConfirmedCreditNote(ledger, first)).toThrow(
       "BILLING_FINANCIAL_CREDIT_DUPLICATE",
     );
-    expect(() => registerConfirmedCreditNote(ledger, credit(invoice.id, 95_000, { number: "AV-2026-03" }))).toThrow(
-      "BILLING_FINANCIAL_CREDIT_EXCEEDS_INVOICE",
-    );
+    expect(() =>
+      registerConfirmedCreditNote(ledger, credit(invoice.id, 95_000, { number: "AV-2026-03" })),
+    ).toThrow("BILLING_FINANCIAL_CREDIT_EXCEEDS_INVOICE");
     expect(() =>
       registerConfirmedCreditNote(
         ledger,
@@ -187,9 +186,7 @@ describe("registre de facturation confirmée, séparé des projets", () => {
       paidOn: "2026-12-12",
     };
     const ledger = reconcileConfirmedBankPayment(initial, payment);
-    expect(invoiceFinancialPosition(ledger, invoice.id).immediatelyOutstandingCents).toBe(
-      94_000,
-    );
+    expect(invoiceFinancialPosition(ledger, invoice.id).immediatelyOutstandingCents).toBe(94_000);
     expect(() =>
       reconcileConfirmedBankPayment(ledger, { ...payment, id: crypto.randomUUID() }),
     ).toThrow("BILLING_FINANCIAL_BANK_DUPLICATE");
@@ -231,9 +228,9 @@ describe("registre de facturation confirmée, séparé des projets", () => {
       dueOn: "2025-02-28",
       amountTtcCents: 6_000,
     });
-    expect(() =>
-      setChantierLastInvoiceDate(ledger, chantierId, "2024-02-19", "Nadia"),
-    ).toThrow("BILLING_FINANCIAL_CLOSING_DATE_BEFORE_INVOICE");
+    expect(() => setChantierLastInvoiceDate(ledger, chantierId, "2024-02-19", "Nadia")).toThrow(
+      "BILLING_FINANCIAL_CLOSING_DATE_BEFORE_INVOICE",
+    );
   });
 
   it("distingue retenue réclamée, encaissée et abandonnée avec justification", () => {
@@ -284,9 +281,7 @@ describe("registre de facturation confirmée, séparé des projets", () => {
     const abandoned = abandonRetention(claimed, abandonment);
     expect(retentionPosition(abandoned, invoice.id, "2027-12-22")?.status).toBe("ABANDONED");
     expect(
-      forecastConfirmedReceipts(abandoned, "2027-12-22").some(
-        (row) => row.type === "RETENTION",
-      ),
+      forecastConfirmedReceipts(abandoned, "2027-12-22").some((row) => row.type === "RETENTION"),
     ).toBe(false);
   });
 });

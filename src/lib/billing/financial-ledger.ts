@@ -3,10 +3,13 @@ import type { BillingDraft } from "./domain";
 
 const moneySchema = z.number().int().nonnegative().safe();
 const positiveMoneySchema = moneySchema.positive();
-const calendarDateSchema = z.string().regex(/^\d{4}-\d{2}-\d{2}$/).refine((value) => {
-  const date = new Date(value + "T00:00:00.000Z");
-  return !Number.isNaN(date.getTime()) && date.toISOString().slice(0, 10) === value;
-}, "BILLING_FINANCIAL_DATE_INVALID");
+const calendarDateSchema = z
+  .string()
+  .regex(/^\d{4}-\d{2}-\d{2}$/)
+  .refine((value) => {
+    const date = new Date(value + "T00:00:00.000Z");
+    return !Number.isNaN(date.getTime()) && date.toISOString().slice(0, 10) === value;
+  }, "BILLING_FINANCIAL_DATE_INVALID");
 
 const taxGroupSchema = z.object({
   ratePercent: z.number().finite().min(0).max(100),
@@ -202,10 +205,7 @@ export function invoiceFinancialPosition(ledger: BillingFinancialLedger, invoice
     immediatelyDueCents,
     immediatelyOutstandingCents: Math.max(0, immediatelyDueCents - immediatePaymentsCents),
     retentionOutstandingCents: Math.max(0, invoice.retentionTtcCents - retentionPaymentsCents),
-    excessPaidCents: Math.max(
-      0,
-      immediatePaymentsCents + retentionPaymentsCents - netTtcCents,
-    ),
+    excessPaidCents: Math.max(0, immediatePaymentsCents + retentionPaymentsCents - netTtcCents),
   };
 }
 
@@ -250,12 +250,14 @@ export function registerConfirmedCreditNote(
       throw new Error("BILLING_FINANCIAL_CREDIT_EXCEEDS_INVOICE");
     }
   }
-  const net = invoice.totalTtcCents - safeTotal([
-    ...ledger.creditNotes
-      .filter((item) => item.invoiceId === invoice.id)
-      .map((item) => item.totalTtcCents),
-    credit.totalTtcCents,
-  ]);
+  const net =
+    invoice.totalTtcCents -
+    safeTotal([
+      ...ledger.creditNotes
+        .filter((item) => item.invoiceId === invoice.id)
+        .map((item) => item.totalTtcCents),
+      credit.totalTtcCents,
+    ]);
   if (net < invoice.retentionTtcCents) {
     throw new Error("BILLING_FINANCIAL_CREDIT_REQUIRES_RETENTION_REVIEW");
   }
@@ -322,16 +324,10 @@ export function setChantierLastInvoiceDate(
 function addOneYear(date: string): string {
   const [year, month, day] = date.split("-").map(Number);
   const lastDay = new Date(Date.UTC(year + 1, month, 0)).getUTCDate();
-  return new Date(Date.UTC(year + 1, month - 1, Math.min(day, lastDay)))
-    .toISOString()
-    .slice(0, 10);
+  return new Date(Date.UTC(year + 1, month - 1, Math.min(day, lastDay))).toISOString().slice(0, 10);
 }
 
-export function retentionPosition(
-  ledger: BillingFinancialLedger,
-  invoiceId: string,
-  asOf: string,
-) {
+export function retentionPosition(ledger: BillingFinancialLedger, invoiceId: string, asOf: string) {
   const date = calendarDateSchema.parse(asOf);
   const position = invoiceFinancialPosition(ledger, invoiceId);
   const invoice = position.invoice;
@@ -385,11 +381,7 @@ export function abandonRetention(
 ): BillingFinancialLedger {
   const abandonment = retentionAbandonmentSchema.parse(input);
   const position = retentionPosition(ledger, abandonment.invoiceId, abandonment.abandonedOn);
-  if (
-    !position ||
-    position.status === "COLLECTED" ||
-    position.status === "ABANDONED"
-  ) {
+  if (!position || position.status === "COLLECTED" || position.status === "ABANDONED") {
     throw new Error("BILLING_FINANCIAL_RETENTION_NOT_ABANDONABLE");
   }
   return {
@@ -426,11 +418,7 @@ export function forecastConfirmedReceipts(
         amountTtcCents: position.immediatelyOutstandingCents,
       });
     }
-    if (
-      retention?.dueOn &&
-      retention.outstandingTtcCents > 0 &&
-      retention.status !== "ABANDONED"
-    ) {
+    if (retention?.dueOn && retention.outstandingTtcCents > 0 && retention.status !== "ABANDONED") {
       rows.push({
         invoiceId: invoice.id,
         type: "RETENTION",
