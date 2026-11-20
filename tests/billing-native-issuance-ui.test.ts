@@ -21,7 +21,17 @@ describe("émission native PAPOT protégée, sans Pennylane sortant", () => {
     const editor = readFileSync("src/components/billing-document-editor.tsx", "utf8");
     const billing = readFileSync("src/app/api/desktop/billing/route.ts", "utf8");
     expect(pdf).toContain("nativeInvoiceLedger?.invoices.find");
-    expect(pdf).toContain("generateNativeInvoicePdf(invoice)");
+    expect(pdf).toContain("loadOriginalNativeInvoicePdf(invoice)");
+    expect(pdf).toContain("Buffer.from(archived.bytes)");
+    expect(pdf).not.toContain("generateNativeInvoicePdf(invoice)");
+    const api = readFileSync("src/app/api/desktop/billing/issue/route.ts", "utf8");
+    expect(api).toContain("await storeOriginalNativeInvoicePdf(issued, pdf)");
+    expect(api).toContain("await loadOriginalNativeInvoicePdf(issued)");
+    expect(api).toContain("repository.mutate(async (current)");
+    const migration = readFileSync("src/lib/server-db/migrations.ts", "utf8");
+    expect(migration).toContain("papot_native_invoice_pdf_archive");
+    expect(migration).toContain("pdf BYTEA");
+    expect(migration).toContain("sha256 CHAR(64)");
     expect(editor).toContain("Émettre la facture et attribuer son numéro définitif");
     expect(editor).toContain("/api/desktop/billing/issue");
     expect(editor).toContain("/api/desktop/billing/issued/");
