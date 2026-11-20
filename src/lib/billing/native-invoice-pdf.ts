@@ -113,7 +113,7 @@ export function generateNativeInvoicePdf(invoice: NativeIssuedInvoice): Uint8Arr
       if (y > CONTENT_BOTTOM - 26) nextPage();
       text(description, isHeading ? 43 : 43, y + 10, isHeading ? 9 : 8, isHeading);
       if (!isHeading && first) {
-        text(String(line.quantity).replace(".", ","), 330, y + 10, 7.5);
+        text(String(line.quantity).replace(".", ",") + " " + line.unit.slice(0, 5), 330, y + 10, 7.5);
         text(money(line.unitPriceCents), 376, y + 10, 7.3);
         text(String(line.vatRatePercent) + " %", 463, y + 10, 7.5);
         text(money(lineHtCents(line)), 495, y + 10, 7.3);
@@ -127,6 +127,8 @@ export function generateNativeInvoicePdf(invoice: NativeIssuedInvoice): Uint8Arr
   }
 
   write([
+    "Document : " + ({ STANDARD: "Facture classique", DEPOSIT: "Facture d'acompte", PROGRESS: "Situation de travaux", FINAL: "Facture de solde" }[invoice.type]),
+    "Intitulé : " + invoice.label,
     "Chantier : " + invoice.affairName,
     "Référence devis : " + invoice.quoteLabel,
     "Date de prestation : " + dateFR(invoice.serviceOn),
