@@ -7,6 +7,60 @@ import type { NativeIssuedInvoice } from "../src/lib/billing/native-issuance";
 // Next's build-time sentinel is mocked only for this server-side unit test.
 vi.mock("server-only", () => ({}));
 
+// Vitest/Vite 2 does not resolve Node 22's node:sqlite ESM builtin. Load
+// the actual SQLite engine through Node require, while mocking just the
+// runtime adapter (not the archive algorithms under test).
+vi.mock("@/lib/local-db/runtime", async () => {
+  const { createRequire } = await import("node:module");
+  const require = createRequire(import.meta.url);
+  const sqlite = require("node:sqlite") as {
+    DatabaseSync: new (file: string) => {
+      exec(sql: string): void;
+      prepare(sql: string): {
+        run(...args: unknown[]): unknown;
+        get(...args: unknown[]): unknown;
+        all(...args: unknown[]): unknown[];
+      };
+    };
+  };
+  type Database = InstanceType<typeof sqlite.DatabaseSync>;
+  let db: Database | null = null;
+  let location = "";
+  function getLocalDatabase(): Database {
+    const desired = process.env.PAPOT_LOCAL_DB_PATH ?? ":memory:";
+    if (db && desired === location) return db;
+    db = new sqlite.DatabaseSync(desired);
+    location = desired;
+    db.exec(`
+      CREATE TABLE IF NOT EXISTS local_native_invoice_pdf_archive (
+        invoice_id TEXT PRIMARY KEY,
+        invoice_number TEXT NOT NULL UNIQUE,
+        issued_at TEXT NOT NULL,
+        pdf BLOB NOT NULL CHECK (length(pdf) > 0),
+        sha256 TEXT NOT NULL CHECK (length(sha256) = 64),
+        archived_at TEXT NOT NULL
+      ) STRICT;
+    `);
+    return db;
+  }
+  return {
+    isLocalStorageMode: () => true,
+    getLocalDatabase,
+    async withLocalDatabaseWrite<T>(work: () => T | Promise<T>): Promise<T> {
+      const db = getLocalDatabase();
+      db.exec("BEGIN IMMEDIATE");
+      try {
+        const result = await work();
+        db.exec("COMMIT");
+        return result;
+      } catch (error) {
+        db.exec("ROLLBACK");
+        throw error;
+      }
+    },
+  };
+});
+
 import {
   loadOriginalNativeInvoicePdf,
   storeOriginalNativeInvoicePdf,
