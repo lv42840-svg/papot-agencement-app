@@ -95,9 +95,11 @@ export function generateNativeInvoicePdf(invoice: NativeIssuedInvoice): Uint8Arr
 
   function write(values: string[], bold = false) {
     for (const value of values) {
-      if (y > CONTENT_BOTTOM - 17) nextPage();
-      text(value, 43, y + 10, 8.5, bold);
-      y += 14;
+      for (const part of wrap(value, 90)) {
+        if (y > CONTENT_BOTTOM - 17) nextPage();
+        text(part, 43, y + 10, 8.5, bold);
+        y += 14;
+      }
     }
   }
 
