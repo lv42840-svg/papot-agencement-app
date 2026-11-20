@@ -42,11 +42,16 @@ const source: BillingSource = {
   ],
 };
 function progress(payload: BillingPayload, percent: number, on = source) {
-  return createBillingDraft(payload, on, {
-    requestId: crypto.randomUUID(),
-    type: "PROGRESS",
-    linePercentages: (on.lines ?? []).map((line) => ({ lineId: line.lineId, percent })),
-  }, "Nadia");
+  return createBillingDraft(
+    payload,
+    on,
+    {
+      requestId: crypto.randomUUID(),
+      type: "PROGRESS",
+      linePercentages: (on.lines ?? []).map((line) => ({ lineId: line.lineId, percent })),
+    },
+    "Nadia",
+  );
 }
 function rows(draft: ReturnType<typeof progress>) {
   return (draft.documentLines ?? []).map((line) => ({ ...line }));
@@ -56,12 +61,17 @@ function revised(
   draft: ReturnType<typeof progress>,
   changed: BillingDocumentLine[],
 ) {
-  return updateBillingDocument(payload, draft.id, {
-    expectedUpdatedAt: draft.updatedAt,
-    label: draft.label,
-    notes: draft.notes,
-    documentLines: changed,
-  }, "Lucien");
+  return updateBillingDocument(
+    payload,
+    draft.id,
+    {
+      expectedUpdatedAt: draft.updatedAt,
+      label: draft.label,
+      notes: draft.notes,
+      documentLines: changed,
+    },
+    "Lucien",
+  );
 }
 function free(centimes: number, allocationLineId: string | null, rate = 20): BillingDocumentLine {
   return {
@@ -96,7 +106,12 @@ describe("traçabilité des prestations libres dans les situations cumulées", (
     expect(first.lineProgress?.map((entry) => entry.cumulativeHtCents)).toEqual([30_000, 20_000]);
     const next = progress({ ...empty(), drafts: [first] }, 75);
     expect(next.amountHtCents).toBe(25_000);
-    expect(amountBySource(next)).toEqual(new Map([[a, 15_000], [b, 10_000]]));
+    expect(amountBySource(next)).toEqual(
+      new Map([
+        [a, 15_000],
+        [b, 10_000],
+      ]),
+    );
     expect(next.vatCents).toBe(5_000);
   });
 
@@ -106,9 +121,9 @@ describe("traçabilité des prestations libres dans les situations cumulées", (
       line.sourceLineId === a ? { ...line, unitPriceCents: 20_000 } : line,
     );
     modified.push(free(10_000, null));
-    expect(() => revised(
-      { ...empty(), drafts: [original] }, original, modified,
-    )).toThrow("BILLING_PROGRESS_FREE_UNALLOCATED");
+    expect(() => revised({ ...empty(), drafts: [original] }, original, modified)).toThrow(
+      "BILLING_PROGRESS_FREE_UNALLOCATED",
+    );
   });
 
   it("rejette une affectation à un ouvrage inconnu ou dont la TVA ne correspond pas", () => {
@@ -116,14 +131,15 @@ describe("traçabilité des prestations libres dans les situations cumulées", (
     const modified = rows(original).map((line) =>
       line.sourceLineId === a ? { ...line, unitPriceCents: 20_000 } : line,
     );
-    expect(() => revised(
-      { ...empty(), drafts: [original] }, original,
-      [...modified, free(10_000, crypto.randomUUID())],
-    )).toThrow("BILLING_DOCUMENT_ALLOCATION_UNKNOWN");
-    expect(() => revised(
-      { ...empty(), drafts: [original] }, original,
-      [...modified, free(10_000, a, 10)],
-    )).toThrow("BILLING_DOCUMENT_VAT_OUTSIDE_CONTRACT");
+    expect(() =>
+      revised({ ...empty(), drafts: [original] }, original, [
+        ...modified,
+        free(10_000, crypto.randomUUID()),
+      ]),
+    ).toThrow("BILLING_DOCUMENT_ALLOCATION_UNKNOWN");
+    expect(() =>
+      revised({ ...empty(), drafts: [original] }, original, [...modified, free(10_000, a, 10)]),
+    ).toThrow("BILLING_DOCUMENT_VAT_OUTSIDE_CONTRACT");
   });
 
   it("ne laisse pas dépasser le plafond d'un ouvrage à montant global identique", () => {
@@ -134,17 +150,22 @@ describe("traçabilité des prestations libres dans les situations cumulées", (
     });
     modified.push(free(10_000, a));
     // The grand total is 80_000 but 70_000 was assigned to a 60_000 ouvrage.
-    expect(() => revised(
-      { ...empty(), drafts: [original] }, original, modified,
-    )).toThrow("BILLING_PROGRESS_LINE_EXCEEDS_CONTRACT");
+    expect(() => revised({ ...empty(), drafts: [original] }, original, modified)).toThrow(
+      "BILLING_PROGRESS_LINE_EXCEEDS_CONTRACT",
+    );
   });
 
   it("reprend les acomptes avec prestations affectées à la bonne ligne du marché", () => {
-    const deposit = createBillingDraft(empty(), source, {
-      requestId: crypto.randomUUID(),
-      type: "DEPOSIT",
-      amountHtCents: 20_000,
-    }, "Nadia");
+    const deposit = createBillingDraft(
+      empty(),
+      source,
+      {
+        requestId: crypto.randomUUID(),
+        type: "DEPOSIT",
+        amountHtCents: 20_000,
+      },
+      "Nadia",
+    );
     const modified = rows(deposit).map((line) =>
       line.sourceLineId === a ? { ...line, unitPriceCents: 2_000 } : line,
     );
@@ -153,15 +174,25 @@ describe("traçabilité des prestations libres dans les situations cumulées", (
     expect(first.amountHtCents).toBe(20_000);
     const next = progress({ ...empty(), drafts: [first] }, 50);
     expect(next.amountHtCents).toBe(30_000);
-    expect(amountBySource(next)).toEqual(new Map([[a, 18_000], [b, 12_000]]));
+    expect(amountBySource(next)).toEqual(
+      new Map([
+        [a, 18_000],
+        [b, 12_000],
+      ]),
+    );
   });
 
   it("déduit une prestation libre sur acompte comme une avance globale par TVA", () => {
-    const deposit = createBillingDraft(empty(), source, {
-      requestId: crypto.randomUUID(),
-      type: "DEPOSIT",
-      amountHtCents: 20_000,
-    }, "Nadia");
+    const deposit = createBillingDraft(
+      empty(),
+      source,
+      {
+        requestId: crypto.randomUUID(),
+        type: "DEPOSIT",
+        amountHtCents: 20_000,
+      },
+      "Nadia",
+    );
     const modified = rows(deposit).map((line) =>
       line.sourceLineId === a ? { ...line, unitPriceCents: 2_000 } : line,
     );
@@ -170,7 +201,12 @@ describe("traçabilité des prestations libres dans les situations cumulées", (
     // An advance is a payment credit, not physical progress by ouvrage.
     const next = progress({ ...empty(), drafts: [first] }, 50);
     expect(next.amountHtCents).toBe(30_000);
-    expect(amountBySource(next)).toEqual(new Map([[a, 18_000], [b, 12_000]]));
+    expect(amountBySource(next)).toEqual(
+      new Map([
+        [a, 18_000],
+        [b, 12_000],
+      ]),
+    );
   });
 
   it("traite un supplément confirmé comme une ligne du marché et pas comme une ligne libre", () => {
@@ -181,19 +217,27 @@ describe("traçabilité des prestations libres dans les situations cumulées", (
       clientName: "Pralus",
     };
     const quote = { ...source, sourceMode: "QUOTE" as const, sourceQuoteIds: undefined };
-    const pending = addBillingExtra(empty(), {
-      requestId: crypto.randomUUID(),
-      chantierId,
-      description: "Cornières de finition",
-      amountHtCents: 20_000,
-      vatRatePercent: 20,
-    }, "Nadia");
+    const pending = addBillingExtra(
+      empty(),
+      {
+        requestId: crypto.randomUUID(),
+        chantierId,
+        description: "Cornières de finition",
+        amountHtCents: 20_000,
+        vatRatePercent: 20,
+      },
+      "Nadia",
+    );
     const unconfirmed = buildChantierMarketSources([chantier], [quote], [], pending.extras)[0];
     expect(unconfirmed.contractHtCents).toBe(100_000);
-    const approved = confirmBillingExtra(pending, {
-      extraId: pending.extras![0].id,
-      evidence: "Accord signé du client",
-    }, "Lucien");
+    const approved = confirmBillingExtra(
+      pending,
+      {
+        extraId: pending.extras![0].id,
+        evidence: "Accord signé du client",
+      },
+      "Lucien",
+    );
     const market = buildChantierMarketSources([chantier], [quote], [], approved.extras)[0];
     expect(market.contractHtCents).toBe(120_000);
     const first = progress(empty(), 50, market);
@@ -222,51 +266,78 @@ describe("traçabilité des prestations libres dans les situations cumulées", (
       "Nadia",
     );
     const visa = payload.visaVersions![0];
-    const lineDecisions = visa.documentLines.filter((line) => line.origin !== "TITLE").map((line) => ({
-      documentLineId: line.id,
-      acceptedHtCents: line.origin === "FREE" ? 5_000 : lineHtCents(line),
-      reason: line.origin === "FREE" ? "Finition limitée au montant accepté" : "",
-    }));
-    const reviewed = recordBillingVisaDecision(payload, {
-      draftId: draft.id,
-      version: 1,
-      decision: "PARTIAL",
-      acceptedHtCents: 45_000,
-      lineDecisions,
-      reviewMethod: "EMAIL",
-      externalContact: "Architecte",
-      evidence: "Réponse du client",
-      reason: "Réduction d'une prestation",
-    }, "Lucien");
-    const applied = applyBillingVisaPartial(reviewed, {
-      draftId: draft.id,
-      version: 1,
-      expectedUpdatedAt: draft.updatedAt,
-    }, "Nadia");
+    const lineDecisions = visa.documentLines
+      .filter((line) => line.origin !== "TITLE")
+      .map((line) => ({
+        documentLineId: line.id,
+        acceptedHtCents: line.origin === "FREE" ? 5_000 : lineHtCents(line),
+        reason: line.origin === "FREE" ? "Finition limitée au montant accepté" : "",
+      }));
+    const reviewed = recordBillingVisaDecision(
+      payload,
+      {
+        draftId: draft.id,
+        version: 1,
+        decision: "PARTIAL",
+        acceptedHtCents: 45_000,
+        lineDecisions,
+        reviewMethod: "EMAIL",
+        externalContact: "Architecte",
+        evidence: "Réponse du client",
+        reason: "Réduction d'une prestation",
+      },
+      "Lucien",
+    );
+    const applied = applyBillingVisaPartial(
+      reviewed,
+      {
+        draftId: draft.id,
+        version: 1,
+        expectedUpdatedAt: draft.updatedAt,
+      },
+      "Nadia",
+    );
     expect(applied.drafts[0].amountHtCents).toBe(45_000);
-    expect(applied.drafts[0].lineProgress?.map((line) => line.cumulativeHtCents))
-      .toEqual([25_000, 20_000]);
+    expect(applied.drafts[0].lineProgress?.map((line) => line.cumulativeHtCents)).toEqual([
+      25_000, 20_000,
+    ]);
     expect(applied.visaVersions?.[0].documentLines).toEqual(visa.documentLines);
-    const v2 = presentBillingVisa(applied, {
-      draftId: draft.id,
-      expectedUpdatedAt: applied.drafts[0].updatedAt,
-      submittedTo: "Architecte",
-      submittedNotes: "Révision avec finitions acceptées",
-    }, "Nadia");
-    const finalVisa = recordBillingVisaDecision(v2, {
-      draftId: draft.id,
-      version: 2,
-      decision: "ACCEPTED",
-      reviewMethod: "EMAIL",
-      externalContact: "Architecte",
-      evidence: "Accord nouvelle version",
-      reason: "Accepté",
-    }, "Lucien");
+    const v2 = presentBillingVisa(
+      applied,
+      {
+        draftId: draft.id,
+        expectedUpdatedAt: applied.drafts[0].updatedAt,
+        submittedTo: "Architecte",
+        submittedNotes: "Révision avec finitions acceptées",
+      },
+      "Nadia",
+    );
+    const finalVisa = recordBillingVisaDecision(
+      v2,
+      {
+        draftId: draft.id,
+        version: 2,
+        decision: "ACCEPTED",
+        reviewMethod: "EMAIL",
+        externalContact: "Architecte",
+        evidence: "Accord nouvelle version",
+        reason: "Accepté",
+      },
+      "Lucien",
+    );
     const firstApproved = approveBillingDraft(
-      finalVisa, draft.id, finalVisa.drafts[0].updatedAt, "Lucien",
+      finalVisa,
+      draft.id,
+      finalVisa.drafts[0].updatedAt,
+      "Lucien",
     );
     const next = progress({ ...empty(), drafts: [firstApproved] }, 100);
-    expect(amountBySource(next)).toEqual(new Map([[a, 35_000], [b, 20_000]]));
+    expect(amountBySource(next)).toEqual(
+      new Map([
+        [a, 35_000],
+        [b, 20_000],
+      ]),
+    );
     expect(next.amountHtCents).toBe(55_000);
   });
 });

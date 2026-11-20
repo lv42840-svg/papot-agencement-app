@@ -289,9 +289,7 @@ export function applyBillingVisaPartial(
       return {
         lineId: row.lineId,
         cumulativeHtCents,
-        percent: source.amountHtCents > 0
-          ? (cumulativeHtCents * 100) / source.amountHtCents
-          : 0,
+        percent: source.amountHtCents > 0 ? (cumulativeHtCents * 100) / source.amountHtCents : 0,
       };
     });
     reconcileDocumentLineProgress(payload, draft, acceptedLines, adjusted);

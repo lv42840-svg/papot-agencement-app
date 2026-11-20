@@ -87,7 +87,11 @@ export function reconcileDocumentLineProgress(
   const current = allocatedDocumentAmounts(rows, sources);
   const sourceIds = new Set(sources.map((source) => source.lineId));
   const chosen = expected ?? draft.lineProgress;
-  if (!chosen || chosen.length !== sourceIds.size || chosen.some((row) => !sourceIds.has(row.lineId))) {
+  if (
+    !chosen ||
+    chosen.length !== sourceIds.size ||
+    chosen.some((row) => !sourceIds.has(row.lineId))
+  ) {
     throw new Error("BILLING_PROGRESS_HISTORY_UNDETERMINED");
   }
   const targets = new Map(chosen.map((row) => [row.lineId, row]));

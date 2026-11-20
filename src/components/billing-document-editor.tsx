@@ -894,11 +894,10 @@ export function BillingDocumentEditor({ draftId }: { draftId: string }) {
           </details>
         ) : null}
         <p className="invoiceHint">
-          Pour une situation, affecte chaque prestation ajoutée à l'ouvrage du marché
-          qu'elle concerne. Cette affectation consomme son budget, elle ne crée pas un
-          nouveau marché. Pour facturer des
-          travaux supplémentaires dépassant le contrat, ajoute un supplément au chantier et
-          enregistre son accord.
+          Pour une situation, affecte chaque prestation ajoutée à l'ouvrage du marché qu'elle
+          concerne. Cette affectation consomme son budget, elle ne crée pas un nouveau marché. Pour
+          facturer des travaux supplémentaires dépassant le contrat, ajoute un supplément au
+          chantier et enregistre son accord.
         </p>
       </section>
 

@@ -667,7 +667,12 @@ export function updateBillingDocument(
     ? calculateLineProgress({ schemaVersion: 1, drafts: priorDrafts }, draft, input.linePercentages)
     : null;
   if (draft.type === "PROGRESS" && draft.lines?.length) {
-    reconcileDocumentLineProgress(payload, draft, documentLines, recalculatedProgress?.lineProgress);
+    reconcileDocumentLineProgress(
+      payload,
+      draft,
+      documentLines,
+      recalculatedProgress?.lineProgress,
+    );
   }
   if (recalculatedProgress && draft.type !== "PROGRESS") {
     throw new Error("BILLING_PROGRESS_INPUT_CONFLICT");

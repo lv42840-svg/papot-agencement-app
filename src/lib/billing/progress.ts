@@ -96,9 +96,9 @@ export function calculateLineProgress(
       vatCents: Math.round((baseHtCents * contract.ratePercent) / 100),
     };
   });
-  if (lineProgress.some(
-    (row) => row.cumulativeHtCents < (previousLineAmounts.get(row.lineId) ?? 0),
-  )) {
+  if (
+    lineProgress.some((row) => row.cumulativeHtCents < (previousLineAmounts.get(row.lineId) ?? 0))
+  ) {
     throw new Error("BILLING_PROGRESS_LINE_BELOW_PREPARED");
   }
   const amountHtCents = groups.reduce((sum, group) => sum + group.baseHtCents, 0);
