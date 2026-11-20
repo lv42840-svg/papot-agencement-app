@@ -628,6 +628,20 @@ export function BillingDocumentEditor({ draftId }: { draftId: string }) {
   async function issueCredit() {
     if (!issued || !canIssueCredits || !creditPosition || busy ||
         creditPosition.remainingTtcCents <= 0 || creditReason.trim().length < 3) return;
+    if (
+      creditMode === "PARTIAL" &&
+      creditPosition.allowances.some((allowance) => {
+        const raw = creditAmounts[String(allowance.ratePercent)]?.trim() ?? "";
+        if (!raw) return false;
+        const entered = centsFromEuros(raw);
+        return !Number.isSafeInteger(entered) ||
+          entered < 0 ||
+          entered > allowance.remainingHtCents;
+      })
+    ) {
+      setError("Un montant HT est invalide ou dépasse le reste créditable.");
+      return;
+    }
     const amounts = creditPosition.allowances.flatMap((allowance) => {
       if (allowance.remainingHtCents <= 0) return [];
       const amount = creditMode === "FULL"
