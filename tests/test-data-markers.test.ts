@@ -85,6 +85,7 @@ describe("Marqueur de recette: affaires, devis et chantiers", () => {
         action: "createDraft",
         commercialCaseId: createAffair(false).cases[0].id,
         subject: "Essai ancien",
+        quoteKind: "STANDARD",
         issueDate: "2026-11-21",
         paymentTerms: "30 jours",
         variantName: "Base",
