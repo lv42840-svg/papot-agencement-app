@@ -574,16 +574,16 @@ function CreateAffair({
   }
   return (
     <form className="commercialV2Create" onSubmit={(event) => void submit(event)}>
-      <label className="testDataFormChoice">
-        <input type="checkbox" name="isTest" />
-        <span>Affaire de TEST : les devis et chantiers créés depuis cette affaire seront marqués TEST.</span>
-      </label>
       <div className="commercialV2CreateTitle">
         <strong>Nouvelle affaire</strong>
         <button type="button" onClick={onCancel}>
           <X size={14} />
         </button>
       </div>
+      <label className="testDataFormChoice">
+        <input type="checkbox" name="isTest" />
+        <span>Affaire de TEST : les nouveaux devis et le chantier lié porteront le badge TEST.</span>
+      </label>
       <label>
         <span>Client</span>
         <select
