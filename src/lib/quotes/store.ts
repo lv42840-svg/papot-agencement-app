@@ -58,6 +58,7 @@ export const nativeQuoteRecordSchema = z
     variantName: z.string().trim().min(1).max(120),
     version: quoteVersionSchema,
     status: quoteStatusSchema,
+    isTest: z.boolean().optional(),
     sentAt: isoDateTimeSchema.nullable().optional().default(null),
     followUpDate: dateOnlySchema.nullable().optional().default(null),
     finalPdf: quoteFinalPdfSchema.nullable().optional().default(null),

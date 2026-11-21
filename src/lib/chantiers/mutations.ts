@@ -36,6 +36,11 @@ export const launchChantierSchema = z.object({
 
 export const chantierMutationSchema = z.discriminatedUnion("action", [
   z.object({
+    action: z.literal("setTestMarker"),
+    chantierId: z.string().uuid(),
+    isTest: z.boolean(),
+  }),
+  z.object({
     action: z.literal("updateDetails"),
     chantierId: z.string().uuid(),
     number: nullableText(80),
@@ -326,6 +331,7 @@ export function launchChantierFromCommercial(
     description: commercialCase.description,
     nextAction: commercialCase.nextAction,
     status: "ACTIVE",
+    isTest: commercialCase.isTest === true,
     plannedInstallDate: commercialCase.plannedInstallDate,
     launchYear: now.getFullYear(),
     launchDocuments: {
@@ -386,6 +392,20 @@ export function applyChantierMutation(
 ): ChantierMutationResult {
   const payload = structuredClone(parseChantiersPayload(rawSource));
   const item = findChantier(payload, input.chantierId);
+
+  if (input.action === "setTestMarker") {
+    if (Boolean(item.isTest) === input.isTest) return { payload, focusChantierId: item.id };
+    item.isTest = input.isTest;
+    touch(item, actor, now);
+    history(
+      item,
+      actor.displayName,
+      "TEST_MARKER_UPDATED",
+      input.isTest ? "Chantier marqué comme donnée de test." : "Marquage test retiré du chantier.",
+      now,
+    );
+    return { payload, focusChantierId: item.id };
+  }
 
   // Cancellation preserves the dossier but stops operational changes until reopening.
   if (item.status === "CANCELLED" && input.action !== "reactivate" && input.action !== "archive") {

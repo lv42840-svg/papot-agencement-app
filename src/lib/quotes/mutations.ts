@@ -36,6 +36,12 @@ const createDraftMutationSchema = z.object({
   paymentTerms: z.string().trim().min(1).max(1000),
 });
 
+const setTestMarkerMutationSchema = z.object({
+  action: z.literal("setTestMarker"),
+  quoteId: z.string().uuid(),
+  isTest: z.boolean(),
+});
+
 const deleteDraftMutationSchema = z.object({
   action: z.literal("deleteDraft"),
   quoteId: z.string().uuid(),
@@ -150,6 +156,7 @@ const upsertSubsectionMutationSchema = z.object({
 export const quotesMutationSchema = z.discriminatedUnion("action", [
   createDraftMutationSchema,
   deleteDraftMutationSchema,
+  setTestMarkerMutationSchema,
   upsertLineMutationSchema,
   upsertOuvrageMutationSchema,
   duplicateLineMutationSchema,
@@ -204,6 +211,7 @@ function createDraft(
   actor: QuotesActor,
   clientId: string | undefined,
   now: Date,
+  initialIsTest = false,
 ): QuotesMutationResult {
   if (!clientId) throw new Error("QUOTE_CLIENT_NOT_FOUND");
 
@@ -227,6 +235,7 @@ function createDraft(
     variantName: input.variantName,
     version,
     status: "DRAFT",
+    isTest: initialIsTest,
     model,
     createdAt: timestamp,
     createdByName: actor.displayName,
@@ -817,10 +826,20 @@ export function applyQuotesMutation(
   now: Date = new Date(),
   librarySource?: QuoteLibraryComponentSource,
   libraryComponentSources?: ReadonlyMap<string, QuoteLibraryComponentSource>,
+  initialIsTest = false,
 ): QuotesMutationResult {
   const payload = structuredClone(parseNativeQuotesPayload(source));
   if (input.action === "createDraft") {
-    return createDraft(payload, input, actor, clientId, now);
+    return createDraft(payload, input, actor, clientId, now, initialIsTest);
+  }
+  if (input.action === "setTestMarker") {
+    const quote = payload.quotes.find((item) => item.id === input.quoteId);
+    if (!quote) throw new Error("QUOTE_NOT_FOUND");
+    if (Boolean(quote.isTest) === input.isTest) return { payload, focusQuoteId: quote.id };
+    quote.isTest = input.isTest;
+    quote.updatedAt = now.toISOString();
+    quote.updatedByName = actor.displayName;
+    return { payload, focusQuoteId: quote.id };
   }
   if (input.action === "deleteDraft") {
     const { quoteIndex } = findDraftQuote(payload, input.quoteId);

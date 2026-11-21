@@ -87,6 +87,7 @@ export function ChantiersWorkspace() {
   const [error, setError] = useState<string | null>(null);
   const [mode, setMode] = useState<ViewMode>("ACTIVE");
   const [query, setQuery] = useState("");
+  const [showTestsOnly, setShowTestsOnly] = useState(false);
   const [launchCaseId, setLaunchCaseId] = useState<string | null>(null);
 
   const load = useCallback(async () => {
@@ -134,10 +135,12 @@ export function ChantiersWorkspace() {
 
   const normalizedQuery = normalize(query);
   const visible = useMemo(() => {
-    const filtered = chantiers.filter((item) => matches(item, normalizedQuery));
-    if (normalizedQuery) return filtered;
+    const filtered = chantiers.filter(
+      (item) => matches(item, normalizedQuery) && (!showTestsOnly || item.isTest === true),
+    );
+    if (normalizedQuery || showTestsOnly) return filtered;
     return filtered.filter((item) => item.status === mode);
-  }, [chantiers, normalizedQuery, mode]);
+  }, [chantiers, normalizedQuery, mode, showTestsOnly]);
 
   const selectedLaunch = launchCandidates.find((item) => item.id === launchCaseId) ?? null;
   const counts = {
@@ -225,7 +228,9 @@ export function ChantiersWorkspace() {
                   <BriefcaseBusiness size={14} />
                 </span>
                 <div>
-                  <strong>{item.name}</strong>
+                  <strong>
+                    {item.name} {item.isTest && <span className="testDataBadge">TEST</span>}
+                  </strong>
                   <small>
                     {[item.clientName, item.siteLabel].filter(Boolean).join(" · ") ||
                       "Client / lieu à compléter"}
@@ -251,6 +256,15 @@ export function ChantiersWorkspace() {
       ) : null}
 
       <section className="chantiersToolbar">
+        <label className="testDataFilter">
+          <input
+            type="checkbox"
+            checked={showTestsOnly}
+            onChange={(event) => setShowTestsOnly(event.target.checked)}
+          />
+          Afficher uniquement les chantiers TEST (
+          {chantiers.filter((item) => item.isTest === true).length})
+        </label>
         <div className="chantiersModes">
           <button
             className={mode === "ACTIVE" ? "isActive" : ""}

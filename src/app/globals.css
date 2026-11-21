@@ -1357,3 +1357,60 @@ select:focus {
     gap: 7px;
   }
 }
+
+/* Repères sûrs pour les affaires, devis et chantiers de recette. */
+.testDataBadge {
+  display: inline-flex;
+  gap: 5px;
+  align-items: center;
+  vertical-align: middle;
+  width: fit-content;
+  padding: 3px 8px;
+  border: 1px solid #d9c9f5;
+  background: #f1eaff;
+  color: #6943ae;
+  border-radius: 999px;
+  font-size: 10px;
+  font-style: normal;
+  font-weight: 800;
+  letter-spacing: 0.04em;
+  white-space: nowrap;
+}
+.testDataMarker {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+  margin: 7px 0;
+}
+.testDataMarkerButton {
+  display: inline-flex;
+  align-items: center;
+  min-height: 30px;
+  font-size: 12px;
+}
+.testDataMarkerError {
+  font-size: 12px;
+  color: #a32e3f;
+}
+.testDataFilter,
+.testDataFormChoice {
+  display: inline-flex;
+  align-items: center;
+  gap: 9px;
+  padding: 9px 11px;
+  border: 1px solid #e3d8f4;
+  border-radius: 8px;
+  background: #f9f5ff;
+  color: #625078;
+  font-size: 12px;
+  line-height: 1.4;
+  cursor: pointer;
+}
+.testDataFilter input,
+.testDataFormChoice input {
+  accent-color: #8064d8;
+  width: 16px;
+  height: 16px;
+  flex: 0 0 auto;
+}

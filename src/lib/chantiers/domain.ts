@@ -124,6 +124,7 @@ export const chantierHistoryEventSchema = z.object({
     "REACTIVATED",
     "ARCHIVED",
     "UNARCHIVED",
+    "TEST_MARKER_UPDATED",
   ]),
   at: isoDateTimeSchema,
   actorName: z.string().trim().min(1).max(120),
@@ -147,6 +148,7 @@ export const chantierRecordSchema = z.object({
   description: nullableText(4000),
   nextAction: nullableText(2000),
   status: chantierStatusSchema,
+  isTest: z.boolean().optional(),
   plannedInstallDate: dateOnlySchema,
   launchYear: z.number().int().min(2020).max(2100),
   launchDocuments: z.object({

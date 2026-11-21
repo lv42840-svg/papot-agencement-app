@@ -140,7 +140,16 @@ export async function POST(request: Request) {
 
       const repository = createQuotesRepository();
       const mutation = await repository.mutate((payload) => {
-        const created = applyQuotesMutation(payload, input, actor, client.id, now);
+        const created = applyQuotesMutation(
+          payload,
+          input,
+          actor,
+          client.id,
+          now,
+          undefined,
+          undefined,
+          affair.isTest === true,
+        );
         return initializeQuoteVatFromClient(
           created.payload,
           created.focusQuoteId,
