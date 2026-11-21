@@ -2,6 +2,7 @@
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
+import { BillingTestSandboxPanel } from "@/components/billing-test-sandbox-panel";
 import { parseBillingPercentageInput } from "@/lib/billing/percentage-input";
 import { calculateLineProgress } from "@/lib/billing/progress";
 import { filterBillingProjects, type BillingProjectSort } from "@/lib/billing/workspace-list";
@@ -27,6 +28,7 @@ type Snapshot = {
   sources: BillingSource[];
   chantiers: BillingChantierChoice[];
   canWrite: boolean;
+  canTestBillingSandbox?: boolean;
 };
 const money = (n: number) =>
   (n / 100).toLocaleString("fr-FR", { style: "currency", currency: "EUR" });
@@ -66,7 +68,7 @@ export function BillingWorkspace({
   const [extraAmount, setExtraAmount] = useState("");
   const [extraVat, setExtraVat] = useState("20");
   const [extraEvidence, setExtraEvidence] = useState<Record<string, string>>({});
-  const [tab, setTab] = useState<"CHANTIER" | "PROJECTS" | "FOLLOWUP">(
+  const [tab, setTab] = useState<"CHANTIER" | "PROJECTS" | "FOLLOWUP" | "TESTS">(
     chantierId || quoteId ? "CHANTIER" : initialTab === "FOLLOWUP" ? "FOLLOWUP" : "PROJECTS",
   );
   const [selectedChantier, setSelectedChantier] = useState(chantierId ?? "");
@@ -408,8 +410,9 @@ export function BillingWorkspace({
             ["CHANTIER", "Nouvelle facture depuis chantier"],
             ["PROJECTS", `Projets de factures (${drafts.length})`],
             ["FOLLOWUP", `Devis à facturer (${followup.length})`],
+            ["TESTS", "Essais supprimables"],
           ] as const
-        ).map(([key, caption]) => (
+        ).filter(([key]) => key !== "TESTS" || data?.canTestBillingSandbox).map(([key, caption]) => (
           <button
             key={key}
             type="button"
@@ -430,6 +433,9 @@ export function BillingWorkspace({
         ))}
       </div>
       {!data && <p>Chargement…</p>}
+      {data && data.canTestBillingSandbox && tab === "TESTS" && (
+        <BillingTestSandboxPanel />
+      )}
       {data && tab === "CHANTIER" && (
         <section
           role="tabpanel"
