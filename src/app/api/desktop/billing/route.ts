@@ -278,6 +278,12 @@ export async function GET() {
         draftId: invoice.draftId,
         number: invoice.number,
         issuedAt: invoice.issuedAt,
+        chantierId: invoice.chantierId,
+        clientName: invoice.buyer.name,
+        affairName: invoice.affairName,
+        label: invoice.label,
+        type: invoice.type,
+        totalTtcCents: invoice.totalTtcCents,
       })),
       issuedCreditNotes: (payload.nativeCreditNoteLedger?.creditNotes ?? []).map((note) => ({
         id: note.id,
