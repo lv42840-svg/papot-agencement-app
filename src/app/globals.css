@@ -1314,3 +1314,39 @@ select:focus {
     text-align: left;
   }
 }
+
+
+/* Lecture immédiate des 3 étapes sur une facture individuelle. */
+.billingProcessSteps {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 11px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.billingProcessSteps li {
+  display: grid;
+  align-content: start;
+  gap: 7px;
+  padding: 14px 15px;
+  border-radius: 11px;
+  border: 1px solid #e8e2ee;
+  background: #faf9fc;
+  color: #81798a;
+}
+.billingProcessSteps li strong { font-size: 13px; }
+.billingProcessSteps li span { font-size: 11px; line-height: 1.5; }
+.billingProcessSteps .billingStepCurrent {
+  color: #6946a8;
+  background: #f1ebfd;
+  border-color: #cab4ee;
+}
+.billingProcessSteps .billingStepDone {
+  color: #28654c;
+  background: #edf8f1;
+  border-color: #c7e5d5;
+}
+@media (max-width: 750px) {
+  .billingProcessSteps { grid-template-columns: minmax(0, 1fr); gap: 7px; }
+}
