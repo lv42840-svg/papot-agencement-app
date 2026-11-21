@@ -49,6 +49,7 @@ function wrap(text: string, limit: number): string[] {
 export function generateNativeCreditNotePdf(
   note: NativeCreditNote,
   original: NativeIssuedInvoice,
+  options: { testOnly?: boolean } = {},
 ): Uint8Array {
   if (
     note.originalInvoiceId !== original.id ||
@@ -85,8 +86,9 @@ export function generateNativeCreditNotePdf(
     if (pages.length >= 100) throw new Error("BILLING_NATIVE_CREDIT_PDF_PAGE_LIMIT");
     content = [];
     pages.push(content);
+    if (options.testOnly) text("DOCUMENT TEST / SANS VALEUR FISCALE", 40, 19, 11, true);
     text(original.seller.name, 40, 45, 13, true);
-    text("AVOIR N° " + note.number, 40, 78, 16, true);
+    text((options.testOnly ? "TEST - AVOIR SIMULE " : "AVOIR N° ") + note.number, 40, 78, 16, true);
     text("Émis le " + dateFR(note.issuedOn), 405, 78, 9);
     rule(91);
     y = 125;
@@ -156,6 +158,10 @@ export function generateNativeCreditNotePdf(
     ...(original.vatOnDebits ? ["TVA acquittée sur les débits."] : []),
   ]);
   for (const [index, page] of pages.entries()) {
+    if (options.testOnly) {
+      page.push("BT /F2 13 Tf 90 380 Td (SPECIMEN - TEST - NON VALABLE) Tj ET");
+      page.push("BT /F2 8 Tf 45 100 Td (TEST - NE PAS ENVOYER AU CLIENT) Tj ET");
+    }
     page.push("0.75 G 0.5 w 40 65 m 555 65 l S 0 G");
     page.push(
       "BT /F1 8 Tf 40 48 Td (" +
