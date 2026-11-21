@@ -50,13 +50,6 @@ type SandboxResponse = {
 const euros = (cents: number) =>
   (cents / 100).toLocaleString("fr-FR", { style: "currency", currency: "EUR" });
 const date = () => new Date().toISOString().slice(0, 10);
-const parseMoney = (value: string): number | null => {
-  const normalized = value.replace(/\s/g, "").replace(",", ".");
-  if (!/^\d+(?:\.\d{1,2})?$/.test(normalized)) return null;
-  const cents = Math.round(Number(normalized) * 100);
-  return Number.isSafeInteger(cents) ? cents : null;
-};
-
 export function BillingTestSandboxPanel() {
   const [data, setData] = useState<SandboxResponse | null>(null);
   const [busy, setBusy] = useState(false);
@@ -278,13 +271,13 @@ export function BillingTestSandboxPanel() {
               <div key={item.id} style={{ padding: 10, border: "1px solid #ddd", borderRadius: 8 }}>
                 <strong>{item.number}</strong> · {item.clientName} · {euros(item.totalTtcCents)}
                 <div>Solde fictif après avoirs : {euros(item.remainingTtcCents)}</div>
-                <a href={\`/api/desktop/billing/test-sandbox/pdf/\${item.id}\`}>
+                <a href={`/api/desktop/billing/test-sandbox/pdf/${item.id}`}>
                   Télécharger la facture TEST
                 </a>
                 {credits.filter((credit) => credit.originalInvoiceId === item.id).map((credit) => (
                   <div key={credit.id}>
                     {credit.number} · {euros(credit.totalTtcCents)} · {credit.reason} ·{" "}
-                    <a href={\`/api/desktop/billing/test-sandbox/pdf/\${credit.id}\`}>
+                    <a href={`/api/desktop/billing/test-sandbox/pdf/${credit.id}`}>
                       Télécharger l&apos;avoir TEST
                     </a>
                   </div>
