@@ -215,6 +215,7 @@ function publicBillingPayload(payload: BillingPayload): BillingPayload {
   delete safe.financialLedger;
   delete safe.nativeInvoiceLedger;
   delete safe.nativeCreditNoteLedger;
+  delete safe.testSandbox;
   return safe;
 }
 
@@ -306,6 +307,10 @@ export async function GET() {
         clientName: chantier.clientName,
         status: chantier.status,
       })),
+      canTestBillingSandbox:
+        context.moduleAccess.canWrite &&
+        process.env.PAPOT_BILLING_TEST_SANDBOX_ENABLED === "true" &&
+        (await hasSpecialPermission(context.user.id, "billing.test_sandbox")),
       canWrite: context.moduleAccess.canWrite,
     });
   } catch (error) {
