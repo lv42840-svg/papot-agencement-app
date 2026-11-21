@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { FilePlus2, FileText } from "lucide-react";
-import { useMemo } from "react";
+import { useMemo, useState } from "react";
 import type { CommercialStatus } from "@/lib/commercial/domain";
 import { quoteDocumentStatusLabel } from "@/lib/quotes/domain";
 import { newQuoteHref, quoteHref } from "@/lib/quotes/navigation";
@@ -31,16 +31,17 @@ export function QuotesWorkspace({
   affairs: QuoteWorkspaceAffair[];
   canWrite: boolean;
 }) {
+  const [showTestsOnly, setShowTestsOnly] = useState(false);
   const affairsById = useMemo(
     () => new Map(affairs.map((affair) => [affair.id, affair])),
     [affairs],
   );
   const sortedQuotes = useMemo(
     () =>
-      [...initialPayload.quotes].sort((left, right) =>
+      [...initialPayload.quotes].filter((quote) => !showTestsOnly || quote.isTest === true).sort((left, right) =>
         right.updatedAt.localeCompare(left.updatedAt),
       ),
-    [initialPayload.quotes],
+    [initialPayload.quotes, showTestsOnly],
   );
 
   return (
@@ -75,6 +76,12 @@ export function QuotesWorkspace({
           </div>
         ) : null}
 
+        <label className="testDataFilter">
+          <input type="checkbox" checked={showTestsOnly}
+            onChange={(event) => setShowTestsOnly(event.target.checked)} />
+          Afficher uniquement les devis TEST ({initialPayload.quotes.filter((quote) => quote.isTest === true).length})
+        </label>
+
         {sortedQuotes.length === 0 ? (
           <div className="quoteEmptyState">
             <FileText size={28} aria-hidden="true" />
@@ -100,7 +107,7 @@ export function QuotesWorkspace({
                   <div className="quoteDraftMain">
                     <FileText size={17} aria-hidden="true" />
                     <div>
-                      <strong>{quote.model.subject}</strong>
+                      <strong>{quote.model.subject} {quote.isTest && <span className="testDataBadge">TEST</span>}</strong>
                       <span>
                         {affair?.clientName ?? "Client"} · {affair?.name ?? "Affaire"}
                       </span>
