@@ -129,6 +129,9 @@ export function BillingWorkspace({
   useEffect(() => {
     void refresh().catch(() => setError("Impossible de charger la facturation."));
   }, []);
+  useEffect(() => {
+    if (data && tab === "TESTS" && !data.canTestBillingSandbox) setTab("HOME");
+  }, [data, tab]);
   const allSources = data?.sources ?? [];
   const chantierChoices = [...(data?.chantiers ?? [])]
     .map((chantier) => ({
