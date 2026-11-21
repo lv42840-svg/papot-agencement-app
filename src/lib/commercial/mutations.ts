@@ -31,6 +31,12 @@ export const commercialMutationSchema = z.discriminatedUnion("action", [
     sourceEntryId: z.string().uuid().optional(),
     description: nullableText(4000),
     nextAction: nullableText(2000),
+    isTest: z.boolean().optional(),
+  }),
+  z.object({
+    action: z.literal("setTestMarker"),
+    caseId: z.string().uuid(),
+    isTest: z.boolean(),
   }),
   z.object({
     action: z.literal("updateDetails"),
@@ -313,6 +319,7 @@ export function applyCommercialMutation(
       id: randomUUID(),
       sourceEntryId: input.sourceEntryId ?? null,
       name: input.name,
+      isTest: input.isTest === true,
       clientName: text(input.clientName),
       siteLabel: text(input.siteLabel),
       siteAddressOverride: input.siteAddressOverride ?? null,
@@ -356,6 +363,15 @@ export function applyCommercialMutation(
   }
 
   const item = findCase(payload, input.caseId);
+
+  if (input.action === "setTestMarker") {
+    if (Boolean(item.isTest) === input.isTest) return { payload, focusCaseId: item.id };
+    item.isTest = input.isTest;
+    touch(item, actor, now);
+    history(item, actor.displayName, "TEST_MARKER_UPDATED",
+      input.isTest ? "Affaire marquée comme donnée de test." : "Marquage test retiré de l'affaire.", now);
+    return { payload, focusCaseId: item.id };
+  }
 
   if (input.action === "updateDetails") {
     assertOpen(item);
