@@ -51,6 +51,7 @@ import {
 } from "@/lib/commercial/domain";
 import { filterCommercialCases, type CommercialListFilter } from "@/lib/commercial/list-filter";
 import { commercialAffairHref } from "@/lib/commercial/navigation";
+import { TestDataMarker } from "@/components/test-data-marker";
 
 type Snapshot = {
   payload: CommercialPayload;
@@ -260,6 +261,7 @@ export function CommercialWorkspaceV2({ affairId }: { affairId?: string }) {
   const { snapshot, loading, busy, error, notice, load, mutate, upload } = useCommercial();
   const [mode, setMode] = useState<CommercialListFilter>("active");
   const [query, setQuery] = useState("");
+  const [showTestsOnly, setShowTestsOnly] = useState(false);
   const [createOpen, setCreateOpen] = useState(false);
 
   const clients = snapshot?.payload.clients ?? [];
@@ -268,6 +270,7 @@ export function CommercialWorkspaceV2({ affairId }: { affairId?: string }) {
   const normalized = query.trim().toLocaleLowerCase("fr-FR");
   const visible = useMemo(() => {
     let list = filterCommercialCases(cases, mode, now);
+    if (showTestsOnly) list = list.filter((item) => item.isTest === true);
     if (normalized) {
       list = list.filter((item) =>
         [
@@ -287,7 +290,7 @@ export function CommercialWorkspaceV2({ affairId }: { affairId?: string }) {
       );
     }
     return list;
-  }, [cases, mode, normalized, now]);
+  }, [cases, mode, normalized, now, showTestsOnly]);
 
   const selected = affairId ? (cases.find((item) => item.id === affairId) ?? null) : null;
 
@@ -436,6 +439,11 @@ export function CommercialWorkspaceV2({ affairId }: { affairId?: string }) {
       </section>
 
       <section className="commercialV2Toolbar">
+        <label className="testDataFilter">
+          <input type="checkbox" checked={showTestsOnly}
+            onChange={(event) => setShowTestsOnly(event.target.checked)} />
+          Afficher uniquement les affaires TEST ({cases.filter((item) => item.isTest === true).length})
+        </label>
         <label className="commercialV2Search">
           <Search size={14} />
           <input
@@ -466,7 +474,7 @@ export function CommercialWorkspaceV2({ affairId }: { affairId?: string }) {
                   className="commercialV2ListRow"
                 >
                   <div>
-                    <strong>{item.name}</strong>
+                    <strong>{item.name} {item.isTest && <span className="testDataBadge">TEST</span>}</strong>
                     <span>{item.clientName || "Client à préciser"}</span>
                   </div>
                   <div className="commercialV2ListMeta">
@@ -561,10 +569,15 @@ function CreateAffair({
       reviewDate: String(form.get("reviewDate") ?? ""),
       description: String(form.get("description") ?? ""),
       nextAction: "",
+      isTest: form.get("isTest") === "on",
     });
   }
   return (
     <form className="commercialV2Create" onSubmit={(event) => void submit(event)}>
+      <label className="testDataFormChoice">
+        <input type="checkbox" name="isTest" />
+        <span>Affaire de TEST : les devis et chantiers créés depuis cette affaire seront marqués TEST.</span>
+      </label>
       <div className="commercialV2CreateTitle">
         <strong>Nouvelle affaire</strong>
         <button type="button" onClick={onCancel}>
@@ -751,6 +764,12 @@ function AffairDetail({
             {COMMERCIAL_STATUS_LABELS[item.status]}
           </span>
           <h2>{item.name}</h2>
+          <TestDataMarker isTest={item.isTest === true} disabled={!canModify || busy}
+            onToggle={async (next) => Boolean(await mutate({
+              action: "setTestMarker", caseId: item.id, isTest: next,
+              expectedUpdatedAt: item.updatedAt,
+            }, next ? "Affaire marquée TEST." : "Marquage TEST retiré."))}
+          />
           <p>
             {item.clientId ? (
               <a
