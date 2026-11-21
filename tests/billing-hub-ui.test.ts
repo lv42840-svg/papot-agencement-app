@@ -33,6 +33,13 @@ describe("Accueil Facturation lisible et séparé de l'émission officielle", ()
     expect(route).toContain("delete safe.testSandbox");
   });
 
+  it("ne laisse pas un lien profond TESTS afficher un écran vide sans autorisation", () => {
+    const workspace = file("src/components/billing-workspace.tsx");
+    expect(workspace).toContain('tab === "TESTS" && !data.canTestBillingSandbox');
+    expect(workspace).toContain('setTab("HOME")');
+    expect(workspace).toContain('tab === "HOME"');
+  });
+
   it("corrige les textes trompeurs de l'onglet Facturation du chantier", () => {
     const tab = file("src/components/chantier-billing-tab.tsx");
     expect(tab).toContain("Factures émises sur ce chantier");
