@@ -20,7 +20,9 @@ describe("bac à sable facturation : aucune suppression ou émission fiscale", (
   it("le reset ne touche pas les registres officiels ni les archives, jamais Pennylane", () => {
     const route = code("src/app/api/desktop/billing/test-sandbox/route.ts");
     const sandbox = code("src/lib/billing/test-sandbox.ts");
-    expect(sandbox).toContain("testSandbox: emptyBillingTestSandbox()");
+    expect(sandbox).toContain("testSandbox: {");
+    expect(sandbox).toContain("...emptyBillingTestSandbox()");
+    expect(sandbox).toContain("lastResetByName: actorName");
     expect(sandbox).not.toContain("deleteNativeInvoice");
     expect(route).toContain("resetBillingTestSandbox(");
     expect(route).not.toContain("storeOriginalNativeInvoicePdf(");
