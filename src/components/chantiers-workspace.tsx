@@ -138,7 +138,7 @@ export function ChantiersWorkspace() {
     const filtered = chantiers.filter(
       (item) => matches(item, normalizedQuery) && (!showTestsOnly || item.isTest === true),
     );
-    if (normalizedQuery) return filtered;
+    if (normalizedQuery || showTestsOnly) return filtered;
     return filtered.filter((item) => item.status === mode);
   }, [chantiers, normalizedQuery, mode, showTestsOnly]);
 
