@@ -746,7 +746,6 @@ function upsertDraftOuvrage(
   actor: QuotesActor,
   now: Date,
   libraryComponentSources?: ReadonlyMap<string, QuoteLibraryComponentSource>,
-  initialIsTest = false,
 ): QuotesMutationResult {
   const { quoteIndex, existingLine, existingIndex } = findDraftLine(
     payload,
@@ -827,6 +826,7 @@ export function applyQuotesMutation(
   now: Date = new Date(),
   librarySource?: QuoteLibraryComponentSource,
   libraryComponentSources?: ReadonlyMap<string, QuoteLibraryComponentSource>,
+  initialIsTest = false,
 ): QuotesMutationResult {
   const payload = structuredClone(parseNativeQuotesPayload(source));
   if (input.action === "createDraft") {
