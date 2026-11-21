@@ -195,8 +195,9 @@ export function summarizeBillingTestSandbox(payload: BillingPayload): {
 export function findBillingTestDocument(
   payload: BillingPayload,
   documentId: string,
-): { kind: "INVOICE"; invoice: NativeIssuedInvoice } |
-   { kind: "CREDIT"; credit: NativeCreditNote; original: NativeIssuedInvoice } {
+):
+  | { kind: "INVOICE"; invoice: NativeIssuedInvoice }
+  | { kind: "CREDIT"; credit: NativeCreditNote; original: NativeIssuedInvoice } {
   const test = payload.testSandbox ?? emptyBillingTestSandbox();
   const invoice = test.invoiceLedger.invoices.find((item) => item.id === documentId);
   if (invoice) return { kind: "INVOICE", invoice };

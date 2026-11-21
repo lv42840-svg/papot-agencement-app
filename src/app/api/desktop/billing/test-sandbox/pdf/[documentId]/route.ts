@@ -1,6 +1,9 @@
 import { z } from "zod";
 import { requireSpecialPermission } from "@/lib/auth/permissions";
-import { desktopRequestErrorStatus, requireModuleRequestContext } from "@/lib/desktop/request-context";
+import {
+  desktopRequestErrorStatus,
+  requireModuleRequestContext,
+} from "@/lib/desktop/request-context";
 import { createBillingRepository } from "@/lib/billing/repository";
 import { findBillingTestDocument } from "@/lib/billing/test-sandbox";
 import { generateNativeInvoicePdf } from "@/lib/billing/native-invoice-pdf";
@@ -26,9 +29,10 @@ export async function GET(
     }
     const payload = await createBillingRepository().load();
     const found = findBillingTestDocument(payload, documentId);
-    const pdf = found.kind === "INVOICE"
-      ? generateNativeInvoicePdf(found.invoice, { testOnly: true })
-      : generateNativeCreditNotePdf(found.credit, found.original, { testOnly: true });
+    const pdf =
+      found.kind === "INVOICE"
+        ? generateNativeInvoicePdf(found.invoice, { testOnly: true })
+        : generateNativeCreditNotePdf(found.credit, found.original, { testOnly: true });
     const number = found.kind === "INVOICE" ? found.invoice.number : found.credit.number;
     return new Response(Buffer.from(pdf), {
       headers: {
@@ -41,10 +45,15 @@ export async function GET(
     });
   } catch (error) {
     const code = error instanceof Error ? error.message : "BILLING_TEST_DOCUMENT_ERROR";
-    return Response.json({ error: code }, {
-      status: code === "BILLING_TEST_DOCUMENT_NOT_FOUND" ? 404 :
-        desktopRequestErrorStatus(code) ?? 500,
-      headers: { "Cache-Control": "private, no-store" },
-    });
+    return Response.json(
+      { error: code },
+      {
+        status:
+          code === "BILLING_TEST_DOCUMENT_NOT_FOUND"
+            ? 404
+            : (desktopRequestErrorStatus(code) ?? 500),
+        headers: { "Cache-Control": "private, no-store" },
+      },
+    );
   }
 }

@@ -5,7 +5,10 @@ import {
   type BillingPayload,
   type BillingSource,
 } from "../src/lib/billing/domain";
-import { issueNativeInvoice, type IssueNativeInvoiceInput } from "../src/lib/billing/native-issuance";
+import {
+  issueNativeInvoice,
+  type IssueNativeInvoiceInput,
+} from "../src/lib/billing/native-issuance";
 import {
   emptyBillingTestSandbox,
   findBillingTestDocument,
@@ -72,17 +75,23 @@ const now = new Date("2026-11-20T11:00:00.000Z");
 function approved(): BillingPayload {
   const empty: BillingPayload = { schemaVersion: 1, drafts: [] };
   const draft = createBillingDraft(
-    empty, source,
+    empty,
+    source,
     { requestId: crypto.randomUUID(), type: "STANDARD" },
-    "Nadia", new Date("2026-11-19T09:00:00.000Z"),
+    "Nadia",
+    new Date("2026-11-19T09:00:00.000Z"),
   );
   return {
     ...empty,
-    drafts: [approveBillingDraft(
-      { ...empty, drafts: [draft] },
-      draft.id, draft.updatedAt, "Nadia",
-      new Date("2026-11-19T10:00:00.000Z"),
-    )],
+    drafts: [
+      approveBillingDraft(
+        { ...empty, drafts: [draft] },
+        draft.id,
+        draft.updatedAt,
+        "Nadia",
+        new Date("2026-11-19T10:00:00.000Z"),
+      ),
+    ],
   };
 }
 function input(payload: BillingPayload): IssueNativeInvoiceInput {
@@ -104,7 +113,12 @@ describe("facturation fictive et remise à zéro strictement isolées", () => {
     const original = approved();
     const legal = issueNativeInvoice(original, input(original), profile, client, "Lucien", now);
     const simulated = simulateBillingTestInvoice(
-      legal, input(legal), profile, client, "Nadia", now,
+      legal,
+      input(legal),
+      profile,
+      client,
+      "Nadia",
+      now,
     );
     expect(simulated.nativeInvoiceLedger).toEqual(legal.nativeInvoiceLedger);
     expect(simulated.drafts).toEqual(legal.drafts);
@@ -121,7 +135,12 @@ describe("facturation fictive et remise à zéro strictement isolées", () => {
     const original = approved();
     const legal = issueNativeInvoice(original, input(original), profile, client, "Lucien", now);
     const invoiceSandbox = simulateBillingTestInvoice(
-      legal, input(legal), profile, client, "Lucien", now,
+      legal,
+      input(legal),
+      profile,
+      client,
+      "Lucien",
+      now,
     );
     const simulatedInvoice = invoiceSandbox.testSandbox!.invoiceLedger.invoices[0];
     const credit = simulateBillingTestCredit(
@@ -133,7 +152,8 @@ describe("facturation fictive et remise à zéro strictement isolées", () => {
         reason: "Réduction sur prestation test",
         amounts: [{ ratePercent: 20, baseHtCents: 10_000 }],
       },
-      "Nadia", now,
+      "Nadia",
+      now,
     );
     expect(credit.nativeCreditNoteLedger).toBeUndefined();
     expect(credit.nativeInvoiceLedger).toEqual(legal.nativeInvoiceLedger);
@@ -148,8 +168,9 @@ describe("facturation fictive et remise à zéro strictement isolées", () => {
     expect(found.kind).toBe("CREDIT");
     if (found.kind === "CREDIT") {
       expect(
-        Buffer.from(generateNativeCreditNotePdf(found.credit, found.original, { testOnly: true }))
-          .toString("latin1"),
+        Buffer.from(
+          generateNativeCreditNotePdf(found.credit, found.original, { testOnly: true }),
+        ).toString("latin1"),
       ).toContain("SPECIMEN - TEST - NON VALABLE");
     }
   });
@@ -159,8 +180,9 @@ describe("facturation fictive et remise à zéro strictement isolées", () => {
     const legal = issueNativeInvoice(payload, input(payload), profile, client, "Lucien", now);
     const original = legal.nativeInvoiceLedger!.invoices[0];
     const official = Buffer.from(generateNativeInvoicePdf(original)).toString("latin1");
-    const simulated = Buffer.from(generateNativeInvoicePdf(original, { testOnly: true }))
-      .toString("latin1");
+    const simulated = Buffer.from(generateNativeInvoicePdf(original, { testOnly: true })).toString(
+      "latin1",
+    );
     expect(official).not.toContain("SANS VALEUR FISCALE");
     expect(official).not.toContain("SPECIMEN - TEST - NON VALABLE");
     expect(simulated).toContain("SANS VALEUR FISCALE");
@@ -170,11 +192,12 @@ describe("facturation fictive et remise à zéro strictement isolées", () => {
   it("la purge retire uniquement les essais, réinitialise leurs compteurs et garde un audit", () => {
     const seed = approved();
     const legal = issueNativeInvoice(seed, input(seed), profile, client, "Lucien", now);
-    const tests = simulateBillingTestInvoice(
-      legal, input(legal), profile, client, "Nadia", now,
-    );
+    const tests = simulateBillingTestInvoice(legal, input(legal), profile, client, "Nadia", now);
     const reset = resetBillingTestSandbox(
-      tests, TEST_RESET_CONFIRMATION, "Lucien", new Date("2026-11-20T12:00:00.000Z"),
+      tests,
+      TEST_RESET_CONFIRMATION,
+      "Lucien",
+      new Date("2026-11-20T12:00:00.000Z"),
     );
     expect(reset.nativeInvoiceLedger).toEqual(legal.nativeInvoiceLedger);
     expect(reset.drafts).toEqual(legal.drafts);
@@ -185,15 +208,18 @@ describe("facturation fictive et remise à zéro strictement isolées", () => {
       lastResetByName: "Lucien",
       lastResetAt: "2026-11-20T12:00:00.000Z",
     });
-    expect(() => findBillingTestDocument(
-      reset, tests.testSandbox!.invoiceLedger.invoices[0].id,
-    )).toThrow("BILLING_TEST_DOCUMENT_NOT_FOUND");
+    expect(() =>
+      findBillingTestDocument(reset, tests.testSandbox!.invoiceLedger.invoices[0].id),
+    ).toThrow("BILLING_TEST_DOCUMENT_NOT_FOUND");
     const second = simulateBillingTestInvoice(
-      reset, input(reset), profile, client, "Nadia", new Date("2026-11-21T09:00:00.000Z"),
+      reset,
+      input(reset),
+      profile,
+      client,
+      "Nadia",
+      new Date("2026-11-21T09:00:00.000Z"),
     );
-    expect(summarizeBillingTestSandbox(second).invoices[0].number).toBe(
-      "TEST-PA-2026-000001",
-    );
+    expect(summarizeBillingTestSandbox(second).invoices[0].number).toBe("TEST-PA-2026-000001");
     expect(second.nativeInvoiceLedger).toEqual(legal.nativeInvoiceLedger);
     expect(second.testSandbox?.resetCount).toBe(1);
   });
@@ -213,16 +239,19 @@ describe("facturation fictive et remise à zéro strictement isolées", () => {
     const payload = approved();
     const legal = issueNativeInvoice(payload, input(payload), profile, client, "Lucien", now);
     const legalId = legal.nativeInvoiceLedger!.invoices[0].id;
-    expect(() => simulateBillingTestCredit(
-      legal,
-      {
-        requestId: crypto.randomUUID(),
-        originalInvoiceId: legalId,
-        mode: "PARTIAL",
-        reason: "Test sur une facture officielle",
-        amounts: [{ ratePercent: 20, baseHtCents: 100 }],
-      },
-      "Nadia", now,
-    )).toThrow("BILLING_NATIVE_CREDIT_ORIGINAL_NOT_FOUND");
+    expect(() =>
+      simulateBillingTestCredit(
+        legal,
+        {
+          requestId: crypto.randomUUID(),
+          originalInvoiceId: legalId,
+          mode: "PARTIAL",
+          reason: "Test sur une facture officielle",
+          amounts: [{ ratePercent: 20, baseHtCents: 100 }],
+        },
+        "Nadia",
+        now,
+      ),
+    ).toThrow("BILLING_NATIVE_CREDIT_ORIGINAL_NOT_FOUND");
   });
 });

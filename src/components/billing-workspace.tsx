@@ -412,30 +412,30 @@ export function BillingWorkspace({
             ["FOLLOWUP", `Devis à facturer (${followup.length})`],
             ["TESTS", "Essais supprimables"],
           ] as const
-        ).filter(([key]) => key !== "TESTS" || data?.canTestBillingSandbox).map(([key, caption]) => (
-          <button
-            key={key}
-            type="button"
-            role="tab"
-            aria-selected={tab === key}
-            className={tab === key ? "primaryButton" : "secondaryButton"}
-            onClick={() => {
-              setTab(key);
-              setSelection("");
-              setLineValues({});
-              setValue("");
-              setError("");
-              setNotice("");
-            }}
-          >
-            {caption}
-          </button>
-        ))}
+        )
+          .filter(([key]) => key !== "TESTS" || data?.canTestBillingSandbox)
+          .map(([key, caption]) => (
+            <button
+              key={key}
+              type="button"
+              role="tab"
+              aria-selected={tab === key}
+              className={tab === key ? "primaryButton" : "secondaryButton"}
+              onClick={() => {
+                setTab(key);
+                setSelection("");
+                setLineValues({});
+                setValue("");
+                setError("");
+                setNotice("");
+              }}
+            >
+              {caption}
+            </button>
+          ))}
       </div>
       {!data && <p>Chargement…</p>}
-      {data && data.canTestBillingSandbox && tab === "TESTS" && (
-        <BillingTestSandboxPanel />
-      )}
+      {data && data.canTestBillingSandbox && tab === "TESTS" && <BillingTestSandboxPanel />}
       {data && tab === "CHANTIER" && (
         <section
           role="tabpanel"

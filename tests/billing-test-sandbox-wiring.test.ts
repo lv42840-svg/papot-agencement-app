@@ -36,7 +36,9 @@ describe("bac à sable facturation : aucune suppression ou émission fiscale", (
     const regular = code("src/lib/billing/native-invoice-pdf.ts");
     const credit = code("src/lib/billing/native-credit-pdf.ts");
     expect(pdf).toContain("generateNativeInvoicePdf(found.invoice, { testOnly: true })");
-    expect(pdf).toContain("generateNativeCreditNotePdf(found.credit, found.original, { testOnly: true })");
+    expect(pdf).toContain(
+      "generateNativeCreditNotePdf(found.credit, found.original, { testOnly: true })",
+    );
     expect(pdf).toContain('requireSpecialPermission(context.user, "billing.test_sandbox")');
     expect(pdf).not.toContain("loadOriginalNativeInvoicePdf");
     expect(regular).toContain("SPECIMEN - TEST - NON VALABLE");

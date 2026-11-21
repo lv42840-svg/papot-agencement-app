@@ -78,7 +78,13 @@ export function generateNativeInvoicePdf(
     pages.push(current);
     if (options.testOnly) text("DOCUMENT TEST / SANS VALEUR FISCALE", 40, 19, 11, true);
     text(invoice.seller.name, 40, 43, 13, true);
-    text((options.testOnly ? "TEST - FACTURE SIMULEE " : "FACTURE N° ") + invoice.number, 40, 78, 16, true);
+    text(
+      (options.testOnly ? "TEST - FACTURE SIMULEE " : "FACTURE N° ") + invoice.number,
+      40,
+      78,
+      16,
+      true,
+    );
     text("Émise le " + dateFR(invoice.issuedOn), 400, 78, 9);
     rule(91);
     if (pages.length === 1) {

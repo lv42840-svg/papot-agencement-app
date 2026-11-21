@@ -1,6 +1,9 @@
 import { z } from "zod";
 import { requireSpecialPermission, hasSpecialPermission } from "@/lib/auth/permissions";
-import { desktopRequestErrorStatus, requireModuleRequestContext } from "@/lib/desktop/request-context";
+import {
+  desktopRequestErrorStatus,
+  requireModuleRequestContext,
+} from "@/lib/desktop/request-context";
 import { createBillingRepository } from "@/lib/billing/repository";
 import { issueNativeInvoiceInputSchema } from "@/lib/billing/native-issuance";
 import { issueNativeCreditNoteInputSchema } from "@/lib/billing/native-credit-notes";
@@ -20,18 +23,24 @@ export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
 const testActionSchema = z.discriminatedUnion("action", [
-  z.object({
-    action: z.literal("SIMULATE_INVOICE"),
-    input: issueNativeInvoiceInputSchema,
-  }).strict(),
-  z.object({
-    action: z.literal("SIMULATE_CREDIT"),
-    input: issueNativeCreditNoteInputSchema,
-  }).strict(),
-  z.object({
-    action: z.literal("RESET_TESTS"),
-    confirmation: z.literal(TEST_RESET_CONFIRMATION),
-  }).strict(),
+  z
+    .object({
+      action: z.literal("SIMULATE_INVOICE"),
+      input: issueNativeInvoiceInputSchema,
+    })
+    .strict(),
+  z
+    .object({
+      action: z.literal("SIMULATE_CREDIT"),
+      input: issueNativeCreditNoteInputSchema,
+    })
+    .strict(),
+  z
+    .object({
+      action: z.literal("RESET_TESTS"),
+      confirmation: z.literal(TEST_RESET_CONFIRMATION),
+    })
+    .strict(),
 ]);
 
 function noStore(body: unknown, status = 200): Response {
@@ -48,11 +57,18 @@ async function authorizeSandbox() {
 }
 
 function httpStatus(code: string): number {
-  return desktopRequestErrorStatus(code) ??
-    (code === "BILLING_TEST_SANDBOX_DISABLED" ? 403 :
-      code === "BILLING_TEST_DOCUMENT_NOT_FOUND" ? 404 :
-        code === "BILLING_TEST_BAD_REQUEST" ? 400 :
-          code.startsWith("BILLING_") ? 409 : 500);
+  return (
+    desktopRequestErrorStatus(code) ??
+    (code === "BILLING_TEST_SANDBOX_DISABLED"
+      ? 403
+      : code === "BILLING_TEST_DOCUMENT_NOT_FOUND"
+        ? 404
+        : code === "BILLING_TEST_BAD_REQUEST"
+          ? 400
+          : code.startsWith("BILLING_")
+            ? 409
+            : 500)
+  );
 }
 
 export async function GET() {
@@ -106,9 +122,7 @@ export async function POST(request: Request) {
 
     const payload = await createBillingRepository().mutate((current) => {
       if (action.action === "RESET_TESTS") {
-        return resetBillingTestSandbox(
-          current, action.confirmation, context.user.displayName,
-        );
+        return resetBillingTestSandbox(current, action.confirmation, context.user.displayName);
       }
       if (action.action === "SIMULATE_CREDIT") {
         return simulateBillingTestCredit(current, action.input, context.user.displayName);
@@ -117,15 +131,20 @@ export async function POST(request: Request) {
       if (!draft) throw new Error("BILLING_DRAFT_NOT_FOUND");
       const client = clients?.find((item) => item.id === draft.clientId);
       if (!company || !client) throw new Error("BILLING_NATIVE_BUYER_PROFILE_INCOMPLETE");
-      return simulateBillingTestInvoice(current, action.input, company, client, context.user.displayName);
+      return simulateBillingTestInvoice(
+        current,
+        action.input,
+        company,
+        client,
+        context.user.displayName,
+      );
     });
     return noStore({
       sandbox: summarizeBillingTestSandbox(payload),
       reset: action.action === "RESET_TESTS",
     });
   } catch (error) {
-    const code = error instanceof Error
-      ? error.message : "BILLING_TEST_MUTATION_FAILED";
+    const code = error instanceof Error ? error.message : "BILLING_TEST_MUTATION_FAILED";
     return noStore({ error: code }, httpStatus(code));
   }
 }
