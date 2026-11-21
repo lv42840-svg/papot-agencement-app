@@ -789,10 +789,39 @@ export function BillingDocumentEditor({ draftId }: { draftId: string }) {
         </div>
       </header>
 
+      <ol className="billingProcessSteps" aria-label="Étapes de la facture">
+        <li className={draft.status === "DRAFT" ? "billingStepCurrent" : "billingStepDone"}>
+          <strong>1. Préparer</strong>
+          <span>Vérifier les prestations et les montants.</span>
+        </li>
+        <li className={draft.status === "APPROVED" ? "billingStepDone" : ""}>
+          <strong>2. Valider en interne</strong>
+          <span>Contrôler le projet et le visa si nécessaire.</span>
+        </li>
+        <li className={issued ? "billingStepDone" : canIssue ? "billingStepCurrent" : ""}>
+          <strong>3. Émettre</strong>
+          <span>
+            {issued
+              ? "Numéro définitif : " + issued.number
+              : canIssue
+                ? "Attribuer un numéro officiel après validation."
+                : "Émission officielle non autorisée pour cette session."}
+          </span>
+        </li>
+      </ol>
       <aside className="invoiceDraftNotice">
-        Tu modifies une <strong>copie du marché du chantier</strong>, uniquement pour ce projet. Les
-        devis retenus restent inchangés. Ce document n&apos;a ni numéro officiel, ni PDF émis, ni
-        envoi Pennylane, ni transmission électronique.
+        {issued ? (
+          <>
+            <strong>Facture officielle {issued.number} :</strong> le document est figé et son
+            PDF original peut être téléchargé. Toute correction doit passer par un avoir.
+          </>
+        ) : (
+          <>
+            Ceci est un <strong>projet non émis</strong>, établi à partir du marché du chantier.
+            Les devis retenus restent inchangés. Aucun numéro officiel ni envoi automatique
+            vers Pennylane n&apos;est créé par l&apos;enregistrement ou la validation interne.
+          </>
+        )}
       </aside>
       {error && (
         <p className="invoiceError" role="alert">
