@@ -269,8 +269,10 @@ export function CommercialWorkspaceV2({ affairId }: { affairId?: string }) {
   const now = useMemo(() => new Date(snapshot?.serverNow ?? Date.now()), [snapshot?.serverNow]);
   const normalized = query.trim().toLocaleLowerCase("fr-FR");
   const visible = useMemo(() => {
-    let list = filterCommercialCases(cases, mode, now);
-    if (showTestsOnly) list = list.filter((item) => item.isTest === true);
+    // The TEST filter deliberately spans all lifecycle statuses for cleanup inventory.
+    let list = showTestsOnly
+      ? cases.filter((item) => item.isTest === true)
+      : filterCommercialCases(cases, mode, now);
     if (normalized) {
       list = list.filter((item) =>
         [
