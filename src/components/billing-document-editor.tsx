@@ -466,11 +466,7 @@ export function BillingDocumentEditor({ draftId }: { draftId: string }) {
   }
   function goBack() {
     if (dirty && !window.confirm("Des modifications ne sont pas enregistrées. Quitter ?")) return;
-    router.push(
-      draft?.chantierId
-        ? `/facturation?chantierId=${encodeURIComponent(draft.chantierId)}`
-        : `/facturation?quoteId=${encodeURIComponent(draft?.quoteId ?? "")}`,
-    );
+    router.push("/facturation?tab=PROJECTS");
   }
   async function save() {
     if (!draft || !canWrite || busy) return;
