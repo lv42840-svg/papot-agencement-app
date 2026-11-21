@@ -47,7 +47,10 @@ function wrap(text: string, limit: number): string[] {
   return lines.length ? lines : [""];
 }
 
-export function generateNativeInvoicePdf(invoice: NativeIssuedInvoice): Uint8Array {
+export function generateNativeInvoicePdf(
+  invoice: NativeIssuedInvoice,
+  options: { testOnly?: boolean } = {},
+): Uint8Array {
   const pages: string[][] = [];
   let current: string[] = [];
   let y = 0;
@@ -73,8 +76,9 @@ export function generateNativeInvoicePdf(invoice: NativeIssuedInvoice): Uint8Arr
     if (pages.length >= 200) throw new Error("BILLING_NATIVE_PDF_PAGE_LIMIT");
     current = [];
     pages.push(current);
+    if (options.testOnly) text("DOCUMENT TEST / SANS VALEUR FISCALE", 40, 19, 11, true);
     text(invoice.seller.name, 40, 43, 13, true);
-    text("FACTURE N° " + invoice.number, 40, 78, 16, true);
+    text((options.testOnly ? "TEST - FACTURE SIMULEE " : "FACTURE N° ") + invoice.number, 40, 78, 16, true);
     text("Émise le " + dateFR(invoice.issuedOn), 400, 78, 9);
     rule(91);
     if (pages.length === 1) {
@@ -218,6 +222,10 @@ export function generateNativeInvoicePdf(invoice: NativeIssuedInvoice): Uint8Arr
   ]);
 
   for (const [index, page] of pages.entries()) {
+    if (options.testOnly) {
+      page.push("BT /F2 13 Tf 90 380 Td (SPECIMEN - TEST - NON VALABLE) Tj ET");
+      page.push("BT /F2 8 Tf 45 100 Td (TEST - NE PAS ENVOYER AU CLIENT) Tj ET");
+    }
     page.push("0.75 G 0.5 w 40 65 m 555 65 l S 0 G");
     page.push(
       "BT /F1 8 Tf 40 48 Td (" +
