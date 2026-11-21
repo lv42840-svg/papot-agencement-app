@@ -812,14 +812,14 @@ export function BillingDocumentEditor({ draftId }: { draftId: string }) {
       <aside className="invoiceDraftNotice">
         {issued ? (
           <>
-            <strong>Facture officielle {issued.number} :</strong> le document est figé et son
-            PDF original peut être téléchargé. Toute correction doit passer par un avoir.
+            <strong>Facture officielle {issued.number} :</strong> le document est figé et son PDF
+            original peut être téléchargé. Toute correction doit passer par un avoir.
           </>
         ) : (
           <>
-            Ceci est un <strong>projet non émis</strong>, établi à partir du marché du chantier.
-            Les devis retenus restent inchangés. Aucun numéro officiel ni envoi automatique
-            vers Pennylane n&apos;est créé par l&apos;enregistrement ou la validation interne.
+            Ceci est un <strong>projet non émis</strong>, établi à partir du marché du chantier. Les
+            devis retenus restent inchangés. Aucun numéro officiel ni envoi automatique vers
+            Pennylane n&apos;est créé par l&apos;enregistrement ou la validation interne.
           </>
         )}
       </aside>

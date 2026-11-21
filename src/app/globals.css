@@ -1315,7 +1315,6 @@ select:focus {
   }
 }
 
-
 /* Lecture immédiate des 3 étapes sur une facture individuelle. */
 .billingProcessSteps {
   display: grid;
@@ -1335,8 +1334,13 @@ select:focus {
   background: #faf9fc;
   color: #81798a;
 }
-.billingProcessSteps li strong { font-size: 13px; }
-.billingProcessSteps li span { font-size: 11px; line-height: 1.5; }
+.billingProcessSteps li strong {
+  font-size: 13px;
+}
+.billingProcessSteps li span {
+  font-size: 11px;
+  line-height: 1.5;
+}
 .billingProcessSteps .billingStepCurrent {
   color: #6946a8;
   background: #f1ebfd;
@@ -1348,5 +1352,8 @@ select:focus {
   border-color: #c7e5d5;
 }
 @media (max-width: 750px) {
-  .billingProcessSteps { grid-template-columns: minmax(0, 1fr); gap: 7px; }
+  .billingProcessSteps {
+    grid-template-columns: minmax(0, 1fr);
+    gap: 7px;
+  }
 }
