@@ -5,6 +5,14 @@ import { useEffect, useState } from "react";
 import type { BillingPayload } from "@/lib/billing/domain";
 import type { ChantierBillingMarket } from "@/lib/billing/chantier-market";
 
+type IssuedInvoiceSummary = {
+  id: string;
+  draftId: string;
+  chantierId: string | null;
+  number: string;
+  issuedAt: string;
+  totalTtcCents: number;
+};
 const money = (cents: number) =>
   (cents / 100).toLocaleString("fr-FR", { style: "currency", currency: "EUR" });
 
@@ -30,15 +38,23 @@ export function ChantierBillingTab({ chantierId }: { chantierId: string }) {
   const [error, setError] = useState("");
   const [market, setMarket] = useState<ChantierBillingMarket | null>(null);
   const [marketError, setMarketError] = useState("");
+  const [issuedInvoices, setIssuedInvoices] = useState<IssuedInvoiceSummary[]>([]);
 
   useEffect(() => {
     void (async () => {
       try {
         const response = await fetch("/api/desktop/billing", { cache: "no-store" });
-        const result = (await response.json()) as { payload?: BillingPayload; error?: string };
+        const result = (await response.json()) as {
+          payload?: BillingPayload;
+          issuedInvoices?: IssuedInvoiceSummary[];
+          error?: string;
+        };
         if (!response.ok || !result.payload)
           throw new Error(result.error ?? "Chargement impossible");
         setSnapshot(result.payload);
+        setIssuedInvoices((result.issuedInvoices ?? []).filter(
+          (item) => item.chantierId === chantierId,
+        ));
         setError("");
         const marketResponse = await fetch("/api/desktop/billing/markets", {
           cache: "no-store",
@@ -58,6 +74,7 @@ export function ChantierBillingTab({ chantierId }: { chantierId: string }) {
     })();
   }, [chantierId]);
 
+  const issuedDraftIds = new Set(issuedInvoices.map((item) => item.draftId));
   const projects = (snapshot?.drafts ?? [])
     .filter((draft) => draft.chantierId === chantierId)
     .sort((left, right) => right.createdAt.localeCompare(left.createdAt));
@@ -69,7 +86,7 @@ export function ChantierBillingTab({ chantierId }: { chantierId: string }) {
       >
         <div>
           <h2>Facturation du chantier</h2>
-          <p>Marché, projets et validations provisoires, sans émission officielle.</p>
+          <p>Marché, projets à préparer, visas et factures effectivement émises.</p>
         </div>
         <Link
           className="primaryButton"
@@ -78,11 +95,26 @@ export function ChantierBillingTab({ chantierId }: { chantierId: string }) {
           Nouvelle facture
         </Link>
       </header>
-      <p>
-        <strong>Factures officiellement émises : non disponibles.</strong> PAPOT ne délivre encore
-        ni numéro légal ni facture officielle sans le raccordement Pennylane. Les projets validés en
-        interne ne sont pas des factures émises.
-      </p>
+      {issuedInvoices.length > 0 ? (
+        <section className="invoiceCard">
+          <h3>Factures émises sur ce chantier ({issuedInvoices.length})</h3>
+          {issuedInvoices.map((invoice) => (
+            <p key={invoice.id}>
+              <strong>{invoice.number}</strong> · {money(invoice.totalTtcCents)} TTC ·
+              {" "}{new Date(invoice.issuedAt).toLocaleDateString("fr-FR")} ·{" "}
+              <a href={"/api/desktop/billing/issued/" + invoice.id + "/pdf"}>
+                Télécharger le PDF officiel
+              </a>
+            </p>
+          ))}
+        </section>
+      ) : (
+        <p>
+          Aucune facture numérotée PAPOT sur ce chantier pour le moment.
+          Les projets validés en interne ne sont pas des factures émises.
+          L&apos;émission officielle reste soumise à l&apos;activation et aux droits prévus.
+        </p>
+      )}
       {marketError ? <p role="status">{marketError}</p> : null}
       {market && (
         <section className="invoiceCard">
@@ -159,8 +191,14 @@ export function ChantierBillingTab({ chantierId }: { chantierId: string }) {
                       <td style={{ padding: 8 }}>{draft.quoteLabel}</td>
                       <td style={{ padding: 8 }}>{draft.label}</td>
                       <td style={{ padding: 8 }}>
-                        {draft.status === "APPROVED" ? "Validé en interne" : "À préparer"}
-                        <div style={{ fontSize: 11 }}>Non émis</div>
+                        {issuedDraftIds.has(draft.id)
+                          ? "Facture émise"
+                          : draft.status === "APPROVED"
+                            ? "Validé en interne"
+                            : "À préparer"}
+                        <div style={{ fontSize: 11 }}>
+                          {issuedDraftIds.has(draft.id) ? "Numérotée dans PAPOT" : "Non émis"}
+                        </div>
                       </td>
                       <td style={{ padding: 8 }}>{visaLabel(snapshot, draft.id, chantierId)}</td>
                       <td style={{ padding: 8, textAlign: "right" }}>
