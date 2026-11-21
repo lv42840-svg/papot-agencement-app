@@ -129,6 +129,12 @@ export function BillingWorkspace({
   useEffect(() => {
     void refresh().catch(() => setError("Impossible de charger la facturation."));
   }, []);
+  // A direct link must not leave an empty panel when TESTS is disabled or forbidden.
+  useEffect(() => {
+    if (data && tab === "TESTS" && !data.canTestBillingSandbox) {
+      setTab("HOME");
+    }
+  }, [data, tab]);
   useEffect(() => {
     if (data && tab === "TESTS" && !data.canTestBillingSandbox) setTab("HOME");
   }, [data, tab]);
