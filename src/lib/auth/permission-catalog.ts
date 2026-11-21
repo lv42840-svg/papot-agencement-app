@@ -87,6 +87,16 @@ export const SPECIAL_PERMISSIONS = [
     moduleKey: "billing",
   },
   {
+    key: "billing.test_sandbox",
+    label: "Créer et consulter les factures et avoirs simulés",
+    moduleKey: "billing",
+  },
+  {
+    key: "billing.reset_test_sandbox",
+    label: "Effacer les essais de facturation (sans effet sur les factures réelles)",
+    moduleKey: "billing",
+  },
+  {
     key: "dashboard.view_global",
     label: "Voir le tableau de bord global",
     moduleKey: "pilotage",
