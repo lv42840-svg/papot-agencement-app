@@ -3,6 +3,8 @@
 import Link from "next/link";
 import { ArrowLeft } from "lucide-react";
 import { useMemo, useState } from "react";
+import { quoteRevisionHeaders } from "@/lib/quotes/concurrency";
+import { TestDataMarker } from "@/components/test-data-marker";
 import { QuoteComponentCheck } from "@/components/quote-component-check";
 import { QuoteFixedSummary } from "@/components/quote-fixed-summary";
 import { QuoteGeneralInfoEditor } from "@/components/quote-general-info-editor";
@@ -69,6 +71,7 @@ export function QuoteDirectEditor({
   contractState: QuoteContractSelectionState;
 }) {
   const [payload, setPayload] = useState(initialPayload);
+  const [testMarkerError, setTestMarkerError] = useState("");
   const quote = useMemo(
     () => payload.quotes.find((candidate) => candidate.id === quoteId) ?? null,
     [payload.quotes, quoteId],
@@ -82,6 +85,26 @@ export function QuoteDirectEditor({
 
   return (
     <div className="quoteDirectWorkspace">
+      <TestDataMarker isTest={quote.isTest === true} disabled={!canWrite}
+        onToggle={async (next) => {
+          setTestMarkerError("");
+          try {
+            const response = await fetch("/api/desktop/quotes", {
+              method: "POST",
+              headers: { "Content-Type": "application/json", ...quoteRevisionHeaders(quote.updatedAt) },
+              body: JSON.stringify({ action: "setTestMarker", quoteId: quote.id, isTest: next }),
+            });
+            const body = (await response.json()) as { payload?: NativeQuotesPayload; error?: string };
+            if (!response.ok || !body.payload) throw new Error(body.error ?? "TEST_MARKER_FAILED");
+            setPayload(body.payload);
+            return true;
+          } catch (error) {
+            setTestMarkerError(error instanceof Error ? error.message : "Marquage impossible.");
+            return false;
+          }
+        }}
+      />
+      {testMarkerError && <p role="alert" className="testDataMarkerError">{testMarkerError}</p>}
       {contractState ? (
         <div
           className={`quoteContractState ${
