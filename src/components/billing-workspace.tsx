@@ -447,7 +447,10 @@ export function BillingWorkspace({
               : "Une action à la fois : les projets restent distincts des factures émises."}
           </p>
         </div>
-        <Link href={chantierId ? "/chantiers/" + chantierId : "/desktop-ready"} className="secondaryButton">
+        <Link
+          href={chantierId ? "/chantiers/" + chantierId : "/desktop-ready"}
+          className="secondaryButton"
+        >
           Quitter la facturation
         </Link>
       </header>
@@ -455,8 +458,8 @@ export function BillingWorkspace({
         <>
           <p className="billingHubGuidance">
             <strong>À retenir :</strong> préparer ou valider un projet n&apos;émet pas de facture.
-            Une facture officielle possède son propre numéro et son PDF archivé.
-            Les factures PAPOT ne sont pas transmises automatiquement à Pennylane.
+            Une facture officielle possède son propre numéro et son PDF archivé. Les factures PAPOT
+            ne sont pas transmises automatiquement à Pennylane.
           </p>
           {data && (
             <BillingHubCards
@@ -472,9 +475,9 @@ export function BillingWorkspace({
           )}
           {data && !data.canTestBillingSandbox && (
             <p className="billingHubHelp">
-              Le mode TEST est volontairement verrouillé. Pour l&apos;ouvrir, activer
-              la simulation sur le serveur et attribuer les droits correspondants
-              dans Paramètres &gt; Utilisateurs.
+              Le mode TEST est volontairement verrouillé. Pour l&apos;ouvrir, activer la simulation
+              sur le serveur et attribuer les droits correspondants dans Paramètres &gt;
+              Utilisateurs.
             </p>
           )}
         </>
@@ -500,8 +503,16 @@ export function BillingWorkspace({
           )}
         </nav>
       )}
-      {error && <p role="alert" className="billingHubError">{error}</p>}
-      {notice && <p role="status" className="billingHubSuccess">{notice}</p>}
+      {error && (
+        <p role="alert" className="billingHubError">
+          {error}
+        </p>
+      )}
+      {notice && (
+        <p role="status" className="billingHubSuccess">
+          {notice}
+        </p>
+      )}
       {!data && <p>Chargement…</p>}
       {data && data.canTestBillingSandbox && tab === "TESTS" && <BillingTestSandboxPanel />}
       {data && tab === "ISSUED" && (
@@ -510,16 +521,16 @@ export function BillingWorkspace({
             <div>
               <h2>Factures émises dans PAPOT</h2>
               <p>
-                Numéros définitifs, PDF originaux et avoirs. Les factures enregistrées
-                uniquement dans Pennylane ne figurent pas dans ce registre.
+                Numéros définitifs, PDF originaux et avoirs. Les factures enregistrées uniquement
+                dans Pennylane ne figurent pas dans ce registre.
               </p>
             </div>
             <span className="billingRegisterCount">{issued.length} facture(s)</span>
           </div>
           {!data.canIssue && (
             <p className="billingHubGuidance">
-              L&apos;émission officielle n&apos;est pas autorisée pour cette session.
-              Tu peux consulter les documents déjà émis sans créer de nouveau numéro.
+              L&apos;émission officielle n&apos;est pas autorisée pour cette session. Tu peux
+              consulter les documents déjà émis sans créer de nouveau numéro.
             </p>
           )}
           <label className="billingRegisterSearch">
@@ -535,10 +546,14 @@ export function BillingWorkspace({
               <FileDown size={30} aria-hidden="true" />
               <h3>Aucune facture officielle PAPOT pour le moment</h3>
               <p>
-                Les projets validés apparaissent dans « À valider », mais ne deviennent
-                des factures qu&apos;après émission numérotée.
+                Les projets validés apparaissent dans « À valider », mais ne deviennent des factures
+                qu&apos;après émission numérotée.
               </p>
-              <button className="secondaryButton" type="button" onClick={() => navigate("PROJECTS")}>
+              <button
+                className="secondaryButton"
+                type="button"
+                onClick={() => navigate("PROJECTS")}
+              >
                 Voir les projets à valider
               </button>
             </div>
@@ -558,7 +573,9 @@ export function BillingWorkspace({
                     <div className="billingIssuedHeader">
                       <div>
                         <strong>{invoice.number}</strong>
-                        <span>{invoice.clientName} · {invoice.affairName}</span>
+                        <span>
+                          {invoice.clientName} · {invoice.affairName}
+                        </span>
                         <small>
                           {new Date(invoice.issuedAt).toLocaleDateString("fr-FR")} · {invoice.label}
                         </small>
@@ -566,9 +583,7 @@ export function BillingWorkspace({
                       <div className="billingIssuedAmount">
                         <strong>{money(invoice.totalTtcCents)} TTC</strong>
                         {position && position.creditedTtcCents > 0 && (
-                          <small>
-                            Après avoirs : {money(position.remainingTtcCents)} TTC
-                          </small>
+                          <small>Après avoirs : {money(position.remainingTtcCents)} TTC</small>
                         )}
                       </div>
                     </div>
@@ -943,8 +958,8 @@ export function BillingWorkspace({
           <h2>Marchés des chantiers et préparation des factures</h2>
           <p>
             Un devis signé n&apos;est pas une facture. Cette liste suit les marchés et les
-            <strong> projets non émis</strong>. Les factures numérotées PAPOT se consultent dans
-            « Factures émises » ; le rapprochement avec Pennylane reste distinct.
+            <strong> projets non émis</strong>. Les factures numérotées PAPOT se consultent dans «
+            Factures émises » ; le rapprochement avec Pennylane reste distinct.
           </p>
           <div style={{ display: "flex", flexWrap: "wrap", gap: 12 }}>
             <strong>{followup.length} marché(s) de chantier</strong>
@@ -1061,8 +1076,8 @@ export function BillingWorkspace({
         >
           <h2>À valider · projets non émis ({unissuedDrafts.length})</h2>
           <p>
-            Prépare le document, vérifie le visa et valide-le en interne.
-            Une validation interne ne génère pas de numéro de facture.
+            Prépare le document, vérifie le visa et valide-le en interne. Une validation interne ne
+            génère pas de numéro de facture.
           </p>
           <div style={{ display: "flex", gap: 12, flexWrap: "wrap", alignItems: "end" }}>
             <label style={{ display: "grid", gap: 5, flex: "2 1 220px" }}>

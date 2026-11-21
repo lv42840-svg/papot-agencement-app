@@ -1020,7 +1020,6 @@ select:focus {
   padding: 5px 9px;
 }
 
-
 /* Facturation V1 : accueil métier simple, dans la palette lavande PAPOT. */
 .billingHubHeader {
   display: flex;
@@ -1081,7 +1080,10 @@ select:focus {
   border-radius: 17px;
   box-shadow: 0 5px 19px rgb(55 42 89 / 0.055);
   cursor: pointer;
-  transition: border-color 120ms ease, box-shadow 120ms ease, transform 120ms ease;
+  transition:
+    border-color 120ms ease,
+    box-shadow 120ms ease,
+    transform 120ms ease;
 }
 .billingHubCard:not(:disabled):hover {
   border-color: #b7a1e9;
@@ -1105,10 +1107,22 @@ select:focus {
   display: grid;
   place-items: center;
 }
-.billingHubIconLavender { color: #7752bb; background: #eee7fa; }
-.billingHubIconAmber { color: #aa752b; background: #fff1dc; }
-.billingHubIconGreen { color: #26845c; background: #e1f6ec; }
-.billingHubIconBlue { color: #3675b0; background: #e6f2ff; }
+.billingHubIconLavender {
+  color: #7752bb;
+  background: #eee7fa;
+}
+.billingHubIconAmber {
+  color: #aa752b;
+  background: #fff1dc;
+}
+.billingHubIconGreen {
+  color: #26845c;
+  background: #e1f6ec;
+}
+.billingHubIconBlue {
+  color: #3675b0;
+  background: #e6f2ff;
+}
 .billingHubCardTitle {
   font-size: 19px;
   line-height: 1.25;
@@ -1133,7 +1147,9 @@ select:focus {
   font-size: 12px;
   font-weight: 750;
 }
-.billingHubCard:disabled .billingHubCardFoot { color: #8a8594; }
+.billingHubCard:disabled .billingHubCardFoot {
+  color: #8a8594;
+}
 .billingHubSubnav {
   display: flex;
   flex-wrap: wrap;
@@ -1152,8 +1168,14 @@ select:focus {
   border-radius: 10px;
   margin: 0;
 }
-.billingHubError { color: #9b292d; background: #fff0f0; }
-.billingHubSuccess { color: #256b49; background: #ebf8f0; }
+.billingHubError {
+  color: #9b292d;
+  background: #fff0f0;
+}
+.billingHubSuccess {
+  color: #256b49;
+  background: #ebf8f0;
+}
 
 .billingRegister {
   display: grid;
@@ -1170,7 +1192,10 @@ select:focus {
   gap: 20px;
   flex-wrap: wrap;
 }
-.billingRegisterHeading h2 { margin: 0 0 6px; font-size: 21px; }
+.billingRegisterHeading h2 {
+  margin: 0 0 6px;
+  font-size: 21px;
+}
 .billingRegisterHeading p {
   margin: 0;
   color: #6c637e;
@@ -1200,7 +1225,10 @@ select:focus {
   border: 1px solid #ddd5e9;
   border-radius: 9px;
 }
-.billingRegisterList { display: grid; gap: 12px; }
+.billingRegisterList {
+  display: grid;
+  gap: 12px;
+}
 .billingIssuedCard {
   padding: 18px;
   border: 1px solid #e9e3f1;
@@ -1214,10 +1242,18 @@ select:focus {
   gap: 15px;
   flex-wrap: wrap;
 }
-.billingIssuedHeader > div:first-child { display: grid; gap: 5px; }
-.billingIssuedHeader strong { font-size: 15px; }
-.billingIssuedHeader span { font-size: 13px; }
-.billingIssuedHeader small, .billingIssuedAmount small {
+.billingIssuedHeader > div:first-child {
+  display: grid;
+  gap: 5px;
+}
+.billingIssuedHeader strong {
+  font-size: 15px;
+}
+.billingIssuedHeader span {
+  font-size: 13px;
+}
+.billingIssuedHeader small,
+.billingIssuedAmount small {
   color: #706981;
   font-size: 11px;
 }
@@ -1240,7 +1276,9 @@ select:focus {
   gap: 7px;
   font-size: 12px;
 }
-.billingIssuedCredits a { color: #7151b9; }
+.billingIssuedCredits a {
+  color: #7151b9;
+}
 .billingRegisterEmpty {
   display: grid;
   place-items: center;
@@ -1251,11 +1289,28 @@ select:focus {
   background: #fbf9ff;
   border-radius: 12px;
 }
-.billingRegisterEmpty h3 { color: #332c44; margin: 0; }
-.billingRegisterEmpty p { max-width: 500px; margin: 0; line-height: 1.5; }
+.billingRegisterEmpty h3 {
+  color: #332c44;
+  margin: 0;
+}
+.billingRegisterEmpty p {
+  max-width: 500px;
+  margin: 0;
+  line-height: 1.5;
+}
 @media (max-width: 750px) {
-  .billingHubCards { grid-template-columns: minmax(0, 1fr); gap: 12px; }
-  .billingHubCard { min-height: 195px; padding: 17px; }
-  .billingRegister { padding: 14px; }
-  .billingIssuedAmount { text-align: left; }
+  .billingHubCards {
+    grid-template-columns: minmax(0, 1fr);
+    gap: 12px;
+  }
+  .billingHubCard {
+    min-height: 195px;
+    padding: 17px;
+  }
+  .billingRegister {
+    padding: 14px;
+  }
+  .billingIssuedAmount {
+    text-align: left;
+  }
 }

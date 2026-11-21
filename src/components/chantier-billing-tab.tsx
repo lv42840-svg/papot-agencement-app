@@ -52,9 +52,9 @@ export function ChantierBillingTab({ chantierId }: { chantierId: string }) {
         if (!response.ok || !result.payload)
           throw new Error(result.error ?? "Chargement impossible");
         setSnapshot(result.payload);
-        setIssuedInvoices((result.issuedInvoices ?? []).filter(
-          (item) => item.chantierId === chantierId,
-        ));
+        setIssuedInvoices(
+          (result.issuedInvoices ?? []).filter((item) => item.chantierId === chantierId),
+        );
         setError("");
         const marketResponse = await fetch("/api/desktop/billing/markets", {
           cache: "no-store",
@@ -100,8 +100,8 @@ export function ChantierBillingTab({ chantierId }: { chantierId: string }) {
           <h3>Factures émises sur ce chantier ({issuedInvoices.length})</h3>
           {issuedInvoices.map((invoice) => (
             <p key={invoice.id}>
-              <strong>{invoice.number}</strong> · {money(invoice.totalTtcCents)} TTC ·
-              {" "}{new Date(invoice.issuedAt).toLocaleDateString("fr-FR")} ·{" "}
+              <strong>{invoice.number}</strong> · {money(invoice.totalTtcCents)} TTC ·{" "}
+              {new Date(invoice.issuedAt).toLocaleDateString("fr-FR")} ·{" "}
               <a href={"/api/desktop/billing/issued/" + invoice.id + "/pdf"}>
                 Télécharger le PDF officiel
               </a>
@@ -110,9 +110,9 @@ export function ChantierBillingTab({ chantierId }: { chantierId: string }) {
         </section>
       ) : (
         <p>
-          Aucune facture numérotée PAPOT sur ce chantier pour le moment.
-          Les projets validés en interne ne sont pas des factures émises.
-          L&apos;émission officielle reste soumise à l&apos;activation et aux droits prévus.
+          Aucune facture numérotée PAPOT sur ce chantier pour le moment. Les projets validés en
+          interne ne sont pas des factures émises. L&apos;émission officielle reste soumise à
+          l&apos;activation et aux droits prévus.
         </p>
       )}
       {marketError ? <p role="status">{marketError}</p> : null}
