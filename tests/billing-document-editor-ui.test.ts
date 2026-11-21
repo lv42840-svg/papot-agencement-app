@@ -40,12 +40,13 @@ describe("facturation: éditeur identique au parcours devis", () => {
   it("crée depuis le chantier et présente les projets en tableau filtrable", () => {
     const ui = readFileSync("src/components/billing-workspace.tsx", "utf8");
     expect(ui).toMatch(/chantierId\s*\|\|\s*quoteId\s*\?\s*"CHANTIER"/);
-    expect(ui).toContain('role="tablist"');
+    expect(ui).toContain('<BillingHubCards');
+    expect(ui).toContain('tab === "HOME"');
     expect(ui).not.toContain("Nouvelle facture depuis devis");
     expect(ui).toContain("Nouvelle facture depuis chantier");
-    expect(ui).toContain("Projets de factures");
+    expect(ui).toContain("À valider");
     expect(ui).toContain('aria-label="Choisir un chantier à facturer"');
-    expect(ui).toContain("filterBillingProjects(drafts");
+    expect(ui).toContain("filterBillingProjects(unissuedDrafts");
     expect(ui).toContain('aria-label="Filtrer par statut"');
     expect(ui).toContain('aria-label="Filtrer par chantier"');
     expect(ui).toContain('aria-label="Trier les projets de factures"');
