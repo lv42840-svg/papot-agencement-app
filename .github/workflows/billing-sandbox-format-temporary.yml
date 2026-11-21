@@ -1,0 +1,51 @@
+name: Temporary billing sandbox formatter
+
+on:
+  push:
+    branches:
+      - feat/billing-chantier-market-foundation
+    paths:
+      - .github/workflows/billing-sandbox-format-temporary.yml
+
+permissions:
+  contents: write
+
+jobs:
+  formatter:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: true
+      - run: |
+          git fetch origin feat/billing-chantier-market-foundation
+          git checkout -B feat/billing-chantier-market-foundation origin/feat/billing-chantier-market-foundation
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - run: |
+          npx prettier --write \
+            src/lib/billing/test-sandbox.ts \
+            src/lib/billing/domain.ts \
+            src/lib/billing/native-invoice-pdf.ts \
+            src/lib/billing/native-credit-pdf.ts \
+            src/lib/auth/permission-catalog.ts \
+            src/app/api/desktop/billing/route.ts \
+            src/app/api/desktop/billing/test-sandbox/route.ts \
+            'src/app/api/desktop/billing/test-sandbox/pdf/[documentId]/route.ts' \
+            src/components/billing-workspace.tsx \
+            src/components/billing-test-sandbox-panel.tsx \
+            tests/billing-test-sandbox.test.ts \
+            tests/billing-test-sandbox-wiring.test.ts
+      - run: |
+          git diff --check
+          if ! git diff --quiet; then
+            git config user.name "github-actions[bot]"
+            git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+            git add src/lib/billing/test-sandbox.ts src/lib/billing/domain.ts src/lib/billing/native-invoice-pdf.ts src/lib/billing/native-credit-pdf.ts src/lib/auth/permission-catalog.ts src/app/api/desktop/billing/route.ts src/app/api/desktop/billing/test-sandbox/route.ts 'src/app/api/desktop/billing/test-sandbox/pdf/[documentId]/route.ts' src/components/billing-workspace.tsx src/components/billing-test-sandbox-panel.tsx tests/billing-test-sandbox.test.ts tests/billing-test-sandbox-wiring.test.ts
+            git commit -m "style(billing): format isolated billing test sandbox"
+            git pull --rebase origin feat/billing-chantier-market-foundation
+            git push
+          fi
