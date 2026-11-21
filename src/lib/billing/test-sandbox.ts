@@ -133,6 +133,7 @@ export type BillingTestInvoiceSummary = {
   remainingHtByRate: Array<{
     ratePercent: number;
     remainingHtCents: number;
+    remainingVatCents: number;
   }>;
 };
 export type BillingTestCreditSummary = {
@@ -177,6 +178,7 @@ export function summarizeBillingTestSandbox(payload: BillingPayload): {
         remainingHtByRate: position.allowances.map((group) => ({
           ratePercent: group.ratePercent,
           remainingHtCents: group.remainingHtCents,
+          remainingVatCents: group.remainingVatCents,
         })),
       };
     }),
