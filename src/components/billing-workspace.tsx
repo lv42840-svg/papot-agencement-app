@@ -135,9 +135,7 @@ export function BillingWorkspace({
       setTab("HOME");
     }
   }, [data, tab]);
-  useEffect(() => {
-    if (data && tab === "TESTS" && !data.canTestBillingSandbox) setTab("HOME");
-  }, [data, tab]);
+
   const allSources = data?.sources ?? [];
   const chantierChoices = [...(data?.chantiers ?? [])]
     .map((chantier) => ({
