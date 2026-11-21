@@ -27,6 +27,9 @@ export const billingTestSandboxSchema = z.object({
   invoiceLedger: nativeInvoiceLedgerSchema,
   creditLedger: nativeCreditNoteLedgerSchema,
   updatedAt: z.string().datetime({ offset: true }).nullable(),
+  resetCount: z.number().int().nonnegative().safe(),
+  lastResetAt: z.string().datetime({ offset: true }).nullable(),
+  lastResetByName: z.string().nullable(),
 });
 export type BillingTestSandbox = z.infer<typeof billingTestSandboxSchema>;
 
@@ -35,6 +38,9 @@ export function emptyBillingTestSandbox(): BillingTestSandbox {
     invoiceLedger: emptyNativeInvoiceLedger(),
     creditLedger: emptyNativeCreditNoteLedger(),
     updatedAt: null,
+    resetCount: 0,
+    lastResetAt: null,
+    lastResetByName: null,
   };
 }
 
@@ -98,13 +104,20 @@ export const TEST_RESET_CONFIRMATION = "EFFACER LES ESSAIS";
 export function resetBillingTestSandbox(
   payload: BillingPayload,
   typedConfirmation: string,
+  actorName: string,
+  now = new Date(),
 ): BillingPayload {
   if (typedConfirmation !== TEST_RESET_CONFIRMATION) {
     throw new Error("BILLING_TEST_CONFIRMATION_REQUIRED");
   }
   return {
     ...payload,
-    testSandbox: emptyBillingTestSandbox(),
+    testSandbox: {
+      ...emptyBillingTestSandbox(),
+      resetCount: (payload.testSandbox?.resetCount ?? 0) + 1,
+      lastResetAt: now.toISOString(),
+      lastResetByName: actorName,
+    },
   };
 }
 
@@ -132,6 +145,9 @@ export type BillingTestCreditSummary = {
 
 export function summarizeBillingTestSandbox(payload: BillingPayload): {
   mode: "TEST_ONLY";
+  resetCount: number;
+  lastResetAt: string | null;
+  lastResetByName: string | null;
   invoices: BillingTestInvoiceSummary[];
   credits: BillingTestCreditSummary[];
 } {
@@ -144,12 +160,15 @@ export function summarizeBillingTestSandbox(payload: BillingPayload): {
   };
   return {
     mode: "TEST_ONLY",
+    resetCount: test.resetCount,
+    lastResetAt: test.lastResetAt,
+    lastResetByName: test.lastResetByName,
     invoices: test.invoiceLedger.invoices.map((item) => {
       const position = nativeInvoiceNetPosition(simulated, item.id);
       return {
         id: item.id,
         draftId: item.draftId,
-        number: "TEST / " + item.number,
+        number: "TEST-" + item.number,
         issuedOn: item.issuedOn,
         totalTtcCents: item.totalTtcCents,
         clientName: item.buyer.name,
@@ -163,7 +182,7 @@ export function summarizeBillingTestSandbox(payload: BillingPayload): {
     }),
     credits: test.creditLedger.creditNotes.map((note) => ({
       id: note.id,
-      number: "TEST / " + note.number,
+      number: "TEST-" + note.number,
       originalInvoiceId: note.originalInvoiceId,
       totalTtcCents: note.totalTtcCents,
       reason: note.reason,
