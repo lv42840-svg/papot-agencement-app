@@ -13,6 +13,8 @@ import {
 } from "@/lib/billing/test-sandbox";
 import { createCompanyProfileRepository } from "@/lib/company-profile/create-repository";
 import { createClientsRepository } from "@/lib/clients/create-repository";
+import type { CompanyProfile } from "@/lib/company-profile/domain";
+import type { ClientRecord } from "@/lib/clients/domain";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -91,13 +93,15 @@ export async function POST(request: Request) {
       await requireSpecialPermission(context.user, "billing.reset_test_sandbox");
     }
 
-    let company: Awaited<ReturnType<ReturnType<typeof createCompanyProfileRepository>["load"]>> | undefined;
-    let clients: Awaited<ReturnType<Awaited<ReturnType<typeof createClientsRepository>>["load"]>> | undefined;
+    let company: CompanyProfile | undefined;
+    let clients: ClientRecord[] | undefined;
     if (action.action === "SIMULATE_INVOICE") {
-      [company, clients] = await Promise.all([
+      const [profile, clientPayload] = await Promise.all([
         createCompanyProfileRepository().load(),
         (await createClientsRepository()).load(),
       ]);
+      company = profile;
+      clients = clientPayload.clients;
     }
 
     const payload = await createBillingRepository().mutate((current) => {
@@ -111,7 +115,7 @@ export async function POST(request: Request) {
       }
       const draft = current.drafts.find((item) => item.id === action.input.draftId);
       if (!draft) throw new Error("BILLING_DRAFT_NOT_FOUND");
-      const client = clients?.clients.find((item) => item.id === draft.clientId);
+      const client = clients?.find((item) => item.id === draft.clientId);
       if (!company || !client) throw new Error("BILLING_NATIVE_BUYER_PROFILE_INCOMPLETE");
       return simulateBillingTestInvoice(current, action.input, company, client, context.user.displayName);
     });
