@@ -368,8 +368,13 @@ export function applyCommercialMutation(
     if (Boolean(item.isTest) === input.isTest) return { payload, focusCaseId: item.id };
     item.isTest = input.isTest;
     touch(item, actor, now);
-    history(item, actor.displayName, "TEST_MARKER_UPDATED",
-      input.isTest ? "Affaire marquée comme donnée de test." : "Marquage test retiré de l'affaire.", now);
+    history(
+      item,
+      actor.displayName,
+      "TEST_MARKER_UPDATED",
+      input.isTest ? "Affaire marquée comme donnée de test." : "Marquage test retiré de l'affaire.",
+      now,
+    );
     return { payload, focusCaseId: item.id };
   }
 

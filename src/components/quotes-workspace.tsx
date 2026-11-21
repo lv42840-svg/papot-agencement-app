@@ -38,9 +38,9 @@ export function QuotesWorkspace({
   );
   const sortedQuotes = useMemo(
     () =>
-      [...initialPayload.quotes].filter((quote) => !showTestsOnly || quote.isTest === true).sort((left, right) =>
-        right.updatedAt.localeCompare(left.updatedAt),
-      ),
+      [...initialPayload.quotes]
+        .filter((quote) => !showTestsOnly || quote.isTest === true)
+        .sort((left, right) => right.updatedAt.localeCompare(left.updatedAt)),
     [initialPayload.quotes, showTestsOnly],
   );
 
@@ -77,9 +77,13 @@ export function QuotesWorkspace({
         ) : null}
 
         <label className="testDataFilter">
-          <input type="checkbox" checked={showTestsOnly}
-            onChange={(event) => setShowTestsOnly(event.target.checked)} />
-          Afficher uniquement les devis TEST ({initialPayload.quotes.filter((quote) => quote.isTest === true).length})
+          <input
+            type="checkbox"
+            checked={showTestsOnly}
+            onChange={(event) => setShowTestsOnly(event.target.checked)}
+          />
+          Afficher uniquement les devis TEST (
+          {initialPayload.quotes.filter((quote) => quote.isTest === true).length})
         </label>
 
         {sortedQuotes.length === 0 ? (
@@ -107,7 +111,10 @@ export function QuotesWorkspace({
                   <div className="quoteDraftMain">
                     <FileText size={17} aria-hidden="true" />
                     <div>
-                      <strong>{quote.model.subject} {quote.isTest && <span className="testDataBadge">TEST</span>}</strong>
+                      <strong>
+                        {quote.model.subject}{" "}
+                        {quote.isTest && <span className="testDataBadge">TEST</span>}
+                      </strong>
                       <span>
                         {affair?.clientName ?? "Client"} · {affair?.name ?? "Affaire"}
                       </span>

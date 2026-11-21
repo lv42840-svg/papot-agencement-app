@@ -9,11 +9,11 @@ import {
   parseNativeQuotesPayload,
 } from "../src/lib/quotes/store";
 import { applyQuotesMutation } from "../src/lib/quotes/mutations";
+import { createInitialChantiersPayload, parseChantiersPayload } from "../src/lib/chantiers/domain";
 import {
-  createInitialChantiersPayload,
-  parseChantiersPayload,
-} from "../src/lib/chantiers/domain";
-import { applyChantierMutation, launchChantierFromCommercial } from "../src/lib/chantiers/mutations";
+  applyChantierMutation,
+  launchChantierFromCommercial,
+} from "../src/lib/chantiers/mutations";
 
 const actor = {
   userId: "11111111-1111-4111-8111-111111111111",
@@ -46,7 +46,10 @@ describe("Marqueur de recette: affaires, devis et chantiers", () => {
     const item = created.cases[0];
     expect(item.isTest).toBe(true);
     const unmarked = applyCommercialMutation(
-      created, { action: "setTestMarker", caseId: item.id, isTest: false }, actor, now,
+      created,
+      { action: "setTestMarker", caseId: item.id, isTest: false },
+      actor,
+      now,
     ).payload;
     expect(unmarked.cases[0].isTest).toBe(false);
     expect(unmarked.cases[0].history.at(-1)?.type).toBe("TEST_MARKER_UPDATED");
@@ -66,14 +69,24 @@ describe("Marqueur de recette: affaires, devis et chantiers", () => {
       quoteKind: "STANDARD" as const,
     };
     const testQuote = applyQuotesMutation(
-      createInitialNativeQuotesPayload(), input, actor, clientId, now,
-      undefined, undefined, testAffair.isTest === true,
+      createInitialNativeQuotesPayload(),
+      input,
+      actor,
+      clientId,
+      now,
+      undefined,
+      undefined,
+      testAffair.isTest === true,
     ).payload;
     expect(testQuote.quotes[0].isTest).toBe(true);
     expect(parseNativeQuotesPayload(testQuote).quotes[0].isTest).toBe(true);
 
     const realQuote = applyQuotesMutation(
-      createInitialNativeQuotesPayload(), input, actor, clientId, now,
+      createInitialNativeQuotesPayload(),
+      input,
+      actor,
+      clientId,
+      now,
     ).payload;
     expect(realQuote.quotes[0].isTest).toBe(false);
     expect(realQuote.quotes[0].model.subject).toBe("Devis recette");
@@ -81,7 +94,8 @@ describe("Marqueur de recette: affaires, devis et chantiers", () => {
 
   it("permet de marquer un ancien devis sans toucher à sa structure ni ses prix", () => {
     const payload = applyQuotesMutation(
-      createInitialNativeQuotesPayload(), {
+      createInitialNativeQuotesPayload(),
+      {
         action: "createDraft",
         commercialCaseId: createAffair(false).cases[0].id,
         subject: "Essai ancien",
@@ -89,19 +103,26 @@ describe("Marqueur de recette: affaires, devis et chantiers", () => {
         issueDate: "2026-11-21",
         paymentTerms: "30 jours",
         variantName: "Base",
-      }, actor, clientId, now,
+      },
+      actor,
+      clientId,
+      now,
     ).payload;
     const original = payload.quotes[0];
     const marked = applyQuotesMutation(
-      payload, { action: "setTestMarker", quoteId: original.id, isTest: true },
-      actor, undefined, new Date("2026-11-21T11:00:00.000Z"),
+      payload,
+      { action: "setTestMarker", quoteId: original.id, isTest: true },
+      actor,
+      undefined,
+      new Date("2026-11-21T11:00:00.000Z"),
     ).payload;
     expect(marked.quotes[0].isTest).toBe(true);
     expect(marked.quotes[0].model).toEqual(original.model);
     expect(marked.quotes[0].updatedByName).toBe("Lucien");
     expect(payload.quotes[0].isTest).toBe(false);
     const unmarked = applyQuotesMutation(
-      marked, { action: "setTestMarker", quoteId: original.id, isTest: false },
+      marked,
+      { action: "setTestMarker", quoteId: original.id, isTest: false },
       actor,
     ).payload;
     expect(unmarked.quotes[0].isTest).toBe(false);
@@ -140,7 +161,8 @@ describe("Marqueur de recette: affaires, devis et chantiers", () => {
     const after = applyChantierMutation(
       linked,
       { action: "setTestMarker", chantierId: before.id, isTest: false },
-      actor, new Date("2026-11-21T11:00:00.000Z"),
+      actor,
+      new Date("2026-11-21T11:00:00.000Z"),
     ).payload;
     expect(after.chantiers[0].isTest).toBe(false);
     expect(after.chantiers[0].history.at(-1)?.type).toBe("TEST_MARKER_UPDATED");

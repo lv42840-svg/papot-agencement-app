@@ -10,8 +10,8 @@ describe("TEST labels in real workflows, without cleanup side effects", () => {
     const launch = read("src/lib/chantiers/mutations.ts");
     expect(ui).toContain('name="isTest"');
     expect(ui).toContain('isTest: form.get("isTest") === "on"');
-    expect(quoteApi).toContain('affair.isTest === true');
-    expect(launch).toContain('isTest: commercialCase.isTest === true');
+    expect(quoteApi).toContain("affair.isTest === true");
+    expect(launch).toContain("isTest: commercialCase.isTest === true");
   });
 
   it("can mark an existing affair, quote or chantier and filter each list", () => {

@@ -345,12 +345,15 @@ export function ChantierWorkspace({ chantierId }: { chantierId: string }) {
             ) : null}
           </div>
           <h1>{chantier.name}</h1>
-          <TestDataMarker isTest={chantier.isTest === true}
+          <TestDataMarker
+            isTest={chantier.isTest === true}
             disabled={busy || !chantiersSnapshot.capabilities.canModify}
-            onToggle={(next) => mutate(
-              { action: "setTestMarker", chantierId: chantier.id, isTest: next },
-              next ? "Chantier marqué comme TEST." : "Marquage TEST retiré.",
-            )}
+            onToggle={(next) =>
+              mutate(
+                { action: "setTestMarker", chantierId: chantier.id, isTest: next },
+                next ? "Chantier marqué comme TEST." : "Marquage TEST retiré.",
+              )
+            }
           />
           <p>
             {[chantier.clientName, chantier.siteLabel].filter(Boolean).join(" · ") ||

@@ -397,8 +397,13 @@ export function applyChantierMutation(
     if (Boolean(item.isTest) === input.isTest) return { payload, focusChantierId: item.id };
     item.isTest = input.isTest;
     touch(item, actor, now);
-    history(item, actor.displayName, "TEST_MARKER_UPDATED",
-      input.isTest ? "Chantier marqué comme donnée de test." : "Marquage test retiré du chantier.", now);
+    history(
+      item,
+      actor.displayName,
+      "TEST_MARKER_UPDATED",
+      input.isTest ? "Chantier marqué comme donnée de test." : "Marquage test retiré du chantier.",
+      now,
+    );
     return { payload, focusChantierId: item.id };
   }
 

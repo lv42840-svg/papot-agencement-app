@@ -440,9 +440,13 @@ export function CommercialWorkspaceV2({ affairId }: { affairId?: string }) {
 
       <section className="commercialV2Toolbar">
         <label className="testDataFilter">
-          <input type="checkbox" checked={showTestsOnly}
-            onChange={(event) => setShowTestsOnly(event.target.checked)} />
-          Afficher uniquement les affaires TEST ({cases.filter((item) => item.isTest === true).length})
+          <input
+            type="checkbox"
+            checked={showTestsOnly}
+            onChange={(event) => setShowTestsOnly(event.target.checked)}
+          />
+          Afficher uniquement les affaires TEST (
+          {cases.filter((item) => item.isTest === true).length})
         </label>
         <label className="commercialV2Search">
           <Search size={14} />
@@ -474,7 +478,9 @@ export function CommercialWorkspaceV2({ affairId }: { affairId?: string }) {
                   className="commercialV2ListRow"
                 >
                   <div>
-                    <strong>{item.name} {item.isTest && <span className="testDataBadge">TEST</span>}</strong>
+                    <strong>
+                      {item.name} {item.isTest && <span className="testDataBadge">TEST</span>}
+                    </strong>
                     <span>{item.clientName || "Client à préciser"}</span>
                   </div>
                   <div className="commercialV2ListMeta">
@@ -582,7 +588,9 @@ function CreateAffair({
       </div>
       <label className="testDataFormChoice">
         <input type="checkbox" name="isTest" />
-        <span>Affaire de TEST : les nouveaux devis et le chantier lié porteront le badge TEST.</span>
+        <span>
+          Affaire de TEST : les nouveaux devis et le chantier lié porteront le badge TEST.
+        </span>
       </label>
       <label>
         <span>Client</span>
@@ -764,11 +772,22 @@ function AffairDetail({
             {COMMERCIAL_STATUS_LABELS[item.status]}
           </span>
           <h2>{item.name}</h2>
-          <TestDataMarker isTest={item.isTest === true} disabled={!canModify || busy}
-            onToggle={async (next) => Boolean(await mutate({
-              action: "setTestMarker", caseId: item.id, isTest: next,
-              expectedUpdatedAt: item.updatedAt,
-            }, next ? "Affaire marquée TEST." : "Marquage TEST retiré."))}
+          <TestDataMarker
+            isTest={item.isTest === true}
+            disabled={!canModify || busy}
+            onToggle={async (next) =>
+              Boolean(
+                await mutate(
+                  {
+                    action: "setTestMarker",
+                    caseId: item.id,
+                    isTest: next,
+                    expectedUpdatedAt: item.updatedAt,
+                  },
+                  next ? "Affaire marquée TEST." : "Marquage TEST retiré.",
+                ),
+              )
+            }
           />
           <p>
             {item.clientId ? (

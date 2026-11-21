@@ -85,16 +85,24 @@ export function QuoteDirectEditor({
 
   return (
     <div className="quoteDirectWorkspace">
-      <TestDataMarker isTest={quote.isTest === true} disabled={!canWrite}
+      <TestDataMarker
+        isTest={quote.isTest === true}
+        disabled={!canWrite}
         onToggle={async (next) => {
           setTestMarkerError("");
           try {
             const response = await fetch("/api/desktop/quotes", {
               method: "POST",
-              headers: { "Content-Type": "application/json", ...quoteRevisionHeaders(quote.updatedAt) },
+              headers: {
+                "Content-Type": "application/json",
+                ...quoteRevisionHeaders(quote.updatedAt),
+              },
               body: JSON.stringify({ action: "setTestMarker", quoteId: quote.id, isTest: next }),
             });
-            const body = (await response.json()) as { payload?: NativeQuotesPayload; error?: string };
+            const body = (await response.json()) as {
+              payload?: NativeQuotesPayload;
+              error?: string;
+            };
             if (!response.ok || !body.payload) throw new Error(body.error ?? "TEST_MARKER_FAILED");
             setPayload(body.payload);
             return true;
@@ -104,7 +112,11 @@ export function QuoteDirectEditor({
           }
         }}
       />
-      {testMarkerError && <p role="alert" className="testDataMarkerError">{testMarkerError}</p>}
+      {testMarkerError && (
+        <p role="alert" className="testDataMarkerError">
+          {testMarkerError}
+        </p>
+      )}
       {contractState ? (
         <div
           className={`quoteContractState ${

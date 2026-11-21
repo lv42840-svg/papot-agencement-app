@@ -20,10 +20,14 @@ export function TestDataMarker({
   const [error, setError] = useState("");
   async function toggle() {
     if (disabled || busy) return;
-    if (!isTest && !window.confirm(
-      "Marquer ce dossier comme TEST ? Il restera enregistré, et ce marquage ne supprimera rien. " +
-      "Vérifie qu'il ne s'agit pas d'un vrai dossier client.",
-    )) return;
+    if (
+      !isTest &&
+      !window.confirm(
+        "Marquer ce dossier comme TEST ? Il restera enregistré, et ce marquage ne supprimera rien. " +
+          "Vérifie qu'il ne s'agit pas d'un vrai dossier client.",
+      )
+    )
+      return;
     setBusy(true);
     setError("");
     try {
@@ -43,12 +47,20 @@ export function TestDataMarker({
         </span>
       )}
       {!disabled && (
-        <button className="secondaryButton testDataMarkerButton" type="button"
-          disabled={busy} onClick={() => void toggle()}>
+        <button
+          className="secondaryButton testDataMarkerButton"
+          type="button"
+          disabled={busy}
+          onClick={() => void toggle()}
+        >
           {isTest ? "Retirer le marquage TEST" : "Marquer comme donnée TEST"}
         </button>
       )}
-      {error && <span role="alert" className="testDataMarkerError">{error}</span>}
+      {error && (
+        <span role="alert" className="testDataMarkerError">
+          {error}
+        </span>
+      )}
     </div>
   );
 }

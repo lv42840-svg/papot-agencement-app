@@ -135,7 +135,9 @@ export function ChantiersWorkspace() {
 
   const normalizedQuery = normalize(query);
   const visible = useMemo(() => {
-    const filtered = chantiers.filter((item) => matches(item, normalizedQuery) && (!showTestsOnly || item.isTest === true));
+    const filtered = chantiers.filter(
+      (item) => matches(item, normalizedQuery) && (!showTestsOnly || item.isTest === true),
+    );
     if (normalizedQuery) return filtered;
     return filtered.filter((item) => item.status === mode);
   }, [chantiers, normalizedQuery, mode, showTestsOnly]);
@@ -226,7 +228,9 @@ export function ChantiersWorkspace() {
                   <BriefcaseBusiness size={14} />
                 </span>
                 <div>
-                  <strong>{item.name} {item.isTest && <span className="testDataBadge">TEST</span>}</strong>
+                  <strong>
+                    {item.name} {item.isTest && <span className="testDataBadge">TEST</span>}
+                  </strong>
                   <small>
                     {[item.clientName, item.siteLabel].filter(Boolean).join(" · ") ||
                       "Client / lieu à compléter"}
@@ -253,9 +257,13 @@ export function ChantiersWorkspace() {
 
       <section className="chantiersToolbar">
         <label className="testDataFilter">
-          <input type="checkbox" checked={showTestsOnly}
-            onChange={(event) => setShowTestsOnly(event.target.checked)} />
-          Afficher uniquement les chantiers TEST ({chantiers.filter((item) => item.isTest === true).length})
+          <input
+            type="checkbox"
+            checked={showTestsOnly}
+            onChange={(event) => setShowTestsOnly(event.target.checked)}
+          />
+          Afficher uniquement les chantiers TEST (
+          {chantiers.filter((item) => item.isTest === true).length})
         </label>
         <div className="chantiersModes">
           <button
