@@ -1,8 +1,10 @@
+import { previousBillingLineAmounts } from "./line-ledger";
 import type {
   BillingDocumentLine,
   BillingDraft,
   BillingPayload,
   BillingSourceLine,
+  BillingSourceStructureItem,
 } from "./domain";
 
 export function lineHtCents(line: BillingDocumentLine): number {
@@ -62,17 +64,58 @@ function distributeAmounts(
   return parts.map((part) => part.amount);
 }
 
+function followSourceStructure(
+  rows: BillingDocumentLine[],
+  structure: readonly BillingSourceStructureItem[] | undefined,
+): BillingDocumentLine[] {
+  if (!structure?.length) return rows;
+  const bySourceId = new Map(
+    rows
+      .filter((line) => line.origin === "QUOTE" && line.sourceLineId !== null)
+      .map((line) => [line.sourceLineId, line]),
+  );
+  const used = new Set<string>();
+  const result: BillingDocumentLine[] = [];
+  const maxTitles = Math.max(0, 1000 - rows.length);
+  let titles = 0;
+
+  for (const item of structure) {
+    if (item.kind === "TITLE") {
+      if (titles >= maxTitles) continue;
+      result.push({
+        id: globalThis.crypto.randomUUID(),
+        origin: "TITLE",
+        headingLevel: item.level ?? "SECTION",
+        sourceLineId: null,
+        description: item.title,
+        quantity: 0,
+        unit: "",
+        unitPriceCents: 0,
+        vatRatePercent: 0,
+      });
+      titles++;
+      continue;
+    }
+    const line = bySourceId.get(item.lineId);
+    if (line && !used.has(line.id)) {
+      used.add(line.id);
+      result.push(line);
+    }
+  }
+  return [...result, ...rows.filter((line) => !used.has(line.id))];
+}
+
 /** Generates an independent editable snapshot; the retained quote is never changed. */
 export function buildInvoiceDocumentLines(
   draft: BillingDraft,
   payload: BillingPayload,
 ): BillingDocumentLine[] {
-  const draftIndex = payload.drafts.findIndex((item) => item.id === draft.id);
-  const prior = payload.drafts
-    .slice(0, draftIndex < 0 ? payload.drafts.length : draftIndex)
-    .filter((item) => item.quoteId === draft.quoteId);
   const sourceLines = draft.lines ?? [];
   const output: BillingDocumentLine[] = [];
+  // Include prior FREE amounts allocated to contract lines, not just QUOTE rows.
+  const previousAmounts = sourceLines.length
+    ? previousBillingLineAmounts(payload, draft, draft.id)
+    : new Map<string, number>();
 
   for (const group of draft.taxGroups) {
     const matching = sourceLines.filter((line) => line.vatRatePercent === group.ratePercent);
@@ -90,26 +133,19 @@ export function buildInvoiceDocumentLines(
       continue;
     }
 
-    const previousSituations = prior.filter((item) => item.type === "PROGRESS");
     const weights = matching.map((line) => {
       const target = draft.lineProgress?.find(
         (row) => row.lineId === line.lineId,
       )?.cumulativeHtCents;
-      if (target === undefined) return line.amountHtCents;
-      const previousTarget = previousSituations.reduce((maximum, item) => {
-        const row = item.lineProgress?.find((entry) => entry.lineId === line.lineId);
-        const amount =
-          row?.cumulativeHtCents ??
-          (item.cumulativePercent === null
-            ? 0
-            : Math.round((line.amountHtCents * item.cumulativePercent) / 100));
-        return Math.max(maximum, amount);
-      }, 0);
-      return Math.max(0, target - previousTarget);
+      const prepared = previousAmounts.get(line.lineId) ?? 0;
+      return Math.max(0, (target ?? line.amountHtCents) - prepared);
     });
     const allocated = distributeAmounts(matching, group.baseHtCents, weights);
     matching.forEach((source, index) => {
       const amount = allocated[index];
+      if (amount + (previousAmounts.get(source.lineId) ?? 0) > source.amountHtCents) {
+        throw new Error("BILLING_PROGRESS_LINE_EXCEEDS_CONTRACT");
+      }
       const quantity = source.quantity ?? 1;
       const roundedUnit = Math.round(amount / quantity);
       const exact =
@@ -132,5 +168,5 @@ export function buildInvoiceDocumentLines(
       });
     });
   }
-  return output;
+  return followSourceStructure(output, draft.structure);
 }

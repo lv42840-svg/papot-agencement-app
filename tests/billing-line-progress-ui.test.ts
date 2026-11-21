@@ -11,7 +11,7 @@ describe("Facturation depuis devis et chantier : avancement par ligne", () => {
     expect(view).toContain("linePercentages = rows");
     expect(view).toContain("Avancement cumulé :");
     const editor = readFileSync("src/components/billing-document-editor.tsx", "utf8");
-    expect(editor).toContain("Déjà préparé sur ce devis");
+    expect(editor).toContain("Déjà préparé sur ce chantier");
   });
 
   it("conserve le parcours chantier et bloque toute émission comptable", () => {

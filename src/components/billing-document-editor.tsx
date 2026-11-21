@@ -1,6 +1,7 @@
 "use client";
 
 import Link from "next/link";
+import { InvoiceOuvragesNavigator } from "@/components/invoice-ouvrages-navigator";
 import { useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import { ArrowLeft, ArrowDown, ArrowUp, Copy, FileText, Plus, Save, Trash2 } from "lucide-react";
@@ -15,8 +16,45 @@ import {
   type BillingPayload,
 } from "@/lib/billing/domain";
 import { calculateLineProgress, type LineProgressInput } from "@/lib/billing/progress";
+import { moveInvoiceEditorRow } from "@/lib/billing/ouvrage-structure";
+import { belongsToBillingSource } from "@/lib/billing/domain";
+import { BillingVisaPanel } from "@/components/billing-visa-panel";
+import { latestBillingVisa, visaRequiredForChantier } from "@/lib/billing/visa-policy";
+import { calculateBillingDraftRetention } from "@/lib/billing/draft-retention";
+import { previewNativeCreditNote } from "@/lib/billing/native-credit-preview";
 
-type ApiSnapshot = { payload: BillingPayload; canWrite: boolean; error?: string };
+type IssuedReference = { id: string; draftId: string; number: string; issuedAt: string };
+type IssuedCreditReference = {
+  id: string;
+  originalInvoiceId: string;
+  number: string;
+  issuedOn: string;
+  reason: string;
+  totalTtcCents: number;
+};
+type CreditAllowance = {
+  ratePercent: number;
+  remainingHtCents: number;
+  remainingVatCents: number;
+  originalHtCents: number;
+};
+type CreditPosition = {
+  originalInvoiceId: string;
+  originalTtcCents: number;
+  creditedTtcCents: number;
+  remainingTtcCents: number;
+  allowances: CreditAllowance[];
+};
+type ApiSnapshot = {
+  payload: BillingPayload;
+  canWrite: boolean;
+  canIssue?: boolean;
+  issuedInvoices?: IssuedReference[];
+  canIssueCredits?: boolean;
+  issuedCreditNotes?: IssuedCreditReference[];
+  creditPositions?: CreditPosition[];
+  error?: string;
+};
 type EditableRow = BillingDocumentLine & { quantityInput: string; priceInput: string };
 
 const currency = (cents: number) =>
@@ -50,7 +88,11 @@ function serialize(row: EditableRow): BillingDocumentLine | null {
   return {
     id: row.id,
     origin: row.origin,
+    ...(row.headingLevel ? { headingLevel: row.headingLevel } : {}),
     sourceLineId: row.sourceLineId,
+    ...(row.origin === "FREE" && row.allocationLineId
+      ? { allocationLineId: row.allocationLineId }
+      : {}),
     description: row.description,
     quantity,
     unit: row.unit,
@@ -66,6 +108,33 @@ const labels: Record<BillingDraft["type"], string> = {
 };
 const serverErrors: Record<string, string> = {
   BILLING_DRAFT_LOCKED: "Ce document est validé en interne et verrouillé.",
+  BILLING_NATIVE_ISSUANCE_DISABLED: "L'émission officielle est désactivée avant la recette finale.",
+  BILLING_NATIVE_CREDIT_ISSUANCE_DISABLED:
+    "Les avoirs officiels restent désactivés avant la recette.",
+  BILLING_NATIVE_CREDIT_EXCEEDS_ORIGINAL:
+    "Le montant de l'avoir dépasse le montant restant sur la facture.",
+  BILLING_NATIVE_CREDIT_FULL_AMOUNT_REQUIRED:
+    "L'avoir total doit reprendre tous les montants restant à créditer.",
+  BILLING_NATIVE_CREDIT_DATE_BACKWARDS:
+    "La date d'avoir ne peut pas précéder la facture d'origine.",
+  BILLING_NATIVE_CREDIT_SEQUENCE_CORRUPT:
+    "La numérotation des avoirs est incohérente. Émission suspendue.",
+  BILLING_NATIVE_CREDIT_DUPLICATE_VAT: "Deux montants utilisent le même taux de TVA.",
+  BILLING_NATIVE_CREDIT_REQUEST_REUSED:
+    "Cette demande d'avoir a déjà été utilisée avec des données différentes.",
+  BILLING_NATIVE_SELLER_PROFILE_INCOMPLETE:
+    "Complète les mentions légales de PAPOT dans Paramètres.",
+  BILLING_NATIVE_BUYER_PROFILE_INCOMPLETE:
+    "Complète la fiche client et ses conditions de paiement.",
+  BILLING_NATIVE_ALREADY_ISSUED: "Cette facture a déjà un numéro officiel. Recharge la page.",
+  BILLING_NATIVE_APPROVAL_REQUIRED: "Le projet doit être validé en interne avant l'émission.",
+  BILLING_NATIVE_DATES_INVALID: "Vérifie les dates de prestation et d'échéance.",
+  SPECIAL_PERMISSION_FORBIDDEN:
+    "Le droit spécifique Émettre les factures doit être attribué par un administrateur.",
+  BILLING_RETENTION_EXCEEDS_TTC:
+    "La retenue en euros dépasse le TTC recalculé. Réduis son montant avant de poursuivre.",
+  BILLING_RETENTION_PERCENT_INVALID:
+    "Le pourcentage de retenue doit être compris entre 0 et 100 avec au plus deux décimales.",
   BILLING_APPROVAL_TOTALS_MISMATCH:
     "Les totaux ne correspondent pas. Corrige puis enregistre avant validation.",
   BILLING_PROGRESS_DOCUMENT_MISMATCH:
@@ -85,12 +154,52 @@ const serverErrors: Record<string, string> = {
     "Un avancement ne peut pas être inférieur à la situation précédente.",
   BILLING_PROGRESS_TAX_ALLOCATION_UNAVAILABLE:
     "La TVA est incompatible avec les acomptes déjà préparés.",
+  BILLING_PROGRESS_FREE_UNALLOCATED:
+    "Affecte les prestations libres à un ouvrage du marché pour cette situation.",
+  BILLING_DOCUMENT_ALLOCATION_UNKNOWN:
+    "La prestation est affectée à un ouvrage inconnu. Choisis un ouvrage du marché.",
+  BILLING_DOCUMENT_ALLOCATION_VAT_MISMATCH:
+    "Le taux de TVA doit correspondre à l'ouvrage auquel la prestation est affectée.",
+  BILLING_PROGRESS_LINE_EXCEEDS_CONTRACT:
+    "Le total affecté à un ouvrage dépasse son marché. Vérifie les montants déjà préparés.",
+  BILLING_PROGRESS_LINE_BELOW_PREPARED:
+    "L'avancement proposé est inférieur aux montants déjà préparés sur un ouvrage.",
+  BILLING_PROGRESS_HISTORY_UNDETERMINED:
+    "Une ancienne prestation sans affectation empêche le cumul par ouvrage. Régularise-la d'abord.",
+  BILLING_VISA_PENDING:
+    "Cette version est présentée à un tiers. Enregistre d'abord sa réponse ou retire la présentation.",
+  BILLING_VISA_REQUIRED:
+    "Le visa extérieur est obligatoire sur ce chantier avant la validation interne.",
+  BILLING_VISA_PARTIAL_REWORK_REQUIRED:
+    "Accord partiel : corrige le projet et représente une nouvelle version.",
+  BILLING_VISA_REFUSED:
+    "Le visa a été refusé : corrige le projet et présente une nouvelle version.",
+  BILLING_VISA_STALE:
+    "Le projet a changé depuis l'accord : présente une nouvelle version pour visa.",
 };
 
 export function BillingDocumentEditor({ draftId }: { draftId: string }) {
   const router = useRouter();
   const [draft, setDraft] = useState<BillingDraft | null>(null);
   const [canWrite, setCanWrite] = useState(false);
+  const [canIssue, setCanIssue] = useState(false);
+  const [issued, setIssued] = useState<IssuedReference | null>(null);
+  const [canIssueCredits, setCanIssueCredits] = useState(false);
+  const [issuedCredits, setIssuedCredits] = useState<IssuedCreditReference[]>([]);
+  const [creditPosition, setCreditPosition] = useState<CreditPosition | null>(null);
+  const [creditMode, setCreditMode] = useState<"FULL" | "PARTIAL">("FULL");
+  const [creditReason, setCreditReason] = useState("");
+  const [creditAmounts, setCreditAmounts] = useState<Record<string, string>>({});
+  const [creditRequestId, setCreditRequestId] = useState<string | null>(null);
+  const [issueRequestId, setIssueRequestId] = useState<string | null>(null);
+  const [serviceOn, setServiceOn] = useState("");
+  const [dueOn, setDueOn] = useState("");
+  const [operationCategory, setOperationCategory] = useState<"SERVICE" | "GOODS" | "MIXED">(
+    "SERVICE",
+  );
+  const [vatOnDebits, setVatOnDebits] = useState(false);
+  const [buyerPurchaseOrderNumber, setBuyerPurchaseOrderNumber] = useState("");
+  const [latePenaltyRate, setLatePenaltyRate] = useState("");
   const [rows, setRows] = useState<EditableRow[]>([]);
   const [initialRows, setInitialRows] = useState<EditableRow[]>([]);
   const [payload, setPayload] = useState<BillingPayload | null>(null);
@@ -98,6 +207,8 @@ export function BillingDocumentEditor({ draftId }: { draftId: string }) {
   const [pendingPercentages, setPendingPercentages] = useState<LineProgressInput[] | null>(null);
   const [label, setLabel] = useState("");
   const [notes, setNotes] = useState("");
+  const [retentionMode, setRetentionMode] = useState<"PERCENT" | "AMOUNT">("PERCENT");
+  const [retentionValue, setRetentionValue] = useState("0");
   const [busy, setBusy] = useState(false);
   const [loading, setLoading] = useState(true);
   const [dirty, setDirty] = useState(false);
@@ -113,6 +224,19 @@ export function BillingDocumentEditor({ draftId }: { draftId: string }) {
     setDraft(selected);
     setPayload(json.payload);
     setCanWrite(json.canWrite && selected.status === "DRAFT");
+    setCanIssue(Boolean(json.canIssue));
+    const currentIssued = json.issuedInvoices?.find((item) => item.draftId === draftId) ?? null;
+    setIssued(currentIssued);
+    setCanIssueCredits(Boolean(json.canIssueCredits));
+    setIssuedCredits(
+      (json.issuedCreditNotes ?? []).filter(
+        (credit) => credit.originalInvoiceId === currentIssued?.id,
+      ),
+    );
+    setCreditPosition(
+      json.creditPositions?.find((position) => position.originalInvoiceId === currentIssued?.id) ??
+        null,
+    );
     setProgressValues(
       Object.fromEntries(
         (selected.lines ?? []).map((line) => [
@@ -128,6 +252,12 @@ export function BillingDocumentEditor({ draftId }: { draftId: string }) {
     setPendingPercentages(null);
     setLabel(selected.label);
     setNotes(selected.notes);
+    setRetentionMode(selected.retention?.mode ?? "PERCENT");
+    setRetentionValue(
+      selected.retention?.mode === "AMOUNT"
+        ? euros(selected.retention.amountTtcCents)
+        : decimal(selected.retention?.ratePercent ?? 0),
+    );
     const original = (
       selected.documentLines ?? buildInvoiceDocumentLines(selected, json.payload)
     ).map(editable);
@@ -163,6 +293,30 @@ export function BillingDocumentEditor({ draftId }: { draftId: string }) {
       return null;
     }
   }, [parsedRows, invalid]);
+  const retentionPreview = useMemo(() => {
+    if (!preview) return null;
+    const value =
+      retentionMode === "AMOUNT"
+        ? centsFromEuros(retentionValue)
+        : /^\d{1,3}(?:[,.]\d{1,2})?$/.test(retentionValue.trim())
+          ? Number(retentionValue.replace(",", "."))
+          : NaN;
+    try {
+      return calculateBillingDraftRetention(retentionMode, value, preview.totalTtcCents);
+    } catch {
+      return null;
+    }
+  }, [preview, retentionMode, retentionValue]);
+  const creditPreview = useMemo(
+    () =>
+      creditPosition
+        ? previewNativeCreditNote(creditPosition.allowances, creditMode, creditAmounts)
+        : null,
+    [creditPosition, creditMode, creditAmounts],
+  );
+  const navigationRows = rows.map(
+    (row, index) => parsedRows[index] ?? { ...row, quantity: 0, unitPriceCents: 0 },
+  );
   const rates = [...new Set(draft?.contractTaxGroups.map((rate) => rate.ratePercent) ?? [20])].sort(
     (a, b) => a - b,
   );
@@ -175,38 +329,57 @@ export function BillingDocumentEditor({ draftId }: { draftId: string }) {
             0,
             payload.drafts.findIndex((item) => item.id === draft.id),
           )
-          .filter((item) => item.quoteId === draft.quoteId)
+          .filter((item) => belongsToBillingSource(item, draft))
       : [];
   const priorHt = priorProjects.reduce((sum, item) => sum + item.amountHtCents, 0);
+  const latestVisa = draft && payload ? latestBillingVisa(payload, draft.id) : null;
+  const visaRequired =
+    draft && payload ? visaRequiredForChantier(payload, draft.chantierId) : false;
+  const editorCanEdit = canWrite && latestVisa?.status !== "SUBMITTED";
+  const visaBlocksApproval =
+    latestVisa?.status === "SUBMITTED" ||
+    latestVisa?.status === "REFUSED" ||
+    latestVisa?.status === "PARTIAL" ||
+    (latestVisa?.status === "ACCEPTED" && latestVisa.draftUpdatedAt !== draft?.updatedAt) ||
+    (visaRequired && latestVisa?.status !== "ACCEPTED");
 
   function alter(id: string, patch: Partial<EditableRow>) {
     setRows((old) => old.map((row) => (row.id === id ? { ...row, ...patch } : row)));
     setDirty(true);
     setNotice("");
   }
-  function reorder(index: number, direction: number) {
-    const other = index + direction;
-    if (other < 0 || other >= rows.length) return;
-    setRows((old) => {
-      const result = [...old];
-      [result[index], result[other]] = [result[other], result[index]];
-      return result;
-    });
+  function reorder(index: number, direction: -1 | 1) {
+    setRows((old) => [...moveInvoiceEditorRow(old, index, direction)]);
     setDirty(true);
     setNotice("");
   }
-  function addLine(kind: "FREE" | "TITLE") {
+  function addLine(
+    kind: "FREE" | "TITLE",
+    insertionIndex = rows.length,
+    headingLevel: "SECTION" | "SUBSECTION" = "SECTION",
+  ) {
     const row: BillingDocumentLine = {
       id: crypto.randomUUID(),
       origin: kind,
+      ...(kind === "TITLE" ? { headingLevel } : {}),
       sourceLineId: null,
-      description: kind === "TITLE" ? "Nouveau titre" : "Prestation complémentaire",
+      ...(kind === "FREE" ? { allocationLineId: null } : {}),
+      description:
+        kind === "TITLE"
+          ? headingLevel === "SUBSECTION"
+            ? "Nouveau sous-titre"
+            : "Nouveau titre"
+          : "Prestation complémentaire",
       quantity: kind === "TITLE" ? 0 : 1,
       unit: kind === "TITLE" ? "" : "u",
       unitPriceCents: 0,
       vatRatePercent: kind === "TITLE" ? 0 : (rates[0] ?? 20),
     };
-    setRows((old) => [...old, editable(row)]);
+    setRows((old) => [
+      ...old.slice(0, insertionIndex),
+      editable(row),
+      ...old.slice(insertionIndex),
+    ]);
     setDirty(true);
     setNotice("");
   }
@@ -217,6 +390,7 @@ export function BillingDocumentEditor({ draftId }: { draftId: string }) {
       id: crypto.randomUUID(),
       origin: "FREE",
       sourceLineId: null,
+      allocationLineId: null,
       description: `${row.description} (copie)`,
     };
     setRows((old) => [...old.slice(0, index + 1), copy, ...old.slice(index + 1)]);
@@ -262,8 +436,25 @@ export function BillingDocumentEditor({ draftId }: { draftId: string }) {
         vatCents: result.tax.vatCents,
         totalTtcCents: result.tax.ttcCents,
       };
-      const custom = rows.filter((row) => row.origin !== "QUOTE");
-      setRows([...buildInvoiceDocumentLines(recalculated, previous).map(editable), ...custom]);
+      const refreshed = buildInvoiceDocumentLines(recalculated, previous).map(editable);
+      const refreshedBySource = new Map(
+        refreshed.filter((row) => row.origin === "QUOTE").map((row) => [row.sourceLineId, row]),
+      );
+      const existingSources = new Set(
+        rows.filter((row) => row.origin === "QUOTE").map((row) => row.sourceLineId),
+      );
+      // Preserve edited titles, free prestations and their positions when progress is recalculated.
+      const kept = rows.map((row) => {
+        if (row.origin !== "QUOTE") return row;
+        const changed = refreshedBySource.get(row.sourceLineId);
+        return changed ? { ...changed, id: row.id, description: row.description } : row;
+      });
+      setRows([
+        ...kept,
+        ...refreshed.filter(
+          (row) => row.origin === "QUOTE" && !existingSources.has(row.sourceLineId),
+        ),
+      ]);
       setPendingPercentages(percentages);
       setDirty(true);
       setError("");
@@ -316,6 +507,12 @@ export function BillingDocumentEditor({ draftId }: { draftId: string }) {
       if (!saved) throw new Error("Projet introuvable après enregistrement");
       setDraft(saved);
       setPayload(json.payload);
+      setRetentionMode(saved.retention?.mode ?? "PERCENT");
+      setRetentionValue(
+        saved.retention?.mode === "AMOUNT"
+          ? euros(saved.retention.amountTtcCents)
+          : decimal(saved.retention?.ratePercent ?? 0),
+      );
       setPendingPercentages(null);
       setProgressValues(
         Object.fromEntries(
@@ -341,6 +538,161 @@ export function BillingDocumentEditor({ draftId }: { draftId: string }) {
     } catch (caught) {
       const code = caught instanceof Error ? caught.message : "";
       setError(serverErrors[code] ?? code ?? "Enregistrement impossible");
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  async function saveRetention() {
+    if (!draft || !editorCanEdit || busy || dirty || !retentionPreview) return;
+    setBusy(true);
+    setError("");
+    setNotice("");
+    try {
+      const response = await fetch("/api/desktop/billing", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          action: "SET_DRAFT_RETENTION",
+          draftId: draft.id,
+          expectedUpdatedAt: draft.updatedAt,
+          mode: retentionMode,
+          value:
+            retentionMode === "AMOUNT"
+              ? retentionPreview.amountTtcCents
+              : retentionPreview.ratePercent,
+        }),
+      });
+      const result = (await response.json()) as ApiSnapshot;
+      if (!response.ok) throw new Error(result.error ?? "Enregistrement impossible");
+      await reload();
+      setNotice("Conditions de retenue enregistrées sur le projet. Aucune facture émise.");
+    } catch (caught) {
+      const code = caught instanceof Error ? caught.message : "";
+      setError(serverErrors[code] ?? code ?? "Enregistrement impossible");
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  async function issue() {
+    if (
+      !draft ||
+      draft.status !== "APPROVED" ||
+      !canIssue ||
+      issued ||
+      busy ||
+      !serviceOn ||
+      !dueOn ||
+      !latePenaltyRate
+    )
+      return;
+    const rate = Number(latePenaltyRate.replace(",", "."));
+    if (!Number.isFinite(rate) || rate <= 0 || rate > 100) {
+      setError("Saisis un taux annuel valide pour les pénalités de retard.");
+      return;
+    }
+    if (
+      !window.confirm(
+        "Émettre DÉFINITIVEMENT cette facture ? Un numéro légal unique sera attribué. " +
+          "La facture deviendra non modifiable. Une correction devra faire l'objet d'un avoir. " +
+          "Aucun envoi automatique à Pennylane ou à une plateforme électronique.",
+      )
+    )
+      return;
+    const requestId = issueRequestId ?? crypto.randomUUID();
+    setIssueRequestId(requestId);
+    setBusy(true);
+    setError("");
+    setNotice("");
+    try {
+      const response = await fetch("/api/desktop/billing/issue", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          requestId,
+          draftId: draft.id,
+          expectedUpdatedAt: draft.updatedAt,
+          serviceOn,
+          dueOn,
+          operationCategory,
+          vatOnDebits,
+          buyerPurchaseOrderNumber: buyerPurchaseOrderNumber.trim(),
+          latePenaltyRatePercent: rate,
+        }),
+      });
+      const result = (await response.json()) as { issued?: IssuedReference; error?: string };
+      if (!response.ok || !result.issued) throw new Error(result.error ?? "Émission impossible");
+      setIssued(result.issued);
+      await reload();
+      setNotice(
+        "Facture " +
+          result.issued.number +
+          " émise dans PAPOT. PDF téléchargeable. Aucun envoi à Pennylane.",
+      );
+    } catch (caught) {
+      const code = caught instanceof Error ? caught.message : "";
+      setError(serverErrors[code] ?? code ?? "Émission impossible");
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  async function issueCredit() {
+    if (
+      !issued ||
+      !canIssueCredits ||
+      !creditPosition ||
+      busy ||
+      creditPosition.remainingTtcCents <= 0 ||
+      creditReason.trim().length < 3
+    )
+      return;
+    if (!creditPreview?.valid) {
+      setError(creditPreview?.error ?? "Vérifie les montants de l'avoir.");
+      return;
+    }
+    const amounts = creditPreview.amounts;
+    if (
+      !window.confirm(
+        "Émettre cet AVOIR OFFICIEL ? Un numéro définitif sera attribué et l'avoir " +
+          "ne pourra plus être modifié. La facture d'origine reste intacte. " +
+          "Aucun transfert automatique vers Pennylane ni remboursement bancaire.",
+      )
+    )
+      return;
+    const requestId = creditRequestId ?? crypto.randomUUID();
+    setCreditRequestId(requestId);
+    setBusy(true);
+    setError("");
+    setNotice("");
+    try {
+      const response = await fetch("/api/desktop/billing/credits/issue", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          requestId,
+          originalInvoiceId: issued.id,
+          mode: creditMode,
+          reason: creditReason.trim(),
+          amounts,
+        }),
+      });
+      const result = (await response.json()) as {
+        issued?: IssuedCreditReference;
+        error?: string;
+      };
+      if (!response.ok || !result.issued) throw new Error(result.error ?? "Émission impossible");
+      await reload();
+      setCreditRequestId(null);
+      setCreditReason("");
+      setCreditAmounts({});
+      setNotice(
+        "Avoir officiel " + result.issued.number + " émis et archivé. Aucun envoi à Pennylane.",
+      );
+    } catch (caught) {
+      const code = caught instanceof Error ? caught.message : "";
+      setError(serverErrors[code] ?? code ?? "Émission d'avoir impossible");
     } finally {
       setBusy(false);
     }
@@ -394,7 +746,11 @@ export function BillingDocumentEditor({ draftId }: { draftId: string }) {
             <ArrowLeft size={15} /> Retour aux projets
           </button>
           <span className="invoiceTag">
-            {draft.status === "APPROVED" ? "VALIDÉ EN INTERNE · NON ÉMIS" : "PROJET · NON ÉMIS"}
+            {issued
+              ? "FACTURE ÉMISE · " + issued.number
+              : draft.status === "APPROVED"
+                ? "VALIDÉ EN INTERNE · NON ÉMIS"
+                : "PROJET · NON ÉMIS"}
           </span>
           <h1>
             <FileText size={25} /> {labels[draft.type]}
@@ -403,7 +759,18 @@ export function BillingDocumentEditor({ draftId }: { draftId: string }) {
             {draft.affairName} · {draft.clientName}
           </p>
           <div className="invoiceReferences">
-            <Link href={`/devis/${draft.quoteId}`}>Devis source : {draft.quoteLabel}</Link>
+            {draft.sourceMode === "CHANTIER" ? (
+              <>
+                <span>{draft.quoteLabel}</span>
+                {(draft.sourceQuoteIds ?? []).map((quoteId) => (
+                  <Link key={quoteId} href={`/devis/${quoteId}`}>
+                    Devis {quoteId.slice(0, 8)}
+                  </Link>
+                ))}
+              </>
+            ) : (
+              <Link href={`/devis/${draft.quoteId}`}>Devis source : {draft.quoteLabel}</Link>
+            )}
             {draft.chantierId && (
               <Link href={`/chantiers/${draft.chantierId}`}>Ouvrir le chantier</Link>
             )}
@@ -414,7 +781,7 @@ export function BillingDocumentEditor({ draftId }: { draftId: string }) {
           <button
             type="button"
             className="primaryButton"
-            disabled={!canWrite || busy || !dirty}
+            disabled={!editorCanEdit || busy || !dirty}
             onClick={() => void save()}
           >
             <Save size={16} /> {busy ? "Enregistrement…" : "Enregistrer le projet"}
@@ -423,9 +790,9 @@ export function BillingDocumentEditor({ draftId }: { draftId: string }) {
       </header>
 
       <aside className="invoiceDraftNotice">
-        Tu modifies une <strong>copie des lignes du devis</strong>, uniquement pour cette facture.
-        Le devis signé reste inchangé. Ce projet n&apos;a ni numéro officiel, ni PDF émis, ni envoi
-        Pennylane.
+        Tu modifies une <strong>copie du marché du chantier</strong>, uniquement pour ce projet. Les
+        devis retenus restent inchangés. Ce document n&apos;a ni numéro officiel, ni PDF émis, ni
+        envoi Pennylane, ni transmission électronique.
       </aside>
       {error && (
         <p className="invoiceError" role="alert">
@@ -437,11 +804,13 @@ export function BillingDocumentEditor({ draftId }: { draftId: string }) {
           {notice}
         </p>
       )}
-      {!canWrite && (
+      {!editorCanEdit && (
         <p className="invoiceDraftNotice">
           {draft.status === "APPROVED"
             ? "Projet verrouillé après validation interne."
-            : "Lecture seule : droit Facturation en écriture requis."}
+            : latestVisa?.status === "SUBMITTED"
+              ? "Version provisoire présentée : modification bloquée jusqu'à décision ou retrait."
+              : "Lecture seule : droit Facturation en écriture requis."}
         </p>
       )}
 
@@ -452,7 +821,7 @@ export function BillingDocumentEditor({ draftId }: { draftId: string }) {
             Intitulé de la facture
             <select
               value={label}
-              disabled={!canWrite}
+              disabled={!editorCanEdit}
               onChange={(e) => {
                 setLabel(e.target.value);
                 setDirty(true);
@@ -473,7 +842,7 @@ export function BillingDocumentEditor({ draftId }: { draftId: string }) {
             <textarea
               rows={2}
               value={notes}
-              disabled={!canWrite}
+              disabled={!editorCanEdit}
               maxLength={4000}
               onChange={(e) => {
                 setNotes(e.target.value);
@@ -485,13 +854,13 @@ export function BillingDocumentEditor({ draftId }: { draftId: string }) {
       </section>
 
       <section className="invoiceCard">
-        <h2>Déjà préparé sur ce devis</h2>
+        <h2>Déjà préparé sur ce chantier</h2>
         <p>
-          Ces montants correspondent aux projets antérieurs, acomptes et situations inclus. Ce ne
-          sont pas des factures officiellement émises.
+          Ces montants correspondent aux anciens projets, acomptes et situations du chantier, même
+          issus de plusieurs devis. Ils ne sont pas des factures officiellement émises.
         </p>
         {priorProjects.length === 0 ? (
-          <p>Aucun acompte ni situation précédemment préparé sur ce devis.</p>
+          <p>Aucun acompte ni situation précédemment préparé sur ce chantier.</p>
         ) : (
           <div className="invoiceScroll">
             <table className="invoiceTable">
@@ -527,7 +896,7 @@ export function BillingDocumentEditor({ draftId }: { draftId: string }) {
           </div>
         )}
         <p>
-          <strong>Déjà préparé : {currency(priorHt)} HT</strong> · Projet actuel :{" "}
+          <strong>Déjà préparé sur le chantier : {currency(priorHt)} HT</strong> · Projet actuel :{" "}
           {currency(preview?.amountHtCents ?? draft.amountHtCents)} HT · Cumul après ce projet :{" "}
           {currency(priorHt + (preview?.amountHtCents ?? draft.amountHtCents))} HT sur{" "}
           {currency(draft.contractHtCents)} HT.
@@ -544,21 +913,40 @@ export function BillingDocumentEditor({ draftId }: { draftId: string }) {
             <button
               className="secondaryButton"
               type="button"
-              disabled={!canWrite || busy}
+              disabled={!editorCanEdit || busy}
               onClick={() => addLine("TITLE")}
             >
-              <Plus size={15} /> Titre
+              <Plus size={15} /> Titre / ouvrage
+            </button>
+            <button
+              className="secondaryButton"
+              type="button"
+              disabled={!editorCanEdit || busy || rows.length >= 1000}
+              onClick={() => addLine("TITLE", rows.length, "SUBSECTION")}
+            >
+              <Plus size={15} /> Sous-titre
             </button>
             <button
               className="primaryButton"
               type="button"
-              disabled={!canWrite || busy || rows.length >= 1000}
+              disabled={!editorCanEdit || busy || rows.length >= 1000}
               onClick={() => addLine("FREE")}
             >
               <Plus size={15} /> Ajouter une ligne
             </button>
           </div>
         </div>
+        <InvoiceOuvragesNavigator
+          lines={navigationRows}
+          disabled={!editorCanEdit || busy || draft.status !== "DRAFT"}
+          onNavigate={(id) =>
+            document.getElementById(`invoice-document-row-${id}`)?.scrollIntoView({
+              behavior: "smooth",
+              block: "center",
+            })
+          }
+          onInsertLine={(index) => addLine("FREE", index)}
+        />
         <div className="invoiceScroll">
           <table className="invoiceTable">
             <thead>
@@ -569,6 +957,7 @@ export function BillingDocumentEditor({ draftId }: { draftId: string }) {
                 <th>Unité</th>
                 <th>Prix unit. HT</th>
                 <th>TVA</th>
+                <th>Affectation marché</th>
                 <th>Total HT</th>
                 <th>Actions</th>
               </tr>
@@ -580,12 +969,16 @@ export function BillingDocumentEditor({ draftId }: { draftId: string }) {
                   ? Math.round(current.quantity * current.unitPriceCents)
                   : NaN;
                 return (
-                  <tr key={row.id} className={row.origin === "TITLE" ? "invoiceTitleRow" : ""}>
+                  <tr
+                    key={row.id}
+                    id={`invoice-document-row-${row.id}`}
+                    className={row.origin === "TITLE" ? "invoiceTitleRow" : ""}
+                  >
                     <td className="invoiceIndex">{index + 1}</td>
                     <td className="invoiceDescription">
                       <input
                         aria-label={`Désignation ligne ${index + 1}`}
-                        disabled={!canWrite}
+                        disabled={!editorCanEdit}
                         value={row.description}
                         onChange={(e) => alter(row.id, { description: e.target.value })}
                       />
@@ -598,8 +991,20 @@ export function BillingDocumentEditor({ draftId }: { draftId: string }) {
                       )}
                     </td>
                     {row.origin === "TITLE" ? (
-                      <td colSpan={5} className="invoiceTitleHint">
-                        Titre libre, sans montant facturé
+                      <td colSpan={6} className="invoiceTitleHint">
+                        <select
+                          aria-label={`Niveau du titre ligne ${index + 1}`}
+                          disabled={!editorCanEdit || busy}
+                          value={row.headingLevel ?? "SECTION"}
+                          onChange={(event) =>
+                            alter(row.id, {
+                              headingLevel: event.target.value as "SECTION" | "SUBSECTION",
+                            })
+                          }
+                        >
+                          <option value="SECTION">Titre / ouvrage</option>
+                          <option value="SUBSECTION">Sous-titre</option>
+                        </select>
                       </td>
                     ) : (
                       <>
@@ -607,7 +1012,7 @@ export function BillingDocumentEditor({ draftId }: { draftId: string }) {
                           <input
                             aria-label={`Quantité ligne ${index + 1}`}
                             inputMode="decimal"
-                            disabled={!canWrite}
+                            disabled={!editorCanEdit}
                             value={row.quantityInput}
                             onChange={(e) => alter(row.id, { quantityInput: e.target.value })}
                           />
@@ -615,7 +1020,7 @@ export function BillingDocumentEditor({ draftId }: { draftId: string }) {
                         <td>
                           <input
                             aria-label={`Unité ligne ${index + 1}`}
-                            disabled={!canWrite}
+                            disabled={!editorCanEdit}
                             maxLength={40}
                             value={row.unit}
                             onChange={(e) => alter(row.id, { unit: e.target.value })}
@@ -625,7 +1030,7 @@ export function BillingDocumentEditor({ draftId }: { draftId: string }) {
                           <input
                             aria-label={`Prix unitaire HT ligne ${index + 1}`}
                             inputMode="decimal"
-                            disabled={!canWrite}
+                            disabled={!editorCanEdit}
                             value={row.priceInput}
                             onChange={(e) => alter(row.id, { priceInput: e.target.value })}
                           />
@@ -633,7 +1038,7 @@ export function BillingDocumentEditor({ draftId }: { draftId: string }) {
                         <td>
                           <select
                             aria-label={`TVA ligne ${index + 1}`}
-                            disabled={!canWrite}
+                            disabled={!editorCanEdit}
                             value={row.vatRatePercent}
                             onChange={(e) =>
                               alter(row.id, { vatRatePercent: Number(e.target.value) })
@@ -646,18 +1051,47 @@ export function BillingDocumentEditor({ draftId }: { draftId: string }) {
                             ))}
                           </select>
                         </td>
+                        <td>
+                          {draft.type === "PROGRESS" && row.origin === "FREE" ? (
+                            <select
+                              aria-label={`Affectation de ${row.description}`}
+                              disabled={!editorCanEdit}
+                              value={row.allocationLineId ?? ""}
+                              onChange={(event) => {
+                                const chosen = draft.lines?.find(
+                                  (line) => line.lineId === event.target.value,
+                                );
+                                alter(row.id, {
+                                  allocationLineId: chosen?.lineId ?? null,
+                                  ...(chosen ? { vatRatePercent: chosen.vatRatePercent } : {}),
+                                });
+                              }}
+                            >
+                              <option value="">À affecter</option>
+                              {(draft.lines ?? []).map((line) => (
+                                <option key={line.lineId} value={line.lineId}>
+                                  {line.description}
+                                </option>
+                              ))}
+                            </select>
+                          ) : row.origin === "FREE" ? (
+                            <span>Prestation libre</span>
+                          ) : (
+                            <span>Ouvrage du marché</span>
+                          )}
+                        </td>
                         <td className="invoiceLineSum">
                           {Number.isSafeInteger(amount) ? currency(amount) : "À vérifier"}
                         </td>
                       </>
                     )}
                     <td className="invoiceRowTools">
-                      {canWrite && (
+                      {editorCanEdit && (
                         <>
                           <button
                             title="Monter"
                             aria-label={`Monter ligne ${index + 1}`}
-                            disabled={index === 0}
+                            disabled={moveInvoiceEditorRow(rows, index, -1) === rows || busy}
                             onClick={() => reorder(index, -1)}
                           >
                             <ArrowUp size={14} />
@@ -665,7 +1099,7 @@ export function BillingDocumentEditor({ draftId }: { draftId: string }) {
                           <button
                             title="Descendre"
                             aria-label={`Descendre ligne ${index + 1}`}
-                            disabled={index === rows.length - 1}
+                            disabled={moveInvoiceEditorRow(rows, index, 1) === rows || busy}
                             onClick={() => reorder(index, 1)}
                           >
                             <ArrowDown size={14} />
@@ -718,7 +1152,7 @@ export function BillingDocumentEditor({ draftId }: { draftId: string }) {
                         <input
                           aria-label={`Avancement cumulé de ${line.description}`}
                           inputMode="decimal"
-                          disabled={!canWrite || busy}
+                          disabled={!editorCanEdit || busy}
                           value={progressValues[line.lineId] ?? "0"}
                           onChange={(event) =>
                             setProgressValues((old) => ({
@@ -736,7 +1170,7 @@ export function BillingDocumentEditor({ draftId }: { draftId: string }) {
             <button
               type="button"
               className="secondaryButton"
-              disabled={!canWrite || busy}
+              disabled={!editorCanEdit || busy}
               onClick={applyProgress}
             >
               Recalculer les lignes depuis les pourcentages
@@ -745,11 +1179,341 @@ export function BillingDocumentEditor({ draftId }: { draftId: string }) {
           </details>
         ) : null}
         <p className="invoiceHint">
-          Les lignes libres sont intégrées au plafond du devis retenu. Pour facturer des travaux
-          supplémentaires dépassant le contrat, crée et fais valider un devis complémentaire.
+          Pour une situation, affecte chaque prestation ajoutée à l&apos;ouvrage du marché
+          qu&apos;elle concerne. Cette affectation consomme son budget, elle ne crée pas un nouveau
+          marché. Pour facturer des travaux supplémentaires dépassant le contrat, ajoute un
+          supplément au chantier et enregistre son accord.
         </p>
       </section>
 
+      {payload && (
+        <BillingVisaPanel
+          draft={draft}
+          payload={payload}
+          canWrite={canWrite}
+          dirty={dirty}
+          onRefresh={reload}
+        />
+      )}
+      <section className="invoiceCard">
+        <h2>Retenue de garantie du projet</h2>
+        <p className="invoiceHint">
+          Cette retenue ne change pas le HT, la TVA ou le TTC du projet. Elle distingue uniquement
+          la part hors retenue de celle conservée en garantie. Aucun règlement réel n&apos;est créé
+          ici.
+        </p>
+        <div className="invoiceMeta">
+          <label>
+            Mode de saisie
+            <select
+              value={retentionMode}
+              disabled={!editorCanEdit || busy}
+              onChange={(event) => {
+                const mode = event.target.value as "PERCENT" | "AMOUNT";
+                setRetentionMode(mode);
+                setRetentionValue(
+                  mode === "AMOUNT"
+                    ? euros(draft.retention?.amountTtcCents ?? 0)
+                    : decimal(draft.retention?.ratePercent ?? 0),
+                );
+              }}
+            >
+              <option value="PERCENT">Pourcentage du TTC</option>
+              <option value="AMOUNT">Montant TTC en euros</option>
+            </select>
+          </label>
+          <label>
+            {retentionMode === "PERCENT" ? "Retenue (%)" : "Retenue TTC (€)"}
+            <input
+              type="text"
+              inputMode="decimal"
+              value={retentionValue}
+              disabled={!editorCanEdit || busy}
+              onChange={(event) => setRetentionValue(event.target.value)}
+              aria-label="Saisir la retenue de garantie"
+            />
+          </label>
+        </div>
+        {!retentionPreview && (
+          <p role="alert" className="invoiceError">
+            Saisis une retenue comprise entre 0 et 100 % et ne dépassant pas le TTC du projet.
+          </p>
+        )}
+        {retentionPreview && preview && (
+          <div className="invoiceTotals">
+            <div>
+              <span>Retenue TTC indicative</span>
+              <strong>{currency(retentionPreview.amountTtcCents)}</strong>
+            </div>
+            <div>
+              <span>Part TTC hors retenue (indicative)</span>
+              <strong>{currency(preview.totalTtcCents - retentionPreview.amountTtcCents)}</strong>
+            </div>
+          </div>
+        )}
+        <button
+          type="button"
+          className="secondaryButton"
+          disabled={!editorCanEdit || busy || dirty || !preview || !retentionPreview}
+          onClick={() => void saveRetention()}
+        >
+          Enregistrer la retenue du projet
+        </button>
+        {dirty && (
+          <p className="invoiceHint">Enregistre d&apos;abord les modifications des lignes.</p>
+        )}
+      </section>
+      {draft.status === "APPROVED" && (
+        <section className="invoiceCard">
+          <h2>Émission officielle PAPOT</h2>
+          {issued ? (
+            <div>
+              <p role="status">
+                <strong>Facture {issued.number} émise</strong>
+              </p>
+              <p>Le document et ses montants sont figés. Pour corriger, il faudra un avoir.</p>
+              <a className="primaryButton" href={`/api/desktop/billing/issued/${issued.id}/pdf`}>
+                Télécharger la facture PDF
+              </a>
+            </div>
+          ) : (
+            <>
+              <p>
+                La validation du projet ne génère pas de numéro. Ce formulaire prépare une émission
+                définitive. Aucun transfert automatique vers Pennylane ni transmission électronique
+                n&apos;est réalisé.
+              </p>
+              <div className="invoiceMeta">
+                <label>
+                  Date de réalisation
+                  <input
+                    type="date"
+                    value={serviceOn}
+                    onChange={(event) => setServiceOn(event.target.value)}
+                    disabled={busy || !canIssue}
+                  />
+                </label>
+                <label>
+                  Échéance de règlement
+                  <input
+                    type="date"
+                    value={dueOn}
+                    onChange={(event) => setDueOn(event.target.value)}
+                    disabled={busy || !canIssue}
+                  />
+                </label>
+                <label>
+                  Nature de l&apos;opération
+                  <select
+                    value={operationCategory}
+                    onChange={(event) =>
+                      setOperationCategory(event.target.value as "SERVICE" | "GOODS" | "MIXED")
+                    }
+                    disabled={busy || !canIssue}
+                  >
+                    <option value="SERVICE">Prestations de services</option>
+                    <option value="GOODS">Livraison de biens</option>
+                    <option value="MIXED">Biens et services</option>
+                  </select>
+                </label>
+                <label>
+                  Taux annuel des pénalités de retard (%)
+                  <input
+                    type="text"
+                    inputMode="decimal"
+                    value={latePenaltyRate}
+                    onChange={(event) => setLatePenaltyRate(event.target.value)}
+                    placeholder="À renseigner"
+                    disabled={busy || !canIssue}
+                  />
+                </label>
+                <label>
+                  N° bon de commande du client (si applicable)
+                  <input
+                    type="text"
+                    value={buyerPurchaseOrderNumber}
+                    onChange={(event) => setBuyerPurchaseOrderNumber(event.target.value)}
+                    maxLength={160}
+                    disabled={busy || !canIssue}
+                  />
+                </label>
+                <label>
+                  <input
+                    type="checkbox"
+                    checked={vatOnDebits}
+                    onChange={(event) => setVatOnDebits(event.target.checked)}
+                    disabled={busy || !canIssue}
+                  />
+                  TVA acquittée sur les débits (si applicable)
+                </label>
+              </div>
+              <button
+                className="primaryButton"
+                type="button"
+                disabled={!canIssue || busy || !serviceOn || !dueOn || !latePenaltyRate}
+                onClick={() => void issue()}
+              >
+                Émettre la facture et attribuer son numéro définitif
+              </button>
+              {!canIssue && (
+                <p>
+                  Émission verrouillée : activation du module et droit spécifique requis. Aucune
+                  facture officielle ne peut être créée pendant les tests.
+                </p>
+              )}
+            </>
+          )}
+        </section>
+      )}
+      {issued && (
+        <section className="invoiceCard">
+          <h2>Avoirs officiels liés à {issued.number}</h2>
+          <p className="invoiceHint">
+            Les avoirs possèdent leur propre numérotation. La facture d&apos;origine est conservée
+            sans modification. Aucun remboursement ou envoi à Pennylane n&apos;est déclenché par
+            cette opération.
+          </p>
+          {creditPosition && (
+            <div className="invoiceTotals">
+              <div>
+                <span>Facture d&apos;origine TTC</span>
+                <strong>{currency(creditPosition.originalTtcCents)}</strong>
+              </div>
+              <div>
+                <span>Avoirs déjà émis TTC</span>
+                <strong>{currency(creditPosition.creditedTtcCents)}</strong>
+              </div>
+              <div>
+                <span>Reste TTC après avoirs</span>
+                <strong>{currency(creditPosition.remainingTtcCents)}</strong>
+              </div>
+            </div>
+          )}
+          {issuedCredits.length > 0 && (
+            <div>
+              <h3>Avoirs émis</h3>
+              {issuedCredits.map((credit) => (
+                <p key={credit.id}>
+                  <strong>{credit.number}</strong> · {currency(credit.totalTtcCents)} ·
+                  {credit.reason} ·{" "}
+                  <a href={`/api/desktop/billing/credits/issued/${credit.id}/pdf`}>
+                    Télécharger l&apos;avoir PDF
+                  </a>
+                </p>
+              ))}
+            </div>
+          )}
+          {creditPosition && creditPosition.remainingTtcCents > 0 && (
+            <>
+              <h3>Préparer un nouvel avoir</h3>
+              <div className="invoiceMeta">
+                <label>
+                  Type d&apos;avoir
+                  <select
+                    value={creditMode}
+                    disabled={busy || !canIssueCredits}
+                    onChange={(event) => {
+                      setCreditMode(event.target.value as "FULL" | "PARTIAL");
+                      setCreditRequestId(null);
+                    }}
+                  >
+                    <option value="FULL">Total du solde restant</option>
+                    <option value="PARTIAL">Partiel par taux de TVA</option>
+                  </select>
+                </label>
+                <label>
+                  Motif obligatoire
+                  <textarea
+                    rows={2}
+                    maxLength={2000}
+                    value={creditReason}
+                    disabled={busy || !canIssueCredits}
+                    onChange={(event) => {
+                      setCreditReason(event.target.value);
+                      setCreditRequestId(null);
+                    }}
+                    placeholder="Ex. correction d'une prestation facturée"
+                  />
+                </label>
+              </div>
+              <div>
+                {creditPosition.allowances
+                  .filter((allowance) => allowance.remainingHtCents > 0)
+                  .map((allowance) => (
+                    <label key={allowance.ratePercent} className="invoiceCreditRate">
+                      TVA {allowance.ratePercent} % · HT encore créditable :{" "}
+                      {currency(allowance.remainingHtCents)}
+                      {creditMode === "PARTIAL" && (
+                        <input
+                          type="text"
+                          inputMode="decimal"
+                          value={creditAmounts[String(allowance.ratePercent)] ?? ""}
+                          disabled={busy || !canIssueCredits}
+                          onChange={(event) => {
+                            setCreditAmounts((old) => ({
+                              ...old,
+                              [String(allowance.ratePercent)]: event.target.value,
+                            }));
+                            setCreditRequestId(null);
+                          }}
+                          aria-label={`Montant HT avoir TVA ${allowance.ratePercent} %`}
+                          placeholder="Montant HT à créditer (€)"
+                        />
+                      )}
+                    </label>
+                  ))}
+              </div>
+              {creditPreview?.valid && (
+                <div className="invoiceTotals" role="status">
+                  <div>
+                    <span>Montant HT de l&apos;avoir envisagé</span>
+                    <strong>{currency(creditPreview.htCents)}</strong>
+                  </div>
+                  <div>
+                    <span>TVA de l&apos;avoir envisagé</span>
+                    <strong>{currency(creditPreview.vatCents)}</strong>
+                  </div>
+                  <div>
+                    <span>Crédit TTC à émettre</span>
+                    <strong>{currency(creditPreview.totalTtcCents)}</strong>
+                  </div>
+                  <div>
+                    <span>Reste TTC après émission</span>
+                    <strong>
+                      {currency(creditPosition.remainingTtcCents - creditPreview.totalTtcCents)}
+                    </strong>
+                  </div>
+                </div>
+              )}
+              {!creditPreview?.valid && (
+                <p className="invoiceHint" role="alert">
+                  {creditPreview?.error ?? "Vérifie les montants de l'avoir."}
+                </p>
+              )}
+              <button
+                type="button"
+                className="primaryButton"
+                disabled={
+                  busy ||
+                  !canIssueCredits ||
+                  creditReason.trim().length < 3 ||
+                  creditPosition.remainingTtcCents <= 0 ||
+                  !creditPreview?.valid
+                }
+                onClick={() => void issueCredit()}
+              >
+                Émettre l&apos;avoir officiel et attribuer son numéro
+              </button>
+              {!canIssueCredits && (
+                <p className="invoiceHint">
+                  Émission d&apos;avoir désactivée tant que la recette et l&apos;autorisation
+                  spécifique ne sont pas validées.
+                </p>
+              )}
+            </>
+          )}
+        </section>
+      )}
       <section className="invoiceCard invoiceSummary">
         <h2>Synthèse du projet</h2>
         <div className="invoiceTotals">
@@ -777,11 +1541,17 @@ export function BillingDocumentEditor({ draftId }: { draftId: string }) {
           </div>
         </div>
         <div className="invoiceFooterActions">
+          {draft.status === "DRAFT" && visaBlocksApproval && (
+            <p role="status">
+              La validation interne attend la décision de visa externe applicable à cette situation,
+              ou une nouvelle présentation après correction.
+            </p>
+          )}
           {draft.status === "DRAFT" && (
             <button
               className="secondaryButton"
               type="button"
-              disabled={!canWrite || busy || dirty || !preview}
+              disabled={!editorCanEdit || busy || dirty || !preview || visaBlocksApproval}
               onClick={() => void approve()}
             >
               Valider en interne et verrouiller
@@ -818,7 +1588,7 @@ export function BillingDocumentEditor({ draftId }: { draftId: string }) {
           <button
             className="primaryButton"
             type="button"
-            disabled={!canWrite || busy || !dirty || !preview}
+            disabled={!editorCanEdit || busy || !dirty || !preview}
             onClick={() => void save()}
           >
             <Save size={16} /> Enregistrer le projet
@@ -938,6 +1708,23 @@ export function BillingDocumentEditor({ draftId }: { draftId: string }) {
           border-radius: 7px;
           padding: 10px;
           width: 100%;
+          background: #fff;
+          color: #2b2735;
+        }
+        .invoiceCreditRate {
+          display: grid;
+          gap: 8px;
+          max-width: 640px;
+          padding: 11px 0;
+          border-bottom: 1px solid #ece8f0;
+          font-size: 12px;
+          font-weight: 600;
+        }
+        .invoiceCreditRate input {
+          max-width: 340px;
+          border: 1px solid #ded9e5;
+          border-radius: 7px;
+          padding: 10px;
           background: #fff;
           color: #2b2735;
         }

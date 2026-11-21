@@ -1,3 +1,5 @@
+import { belongsToBillingSource } from "./domain";
+import { previousBillingLineAmounts } from "./line-ledger";
 import type { BillingDraft, BillingLineProgress, BillingPayload, BillingSource } from "./domain";
 
 export type LineProgressInput = { lineId: string; percent: number };
@@ -37,7 +39,9 @@ export function calculateLineProgress(
     throw new Error("BILLING_PROGRESS_LINES_REQUIRED");
   }
 
-  const previousDrafts = payload.drafts.filter((draft) => draft.quoteId === source.quoteId);
+  const previousDrafts = payload.drafts.filter((draft) => belongsToBillingSource(draft, source));
+  // Unallocated historic FREE lines cannot be deducted per ouvrage.
+  const previousLineAmounts = previousBillingLineAmounts(payload, source);
   const history = previousDrafts.filter((draft) => draft.type === "PROGRESS");
   if (history.some((draft) => !draft.lineProgress?.length && draft.cumulativePercent === null)) {
     throw new Error("BILLING_PROGRESS_HISTORY_UNDETERMINED");
@@ -47,6 +51,10 @@ export function calculateLineProgress(
     const percent = inputById.get(line.lineId)!;
     const prior = history.reduce((max, draft) => {
       const historic = draft.lineProgress?.find((row) => row.lineId === line.lineId);
+      // A legacy situation of another quote must not advance unrelated lines.
+      if (!historic && !draft.lines?.some((item) => item.lineId === line.lineId)) {
+        return max;
+      }
       const historicPercent = historic?.percent ?? draft.cumulativePercent ?? 0;
       return Math.max(max, historicPercent);
     }, 0);
@@ -88,6 +96,11 @@ export function calculateLineProgress(
       vatCents: Math.round((baseHtCents * contract.ratePercent) / 100),
     };
   });
+  if (
+    lineProgress.some((row) => row.cumulativeHtCents < (previousLineAmounts.get(row.lineId) ?? 0))
+  ) {
+    throw new Error("BILLING_PROGRESS_LINE_BELOW_PREPARED");
+  }
   const amountHtCents = groups.reduce((sum, group) => sum + group.baseHtCents, 0);
   const previousTotal = previousDrafts.reduce((sum, draft) => sum + draft.amountHtCents, 0);
   const contractRemaining = source.contractHtCents - previousTotal;

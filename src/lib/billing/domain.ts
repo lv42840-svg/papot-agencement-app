@@ -1,6 +1,17 @@
 import { calculateLineProgress } from "./progress";
+import { assertBillingVisaEditable, assertBillingVisaAllowsApproval } from "./visa-policy";
 import { buildInvoiceDocumentLines, calculateInvoiceDocumentTotals } from "./document-lines";
+import {
+  allocatedBillingLineId,
+  allocatedDocumentAmounts,
+  reconcileDocumentLineProgress,
+} from "./line-ledger";
 import { z } from "zod";
+import { billingDraftRetentionSchema, rebaseBillingDraftRetention } from "./draft-retention";
+import { billingFinancialLedgerSchema } from "./financial-ledger";
+import { nativeInvoiceLedgerSchema } from "./native-issuance";
+import { nativeCreditNoteLedgerSchema } from "./native-credit-notes";
+import { billingTestSandboxSchema } from "./test-sandbox";
 
 const centsSchema = z.number().int().nonnegative().safe();
 const dateTimeSchema = z.string().datetime({ offset: true });
@@ -21,6 +32,7 @@ export const billingSourceLineSchema = z.object({
   vatRatePercent: z.number().finite().min(0).max(100),
   quantity: z.number().finite().positive().optional(),
   unit: z.string().trim().max(40).optional(),
+  sourceQuoteId: z.string().uuid().optional(),
 });
 export type BillingSourceLine = z.infer<typeof billingSourceLineSchema>;
 
@@ -35,7 +47,10 @@ export const billingDocumentLineSchema = z
   .object({
     id: z.string().uuid(),
     origin: z.enum(["QUOTE", "FREE", "TITLE"]),
+    headingLevel: z.enum(["SECTION", "SUBSECTION"]).optional(),
     sourceLineId: z.string().uuid().nullable(),
+    // FREE rows on cumulative situations are charged against a named contract work line.
+    allocationLineId: z.string().uuid().nullable().optional(),
     description: z.string().trim().min(1).max(4000),
     quantity: z.number().finite().min(0).max(1000000),
     unit: z.string().trim().max(40),
@@ -43,6 +58,9 @@ export const billingDocumentLineSchema = z
     vatRatePercent: z.number().finite().min(0).max(100),
   })
   .superRefine((line, ctx) => {
+    if (line.origin !== "FREE" && line.allocationLineId != null) {
+      ctx.addIssue({ code: z.ZodIssueCode.custom, message: "BILLING_DOCUMENT_ALLOCATION_INVALID" });
+    }
     if (line.origin === "TITLE") {
       if (line.quantity !== 0 || line.unitPriceCents !== 0 || line.sourceLineId !== null) {
         ctx.addIssue({ code: z.ZodIssueCode.custom, message: "BILLING_TITLE_INVALID" });
@@ -57,6 +75,16 @@ export const billingDocumentLineSchema = z
   });
 export type BillingDocumentLine = z.infer<typeof billingDocumentLineSchema>;
 
+export const billingSourceStructureItemSchema = z.discriminatedUnion("kind", [
+  z.object({
+    kind: z.literal("TITLE"),
+    title: z.string().trim().min(1).max(500),
+    level: z.enum(["SECTION", "SUBSECTION"]).optional(),
+  }),
+  z.object({ kind: z.literal("LINE"), lineId: z.string().uuid() }),
+]);
+export type BillingSourceStructureItem = z.infer<typeof billingSourceStructureItemSchema>;
+
 export const billingSourceSchema = z.object({
   quoteId: z.string().uuid(),
   commercialCaseId: z.string().uuid(),
@@ -68,6 +96,9 @@ export const billingSourceSchema = z.object({
   contractHtCents: centsSchema.positive(),
   contractTaxGroups: z.array(billingTaxGroupSchema).min(1),
   lines: z.array(billingSourceLineSchema).max(1000).optional(),
+  structure: z.array(billingSourceStructureItemSchema).max(1000).optional(),
+  sourceMode: z.enum(["CHANTIER", "QUOTE"]).optional(),
+  sourceQuoteIds: z.array(z.string().uuid()).max(1000).optional(),
 });
 export type BillingSource = z.infer<typeof billingSourceSchema>;
 
@@ -87,6 +118,7 @@ export const billingDraftSchema = billingSourceSchema.extend({
   cumulativePercent: z.number().finite().min(0).max(100).nullable(),
   lineProgress: z.array(billingLineProgressSchema).max(1000).optional(),
   documentLines: z.array(billingDocumentLineSchema).max(1000).optional(),
+  retention: billingDraftRetentionSchema.optional(),
   createdAt: dateTimeSchema,
   createdByName: z.string().trim().min(1),
   updatedAt: dateTimeSchema,
@@ -111,10 +143,205 @@ export const billingTitlesSchema = z
     "BILLING_TITLES_DUPLICATE",
   );
 
+/** Manual contract for a chantier launched without a retained quote. */
+export const billingManualMarketSchema = z.object({
+  chantierId: z.string().uuid(),
+  commercialCaseId: z.string().uuid(),
+  clientId: z.string().uuid(),
+  clientName: z.string().trim().min(1).max(240),
+  description: z.string().trim().min(1).max(4000),
+  lineId: z.string().uuid(),
+  amountHtCents: centsSchema.positive(),
+  vatRatePercent: z.number().finite().min(0).max(100),
+  createdAt: dateTimeSchema,
+  createdByName: z.string().trim().min(1).max(160),
+});
+export type BillingManualMarket = z.infer<typeof billingManualMarketSchema>;
+
+/** Extras are segregated from signed market until a named agreement is recorded. */
+export const billingExtraSchema = z
+  .object({
+    id: z.string().uuid(),
+    chantierId: z.string().uuid(),
+    lineId: z.string().uuid(),
+    description: z.string().trim().min(1).max(4000),
+    amountHtCents: centsSchema.positive(),
+    vatRatePercent: z.number().finite().min(0).max(100),
+    agreementStatus: z.enum(["TO_CONFIRM", "CONFIRMED"]),
+    agreementEvidence: z.string().trim().min(1).max(1000).nullable(),
+    confirmedAt: dateTimeSchema.nullable(),
+    confirmedByName: z.string().trim().min(1).max(160).nullable(),
+    createdAt: dateTimeSchema,
+    createdByName: z.string().trim().min(1).max(160),
+  })
+  .superRefine((item, ctx) => {
+    if (
+      item.agreementStatus === "CONFIRMED" &&
+      (!item.agreementEvidence || !item.confirmedAt || !item.confirmedByName)
+    ) {
+      ctx.addIssue({ code: z.ZodIssueCode.custom, message: "BILLING_EXTRA_AGREEMENT_REQUIRED" });
+    }
+    if (
+      item.agreementStatus === "TO_CONFIRM" &&
+      (item.agreementEvidence || item.confirmedAt || item.confirmedByName)
+    ) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        message: "BILLING_EXTRA_AGREEMENT_INCONSISTENT",
+      });
+    }
+  });
+export type BillingExtra = z.infer<typeof billingExtraSchema>;
+
+export const billingVisaRequirementSchema = z.object({
+  chantierId: z.string().uuid(),
+  required: z.boolean(),
+  updatedAt: dateTimeSchema,
+  updatedByName: z.string().trim().min(1).max(160),
+});
+export type BillingVisaRequirement = z.infer<typeof billingVisaRequirementSchema>;
+
+export const billingVisaMethodSchema = z.enum(["EMAIL", "SIGNATURE", "MEETING", "PHONE", "OTHER"]);
+export type BillingVisaMethod = z.infer<typeof billingVisaMethodSchema>;
+
+export const billingVisaLineDecisionSchema = z
+  .object({
+    documentLineId: z.string().uuid(),
+    acceptedHtCents: centsSchema,
+    reason: z.string().trim().max(1000),
+  })
+  .strict();
+export type BillingVisaLineDecision = z.infer<typeof billingVisaLineDecisionSchema>;
+
+export const billingVisaVersionSchema = z
+  .object({
+    id: z.string().uuid(),
+    draftId: z.string().uuid(),
+    version: z.number().int().positive().max(100),
+    draftUpdatedAt: dateTimeSchema,
+    clientName: z.string().trim().min(1).max(240),
+    chantierName: z.string().trim().min(1).max(240),
+    documentLabel: z.string().trim().min(1).max(240),
+    documentNotes: z.string().max(4000),
+    documentLines: z.array(billingDocumentLineSchema).min(1).max(1000),
+    amountHtCents: centsSchema.positive(),
+    vatCents: centsSchema,
+    totalTtcCents: centsSchema.positive(),
+    retention: billingDraftRetentionSchema.optional(),
+    submittedTo: z.string().trim().min(1).max(240),
+    submittedNotes: z.string().trim().max(2000),
+    submittedAt: dateTimeSchema,
+    submittedByName: z.string().trim().min(1).max(160),
+    status: z.enum(["SUBMITTED", "ACCEPTED", "PARTIAL", "REFUSED", "WITHDRAWN"]),
+    acceptedHtCents: centsSchema.nullable(),
+    lineDecisions: z.array(billingVisaLineDecisionSchema).max(1000).optional(),
+    appliedAt: dateTimeSchema.optional(),
+    appliedByName: z.string().trim().min(1).max(160).optional(),
+    reviewMethod: billingVisaMethodSchema.nullable(),
+    externalContact: z.string().trim().min(1).max(240).nullable(),
+    evidence: z.string().trim().min(1).max(2000).nullable(),
+    reason: z.string().trim().max(2000).nullable(),
+    reviewedAt: dateTimeSchema.nullable(),
+    reviewedByName: z.string().trim().min(1).max(160).nullable(),
+  })
+  .superRefine((visa, ctx) => {
+    const invalid = (message: string) => ctx.addIssue({ code: z.ZodIssueCode.custom, message });
+    const decisions = visa.lineDecisions;
+    if (
+      Boolean(visa.appliedAt) !== Boolean(visa.appliedByName) ||
+      (visa.appliedAt && (visa.status !== "PARTIAL" || !decisions?.length))
+    ) {
+      invalid("BILLING_VISA_APPLICATION_INVALID");
+    }
+    if (visa.status === "PARTIAL" && !decisions?.length) {
+      invalid("BILLING_VISA_LINE_DECISIONS_REQUIRED");
+    }
+    if (decisions?.length) {
+      if (visa.status !== "PARTIAL") {
+        invalid("BILLING_VISA_LINE_DECISIONS_NOT_PARTIAL");
+      } else {
+        const billable = visa.documentLines.filter((line) => line.origin !== "TITLE");
+        const lookup = new Map(billable.map((line) => [line.id, line]));
+        const seen = new Set<string>();
+        let acceptedSum = 0;
+        for (const decision of decisions) {
+          const original = lookup.get(decision.documentLineId);
+          if (!original || seen.has(decision.documentLineId)) {
+            invalid("BILLING_VISA_LINE_DECISION_INVALID");
+            continue;
+          }
+          seen.add(decision.documentLineId);
+          const originalHt = Math.round(original.quantity * original.unitPriceCents);
+          if (!Number.isSafeInteger(originalHt) || decision.acceptedHtCents > originalHt) {
+            invalid("BILLING_VISA_LINE_AMOUNT_INVALID");
+          }
+          if (decision.acceptedHtCents < originalHt && !decision.reason.trim()) {
+            invalid("BILLING_VISA_LINE_REASON_REQUIRED");
+          }
+          acceptedSum += decision.acceptedHtCents;
+        }
+        if (
+          seen.size !== billable.length ||
+          !Number.isSafeInteger(acceptedSum) ||
+          acceptedSum !== visa.acceptedHtCents
+        )
+          invalid("BILLING_VISA_LINE_TOTAL_MISMATCH");
+      }
+    }
+    if (visa.status === "SUBMITTED") {
+      if (
+        visa.acceptedHtCents !== null ||
+        visa.reviewMethod !== null ||
+        visa.externalContact !== null ||
+        visa.evidence !== null ||
+        visa.reason !== null ||
+        visa.reviewedAt !== null ||
+        visa.reviewedByName !== null
+      )
+        invalid("BILLING_VISA_PENDING_FIELDS_INVALID");
+      return;
+    }
+    if (!visa.reviewedAt || !visa.reviewedByName || !visa.reason) {
+      invalid("BILLING_VISA_DECISION_INCOMPLETE");
+      return;
+    }
+    if (visa.status === "WITHDRAWN") {
+      if (
+        visa.acceptedHtCents !== null ||
+        visa.reviewMethod !== null ||
+        visa.externalContact !== null ||
+        visa.evidence !== null
+      )
+        invalid("BILLING_VISA_WITHDRAWAL_INVALID");
+      return;
+    }
+    if (!visa.reviewMethod || !visa.externalContact || !visa.evidence) {
+      invalid("BILLING_VISA_EVIDENCE_REQUIRED");
+    }
+    if (
+      (visa.status === "ACCEPTED" && visa.acceptedHtCents !== visa.amountHtCents) ||
+      (visa.status === "PARTIAL" &&
+        (visa.acceptedHtCents === null ||
+          visa.acceptedHtCents <= 0 ||
+          visa.acceptedHtCents >= visa.amountHtCents)) ||
+      (visa.status === "REFUSED" && visa.acceptedHtCents !== 0)
+    )
+      invalid("BILLING_VISA_ACCEPTED_AMOUNT_INVALID");
+  });
+export type BillingVisaVersion = z.infer<typeof billingVisaVersionSchema>;
+
 export const billingPayloadSchema = z.object({
   schemaVersion: z.literal(1),
   drafts: z.array(billingDraftSchema),
+  manualMarkets: z.array(billingManualMarketSchema).optional(),
+  extras: z.array(billingExtraSchema).optional(),
+  visaRequirements: z.array(billingVisaRequirementSchema).optional(),
+  visaVersions: z.array(billingVisaVersionSchema).optional(),
   invoiceTitles: billingTitlesSchema.optional(),
+  financialLedger: billingFinancialLedgerSchema.optional(),
+  nativeInvoiceLedger: nativeInvoiceLedgerSchema.optional(),
+  nativeCreditNoteLedger: nativeCreditNoteLedgerSchema.optional(),
+  testSandbox: billingTestSandboxSchema.optional(),
 });
 export type BillingPayload = z.infer<typeof billingPayloadSchema>;
 
@@ -131,6 +358,25 @@ export function preparedHtCents(
   return payload.drafts
     .filter((draft) => draft.quoteId === quoteId && draft.id !== excludingId)
     .reduce((sum, draft) => sum + draft.amountHtCents, 0);
+}
+
+export function belongsToBillingSource(draft: BillingDraft, source: BillingSource): boolean {
+  if (source.sourceMode === "CHANTIER") {
+    return Boolean(source.chantierId && draft.chantierId === source.chantierId);
+  }
+  return draft.quoteId === source.quoteId;
+}
+
+export function preparedForBillingSource(
+  payload: BillingPayload,
+  source: BillingSource,
+  excludingId?: string,
+): number {
+  const total = payload.drafts
+    .filter((draft) => draft.id !== excludingId && belongsToBillingSource(draft, source))
+    .reduce((amount, draft) => amount + draft.amountHtCents, 0);
+  if (!Number.isSafeInteger(total)) throw new Error("BILLING_AMOUNT_INVALID");
+  return total;
 }
 
 function assertSource(source: BillingSource): BillingSource {
@@ -241,7 +487,7 @@ export function createBillingDraft(
   now = new Date(),
 ): BillingDraft {
   const validSource = assertSource(source);
-  const alreadyPreparedCents = preparedHtCents(payload, source.quoteId);
+  const alreadyPreparedCents = preparedForBillingSource(payload, validSource);
   if (
     input.linePercentages &&
     (input.type !== "PROGRESS" ||
@@ -252,7 +498,7 @@ export function createBillingDraft(
   }
   const hasLineHistory = payload.drafts.some(
     (draft) =>
-      draft.quoteId === source.quoteId &&
+      belongsToBillingSource(draft, validSource) &&
       draft.type === "PROGRESS" &&
       Boolean(draft.lineProgress?.length),
   );
@@ -327,7 +573,8 @@ export function updateBillingDraft(
   if (!draft) throw new Error("BILLING_DRAFT_NOT_FOUND");
   if (draft.status !== "DRAFT") throw new Error("BILLING_DRAFT_LOCKED");
   if (draft.updatedAt !== input.expectedUpdatedAt) throw new Error("BILLING_VERSION_CONFLICT");
-  const alreadyPreparedCents = preparedHtCents(payload, draft.quoteId, draft.id);
+  assertBillingVisaEditable(payload, draftId);
+  const alreadyPreparedCents = preparedForBillingSource(payload, draft, draft.id);
   const amountHtCents =
     draft.type === "STANDARD" || draft.type === "FINAL"
       ? draft.amountHtCents
@@ -340,11 +587,7 @@ export function updateBillingDraft(
   }
   if (amountHtCents !== draft.amountHtCents) {
     const draftIndex = payload.drafts.findIndex((item) => item.id === draftId);
-    if (
-      payload.drafts
-        .slice(draftIndex + 1)
-        .some((item) => item.quoteId === draft.quoteId && item.type === "PROGRESS")
-    ) {
+    if (payload.drafts.slice(draftIndex + 1).some((item) => item.chantierId === draft.chantierId)) {
       throw new Error("BILLING_DRAFT_HAS_DEPENDENTS");
     }
   }
@@ -371,6 +614,9 @@ export function updateBillingDraft(
     taxGroups: tax.groups,
     vatCents: tax.vatCents,
     totalTtcCents: tax.ttcCents,
+    ...(draft.retention
+      ? { retention: rebaseBillingDraftRetention(draft.retention, tax.ttcCents) }
+      : {}),
     // Editing the amount explicitly switches the draft away from a cumulative percentage.
     cumulativePercent: amountHtCents !== draft.amountHtCents ? null : draft.cumulativePercent,
     updatedAt: now.toISOString(),
@@ -397,6 +643,7 @@ export function updateBillingDocument(
   const draft = payload.drafts[index];
   if (draft.status !== "DRAFT") throw new Error("BILLING_DRAFT_LOCKED");
   if (draft.updatedAt !== input.expectedUpdatedAt) throw new Error("BILLING_VERSION_CONFLICT");
+  assertBillingVisaEditable(payload, draftId);
   const documentLines = z
     .array(billingDocumentLineSchema)
     .min(1)
@@ -406,6 +653,7 @@ export function updateBillingDocument(
     throw new Error("BILLING_DOCUMENT_DUPLICATE_LINE");
   }
   const quoteIds = new Set((draft.lines ?? []).map((line) => line.lineId));
+  const sourceByLineId = new Map((draft.lines ?? []).map((line) => [line.lineId, line]));
   const seenQuoteIds = new Set<string>();
   const allowedRates = new Set(draft.contractTaxGroups.map((group) => group.ratePercent));
   for (const line of documentLines) {
@@ -421,6 +669,14 @@ export function updateBillingDocument(
     }
     if (line.origin !== "TITLE" && !allowedRates.has(line.vatRatePercent)) {
       throw new Error("BILLING_DOCUMENT_VAT_OUTSIDE_CONTRACT");
+    }
+    const allocationId = allocatedBillingLineId(line);
+    if (allocationId) {
+      const contractLine = sourceByLineId.get(allocationId);
+      if (!contractLine) throw new Error("BILLING_DOCUMENT_ALLOCATION_UNKNOWN");
+      if (line.vatRatePercent !== contractLine.vatRatePercent) {
+        throw new Error("BILLING_DOCUMENT_ALLOCATION_VAT_MISMATCH");
+      }
     }
   }
   const totals = calculateInvoiceDocumentTotals(documentLines);
@@ -455,10 +711,10 @@ export function updateBillingDocument(
   const progressChanged =
     recalculatedProgress?.lineProgress.some(
       (row) =>
-        row.percent !==
-        draft.lineProgress?.find((previous) => previous.lineId === row.lineId)?.percent,
+        row.cumulativeHtCents !==
+        draft.lineProgress?.find((previous) => previous.lineId === row.lineId)?.cumulativeHtCents,
     ) ?? false;
-  const priorCents = preparedHtCents(payload, draft.quoteId, draft.id);
+  const priorCents = preparedForBillingSource(payload, draft, draft.id);
   if (totals.amountHtCents + priorCents > draft.contractHtCents) {
     throw new Error("BILLING_AMOUNT_EXCEEDS_CONTRACT");
   }
@@ -469,11 +725,33 @@ export function updateBillingDocument(
         (totals.taxGroups.find((value) => value.ratePercent === group.ratePercent)?.baseHtCents ??
           0) !== group.baseHtCents,
     );
+  // A silent transfer between ouvrages can change the next situation even
+  // when HT and VAT totals are identical. Only harmless text edits remain allowed.
+  let sourceAllocationChanged = false;
+  if (draft.type === "PROGRESS" && draft.lines?.length && draft.documentLines) {
+    const previous = allocatedDocumentAmounts(draft.documentLines, draft.lines);
+    const proposed = allocatedDocumentAmounts(documentLines, draft.lines);
+    sourceAllocationChanged = draft.lines.some(
+      (line) => (previous.get(line.lineId) ?? 0) !== (proposed.get(line.lineId) ?? 0),
+    );
+  }
   if (
-    (financialChange || progressChanged) &&
-    payload.drafts.slice(index + 1).some((candidate) => candidate.quoteId === draft.quoteId)
+    (financialChange || progressChanged || sourceAllocationChanged) &&
+    payload.drafts
+      .slice(index + 1)
+      .some(
+        (candidate) => candidate.chantierId !== null && candidate.chantierId === draft.chantierId,
+      )
   ) {
     throw new Error("BILLING_DRAFT_HAS_DEPENDENTS");
+  }
+  if (draft.type === "PROGRESS" && draft.lines?.length) {
+    reconcileDocumentLineProgress(
+      payload,
+      draft,
+      documentLines,
+      recalculatedProgress?.lineProgress,
+    );
   }
   return billingDraftSchema.parse({
     ...draft,
@@ -487,6 +765,9 @@ export function updateBillingDocument(
     taxGroups: totals.taxGroups,
     vatCents: totals.vatCents,
     totalTtcCents: totals.totalTtcCents,
+    ...(draft.retention
+      ? { retention: rebaseBillingDraftRetention(draft.retention, totals.totalTtcCents) }
+      : {}),
     updatedAt: now.toISOString(),
     updatedByName: actorName,
   });
@@ -504,6 +785,7 @@ export function approveBillingDraft(
   if (!draft) throw new Error("BILLING_DRAFT_NOT_FOUND");
   if (draft.status !== "DRAFT") throw new Error("BILLING_DRAFT_LOCKED");
   if (draft.updatedAt !== expectedUpdatedAt) throw new Error("BILLING_VERSION_CONFLICT");
+  assertBillingVisaAllowsApproval(payload, draft);
   const lines = draft.documentLines ?? buildInvoiceDocumentLines(draft, payload);
   const totals = calculateInvoiceDocumentTotals(lines);
   if (

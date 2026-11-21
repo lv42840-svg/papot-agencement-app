@@ -1,3 +1,4 @@
+import { belongsToBillingSource } from "./domain";
 import type { BillingDraft, BillingSource } from "./domain";
 
 export type BillingPreparationStatus = "NONE" | "PARTIAL" | "FULL";
@@ -20,7 +21,7 @@ export function billingPreparationFollowup(
   projects: readonly BillingDraft[],
 ): BillingPreparationRow[] {
   return sources.map((source) => {
-    const related = projects.filter((project) => project.quoteId === source.quoteId);
+    const related = projects.filter((project) => belongsToBillingSource(project, source));
     const preparedHtCents = related.reduce((sum, item) => sum + item.amountHtCents, 0);
     if (!Number.isSafeInteger(preparedHtCents) || preparedHtCents > source.contractHtCents) {
       throw new Error("BILLING_PREPARATION_EXCEEDS_CONTRACT");

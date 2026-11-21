@@ -971,3 +971,51 @@ select:focus {
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 }
+
+/* Facturation : navigation par ouvrages et sous-titres, adaptée aux grandes situations. */
+.invoiceOuvragesNavigator {
+  display: grid;
+  gap: 12px;
+  padding: 14px;
+  margin: 12px 0 18px;
+  border: 1px solid #e5dfef;
+  border-radius: 12px;
+  background: #faf8ff;
+}
+.invoiceOuvragesNavigator > div > p {
+  color: #6c6380;
+  font-size: 12px;
+  margin: 4px 0 0;
+}
+.invoiceOuvragesGroups {
+  display: grid;
+  gap: 7px;
+  max-height: 290px;
+  overflow: auto;
+}
+.invoiceOuvragesGroups > details {
+  border: 1px solid #e7e0ef;
+  background: white;
+  border-radius: 9px;
+  padding: 8px 12px;
+}
+.invoiceOuvragesGroups > details.invoiceOuvrageSubsection {
+  margin-left: 18px;
+  border-left: 3px solid #a99ad3;
+}
+.invoiceOuvragesGroups > details > summary {
+  font-weight: 700;
+  font-size: 13px;
+  cursor: pointer;
+}
+.invoiceOuvragesGroups > details > div {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  padding-top: 9px;
+}
+.invoiceOuvragesGroups .secondaryButton {
+  font-size: 11px;
+  min-height: 30px;
+  padding: 5px 9px;
+}

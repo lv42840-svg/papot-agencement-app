@@ -2,6 +2,7 @@
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
+import { BillingTestSandboxPanel } from "@/components/billing-test-sandbox-panel";
 import { parseBillingPercentageInput } from "@/lib/billing/percentage-input";
 import { calculateLineProgress } from "@/lib/billing/progress";
 import { filterBillingProjects, type BillingProjectSort } from "@/lib/billing/workspace-list";
@@ -9,13 +10,26 @@ import {
   billingPreparationFollowup,
   type BillingPreparationStatus,
 } from "@/lib/billing/preparation-followup";
+import { belongsToBillingSource } from "@/lib/billing/domain";
 import type {
   BillingDraft,
   BillingPayload,
   BillingSource,
   BillingType,
 } from "@/lib/billing/domain";
-type Snapshot = { payload: BillingPayload; sources: BillingSource[]; canWrite: boolean };
+type BillingChantierChoice = {
+  id: string;
+  name: string;
+  clientName: string | null;
+  status: string;
+};
+type Snapshot = {
+  payload: BillingPayload;
+  sources: BillingSource[];
+  chantiers: BillingChantierChoice[];
+  canWrite: boolean;
+  canTestBillingSandbox?: boolean;
+};
 const money = (n: number) =>
   (n / 100).toLocaleString("fr-FR", { style: "currency", currency: "EUR" });
 const options: { value: BillingType; label: string }[] = [
@@ -47,8 +61,15 @@ export function BillingWorkspace({
   const [mode, setMode] = useState<"AMOUNT" | "PERCENT" | "LINES">("PERCENT");
   const [lineValues, setLineValues] = useState<Record<string, string>>({});
   const [value, setValue] = useState("");
-  const [tab, setTab] = useState<"CHANTIER" | "PROJECTS" | "FOLLOWUP">(
-    chantierId ? "CHANTIER" : initialTab === "FOLLOWUP" ? "FOLLOWUP" : "PROJECTS",
+  const [manualDescription, setManualDescription] = useState("Travaux réalisés");
+  const [manualAmount, setManualAmount] = useState("");
+  const [manualVat, setManualVat] = useState("20");
+  const [extraDescription, setExtraDescription] = useState("");
+  const [extraAmount, setExtraAmount] = useState("");
+  const [extraVat, setExtraVat] = useState("20");
+  const [extraEvidence, setExtraEvidence] = useState<Record<string, string>>({});
+  const [tab, setTab] = useState<"CHANTIER" | "PROJECTS" | "FOLLOWUP" | "TESTS">(
+    chantierId || quoteId ? "CHANTIER" : initialTab === "FOLLOWUP" ? "FOLLOWUP" : "PROJECTS",
   );
   const [selectedChantier, setSelectedChantier] = useState(chantierId ?? "");
   const [projectSearch, setProjectSearch] = useState("");
@@ -68,22 +89,28 @@ export function BillingWorkspace({
     void refresh().catch(() => setError("Impossible de charger la facturation."));
   }, []);
   const allSources = data?.sources ?? [];
-  const chantierChoices = [
-    ...new Map<string, { id: string; name: string; client: string }>(
-      allSources
-        .filter((source) => source.chantierId !== null)
-        .map((source) => [
-          source.chantierId!,
-          { id: source.chantierId!, name: source.affairName, client: source.clientName },
-        ]),
-    ).values(),
-  ].sort((a, b) => a.name.localeCompare(b.name, "fr-FR"));
+  const chantierChoices = [...(data?.chantiers ?? [])]
+    .map((chantier) => ({
+      id: chantier.id,
+      name: chantier.name,
+      client: chantier.clientName || "Client à rattacher",
+    }))
+    .sort((a, b) => a.name.localeCompare(b.name, "fr-FR"));
+  const linkedChantierId = allSources.find(
+    (source) => source.sourceQuoteIds?.includes(quoteId ?? "") || source.quoteId === quoteId,
+  )?.chantierId;
   const activeChantierId = chantierChoices.some((site) => site.id === selectedChantier)
     ? selectedChantier
-    : (chantierChoices[0]?.id ?? "");
+    : (linkedChantierId ?? chantierChoices[0]?.id ?? "");
   const sources = allSources.filter((source) => source.chantierId === activeChantierId);
-  const active = sources.find((source) => source.quoteId === selection) ?? sources[0];
+  const active =
+    sources.find(
+      (source) => source.quoteId === selection || source.sourceQuoteIds?.includes(selection),
+    ) ?? sources[0];
   const drafts = data?.payload.drafts ?? [];
+  const chantierExtras = (data?.payload.extras ?? []).filter(
+    (extra) => extra.chantierId === activeChantierId,
+  );
   const followup = billingPreparationFollowup(allSources, drafts);
   const visibleFollowup = followup.filter((row) => {
     if (followupStatus !== "ALL" && row.status !== followupStatus) return false;
@@ -112,24 +139,26 @@ export function BillingWorkspace({
   });
   const used = active
     ? (data?.payload.drafts ?? [])
-        .filter((d) => d.quoteId === active.quoteId)
+        .filter((d) => belongsToBillingSource(d, active))
         .reduce((n, d) => n + d.amountHtCents, 0)
     : 0;
   const remaining = Math.max(0, (active?.contractHtCents ?? 0) - used);
   function previousPercents(source: BillingSource): Record<string, string> {
-    const latest = (data?.payload.drafts ?? [])
-      .filter((draft) => draft.quoteId === source.quoteId && draft.type === "PROGRESS")
-      .sort((a, b) => a.createdAt.localeCompare(b.createdAt))
-      .at(-1);
+    const history = (data?.payload.drafts ?? []).filter(
+      (draft) => draft.type === "PROGRESS" && belongsToBillingSource(draft, source),
+    );
     return Object.fromEntries(
-      (source.lines ?? []).map((line) => [
-        line.lineId,
-        String(
-          latest?.lineProgress?.find((progress) => progress.lineId === line.lineId)?.percent ??
-            latest?.cumulativePercent ??
-            0,
-        ),
-      ]),
+      (source.lines ?? []).map((line) => {
+        const prior = history.reduce((maximum, draft) => {
+          const progress = draft.lineProgress?.find((row) => row.lineId === line.lineId);
+          const included = draft.lines?.some((row) => row.lineId === line.lineId);
+          return Math.max(
+            maximum,
+            progress?.percent ?? (included ? (draft.cumulativePercent ?? 0) : 0),
+          );
+        }, 0);
+        return [line.lineId, String(prior)];
+      }),
     );
   }
   // Preview and submit the same percentages, including visible saved defaults.
@@ -207,7 +236,17 @@ export function BillingWorkspace({
             `Des données du devis empêchent la création${fields}. Vérifie les lignes du devis.`,
           );
         }
-        throw new Error(result.error ?? "Erreur de facturation");
+        const descriptions: Record<string, string> = {
+          BILLING_MARKET_WITHOUT_CLIENT:
+            "Rattache un client existant à l'affaire commerciale avant de créer un marché sans devis.",
+          BILLING_MARKET_SOURCE_CONFLICT:
+            "Ce chantier comporte déjà un devis retenu. Corrige les devis retenus avant de créer ce marché.",
+          BILLING_MARKET_ALREADY_PREPARED:
+            "Le marché ne peut plus être modifié après la création d'un projet. Une régularisation devra être enregistrée.",
+        };
+        throw new Error(
+          descriptions[result.error ?? ""] ?? result.error ?? "Erreur de facturation",
+        );
       }
       await refresh();
       setNotice(success);
@@ -219,6 +258,74 @@ export function BillingWorkspace({
       setBusy(false);
     }
   }
+  async function saveManualMarket() {
+    if (!activeChantierId) return;
+    const amountHtCents = parseMoney(manualAmount);
+    const vatRatePercent = Number(manualVat.replace(",", "."));
+    if (!Number.isSafeInteger(amountHtCents) || amountHtCents <= 0) {
+      setError("Saisis un montant de marché HT positif.");
+      return;
+    }
+    if (!manualDescription.trim() || !Number.isFinite(vatRatePercent)) {
+      setError("Indique la prestation et un taux de TVA.");
+      return;
+    }
+    await write(
+      {
+        action: "SET_MANUAL_MARKET",
+        chantierId: activeChantierId,
+        description: manualDescription.trim(),
+        amountHtCents,
+        vatRatePercent,
+      },
+      "Marché sans devis enregistré. Tu peux maintenant préparer un projet.",
+    );
+  }
+
+  async function addExtra() {
+    if (!activeChantierId || !active) return;
+    const amountHtCents = parseMoney(extraAmount);
+    const vatRatePercent = Number(extraVat.trim().replace(",", "."));
+    if (!extraDescription.trim() || !Number.isSafeInteger(amountHtCents) || amountHtCents <= 0) {
+      setError("Renseigne une désignation et un montant HT positif pour ce supplément.");
+      return;
+    }
+    if (!Number.isFinite(vatRatePercent) || vatRatePercent < 0 || vatRatePercent > 100) {
+      setError("Renseigne un taux de TVA valide.");
+      return;
+    }
+    const result = await write(
+      {
+        action: "ADD_EXTRA",
+        requestId: crypto.randomUUID(),
+        chantierId: activeChantierId,
+        description: extraDescription.trim(),
+        amountHtCents,
+        vatRatePercent,
+      },
+      "Travaux supplémentaires enregistrés en attente d'accord. Ils ne sont pas facturables.",
+    );
+    if (result) {
+      setExtraDescription("");
+      setExtraAmount("");
+    }
+  }
+
+  async function confirmExtra(extraId: string) {
+    const evidence = extraEvidence[extraId]?.trim();
+    if (!evidence) {
+      setError("Indique la preuve de l'accord et sa date avant de confirmer.");
+      return;
+    }
+    const result = await write(
+      { action: "CONFIRM_EXTRA", extraId, evidence },
+      "Accord enregistré : le supplément entre désormais dans le marché du chantier.",
+    );
+    if (result) {
+      setExtraEvidence((old) => ({ ...old, [extraId]: "" }));
+    }
+  }
+
   async function create() {
     if (!active) return;
     const linesMode = type === "PROGRESS" && mode === "LINES";
@@ -303,28 +410,32 @@ export function BillingWorkspace({
             ["CHANTIER", "Nouvelle facture depuis chantier"],
             ["PROJECTS", `Projets de factures (${drafts.length})`],
             ["FOLLOWUP", `Devis à facturer (${followup.length})`],
+            ["TESTS", "Essais supprimables"],
           ] as const
-        ).map(([key, caption]) => (
-          <button
-            key={key}
-            type="button"
-            role="tab"
-            aria-selected={tab === key}
-            className={tab === key ? "primaryButton" : "secondaryButton"}
-            onClick={() => {
-              setTab(key);
-              setSelection("");
-              setLineValues({});
-              setValue("");
-              setError("");
-              setNotice("");
-            }}
-          >
-            {caption}
-          </button>
-        ))}
+        )
+          .filter(([key]) => key !== "TESTS" || data?.canTestBillingSandbox)
+          .map(([key, caption]) => (
+            <button
+              key={key}
+              type="button"
+              role="tab"
+              aria-selected={tab === key}
+              className={tab === key ? "primaryButton" : "secondaryButton"}
+              onClick={() => {
+                setTab(key);
+                setSelection("");
+                setLineValues({});
+                setValue("");
+                setError("");
+                setNotice("");
+              }}
+            >
+              {caption}
+            </button>
+          ))}
       </div>
       {!data && <p>Chargement…</p>}
+      {data && data.canTestBillingSandbox && tab === "TESTS" && <BillingTestSandboxPanel />}
       {data && tab === "CHANTIER" && (
         <section
           role="tabpanel"
@@ -356,30 +467,55 @@ export function BillingWorkspace({
             )}
           </label>
           {sources.length === 0 ? (
-            <p>
-              Aucun devis retenu éligible pour cette sélection. Vérifie les devis retenus et leurs
-              prix.
-            </p>
+            <div className="invoiceCard">
+              <h3>Chantier sans devis retenu</h3>
+              <p>
+                Renseigne un marché simplifié pour préparer une facture. Ce montant constitue une
+                base de travail interne, sans émission officielle.
+              </p>
+              <label>
+                Désignation des travaux
+                <input
+                  value={manualDescription}
+                  maxLength={4000}
+                  onChange={(event) => setManualDescription(event.target.value)}
+                />
+              </label>
+              <label>
+                Montant total HT
+                <input
+                  value={manualAmount}
+                  inputMode="decimal"
+                  placeholder="Ex. 1500,00"
+                  onChange={(event) => setManualAmount(event.target.value)}
+                />
+              </label>
+              <label>
+                Taux de TVA applicable (%), à confirmer selon le chantier
+                <input
+                  value={manualVat}
+                  inputMode="decimal"
+                  onChange={(event) => setManualVat(event.target.value)}
+                />
+              </label>
+              <button
+                className="primaryButton"
+                type="button"
+                disabled={!data.canWrite || busy}
+                onClick={() => void saveManualMarket()}
+              >
+                Enregistrer le marché simplifié
+              </button>
+            </div>
           ) : (
             <>
-              <label>
-                Devis retenu{" "}
-                <select
-                  style={{ width: "100%", padding: 9 }}
-                  value={active?.quoteId ?? ""}
-                  onChange={(e) => {
-                    setSelection(e.target.value);
-                    const source = sources.find((item) => item.quoteId === e.target.value);
-                    if (source) setLineValues(previousPercents(source));
-                  }}
-                >
-                  {sources.map((s) => (
-                    <option key={s.quoteId} value={s.quoteId}>
-                      {s.affairName} · {s.quoteLabel} · {s.clientName}
-                    </option>
-                  ))}
-                </select>
-              </label>
+              <div>
+                <strong>Marché global du chantier</strong>
+                <p>
+                  {active?.quoteLabel} · {active?.lines?.length ?? 0} prestations. Tous les devis
+                  retenus de ce chantier sont regroupés dans un seul projet.
+                </p>
+              </div>
               <p>
                 <b>Contrat :</b> {money(active?.contractHtCents ?? 0)} HT · <b>Déjà préparé :</b>{" "}
                 {money(used)} HT · <b>Disponible :</b> {money(remaining)} HT
@@ -532,19 +668,119 @@ export function BillingWorkspace({
           )}
         </section>
       )}
+      {data && tab === "CHANTIER" && active && (
+        <section
+          className="invoiceCard"
+          role="tabpanel"
+          aria-label="Travaux supplémentaires du chantier"
+        >
+          <h2>Travaux supplémentaires du chantier</h2>
+          <p>
+            Un supplément en attente d&apos;accord reste visible, mais il n&apos;augmente pas le
+            marché facturable. Une confirmation documentée est nécessaire.
+          </p>
+          <div style={{ display: "grid", gap: 10 }}>
+            <label>
+              Désignation des travaux supplémentaires
+              <input
+                value={extraDescription}
+                maxLength={4000}
+                onChange={(event) => setExtraDescription(event.target.value)}
+                placeholder="Ex. Cornières complémentaires"
+              />
+            </label>
+            <div style={{ display: "flex", gap: 12, flexWrap: "wrap" }}>
+              <label style={{ flex: "1 1 160px" }}>
+                Montant HT
+                <input
+                  value={extraAmount}
+                  inputMode="decimal"
+                  placeholder="Ex. 850,00"
+                  onChange={(event) => setExtraAmount(event.target.value)}
+                />
+              </label>
+              <label style={{ flex: "1 1 120px" }}>
+                TVA (%)
+                <input
+                  value={extraVat}
+                  inputMode="decimal"
+                  onChange={(event) => setExtraVat(event.target.value)}
+                />
+              </label>
+            </div>
+            <button
+              type="button"
+              className="secondaryButton"
+              disabled={!data.canWrite || busy}
+              onClick={() => void addExtra()}
+            >
+              Ajouter un supplément en attente d&apos;accord
+            </button>
+          </div>
+          {chantierExtras.length === 0 ? (
+            <p>Aucun travail supplémentaire enregistré sur ce chantier.</p>
+          ) : (
+            <ul style={{ display: "grid", gap: 12, paddingLeft: 18 }}>
+              {chantierExtras.map((extra) => (
+                <li key={extra.id}>
+                  <strong>{extra.description}</strong> · {money(extra.amountHtCents)} HT ·
+                  {extra.agreementStatus === "CONFIRMED"
+                    ? " Accord confirmé"
+                    : " Accord à confirmer"}
+                  {extra.agreementStatus === "CONFIRMED" ? (
+                    <p>
+                      Justificatif : {extra.agreementEvidence} · Confirmé par{" "}
+                      {extra.confirmedByName}
+                    </p>
+                  ) : (
+                    <div style={{ display: "grid", gap: 6, maxWidth: 700 }}>
+                      <label>
+                        Justificatif de l&apos;accord (date, interlocuteur et référence)
+                        <input
+                          value={extraEvidence[extra.id] ?? ""}
+                          maxLength={1000}
+                          placeholder="Ex. Accord du client par mail le..."
+                          onChange={(event) =>
+                            setExtraEvidence((old) => ({
+                              ...old,
+                              [extra.id]: event.target.value,
+                            }))
+                          }
+                        />
+                      </label>
+                      <button
+                        type="button"
+                        className="secondaryButton"
+                        disabled={!data.canWrite || busy}
+                        onClick={() => void confirmExtra(extra.id)}
+                      >
+                        Confirmer l&apos;accord et intégrer au marché
+                      </button>
+                    </div>
+                  )}
+                </li>
+              ))}
+            </ul>
+          )}
+          <p>
+            La confirmation crée une nouvelle base de préparation. Les anciens devis restent
+            inchangés et aucun document officiel n&apos;est émis.
+          </p>
+        </section>
+      )}
       {data && tab === "FOLLOWUP" && (
         <section
           role="tabpanel"
           style={{ background: "white", padding: 20, borderRadius: 12, display: "grid", gap: 14 }}
         >
-          <h2>Devis acceptés et suivi de préparation des factures</h2>
+          <h2>Marchés des chantiers et préparation des factures</h2>
           <p>
             Un devis signé n&apos;est pas une facture. Les acomptes, situations et soldes ci-dessous
             sont uniquement des <strong>projets PAPOT non émis</strong>. En attendant Pennylane,
             l&apos;état réellement non facturé ou partiellement facturé ne peut pas être certifié.
           </p>
           <div style={{ display: "flex", flexWrap: "wrap", gap: 12 }}>
-            <strong>{followup.length} devis retenu(s)</strong>
+            <strong>{followup.length} marché(s) de chantier</strong>
             <strong>
               {money(followup.reduce((s, r) => s + r.preparedHtCents, 0))} HT en projets
             </strong>
@@ -554,7 +790,7 @@ export function BillingWorkspace({
           </div>
           <div style={{ display: "flex", gap: 12, flexWrap: "wrap" }}>
             <label style={{ display: "grid", gap: 5, flex: "2 1 220px" }}>
-              Rechercher un devis accepté
+              Rechercher un marché de chantier
               <input
                 value={followupSearch}
                 onChange={(event) => setFollowupSearch(event.target.value)}
@@ -567,7 +803,7 @@ export function BillingWorkspace({
                 value={followupStatus}
                 onChange={(event) => setFollowupStatus(event.target.value as typeof followupStatus)}
               >
-                <option value="ALL">Tous les devis</option>
+                <option value="ALL">Tous les marchés</option>
                 <option value="NONE">Aucun projet</option>
                 <option value="PARTIAL">Projets partiels</option>
                 <option value="FULL">Totalité préparée (non émise)</option>
@@ -579,7 +815,7 @@ export function BillingWorkspace({
               <thead>
                 <tr style={{ textAlign: "left", borderBottom: "2px solid #ded8e9" }}>
                   <th style={{ padding: 9 }}>Client / chantier</th>
-                  <th style={{ padding: 9 }}>Devis accepté</th>
+                  <th style={{ padding: 9 }}>Devis du marché</th>
                   <th style={{ padding: 9, textAlign: "right" }}>Contrat HT</th>
                   <th style={{ padding: 9, textAlign: "right" }}>Projets préparés HT</th>
                   <th style={{ padding: 9, textAlign: "right" }}>Reste à préparer HT</th>
@@ -596,9 +832,18 @@ export function BillingWorkspace({
                       <div>{row.source.affairName}</div>
                     </td>
                     <td style={{ padding: 9 }}>
-                      <Link href={`/devis/${encodeURIComponent(row.source.quoteId)}`}>
-                        {row.source.quoteLabel}
-                      </Link>
+                      {row.source.sourceQuoteIds?.length ? (
+                        <div style={{ display: "grid", gap: 5 }}>
+                          <strong>{row.source.sourceQuoteIds.length} devis retenu(s)</strong>
+                          {row.source.sourceQuoteIds.map((quoteId) => (
+                            <Link key={quoteId} href={`/devis/${encodeURIComponent(quoteId)}`}>
+                              Ouvrir le devis {quoteId.slice(0, 8)}
+                            </Link>
+                          ))}
+                        </div>
+                      ) : (
+                        "Marché sans devis"
+                      )}
                     </td>
                     <td style={{ padding: 9, textAlign: "right" }}>
                       {money(row.source.contractHtCents)}
@@ -631,12 +876,7 @@ export function BillingWorkspace({
                           Préparer une facture
                         </button>
                       ) : (
-                        <Link
-                          className="secondaryButton"
-                          href={`/devis/${encodeURIComponent(row.source.quoteId)}`}
-                        >
-                          Voir le devis
-                        </Link>
+                        <span>Chantier à vérifier</span>
                       )}
                     </td>
                   </tr>

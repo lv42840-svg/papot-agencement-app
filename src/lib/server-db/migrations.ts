@@ -45,6 +45,8 @@ const PENNYLANE_CONNECTION_NAME = "pennylane_encrypted_connection";
 const PENNYLANE_STAGING_NAME = "pennylane_readonly_staging";
 const BILLING_STORAGE_VERSION = 15;
 const BILLING_STORAGE_NAME = "billing_draft_storage";
+const NATIVE_INVOICE_ARCHIVE_VERSION = 22;
+const NATIVE_INVOICE_ARCHIVE_NAME = "papot_native_invoice_pdf_archive";
 
 const FRESH_WEB_SOURCE = "fresh:web";
 const FRESH_WEB_HASH = "fresh-empty-v1";
@@ -66,6 +68,7 @@ async function ensureFreshWebBootstrap(client: PoolClient): Promise<void> {
     chantiers: string;
     library: string;
     quotes: string;
+    native_invoice_pdfs: string;
     cutovers: string;
   }>(`
     SELECT
@@ -77,6 +80,7 @@ async function ensureFreshWebBootstrap(client: PoolClient): Promise<void> {
       (SELECT COUNT(*)::text FROM papot_chantiers_state) AS chantiers,
       (SELECT COUNT(*)::text FROM papot_library_state) AS library,
       (SELECT COUNT(*)::text FROM papot_quotes_state) AS quotes,
+      (SELECT COUNT(*)::text FROM papot_native_invoice_pdf_archive) AS native_invoice_pdfs,
       (SELECT COUNT(*)::text FROM papot_domain_cutovers) AS cutovers
   `);
 
@@ -92,6 +96,7 @@ async function ensureFreshWebBootstrap(client: PoolClient): Promise<void> {
     row.chantiers,
     row.library,
     row.quotes,
+    row.native_invoice_pdfs,
   ];
 
   const allBusinessEmpty = businessCounts.every((count) => count === "0");
@@ -544,6 +549,19 @@ async function ensureBillingStorage(client: PoolClient): Promise<void> {
   `);
 }
 
+async function ensureNativeInvoicePdfArchive(client: PoolClient): Promise<void> {
+  await client.query(`
+    CREATE TABLE IF NOT EXISTS papot_native_invoice_pdf_archive (
+      invoice_id UUID PRIMARY KEY,
+      invoice_number TEXT NOT NULL UNIQUE,
+      issued_at TIMESTAMPTZ NOT NULL,
+      pdf BYTEA NOT NULL CHECK (octet_length(pdf) > 0),
+      sha256 CHAR(64) NOT NULL CHECK (char_length(sha256) = 64),
+      archived_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+    )
+  `);
+}
+
 async function ensurePennylaneStaging(client: PoolClient): Promise<void> {
   await client.query(`
     CREATE TABLE IF NOT EXISTS papot_pennylane_staging (
@@ -851,6 +869,13 @@ export async function runServerDbMigrations(
         ON CONFLICT (version) DO NOTHING
       `,
       [BILLING_STORAGE_VERSION, BILLING_STORAGE_NAME],
+    );
+
+    await ensureNativeInvoicePdfArchive(client);
+    await client.query(
+      `INSERT INTO papot_schema_migrations (version, name)
+       VALUES ($1, $2) ON CONFLICT (version) DO NOTHING`,
+      [NATIVE_INVOICE_ARCHIVE_VERSION, NATIVE_INVOICE_ARCHIVE_NAME],
     );
 
     if (freshWebBootstrapEnabled(env)) {

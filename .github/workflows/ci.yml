@@ -73,7 +73,7 @@ jobs:
           sudo apt-get update
           sudo apt-get install -y libreoffice-writer poppler-utils
       - run: npm ci
-      - run: npm test -- tests/quote-word-v2-pdf.integration.test.ts
+      - run: npm test -- tests/quote-word-v2-pdf.integration.test.ts tests/billing-visa-pdf.integration.test.ts
       - name: Upload PDF QA artifact
         if: always()
         uses: actions/upload-artifact@v4
