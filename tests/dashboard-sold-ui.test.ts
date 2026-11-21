@@ -29,10 +29,11 @@ describe("accueil : chiffre d'affaires réellement facturé", () => {
 
   it("accède au suivi des devis acceptés mais ne les présente pas comme facturés", () => {
     expect(card).toContain("/facturation?tab=FOLLOWUP");
-    expect(billing).toContain('["FOLLOWUP", `Devis à facturer (${followup.length})`]');
+    expect(billing).toContain('initialTab === "FOLLOWUP"');
+    expect(billing).toContain('tab === "FOLLOWUP"');
     expect(billing).toContain("Préparation partielle");
     expect(billing).toContain("Reste à préparer HT");
     expect(billing).toContain("À rapprocher avec Pennylane");
-    expect(billing).toContain("projets PAPOT non émis");
+    expect(billing).toContain("projets non émis");
   });
 });
