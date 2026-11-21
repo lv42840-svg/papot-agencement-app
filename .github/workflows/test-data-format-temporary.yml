@@ -1,0 +1,56 @@
+name: Temporary test data formatter
+
+on:
+  push:
+    branches:
+      - feat/test-data-labels-20261121
+    paths:
+      - .github/workflows/test-data-format-temporary.yml
+
+permissions:
+  contents: write
+
+jobs:
+  formatter:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: true
+      - run: |
+          git fetch origin feat/test-data-labels-20261121
+          git checkout -B feat/test-data-labels-20261121 origin/feat/test-data-labels-20261121
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - run: |
+          npx prettier --write \
+            src/lib/commercial/domain.ts \
+            src/lib/chantiers/domain.ts \
+            src/lib/quotes/store.ts \
+            src/lib/commercial/mutations.ts \
+            src/lib/chantiers/mutations.ts \
+            src/lib/quotes/mutations.ts \
+            src/app/api/desktop/quotes/route.ts \
+            src/components/commercial-workspace-v2.tsx \
+            src/components/quotes-workspace.tsx \
+            src/components/quote-direct-editor.tsx \
+            src/components/chantiers-workspace.tsx \
+            src/components/chantier-workspace.tsx \
+            src/components/test-data-marker.tsx \
+            src/app/globals.css \
+            tests/test-data-markers.test.ts \
+            tests/test-data-marker-ui.test.ts \
+            docs/test-data-tagging.md
+      - run: |
+          git diff --check
+          if ! git diff --quiet; then
+            git config user.name "github-actions[bot]"
+            git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+            git add src/lib/commercial/domain.ts src/lib/chantiers/domain.ts src/lib/quotes/store.ts src/lib/commercial/mutations.ts src/lib/chantiers/mutations.ts src/lib/quotes/mutations.ts src/app/api/desktop/quotes/route.ts src/components/commercial-workspace-v2.tsx src/components/quotes-workspace.tsx src/components/quote-direct-editor.tsx src/components/chantiers-workspace.tsx src/components/chantier-workspace.tsx src/components/test-data-marker.tsx src/app/globals.css tests/test-data-markers.test.ts tests/test-data-marker-ui.test.ts docs/test-data-tagging.md
+            git commit -m "style(test-data): format test markers and UI"
+            git pull --rebase origin feat/test-data-labels-20261121
+            git push
+          fi
