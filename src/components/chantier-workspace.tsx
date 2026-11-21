@@ -25,6 +25,7 @@ import {
 } from "lucide-react";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { ChantierOperationalWorkspace } from "@/components/chantier-operational-workspace";
+import { TestDataMarker } from "@/components/test-data-marker";
 import { ChantierProfitabilityPanel } from "@/components/chantier-profitability-panel";
 import { ChantierBillingTab } from "@/components/chantier-billing-tab";
 import { ChantierCommandesTab } from "@/components/chantier-commandes-tab";
@@ -344,6 +345,13 @@ export function ChantierWorkspace({ chantierId }: { chantierId: string }) {
             ) : null}
           </div>
           <h1>{chantier.name}</h1>
+          <TestDataMarker isTest={chantier.isTest === true}
+            disabled={busy || !chantiersSnapshot.capabilities.canModify}
+            onToggle={(next) => mutate(
+              { action: "setTestMarker", chantierId: chantier.id, isTest: next },
+              next ? "Chantier marqué comme TEST." : "Marquage TEST retiré.",
+            )}
+          />
           <p>
             {[chantier.clientName, chantier.siteLabel].filter(Boolean).join(" · ") ||
               "Client / lieu à compléter"}
