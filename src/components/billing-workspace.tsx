@@ -504,6 +504,105 @@ export function BillingWorkspace({
       {notice && <p role="status" className="billingHubSuccess">{notice}</p>}
       {!data && <p>Chargement…</p>}
       {data && data.canTestBillingSandbox && tab === "TESTS" && <BillingTestSandboxPanel />}
+      {data && tab === "ISSUED" && (
+        <section className="billingRegister" aria-label="Registre des factures émises">
+          <div className="billingRegisterHeading">
+            <div>
+              <h2>Factures émises dans PAPOT</h2>
+              <p>
+                Numéros définitifs, PDF originaux et avoirs. Les factures enregistrées
+                uniquement dans Pennylane ne figurent pas dans ce registre.
+              </p>
+            </div>
+            <span className="billingRegisterCount">{issued.length} facture(s)</span>
+          </div>
+          {!data.canIssue && (
+            <p className="billingHubGuidance">
+              L&apos;émission officielle n&apos;est pas autorisée pour cette session.
+              Tu peux consulter les documents déjà émis sans créer de nouveau numéro.
+            </p>
+          )}
+          <label className="billingRegisterSearch">
+            Rechercher un numéro, un client ou un chantier
+            <input
+              value={issuedSearch}
+              onChange={(event) => setIssuedSearch(event.target.value)}
+              placeholder="Référence, client ou chantier…"
+            />
+          </label>
+          {issued.length === 0 ? (
+            <div className="billingRegisterEmpty">
+              <FileDown size={30} aria-hidden="true" />
+              <h3>Aucune facture officielle PAPOT pour le moment</h3>
+              <p>
+                Les projets validés apparaissent dans « À valider », mais ne deviennent
+                des factures qu&apos;après émission numérotée.
+              </p>
+              <button className="secondaryButton" type="button" onClick={() => navigate("PROJECTS")}>
+                Voir les projets à valider
+              </button>
+            </div>
+          ) : visibleIssued.length === 0 ? (
+            <p>Aucune facture émise ne correspond à cette recherche.</p>
+          ) : (
+            <div className="billingRegisterList">
+              {visibleIssued.map((invoice) => {
+                const credits = (data.issuedCreditNotes ?? []).filter(
+                  (credit) => credit.originalInvoiceId === invoice.id,
+                );
+                const position = data.creditPositions?.find(
+                  (item) => item.originalInvoiceId === invoice.id,
+                );
+                return (
+                  <article className="billingIssuedCard" key={invoice.id}>
+                    <div className="billingIssuedHeader">
+                      <div>
+                        <strong>{invoice.number}</strong>
+                        <span>{invoice.clientName} · {invoice.affairName}</span>
+                        <small>
+                          {new Date(invoice.issuedAt).toLocaleDateString("fr-FR")} · {invoice.label}
+                        </small>
+                      </div>
+                      <div className="billingIssuedAmount">
+                        <strong>{money(invoice.totalTtcCents)} TTC</strong>
+                        {position && position.creditedTtcCents > 0 && (
+                          <small>
+                            Après avoirs : {money(position.remainingTtcCents)} TTC
+                          </small>
+                        )}
+                      </div>
+                    </div>
+                    <div className="billingIssuedActions">
+                      <a
+                        className="secondaryButton"
+                        href={"/api/desktop/billing/issued/" + invoice.id + "/pdf"}
+                      >
+                        <FileDown size={16} aria-hidden="true" /> Télécharger la facture
+                      </a>
+                      <Link href={"/facturation/" + invoice.draftId} className="secondaryButton">
+                        Consulter le document
+                      </Link>
+                    </div>
+                    {credits.length > 0 && (
+                      <div className="billingIssuedCredits">
+                        <strong>Avoirs liés</strong>
+                        {credits.map((credit) => (
+                          <a
+                            key={credit.id}
+                            href={"/api/desktop/billing/credits/issued/" + credit.id + "/pdf"}
+                          >
+                            {credit.number} · {money(credit.totalTtcCents)} TTC · PDF
+                          </a>
+                        ))}
+                      </div>
+                    )}
+                  </article>
+                );
+              })}
+            </div>
+          )}
+        </section>
+      )}
       {data && tab === "CHANTIER" && (
         <section
           role="tabpanel"
@@ -843,9 +942,9 @@ export function BillingWorkspace({
         >
           <h2>Marchés des chantiers et préparation des factures</h2>
           <p>
-            Un devis signé n&apos;est pas une facture. Les acomptes, situations et soldes ci-dessous
-            sont uniquement des <strong>projets PAPOT non émis</strong>. En attendant Pennylane,
-            l&apos;état réellement non facturé ou partiellement facturé ne peut pas être certifié.
+            Un devis signé n&apos;est pas une facture. Cette liste suit les marchés et les
+            <strong> projets non émis</strong>. Les factures numérotées PAPOT se consultent dans
+            « Factures émises » ; le rapprochement avec Pennylane reste distinct.
           </p>
           <div style={{ display: "flex", flexWrap: "wrap", gap: 12 }}>
             <strong>{followup.length} marché(s) de chantier</strong>
@@ -960,7 +1059,11 @@ export function BillingWorkspace({
           role="tabpanel"
           style={{ background: "white", padding: 20, borderRadius: 12, display: "grid", gap: 12 }}
         >
-          <h2>Projets de factures ({drafts.length})</h2>
+          <h2>À valider · projets non émis ({unissuedDrafts.length})</h2>
+          <p>
+            Prépare le document, vérifie le visa et valide-le en interne.
+            Une validation interne ne génère pas de numéro de facture.
+          </p>
           <div style={{ display: "flex", gap: 12, flexWrap: "wrap", alignItems: "end" }}>
             <label style={{ display: "grid", gap: 5, flex: "2 1 220px" }}>
               Rechercher (client, chantier, devis)
@@ -1029,7 +1132,7 @@ export function BillingWorkspace({
             </label>
           </div>
           <p>
-            {visibleDrafts.length} projet(s) affiché(s) sur {drafts.length}.
+            {visibleDrafts.length} projet(s) affiché(s) sur {unissuedDrafts.length}.
           </p>
           {visibleDrafts.length === 0 ? (
             <p>Aucun projet ne correspond aux filtres.</p>
@@ -1064,7 +1167,7 @@ export function BillingWorkspace({
                         <div>{options.find((option) => option.value === d.type)?.label}</div>
                       </td>
                       <td style={{ padding: 9 }}>
-                        {d.status === "APPROVED" ? "Validé en interne" : "Projet"}
+                        {d.status === "APPROVED" ? "Validé · à émettre" : "À préparer"}
                         <div style={{ fontSize: 11 }}>Non émis</div>
                       </td>
                       <td style={{ padding: 9, textAlign: "right", whiteSpace: "nowrap" }}>
