@@ -1,0 +1,13 @@
+[Unit]
+Description=Sauvegarde PostgreSQL et fichiers PAPOT AGENCEMENT vers depot chiffre hors site
+After=docker.service network-online.target
+Requires=docker.service
+Wants=network-online.target
+
+[Service]
+Type=oneshot
+User=root
+UMask=0077
+EnvironmentFile=/etc/papot-agencement-backup.env
+ExecStart=/usr/local/sbin/papot-agencement-backup
+TimeoutStartSec=3h

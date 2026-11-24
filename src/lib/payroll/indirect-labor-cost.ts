@@ -42,7 +42,10 @@ export function calculateIndirectLaborCostsForPeriod(
 
   for (const entry of entries) {
     if (entry.hours <= 0) continue;
-    for (const split of monthlySharesForWeek(entry.week, schedules.get(entry.userId))) {
+    for (const split of monthlySharesForWeek(
+      entry.week,
+      entry.scheduleAtEntry ?? schedules.get(entry.userId),
+    )) {
       if (!split.month.startsWith(period)) continue;
       const bucket = buckets[entry.category];
       const hours = entry.hours * split.fraction;

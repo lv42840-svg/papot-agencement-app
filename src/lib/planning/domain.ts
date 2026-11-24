@@ -55,6 +55,7 @@ export const planningDailyAssignmentSchema = z.object({
 export type PlanningDailyAssignment = z.infer<typeof planningDailyAssignmentSchema>;
 
 export const planningActualHoursSchema = z.object({
+  scheduleAtEntry: planningPersonCapacitySchema.shape.weeklySchedule.optional(),
   chantierId: z.string().uuid(),
   userId: z.string().uuid(),
   activity: planningActivitySchema,
@@ -66,6 +67,7 @@ export const planningActualHoursSchema = z.object({
 export const indirectHoursCategorySchema = z.enum(["SAV", "GENERAL"]);
 export type IndirectHoursCategory = z.infer<typeof indirectHoursCategorySchema>;
 export const planningIndirectHoursSchema = z.object({
+  scheduleAtEntry: planningPersonCapacitySchema.shape.weeklySchedule.optional(),
   userId: z.string().uuid(),
   category: indirectHoursCategorySchema,
   week: isoWeekSchema,

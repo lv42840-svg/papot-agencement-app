@@ -5,10 +5,12 @@ const apiSource = readFileSync(
   new URL("../src/app/api/desktop/planning/route.ts", import.meta.url),
   "utf-8",
 );
-const workspaceSource = readFileSync(
-  new URL("../src/components/grand-planning-workspace.tsx", import.meta.url),
-  "utf-8",
-);
+const workspaceSource =
+  readFileSync(
+    new URL("../src/components/grand-planning-workspace.tsx", import.meta.url),
+    "utf-8",
+  ) +
+  readFileSync(new URL("../src/components/grand-planning-workspace.css", import.meta.url), "utf-8");
 const gridSource = readFileSync(
   new URL("../src/components/planning-excel-grid.tsx", import.meta.url),
   "utf-8",
