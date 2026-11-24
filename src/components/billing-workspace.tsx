@@ -1,7 +1,7 @@
 "use client";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { ArrowLeft, ArrowRight, FileDown } from "lucide-react";
 import { BillingHubCards, type BillingHubDestination } from "@/components/billing-hub-cards";
 import { BillingTestSandboxPanel } from "@/components/billing-test-sandbox-panel";
@@ -19,6 +19,9 @@ import type {
   BillingSource,
   BillingType,
 } from "@/lib/billing/domain";
+import { billingMarketIssueMessage, type BillingMarketIssue } from "@/lib/billing/market-sources";
+import type { ManualMarketResolution } from "@/lib/billing/manual-market-resolution";
+
 type BillingChantierChoice = {
   id: string;
   name: string;
@@ -58,6 +61,8 @@ type Snapshot = {
   creditPositions?: CreditPositionSummary[];
   canIssue?: boolean;
   sources: BillingSource[];
+  marketIssues?: BillingMarketIssue[];
+  manualMarketResolutions?: ManualMarketResolution[];
   chantiers: BillingChantierChoice[];
   canWrite: boolean;
   canTestBillingSandbox?: boolean;
@@ -86,6 +91,7 @@ export function BillingWorkspace({
   const router = useRouter();
   const [data, setData] = useState<Snapshot | null>(null);
   const [error, setError] = useState("");
+  const [loadError, setLoadError] = useState("");
   const [notice, setNotice] = useState("");
   const [busy, setBusy] = useState(false);
   const [selection, setSelection] = useState(quoteId ?? "");
@@ -120,15 +126,19 @@ export function BillingWorkspace({
   const [projectType, setProjectType] = useState<"ALL" | BillingType>("ALL");
   const [projectChantier, setProjectChantier] = useState("ALL");
   const [projectSort, setProjectSort] = useState<BillingProjectSort>("RECENT");
-  async function refresh() {
+  const refresh = useCallback(async () => {
     const response = await fetch("/api/desktop/billing", { cache: "no-store" });
     const body = (await response.json()) as Snapshot & { error?: string };
     if (!response.ok) throw new Error(body.error ?? "BILLING_LOAD_FAILED");
     setData(body);
-  }
-  useEffect(() => {
-    void refresh().catch(() => setError("Impossible de charger la facturation."));
   }, []);
+  const loadBilling = useCallback(() => {
+    setLoadError("");
+    return refresh().catch(() => setLoadError("Impossible de charger la facturation."));
+  }, [refresh]);
+  useEffect(() => {
+    void loadBilling();
+  }, [loadBilling]);
   // A direct link must not leave an empty panel when TESTS is disabled or forbidden.
   useEffect(() => {
     if (data && tab === "TESTS" && !data.canTestBillingSandbox) {
@@ -147,9 +157,18 @@ export function BillingWorkspace({
   const linkedChantierId = allSources.find(
     (source) => source.sourceQuoteIds?.includes(quoteId ?? "") || source.quoteId === quoteId,
   )?.chantierId;
+  const marketIssues = data?.marketIssues ?? [];
+  const blockedChantiers = new Set(marketIssues.map((issue) => issue.chantierId));
+  const linkedBlockedChantierId = marketIssues.find((issue) =>
+    issue.quoteIds.includes(quoteId ?? ""),
+  )?.chantierId;
   const activeChantierId = chantierChoices.some((site) => site.id === selectedChantier)
     ? selectedChantier
-    : (linkedChantierId ?? chantierChoices[0]?.id ?? "");
+    : (linkedChantierId ?? linkedBlockedChantierId ?? chantierChoices[0]?.id ?? "");
+  const activeMarketIssue = marketIssues.find((issue) => issue.chantierId === activeChantierId);
+  const activeResolution = data?.manualMarketResolutions?.find(
+    (resolution) => resolution.chantierId === activeChantierId,
+  );
   const sources = allSources.filter((source) => source.chantierId === activeChantierId);
   const active =
     sources.find(
@@ -162,7 +181,9 @@ export function BillingWorkspace({
   const issuedIds = new Set(issued.map((invoice) => invoice.draftId));
   const unissuedDrafts = drafts.filter((draft) => !issuedIds.has(draft.id));
   const toPrepare = unissuedDrafts.filter((draft) => draft.status === "DRAFT").length;
-  const readyForEmission = unissuedDrafts.filter((draft) => draft.status === "APPROVED").length;
+  const readyForEmission = unissuedDrafts.filter(
+    (draft) => draft.status === "APPROVED" && !blockedChantiers.has(draft.chantierId ?? ""),
+  ).length;
   const visibleIssued = issued.filter((invoice) =>
     [invoice.number, invoice.clientName, invoice.affairName, invoice.label]
       .join(" ")
@@ -302,6 +323,10 @@ export function BillingWorkspace({
             "Rattache un client existant à l'affaire commerciale avant de créer un marché sans devis.",
           BILLING_MARKET_SOURCE_CONFLICT:
             "Ce chantier comporte déjà un devis retenu. Corrige les devis retenus avant de créer ce marché.",
+          BILLING_MANUAL_MARKET_RESOLUTION_STALE:
+            "Le marché ou le devis a changé depuis l’affichage. Actualise avant de vérifier le doublon.",
+          BILLING_MANUAL_MARKET_HAS_DOCUMENTS:
+            "Le retrait est bloqué : ce chantier a des documents ou un historique de facturation à conserver.",
           BILLING_MARKET_ALREADY_PREPARED:
             "Le marché ne peut plus être modifié après la création d'un projet. Une régularisation devra être enregistrée.",
         };
@@ -318,6 +343,29 @@ export function BillingWorkspace({
     } finally {
       setBusy(false);
     }
+  }
+  async function removeManualDuplicate() {
+    if (!data?.canWrite || busy || !activeResolution || activeResolution.blockedByDocuments) return;
+    const chantier = chantierChoices.find((site) => site.id === activeResolution.chantierId);
+    const retained = activeResolution.retainedQuotes
+      .map((quote) => `${quote.label} (${money(quote.amountHtCents)} HT)`)
+      .join(", ");
+    if (
+      !window.confirm(
+        `Pour « ${chantier?.name ?? "ce chantier"} », retirer uniquement le marché manuel « ${activeResolution.manual.description} » (${money(activeResolution.manual.amountHtCents)} HT) et garder : ${retained} ? Confirme seulement s’il s’agit des mêmes travaux.`,
+      )
+    )
+      return;
+    await write(
+      {
+        action: "REMOVE_DUPLICATE_MANUAL_MARKET",
+        chantierId: activeResolution.chantierId,
+        manualVersion: activeResolution.manual.version,
+        retainedVersion: activeResolution.retainedVersion,
+        confirmed: true,
+      },
+      "Le marché manuel en doublon a été retiré. Le devis et le chantier sont conservés.",
+    );
   }
   async function saveManualMarket() {
     if (!activeChantierId) return;
@@ -520,7 +568,22 @@ export function BillingWorkspace({
           {notice}
         </p>
       )}
-      {!data && <p>Chargement…</p>}
+      {loadError ? (
+        <div role="alert" className="billingHubError">
+          <p>{loadError}</p>
+          <button type="button" className="secondaryButton" onClick={() => void loadBilling()}>
+            Réessayer
+          </button>
+        </div>
+      ) : !data ? (
+        <p>Chargement…</p>
+      ) : null}
+      {data && marketIssues.length > 0 && (tab === "HOME" || tab === "FOLLOWUP") && (
+        <p role="status" className="billingHubGuidance">
+          {marketIssues.length} chantier(s) à vérifier, non inclus dans les totaux des marchés. Les
+          autres chantiers restent disponibles.
+        </p>
+      )}
       {data && data.canTestBillingSandbox && tab === "TESTS" && <BillingTestSandboxPanel />}
       {data && tab === "ISSUED" && (
         <section className="billingRegister" aria-label="Registre des factures émises">
@@ -655,7 +718,44 @@ export function BillingWorkspace({
               <p>Aucun chantier avec un devis retenu éligible à la facturation.</p>
             )}
           </label>
-          {sources.length === 0 ? (
+          {activeMarketIssue ? (
+            <div className="invoiceCard" role="alert">
+              <h3>Marché à vérifier</h3>
+              <p>{billingMarketIssueMessage(activeMarketIssue.code)}</p>
+              {activeResolution && (
+                <>
+                  <p>
+                    Marché manuel : <strong>{activeResolution.manual.description}</strong> ·{" "}
+                    {money(activeResolution.manual.amountHtCents)} HT
+                  </p>
+                  <p>Devis retenu(s) à conserver :</p>
+                  <ul>
+                    {activeResolution.retainedQuotes.map((quote) => (
+                      <li key={quote.id}>
+                        <Link href={`/devis/${encodeURIComponent(quote.id)}`}>{quote.label}</Link> ·{" "}
+                        {money(quote.amountHtCents)} HT
+                      </li>
+                    ))}
+                  </ul>
+                  {activeResolution.blockedByDocuments ? (
+                    <p>Retrait bloqué : des documents de facturation doivent être conservés.</p>
+                  ) : data.canWrite ? (
+                    <button
+                      type="button"
+                      className="secondaryButton"
+                      disabled={busy}
+                      onClick={() => void removeManualDuplicate()}
+                    >
+                      Retirer le marché manuel et garder le devis
+                    </button>
+                  ) : null}
+                </>
+              )}
+              <a href={`/chantiers/${encodeURIComponent(activeChantierId)}`}>
+                Ouvrir la fiche chantier
+              </a>
+            </div>
+          ) : sources.length === 0 ? (
             <div className="invoiceCard">
               <h3>Chantier sans devis retenu</h3>
               <p>
@@ -1189,7 +1289,11 @@ export function BillingWorkspace({
                         <div>{options.find((option) => option.value === d.type)?.label}</div>
                       </td>
                       <td style={{ padding: 9 }}>
-                        {d.status === "APPROVED" ? "Validé · à émettre" : "À préparer"}
+                        {blockedChantiers.has(d.chantierId ?? "")
+                          ? "Marché à vérifier"
+                          : d.status === "APPROVED"
+                            ? "Validé · à émettre"
+                            : "À préparer"}
                         <div style={{ fontSize: 11 }}>Non émis</div>
                       </td>
                       <td style={{ padding: 9, textAlign: "right", whiteSpace: "nowrap" }}>

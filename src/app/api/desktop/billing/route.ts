@@ -21,7 +21,11 @@ import { createChantiersRepository } from "@/lib/chantiers/create-repository";
 import { createClientsRepository } from "@/lib/clients/create-repository";
 import { clientDisplayName } from "@/lib/clients/domain";
 import { createCommercialRepository } from "@/lib/commercial/create-repository";
-import { buildChantierMarketSources } from "@/lib/billing/market-sources";
+import {
+  buildBillingSourceForChantier,
+  inspectChantierBillingSources,
+  isBillingMarketIssue,
+} from "@/lib/billing/market-sources";
 import { addBillingExtra, confirmBillingExtra } from "@/lib/billing/extras";
 import {
   presentBillingVisa,
@@ -35,6 +39,10 @@ import { setBillingDraftRetention } from "@/lib/billing/draft-retention";
 import { nativeInvoiceNetPosition } from "@/lib/billing/native-credit-notes";
 import { vatRatePercentSchema } from "@/lib/vat";
 import { loadBillingSources } from "@/lib/billing/sources";
+import {
+  inspectManualMarketResolution,
+  removeDuplicateManualMarket,
+} from "@/lib/billing/manual-market-resolution";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -121,6 +129,15 @@ const billingMutationSchema = z.discriminatedUnion("action", [
       action: z.literal("CONFIRM_EXTRA"),
       extraId: z.string().uuid(),
       evidence: z.string().trim().min(1).max(1000),
+    })
+    .strict(),
+  z
+    .object({
+      action: z.literal("REMOVE_DUPLICATE_MANUAL_MARKET"),
+      chantierId: z.string().uuid(),
+      manualVersion: z.string().regex(/^[0-9a-f]{64}$/),
+      retainedVersion: z.string().regex(/^[0-9a-f]{64}$/),
+      confirmed: z.literal(true),
     })
     .strict(),
   z
@@ -226,14 +243,13 @@ function noStoreJson(data: unknown, status = 200) {
 function statusFor(code: string): number {
   const authStatus = desktopRequestErrorStatus(code);
   if (authStatus) return authStatus;
+  if (isBillingMarketIssue(code)) return 409;
   if (code === "BILLING_DRAFT_NOT_FOUND" || code === "BILLING_QUOTE_NOT_AVAILABLE") return 404;
   if (
+    code === "BILLING_MANUAL_MARKET_RESOLUTION_STALE" ||
+    code === "BILLING_MANUAL_MARKET_HAS_DOCUMENTS" ||
     code === "BILLING_MARKET_WITHOUT_CLIENT" ||
-    code === "BILLING_MARKET_CLIENT_MISMATCH" ||
-    code === "BILLING_MARKET_SOURCE_CONFLICT" ||
     code === "BILLING_MARKET_ALREADY_PREPARED" ||
-    code === "BILLING_MARKET_LINES_LIMIT" ||
-    code === "BILLING_MARKET_LINE_DUPLICATE" ||
     code === "BILLING_EXTRA_ALREADY_CONFIRMED" ||
     code === "BILLING_EXTRA_MARKET_REQUIRED"
   )
@@ -265,11 +281,12 @@ export async function GET() {
       loadBillingSources(),
       createChantiersRepository().load(),
     ]);
-    const sources = buildChantierMarketSources(
+    const { sources, marketIssues } = inspectChantierBillingSources(
       chantiers.chantiers,
       quotes,
       payload.manualMarkets ?? [],
       payload.extras ?? [],
+      payload.drafts,
     );
     return noStoreJson({
       payload: publicBillingPayload(payload),
@@ -307,6 +324,16 @@ export async function GET() {
         process.env.PAPOT_NATIVE_BILLING_ISSUANCE_ENABLED === "true" &&
         (await hasSpecialPermission(context.user.id, "billing.issue_invoices")),
       sources,
+      marketIssues,
+      manualMarketResolutions: context.moduleAccess.canWrite
+        ? marketIssues.flatMap((issue) => {
+            if (issue.code !== "BILLING_MARKET_SOURCE_CONFLICT") return [];
+            const chantier = chantiers.chantiers.find((item) => item.id === issue.chantierId);
+            if (!chantier) return [];
+            const resolution = inspectManualMarketResolution(payload, chantier, quotes);
+            return resolution ? [resolution] : [];
+          })
+        : [],
       chantiers: chantiers.chantiers.map((chantier) => ({
         id: chantier.id,
         name: chantier.name,
@@ -341,17 +368,26 @@ export async function POST(request: Request) {
       input.action === "SET_MANUAL_MARKET" ||
       input.action === "ADD_EXTRA" ||
       input.action === "SET_VISA_REQUIREMENT";
-    const [quotes, chantiers, commercial, clients] = needsMarket
-      ? await Promise.all([
-          loadBillingSources(),
-          createChantiersRepository().load(),
-          createCommercialRepository().load(),
-          (await createClientsRepository()).load(),
-        ])
-      : [[], null, null, null];
+    const checkCurrentMarket =
+      needsMarket ||
+      input.action === "APPROVE" ||
+      input.action === "REMOVE_DUPLICATE_MANUAL_MARKET";
+    const [quotes, chantiers, commercial, clients] = await Promise.all([
+      checkCurrentMarket ? loadBillingSources() : [],
+      checkCurrentMarket ? createChantiersRepository().load() : null,
+      input.action === "SET_MANUAL_MARKET" ? createCommercialRepository().load() : null,
+      input.action === "SET_MANUAL_MARKET" ? (await createClientsRepository()).load() : null,
+    ]);
     const repository = createBillingRepository();
     const payload = await repository.mutate((current) => {
       const drafts = [...current.drafts];
+      if (input.action === "REMOVE_DUPLICATE_MANUAL_MARKET") {
+        // Compare the freshly re-read retained quote basis and the billing row
+        // locked by the repository; never use the client's amounts as authority.
+        const chantier = chantiers?.chantiers.find((item) => item.id === input.chantierId);
+        if (!chantier) throw new Error("BILLING_MANUAL_MARKET_RESOLUTION_STALE");
+        return removeDuplicateManualMarket(current, chantier, quotes, input);
+      }
       if (input.action === "SET_TITLES") {
         return { ...current, invoiceTitles: input.invoiceTitles };
       }
@@ -388,13 +424,17 @@ export async function POST(request: Request) {
         return applyBillingVisaPartial(current, input, context.user.displayName);
       }
       if (input.action === "ADD_EXTRA") {
-        const sources = buildChantierMarketSources(
-          chantiers?.chantiers ?? [],
-          quotes,
-          current.manualMarkets ?? [],
-          current.extras ?? [],
-        );
-        if (!sources.some((source) => source.chantierId === input.chantierId)) {
+        const chantier = chantiers?.chantiers.find((item) => item.id === input.chantierId);
+        if (
+          !chantier ||
+          !buildBillingSourceForChantier(
+            chantier,
+            quotes,
+            current.manualMarkets ?? [],
+            current.extras,
+            current.drafts,
+          )
+        ) {
           throw new Error("BILLING_EXTRA_MARKET_REQUIRED");
         }
         return addBillingExtra(current, input, context.user.displayName);
@@ -450,20 +490,35 @@ export async function POST(request: Request) {
       if (input.action === "CREATE") {
         // Request IDs survive retries, including a retry after a connection timeout.
         if (drafts.some((draft) => draft.requestId === input.requestId)) return current;
-        const sources = buildChantierMarketSources(
-          chantiers?.chantiers ?? [],
-          quotes,
-          current.manualMarkets ?? [],
-          current.extras ?? [],
+        const chantier = chantiers?.chantiers.find(
+          (item) => item.id === (input.chantierId ?? input.quoteId),
         );
-        const source = sources.find((candidate) => candidate.quoteId === input.quoteId);
-        if (!source || (input.chantierId && source.chantierId !== input.chantierId)) {
+        const source = chantier
+          ? buildBillingSourceForChantier(
+              chantier,
+              quotes,
+              current.manualMarkets ?? [],
+              current.extras,
+              current.drafts,
+            )
+          : undefined;
+        if (!source || source.quoteId !== input.quoteId) {
           throw new Error("BILLING_QUOTE_NOT_AVAILABLE");
         }
         drafts.push(createBillingDraft(current, source, input, context.user.displayName));
       } else if (input.action === "APPROVE") {
         const index = drafts.findIndex((draft) => draft.id === input.draftId);
         if (index < 0) throw new Error("BILLING_DRAFT_NOT_FOUND");
+        const chantier = chantiers?.chantiers.find((item) => item.id === drafts[index].chantierId);
+        if (chantier) {
+          buildBillingSourceForChantier(
+            chantier,
+            quotes,
+            current.manualMarkets ?? [],
+            current.extras,
+            current.drafts,
+          );
+        }
         drafts[index] = approveBillingDraft(
           current,
           input.draftId,

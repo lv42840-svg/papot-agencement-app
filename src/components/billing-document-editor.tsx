@@ -23,6 +23,8 @@ import { latestBillingVisa, visaRequiredForChantier } from "@/lib/billing/visa-p
 import { calculateBillingDraftRetention } from "@/lib/billing/draft-retention";
 import { previewNativeCreditNote } from "@/lib/billing/native-credit-preview";
 
+import { billingMarketIssueMessage, type BillingMarketIssue } from "@/lib/billing/market-sources";
+
 type IssuedReference = { id: string; draftId: string; number: string; issuedAt: string };
 type IssuedCreditReference = {
   id: string;
@@ -49,6 +51,7 @@ type ApiSnapshot = {
   payload: BillingPayload;
   canWrite: boolean;
   canIssue?: boolean;
+  marketIssues?: BillingMarketIssue[];
   issuedInvoices?: IssuedReference[];
   canIssueCredits?: boolean;
   issuedCreditNotes?: IssuedCreditReference[];
@@ -183,6 +186,7 @@ export function BillingDocumentEditor({ draftId }: { draftId: string }) {
   const [draft, setDraft] = useState<BillingDraft | null>(null);
   const [canWrite, setCanWrite] = useState(false);
   const [canIssue, setCanIssue] = useState(false);
+  const [marketIssue, setMarketIssue] = useState<BillingMarketIssue>();
   const [issued, setIssued] = useState<IssuedReference | null>(null);
   const [canIssueCredits, setCanIssueCredits] = useState(false);
   const [issuedCredits, setIssuedCredits] = useState<IssuedCreditReference[]>([]);
@@ -224,7 +228,11 @@ export function BillingDocumentEditor({ draftId }: { draftId: string }) {
     setDraft(selected);
     setPayload(json.payload);
     setCanWrite(json.canWrite && selected.status === "DRAFT");
-    setCanIssue(Boolean(json.canIssue));
+    const marketIssue = json.marketIssues?.find(
+      (issue) => issue.chantierId === selected.chantierId,
+    );
+    setMarketIssue(marketIssue);
+    setCanIssue(Boolean(json.canIssue) && !marketIssue);
     const currentIssued = json.issuedInvoices?.find((item) => item.draftId === draftId) ?? null;
     setIssued(currentIssued);
     setCanIssueCredits(Boolean(json.canIssueCredits));
@@ -695,7 +703,7 @@ export function BillingDocumentEditor({ draftId }: { draftId: string }) {
   }
 
   async function approve() {
-    if (!draft || !canWrite || busy || dirty) return;
+    if (!draft || !canWrite || busy || dirty || marketIssue) return;
     if (
       !window.confirm(
         "Valider et verrouiller ce projet en interne ? Il ne pourra plus être modifié. Aucun numéro légal ni facture officielle ne sera émis.",
@@ -824,6 +832,7 @@ export function BillingDocumentEditor({ draftId }: { draftId: string }) {
           {error}
         </p>
       )}
+      {marketIssue && <p role="alert">{billingMarketIssueMessage(marketIssue.code)}</p>}
       {notice && (
         <p className="invoiceSuccess" role="status">
           {notice}
@@ -1576,7 +1585,9 @@ export function BillingDocumentEditor({ draftId }: { draftId: string }) {
             <button
               className="secondaryButton"
               type="button"
-              disabled={!editorCanEdit || busy || dirty || !preview || visaBlocksApproval}
+              disabled={
+                !editorCanEdit || busy || dirty || !preview || visaBlocksApproval || !!marketIssue
+              }
               onClick={() => void approve()}
             >
               Valider en interne et verrouiller

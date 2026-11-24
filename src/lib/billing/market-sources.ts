@@ -1,5 +1,6 @@
 import type { ChantierRecord } from "@/lib/chantiers/domain";
 import type {
+  BillingDraft,
   BillingManualMarket,
   BillingExtra,
   BillingSource,
@@ -7,6 +8,8 @@ import type {
   BillingSourceStructureItem,
   BillingTaxGroup,
 } from "./domain";
+
+import { billingPreparationFollowup } from "./preparation-followup";
 
 type ChantierIdentity = Pick<
   ChantierRecord,
@@ -184,4 +187,82 @@ export function buildChantierMarketSources(
       structure,
     };
   });
+}
+
+const marketIssueCodes = [
+  "BILLING_MARKET_SOURCE_CONFLICT",
+  "BILLING_MARKET_CLIENT_MISMATCH",
+  "BILLING_MARKET_LINE_DUPLICATE",
+  "BILLING_MARKET_LINES_LIMIT",
+  "BILLING_MARKET_DUPLICATE",
+  "BILLING_MARKET_AMOUNT_INVALID",
+  "BILLING_PREPARATION_EXCEEDS_CONTRACT",
+] as const;
+type BillingMarketIssueCode = (typeof marketIssueCodes)[number];
+
+export type BillingMarketIssue = {
+  chantierId: string;
+  quoteIds: string[];
+  code: BillingMarketIssueCode;
+};
+
+export function isBillingMarketIssue(code: string): code is BillingMarketIssueCode {
+  return (marketIssueCodes as readonly string[]).includes(code);
+}
+
+export function billingMarketIssueMessage(code: BillingMarketIssueCode): string {
+  if (code === "BILLING_MARKET_SOURCE_CONFLICT") {
+    return "Ce chantier contient un marché simplifié et un devis retenu. Vérifie si les deux couvrent les mêmes travaux avant de préparer une nouvelle facture. Les documents existants restent consultables.";
+  }
+  return "Le marché de ce chantier doit être vérifié avant de préparer une nouvelle facture. Les documents existants restent consultables.";
+}
+
+export function buildBillingSourceForChantier(
+  chantier: ChantierIdentity,
+  quoteSources: readonly BillingSource[],
+  manualMarkets: readonly BillingManualMarket[],
+  extras: readonly BillingExtra[] = [],
+  drafts: readonly BillingDraft[] = [],
+): BillingSource | undefined {
+  const source = buildChantierMarketSources(
+    [chantier],
+    quoteSources.filter((quote) => quote.chantierId === chantier.id),
+    manualMarkets.filter((market) => market.chantierId === chantier.id),
+    extras.filter((extra) => extra.chantierId === chantier.id),
+  )[0];
+  if (source && drafts.length) billingPreparationFollowup([source], drafts);
+  return source;
+}
+
+export function inspectChantierBillingSources(
+  chantiers: readonly ChantierIdentity[],
+  quoteSources: readonly BillingSource[],
+  manualMarkets: readonly BillingManualMarket[],
+  extras: readonly BillingExtra[] = [],
+  drafts: readonly BillingDraft[] = [],
+): { sources: BillingSource[]; marketIssues: BillingMarketIssue[] } {
+  const sources: BillingSource[] = [];
+  const marketIssues: BillingMarketIssue[] = [];
+  for (const chantier of chantiers) {
+    try {
+      const source = buildBillingSourceForChantier(
+        chantier,
+        quoteSources,
+        manualMarkets,
+        extras,
+        drafts,
+      );
+      if (source) sources.push(source);
+    } catch (error) {
+      if (!(error instanceof Error) || !isBillingMarketIssue(error.message)) throw error;
+      marketIssues.push({
+        chantierId: chantier.id,
+        quoteIds: quoteSources
+          .filter((quote) => quote.chantierId === chantier.id)
+          .map((quote) => quote.quoteId),
+        code: error.message,
+      });
+    }
+  }
+  return { sources, marketIssues };
 }
