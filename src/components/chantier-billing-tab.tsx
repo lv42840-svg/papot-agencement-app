@@ -5,6 +5,8 @@ import { useEffect, useState } from "react";
 import type { BillingPayload } from "@/lib/billing/domain";
 import type { ChantierBillingMarket } from "@/lib/billing/chantier-market";
 
+import { billingMarketIssueMessage, type BillingMarketIssue } from "@/lib/billing/market-sources";
+
 type IssuedInvoiceSummary = {
   id: string;
   draftId: string;
@@ -40,39 +42,62 @@ export function ChantierBillingTab({ chantierId }: { chantierId: string }) {
   const [marketError, setMarketError] = useState("");
   const [issuedInvoices, setIssuedInvoices] = useState<IssuedInvoiceSummary[]>([]);
 
+  const [retryId, setRetryId] = useState(0);
+  const [issue, setIssue] = useState<BillingMarketIssue>();
+
   useEffect(() => {
+    let cancelled = false;
+    setError("");
+    setSnapshot(null);
+    setIssue(undefined);
+    setMarket(null);
+    setMarketError("");
+    setIssuedInvoices([]);
     void (async () => {
       try {
         const response = await fetch("/api/desktop/billing", { cache: "no-store" });
+        if (cancelled) return;
+        if (response.status === 401 || response.status === 403) {
+          setError("Accès aux projets de facture refusé. Vérifie les droits Facturation.");
+          return;
+        }
         const result = (await response.json()) as {
           payload?: BillingPayload;
           issuedInvoices?: IssuedInvoiceSummary[];
-          error?: string;
+          marketIssues?: BillingMarketIssue[];
         };
-        if (!response.ok || !result.payload)
-          throw new Error(result.error ?? "Chargement impossible");
+        if (cancelled) return;
+        if (!response.ok || !result.payload) throw new Error("Chargement impossible");
         setSnapshot(result.payload);
         setIssuedInvoices(
           (result.issuedInvoices ?? []).filter((item) => item.chantierId === chantierId),
         );
-        setError("");
-        const marketResponse = await fetch("/api/desktop/billing/markets", {
-          cache: "no-store",
-        });
-        if (marketResponse.ok) {
-          const marketResult = (await marketResponse.json()) as {
-            markets: ChantierBillingMarket[];
-          };
-          setMarket(marketResult.markets.find((item) => item.chantierId === chantierId) ?? null);
-          setMarketError("");
-        } else {
-          setMarketError("Aperçu du marché indisponible.");
-        }
+        const issue = result.marketIssues?.find((item) => item.chantierId === chantierId);
+        setIssue(issue);
+        if (issue) return;
       } catch {
-        setError("Impossible d'afficher les projets de facture. Vérifie les droits Facturation.");
+        if (!cancelled) setError("Impossible d’afficher les projets de facture pour le moment.");
+        return;
+      }
+      try {
+        const marketResponse = await fetch("/api/desktop/billing/markets", { cache: "no-store" });
+        if (!marketResponse.ok) throw new Error("Marché indisponible");
+        const marketResult = (await marketResponse.json()) as {
+          markets: ChantierBillingMarket[];
+          marketIssues?: BillingMarketIssue[];
+        };
+        if (cancelled) return;
+        const issue = marketResult.marketIssues?.find((item) => item.chantierId === chantierId);
+        if (issue) setIssue(issue);
+        else setMarket(marketResult.markets.find((item) => item.chantierId === chantierId) ?? null);
+      } catch {
+        if (!cancelled) setMarketError("Aperçu du marché indisponible.");
       }
     })();
-  }, [chantierId]);
+    return () => {
+      cancelled = true;
+    };
+  }, [chantierId, retryId]);
 
   const issuedDraftIds = new Set(issuedInvoices.map((item) => item.draftId));
   const projects = (snapshot?.drafts ?? [])
@@ -88,33 +113,37 @@ export function ChantierBillingTab({ chantierId }: { chantierId: string }) {
           <h2>Facturation du chantier</h2>
           <p>Marché, projets à préparer, visas et factures effectivement émises.</p>
         </div>
-        <Link
-          className="primaryButton"
-          href={`/facturation?chantierId=${encodeURIComponent(chantierId)}`}
-        >
-          Nouvelle facture
-        </Link>
+        {snapshot && (
+          <Link
+            className="primaryButton"
+            href={`/facturation?chantierId=${encodeURIComponent(chantierId)}`}
+          >
+            {issue ? "Examiner le marché bloqué" : "Nouvelle facture"}
+          </Link>
+        )}
       </header>
-      {issuedInvoices.length > 0 ? (
-        <section className="invoiceCard">
-          <h3>Factures émises sur ce chantier ({issuedInvoices.length})</h3>
-          {issuedInvoices.map((invoice) => (
-            <p key={invoice.id}>
-              <strong>{invoice.number}</strong> · {money(invoice.totalTtcCents)} TTC ·{" "}
-              {new Date(invoice.issuedAt).toLocaleDateString("fr-FR")} ·{" "}
-              <a href={"/api/desktop/billing/issued/" + invoice.id + "/pdf"}>
-                Télécharger le PDF officiel
-              </a>
-            </p>
-          ))}
-        </section>
-      ) : (
-        <p>
-          Aucune facture numérotée PAPOT sur ce chantier pour le moment. Les projets validés en
-          interne ne sont pas des factures émises. L&apos;émission officielle reste soumise à
-          l&apos;activation et aux droits prévus.
-        </p>
-      )}
+      {snapshot &&
+        (issuedInvoices.length > 0 ? (
+          <section className="invoiceCard">
+            <h3>Factures émises sur ce chantier ({issuedInvoices.length})</h3>
+            {issuedInvoices.map((invoice) => (
+              <p key={invoice.id}>
+                <strong>{invoice.number}</strong> · {money(invoice.totalTtcCents)} TTC ·{" "}
+                {new Date(invoice.issuedAt).toLocaleDateString("fr-FR")} ·{" "}
+                <a href={"/api/desktop/billing/issued/" + invoice.id + "/pdf"}>
+                  Télécharger le PDF officiel
+                </a>
+              </p>
+            ))}
+          </section>
+        ) : (
+          <p>
+            Aucune facture numérotée PAPOT sur ce chantier pour le moment. Les projets validés en
+            interne ne sont pas des factures émises. L&apos;émission officielle reste soumise à
+            l&apos;activation et aux droits prévus.
+          </p>
+        ))}
+      {issue && <p role="alert">{billingMarketIssueMessage(issue.code)}</p>}
       {marketError ? <p role="status">{marketError}</p> : null}
       {market && (
         <section className="invoiceCard">
@@ -160,7 +189,18 @@ export function ChantierBillingTab({ chantierId }: { chantierId: string }) {
           )}
         </section>
       )}
-      {error ? <p role="alert">{error}</p> : null}
+      {error ? (
+        <div role="alert">
+          <p>{error}</p>
+          <button
+            type="button"
+            className="secondaryButton"
+            onClick={() => setRetryId((n) => n + 1)}
+          >
+            Réessayer
+          </button>
+        </div>
+      ) : null}
       {!error && !snapshot ? <p>Chargement des projets…</p> : null}
       {snapshot && (
         <>

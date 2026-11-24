@@ -12,6 +12,9 @@ import {
   storeOriginalNativeInvoicePdf,
 } from "@/lib/billing/native-pdf-archive";
 import { createCompanyProfileRepository } from "@/lib/company-profile/create-repository";
+import { createChantiersRepository } from "@/lib/chantiers/create-repository";
+import { buildBillingSourceForChantier, isBillingMarketIssue } from "@/lib/billing/market-sources";
+import { loadBillingSources } from "@/lib/billing/sources";
 import { createClientsRepository } from "@/lib/clients/create-repository";
 
 export const runtime = "nodejs";
@@ -37,6 +40,13 @@ export async function POST(request: Request) {
       (await createClientsRepository()).load(),
     ]);
     const repository = createBillingRepository();
+    const before = await repository.load();
+    const replay = before.nativeInvoiceLedger?.invoices.some(
+      (item) => item.requestId === input.requestId,
+    );
+    const [quotes, chantiers] = replay
+      ? [[], null]
+      : await Promise.all([loadBillingSources(), createChantiersRepository().load()]);
     const payload = await repository.mutate(async (current) => {
       const draft = current.drafts.find((item) => item.id === input.draftId);
       if (!draft) throw new Error("BILLING_DRAFT_NOT_FOUND");
@@ -45,6 +55,16 @@ export async function POST(request: Request) {
       const wasAlreadyIssued =
         current.nativeInvoiceLedger?.invoices.some((item) => item.requestId === input.requestId) ??
         false;
+      const chantier = chantiers?.chantiers.find((item) => item.id === draft.chantierId);
+      if (!wasAlreadyIssued && chantier) {
+        buildBillingSourceForChantier(
+          chantier,
+          quotes,
+          current.manualMarkets ?? [],
+          current.extras,
+          current.drafts,
+        );
+      }
       const next = issueNativeInvoice(current, input, company, client, context.user.displayName);
       const issued = next.nativeInvoiceLedger?.invoices.find(
         (item) => item.requestId === input.requestId,
@@ -91,6 +111,7 @@ export async function POST(request: Request) {
         : code === "BILLING_DRAFT_NOT_FOUND"
           ? 404
           : code.startsWith("BILLING_NATIVE_") ||
+              isBillingMarketIssue(code) ||
               code === "BILLING_VERSION_CONFLICT" ||
               code === "BILLING_APPROVAL_TOTALS_MISMATCH"
             ? 409

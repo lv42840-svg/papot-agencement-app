@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 
 import { createBillingRepository } from "@/lib/billing/repository";
 import { loadBillingSources } from "@/lib/billing/sources";
+import { inspectChantierBillingSources } from "@/lib/billing/market-sources";
 import { summarizeChantierBillingMarkets } from "@/lib/billing/chantier-market";
 import { createChantiersRepository } from "@/lib/chantiers/create-repository";
 import {
@@ -21,14 +22,25 @@ export async function GET() {
       loadBillingSources(),
       createChantiersRepository().load(),
     ]);
-    const markets = summarizeChantierBillingMarkets(
+    const { marketIssues } = inspectChantierBillingSources(
       chantiers.chantiers,
+      sources,
+      payload.manualMarkets ?? [],
+      payload.extras,
+      payload.drafts,
+    );
+    const blocked = new Set(marketIssues.map((item) => item.chantierId));
+    const markets = summarizeChantierBillingMarkets(
+      chantiers.chantiers.filter((item) => !blocked.has(item.id)),
       sources,
       payload.drafts,
       payload.manualMarkets ?? [],
       payload.extras ?? [],
     );
-    return NextResponse.json({ markets }, { headers: { "Cache-Control": "no-store" } });
+    return NextResponse.json(
+      { markets, marketIssues },
+      { headers: { "Cache-Control": "no-store" } },
+    );
   } catch (error) {
     const code = error instanceof Error ? error.message : "BILLING_MARKETS_LOAD_FAILED";
     return NextResponse.json(
